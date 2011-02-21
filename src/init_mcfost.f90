@@ -60,7 +60,6 @@ subroutine initialisation_mcfost()
   !$ nb_proc=omp_get_num_threads() ; lpara=.true.
   !$omp end parallel
 
-  lom=.false.
   lgap=.false.
   lpah=.false.
   ln_zone=.false. ; n_zones=1
@@ -118,6 +117,7 @@ subroutine initialisation_mcfost()
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
+  lforce_1st_scatt = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -228,10 +228,6 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : wavelength needed"
            stop
         endif
-        i_arg = i_arg+1
-     case("-othin")
-        lom=.true.
-        write(*,*) "Optically thin disk calculation"
         i_arg = i_arg+1
      case("-gap")
         lgap=.true.
@@ -595,6 +591,10 @@ subroutine initialisation_mcfost()
      case("-read_Seb_C")
         i_arg = i_arg+1
         lread_Seb_Charnoz=.true.
+     case("-force_1st_scatt")
+        i_arg = i_arg+1
+        lforce_1st_scatt=.true.
+        write(*,*) "WARNING: forcing 1st scattering event when tau < 10"
      case default
         call display_help()
      end select
@@ -617,7 +617,6 @@ subroutine initialisation_mcfost()
      limg=.false.
      lmono=.false.
      lmono0=.false.
-     lom=.false.
      lstrat=.false.
      scattering_method=2
   endif
@@ -679,9 +678,10 @@ subroutine initialisation_mcfost()
   
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.(ldust_prop))) then
      write(*,*) "Thermal equilibrium calculation"
-     if (lom) then
-        write(*,*) "The [-othin] option is not relevant for SED calculation"
+     if (lforce_1st_scatt) then
+        write(*,*) "The [-force_1st_scatt] option is not relevant for SED calculation"
         write(*,*) "It is therefore discarded here"
+        lforce_1st_scatt = .false.
      endif
      
      if (lmono) then
@@ -718,8 +718,10 @@ subroutine initialisation_mcfost()
      stop
   endif
   
-  if (lom) then
-     lom=lmono0
+  if ( (lforce_1st_scatt).and.(lscatt_ray_tracing) ) then
+     write(*,*) "ERROR: force_1st_scatt is not compatible with rt"
+     write(*,*) "Exiting"
+     stop
   endif
 
 !  if ((abs(exp_strat)>tiny(0.0)).and.(.not.lstrat)) then
@@ -759,9 +761,6 @@ subroutine initialisation_mcfost()
 !  endif
 
   if (lstrat_SPH) lstrat=.true.
-
-  if (lscatt_ray_tracing) lom = .false.
-
 
   if (lemission_mol)  then
      do imol=1,n_molecules
@@ -881,6 +880,7 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : only computes opacity" 
   write(*,*) "        : -dust_emission_in_images : include thermal emission "
   write(*,*) "      from the disk in images (override value in parameter file)"  
+  write(*,*) "        : -force_1st_scatt"
   write(*,*) " "
   write(*,*) " Options related to optical properties"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
