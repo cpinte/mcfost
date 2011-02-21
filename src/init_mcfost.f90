@@ -499,12 +499,17 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1 
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.false.
-        lscatt_ray_tracing2=.true.
+        lscatt_ray_tracing2=.false.
      case("-rt1")
         i_arg = i_arg + 1 
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.true.
         lscatt_ray_tracing2=.false.
+     case("-rt2")
+        i_arg = i_arg + 1 
+        lscatt_ray_tracing=.true.
+        lscatt_ray_tracing1=.false.
+        lscatt_ray_tracing2=.true.
      case("-gap_laure")
         i_arg = i_arg + 1 
         lgap_laure=.true.
@@ -814,6 +819,17 @@ subroutine initialisation_mcfost()
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
   endif
 
+
+  if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
+     if (lmono0) then
+        lscatt_ray_tracing2 = .true.
+        write(*,*) "Using ray-tracing method 2"
+     else
+        lscatt_ray_tracing1 = .true.
+        write(*,*) "Using ray-tracing method 1"
+     endif
+  endif
+
   ! Signal handler
   ! do i=1,17
   !    sig=signal(i,sig_handler,-1)
@@ -833,13 +849,36 @@ subroutine display_help()
   write(*,*) "mcfost -v diplays this help message"
   write(*,*) "mcfost -u updates MCFOST"
   write(*,*) " "
-  write(*,*) "options : -img <wavelength> (microns) "
-  write(*,*) "        : -othin  : optically thin disk (used only for image calculations)"
-  write(*,*) "        : -weight_emission  : weight emission towards disk surface"
+  write(*,*) " Main mcfost options" 
+  write(*,*) "        : -img <wavelength> (microns) "
+  write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs"
   write(*,*) "        : -mol : calculates molecular emission"
+  write(*,*) "        : -prodimo"
+  write(*,*) " "
+  write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> "
   write(*,*) "        : -root_dir <root_dir>"
   write(*,*) "        : -no_backup"
+  write(*,*) " "
+  write(*,*) " Options related to images"
+  write(*,*) "        : -zoom <zoom> (override value in parameter file)"
+  write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
+  write(*,*) "        : -op <wavelength> (microns) : only computes opacity" 
+  write(*,*) "        : -dust_emission_in_images : include thermal emission "
+  write(*,*) "      from the disk in images (override value in parameter file)"  
+  write(*,*) "        : -force_1st_scatt : for optically thin disk (used only for image calculations)"
+  write(*,*) "        : -rt1 : use ray-tracing method 1"
+  write(*,*) "        : -rt2 : use ray-tracing method 2"
+  write(*,*) " "
+  write(*,*) " Options related to temperature equilibrium"
+  write(*,*) "        : -no_diff_approx : compute T structure with only MC method"  
+  write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
+  write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
+  write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
+  write(*,*) "        : -origin : save origin of packets received the interest bin"
+  write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
+  write(*,*) "        : -reemission_stats"
+  write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -3D : 3D geometrical grid"
@@ -862,25 +901,6 @@ subroutine display_help()
   write(*,*) "        : -Laure_SED <file>"
   write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
-  write(*,*) " "
-  write(*,*) " Options related to temperature equilibrium"
-  write(*,*) "        : -no_diff_approx : compute T structure with only MC method"  
-  write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
-  write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
-  write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
-  write(*,*) "        : -origin : save origin of packets received the interest bin"
-!  write(*,*) '        : -pah : emmsivity file + kind of grain ("pah","bg","vsg") OUTDATED'
-  write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
-  write(*,*) "        : -reemission_stats"
-!  write(*,*) "        : -killing_level <max_number_of_scatt_in_temp_computation> (default : 100000) OUTDATED"
-  write(*,*) " "
-  write(*,*) " Options related to images"
-  write(*,*) "        : -zoom zoom (override value in parameter file)"
-  write(*,*) "        : -resol <nx> <ny>"
-  write(*,*) "        : -op <wavelength> (microns) : only computes opacity" 
-  write(*,*) "        : -dust_emission_in_images : include thermal emission "
-  write(*,*) "      from the disk in images (override value in parameter file)"  
-  write(*,*) "        : -force_1st_scatt"
   write(*,*) " "
   write(*,*) " Options related to optical properties"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
