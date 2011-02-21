@@ -1,0 +1,459 @@
+Depuis 25/01/07
+
+A FAIRE
+**********
+
+-----------------------------------------------------
+Ray-tracing
+
+1) pour tous les points de fct de phase determine le dOmega correspondant
+
+2) pour chaque direction Inu, determiner, la contribution des differents points de fct de phase
+pour une direction de rayon donnee --> independant de lambda
+--> permet de calculer facilement un poids pour chaque Inu en fct de lambda
+--> esp_nu = SUM (Inu x poids) ~ 100 multiplications, rapide
+
+Poids_fct_phase(theta_Inu,phi_Inu,iscatt)
+
+Puis Poids_Inu(theta_Inu,phi_Inu) = SUM(Poids_fct_phase x Psi) somme sur iscatt
+
+3) si le nbre de rayon est un multiple du nbre 
+de Inu en phi, alors par symetrie, 
+on peut ne calculer que les quelques premiers 
+puis juste decale les indices des coefficients en phi
+
+Etape 1 : Si c'est le meme nbre, on n'a besoin de le faire qu'une seule fois, 
+--> interp entre les directions de rayons dans etape de ray-tracing 
+
+Etape 2 : direction de rayon surechantillonne par rapport au champ de radiation
+--> meilleure moyennage de la fct de phase mais on interpole de toute facon
+pas sur que ca ameliore bcp 
+
+-----------------------------------------------------
+
+- pression de radiation:
+Qpr(a) = Qext - g * Qsca
+
+<Qpr> = int_lambda Qpr * F_lambda * dlambda / int_lambda F_lambda * dlambda
+
+etoile non ponctuelle
+
+Court terme :
+- estimer valeur minimale des parametres de resolution (3) ~ OK augmenter resol pour test
+- estimer besoin de separer les champs de radiation : OK 
+- verifier autres inclinaisons 1, 3, 7, 10
+- symetrie : phi_I et nang_ray_tracing
+- RT lui meme
+ 
+- enveloppe Marshall
+
+- separation des champs de rayonnement direct et diffuse pour etoile dans ray-tracing2 (inutile dans rt1)
+
+- interpolation fct source dans partie ray-tracing
+
+- origine des rayons dans partie ray-tracing
+
+- profiter des symetrie du ray-tracing
+
+- pb parallelisation en mode rt1 (et 2 ???)
+
+- BUG sur approximation de diffusion icare + intel 64 bits
+  dossier a la racine de icare
+
+- crash sur tomte et icluster2 en mode strat TTauri_Herschel
+
+- tout passer en modules pour detecter plus de pb a la compilation
+
+- bug move to_grid : pas la bonne cellule ??
+
+- Bug approximation diffusion : cellule interne sort du disque
+
+- approximation de diffusion : trouver un meilleur critere : tau_Rosseland ???
+
+- Ray-tracing :
+	ajouter emission thermique
+	ajouter etoile
+	
+	grille spherique
+	SED
+	3D
+
+	gerer trop grande variation de position a l'interieur d'une cellule
+
+	calibration energie photon
+	E depend du nombre de photon : E proportionnel au nombre de paquets
+	E depend du nombre de pixels : OK normal
+
+	nbre de sous-pixels adaptatifs	
+
+- weigthing emission pour maximiser emission a tau=1
+
+- virer proprement les lchauff et les remplacer par lcellule_non_vide : attention a ltot
+
+- scattering : renommer intelligement method et aniso_method avec variables logiques
+
+- passer les tab_amu1 dans la structure dust_pop
+
+- scattering : ray tracing : stockage source fonction
+	n_cell * n_angle  * 4 octets par lambda
+	(140 * 60) * (60 * 60) * 4 = 115 Mo avant compression
+	Mode SED 2 : creation d'un fichier par lambda puis relecture
+	l'echantillonnage peut etre adaptatif en angle en fonction de lambda
+	
+
+- mol : bug avec NH3 : relative difference tjs a 1 !
+
+- mol : selectionner cellules a LTE dans disque puis eliminer progressivement les cellules convergees
+
+- mol : eventuellement, ne faire le TR que dans les cellules couplees entre elles
+
+- mol : mettre toutes les donnees moleculaire dans utils
+
+- PAH : sortir le calcul des chaleurs specifique + paralleliser
+
+- approximation de diffusion : 1D vertical (bug pour le moment)
+
+- approximation de diffusion : verifier Pb IM Lup --> strat, apparamment non : ok niveau codage 
+(pour 1 grain) : pb de pente de la densite de surface : ne marche plus en -2. 
+Pourquoi le pas de tps est pas tjs OK ??????
+
+
+- equilibre hydrostatique :  - verifier normalisation densite gaz
+			     - calculer la densite de poussiere a partir de celle du gaz (y compris strat) 
+		             - et de fait : initialisation densite gaz
+                	     - sortir table de densite gaz en fits	
+			     - iteration structure du disque et RT (y compris bord interne ?????)
+			     - forcer approximation de diffusion
+			     - chauffage actif
+
+
+- grains hors equilibre : pretabuler matrice de collision voire termes constant de la matrice de radiation
+
+- grains hors equilibre : AMC
+
+- grains hors equilibre :
+	- flag sur origine des paquets emis par le disque : eq radiatif ou non.	
+	- supprimer les grains si temperature max depassee ??
+	- precalcule nu_bin pour PAH : prend du tps
+
+
+- bien normaliser profil emission  (Euh ??????, ca veut dire quoi ca ?)
+
+
+- Bug uniformisation du bruit dans images
+
+- details:
+
+	- routines derivees de deg2 a verifier avec dark_zone
+
+	- Peut-etre bug : cf densite_2zone : A priori teste OK 5/03/07
+
+        - virer la routine mulmat et la remplacer par la fonction intrinsic matmul
+
+	- passer masse en kg !!!! et faire toutes les conversion a partir des constantes
+
+	- bug define_dark_zone avec une seule cellule
+
+ 	- routine integ_tau_vert
+
+	- decrire ou recoder proprement les energie E_totale, E_disk, E_star (Unites)
+	+ spectre stellaires (qui sont cumules)
+
+*****************************************************************************
+*****************************************************************************
+*****************************************************************************
+
+
+REGLE
+*********
+
+- restructuration mcfost_utils						21/02/11
+- depot git
+- ajout commentaires dans fichiers lambda et prop optiques
+
+
+- correction bug echantillonage grille spatiale				19/02/01
+  interpolation lineaire entre zones dans les regions vides  
+
+- correction echantillonage spectre stellaire
+
+- correction bug pour PAHs
+
+- correction du bug i=0 avec ray-tracing et pola			16/08/10
+ca n'etait pas rotation mais il faut un angle > 0
+pour RT2 car il faut un axe (perpendiculaire a z) de reference
+car plusieursangle de ray-tracing
+Suppresion de tous les istart --> n_Stokes global
+
+- ajout des keywords WCS dans les images en ray-tracing			15/08/10
+  correction temporaire du bug ray-tracing quand i=0
+  ---> evite d'utiliser la routine rotation avec 0
+
+- correction bug introduit lors de la separation des contributions	13/08/10
+en ray-tracing methode 2
+
+- correction bug "PB r" en cellule 0 en spherique			12/08/10
+
+- reparation ray-tracing dans les raies apres modif pour ProDiMo	11/08/10
+  verification Dutrey94 OK (toujours le meme facteur 1.1)
+
+- Correction bug memoire quand utilisation du ray-tracing +		29/07/10
+  separation des contrib
+
+- Correction bug quand la Teff de l'etoile n'est pas la meme que	13/07/10
+  celle du spectre stellaire. Corrige en meme temps les petites
+  differences entre sed1 et sed2  
+
+- Correction bug dans les PAHs, la temperature n'est pas bien mise	30/04/10
+a jour dans calc_Ith + sampling minimum de 2 quand il y a un gap.
+
+- Corrections de petits bugs pour les envelopes				10/04/10
+
+- ajout points a large velocite dans les spectres mais avec resolution  05/09/09
+moindre
+
+- bug corrige dans les interpolations des indices quand les		15/09/09
+lambda ne sont pas continus (cas de l'emission moleculaire)
+
+- tiny_real --> tiny_db dans test sur calcul de temperature		04/09/09
+afin d'avoir la temperature definie meme dans les zones de tres	
+faible densite (bug de prodimo)
+
+- commande system au debut avant allocation memoire
+  pour eviter plantage lors de la creation du thread system		21/05/09	
+
+- rt a l'air de marcher, plus de spikes, benchmark presque ok		20/05/09
+
+- debut de rt4, sauvegarde avant  	      	     			06/05/09	
+
+- ajout de la carte du continu dans spectre.fits.gz			28/04/09
+  seulement kappa_abs * B (ie pas de scattering encore)
+
+- Comparaison MCFOST / SKY OK pour CII and OI				28/04/09
+  dans le cas du model Herbig
+
+- Champ de radiation calcule a partir du step 2				17/04/09
+  pour ProDiMo (verifie OK / temperature)
+
+- Version 3D de mcfost OK pour emission thermique			12/01/09
+  Comparaison avev la version 2D OK : SED et images
+  (grille cylindrique)
+
+- symetrie OK sur nang_ray_tracing					06/10/08
+
+- ray-tracing OK en mode pola						03/10/08
+  il ne faut pas faire tourner le plan de diffussion de 90 degres
+
+- Reduction memoire utilisee par ray-tracing				25/09/08
+  I_em_th2 supprime et passage de tableaux en simple
+
+- Bug ray-tracing corrige dans les images.				06/09/08 
+  Le benchmark est reproduit parfaitement
+
+- Le ray-tracing est pleinement fonctionel :-)				01/09/08
+  en mode image et SED
+  L'optimitisation sur les differents parametres
+  d'echantillonage reste a faire
+
+- method devient scattering_method					01/09/08
+
+- correction bug spectre stellaire					05/05/08
+
+- correction bug pos_em_cellule_sph   et approx diffusion		04/05/08
+
+- correction bug new_stokes						12/03/08
+
+- correction bug pola ray-tracing					28/02/08
+  correction bug introduit sur PAH et ajout messages erreur
+  en cas de depassement de la stack
+
+- ray-tracing scattering calibre en flux				09/02/08
+
+- 30 000 lignes :-)							08/02/08
+	
+- ray-tracing OK : 2D (attention, il faut bien gerer les angles		08/02/08
+	en fct de z)
+  Modif des routines de diffusions :
+	-bhmie et derives angles entiers	
+        -interpolation lineaire des elements de mueller
+	dans le routines utilisant itheta
+  Compatibilite avec othin (devrait aussi etre ok avec em th)
+  Parallelisation OK 	
+
+- Approximation de diffusion OK en 1+1D					08/02/08
+	condition initiale pour version 2D
+
+- ray-tracing:	PB symetrie verticale : 2 fois plus de directions 	04/02/08
+	et/ou faire test sur z : ca revient au meme
+
+- ajout switch pour diffusion isotrope et suppression scattering	23/01/08
+
+- trace origine emission moleculaire					23/01/08
+
+- Benchmark OK tau=10^3 vs Torus					23/01/08
+
+- MCFOST 3								18/01/08
+  Emission moleculaire finalement validee (hors couplage avec dust)
+  separation des fichiers f90		
+
+- Validation de mcfost vs torus sur le papier de Dutrey et le 		18/01/08
+  benchmark de van Zadelhoff (populations et raies)
+  Je suis oblige de diviser les raies par 1.1 pour Dutrey alors
+  que la densite semble ok. Bizarre.
+  Mais test LTE + ray tracing nickel sur van Zadelhoff		
+
+- porosite : ajout regle Bruggeman propre avec test			18/01/07
+
+- version : introduction de la 2.09 : porosite				07/12/07
+
+- memoire : suprresion des threads appelant wc                          07/12/07
+
+- mol : meilleure allocation memoire                                    25/10/07
+- mol : disque : faire le TR a 1D verticalement en toute premiere etape
+- mol : Bug : le Cmb est symetrise en frequence lors de la production des cartes d'emission 
+- mol : methode avec tableau de vitesse ou sampling random : comparer ce que ca change pour etape 2 
+   (vitesse et convergence), necessaire pour etape 3 a cause de l'espace memoire ?
+
+- correction bug renormalisation masse +
+	fusion densite et densite_3D					05/10/07
+
+- parallelisation approximation de diffusion 				25/09/07
+
+- routine de calcul densite gaz par equilibre hydrostatique             25/09/07
+
+- mol : BUG ray-tracing en geometrie cylindrique si rayon edge-on : 
+	a priori bug dans integ_ray_cyl + BUG dans move_to_grid         19/09/07
+  Corrige : teste OK / cas spherique
+
+- correction bug en geometrie spherique avec g95			18/09/07
+
+- mol : Reproduire Dutrey94 pour tester ray-tracing avec convolution 
+	par le beam, solution pour regler le pb avec le bench 
+	de van Zadelhoff 						18/09/07
+
+- mol : data_mol et fits pour population des niveaux			15/09/07
+
+- mol : fournir largeur du profile de raie en input                     15/09/07
+
+- eventuellement : regarder pb sur vitesse moyenne le long du rayon dans integ_ray : 
+	bench2 cd van Z. differe dans partie interne.                   15/09/07
+
+- ray-tracing pour emission moleculaire : geometrie teste OK, 		12/09/07
+validation vs TORUS sur le banchmark de van Zadelhoff, semble OK 
+	pour disque sur grille spherique
+
+- elimination des routines inutilisees pour emission moleculaire        01/08/07
+
+* transfert dans les raies : OK benchmark van Zadelhoff valide          17/07/07
+
+* enveloppe  OK fin juin / debut juillet 07
+
+- bug tab_albedo_pos : ri=0 pour BD --> rin tres petit et pente en -2.  19/06/07
+
+- BUG geometrie spherique : image et SED optiquement mince OK 
+  sed1 dans cas optiquement epais OK mais pas sed2 : manque du flux MIR ds sed2 entre 3 et 60 mirons 
+  mais le reste est OK + bcp plus long a cause absence de dark_zone
+  OK ds cas epais mais raisonable mais pb dans cas tres epais : la db n'ameliore pas.	
+
+  Corrige : modification grille au bord interne  19/06/07	
+
+
+- finir version spherique : dark_zone, masse, densite, opacite, position (rcyl, z), ..., length_deg2_tot,
+  angle_max                              19/06/07 
+
+- debut codage grille spherique           3/06/07
+
+- Partie othin pour diffusion > 1 viree   3/06/07
+
+- Possibilite de superposer differentes zones ajoutees dans densite 23/03/07
+
+- pi en db proprement + virer les "use nr" qui servent a rien	22/03/07
+
+- passage des constantes dans le module constantes + c devient c_light 22/03/07
+
+- Verification OK de Pascucci04    20/03/07
+
+- bug dans hg au moins avec g=0.0. Corrige : cospsi est db 20/03/07
+  Au passage suppression sctang1 qui trainait encore
+
+- relecture temperature pour grains hors equilibre et verification SEDs et images 
+ (bug sur precision argument rotation et variables mal reglees dans mcfost) 
+ Tps de calcul et resultats verifies OK par rapport a la version 2.02     5/03/07
+
+- Version n_zone du code 4/03/07
+
+- Grains hors equilibre :
+	- meilleur critere de convergence pour grains hors equilibre : temperature et non energie absorbee ou alors AMC 
+	- heating et couling time pour accelerer calcul proba temperature --> Teq, essentiel => origine du bug sur grain trop gros et/ou trp pres
+	Teste OK le 4/03/07	
+
+- parallelisation pour accelerer calcul proba temperature --> Teq 22/02/07
+
+- validation etape 1 = etape 2 pour grains hors equilibre, effet resolution grille ? NON, valeur convergence temperature ? NON, bug dans emission PAH ? NON 
+-> Ca marche, il faut que les temperatures des grains soient bien comprises dans l'intervales sinon il n'y a pas conservation de l'energie 21/02/07
+
+- correction petit bug avec ifort dans Temp_nRE 20/02/07
+
+
+- mieux comprendre correlation entre pas de temps et valeur de stabilite pour l'equation 
+ de diffusion : valeur de precision doit diminuer si securite diminue ???
+ securite = 10 ne converge pas avec precision = 1e-2 : on ajoute plus de termes : ils doivent etre 
+ plus petits en relatif ???
+ depend aussi de le limite en opacite de la zone de diffusion (et/ou par consequence (??) de 
+ la taille (nbre de cellule) de la grille)	
+ -> reduction progressive du pas de temps et de la precision 17/02/07
+
+
+- mieux interfacer zone de diffusion et zone MC : plus de cellule comme conditions initiales pour
+ lisser le bruit dans la zone de diffusion 17/02/07
+
+- difference dans temperature avec double precision sur la grille pour le benchmark : essayer avec
+ la meme grille OK 15/02/07
+
+- approximation de diffusion pour calculer temperature dans plan median : besoin pour transfert 
+ dans les raies 15/02/07
+
+- Pb calul duree simu : cpu_time --> system_clock 14/02/07
+
+- Pb temperature premiere cellule radiale dans le cas du benchmark :
+  meme pb a toutes les opacites et a differentes resolutions : reduire
+  taille premiere cellule ?? -->  bug dans deg2                      13/02/07
+ => resolution par passage en double precision des variables x, y, z, u, v, w des paquets
+ + modif algorithme : rajoute un petit delta a la limite  franchir plutot qu'a delta_vol 
+car regle le pb de la difference trop grande en valeur de la limite et longueur de vol dans 
+la cellule qui faisait que le delta sur la longueur de vol pouvait etre negligeable par rapport 
+a la valeur de la limite en db
+
+
+- spectre_emission pour grains hors equilibre 06/02/07
+
+- iteration pour neg 05/02/07
+
+- reemission des PAHs pour chauffage des gros grains 05/02/07
+
+- BUG : repartition_energie 05/02/07
+
+- E0 dans les cas nLTE et nRE -> permet d'eviter les problemes
+  d'extrapolation dans Temp_neg en creant un champ non nul a toute
+  lambda : +/- regle avec tiny_db -> tableau J0 01/02/07
+
+- PB p_lambda : prop_grain et opacite2 decouples !!!! depuis les
+  modifs de densite : sublimation radius et remove species : ***BUG*** 01/02/07
+
+- routine de repartition_energie en prenant en compte les differents
+  types de grains 01/02/07
+
+- init_lambda pour grains de PAH 01/02/07
+
+- tester le spectre de modes du C24H12 a 500K 01/02/07
+
+- variables pour bien separer lLTE ... et que tout fonctionne ensemble
+  : choix reemission, proba RE / nRE, reemission avec differents types
+  de grains 30/01/07
+
+- reemission des neg 30/01/07
+
+- proba temperature grains si hors eq : teste ok ifort, g95, sunf95 +
+  icare 29/01/07 test pour PAH OK 02/02/07
+
+- virer kappa_abs_1grain 28/01/07
