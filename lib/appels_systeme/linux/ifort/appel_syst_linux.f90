@@ -2,7 +2,7 @@ subroutine appel_syst(commande, status)
 
   implicit none
 
-  character(len=128), intent(in) :: commande
+  character(len=512), intent(in) :: commande
   integer, intent(out) :: status
   integer :: system
 
