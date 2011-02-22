@@ -178,7 +178,7 @@ subroutine initialisation_mcfost()
 
   ! Options ligne de commande
   do while (i_arg <= nbr_arg)
-     call get_command_argument(i_arg,s) !;  cmd_opt = trim(cmd_opt)//" "//s
+     call get_command_argument(i_arg,s)
      select case(trim(s))
      case("-v")
         write(*,*) "Version ", mcfost_release
@@ -191,7 +191,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : seed needed"
            stop
         endif
-        call get_command_argument(i_arg,str_seed) !; cmd_opt = trim(cmd_opt)//" "//str_seed
+        call get_command_argument(i_arg,str_seed) 
         read(str_seed,*,iostat=ios) seed
         if (ios/=0) then
            write(*,*) "Error : seed needed"
@@ -207,7 +207,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : wavelength needed"
            stop
         endif
-        call get_command_argument(i_arg,band) !; cmd_opt = trim(cmd_opt)//" "//band
+        call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
            write(*,*) "Error : wavelength needed"
@@ -222,7 +222,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : wavelength needed"
            stop
         endif
-        call get_command_argument(i_arg,band) !; cmd_opt = trim(cmd_opt)//" "//band
+        call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
            write(*,*) "Error : wavelength needed"
@@ -241,7 +241,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : Number of zones needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) n_zones
         if (ios/=0) then
            write(*,*) "Error : Number of zones needed"
@@ -258,7 +258,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : zoom needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) opt_zoom
         if (ios/=0) then
            write(*,*) "Error : zoom needed"
@@ -272,13 +272,13 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : emmisivity needed"
            stop
         endif
-        call get_command_argument(i_arg,model_pah) !; cmd_opt = trim(cmd_opt)//" "//model_pah
+        call get_command_argument(i_arg,model_pah)
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
            write(*,*) "Error : grain type needed"
            stop
         endif
-        call get_command_argument(i_arg,pah_grain) !; cmd_opt = trim(cmd_opt)//" "//pah_grain
+        call get_command_argument(i_arg,pah_grain)
         i_arg = i_arg+1
      case("-aggregate")
         laggregate=.true.
@@ -287,13 +287,13 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : GMM input file needed"
            stop
         endif
-        call get_command_argument(i_arg,aggregate_file) !; cmd_opt = trim(cmd_opt)//" "//aggregate_file            
+        call get_command_argument(i_arg,aggregate_file)
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
            write(*,*) "Error : GMM output file needed"
            stop
         endif
-        call get_command_argument(i_arg,mueller_aggregate_file) !; cmd_opt = trim(cmd_opt)//" "//mueller_aggregate_file            
+        call get_command_argument(i_arg,mueller_aggregate_file)
      case("-3D")
         l3D=.true.
         i_arg = i_arg+1
@@ -308,7 +308,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : h_warp needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) z_warp
         i_arg= i_arg+1
      case("-rs")
@@ -318,14 +318,14 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : specie number needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) specie_removed
         i_arg= i_arg+1
         if (i_arg > nbr_arg) then
            write(*,*) "Error : Temperature needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
      case("-strat_SPH")
@@ -351,14 +351,14 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : resolution needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) nx
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
            write(*,*) "Error : resolution needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1 
      case("-output_density_grid")
@@ -379,7 +379,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : killing_level needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) n_dif_max_eq_th
         i_arg = i_arg+1
      case("-tau_dark_zone_eq_th")
@@ -388,7 +388,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : tau_dark_zone needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_eq_th
         i_arg = i_arg+1  
      case("-tau_dark_zone_obs")
@@ -397,7 +397,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : tau_dark_zone needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_obs
         i_arg = i_arg+1  
      case("-root_dir")
@@ -406,7 +406,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : root_dir needed"
            stop
         endif
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         root_dir=trim(root_dir)//s
         i_arg = i_arg+1
      case("-dust_prop")
@@ -438,13 +438,13 @@ subroutine initialisation_mcfost()
            stop
         endif
         i_arg = i_arg+1
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_h
         i_arg = i_arg+1
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_r
         i_arg = i_arg+1
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
         i_arg = i_arg+1  
      case("-opacity_wall")
@@ -454,10 +454,10 @@ subroutine initialisation_mcfost()
            stop
         endif
         i_arg = i_arg+1
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) h_wall
         i_arg = i_arg+1
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         read(s,*) tau_wall
         i_arg = i_arg+1
      case("-spherical")
@@ -469,7 +469,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1 
      case("-Tfile")
         i_arg = i_arg + 1 
-        call get_command_argument(i_arg,Tfile) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,Tfile)
         i_arg = i_arg + 1 
      case("-linear_grid")
         i_arg = i_arg + 1 
@@ -477,13 +477,13 @@ subroutine initialisation_mcfost()
      case("-r_subdivide")
         i_arg = i_arg + 1 
         lr_subdivide=.true.
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) r_subdivide
      case("-freeze_out")
         i_arg = i_arg + 1 
         lfreeze_out=.true.
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) T_freeze_out
      case("-isotropic")
@@ -515,7 +515,7 @@ subroutine initialisation_mcfost()
         lgap_laure=.true.
         !llinear_grid=.true.  ! Ce n'est plus la gap pour densite_gap_laure2 !!!
         !write(*,*) "Using linear grid to read Laure's gap data"
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1 
      case("-debris")
@@ -525,7 +525,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : debris disk structure file needed"
            stop
         endif
-        call get_command_argument(i_arg,debris_file) !; cmd_opt = trim(cmd_opt)//" "//debris_file
+        call get_command_argument(i_arg,debris_file)
         i_arg = i_arg+1 
      case("-kappa_abs_grain")
         i_arg = i_arg+1
@@ -539,13 +539,13 @@ subroutine initialisation_mcfost()
      case("-correct_density")
         i_arg = i_arg+1
         lcorrect_density=.true.
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) correct_density_factor
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) correct_density_Rin
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) correct_density_Rout
      case("-prodimo")
@@ -555,10 +555,10 @@ subroutine initialisation_mcfost()
      case("-gap_ELT")
         i_arg = i_arg+1
         lgap_ELT=.true.
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) r_gap_ELT
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) sigma_gap_ELT
      case("-dust_emission_in_images")
@@ -573,18 +573,18 @@ subroutine initialisation_mcfost()
      case("-Laure_SED")
         i_arg = i_arg+1
         lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename) !; cmd_opt = trim(cmd_opt)//" "//Laure_SED_filename
+         call get_command_argument(i_arg,Laure_SED_filename)
         i_arg = i_arg + 1
      case("-Laure_SED_force_T")
         i_arg = i_arg+1
         lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename) !; cmd_opt = trim(cmd_opt)//" "//Laure_SED_filename
+         call get_command_argument(i_arg,Laure_SED_filename)
         i_arg = i_arg + 1
         lforce_T_Laure_SED = .true.
      case("-Seb_F")
         i_arg = i_arg + 1 
         lSeb_Fromang=.true. ; lsetup_gas = .true. ; lstrat = .true.
-        call get_command_argument(i_arg,s) !; cmd_opt = trim(cmd_opt)//" "//s
+        call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) Seb_Fromang_model
      case("-spot")
