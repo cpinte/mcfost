@@ -1272,7 +1272,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
            ! On restaure
            x = x_save ; y = y_save ; z = z_save 
            ri = ri_save ; zj = zj_save ; phik = phik_save 
-           flag_sortie = 1
+           flag_sortie = .true.
         endif
      else ! tau_max = 0. 
         lpacket_alive = .false.  ! on a deja compter le paquet donc on le tue
