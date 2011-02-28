@@ -147,7 +147,7 @@ subroutine init_indices_optiques()
 
         open(unit=1,file=filename, status='old', iostat=ios)
         if (ios /=0) then
-           write(*,*) "ERROR: dust file cannot be opened:",filename
+           write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
            write(*,*) "Exiting"
            stop
         endif
