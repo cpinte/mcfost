@@ -948,7 +948,10 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
            rand2 = sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
               call angle_diff_theta(lambda,taille_grain,rand,rand2,itheta,cospsi)
-              if (lisotropic)  cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
+              if (lisotropic)  then ! Diffusion isotrope
+                 itheta=1 
+                 cospsi=2.0*rand-1.0 
+              endif
               rand = sprng(stream(id)) 
               !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
@@ -964,7 +967,10 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               endif
            else ! fonction de phase HG
               call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
-              if (lisotropic) cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
+              if (lisotropic) then ! Diffusion isotrope
+                 itheta=1 
+                 cospsi=2.0*rand-1.0 
+              endif
               rand = sprng(stream(id)) 
               !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
@@ -976,10 +982,12 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         else ! methode 2 : diffusion sur la population de grains
            rand = sprng(stream(id))
            rand2= sprng(stream(id))
-           ! cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
            if (lmethod_aniso1) then ! fonction de phase de Mie
               call angle_diff_theta_pos(lambda,p_ri,p_zj, p_phik, rand, rand2, itheta, cospsi)
-              if (lisotropic) cospsi=2.0*rand-1.0 ; itheta=1  ! Diffusion isotrope
+              if (lisotropic) then ! Diffusion isotrope
+                 itheta=1  
+                 cospsi=2.0*rand-1.0
+              endif
               rand = sprng(stream(id)) 
               ! call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
@@ -989,7 +997,10 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
               call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
-              if (lisotropic)  cospsi=2.0*rand-1.0  ; itheta=1 ! Diffusion isotrope
+              if (lisotropic)  then ! Diffusion isotrope
+                 itheta=1 
+                 cospsi=2.0*rand-1.0 
+              endif
               rand = sprng(stream(id))
               ! call angle_diff_phi(l,STOKES(1),STOKES(2),STOKES(3),itheta,rand,phi)
               phi = pi * ( 2.0 * rand - 1.0 )
@@ -1164,7 +1175,10 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
               rand2 = sprng(stream(id))
               if (lmethod_aniso1) then ! fonction de phase de Mie
                  call angle_diff_theta(lambda,taille_grain,rand,rand2,itheta,cospsi)
-                 if (lisotropic)  cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
+                 if (lisotropic) then ! Diffusion isotrope
+                    itheta=1 
+                    cospsi=2.0*rand-1.0 
+                 endif
                  rand = sprng(stream(id)) 
                  !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
                  PHI = PI * ( 2.0 * rand - 1.0 )
@@ -1180,7 +1194,10 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
                  endif
               else ! fonction de phase HG
                  call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
-                 if (lisotropic) cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
+                 if (lisotropic) then ! Diffusion isotrope
+                    itheta=1 
+                    cospsi=2.0*rand-1.0
+                 endif
                  rand = sprng(stream(id)) 
                  !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
                  PHI = PI * ( 2.0 * rand - 1.0 )
@@ -1192,11 +1209,13 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
            else ! methode 2 : diffusion sur la population de grains
               rand = sprng(stream(id))
               rand2= sprng(stream(id))
-              ! cospsi=2.0*rand-1.0 ; itheta=1 ! Diffusion isotrope
               if (lmethod_aniso1) then ! fonction de phase de Mie
                  call angle_diff_theta_pos(lambda,p_ri,p_zj, p_phik, rand, rand2, itheta, cospsi)
-                 if (lisotropic) cospsi=2.0*rand-1.0 ; itheta=1  ! Diffusion isotrope
-                 rand = sprng(stream(id)) 
+                 if (lisotropic) then ! Diffusion isotrope
+                     itheta=1  
+                     cospsi=2.0*rand-1.0 
+                  endif
+                  rand = sprng(stream(id)) 
                  ! call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
                  PHI = PI * ( 2.0 * rand - 1.0 )
                  ! direction de propagation apres diffusion
@@ -1205,7 +1224,10 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
                  if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
               else ! fonction de phase HG
                  call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
-                 if (lisotropic)  cospsi=2.0*rand-1.0  ; itheta=1 ! Diffusion isotrope
+                 if (lisotropic)  then ! Diffusion isotrope
+                    itheta=1 
+                    cospsi=2.0*rand-1.0
+                 endif
                  rand = sprng(stream(id))
                  ! call angle_diff_phi(l,STOKES(1),STOKES(2),STOKES(3),itheta,rand,phi)
                  phi = pi * ( 2.0 * rand - 1.0 )
