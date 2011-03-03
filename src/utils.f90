@@ -417,7 +417,8 @@ subroutine mcfost_update()
   
   ! Last version
   write(*,*) "Checking last version ..."
-  cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
+  !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
+  cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)           
   if (syst_status/=0) then 
      write(*,*) "Cannot get MCFOST last version number"
@@ -443,9 +444,9 @@ subroutine mcfost_update()
      ! get the correct url corresponding to the system
      if (ostype=="linux") then
         if (machtype=="i386") then
-           url = trim(webpage)//"/linux_32bits/mcfost"
+           url = trim(webpage)//"linux_32bits/mcfost"
         else if (machtype=="x86_64") then
-           url = trim(webpage)//"/linux_64bits/mcfost"
+           url = trim(webpage)//"linux_64bits/mcfost"
         else
            write(*,*) "Linux system but unknown architecture"
            write(*,*) "Cannot download new binary"
@@ -455,7 +456,7 @@ subroutine mcfost_update()
          system = trim(ostype)//" "//trim(machtype)
      else if (ostype(1:6)=="darwin") then
         system = "MacOS X x86_64" 
-        url = trim(webpage)//"/macos_intel_64bits/mcfost"
+        url = trim(webpage)//"macos_intel_64bits/mcfost"
      else
         write(*,*) "Your system: ", trim(system)
         write(*,*) "TEST", trim(ostype(1:6)), ostype(1:6)=="darwin"
@@ -475,19 +476,16 @@ subroutine mcfost_update()
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     cmd = "wget -q "//trim(url)//" -O mcfost_update"
+     !cmd = "wget -q "//trim(url)//" -O mcfost_update"
+     cmd = "curl "//trim(url)//" -o mcfost_update -s"
      call appel_syst(cmd, syst_status)  
      if (syst_status==0) then 
         write(*,*) "Done"
-
         cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
         call appel_syst(cmd, syst_status)    
         write(*,*) " "
         write(*,*) "MCFOST has been updated"
         write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)
-        
-
-
      else
         cmd = "rm -rf mcfost_update"
         call appel_syst(cmd, syst_status) 
