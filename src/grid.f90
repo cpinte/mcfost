@@ -225,13 +225,7 @@ subroutine define_grid3()
         tab_r3(i) = tab_r2(i) * tab_r(i)
      enddo
      
-
   endif ! llinear_grid
-
-!     do i=1, n_rad+1
-!        write(*,*) i, tab_r(i)
-!     enddo
-!     stop
 
   
   r_lim(0)= grid_rmin
@@ -242,8 +236,6 @@ subroutine define_grid3()
      r_lim_2(i)= r_lim(i)**2
      r_lim_3(i)= r_lim(i)**3
   enddo !i
-
-
 
 
   if (lcylindrical) then
@@ -262,6 +254,8 @@ subroutine define_grid3()
         do izone=1,n_zones
            dz=disk_zone(izone)
            if ((dz%rmin < rcyl).and.(rcyl < dz%rout)) then
+              write(*,*) i, rcyl, "zone=", izone
+
               hzone = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               if (hzone > H) H = hzone
            endif ! test rcyl
@@ -294,11 +288,11 @@ subroutine define_grid3()
      enddo !i
 
      ! Version basique et initiale : prend la premiere zone pour determiner echelle de hauteur
-     do i=1, n_rad
-        rcyl = r_grid(i,1)
-        dz=disk_zone(1)
-        zmax(i) = cutoff * dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-     enddo !i
+     !do i=1, n_rad
+     !   rcyl = r_grid(i,1)
+     !   dz=disk_zone(1)
+     !   zmax(i) = cutoff * dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+     !enddo !i
 
 
      do i=1, n_rad
