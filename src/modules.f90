@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.12
-  character(8), parameter :: mcfost_release = "2.12.11"
+  character(8), parameter :: mcfost_release = "2.12.12"
   real :: para_version
 
   ! Système
