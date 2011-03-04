@@ -32,18 +32,6 @@ subroutine initialisation_mcfost()
   logical :: lresol, lzoom, ldust_emisison_in_images
 
 
-  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
-  if (mcfost_utils == "") then
-     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
-     write(*,*) "Exiting."
-     stop
-  endif
-  
-  dust_dir = trim(mcfost_utils)//"/Dust/"
-  mol_dir = trim(mcfost_utils)//"/Molecules/"
-  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
-  lambda_dir = trim(mcfost_utils)//"/Lambda/"
-
   call get_environment_variable('HOME',home)
   if (home == "") then
      home="./"
@@ -129,8 +117,6 @@ subroutine initialisation_mcfost()
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
   if (nbr_arg < 1) call display_help
-
-
 
   call get_command_argument(1,para)
   if (para(1:1)=="-") then
@@ -603,8 +589,22 @@ subroutine initialisation_mcfost()
      case default
         call display_help()
      end select
-
   enddo ! while
+
+  ! Test if MCFOST_UTILS is defined
+  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
+  if (mcfost_utils == "") then
+     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
+     write(*,*) "Exiting."
+     stop
+  endif
+  
+  dust_dir = trim(mcfost_utils)//"/Dust/"
+  mol_dir = trim(mcfost_utils)//"/Molecules/"
+  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
+  lambda_dir = trim(mcfost_utils)//"/Lambda/"
+
+
 
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
