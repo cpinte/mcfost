@@ -329,7 +329,7 @@ subroutine angles_scatt_ray_tracing(id,ibin,x,y,z,u,v,w,lstar)
            !theta = theta  + pi_sur_deux  
               
            !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-           omega = -2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall
+           omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
            !     prochain if car l'arccos va de 0 a pi seulement
            !     le +/- pour faire la difference dans le sens de rotation
            if (v1pk < 0.0) omega = -1.0_db * omega
@@ -1030,7 +1030,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                  !theta = theta  + pi_sur_deux  
               
                  !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-                 omega = -2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall
+                 omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
                  !     prochain if car l'arccos va de 0 a pi seulement
                  !     le +/- pour faire la difference dans le sens de rotation
                  if (v1pk < 0.0) omega = -1.0_db * omega

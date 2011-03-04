@@ -1495,7 +1495,7 @@ subroutine dust_map(lambda,ibin)
 
 
      ! On recupere tout le flux par symetrie
-     ! TODO : BUG : besoin de le faire ici ?? cat fait dans output.f90 de toute facon ...
+     ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
      if (l_sym_ima) then 
         do i=igridx_max+1,igridx
            Stokes_ray_tracing(lambda,i,:,ibin,:,:) = Stokes_ray_tracing(lambda,igridx-i+1,:,ibin,:,:)

@@ -676,10 +676,14 @@ subroutine opacite2(lambda)
                  norme = 1.0_db / (norme * deux_pi)
 
                  tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
-                 if (lsepar_pola) then
-                    tab_s12_ray_tracing(lambda,i,j,:) =  tab_s12_pos(lambda,i,j,1,:) * norme
-                    tab_s33_ray_tracing(lambda,i,j,:) =  tab_s33_pos(lambda,i,j,1,:) * norme
-                    tab_s34_ray_tracing(lambda,i,j,:) =  tab_s34_pos(lambda,i,j,1,:) * norme
+                 if (lsepar_pola) then 
+                    ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard 
+                    ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer 
+                    ! le signe de la matrice de Mueller
+                    ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
+                    tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
+                    tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
+                    tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
                  endif
               else
                  tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
