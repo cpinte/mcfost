@@ -501,6 +501,31 @@ end subroutine mcfost_update
 
 !***********************************************************
 
+subroutine mcfost_history()
+
+  character(len=512) :: cmd, webpage
+  integer ::  syst_status
+
+  !webpage = "http://people.exeter.ac.uk/cp263/mcfost/" 
+  webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
+  
+  ! Last version
+  write(*,*) "Getting MCFOST history ..."
+  cmd = "curl "//trim(webpage)//"history.txt"
+  call appel_syst(cmd, syst_status)           
+  if (syst_status/=0) then 
+     write(*,*) "Cannot get MCFOST history"
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) " "
+
+  return
+
+end subroutine mcfost_history
+
+!***********************************************************
+
 function indgen(n)
    
   implicit none
