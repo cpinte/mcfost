@@ -359,7 +359,7 @@ subroutine prop_grains(lambda, p_lambda)
         do i=1, n_pop
            dp = dust_pop(i)
            if (dp%is_PAH) then 
-              opt_file = trim(mcfost_utils)//"/"//trim(dp%indices)
+              opt_file = trim(dust_dir)//"/"//trim(dp%indices)
               ! load optical data from file
               call draine_load(opt_file, PAH_n_lambda, PAH_n_rad, 10, 1, &
                    tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)

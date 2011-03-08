@@ -254,8 +254,6 @@ subroutine define_grid3()
         do izone=1,n_zones
            dz=disk_zone(izone)
            if ((dz%rmin < rcyl).and.(rcyl < dz%rout)) then
-              write(*,*) i, rcyl, "zone=", izone
-
               hzone = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               if (hzone > H) H = hzone
            endif ! test rcyl
