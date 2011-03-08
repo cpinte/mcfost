@@ -543,6 +543,21 @@ mcfost2prodimo: mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90  $(COMP_FITS)  $(LIBS_FITS)
 
 #*************************************************************
+# Release
+#*************************************************************
+release : main
+	rm -rf web
+	mkdir web web/linux_64bits web/macos_intel_64bits
+	cp mcfost web/macos_intel_64bits
+	rsync -Pu *.f90 fosti:mcfost/src
+	ssh fosti "cd mcfost/src ; make"
+	scp fosti:mcfost/src/mcfost web/linux_64bits/
+	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
+	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
+	scp -r web/* horus:/server/laog/public/pintec/mcfost
+	rm -rf web
+
+#*************************************************************
 # Sauvegarde
 #*************************************************************
 save :
