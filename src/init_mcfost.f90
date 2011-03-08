@@ -125,6 +125,8 @@ subroutine initialisation_mcfost()
         write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
      else if (para(2:2)=="u") then
        call mcfost_update()
+     else if (para(2:2)=="h") then
+       call mcfost_history()
      else
         call display_help
      endif
@@ -848,6 +850,7 @@ subroutine display_help()
   write(*,*) "usage : mcfost parameter_file [options]"
   write(*,*) "mcfost -v diplays this help message"
   write(*,*) "mcfost -u updates MCFOST"
+  write(*,*) "mcfost -h displays MCFOST history"
   write(*,*) " "
   write(*,*) " Main mcfost options" 
   write(*,*) "        : -img <wavelength> (microns) "
