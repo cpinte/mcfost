@@ -395,7 +395,7 @@ subroutine initialisation_mcfost()
            stop
         endif
         call get_command_argument(i_arg,s)
-        root_dir=trim(root_dir)//s
+        root_dir=trim(root_dir)//"/"//s
         i_arg = i_arg+1
      case("-dust_prop")
         i_arg = i_arg+1
