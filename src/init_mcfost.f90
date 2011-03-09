@@ -121,8 +121,7 @@ subroutine initialisation_mcfost()
   call get_command_argument(1,para)
   if (para(1:1)=="-") then
      if (para(2:2)=="v") then
-        write(*,*) "Version ", mcfost_release
-        write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
+        call mcfost_v()
      else if (para(2:2)=="u") then
        call mcfost_update()
      else if (para(2:2)=="h") then
@@ -169,8 +168,7 @@ subroutine initialisation_mcfost()
      call get_command_argument(i_arg,s)
      select case(trim(s))
      case("-v")
-        write(*,*) "Version ", mcfost_release
-        write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
+        call mcfost_v()
         stop
      case("-seed")
         lseed=.true.

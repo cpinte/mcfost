@@ -407,11 +407,8 @@ end function Blambda
 
 subroutine mcfost_update()
 
-  character(len=512) :: cmd, url, webpage, last_version, machtype, ostype, system
-  integer ::  syst_status
-
-  !webpage = "http://people.exeter.ac.uk/cp263/mcfost/" 
-  webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
+  character(len=512) :: cmd, url, last_version, machtype, ostype, system
+  integer ::  syst_status, ios
 
   write(*,*) "Version ", mcfost_release
   
@@ -421,13 +418,19 @@ subroutine mcfost_update()
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)           
   if (syst_status/=0) then 
-     write(*,*) "Cannot get MCFOST last version number"
+     write(*,*) "ERROR: Cannot get MCFOST last version number"
      write(*,*) "Exiting"
      stop
   endif
   open(unit=1, file="version.txt", status='old')
-  read(1,*) last_version
+  read(1,*,iostat=ios) last_version
   close(unit=1,status="delete")
+
+  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
+     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "Exiting"
+     stop
+  endif
 
   ! Do we need to update ?
   if (last_version == mcfost_release) then
@@ -473,7 +476,6 @@ subroutine mcfost_update()
      write(*,*) "Your system ", trim(system)
      
      
-
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
      !cmd = "wget -q "//trim(url)//" -O mcfost_update"
@@ -503,11 +505,8 @@ end subroutine mcfost_update
 
 subroutine mcfost_history()
 
-  character(len=512) :: cmd, webpage
+  character(len=512) :: cmd
   integer ::  syst_status
-
-  !webpage = "http://people.exeter.ac.uk/cp263/mcfost/" 
-  webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   
   ! Last version
   write(*,*) "Getting MCFOST history ..."
@@ -523,6 +522,84 @@ subroutine mcfost_history()
   return
 
 end subroutine mcfost_history
+
+!***********************************************************
+
+subroutine mcfost_v()
+
+  character(len=512) :: cmd, last_version
+  integer ::  syst_status, line_number, ios
+  character(len=128) :: sline_number
+
+  write(*,*) "This is MCFOST version: ", mcfost_release
+  write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
+  write(*,*) " "
+  
+  ! Last version
+  write(*,*) "Checking last version ..."
+  cmd = "curl "//trim(webpage)//"version.txt -O -s"
+
+  call appel_syst(cmd, syst_status)           
+  if (syst_status/=0) then 
+     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "Exiting"
+     stop
+  endif
+  open(unit=1, file="version.txt", status='old')
+  read(1,*,iostat=ios) last_version
+  close(unit=1,status="delete")
+
+  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
+     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "Exiting"
+     stop
+  endif
+
+  ! Do we have the last version ?
+  if (last_version == mcfost_release) then
+     write(*,*) "MCFOST is up-to-date"
+  else ! Print the history of new version
+     write(*,*) "A new version of MCFOST is available: ", trim(last_version)
+     
+     ! Last version
+     write(*,*)
+     write(*,*) "Getting MCFOST history ..."
+     cmd = "curl "//trim(webpage)//"history.txt -O -s"
+     call appel_syst(cmd, syst_status)           
+     if (syst_status/=0) then 
+        write(*,*) "Cannot get MCFOST history"
+        write(*,*) "Exiting"
+        stop
+     endif
+
+     ! Getting line number of current version in history
+     cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
+     call appel_syst(cmd, syst_status)
+     open(unit=1, file="line_number.txt", status='old')
+     read(1,*,iostat=ios) line_number
+     close(unit=1,status="delete") 
+     
+     ! Printing history
+     if (ios==0) then
+        write(sline_number,*)  line_number-1
+        write(*,*) "Changes since your version:"
+        cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
+        call appel_syst(cmd, syst_status)
+
+        write(*,*) " "
+        write(*,*) "Full history is available with mcfost -h"
+        write(*,*) "The new version can be downloaded with mcfost -u"
+     else
+        cmd = "rm -rf history.txt"
+        call appel_syst(cmd, syst_status)
+        write(*,*) "ERROR: I did not find any modifications in the history"
+        write(*,*) "Exiting"
+     endif ! ios
+  endif ! last_version = mcfost_release
+
+  return
+
+end subroutine mcfost_v
 
 !***********************************************************
 
@@ -545,5 +622,25 @@ end function indgen
  
 !************************************************************
 
+function is_digit(ch) result(res)
+  ! Returns .true. if ch is a digit (0,1,...,9) and .false. otherwise
+  ! From stringmod.f90 by George Benthien
+  ! http://www.gbenthien.net/strings/index.html
+
+  character, intent(in) :: ch
+  logical :: res
+
+  select case(ch)
+  case('0':'9')
+     res=.true.
+  case default
+     res=.false.
+  end select
+  
+  return
+
+end function is_digit
+
+!************************************************************
 
 end module utils
