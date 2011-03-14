@@ -522,6 +522,9 @@ subroutine repartition_energie_etoiles()
   real(kind=db) :: L_star, Cst0, L_UV, L_star0, correct_UV
 
 
+  real(kind=db) :: wl_spectre_avg, wl_deviation
+
+
   ! pour obtenir un spectre normalise a 1 Rsun et 1pc
   Cst0 =  2.0*hp*c_light**2 * 1e-6
   surface= pi*Rsun_to_AU**2 ! pour 1 rayon solaire
@@ -740,6 +743,8 @@ subroutine repartition_energie_etoiles()
   log_wl_spectre = log(tab_lambda_spectre(1,:))
   log_lambda = log(tab_lambda(:))
 
+  
+
   do lambda=1, n_lambda
      wl = tab_lambda(lambda)*1.e-6
      delta_wl=tab_delta_lambda(lambda)*1.e-6     
@@ -756,28 +761,35 @@ subroutine repartition_energie_etoiles()
         ! calcul de terme en binnant le spectre d'entree
         terme = 0.0 ; N = 0 
         
+        wl_spectre_avg = 0.0
         do l=1, n_lambda_spectre
            if ( (tab_lambda_spectre(1,l) > wl_inf).and.(tab_lambda_spectre(1,l) < wl_sup) ) then        
               terme = terme + tab_spectre(1,l)
+              wl_spectre_avg = wl_spectre_avg + tab_lambda_spectre(1,l)
               N = N + 1
            endif
         enddo ! l
 
-        if ((terme > tiny_db) .and. (N>2)) then
-           terme = terme / N * (surface / Cst0)    
+        if (N>1) wl_spectre_avg = wl_spectre_avg / N 
+        wl_deviation = wl_spectre_avg / tab_lambda(lambda) ! Deviation between bin center and averaged wl
+           
+        if ((terme > tiny_db) .and. (N>3) .and. (abs(wl_deviation-1.0) < 3e-2)) then
+           terme = terme / N * (surface / Cst0)   
         else ! on est en dehors du spectre fournit
-           if ((wl > wl_spectre_max).or.(wl < wl_spectre_min)) then
+           if (tab_lambda(lambda) < wl_spectre_min) then
               cst_wl=cst_th/(etoile(i)%T*wl)
-              terme =  surface/((wl**5)*(exp(cst_wl)-1.0))
+              terme =  surface/((wl**5)*(exp(cst_wl)-1.0))  ! BB faute de mieux
+           else if (tab_lambda(lambda) > wl_spectre_max) then ! extrapolation loi de puissance -2 en lambda.F_lambda
+              ! Le corps noir ne marche pas car le niveau est plus eleve a cause du line-blanketing
+              ! Donc je fais une extrapolation en loi de puissance
+              terme = (surface / Cst0) * tab_spectre(i,n_lambda_spectre) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
            else
-              terme = exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda))) * (surface / Cst0)    
+              terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda))) 
            endif
         endif
         
         spectre = spectre + terme * delta_wl
- 
-        spectre_etoiles(lambda)=spectre
-
+        spectre_etoiles(lambda) = spectre
 
         ! Pas de le delta_wl car il faut comparer a emission du disque
         prob_E_star(lambda,i) = prob_E_star(lambda,i-1) +  terme 
@@ -789,7 +801,6 @@ subroutine repartition_energie_etoiles()
 
      ! Normalisation a 1 de la proba d'emissition des etoiles
      prob_E_star(lambda,:) = prob_E_star(lambda,:)/prob_E_star(lambda,n_etoiles)
-     
   enddo ! lambda
 
   ! Multiplication par rayon etoile et distance (en Rsun et pc)
