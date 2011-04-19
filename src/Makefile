@@ -97,11 +97,11 @@ endif
 ifeq ($(PLATFORM),x86_64)
 FC_SER = ifort -fpp -traceback
 FC_OMP = ifort -fpp  -openmp -traceback
-OPTS = -fast #-ipo -no-prec-div -fast
+OPTS = -O3 -ipo -no-prec-div #-fast (because -fast implies -xP, cannot be overwritten)
 # fpe0 bug avec openmp
 DEBUG_OPTS =  -check all -traceback  -fpstkchk  -C -g -d2  -fpe0
 #PARALLEL = -openmp
-MACH = #-tpp7 #-xW -tune pn4
+MACH =  -xW -axP #-tpp7 #-xW -tune pn4
 PREC = #-pc80 -prec_div -mp
 # Option de conservation de la precision
 # -mp : maintain precision fait prendre 1 facteur 2 dans le tps d'execution
@@ -488,7 +488,7 @@ LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
 
-FF = $(FC_OMP) $(OPTS) $(MACH)
+FF = $(FC_OMP)  $(MACH) $(OPTS)
 ifeq ($(debugp), yes)
 FF = $(FC_OMP)  $(DEBUG_OPTS) 
 endif
@@ -496,7 +496,7 @@ ifeq ($(debug), yes)
 FF = $(FC_SER) $(DEBUG_OPTS) 
 endif
 ifeq ($(mono), yes)
-FF = $(FC_SER)  $(OPTS) $(MACH)
+FF = $(FC_SER)  $(MACH) $(OPTS)
 endif
 ifeq ($(prof), yes)
 FF = $(FC_SER) -O0 -pg
@@ -546,6 +546,7 @@ mcfost2prodimo: mcfost mcfost2prodimo.o
 # Release
 #*************************************************************
 release : main
+	\cp -f mcfost ~/bin
 	rm -rf web
 	mkdir web web/linux_64bits web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
