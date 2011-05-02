@@ -482,7 +482,6 @@ subroutine transfert_poussiere()
         p_nnfot2 => nnfot2
         E_abs_nRE = 0.0
      else
-        ! if ((lmono0).or.(lscatt_ray_tracing)) then  ! BUG sur les SEDs en ray-tracing
         if (lmono0) then
            p_nnfot2 => nnfot2
         else
@@ -641,6 +640,8 @@ subroutine transfert_poussiere()
            call Temp_nRE(flag_em_nRE)
            if (n_iter > 10) then
               flag_em_nRE = .true. 
+              write(*,*) "WARNING: Reaching the maximum number of iterations"
+              write(*,*) "radiation field may not be converged"
            endif
            
            if (.not.flag_em_nRE) then ! il faut iterer

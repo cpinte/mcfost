@@ -857,7 +857,7 @@ end subroutine mueller_gmm
 
 !***************************************************
 
-subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
+subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces 
   ! pour grains de PAH  apres lecture du fichier de Draine
   ! Suppose une HG pour la fonction de phase et une polarisabilite nulle !!
@@ -866,8 +866,7 @@ subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
 
   implicit none
 
-  integer, intent(in) :: taille_grain, lambda
-  real, intent(in) :: wav
+  integer, intent(in) :: taille_grain, lambda, p_lambda
   real, intent(out) :: qext,qsca,gsca
 
   real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4, a
@@ -876,10 +875,9 @@ subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
   real :: norme, somme2, somme_prob, log_a, log_wavel, wl_min, wl_max
 
-  
 
   log_a=log(tab_a(taille_grain))
-  log_wavel = log(wav)
+  log_wavel = log(tab_lambda(lambda))
   
   pop=grain(taille_grain)%pop
 
@@ -902,7 +900,6 @@ subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
   enddo 
   frac_a = (log_a-log_PAH_rad(j-1))/(log_PAH_rad(j)-log_PAH_rad(j-1))
   frac_a_m1 = 1- frac_a
-
 
   ! Moyennage en longueur d'onde
   ! tableau decroissant
@@ -968,21 +965,21 @@ subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
      s12=0.0 ; s33 = 0.0 ; s34 = 0.0
 
      ! Integration S11 pour tirer angle
-     prob_s11(lambda,taille_grain,0)=0.0
+     prob_s11(p_lambda,taille_grain,0)=0.0
      somme2 = 0.0
 
      do j=1,nang_scatt
-        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+&
+        prob_s11(p_lambda,taille_grain,j)=prob_s11(p_lambda,taille_grain,j-1)+&
              s11(j)*sin(real(j)/real(nang_scatt)*pi)
      enddo
 
      ! Normalisation
-     somme_prob=prob_s11(lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
+     somme_prob=prob_s11(p_lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
      do j=1,nang_scatt
-        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
+        prob_s11(p_lambda,taille_grain,j)=prob_s11(p_lambda,taille_grain,j)/somme_prob
      enddo
 
-     do J=0,nang_scatt
+     do j=0,nang_scatt
         if (scattering_method==1) then
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
            norme=s11(j) !* qext/q sca
@@ -992,10 +989,10 @@ subroutine mueller_PAH(lambda,taille_grain,wav,qext,qsca,gsca)
            s34(j) = s34(j) / norme
         endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
         
-        tab_s11(lambda,taille_grain,j) = s11(j)
-        tab_s12(lambda,taille_grain,j) = s12(j)
-        tab_s33(lambda,taille_grain,j) = s33(j)
-        tab_s34(lambda,taille_grain,j) = s34(j)
+        tab_s11(p_lambda,taille_grain,j) = s11(j)
+        tab_s12(p_lambda,taille_grain,j) = s12(j)
+        tab_s33(p_lambda,taille_grain,j) = s33(j)
+        tab_s34(p_lambda,taille_grain,j) = s34(j)
      enddo
      
   endif ! aniso_method ==1

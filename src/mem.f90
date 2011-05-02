@@ -679,12 +679,12 @@ subroutine alloc_dynamique()
         frac_E_em_1grain_nRE=0.0
         frac_E_em_1grain_nRE=0.0
 
-        allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error log_frac_E_em_1grain'
-           stop
-        endif
-        log_frac_E_em_1grain=0.0
+        !allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
+        !if (alloc_status > 0) then
+        !   write(*,*) 'Allocation error log_frac_E_em_1grain'
+        !   stop
+        !endif
+        !log_frac_E_em_1grain=0.0
         
         allocate(Temperature_1grain_nRE_old(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
         if (alloc_status > 0) then
@@ -1105,6 +1105,7 @@ subroutine realloc_dust_mol()
   endif
   tab_s34 = 0
 
+  ! TODO : cette partie prend bcp de memoire
   if (l3D) then
      allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
   else
