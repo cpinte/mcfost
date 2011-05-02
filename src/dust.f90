@@ -408,7 +408,7 @@ subroutine prop_grains(lambda, p_lambda)
         endif
      else ! grain de PAH
         is_grain_PAH(k) = .true.
-        call mueller_PAH(p_lambda,k,wavel,qext,qsca,gsca)
+        call mueller_PAH(lambda,p_lambda,k,qext,qsca,gsca)
      endif
      tab_albedo(lambda,k)=qsca/qext
      tab_g(lambda,k) = gsca

@@ -131,7 +131,7 @@ contains
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;  
     read(1,*) nbre_photons_image 
     tau_seuil  = 1.0e31
-    wl_seuil = 0.0
+    wl_seuil = 0.81
     lcheckpoint=.false.
 
     ! ----------
@@ -644,7 +644,7 @@ contains
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;  
     read(1,*) nbre_photons_image 
     tau_seuil  = 1.0e31
-    wl_seuil = 0.0
+    wl_seuil = 0.81
     lcheckpoint=.false.
 
     ! ----------

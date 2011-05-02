@@ -678,7 +678,8 @@ subroutine repartition_energie_etoiles()
   ! Luminosite etoile integree sur le spectre
   L_star_spectre0 = 0.0
   do l = 2, n_lambda_spectre
-     L_star_spectre0 = L_star_spectre0 + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
+     L_star_spectre0 = L_star_spectre0 + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) & 
+          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
   enddo
   correct_step2 = (sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2) / L_star_spectre0
 
@@ -719,7 +720,8 @@ subroutine repartition_energie_etoiles()
   ! Luminosite etoile integree sur le spectre
   L_star_spectre = 0.0
   do l = 2, n_lambda_spectre
-     L_star_spectre = L_star_spectre + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
+     L_star_spectre = L_star_spectre + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) & 
+          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
   enddo
 
   !correct_UV = L_star_spectre / L_star_spectre0 ! Bug --> donne une petite difference: le calcul doit etre fait apres resampling
