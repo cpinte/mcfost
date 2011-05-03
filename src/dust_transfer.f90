@@ -144,8 +144,14 @@ subroutine transfert_poussiere()
      call init_indices_optiques()   
 
      call taille_grains()
-     call define_grid3()
-   
+
+     if (lold_grid) then
+        call define_grid3()
+     else
+        call define_physical_zones()
+        call define_grid4()
+     endif
+
      !call densite_data_hd32297(para) ! grille redefinie dans routine
      if (lgap_laure) then
         call densite_gap_laure2()
