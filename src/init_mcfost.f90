@@ -106,6 +106,7 @@ subroutine initialisation_mcfost()
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
   lforce_1st_scatt = .false.
+  lold_grid = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -586,6 +587,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lforce_1st_scatt=.true.
         write(*,*) "WARNING: forcing 1st scattering event when tau < 10"
+     case("-old_grid")
+        i_arg = i_arg+1
+        lold_grid=.true.
      case default
         call display_help()
      end select

@@ -643,4 +643,51 @@ end function is_digit
 
 !************************************************************
 
+function bubble_sort(data)
+  ! Implementation of Bubble sort
+  ! Warning : this is N^2, only for small arrays 
+  ! Return
+  !
+  ! C. Pinte
+  ! 02/05/11
+
+  real, dimension(:), intent(inout) :: data   
+  integer, dimension(:), allocatable :: bubble_sort ! indices
+
+  integer :: i, pass, n, tmp_i
+  logical :: sorted
+  real ::  temp
+
+  n = size(data)
+  allocate(bubble_sort(n)) 
+
+  bubble_sort = indgen(n) ;
+
+  pass = 1
+  sorted = .false.
+  
+  do while(.not.sorted) 
+     sorted = .true.
+     
+     do i = 1,n-pass
+        if(data(i) > data(i+1)) then
+           temp = data(i)
+           data(i) = data(i+1)
+           data(i+1) = temp
+           sorted = .false.
+
+           ! same operation on indices
+           tmp_i = bubble_sort(i) 
+           bubble_sort(i) = bubble_sort(i+1)
+           bubble_sort(i+1) = tmp_i
+           
+        endif
+     end do ! i
+     pass = pass +1
+
+     return
+  end do ! while
+
+end function bubble_sort
+
 end module utils

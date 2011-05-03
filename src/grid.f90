@@ -7,12 +7,471 @@ module grid
   use grains
   use em_th
   use prop_star
-
   use mem
 
   implicit none
 
   contains
+
+
+!******************************************************************************
+
+subroutine define_physical_zones()
+  ! Recheche les connections de zone 2 a 2
+  ! on doit pouvoir faire mieux que ca
+
+  implicit none
+
+  integer :: i, j, index, i_region, iter, ir
+  type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
+  type(disk_zone_type) :: dz
+
+  logical, dimension(n_zones) :: zone_scanned
+  
+  real(kind=db) :: r1, r2, minR, maxR
+
+  logical :: test_j_in_i, test_i_in_j
+
+  allocate(region(n_zones)) 
+
+  ! Detecting connected zones 
+  zone_scanned(:) = .false.
+  index = 0 
+  do i=1, n_zones
+     if (.not.zone_scanned(i)) then
+        index = index + 1 
+        region(i) = index 
+        zone_scanned(i) = .true.
+
+        ! Current minimum & maximum radii of region
+        minR = disk_zone(i)%rin
+        maxR = disk_zone(i)%rout
+
+        ! Besoin d'iterer au cas ou les connections entre zones sont multiples
+        ! probablement pas autant mais ca ne coute rien en calcul
+        do iter=1, n_zones-1 
+           do j=i+1, n_zones
+           
+              r1 = disk_zone(j)%rin
+              r2 = disk_zone(j)%rout
+              
+              ! Test if the 2 zones are imbrigated
+              test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 < maxR))
+              test_i_in_j = ((minR > r1).and.(minR < r2)) .or. ((minR > r1).and.(maxR < r2))
+
+              if ( test_j_in_i .or. test_i_in_j ) then
+                 if (.not.zone_scanned(j)) then
+                    i_region = index
+                 else
+                    i_region = region(j) 
+                 endif ! zone_scanned
+                 
+                 region(j) = i_region
+                 zone_scanned(j) = .true.
+                 
+                 ! Updating minimum & maximum radii of region
+                 minR = min(minR,r1)
+                 maxR = max(maxR,r2)
+              endif ! test rayon
+              
+           enddo ! j
+        enddo ! iter
+     endif !.not.zone_scanned(i)
+  enddo !i
+
+  
+
+  n_regions = maxval(region(:))
+
+  allocate(Rmin_region(n_regions),Rmax_region(n_regions))
+
+  do ir = 1, n_regions
+     Rmin_region(ir) = 1e30 
+     Rmax_region(ir) = 0
+     do i=1, n_zones
+        if (region(i) == ir) then
+           Rmin_region(ir) = min(Rmin_region(ir),disk_zone(i)%rin)
+           Rmax_region(ir) = max(Rmax_region(ir),disk_zone(i)%rout)
+        endif
+     enddo !i
+  enddo !ir
+
+  !write(*,*) "Number of regions detected =", n_regions
+  !do i=1, n_zones
+  !   write(*,*) "zone=", i, "region=", region(i), real(Rmin_region(region(i))), real(Rmax_region(region(i)))
+  !enddo
+    
+  return
+
+end subroutine define_physical_zones
+
+!******************************************************************************
+
+subroutine define_grid4()
+  implicit none
+
+  real, parameter :: pi = 3.1415926535
+  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
+  real :: phi
+  integer :: i,j,k, izone, i_subdivide, iz_subdivide, ii, ii_min, ii_max
+
+  !tab en cylindrique ou spherique suivant grille
+  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3 
+  real(kind=db) ::   r_i, r_f, dr, fac, r0, rout_cell, H, hzone
+  integer :: ir, iz, n_cells, n_rad_region, n_rad_in_region, n_empty, istart
+
+  real(kind=db), dimension(n_rad-n_rad_in+2) :: tab_r_tmp
+  real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
+
+  type(disk_zone_type) :: dz
+
+  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+ ! calcul des parametres de la table log
+!  delta_r = (rout/(rmin))**(1.0/(real(resol)-1.0))
+
+ ! rmin2=rmin*rmin
+  rout2=rout*rout
+ ! rmin_1 = 1.0/rmin
+ ! rmin2_1 = 1.0/(rmin2)
+
+  if (grid_type == 1) then
+     lcylindrical = .true.
+     lspherical = .false.
+  else
+     lcylindrical = .false.
+     lspherical = .true.
+  endif
+       
+  if ((.not.lcylindrical).and.(is_there_disk)) then
+     !w = 0.5_db / real(nz,kind=db)
+!     w = 0.15_db  ! Empirique pour echantilloner suffisamment le bord interne verticalement
+!    grid_rmin = rmin / sqrt(1.0_db -w*w)     ! ---> Ca cree un bug dans indice_cellule_sph    
+     grid_rmin=rmin
+  else
+     grid_rmin=rmin
+  endif
+
+  if (llinear_grid) then
+     
+     do i=1, n_rad+1
+        tab_r(i) = grid_rmin + (rout - grid_rmin) * real(i-1)/real(n_rad)
+        tab_r2(i) = tab_r(i) * tab_r(i)
+        tab_r3(i) = tab_r2(i) * tab_r(i) 
+     enddo
+
+  else 
+
+     ! Definition du nombre de chaques cellules
+     n_empty = 3 
+     n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
+     n_rad_in_region = n_rad_in
+
+     n_cells = 0 
+
+     istart = 1
+     tab_r(:) = 0.0_db
+     do ir=1, n_regions
+        if (lprint) write(*,*) "**********************"
+        if (lprint) write(*,*) "New region", ir 
+        if (lprint) write(*,*) "istart", istart, n_rad_in_region, n_rad_in
+        if (lprint) write(*,*) "R=", Rmin_region(ir), Rmax_region(ir)
+
+
+        if (ir == n_regions) then
+           n_rad_region = n_rad - n_cells ! On prend toutes les celles restantes
+        endif
+
+        ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
+        R0 =  Rmin_region(ir)
+        if (ir > 1) then
+           if (Rmin_region(ir) == Rmax_region(ir-1)) then
+              R0 =  Rmin_region(ir) * 1.00001_db
+           endif
+        endif
+
+        ! Grille log avec subdivision cellule interne
+        !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
+        ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(Rmax_region(ir)/R0) 
+        delta_r = exp(ln_delta_r)
+
+        ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
+        delta_r_in = exp(ln_delta_r_in)
+
+        if (lprint) write(*,*) "Delta_r", delta_r, delta_r_in
+
+        ! Selection de la zone correpondante : pente la plus forte
+        puiss = -1.e30
+        do iz=1, n_zones
+           if (region(iz) == ir) then
+              p=1+dz%surf-dz%exp_beta
+              if (p > puiss) then
+                 puiss = p
+              endif
+           endif
+        enddo
+
+        if (lprint) write(*,*) "n_rad_in, puiss=", puiss
+        
+        ! Calcul recursif hors boucle //
+        ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
+
+        tab_r(istart) = R0
+        tab_r2(istart) = tab_r(istart) * tab_r(istart)
+        tab_r3(istart) = tab_r2(istart) * tab_r(istart)
+
+         if (lprint) write(*,*) istart, ir, tab_r(istart)
+
+        if (puiss == 0.0) then
+           do i=istart+1, istart + n_rad_in_region
+              tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
+              tab_r2(i) = tab_r(i) * tab_r(i)
+              tab_r3(i) = tab_r2(i) * tab_r(i)
+
+              if (lprint) write(*,*) i, ir, tab_r(i)
+           enddo
+        else
+           r_i = exp(puiss*log(R0))
+           r_f = exp(puiss*log(R0*delta_r))
+           dr=r_f-r_i
+           fac = 1.0/(2.0**(n_rad_in_region+1)-1.0)
+           do i=istart+1, istart + n_rad_in_region
+              tab_r(i) = (R0**puiss - (R0**puiss-(R0*delta_r)**puiss) & 
+                   *(2.0**(i-istart+1)-1.0)/(2.0**(n_rad_in_region+1)-1.0))**(1.0/puiss)
+              !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
+              !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
+              if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
+                 write(*,*) "Error : spatial grid resolution too high"
+                 write(*,*) "Differences between two cells are below double precision"
+                 stop
+              endif
+              tab_r2(i) = tab_r(i) * tab_r(i)
+              tab_r3(i) = tab_r2(i) * tab_r(i)
+
+              if (lprint) write(*,*) i, ir, tab_r(i)
+           enddo
+        endif
+     
+        if (lprint) write(*,*) "n_rad"
+
+
+        do i=istart + n_rad_in_region+1, istart+n_rad_region
+           tab_r(i) = tab_r(i-1) * delta_r
+           tab_r2(i) = tab_r(i) * tab_r(i)
+           tab_r3(i) = tab_r2(i) * tab_r(i)
+
+           if (lprint) write(*,*) i, ir, tab_r(i)
+        enddo
+        
+        
+        n_cells = istart+n_rad_region
+
+        ! Cellules vides
+        if (ir < n_regions) then
+           if ( (Rmin_region(ir+1) > Rmax_region(ir)) ) then
+              if (lprint) write(*,*) "empty cells"
+              ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(Rmin_region(ir+1)/Rmax_region(ir)) 
+              delta_r = exp(ln_delta_r)
+              do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
+                 tab_r(i) = tab_r(i-1) * delta_r
+                 tab_r2(i) = tab_r(i) * tab_r(i)
+                 tab_r3(i) = tab_r2(i) * tab_r(i)
+
+                 if (lprint) write(*,*) i, ir, tab_r(i)
+              enddo
+              n_cells = n_cells + n_empty
+           endif
+        endif
+
+        istart = n_cells+1
+     enddo ! ir
+     
+  endif ! llinear_grid
+
+
+  
+  r_lim(0)= grid_rmin
+  r_lim_2(0)= grid_rmin**2
+  r_lim_3(0) = grid_rmin**3
+  do i=1, n_rad
+     r_lim(i)=tab_r(i+1)
+     r_lim_2(i)= r_lim(i)**2
+     r_lim_3(i)= r_lim(i)**3
+  enddo !i
+
+
+  if (lcylindrical) then
+     ! Calcul volume des cellules (pour calculer leur masse)
+     ! On prend ici le rayon au milieu de la cellule
+     ! facteur 2 car symétrie
+     ! tab_r est en cylindrique ici
+
+     do i=1, n_rad
+        rcyl = 0.5*(r_lim(i) +r_lim(i-1))        
+        r_grid(i,:) = rcyl!sqrt(r_lim(i) +r_lim(i-1)))
+
+        ! Estimation du zmax proprement
+        ! Recherche de l'echelle de hauteur max des zones pertinentes au rayon donne
+        H = 0.
+        do izone=1,n_zones
+           dz=disk_zone(izone)
+           if ((dz%rmin < rcyl).and.(rcyl < dz%rout)) then
+              hzone = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+              if (hzone > H) H = hzone
+           endif ! test rcyl
+        enddo ! izone
+        zmax(i) = cutoff * H
+     enddo ! i
+
+     do i=1, n_rad
+        ! Interpolation pour les cellules ou H n'est pas defini
+        if (zmax(i) < tiny_real)  then
+           search_min: do ii = i-1, 1, -1
+              if (zmax(ii) > tiny_real) then
+                 ii_min = ii
+                 exit search_min
+              endif
+           enddo search_min !ii
+
+           search_max: do ii = i+1, n_rad
+              if (zmax(ii) > tiny_real) then
+                 ii_max = ii
+                 exit search_max
+              endif
+           enddo search_max !ii
+
+           ! Interpolation lineaire en log(r)
+           rcyl = r_grid(i,1) ; rcyl_min =  r_grid(ii_min,1)  ; rcyl_max =  r_grid(ii_max,1)         
+           frac = (log(rcyl) - log(rcyl_min)) / (log(rcyl_max) - log(rcyl_min))
+           zmax(i) = exp(log(zmax(ii_max)) * frac + log(zmax(ii_min)) * (1.0 - frac))
+        endif ! zmax(i) < tiny_real
+     enddo !i
+
+     ! Version basique et initiale : prend la premiere zone pour determiner echelle de hauteur
+     !do i=1, n_rad
+     !   rcyl = r_grid(i,1)
+     !   dz=disk_zone(1)
+     !   zmax(i) = cutoff * dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+     !enddo !i
+
+
+     do i=1, n_rad
+        if ((tab_r2(i+1)-tab_r2(i)) > 1.0e-6*tab_r2(i)) then
+           volume(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
+           dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
+        else
+           volume(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
+           dr2_grid(i) = 2.0_db * rcyl*(tab_r(i+1)-tab_r(i)) 
+        endif
+        ! Conversion en cm**3 
+        ! 1 AU = 1.49597870691e13 cm
+        !     volume(i)=volume(i)*3.347929e39
+
+        delta_z(i)=zmax(i)/real(nz)
+        ! Pas d'integration = moitie + petite dimension cellule 
+        if (linteg_dic) delta0(i) = 0.5*min(tab_r(i+1)-tab_r(i),delta_z(i))
+        z_lim(i,nz+1)=zmax(i)
+
+        do j=1,nz
+           z_lim(i,j) = (real(j,kind=db)-1.0_db)*delta_z(i) 
+           z_grid(i,j) = (real(j,kind=db)-0.5_db)*delta_z(i) 
+        enddo
+     enddo
+
+     z_lim(:,nz+2)=1.0e30
+     zmaxmax = maxval(zmax)
+
+     if (linteg_dic) delta0(0)=0.5*grid_rmin
+
+  else !lspherical
+     izone=1
+     dz=disk_zone(izone)
+
+
+     ! tab_r est en spherique ici
+     w_lim(0) = 0.0_db
+     theta_lim(0) = 0.0_db
+     tan_theta_lim(0) = 1.0e-10_db
+     
+     w_lim(nz) = 1.0_db
+     theta_lim(nz) = pi/2.
+     tan_theta_lim(nz) = 1.e30_db
+     
+     do j=1, nz-1
+        ! repartition uniforme en cos
+        w= real(j,kind=db)/real(nz,kind=db)
+        w_lim(j) = w
+        tan_theta_lim(j) = w / sqrt(1.0_db - w*w)
+        theta_lim(j) = atan(tan_theta_lim(j))
+ !       write(*,*) "tan_theta_lim", j, w, tan_theta_lim(j)
+     enddo
+  !   stop
+
+     
+     do i=1, n_rad
+        !rsph = 0.5*(r_lim(i) +r_lim(i-1))
+        rsph = sqrt(r_lim(i) * r_lim(i-1))
+        
+        do j=1,nz
+           w = (real(j,kind=db)-0.5_db)/real(nz,kind=db)
+           uv = sqrt(1.0_db - w*w)
+           r_grid(i,j)=rsph * uv 
+           z_grid(i,j)=rsph * w
+        enddo
+
+        if (rsph > dz%rout) then
+           izone = izone +1
+           dz=disk_zone(izone)
+        endif
+        
+        if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
+           volume(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
+        else
+           volume(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
+        endif
+     enddo
+
+  endif ! cylindrique ou spherique
+
+  ! Version 3D
+  if (l3D) then
+     do k=1, n_az
+        phi_grid(k) = 2.0*pi*real(k)/real(n_az)
+        phi = phi_grid(k)
+        if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
+           tan_phi_lim(k) = 1.0d300
+        else
+           tan_phi_lim(k) = tan(phi)
+        endif
+     enddo !pk
+
+     volume(:) = volume(:) * 0.5 / real(n_az) 
+
+     do j=1,nz
+        z_grid(:,-j) = z_grid(:,j)
+     enddo
+  endif
+
+  ! Pour Sebastien Charnoz
+  if (lSeb_Charnoz) then
+     write(*,*) "# n_rad nz"
+     write(*,*) n_rad, nz
+     write(*,*) "# ir	iz	Rmin		deltaR			Zmin		deltaZ"
+     j = 1
+     do i=1, n_rad
+        do j=1, nz
+           write(*,'(I3,3X,I3,3X,ES16.9,3X,ES16.9,3X,ES16.9,3X,ES16.9)') &
+                i, j, r_lim(i-1), r_lim(i) - r_lim(i-1), z_lim(i,j),  z_lim(i,j+1) -  z_lim(i,j)
+        enddo
+     enddo
+     stop
+  endif ! lSeb_Charnoz
+
+  return
+
+end subroutine define_grid4
+
+!******************************************************************************
 
 subroutine define_grid3()
 ! Definit la grille du code
@@ -35,8 +494,6 @@ subroutine define_grid3()
   real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
-
-  character(len=40) :: FMT
 
  ! calcul des parametres de la table log
 !  delta_r = (rout/(rmin))**(1.0/(real(resol)-1.0))
@@ -74,8 +531,6 @@ subroutine define_grid3()
   else if (lr_subdivide) then
      ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/grid_rmin) 
      delta_r = exp(ln_delta_r)
-     ln_delta_r_1 = 1.0_db/ln_delta_r
-     ln_delta_r_2_1 = 0.5_db*ln_delta_r_1
 
      ! Repartition des cellules "entieres" en log
      tab_r_tmp(1) = grid_rmin
@@ -121,8 +576,6 @@ subroutine define_grid3()
      ! Subdivision
 !     ln_delta_r_in = (1.0_db/real(n_rad_in-1,kind=db))*log(delta_r)
 !     delta_r_in = exp(ln_delta_r_in)
-!     ln_delta_r_in_1 = 1.0_db/ln_delta_r_in
-!     ln_delta_r_in_2_1 = 0.5_db*ln_delta_r_in_1
 
      r0 = tab_r_tmp(i_subdivide)
      tab_r_tmp2(1) = r0
@@ -171,14 +624,10 @@ subroutine define_grid3()
      !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
      ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/grid_rmin) 
      delta_r = exp(ln_delta_r)
-     ln_delta_r_1 = 1.0_db/ln_delta_r
-     ln_delta_r_2_1 = 0.5_db*ln_delta_r_1
   
      !delta_r_in = delta_r**(1.0/real(n_rad_in))
      ln_delta_r_in = (1.0_db/real(n_rad_in,kind=db))*log(delta_r)
      delta_r_in = exp(ln_delta_r_in)
-     ln_delta_r_in_1 = 1.0_db/ln_delta_r_in
-     ln_delta_r_in_2_1 = 0.5_db*ln_delta_r_in_1
      
      !   delta_0 = (delta_r - 1.0) * rmin pour length4. Il faut prendre le moitie pour length3
      !delta_0 = (delta_r - 1.0) * rmin !* 0.5

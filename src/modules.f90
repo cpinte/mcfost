@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.12
-  character(8), parameter :: mcfost_release = "2.12.16"
+  character(8), parameter :: mcfost_release = "2.12.17"
   character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
 
   real :: para_version
@@ -219,7 +219,7 @@ module disk
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
   ! Echelle log
-  real(kind=db) :: delta_r, ln_delta_r, ln_delta_r_1, ln_delta_r_2_1
+  real(kind=db) :: delta_r, ln_delta_r
   real(kind=db) :: delta_r_in, ln_delta_r_in, ln_delta_r_in_1, ln_delta_r_in_2_1
   real(kind=db) :: rmin2_1, rmin_1, delta_0, delta_test
 
@@ -231,9 +231,16 @@ module disk
   real(kind=db), dimension(:,:), allocatable :: tab_length, tab_tau, tab_length_tot ! n_cpu, n_cellule
   real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
 
-  ! Disque decrit en une ou deux zones
+  ! Disque decrit en une ou n zones
   logical :: ln_zone
   integer :: n_zones
+  
+  ! Definition des regions = zones deconnectees
+  logical :: lold_grid
+  integer :: n_regions
+  integer, dimension(:), allocatable :: region ! n_zones
+  real(kind=db), dimension(:), allocatable :: Rmin_region, Rmax_region ! n_regions
+  
 
   real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
