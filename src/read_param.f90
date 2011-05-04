@@ -439,7 +439,7 @@ contains
              enddo
           endif
        enddo !n_zones
-    else
+    else ! lfits
        do j=1, n_zones
           read(1,*) n_especes(j)   
           somme=0.0
@@ -491,7 +491,6 @@ contains
              dust_pop(ind_pop)%ind_debut = grain_RE_LTE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_RE_LTE_end + dust_pop(ind_pop)%n_grains
              grain_RE_LTE_end = grain_RE_LTE_end +  dust_pop(ind_pop)%n_grains
-
           endif
        enddo
     endif

@@ -8,6 +8,7 @@ module grid
   use em_th
   use prop_star
   use mem
+  use utils
 
   implicit none
 
@@ -16,11 +17,45 @@ module grid
 
 !******************************************************************************
 
+ subroutine order_zones()
+   ! Order the various zones according to their Rin
+   ! C. Pinte
+   ! 04/05/11
+
+   integer, dimension(n_zones) :: order
+   type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
+   integer, dimension(n_pop) :: Izone_tmp
+
+   integer :: i, ipop
+
+   ! Save arrays to order
+   disk_zone_tmp(:) = disk_zone(:) 
+   Izone_tmp(:) =  dust_pop(:)%zone
+
+   ! order following Rin
+   order = bubble_sort(disk_zone(:)%rin)
+
+   ! Reordoring zones
+   do i=1, n_zones
+       disk_zone(i) =  disk_zone_tmp(order(i))
+   enddo
+   
+   ! reordering zone index in pops
+   do ipop=1,n_pop
+      dust_pop(ipop)%zone = order(Izone_tmp(ipop))
+   enddo
+
+   return
+
+ end subroutine order_zones
+
+!******************************************************************************
+
 subroutine define_physical_zones()
   ! Recheche les connections de zone 2 a 2
   ! on doit pouvoir faire mieux que ca
-
-  implicit none
+  ! C. Pinte
+  ! 03/05/11
 
   integer :: i, j, index, i_region, iter, ir
   type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
@@ -108,7 +143,11 @@ end subroutine define_physical_zones
 !******************************************************************************
 
 subroutine define_grid4()
-  implicit none
+  ! Definit la grille du code
+  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+  ! Version 4 gere les subdivisions pour les zones multiples
+  ! C. Pinte 
+  ! 03/05/11, version 3 :  27/04/05 
 
   real, parameter :: pi = 3.1415926535
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac

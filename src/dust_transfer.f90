@@ -148,6 +148,7 @@ subroutine transfert_poussiere()
      if (lold_grid) then
         call define_grid3()
      else
+        call order_zones()
         call define_physical_zones()
         call define_grid4()
      endif
