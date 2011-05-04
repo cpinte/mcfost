@@ -643,23 +643,26 @@ end function is_digit
 
 !************************************************************
 
-function bubble_sort(data)
+function bubble_sort(data_in)
   ! Implementation of Bubble sort
   ! Warning : this is N^2, only for small arrays 
-  ! Return
+  ! Same behaviour as yorick to allow ordering of mutiple arrays
+  ! Return the order of data, the sorted array would be data_in(order)
   !
   ! C. Pinte
   ! 02/05/11
 
-  real, dimension(:), intent(inout) :: data   
+  real(kind=db), dimension(:), intent(in) :: data_in   
+  real(kind=db), dimension(:), allocatable :: data 
   integer, dimension(:), allocatable :: bubble_sort ! indices
 
   integer :: i, pass, n, tmp_i
   logical :: sorted
   real ::  temp
 
-  n = size(data)
-  allocate(bubble_sort(n)) 
+  n = size(data_in)
+  allocate(bubble_sort(n),data(n)) 
+  data = data_in
 
   bubble_sort = indgen(n) ;
 
