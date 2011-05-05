@@ -497,44 +497,44 @@ end function phiProf
 
 !***********************************************************
 
-function Cmb(ispeed,tab_speed)
-! Loi de Planck aux differentes frequences de la 
-! molecule etudiee
-! Bnu en SI : W.m-2.Hz-1.sr-1
-! C. Pinte
-! 17/07/7
-
-  implicit none
-
-  integer, dimension(2), intent(in) :: ispeed
-  real(kind=db), dimension(ispeed(1):ispeed(2)),intent(in) :: tab_speed
-
-  real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: Cmb
-
-
-  integer :: iTrans, iv, iiTrans
-  real(kind=db) :: cst, cst_nu, nu
-
-  cst = 2.0_db*hp/c_light**2
-  
-  ! On ne calcule le Cmb qu'aux frequences specifiees
-  do iTrans=1,nTrans
-     iiTrans = indice_Trans(iTrans)
-     do iv=ispeed(1),ispeed(2)
-        nu = Transfreq(iiTrans) * (1.0_db + tab_speed(iv)/c_light)
-    
-        cst_nu = (hp * nu) / (kb * T_min) 
-        if (cst_nu > 100._db) then
-           Cmb(iv,iTrans) = 0.0_db
-        else
-           Cmb(iv,iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_db)
-        endif
-     enddo ! iv
-  enddo ! iTrans
-    
-  return
-
-end function Cmb
+! --- function Cmb(ispeed,tab_speed)
+! --- ! Loi de Planck aux differentes frequences de la 
+! --- ! molecule etudiee
+! --- ! Bnu en SI : W.m-2.Hz-1.sr-1
+! --- ! C. Pinte
+! --- ! 17/07/7
+! --- 
+! ---   implicit none
+! --- 
+! ---   integer, dimension(2), intent(in) :: ispeed
+! ---   real(kind=db), dimension(ispeed(1):ispeed(2)),intent(in) :: tab_speed
+! --- 
+! ---   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: Cmb
+! --- 
+! --- 
+! ---   integer :: iTrans, iv, iiTrans
+! ---   real(kind=db) :: cst, cst_nu, nu
+! --- 
+! ---   cst = 2.0_db*hp/c_light**2
+! ---   
+! ---   ! On ne calcule le Cmb qu'aux frequences specifiees
+! ---   do iTrans=1,nTrans
+! ---      iiTrans = indice_Trans(iTrans)
+! ---      do iv=ispeed(1),ispeed(2)
+! ---         nu = Transfreq(iiTrans) * (1.0_db + tab_speed(iv)/c_light)
+! ---     
+! ---         cst_nu = (hp * nu) / (kb * T_min) 
+! ---         if (cst_nu > 100._db) then
+! ---            Cmb(iv,iTrans) = 0.0_db
+! ---         else
+! ---            Cmb(iv,iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_db)
+! ---         endif
+! ---      enddo ! iv
+! ---   enddo ! iTrans
+! ---     
+! ---   return
+! --- 
+! --- end function Cmb
 
 !***********************************************************
 
@@ -647,7 +647,7 @@ end subroutine opacite_mol_loc
 
 !***********************************************************
  
-subroutine init_dust_mol()
+subroutine init_dust_mol(imol)
   ! calcul les opacites et emissivites des cellules
   ! aux longueurs d'onde des raies moleculaires
   ! pour prendre en compte l'interaction radiative entre
@@ -658,7 +658,8 @@ subroutine init_dust_mol()
 
   implicit none
 
-  integer :: iTrans, ri, zj, p_lambda
+  integer, intent(in) :: imol
+  integer :: iTrans, iiTrans, ri, zj, p_lambda
   real(kind=db) :: f
   real :: T, wl, kap
 
@@ -669,7 +670,8 @@ subroutine init_dust_mol()
   p_n_lambda = n_lambda
 
   ! Reallocation des tableaux de proprietes de poussiere
-  n_lambda = nTrans ! opacites dust considerees cst sur le profil de raie
+ ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
+  n_lambda =   nTrans ! opacites dust considerees cst sur le profil de raie
   call realloc_dust_mol()
 
   if (ldust_mol) then
@@ -680,7 +682,7 @@ subroutine init_dust_mol()
      
      if (lbenchmark_water3) then ! opacite en loi de puissance
         
-        do iTrans=1,nTrans
+        do iTrans=1,mol(imol)%nTrans_raytracing
            wl = tab_lambda(iTrans)
            
            ! Loi d'opacite (cm^2 par g de poussiere)
@@ -712,13 +714,17 @@ subroutine init_dust_mol()
         scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
         aniso_method = 2 ; lmethod_aniso1 = .false. 
         
-        
+        lsepar_pola = .false.
+        ltemp = .false.
+        lmono = .true. ! equivalent au mode sed2
+     
         ! On recalcule les proprietes optiques
         do iTrans=1,nTrans
            call prop_grains(iTrans, p_lambda)
            call opacite2(iTrans)
         enddo
      endif
+
      
      ! Changement d'unite : kappa en m-1 pour le TR dans les raies !!!!!!!
      ! Sera reconverti en AU-1 dans opacite_mol_loc
