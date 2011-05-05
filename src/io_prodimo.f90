@@ -18,6 +18,9 @@ module ProDiMo
   save
 
   character(len=32), parameter :: mcfost2ProDiMo_file = "forProDiMo.fits.gz"
+  integer, parameter :: mcfost2ProDiMo_version = 2
+  integer :: ProDiMo2mcfost_version
+  
 
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
@@ -78,20 +81,29 @@ contains
 
     integer :: alloc_status
 
-    write(*,*) "***************************"
-    write(*,*) "* Modelling for ProDiMo   *"
-    write(*,*) "* Forcing wavelength grid *"
-    write(*,*) "***************************"
-    
- 
     ! Limte 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
 
     ! TODO : verif fichier parametres : pour relecture avec Yorick
     ! N_etoiles = 1
-    n_lambda = 39
-    lambda_min = 0.0912
-    lambda_max = 3410.85
+    if (mcfost2ProDiMo_version == 1) then
+       write(*,*) "***************************"
+       write(*,*) "* Modelling for ProDiMo   *"
+       write(*,*) "* Forcing wavelength grid *"
+       write(*,*) "***************************"
+       n_lambda = 39
+       lambda_min = 0.0912
+       lambda_max = 3410.85
+    else 
+       if (lambda_min > 0.0912) then
+          write(*,*) "*****************************************"
+          write(*,*) "WARNING: lambda_min seems large"
+          write(*,*) "UV radiation field is needed for ProDiMo"
+          write(*,*) "lambda_min < 0.0912 is recommended"
+          write(*,*) "*****************************************"
+       endif
+    endif
+
     ! on ne veut changer les lambda pour le step 2
     lsed_complete = .true.
     
@@ -248,8 +260,9 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-
     ! Write  optional keywords to the header
+    call ftpkys(unit,'MCFOST',trim(mcfost_release),'',status)
+    call ftpkyj(unit,'MCFOST2PRODIMO',mcfost2ProDiMo_version,'',status)
     !FTPKY[EDFG](unit,keyword,keyval,decimals,comment, > status)
     call ftpkys(unit,'model_name',trim(para),'',status)
 
@@ -671,9 +684,11 @@ contains
     lemission_mol = .true.
     lsetup_gas=.true.
     lfits = .false.
-    n_lambda = 39
-    lambda_min = 0.0912
-    lambda_max = 3410.85
+
+    ! on ne force plus depuis version 2 de l'interface
+    !n_lambda = 39 
+    !lambda_min = 0.0912
+    !lambda_max = 3410.85
 
     deallocate(mol) ! car on va le remplacer
 
@@ -833,7 +848,7 @@ contains
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
     enddo
-    vitesse_turb =0.0
+    vitesse_turb = 0.0
     largeur_profile = 15.
     lpop = .true. ; lprecise_pop = .true. ; lmol_LTE = .true.
     para_version = mcfost_version
@@ -862,21 +877,28 @@ contains
     character(len=30) errtext
     character (len=80) errmessage, comment
     character(len=512) :: filename
-    
+    character(8) :: used_mcfost_version
+      
     logical, save :: l_first_time = .true.
 
     real(kind=db), dimension(MC_NSP,n_rad,nz) :: TMP
     real(kind=db), dimension(n_rad,nz) :: Tgas ! Pas utilise pour le moment, pour futurs calculs NLTE 
     real, dimension(n_rad,nz,2) :: grid ! Seulement pout test
+    real, dimension(n_rad,nz) :: sum_pops
     real, dimension(:,:,:), allocatable :: MCpops
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O 
 
     real :: sigma2, vmax, sigma2_m1, r_cyl
-    real(kind=db) :: S, dz, dV
-    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed
+    real(kind=db) :: S, dz, dV, Somme
+    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed, l, status
 
-    
+
+    ! TMP
+    integer :: iTrans, iUp, iLow
+    real(kind=db) :: cst, nUp, nLow
+    real :: Tex
+
     n_speed_rt = mol(imol)%n_speed_rt
 
     lCII = .false. ; lOI = .false. ; lCO = .false. ; loH2O = .false. ;  lpH2O = .false. ; 
@@ -926,6 +948,19 @@ contains
        write(*,*) "Reading ProDiMo calculations"
        write(*,*) trim(filename)
 
+       ! reading keywords
+       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,status)
+       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,status)
+
+       if (used_mcfost_version /= mcfost_release) then
+          write(*,*) "************************************************"
+          write(*,*) "WARNING: MCFOST has been updated"
+          write(*,*) "initial model was computed with mcfost "//trim(used_mcfost_version)
+          write(*,*) "this is mcfost "//trim(mcfost_release)
+          write(*,*) "Problems can occur"
+          write(*,*) "************************************************"
+       endif
+
        fits_status = 0 
        !  Get an unused Logical Unit Number to use to open the FITS file.
        call ftgiou(unit,fits_status)
@@ -955,8 +990,7 @@ contains
           stop
        endif
        if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2)) then
-          write(*,*) "Error : HDU 1 does not have the"
-          write(*,*) "right dimensions. Exiting."
+          write(*,*) "Error : HDU 1 does not have the right dimensions. Exiting."
           write(*,*) naxes(1:3)
           stop
        endif
@@ -977,6 +1011,7 @@ contains
              
              if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then 
                 write(*,*) "ERROR Z. Exiting."
+                write(*,*) ri, zj, z_grid(ri,zj), grid(ri,zj,2)
                 stop
              endif
           enddo
@@ -1098,6 +1133,21 @@ contains
 
           ! read_image
           call ftgpve(unit,group,firstpix,npixels,nullval,MCpops,anynull,fits_status)
+
+          if (ProDiMo2mcfost_version > 1) then
+             ! Les pops sont definies en relatif par rapport au niveau precedent
+             sum_pops(:,:) = MCpops(1,:,:)
+             do l=2, lpops%lmax(i)
+                MCpops(l,:,:) = MCpops(l,:,:) * MCpops(l-1,:,:)
+                sum_pops(:,:) = sum_pops(:,:) + MCpops(l,:,:)
+             enddo !l
+             
+             ! On renormalise pour avoir une somme des populations a 1
+             do l=1, lpops%lmax(i)
+                MCpops(l,:,:) = MCpops(l,:,:) / sum_pops(:,:)
+             enddo !l
+          endif ! interface_version
+
           
           if (i==1) pop_CII = MCpops
           if (i==2) pop_OI = MCpops
@@ -1144,6 +1194,52 @@ contains
           if (lpH2O) tab_nLevel(i,j,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
        enddo
     enddo
+    
+
+!    iTrans = 2 ; 
+!    iUp = iTransUpper(iTrans)
+!       iLow = iTransLower(iTrans)
+!       cst = - hp * Transfreq(iTrans) / kb 
+!
+!       write(*,*) "iTrans", iTrans, iLow, iUp
+!       write(*,*), "g", poids_stat_g(iLow), poids_stat_g(iUp)
+!       do j=1, nz
+!          do i=1, n_rad
+!             nUp = tab_nLevel(i,j,iUp)
+!             nLow =  tab_nLevel(i,j,iLow)
+!             if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
+!                Tex = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
+!                
+!                write(*,*) "Cell", i, j, nUp, nLow
+!                write(*,*) "ratio", nUp/nLow, poids_stat_g(iUp)/poids_stat_g(iLow) * exp(- hp * Transfreq(iTrans)/ (kb*Tgas(i,j)))
+!                write(*,*) Tex, Tgas(i,j)
+!                read(*,*)
+!             endif
+!          enddo ! i
+!       enddo !j
+!    !enddo !iTrans
+!    
+!    write(*,*) "test done"
+!    stop
+!
+!    Tcin(:,:,1) = Tgas
+!    do i=1, n_rad
+!       do j=1, nz 
+!          tab_nLevel(i,j,1) = 1.0
+!          do l=2, nLevels
+!             tab_nLevel(i,j,l) = tab_nLevel(i,j,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
+!                  exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
+!          enddo
+!
+!          Somme = sum(tab_nLevel(i,l,:)) 
+!          if (Somme < 1e-30) then
+!             write(*,*) "ERROR"
+!             stop
+!          endif
+!          tab_nLevel(i,j,:) = tab_nLevel(i,j,:) * nCO(i,j) / Somme
+!       enddo
+!    enddo
+
 
     ! Vitesse keplerienne
     do i=1, n_rad
@@ -1190,8 +1286,7 @@ contains
 
     write(*,*) "Done"
     write(*,*) "*******************************"
-
- 
+     
     return
     
   end subroutine read_ProDiMo2mcfost

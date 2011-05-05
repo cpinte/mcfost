@@ -30,14 +30,15 @@ subroutine mol_line_transfer()
   
   real(kind=db) :: u0, v0, w0
   integer :: iTrans, imol, ibin
-  
+
+  if (lProDiMo2mcfost) ldust_mol = .true.
+    
   ! Liberation memoire
   call dealloc_em_th()
 
-  call init_directions_ray_tracing()
-
+  call init_directions_ray_tracing() ! TODO : on peut le faire apres
+ 
   do imol=1,n_molecules
-
      if (lbenchmark_vanzadelhoff1) then
         call readmolecule_benchmark1()
      else if (lbenchmark_vanzadelhoff2) then
@@ -46,9 +47,8 @@ subroutine mol_line_transfer()
         call readmolecule(imol)
      endif
 
-     call alloc_emission_mol(imol)
-  
-     ! Transfer sur toutes les transitions
+     call alloc_emission_mol(imol) ! ne prend pas bcp de memoire
+
      nTrans = nTrans_tot
      allocate(indice_Trans(nTrans_tot))
      do iTrans=1,nTrans
@@ -57,10 +57,7 @@ subroutine mol_line_transfer()
   
      ! Champ externe
      call init_tab_Cmb_mol()
-    
-     ! les benchmarks
-     if (lProDiMo2mcfost) ldust_mol = .true.
-     
+
      if (lDutrey94) then
         call init_GG_Tau_mol()
         call init_molecular_disk(imol)
@@ -86,10 +83,10 @@ subroutine mol_line_transfer()
      if (lfreeze_out) call freeze_out()
 
      ! Absorption et emissivite poussiere
-     call init_dust_mol() 
+     call init_dust_mol(imol) 
 
-     call init_Doppler_profiles(imol) 
- 
+     call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
+
      ! population dans le cas limite optiquement mince
      if (ldouble_RT) call equilibre_othin_mol_pop2()
      
@@ -98,18 +95,17 @@ subroutine mol_line_transfer()
 
      ! Condition initiale : equilibre avec Cmb
      !     call equilibre_othin_mol()
-
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
- 
+        
      call opacite_mol()
      call integ_tau_mol(imol)
   
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) call NLTE_mol_line_transfer(imol)
-  
+     
      !call ecriture_pops()
      !call ecriture_Tex()
-
+     
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
         ! Selection des transitions
