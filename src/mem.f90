@@ -1212,6 +1212,14 @@ subroutine realloc_step2()
      deallocate(xJ_abs, xKJ_abs, nbre_reemission)
   endif
 
+  if (lProDiMo) then
+     allocate(xJ_abs(n_lambda2,n_rad,nz,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error xJ_abs in realloc_step2'
+        stop
+     endif
+     xJ_abs = 0.0 
+  endif
 
   ! Liberation memoire step1 et reallocation step 2
   deallocate(tab_lambda,tab_delta_lambda,tab_amu1,tab_amu2)
