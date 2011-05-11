@@ -275,24 +275,24 @@ ifeq ($(PLATFORM),i386)
 FC_SER = ifort -fpp -traceback
 FC_OMP = ifort -fpp -openmp -traceback #-stand f03 #-diag-enable sv3
 # fast = -O3 -ipo -no-prec-div -mdynamic-no-pic
-OPTS = -fast #-fp-model fast=2 -no-prec-div -no-prec-sqrt -mdynamic-no-pic -ftz -auto -ipo-jobs2
+OPTS = -O3 #-fp-model fast=2 -no-prec-div -no-prec-sqrt -mdynamic-no-pic -ftz -auto -ipo-jobs2
 # traceback does not slow down the calculations
 # fpe0 bug avec openmp
 DEBUG_OPTS = -check all  -C -g  -fpe0  -traceback -no-ftz # -no-ftz permet eviter bug dans conversion db -> sl 
 #PARALLEL = -openmp
-MACH = -xSSSE3  -axSSE4.2 #-tpp7 #-xW -tune pn4
+MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
 PREC = #-pc80 -prec_div -mp
 # Option de conservation de la precision
 # -mp : maintain precision fait prendre 1 facteur 2 dans le tps d'execution
 # mais sinon donne des resultats faux
 # -pc80 -prec_div ne fait pas perdre plus de tps
 FFLAGS =-c $(PREC)
-FFLAGS_EXE = $(PREC) -static-intel  -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
+FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 
 LIBS = $(HOME)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
+LIBS_SYST = -L $(LIBS) -lappel_syst 
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -557,6 +557,17 @@ release : main
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
 	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	rm -rf web
+
+release_mac : main
+	\cp -f mcfost ~/bin
+	rm -rf web
+	mkdir web web/macos_intel_64bits
+	cp mcfost web/macos_intel_64bits
+	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
+	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
+	scp -r web/* horus:/server/laog/public/pintec/mcfost
+	rm -rf web
+
 
 #*************************************************************
 # Sauvegarde

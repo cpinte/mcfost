@@ -405,7 +405,10 @@ end function Blambda
 
 !***********************************************************
 
-subroutine mcfost_update()
+subroutine mcfost_update(lforce_update)
+
+  logical, intent(in) :: lforce_update
+  logical :: lupdate
 
   character(len=512) :: cmd, url, last_version, machtype, ostype, system
   integer ::  syst_status, ios
@@ -435,9 +438,18 @@ subroutine mcfost_update()
   ! Do we need to update ?
   if (last_version == mcfost_release) then
      write(*,*) "MCFOST is up-to-date"
+     lupdate = .false.
   else ! Updating
      write(*,*) "New MCFOST version available: ", trim(last_version)
-        
+     lupdate = .true.
+  endif
+  if (lforce_update) then
+     write(*,*) "Forcing update"
+     lupdate = .true.
+  endif
+  write(*,*) " "
+
+  if (lupdate) then
      ! get system info
      call get_environment_variable('OSTYPE',ostype)
      call get_environment_variable('MACHTYPE',machtype)
@@ -461,14 +473,18 @@ subroutine mcfost_update()
         system = "MacOS X x86_64" 
         url = trim(webpage)//"macos_intel_64bits/mcfost"
      else
-        write(*,*) "Your system: ", trim(system)
-        write(*,*) "TEST", trim(ostype(1:6)), ostype(1:6)=="darwin"
-        write(*,*) "TEST2", trim(ostype)
-        write(*,*) "TEST2", trim(machtype)
-
-
         write(*,*) "Unknown operating system"
         write(*,*) "Cannot download new binary"
+        write(*,*) " "
+        write(*,*) "Detected configuration:"
+        write(*,*) "OSTYPE: ", trim(ostype)
+        write(*,*) "MACHTYPE: ", trim(machtype)
+        write(*,*) " "
+        write(*,*) "You can try to update the environement variables OSTYPE & MACHTYPE"
+        write(*,*) "Known values:"
+        write(*,*) " - OSTYPE: linux or darwin"
+        write(*,*) " - MACHTYPE: i386 or x86_64"
+        
         write(*,*) "Exiting."
         stop
      endif
@@ -495,7 +511,7 @@ subroutine mcfost_update()
         write(*,*) "Exiting"
      endif
         
-  endif
+  endif ! lupdate
 
   return
 
