@@ -120,13 +120,16 @@ subroutine initialisation_mcfost()
   if (nbr_arg < 1) call display_help
 
   call get_command_argument(1,para)
+  
   if (para(1:1)=="-") then
      if (para(2:2)=="v") then
         call mcfost_v()
      else if (para(2:2)=="u") then
-       call mcfost_update()
+        call mcfost_update(.false.)
+     else if (para(2:3)=="fu") then
+        call mcfost_update(.true.)
      else if (para(2:2)=="h") then
-       call mcfost_history()
+        call mcfost_history()
      else
         call display_help
      endif
