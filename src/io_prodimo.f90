@@ -94,6 +94,9 @@ contains
        n_lambda = 39
        lambda_min = 0.0912
        lambda_max = 3410.85
+
+       ! on ne veut changer les lambda pour le step 2
+       lsed_complete = .true.
     else 
        if (lambda_min > 0.0912) then
           write(*,*) "*****************************************"
@@ -104,35 +107,32 @@ contains
        endif
     endif
 
-    ! on ne veut changer les lambda pour le step 2
-    lsed_complete = .true.
-    
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
 
-    allocate(xN_abs(n_lambda,n_rad,nz,nb_proc),  stat=alloc_status)
+    allocate(xN_abs(n_lambda2,n_rad,nz,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error xN_abs'
        stop
     endif
     xN_abs = 0.0
 
-    allocate(J_ProDiMo(n_lambda,n_rad,nz),  stat=alloc_status)
+    allocate(J_ProDiMo(n_lambda2,n_rad,nz),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error J_ProDiMo'
        stop
     endif
     J_ProDiMo = 0.0
 
-    allocate(N_ProDiMo(n_lambda,n_rad,nz),  stat=alloc_status)
+    allocate(N_ProDiMo(n_lambda2,n_rad,nz),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error J_ProDiMo'
        stop
     endif
     N_ProDiMo = 0.0
 
-    allocate(n_phot_envoyes_ISM(nb_proc,n_lambda),  stat=alloc_status)
+    allocate(n_phot_envoyes_ISM(nb_proc,n_lambda2),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error n_phot_envoyes_ISM'
        stop
