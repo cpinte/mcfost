@@ -8,6 +8,7 @@
 # -mmacosx-version-min=10.4 requis sur Snow Leopard
 
 SHELL = /bin/sh
+INSTALL_DIR = $(HOME)/Software/mcfost
 
 # Choix du type de compilateur
 ARCH = $(shell uname | tr '[a-z]' '[A-Z]')
@@ -43,7 +44,7 @@ PREC = #-pc80 -prec_div -mp
 FFLAGS = -c  $(PREC) 
 FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 
-LIBS = $(HOME)/lib/ifort/
+LIBS = $(INSTALL_DIR)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
@@ -58,7 +59,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) 
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 
 # Linux, sunf95
@@ -73,7 +74,7 @@ PREC =
 FFLAGS = -c $(PREC) 
 FFLAGS_EXE = $(PREC) 
 
-LIBS = $(HOME)/sunf95/
+LIBS = $(INSTALL_DIR)/lib/sunf95/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst
@@ -88,7 +89,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) 
-INCLUDE_SPRNG = -I$(HOME)/include
+INCLUDE_SPRNG = -I$(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -110,7 +111,7 @@ PREC = #-pc80 -prec_div -mp
 FFLAGS = -c  $(PREC) 
 FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 
-LIBS = $(HOME)/lib/ifort/
+LIBS = $(INSTALL_DIR)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
@@ -125,7 +126,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -140,7 +141,7 @@ PREC = #-pc80 -prec_div -mp
 FFLAGS = -c  $(PREC) 
 FFLAGS_EXE = $(PREC)  -static-libcxa -i-static
 
-LIBS = $(HOME)/lib/ifort/
+LIBS = $(INSTALL_DIR)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
@@ -155,7 +156,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8 # 64 bits Itanium
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -170,7 +171,7 @@ MACH = -qarch=auto -qtune=auto
 FFLAGS = -c 
 FFLAGS_EXE =  
 
-LIBS = $(HOME)/lib/
+LIBS = $(INSTALL_DIR)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio 
 COMP_FITS = -qextname=ftclos:ftcrhd:ftfiou:ftgerr:ftgiou:ftgmsg:ftinit:ftphpr:ftpkye:ftppre:ftgknj:ftgpve:ftopen:ftpprd:ftpprj:ftgpvj:ftmahd:ftpkys:ftpkyj
@@ -186,7 +187,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = -qsuffix=f=f90:cpp=f90
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 #profiling -pg  puis utiliser gprof
 endif
@@ -206,7 +207,7 @@ MACH = -qarch=pwr3 -qtune=pwr3
 FFLAGS = -c 
 FFLAGS_EXE =  -bmaxdata:0x80000000 -bmaxstack:0x20000000
 
-LIBS = $(HOME)/lib/
+LIBS = $(INSTALL_DIR)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio
 LIBS_SYST =  -L $(LIBS) -lappel_syst
@@ -221,7 +222,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = -qsuffix=f=f90:cpp=f90
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 #profiling -pg  puis utiliser gprof
 endif
@@ -247,7 +248,7 @@ PREC =
 FFLAGS = -c  $(PREC) 
 FFLAGS_EXE = $(PREC) 
 
-LIBS = $(HOME)/lib/
+LIBS = $(INSTALL_DIR)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11
 LIBS_FITS = -L $(LIBS) -lcfitsio -lnsl -lsocket
 LIBS_SYST = -L $(LIBS) -lappel_syst
@@ -263,7 +264,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 # SPRNG
 #FLAGS_SPRNG = $(FLAGS) 
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8 # 64 bits 
-INCLUDE_SPRNG = -I$(HOME)/include
+INCLUDE_SPRNG = -I$(INSTALL_DIR)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
 
@@ -289,7 +290,7 @@ PREC = #-pc80 -prec_div -mp
 FFLAGS =-c $(PREC)
 FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 
-LIBS = $(HOME)/lib/ifort/
+LIBS = $(INSTALL_DIR)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst 
@@ -304,7 +305,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG =$(FLAGS) -DPOINTER_SIZE=8
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -353,7 +354,7 @@ MACH = -qarch=auto -qtune=auto
 FFLAGS = -c $(OPTS) $(MACH)
 FFLAGS_EXE = $(OPTS) $(MACH) #-bmaxdata:0x80000000 -bmaxstack:0x20000000
 
-LIBS = $(HOME)/lib/
+LIBS = $(INSTALL_DIR)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio 
 COMP_FITS = -qextname=ftclos:ftcrhd:ftfiou:ftgerr:ftgiou:ftgmsg:ftinit:ftphpr:ftpkye:ftppre:ftgknj:ftgpve:ftopen:ftpprd:ftpprj:ftgpvj:ftmahd:ftpkys:ftpkyj
@@ -369,7 +370,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = -qsuffix=f=f90:cpp=f90
-INCLUDE_SPRNG = -I $(HOME)/include/
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include/
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -391,7 +392,7 @@ PREC =
 FFLAGS = -c $(PREC) 
 FFLAGS_EXE = $(PREC) 
 
-LIBS = $(HOME)/lib/g95/
+LIBS = $(INSTALL_DIR)/lib/g95/
 LIBS_PGPLOT = -L$(LIBS) -lpgplot
 LIBS_FITS = -L$(LIBS) -lcfitsio
 LIBS_SYST = -L$(LIBS) -lappel_syst
@@ -411,7 +412,7 @@ endif
 ifeq ($(ARCH),LINUX) # version 64 bits de g95 sur linux
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif
-INCLUDE_SPRNG = -I$(HOME)/include
+INCLUDE_SPRNG = -I$(INSTALL_DIR)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
 
@@ -429,7 +430,7 @@ PREC =
 FFLAGS = -c $(PREC) 
 FFLAGS_EXE = $(PREC) 
 
-LIBS = $(HOME)/lib/g95/
+LIBS = $(INSTALL_DIR)/lib/g95/
 LIBS_PGPLOT = -L$(LIBS) -lpgplot
 LIBS_FITS = -L$(LIBS) -lcfitsio
 LIBS_SYST = -L$(LIBS) -lappel_syst
@@ -444,7 +445,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) 
-INCLUDE_SPRNG = -I$(HOME)/include
+INCLUDE_SPRNG = -I$(INSTALL_DIR)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
 
@@ -468,7 +469,7 @@ PREC = #-pc80 -prec_div -mp
 FFLAGS = -c  $(PREC) 
 FFLAGS_EXE = $(PREC)  -static-intel
 
-LIBS = $(HOME)/lib/ifort32/
+LIBS = $(INSTALL_DIR)/lib/ifort32/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
 LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
@@ -483,7 +484,7 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS)  
-INCLUDE_SPRNG = -I $(HOME)/include
+INCLUDE_SPRNG = -I $(INSTALL_DIR)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
 
@@ -546,11 +547,11 @@ mcfost2prodimo: mcfost mcfost2prodimo.o
 # Release
 #*************************************************************
 release : main
-	\cp -f mcfost ~/bin
+	\cp -f mcfost $(INSTALL_DIR)/bin/
 	rm -rf web
 	mkdir web web/linux_64bits web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
-	rsync -Pu *.f90 fosti:mcfost/src
+	rsync -Pu *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
@@ -559,7 +560,7 @@ release : main
 	rm -rf web
 
 release_mac : main
-	\cp -f mcfost ~/bin
+	\cp -f mcfost $(INSTALL_DIR)/bin/
 	rm -rf web
 	mkdir web web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
