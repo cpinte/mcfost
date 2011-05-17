@@ -661,6 +661,7 @@ subroutine initialisation_mcfost()
   !                       et
   ! verification cohérence du fichier de paramètres
 
+  n_lambda2 = n_lambda
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
   if (limg) then
