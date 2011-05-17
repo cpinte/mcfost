@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.12
-  character(8), parameter :: mcfost_release = "2.12.18"
+  real, parameter :: mcfost_version = 2.13
+  character(8), parameter :: mcfost_release = "2.13.0"
   character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
 
   real :: para_version
@@ -367,8 +367,9 @@ module grains
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
      real :: amin, amax, aexp, frac_mass, rho1g, xmg, masse, porosity, sblow
-     character(len=512) :: indices
-     logical :: is_PAH
+     real :: rho1g_coating, coating_frac
+     character(len=512) :: indices, indices_coating
+     logical :: is_PAH, lcoating, lmantle
      integer :: ind_debut, ind_fin
      integer :: pop_geo
   end type dust_pop_type
@@ -399,6 +400,7 @@ module grains
   ! Tab de lambda
   real, dimension(:), allocatable :: tab_lambda, tab_delta_lambda !n_lambda
   real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
+  real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
   real, dimension(:), allocatable :: tab_lambda2, tab_delta_lambda2
 
   ! Parametres de diffusion des grains

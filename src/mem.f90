@@ -266,10 +266,17 @@ subroutine alloc_dynamique()
 
   allocate(tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_lambda'
+     write(*,*) 'Allocation error tab_amu'
      stop
   endif
   tab_amu1=0.0; tab_amu2=0.0;
+
+  allocate(tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_amu_coating'
+     stop
+  endif
+  tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
 
   ! Tableaux relatifs aux prop optiques des cellules
