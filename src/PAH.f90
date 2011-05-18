@@ -87,7 +87,7 @@ function PAH_specific_heat(T,taille_grain)
 
   logical, save :: l_first_time = .true.
 
-  a = tab_a(taille_grain)
+  a = r_grain(taille_grain)
 
   nT=size(T)
 
@@ -217,7 +217,7 @@ subroutine test_PAH_specific_heat()
 
   nc=24
   a=1d-3*(nc/468.)**(1/3.)
-  tab_a(1) = a
+  r_grain(1) = a
   T(1) = 500.
 
   C = PAH_specific_heat(T,1)
@@ -237,7 +237,7 @@ real function get_astrosil_Na(taille_grain)
   integer, intent(in) :: taille_grain
   real :: a
 
-  a=tab_a(taille_grain)
+  a=r_grain(taille_grain)
 
   get_astrosil_Na=4.*pi/3. * a**3 * 3.7e10
 

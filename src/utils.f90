@@ -709,4 +709,21 @@ function bubble_sort(data_in)
 
 end function bubble_sort
 
+!************************************************************
+
+function is_diff(a,b)
+
+  logical is_diff
+  real(kind=db) :: a,b
+  
+  if (abs(a-b) > 0.5e-5 * abs(a+b)) then
+     is_diff = .true.
+  else
+     is_diff = .false.
+  endif
+  
+end function is_diff
+
+!************************************************************
+
 end module utils

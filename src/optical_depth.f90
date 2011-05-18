@@ -1659,14 +1659,6 @@ subroutine integ_tau(lambda)
      stop
   endif
 
-!  write(*,*) angle, tau, tau/kappa(lambda,1,1)*sum(densite_pouss(1,1,:))*xmg, tau/kappa(lambda,1,1)*(masse(1,1)/volume(1))
-!  write(*,*) sum(densite_pouss(1,1,:))*xmg, (masse(1,1)/(volume(1)*3.347929d39))
-
-!  write(*,*) "colonne densite"
-!  write(*,*) sum(densite_pouss(1,1,:))*xmg, kappa(lambda,1,1)
-!  write(*,*) "fin test"
-
-
 
   ! Verif
 !!$  do i=1,30

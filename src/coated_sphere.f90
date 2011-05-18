@@ -64,7 +64,7 @@ contains
        nang= (nang_scatt+1) / 2 + 1
     endif
 
-    rcore=tab_a(taille_grain)
+    rcore=r_grain(taille_grain)
     fact=exp(log(1.-coat_frac)/3.) ! (1-coat_frac)^1/3
     rshell=rcore/fact
 

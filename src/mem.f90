@@ -197,13 +197,14 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! Tableaux relatifs aux grains
   ! **************************************************
-  allocate(nbre_grains(n_grains_tot), tab_a(n_grains_tot), is_grain_PAH(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
+  allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  S_grain(n_grains_tot), M_grain(n_grains_tot), &
+       is_grain_PAH(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_a'
+     write(*,*) 'Allocation error r_grain'
      stop
   endif
   nbre_grains = 0.0   
-  tab_a=0.0
+  r_grain=0.0 ; S_grain=0.0 ; M_grain=0.0
   is_grain_PAH=.false.
 
   allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
@@ -1775,7 +1776,7 @@ subroutine save_checkpoint_init()
   open(1,file=filename,status='new',form='unformatted')
   
   write(1) tab_lambda, tab_delta_lambda, tab_amu1, tab_amu2, tab_lambda2, tab_delta_lambda2,  tab_albedo_pos, &
-       prob_E_star, E_stars, L_etoile, rmin, rmin2, rout2, zmax, volume, r_lim, r_lim_2, r_lim_3, z_lim, delta0, tab_a,  masse, &
+       prob_E_star, E_stars, L_etoile, rmin, rmin2, rout2, zmax, volume, r_lim, r_lim_2, r_lim_3, z_lim, delta0, r_grain,  masse, &
        kappa, kappa_abs_eg,  probsizecumul, ech_prob, valeur_prob, l_dark_zone,  E_photon, spectre_etoiles_cumul, tab_Temp, E0, &
        delta0, prob_E_cell, frac_E_stars, E_totale, cos_max2, etape_i, etape_f, &
        lscattering_method1, lmethod_aniso1, nbre_photons_tot, n_lambda2
@@ -1862,7 +1863,7 @@ subroutine restore_checkpoint()
   open(1,file=filename,status='old',form='unformatted')
 
   read(1,iostat=ios(1)) tab_lambda, tab_delta_lambda, tab_amu1, tab_amu2, tab_lambda2, tab_delta_lambda2,  tab_albedo_pos, &
-       prob_E_star, E_stars, L_etoile, rmin, rmin2, rout2, zmax, volume, r_lim, r_lim_2, z_lim, delta0, tab_a,  masse, &
+       prob_E_star, E_stars, L_etoile, rmin, rmin2, rout2, zmax, volume, r_lim, r_lim_2, z_lim, delta0, r_grain,  masse, &
        kappa, kappa_abs_eg,  probsizecumul, ech_prob, valeur_prob, l_dark_zone,  E_photon, spectre_etoiles_cumul, tab_Temp, E0, &
        delta0, prob_E_cell, frac_E_stars, E_totale, cos_max2, etape_i, etape_f, &
        lscattering_method1, lmethod_aniso1, nbre_photons_tot, n_lambda2

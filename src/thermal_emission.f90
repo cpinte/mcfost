@@ -1632,46 +1632,4 @@ end subroutine compute_sublimation_radius
 
 !***********************************************************
 
-subroutine remove_specie()
-
-  implicit none
-
-  integer :: i, j, pk, k
-  real :: mass
-
-  write(*,*) "Removing specie", specie_removed, "where T >", T_rm
-
-  do i=1,n_rad
-     do j=1,nz
-        do pk=1,n_az
-           do k=1,n_grains_tot
-              if (grain(k)%pop==specie_removed) then
-                 if (Temperature(i,j,pk) > T_rm) then
-                    densite_pouss(i,j,pk,k) = 0.0
-                 endif
-              endif
-           enddo
-        enddo
-     enddo
-  enddo
-
-  mass = 0.0
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * & 
-                (tab_a(k)*1.e-4)**3) * (volume(i) * 3.347929d39)
-        enddo
-     enddo
-  enddo
-  mass =  mass/Msun_to_g
-
-  write(*,*) 'New total dust mass in model :', mass,' Msun'
-
-  return
-
-end subroutine remove_specie
-
-!************************************************************
-
 end module thermal_emission

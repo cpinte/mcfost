@@ -876,16 +876,16 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   real :: norme, somme2, somme_prob, log_a, log_wavel, wl_min, wl_max
 
 
-  log_a=log(tab_a(taille_grain))
+  log_a=log(r_grain(taille_grain))
   log_wavel = log(tab_lambda(lambda))
   
   pop=grain(taille_grain)%pop
 
-  if (tab_a(taille_grain) < exp(log_PAH_rad(1))) then
+  if (r_grain(taille_grain) < exp(log_PAH_rad(1))) then
      write(*,*) "Minimum PAH grain size is",  exp(log_PAH_rad(1))
      write(*,*) "Exiting"
      stop
-  else if (tab_a(taille_grain) > exp(log_PAH_rad(PAH_n_rad))) then
+  else if (r_grain(taille_grain) > exp(log_PAH_rad(PAH_n_rad))) then
      write(*,*) "Maximum PAH grain size is",  exp(log_PAH_rad(PAH_n_rad))
      write(*,*) "Exiting"
      stop
