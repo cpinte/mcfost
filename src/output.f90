@@ -1892,7 +1892,7 @@ subroutine taille_moyenne_grains()
      do i=1,n_rad
         somme=0.0
         do l=1, n_grains_tot
-           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(i,j,1,l) * tab_a(l)**2
+           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(i,j,1,l) * r_grain(l)**2
            somme = somme + densite_pouss(i,j,1,l)
         enddo
         a_moyen(i,j) = a_moyen(i,j) / somme

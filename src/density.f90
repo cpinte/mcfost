@@ -83,9 +83,9 @@ subroutine define_density()
   ! facteur multiplicatif pour passer en g/cm**3: 
   cst=cst * Msun_to_g / AU3_to_cm3
 
-  ! facteur multiplicatif pour passer en part/cm**3: XMG
+  ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
   do i=1, n_pop
-     cst_pous(i) = cst(i)/dust_pop(i)%xmg
+     cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
 
   ! Facteur multiplicatif pour passer en masse de gaz
@@ -98,13 +98,13 @@ subroutine define_density()
      ! Correction stratification
      if (lstrat) then 
         ! loi de puissance
-        if (tab_a(l) > a_strat) then
-           correct_strat(l) = (tab_a(l)/a_strat)**exp_strat
+        if (r_grain(l) > a_strat) then
+           correct_strat(l) = (r_grain(l)/a_strat)**exp_strat
         else
            correct_strat(l) = 1.0
         endif
         ! loi exponentielle (Garaud , Barriere 2004)
-        !        correct_strat(k) = exp(tab_a(k)*fact_strat)/exp(amin*fact_strat) 
+        !        correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat) 
      else
         correct_strat(l) = 1.0
      endif
@@ -132,7 +132,7 @@ subroutine define_density()
         !$o m p private(j,k,z,density,k_min,proba,z0,phi,rho,rho0,h,Ztilde,Omega)&
         !$o m p shared(i,rcyl,fact_exp,coeff_exp,delta_z,amax_reel,nz,n_rad,grain,dust_pop,pop) &
         !$o m p shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,z_lim,n_grains_tot,puffed) &
-        !$o m p shared(nbre_grains,correct_strat,cst_pous,densite_pouss,tab_a,masse,dz,izone,volume) &
+        !$o m p shared(nbre_grains,correct_strat,cst_pous,densite_pouss,r_grain,masse,dz,izone,volume) &
         !$o m p shared(lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r,z_grid,r_grid) &
         !$o m p shared(lsetup_gas,cst_gaz,densite_gaz,masse_gaz,j_start,n_az,z_warp,phi_grid,lwarp) &
         !$o m p shared(lSeb_Fromang,Seb_Fromang_model,dtilde)
@@ -227,7 +227,7 @@ subroutine define_density()
 
                  do l=1,n_grains_tot
                     !calculate omega_tau in the disk midplane
-                    Omega = omega_tau(rho0,h,tab_a(l)) 
+                    Omega = omega_tau(rho0,h,r_grain(l)) 
               
                     do j=j_start,nz
                        if (j==0) cycle 
@@ -401,8 +401,7 @@ subroutine define_density()
               
               do k=1,n_az
                  do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + densite_pouss(i,j,k,l) * (dust_pop(pop)%rho1g * 4.*pi/3. & 
-                         * (tab_a(l)*1.e-4)**3) * (volume(i) * AU3_to_cm3) 
+                    mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3) 
                  enddo !l
               enddo !k
            enddo bz2
@@ -417,8 +416,7 @@ subroutine define_density()
               do k=1, n_az
                  do l=dp%ind_debut,dp%ind_fin
                     densite_pouss(i,j,k,l) = densite_pouss(i,j,k,l) * facteur
-                    masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * tab_a(l)**3 & 
-                         * dust_pop(pop)%rho1g * volume(i)
+                    masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
                  enddo !l
               enddo !k
            enddo bz3
@@ -427,7 +425,7 @@ subroutine define_density()
      endif ! test wall
   enddo ! pop
   
-  masse(:,:,:) = masse(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
   
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
      
@@ -477,7 +475,7 @@ subroutine define_density()
 !  do i=1,n_rad
 !     do j=1,nz
 !        do l=1,n_grains_tot
-!           mass=mass + densite_pouss(i,j,l) * (rho1g * 4.*pi/3. * (tab_a(l)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+!           mass=mass + densite_pouss(i,j,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
 !        enddo
 !     enddo
 !  enddo
@@ -598,8 +596,7 @@ subroutine define_density_wall3D()
        
               do k=1,n_az
                  do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + density_wall(i,j,k,l) * (dust_pop(pop)%rho1g * 4.*pi/3. & 
-                    * (tab_a(l)*1.e-4)**3) * (volume(i) * AU3_to_cm3) 
+                    mass=mass + density_wall(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3) 
                  enddo !l
               enddo !k
            enddo bz2
@@ -614,8 +611,7 @@ subroutine define_density_wall3D()
               do k=1, n_az
                  do l=dp%ind_debut,dp%ind_fin
                     density_wall(i,j,k,l) = density_wall(i,j,k,l) * facteur
-                    masse_wall(i,j,k) = masse_wall(i,j,k) + density_wall(i,j,k,l) * tab_a(l)**3 & 
-                         * dust_pop(pop)%rho1g * volume(i)
+                    masse_wall(i,j,k) = masse_wall(i,j,k) + density_wall(i,j,k,l) * M_grain(l) * volume(i)
                  enddo !l
               enddo !k
            enddo bz3
@@ -624,7 +620,7 @@ subroutine define_density_wall3D()
      endif ! zone = wall
   enddo ! pop
      
-  masse_wall(:,:,:) = masse_wall(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3
+  masse_wall(:,:,:) = masse_wall(:,:,:) * AU3_to_cm3
   write(*,*) 'Wall dust mass:', real(sum(masse_wall)*g_to_Msun),' Msun'
 
   ! superposition du mur sur le disque
@@ -684,7 +680,7 @@ subroutine densite_data2()
   if (lstrat) then
      do k=1,n_grains_tot
         ! Petits grains
-        if (tab_a(k) < a_sph(1)) then
+        if (r_grain(k) < a_sph(1)) then
            a0_int(k) = a0(1)
            a1_int(k) = a1(1)
            a2_int(k) = a2(1)
@@ -694,7 +690,7 @@ subroutine densite_data2()
            b1_int(k) = b1(1)
            b0_int(k) = b0(1)
            ! Gros grains
-        else if (tab_a(k) > a_sph(nbre_a)) then
+        else if (r_grain(k) > a_sph(nbre_a)) then
            a0_int(k) = a0(5)
            a1_int(k) = a1(5)
            a2_int(k) = a2(5)
@@ -705,15 +701,15 @@ subroutine densite_data2()
            b0_int(k) = b0(5)
         else
            ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           a0_int(k) = a0(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a0(l+1)-a0(l))
-           a1_int(k) = a1(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a1(l+1)-a1(l))
-           a2_int(k) = a2(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a2(l+1)-a2(l))
-           b4_int(k) = b4(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b4(l+1)-b4(l))
-           b3_int(k) = b3(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b3(l+1)-b3(l))
-           b2_int(k) = b2(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b2(l+1)-b2(l))
-           b1_int(k) = b1(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b1(l+1)-b1(l))
-           b0_int(k) = b0(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b0(l+1)-b0(l))
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           a0_int(k) = a0(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a0(l+1)-a0(l))
+           a1_int(k) = a1(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a1(l+1)-a1(l))
+           a2_int(k) = a2(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(a2(l+1)-a2(l))
+           b4_int(k) = b4(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b4(l+1)-b4(l))
+           b3_int(k) = b3(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b3(l+1)-b3(l))
+           b2_int(k) = b2(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b2(l+1)-b2(l))
+           b1_int(k) = b1(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b1(l+1)-b1(l))
+           b0_int(k) = b0(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(b0(l+1)-b0(l))
         endif
      enddo
   else !lstrat
@@ -729,7 +725,7 @@ subroutine densite_data2()
 
   ! Constantes 
   ! On divise ici par (AU/cm)**3 pour eviter overflow
-  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%xmg 
+  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass 
 
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
@@ -785,8 +781,7 @@ subroutine densite_data2()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3.&
-                * (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -798,7 +793,7 @@ subroutine densite_data2()
 !  do i=1,n_rad
 !     do j=1,nz
 !        do k=1,n_grains_tot
-!           masse=masse + densite_pouss(i,j,k) * (rho1g * 4.*pi/3. * (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+!           masse=masse + densite_pouss(i,j,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
 !        enddo
 !     enddo
 !  enddo
@@ -863,7 +858,7 @@ subroutine densite_data_SPH_binaire()
   if (.not.lno_strat_SPH_bin) then
      do k=1,n_grains_tot
         ! Petits grains
-        if (tab_a(k) < a_sph(1)) then
+        if (r_grain(k) < a_sph(1)) then
            a0_int(k) = a0(1)
            a1_int(k) = a1(1)
            a2_int(k) = a2(1)
@@ -871,7 +866,7 @@ subroutine densite_data_SPH_binaire()
            b1_int(k) = b1(1)
            b0_int(k) = b0(1)
            ! Gros grains
-        else if (tab_a(k) > a_sph(nbre_a)) then
+        else if (r_grain(k) > a_sph(nbre_a)) then
            a0_int(k) = a0(5)
            a1_int(k) = a1(5)
            a2_int(k) = a2(5)
@@ -880,9 +875,9 @@ subroutine densite_data_SPH_binaire()
            b0_int(k) = b0(5)
         else
            ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           !fact = (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
-           fact = (log(tab_a(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           !fact = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+           fact = (log(r_grain(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
            a0_int(k) = a0(l) + fact * (a0(l+1)-a0(l))
            a1_int(k) = a1(l) + fact * (a1(l+1)-a1(l))
            a2_int(k) = a2(l) + fact * (a2(l+1)-a2(l))
@@ -902,7 +897,7 @@ subroutine densite_data_SPH_binaire()
 
   ! Constantes 
   ! On divise ici par (AU/cm)**3 pour eviter overflow
-  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%xmg
+  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass
  
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
@@ -954,8 +949,7 @@ subroutine densite_data_SPH_binaire()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -967,7 +961,7 @@ subroutine densite_data_SPH_binaire()
 !  do i=1,n_rad
 !     do j=1,nz
 !        do k=1,n_grains_tot
-!           masse=masse + densite_pouss(i,j,k) * (rho1g * 4.*pi/3. * (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+!           masse=masse + densite_pouss(i,j,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
 !        enddo
 !     enddo
 !  enddo
@@ -1033,7 +1027,7 @@ subroutine densite_data_SPH_TTauri()
   if (.not.lno_strat_SPH) then
      do k=1,n_grains_tot
         ! Petits grains
-        if (tab_a(k) < a_sph(1)) then
+        if (r_grain(k) < a_sph(1)) then
            a0_int(k) = a0(1)
            a1_int(k) = a1(1)
            a2_int(k) = a2(1)
@@ -1045,7 +1039,7 @@ subroutine densite_data_SPH_TTauri()
            b1_int(k) = b1(1)
            b0_int(k) = b0(1)
            ! Gros grains
-        else if (tab_a(k) > a_sph(nbre_a)) then
+        else if (r_grain(k) > a_sph(nbre_a)) then
            a0_int(k) = a0(nbre_a)
            a1_int(k) = a1(nbre_a)
            a2_int(k) = a2(nbre_a)
@@ -1058,9 +1052,9 @@ subroutine densite_data_SPH_TTauri()
            b0_int(k) = b0(nbre_a)
         else
            ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           fact = (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
-           !fact = (log(tab_a(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           fact = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+           !fact = (log(r_grain(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
            a0_int(k) = a0(l) + fact * (a0(l+1)-a0(l))
            a1_int(k) = a1(l) + fact * (a1(l+1)-a1(l))
            a2_int(k) = a2(l) + fact * (a2(l+1)-a2(l))
@@ -1092,7 +1086,7 @@ subroutine densite_data_SPH_TTauri()
 
   ! Constantes 
   ! On divise ici par (AU/cm)**3 pour eviter overflow
-  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%xmg 
+  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass 
   
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
@@ -1162,8 +1156,7 @@ subroutine densite_data_SPH_TTauri()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1176,8 +1169,7 @@ subroutine densite_data_SPH_TTauri()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. *&
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1318,24 +1310,24 @@ subroutine densite_data_SPH_TTauri_1()
   l = 0
   do k=1, n_grains_tot
      ! Petits grains
-     if (tab_a(k) < a_sph(1)) then
+     if (r_grain(k) < a_sph(1)) then
         tab_beta(k) = beta_sph(1)
         tab_surf(k) = surf_sph(1)
         tab_h0(k) = h0_sph(1)
      ! Gros grains
-     else if (tab_a(k) > a_sph(nbre_a)) then
+     else if (r_grain(k) > a_sph(nbre_a)) then
         tab_beta(k) = beta_sph(nbre_a)
         tab_surf(k) = surf_sph(nbre_a)
         tab_h0(k) = h0_sph(nbre_a)
      else
         ! Autres grains : interpolation
-        if (tab_a(k) > a_sph(l+1)) l = l+1
+        if (r_grain(k) > a_sph(l+1)) l = l+1
 !        write(*,*) l, k
-        tab_beta(k) = beta_sph(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(beta_sph(l+1)-beta_sph(l))
-        tab_surf(k) = surf_sph(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(surf_sph(l+1)-surf_sph(l))
-        tab_h0(k) = h0_sph(l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(h0_sph(l+1)-h0_sph(l))
+        tab_beta(k) = beta_sph(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(beta_sph(l+1)-beta_sph(l))
+        tab_surf(k) = surf_sph(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(surf_sph(l+1)-surf_sph(l))
+        tab_h0(k) = h0_sph(l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))*(h0_sph(l+1)-h0_sph(l))
      endif
-!        write(*,*) k, tab_a(k), tab_beta(k), tab_surf(k),  tab_h0(k)
+!        write(*,*) k, r_grain(k), tab_beta(k), tab_surf(k),  tab_h0(k)
   enddo
 
   dz%exp_beta=beta_sph(1)
@@ -1354,8 +1346,8 @@ subroutine densite_data_SPH_TTauri_1()
 
      ! facteur multiplicatif pour passer en g/cm**3: 
      cst=cst*Msun_to_g / AU3_to_cm3
-     ! facteur multiplicatif pour passer en part/cm**3: XMG
-     cst_pous = cst/dust_pop(1)%xmg
+     ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
+     cst_pous = cst/dust_pop(1)%avg_grain_mass
      ! Facteur multiplicatif pour prendre en compte que les grains de taille a
      tab_cst(k) = cst_pous*nbre_grains(k) 
   enddo
@@ -1399,8 +1391,7 @@ subroutine densite_data_SPH_TTauri_1()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1413,8 +1404,7 @@ subroutine densite_data_SPH_TTauri_1()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1490,14 +1480,14 @@ subroutine densite_data_SPH_TTauri_2()
   if (.not.lno_strat_SPH) then
      do k=1,n_grains_tot
         ! Petits grains
-        if (tab_a(k) < a_sph(1)) then
+        if (r_grain(k) < a_sph(1)) then
            do i=1, n_rad
               do j=1,nz
                  densite_pouss(i,j,1,k) = rho(i,j,1)
               enddo
            enddo
            ! Gros grains
-        else if (tab_a(k) > a_sph(nbre_a)) then
+        else if (r_grain(k) > a_sph(nbre_a)) then
            do i=1, n_rad
               do j=1,nz
                  densite_pouss(i,j,1,k) = rho(i,j,1)
@@ -1505,10 +1495,10 @@ subroutine densite_data_SPH_TTauri_2()
            enddo
         else
            ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           !write(*,*) tab_a(k), l, a_sph(l), a_sph(l+1)         
-           !fact = (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
-           fact = (log(tab_a(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           !write(*,*) r_grain(k), l, a_sph(l), a_sph(l+1)         
+           !fact = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+           fact = (log(r_grain(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
            do i=1, n_rad
               do j=1,nz
                  densite_pouss(i,j,1,k) = exp(log(rho(i,j,l))  + fact* (log(rho(i,j,l+1)) - log(rho(i,j,l))) )
@@ -1553,7 +1543,7 @@ subroutine densite_data_SPH_TTauri_2()
      do j=1,nz
         do k=1,n_grains_tot
            masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+                (r_grain(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1566,8 +1556,7 @@ subroutine densite_data_SPH_TTauri_2()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -1707,8 +1696,7 @@ subroutine densite_data_LAURE_SED()
        
            do k=1,n_az
               do l=dp%ind_debut,dp%ind_fin
-                 mass=mass + densite_pouss(i,j,k,l) * (dust_pop(pop)%rho1g * 4.*pi/3. & 
-                      * (tab_a(l)*1.e-4)**3) * (volume(i) * AU3_to_cm3) 
+                 mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3) 
               enddo !l
            enddo !k
         enddo bz2
@@ -1724,8 +1712,7 @@ subroutine densite_data_LAURE_SED()
            do k=1, n_az
               do l=dp%ind_debut,dp%ind_fin
                  densite_pouss(i,j,k,l) = densite_pouss(i,j,k,l) * facteur
-                 masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * tab_a(l)**3 & 
-                      * dust_pop(pop)%rho1g * volume(i)
+                 masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
               enddo !l
            enddo !k
         enddo bz3
@@ -1733,7 +1720,7 @@ subroutine densite_data_LAURE_SED()
      
   enddo ! pop
   
-  masse(:,:,:) = masse(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
   
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   
@@ -1805,8 +1792,8 @@ subroutine densite_eqdiff()
   ! facteur multiplicatif pour passer en g/cm**3: 
   cst=cst * Msun_to_g / AU3_to_cm3
 
-  ! facteur multiplicatif pour passer en part/cm**3: XMG
-  cst_pous = cst/dust_pop(1)%xmg
+  ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
+  cst_pous = cst/dust_pop(1)%avg_grain_mass
 
   ! Facteur multiplicatif pour passer en masse de gaz
   cst_gaz = cst*gas_dust
@@ -1867,8 +1854,8 @@ subroutine densite_eqdiff()
         pas_z = delta_z(i)
         do k=1, n_grains_tot
            ! Coeff dependant de a
-           coeff1 = (omega**2*dust_pop(1)%rho1g*tab_a(k)*1.e-4)/(c_sound*D0*cst_gaz*fact_exp)
-           coeff2 = (omega*dust_pop(1)%rho1g*tab_a(k)*1.e-4)/(c_sound**cst_gaz*fact_exp)
+           coeff1 = (omega**2*dust_pop(1)%rho1g*r_grain(k)*mum_to_cm)/(c_sound*D0*cst_gaz*fact_exp)
+           coeff2 = (omega*dust_pop(1)%rho1g*r_grain(k)*mum_to_cm)/(c_sound**cst_gaz*fact_exp)
            ! Integration main loop
            y(1) = 1.0
            correct_strat(k,1) = 1.0
@@ -1896,7 +1883,7 @@ subroutine densite_eqdiff()
            do j=1,nz
               correct_strat(k,j) = correct_strat(k,j)*correct
            enddo
-!           if ((rcyl > 10.0).and.(tab_a(k)>0.1)) then 
+!           if ((rcyl > 10.0).and.(r_grain(k)>0.1)) then 
 !              do j=1,nz
 !                 write(*,*) z(j)/rcyl,  correct_strat(k,j)
 !              enddo
@@ -2092,7 +2079,7 @@ subroutine densite_data_hd32297()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(1)%rho1g * 4.*pi/3. * (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -2241,8 +2228,7 @@ subroutine densite_data_gap()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -2270,7 +2256,7 @@ subroutine init_opacity_wall()
   ! Au cas ou ils taperrait dans le mur
   cos_max2 = 0.0
 
-  write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*xmg/0.594098e-6
+  write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*avg_grain_mass/0.594098e-6
 
   return
 
@@ -2402,13 +2388,13 @@ subroutine densite_gap_laure()
      write(*,*) "Differential gap"
      l=1
      do k=1,n_grains_tot
-        if (tab_a(k) < a_sph(1)) then  ! Petits grains
+        if (r_grain(k) < a_sph(1)) then  ! Petits grains
            densite_pouss(:,1:nz,1,k) = sph_dens(:,:,1)
-        else if (tab_a(k) > a_sph(nbre_a)) then ! Gros grains
+        else if (r_grain(k) > a_sph(nbre_a)) then ! Gros grains
            densite_pouss(:,1:nz,1,k) = sph_dens(:,:,nbre_a)
         else  ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
                 ( sph_dens(:,:,l+1) -  sph_dens(:,:,l) )
         endif
      enddo
@@ -2441,8 +2427,7 @@ subroutine densite_gap_laure()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3.&
-                * (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -2454,13 +2439,12 @@ subroutine densite_gap_laure()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * tab_a(k)**3 & 
-                      * dust_pop(1)%rho1g * volume(i)
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * volume(i)
         enddo !k
      enddo !j
   enddo ! i
  
-  masse(:,:,:) = masse(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
 
@@ -2555,13 +2539,13 @@ subroutine densite_gap_laure2()
      write(*,*) "Differential gap"
      l=1
      do k=1,n_grains_tot
-        if (tab_a(k) < a_sph(1)) then  ! Petits grains
+        if (r_grain(k) < a_sph(1)) then  ! Petits grains
            densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-        else if (tab_a(k) > a_sph(nbre_a)) then ! Gros grains
+        else if (r_grain(k) > a_sph(nbre_a)) then ! Gros grains
            densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,nbre_a)
         else  ! Autres grains : interpolation
-           if (tab_a(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (tab_a(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+           if (r_grain(k) > a_sph(l+1)) l = l+1
+           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
                 ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
         endif
      enddo
@@ -2620,8 +2604,7 @@ subroutine densite_gap_laure2()
         if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
-              mass=mass + densite_pouss(i,j,k,l) * (dust_pop(grain(l)%pop)%rho1g * 4.*pi/3.&
-                   * (tab_a(l)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+              mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
            enddo !l
         enddo !k
      enddo !j
@@ -2637,14 +2620,13 @@ subroutine densite_gap_laure2()
         if (j==0) cycle 
         do k=1,n_az
            do l=1,n_grains_tot
-              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * tab_a(l)**3 & 
-                   * dust_pop(1)%rho1g * volume(i)
+              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
            enddo !l
         enddo !k
      enddo !j
   enddo ! i
  
-  masse(:,:,:) = masse(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
 
@@ -2689,7 +2671,7 @@ subroutine densite_debris
            densite_pouss(i,j,1,k) = rho(i,j,k) !/ (volume(i) * AU3_to_cm3)
         enddo
      enddo
-!     write(6,*) tab_a(k),tab_densite(1,1,1,k)
+!     write(6,*) r_grain(k),tab_densite(1,1,1,k)
   enddo
 
   ! Normalisation : Calcul masse totale
@@ -2697,8 +2679,7 @@ subroutine densite_debris
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -2791,14 +2772,13 @@ subroutine densite_fits
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
-                (tab_a(k)*1.e-4)**3) * (volume(i) * 3.347929d39)
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(l) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
   mass=sum(masse)
 
-  write(*,*) "Total dust mass =", mass/ 1.9891e33," Msun"
+  write(*,*) "Total dust mass =", mass/ Msun_to_g," Msun"
 
 
 !***************
@@ -2857,7 +2837,7 @@ subroutine densite_Seb_Charnoz()
 
   read(1,*)
   read(1,*) taille_grains_Seb
-  tab_a(:) = taille_grains_Seb(:) * 1e6 ! conversion en micron
+  r_grain(:) = taille_grains_Seb(:) * m_to_mum ! conversion en micron
 
   read(1,*)
   Somme = 0.
@@ -2877,7 +2857,7 @@ subroutine densite_Seb_Charnoz()
            
 
         densite_pouss(i,j,1,:) = density_Seb(:) / (volume(i)*AU3_to_cm3) ! comversion en densite volumique
-        Somme = Somme +  1.6 * 4.*pi/3. *  (1.e-4)**3 * sum( density_Seb(:) * tab_a(:)**3 )
+        Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
      enddo ! j
   enddo !i
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
@@ -2910,14 +2890,13 @@ subroutine densite_Seb_Charnoz()
         if (j==0) cycle bz
         do k=1, n_az
            do l=1,n_grains_tot
-              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * tab_a(l)**3 & 
-                   * dust_pop(1)%rho1g * volume(i)
+              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
            enddo !l
         enddo !k
      enddo bz
   enddo ! i
 
-  masse(:,:,:) = masse(:,:,:) * 4.*pi/3. *  (1.e-4)**3 * AU3_to_cm3 * 1600./3500 ! TMP
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3 * 1600./3500 ! TMP
    
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
 
@@ -2928,17 +2907,45 @@ end subroutine densite_Seb_Charnoz
 
 !**********************************************************************
 
-function is_diff(a,b)
+subroutine remove_specie()
 
-  logical is_diff
-  real(kind=db) :: a,b
-  
-  if (abs(a-b) > 0.5e-5 * abs(a+b)) then
-     is_diff = .true.
-  else
-     is_diff = .false.
-  endif
-  
-end function is_diff
+  implicit none
+
+  integer :: i, j, pk, k
+  real :: mass
+
+  write(*,*) "Removing specie", specie_removed, "where T >", T_rm
+
+  do i=1,n_rad
+     do j=1,nz
+        do pk=1,n_az
+           do k=1,n_grains_tot
+              if (grain(k)%pop==specie_removed) then
+                 if (Temperature(i,j,pk) > T_rm) then
+                    densite_pouss(i,j,pk,k) = 0.0
+                 endif
+              endif
+           enddo
+        enddo
+     enddo
+  enddo
+
+  mass = 0.0
+  do i=1,n_rad
+     do j=1,nz
+        do k=1,n_grains_tot
+           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
+        enddo
+     enddo
+  enddo
+  mass =  mass/Msun_to_g
+
+  write(*,*) 'New total dust mass in model :', mass,' Msun'
+
+  return
+
+end subroutine remove_specie
+
+!************************************************************
 
 end module density

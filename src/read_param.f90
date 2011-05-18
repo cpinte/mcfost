@@ -50,8 +50,8 @@ contains
 
     correct_Rsub = 1.0_db
 
+    write(*,*) "You are running MCFOST "//trim(mcfost_release)
     if (abs(para_version - 2.13) > 1.e-4) then
-       write(*,*) "You are running MCFOST "//trim(mcfost_release)
        write(*,*) "Wrong version of the parameter file."
        if (abs(para_version-2.12) < 1.e-4) then
           write(*,*) "Trying to read 2.12 parameter file."
@@ -126,8 +126,6 @@ contains
           stop
        endif
     endif
-
-    write(*,*) "You are running MCFOST "//trim(mcfost_release)
 
     ! -------------------------
     ! Number of photon packages
@@ -678,8 +676,6 @@ contains
     endif
 
     correct_Rsub = 1.0_db
-
-    write(*,*) "You are running MCFOST "//trim(mcfost_release)
 
     ! -------------------------
     ! Number of photon packages

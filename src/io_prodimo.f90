@@ -79,9 +79,9 @@ contains
 
     ! TODO : linit_gaz
 
-    integer :: alloc_status
+    integer :: alloc_status, nl
 
-    ! Limte 10x plus haut pour avoir temperature plus propre pour ProDiMo
+    ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
 
     ! TODO : verif fichier parametres : pour relecture avec Yorick
@@ -320,11 +320,11 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    norme = sum(tab_a(:)**2 * nbre_grains(:))
+    norme = sum(r_grain(:)**2 * nbre_grains(:))
     if (lRE_nLTE) then
        do ri=1, n_rad
           do zj=1, nz
-             Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * tab_a(:)**2 * nbre_grains(:)) / norme
+             Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
           enddo !j
        enddo !i
        
@@ -606,9 +606,9 @@ contains
           ! Nbre total de grain : le da est deja dans densite_pouss
           N = sum(densite_pouss(ri,zj,1,:))
           N_grains(ri,zj,0) = N
-          N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * tab_a(:)) / N
-          N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * tab_a(:)**2) / N
-          N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * tab_a(:)**3) / N
+          N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
+          N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
+          N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
        enddo
     enddo
 
