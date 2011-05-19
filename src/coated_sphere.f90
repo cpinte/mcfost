@@ -15,7 +15,7 @@ module coated_sphere
 
 contains
 
-  subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,coat_frac,amu1_coat,amu2_coat,qext,qsca,gsca)
+  subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
     !***************************************************************
     ! calcule les elements de la matrice de diffusion a partir de
     ! la sous-routine dmilay (coated grains)   
@@ -30,7 +30,6 @@ contains
     
     integer, intent(in) :: lambda, taille_grain
     real, intent(in) :: amu1, amu2, amu1_coat, amu2_coat
-    real, intent(in) :: coat_frac
     real, intent(in) :: wl
     real, intent(out) :: qext, qsca, gsca
 
@@ -39,7 +38,7 @@ contains
     complex, dimension(nang_scatt+1) :: S1,S2
 
     real, parameter :: pi = 3.1415926535
-    real :: rcore, rshell, wvno, fact, gqsc
+    real :: rcore, rshell, wvno, gqsc
     real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
     real :: qbs
     complex :: refrel, refrel_coat
@@ -64,11 +63,10 @@ contains
        nang= (nang_scatt+1) / 2 + 1
     endif
 
-    rcore=r_grain(taille_grain)
-    fact=exp(log(1.-coat_frac)/3.) ! (1-coat_frac)^1/3
-    rshell=rcore/fact
+    rcore=r_core(taille_grain)
+    rshell=r_grain(taille_grain)
 
-    !write(*,*) rcore, rshell
+    !write(*,*) rcore, rshell 
 
     wvno= 2.0 * pi / wl 
 

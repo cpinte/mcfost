@@ -28,7 +28,7 @@ subroutine taille_grains()
   real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
   real(kind=db) :: exp_grains
   real :: masse_pop
-  real :: corr_fact
+  real :: correct_fact_r, correct_fact_S, correct_fact_M
 
   type(dust_pop_type), pointer :: dp
 
@@ -55,15 +55,8 @@ subroutine taille_grains()
         endif
      endif
 
-     if (dp%lcoating == .true.) then
-        ! increase grain mass to take into account coating
-        corr_fact = (dp%coating_frac*dp%rho1g_coating)/((1.-dp%coating_frac)*dp%rho1g)
-        dp%avg_grain_mass = dp%avg_grain_mass * (1.+corr_fact)
-     endif
-
      ! Proprietes des grains
      !exp_grains = (amax/amin)**(1./real(n_grains_tot))
-
      if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
         write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
         write(*,*) "If yes, press return"
@@ -107,6 +100,22 @@ subroutine taille_grains()
      do  k=dp%ind_debut,dp%ind_fin
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
+
+
+     ! Increase grain radius, surface & mass to take into account coating
+     if (dp%lcoating == .true.) then
+        correct_fact_r =  1.0 / (1-dp%coating_frac)**(1./3)  ! r_tot = r_core * correct_fact_r
+        correct_fact_S = correct_fact_r**2
+        correct_fact_M = 1.0 + (dp%coating_frac*dp%rho1g_coating) / ((1.-dp%coating_frac)*dp%rho1g)
+     
+        dp%avg_grain_mass = dp%avg_grain_mass * correct_fact_M
+        do k=dp%ind_debut,dp%ind_fin
+           r_core(k) = r_grain(k) 
+           r_grain(k) = r_grain(k) * correct_fact_r
+           S_grain(k) = S_grain(k) * correct_fact_S
+           M_grain(k) = M_grain(k) * correct_fact_M
+        enddo ! k
+     endif
 
   enddo !i
 
@@ -303,7 +312,6 @@ subroutine init_indices_optiques()
         deallocate(tab_l,tab_a1,tab_a2)
 
         ! Layer coating
-
         if (dust_pop(pop)%lcoating.and.dust_pop(pop)%lmantle) then
            ! Lecture fichier indices
            filename = trim(dust_dir)//trim(dust_pop(pop)%indices_coating)
@@ -359,11 +367,8 @@ subroutine init_indices_optiques()
               write(*,*) "Exiting"
               stop
            endif
-           ! adjust density of grains to include coating
-           ! NEED TO MOVE THIS BELOW IF COATING POROSITY IS INCLUDED
-           dust_pop(pop)%rho1g=(1.-dust_pop(pop)%coating_frac)*dust_pop(pop)%rho1g+&
-                dust_pop(pop)%coating_frac*dust_pop(pop)%rho1g_coating
 
+           
            ! ligne vide
            read(1,*)
            
@@ -583,8 +588,7 @@ subroutine prop_grains(lambda, p_lambda)
               if (dust_pop(pop)%lmantle) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
-                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,&
-                      dust_pop(pop)%coating_frac,amu1_coat,amu2_coat,qext,qsca,gsca)
+                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
               else
                   ! EMT MIXING - THIS IS NOT CODED YET...
               endif ! lmantle

@@ -366,6 +366,7 @@ module grains
 
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
+     ! en cas de coating, rho1g est la densite du coeur
      real :: amin, amax, aexp, frac_mass, rho1g, avg_grain_mass, masse, porosity, sblow
      real :: rho1g_coating, coating_frac
      character(len=512) :: indices, indices_coating
@@ -383,7 +384,7 @@ module grains
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
-  real, dimension(:), allocatable :: r_grain, S_grain, M_grain !n_grains_tot
+  real, dimension(:), allocatable :: r_grain, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
   
