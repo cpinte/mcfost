@@ -57,9 +57,14 @@ subroutine taille_grains()
         a=dp%amin
         dp%xmg = 4.1887E-12 * a**3 * dp%rho1g
      else
-        if (abs(dp%aexp - 4.) > 1.0e-5) then
-           dp%xmg = 4.1887E-12 * dp%rho1g *(1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+        if (abs(dp%aexp - 4.) > 1.0e-5)  then
+           if (abs(dp%aexp - 1.) > 1.0e-5) then
+              dp%xmg = 4.1887E-12 * dp%rho1g *(1-dp%aexp)/(4-dp%aexp) *(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                   (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+           else
+              dp%xmg = 4.1887E-12 * dp%rho1g /(4-dp%aexp) *(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                   (log(dp%amax)-log(dp%amin))
+           endif
         else
            dp%xmg = 4.1887E-12 * dp%rho1g *(1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
                 (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
