@@ -18,8 +18,7 @@ module ProDiMo
   save
 
   character(len=32), parameter :: mcfost2ProDiMo_file = "forProDiMo.fits.gz"
-  integer, parameter :: mcfost2ProDiMo_version = 2
-  integer :: ProDiMo2mcfost_version
+  integer :: mcfost2ProDiMo_version, ProDiMo2mcfost_version
   
 
   ! Pour champ UV
