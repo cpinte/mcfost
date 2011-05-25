@@ -1355,7 +1355,7 @@ subroutine realloc_step2()
   prob_E_star = 0.0
   
   deallocate(spectre_etoiles_cumul, spectre_etoiles, spectre_emission_cumul)
-  allocate(spectre_etoiles_cumul(0:n_lambda2),spectre_etoiles(0:n_lambda2),spectre_emission_cumul(0:n_lambda2), stat=alloc_status)
+  allocate(spectre_etoiles_cumul(0:n_lambda2),spectre_etoiles(n_lambda2),spectre_emission_cumul(0:n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre_etoile'
      stop
