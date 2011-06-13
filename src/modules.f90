@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.12
-  character(8), parameter :: mcfost_release = "2.12.18"
+  real, parameter :: mcfost_version = 2.13
+  character(8), parameter :: mcfost_release = "2.13.0"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   character(len=128), parameter :: webpage="http://ipag.osug.fr/public/pintec/mcfost/"
 
@@ -367,9 +367,11 @@ module grains
 
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
-     real :: amin, amax, aexp, frac_mass, rho1g, xmg, masse, porosity, sblow
-     character(len=512) :: indices
-     logical :: is_PAH
+     ! en cas de coating, rho1g est la densite du coeur
+     real :: amin, amax, aexp, frac_mass, rho1g, avg_grain_mass, masse, porosity, sblow
+     real :: rho1g_coating, coating_frac
+     character(len=512) :: indices, indices_coating
+     logical :: is_PAH, lcoating, lmantle
      integer :: ind_debut, ind_fin
      integer :: pop_geo
   end type dust_pop_type
@@ -383,7 +385,7 @@ module grains
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
-  real, dimension(:), allocatable :: tab_a !n_grains_tot
+  real, dimension(:), allocatable :: r_grain, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
   
@@ -400,6 +402,7 @@ module grains
   ! Tab de lambda
   real, dimension(:), allocatable :: tab_lambda, tab_delta_lambda !n_lambda
   real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
+  real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
   real, dimension(:), allocatable :: tab_lambda2, tab_delta_lambda2
 
   ! Parametres de diffusion des grains
@@ -690,8 +693,9 @@ module constantes
 
   ! Quelques reels utiles
   real(kind=db), parameter :: pi =3.141592653589793238462643383279502884197_db ! ca devrait etre bon la
-  real(kind=db), parameter :: deux_pi = 2._db * pi
-  real(kind=db), parameter :: quatre_pi = 4._db * pi
+  real(kind=db), parameter :: deux_pi = 2.0_db * pi
+  real(kind=db), parameter :: quatre_pi = 4.0_db * pi
+  real(kind=db), parameter :: quatre_tiers_pi = 4.0_db/3.0_db * pi
   real(kind=db), parameter :: pi_sur_deux = 0.5_db * pi
   real(kind=db), parameter :: un_tiers = 1.0_db / 3.0_db
 
@@ -724,6 +728,8 @@ module constantes
   real(kind=db), parameter :: AU_to_m = 1.49595e11_db
   real(kind=db), parameter :: m_to_AU = 1.0_db/AU_to_m
 
+  real(kind=db), parameter :: mum_to_m = 1.0e-6_db
+  real(kind=db), parameter :: m_to_mum = 1.0e6_db
   real(kind=db), parameter :: mum_to_cm = 1.0e-4_db
   real(kind=db), parameter :: cm_to_mum = 1.0e4_db
 

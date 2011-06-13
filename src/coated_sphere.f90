@@ -2,6 +2,7 @@ module coated_sphere
 
   use parametres
   use constantes
+  use grains
 
   implicit none
 
@@ -14,7 +15,7 @@ module coated_sphere
 
 contains
 
-  subroutine mueller_coated_sphere(lambda,pop,taille_grain,qext,qsca,gsca)
+  subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
     !***************************************************************
     ! calcule les elements de la matrice de diffusion a partir de
     ! la sous-routine dmilay (coated grains)   
@@ -22,25 +23,149 @@ contains
     !        calcule aussi "g" = le parametre d'asymetrie
     !
     ! C. Pinte 19 Mars 2008
+    ! G. Duchene 22 Avril 2011
     !****************************************************************
 
-    integer, intent(in) :: lambda, taille_grain
-    real, intent(out) :: qext, qsca,gsca
-
-    qext=0.
-    qsca=0.
-    gsca=0.
-
+    implicit none
     
+    integer, intent(in) :: lambda, taille_grain
+    real, intent(in) :: amu1, amu2, amu1_coat, amu2_coat
+    real, intent(in) :: wl
+    real, intent(out) :: qext, qsca, gsca
 
+    integer :: j, nang
+ 
+    complex, dimension(nang_scatt+1) :: S1,S2
+
+    real, parameter :: pi = 3.1415926535
+    real :: rcore, rshell, wvno, gqsc
+    real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
+    real :: qbs
+    complex :: refrel, refrel_coat
+    real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
+
+  
+    refrel = cmplx(amu1,amu2)
+    refrel_coat = cmplx(amu1_coat,amu2_coat)
+    refrel = conjg(refrel)  ! to match convetion in dmilay (negative img part)
+    refrel_coat = conjg(refrel_coat)  ! to match convention in dmilay (negative img part)
+
+    if (modulo(nang_scatt,2)==1) then
+       write(*,*) "ERROR : nang_scatt must be an EVEN number"
+       write(*,*) "Exiting"
+       stop
+    endif
+
+    ! Si fonction de HG, on ne calcule pas la fonction de phase
+    if (aniso_method==2) then
+       nang=1
+    else
+       nang= (nang_scatt+1) / 2 + 1
+    endif
+
+    rcore=r_core(taille_grain)
+    rshell=r_grain(taille_grain)
+
+    !write(*,*) rcore, rshell 
+
+    wvno= 2.0 * pi / wl 
+
+    !write(*,*) wl,refrel,refrel_coat
+
+    call dmilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
+    gsca = gqsc / qsca ! dmilay return gsca * qsca
+
+    !write(*,*) wl, qext,qsca,qbs,gsca
+    
+    if (aniso_method==1) then
+       
+       !  QABS=QEXT-QSCA 
+       ! Calcul des elements de la matrice de diffusion
+       ! indices decales de 1 par rapport a bhmie 
+       do J=0,nang_scatt
+          vi1 = cabs(S2(J+1))*cabs(S2(J+1))
+          vi2 = cabs(S1(J+1))*cabs(S1(J+1))
+          s11(j) = 0.5*(vi1 + vi2)
+          !        write(*,*) j, s11(j), vi1, vi2 ! PB : s11(1) super grand
+          s12(j) = 0.5*(vi1 - vi2)
+          s33(j)=real(S2(J+1)*conjg(S1(J+1))) 
+          s34(j)=aimag(S2(J+1)*conjg(S1(J+1))) 
+       enddo !j
+       
+       ! Integration S11 pour tirer angle
+       somme_sin= 0.0
+       somme2 = 0.0
+       prob_s11(lambda,taille_grain,0)=0.0
+       do j=1,nang_scatt
+          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+&
+               s11(j)*sin(real(j)/real(nang_scatt)*pi)
+          somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
+          !     somme2=somme2+s12(j)*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
+          ! Somme2 sert juste pour faire des plots
+       enddo
+
+       ! Normalisation
+       somme_prob=prob_s11(lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
+       ! Soit int_0^\pi (i1(t)+i2(t)) sin(t) = x**2*qsca
+       do j=1,nang_scatt
+          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
+       enddo
+       
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!$  open(unit=1,file='diffusion.dat')
+!!$
+!!$  write(*,*) 'g=',gsca
+!!$  somme1=0.0
+!!$  somme2=0.0
+!!$  do J=1,2*NANG
+!!$     hg=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j)-0.5)/180.*pi))**(-1.5)
+!!$     somme1=somme1+s11(j)/somme_prob*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
+!!$     somme2=somme2+hg*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
+!!$     write(1,*) (real(j)-0.5), s11(j)/somme_prob,hg , 0.5E0*CABS(S2(J))*CABS(S2(J)), 0.5E0*CABS(S1(J))*CABS(S1(J))
+!!$  enddo
+!!$  write(*,*) somme1, somme2
+!!$  close(unit=1)
+!!$!  stop 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       
+       do J=0,nang_scatt
+          !     ! Normalisation pour diffusion isotrope et E_sca(theta)
+          !     if (j == 1)  then 
+          !        norme = somme_prob/somme_sin
+          !     endif
+          
+          ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
+          ! PAR CELLULE)
+          ! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS 
+          
+          !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
+          
+          
+          if (scattering_method==1) then
+             ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+             norme=s11(j) !* qext/q sca
+             s11(j) = s11(j) / norme
+             s12(j) = s12(j) / norme
+             s33(j) = s33(j) / norme
+             s34(j) = s34(j) / norme
+          endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
+          
+          tab_s11(lambda,taille_grain,j) = s11(j)
+          tab_s12(lambda,taille_grain,j) = s12(j)
+          tab_s33(lambda,taille_grain,j) = s33(j)
+          tab_s34(lambda,taille_grain,j) = s34(j)
+       enddo
+       
+    endif ! aniso_method ==1
+    
     return
-
+    
   end subroutine mueller_coated_sphere
 
   ! **********************************************************************
 
-  subroutine dmilay(rcore, rshell, wvno, rindsh, rindco, mu, &
-       numang, qext, qsca, qbs, gqsc, m1, m2, s21, d21, maxang)
+  subroutine dmilay(rcore, rshell, wvno, rindsh, rindco, &
+       numang, qext, qsca, qbs, gqsc, s1, s2)
     ! *******************************************************************
     !              DOUBLE PRECISION version of MieLay
     ! *******************************************************************
@@ -308,61 +433,96 @@ contains
     ! 19/03/08 : conversion en fortran 90, suppresion goto et continue,
     ! ajout des intent, suppresion data, passage en module et interfacage 
     ! mcfost
+    ! 21/04/11 : skipping the computation of M1, M2, S21 and D21. Adjusting
+    ! the angle values to match those used in mueller2/BHMIE.
     !
     ! **********************************************************************
 
     ! .. Parameters ..
-    integer, parameter ::   mxang = 100
-    integer, parameter :: ll = 1000
+    !    integer, parameter ::   mxang = 100
+    !  integer, parameter :: ll = 500000
+  
     real(kind=db), parameter :: zero = 0.0_db
     real(kind=db), parameter :: one = 1.0_db
     real(kind=db), parameter :: two = 2.0_db
     real(kind=db), parameter :: toler = 1.0e-6_db
 
     ! .. Scalar Arguments ..
-    integer, intent(in) ::   maxang, numang
+    integer, intent(in) ::   numang
     real, intent(in) :: rcore, rshell, wvno
     real, intent(out) ::   gqsc, qbs, qext, qsca
     complex, intent(in) ::   rindco, rindsh
     ! ..
     ! .. Array Arguments ..
-    real, dimension(numang), intent(in) ::      mu
-    real, dimension(maxang,2), intent(out) :: D21, M1 ,M2, S21
+    !    real, dimension(numang,2), intent(out) :: D21, M1 ,M2, S21
+    complex, dimension(nang_scatt+1), intent(out) :: S1, S2
     ! ..
     ! .. Local Scalars ..
     logical ::   inperr, pass1
-    integer ::   j, k, m, n, nmx1, nmx2, nn
+    integer ::   j, k, m, n, nmx1, nmx2, nn, jj, ll, alloc_status
 
-    real(kind=db) ::  aa, aim, am1im, am1re, are, bb, bim, bm1im, bm1re, bre, cc, cosx1, cosx4, dd, denom, &
-         dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4, fourpi, &
-         rmm, rx, sinx1, sinx4, x1, x4, xcore, xshell, y1, y4
+    real(kind=db) :: aa, aim, am1im, am1re, are, bb, bim, bm1im, bm1re, bre, cc, cosx1, cosx4
+    real(kind=db) :: dd, denom, dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4, fourpi
+    real(kind=db) :: rmm, rx, sinx1, sinx4, x1, x4, xcore, xshell, y1, y4
 
-    complex(kind=db) ::  ac, acoe, acoem1, bc, bcoe, bcoem1, dh1, dh2, dh4, dummy, dumsq, &
-         k1, k2, k3, p24h21, p24h24, rrfx, sback, wm1
+    complex(kind=db) :: ac, acoe, acoem1, bc, bcoe, bcoem1, dh1, dh2, dh4, dummy, dumsq
+    complex(kind=db) :: k1, k2, k3, p24h21, p24h24, rrfx, sback, wm1
 
     ! .. Local Arrays ..
-    real(kind=db), dimension(mxang,3) ::  tau, pi_tab
-    real(kind=db), dimension(mxang) :: SI2THT
+    real(kind=db), dimension(numang) ::   AMU
+    real(kind=db) :: THETA
+    real(kind=db), dimension(numang,3) ::  tau, pi_tab
+    real(kind=db), dimension(numang) :: SI2THT
     real(kind=db), dimension(5) :: T
     real(kind=db), dimension(5) :: TA
-
-    complex(kind=db), dimension(mxang,2) :: S1, S2
-    complex(kind=db), dimension(ll) :: acap
+    real(kind=db) :: DANG, PII
+    
     complex(kind=db), dimension(8) :: U
-    complex(kind=db), dimension(3,ll) :: W
     complex(kind=db), dimension(2) :: wfn
     complex(kind=db), dimension(4) :: z
+
+    complex(kind=db), dimension(:), allocatable :: acap
+    complex(kind=db), dimension(:,:), allocatable :: W
+
+    !    write(*,*) wvno,rcore,rshell,numang,rindco,rindsh
+
+    ! ==============================
+    ! Bits copied over from BHMIE
+    !
+    !*** Obtain pi:                                                         
+    PII=4.*atan(1.D0) 
+    DANG=0. 
+    if (numang > 1) then
+       DANG=.5*PII/dble(numang-1) 
+    endif
+    do J=1,numang
+       THETA=(dble(J)-1.0)*dang
+       AMU(J)=cos(THETA) 
+    end do
+
+    NN=2*numang-1 
+    do J=1,NN 
+       S1(J)=(0._db,0._db) 
+       S2(J)=(0._db,0._db) 
+    end do
 
     xshell = rshell*wvno
     xcore  = rcore*wvno
     T(1) = xshell*abs(rindsh)
-    NMX1   = 1.1_db*T(1)
-    NMX2   = T(1)
+    NMX1   = max(2.2*T(1),150.)
+    NMX2   = NMX1 / 1.1
 
-    if (nmx1 <= 150) then
-       nmx1   = 150
-       nmx2   = 135
+    ! Dynamical allocation
+    ll = nmx1 + 1 
+    allocate(acap(ll), W(3,ll), stat=alloc_status)
+    if (alloc_status > 0) then
+       write(*,*) 'Allocation error in Dmilay'
+       stop
     endif
+    acap = czero ; W = czero ;    
+
+    ! Nothing changed below this line (except skipping computation of M1, M2, S21 and D21)
+    ! ==============================
 
     ! ** Check input arguments for gross errors
     inperr = .false.
@@ -372,15 +532,15 @@ contains
     if (real(rindsh) <= 0.0 .or. aimag(rindsh) > 0.0) inperr = wrtbad('rindsh')
     if (real(rindco) <= 0.0 .or. aimag(rindco) > 0.0) inperr = wrtbad('RindCo')
     if (numang < 0) inperr = wrtbad('NumAng')
-    if (numang > mxang) inperr = wrtdim('MxAng', numang)
-    if (numang > maxang) inperr = wrtdim('MaxAng', numang)
-    if (nmx1 + 1 > ll) inperr = wrtdim('LL', nmx1 + 1)
+!    if (numang > mxang) inperr = wrtdim('MxAng', numang)
+!    if (numang > maxang) inperr = wrtdim('MaxAng', numang)
+!    if (nmx1 + 1 > ll) inperr = wrtdim('LL', nmx1 + 1)
     do  j=1, numang
-       if (mu(j) < - toler .or. mu(j) > 1.0+toler) inperr = wrtbad('MU')
+       if (amu(j) < - toler .or. amu(j) > 1.0+toler)   inperr = wrtbad('MU')
     enddo
     if (inperr) call errmsg('MIELAY--Input argument errors.  Aborting...', .true.)
 
-    K    = RINDCO*WVNO
+    K1    = RINDCO*WVNO
     K2   = RINDSH*WVNO
     K3   = DCMPLX(WVNO)
     Z(1) = RINDSH*XSHELL
@@ -400,19 +560,19 @@ contains
     enddo
 
     rrfx  = one / (rindsh*xshell)
-    do  nn = nmx1, 1, -1
+    do nn = nmx1, 1, -1
        acap(nn) = ((nn+1)*rrfx) - one / (((nn+1)*rrfx) + acap(nn+1))
        do m = 1, 3
           w(m,nn) = ((nn + 1) / z(m+1)) - one / (((nn+1)/z(m+1)) + w(m,nn+1))
-       enddo
-    enddo
+       enddo !m
+    enddo !nn
 
     do  j=1, numang
-       si2tht(j) = one - mu(j)**2
+       si2tht(j) = one - amu(j)**2
        pi_tab(j,1) = zero
        pi_tab(j,2) = one
        tau(j,1) = zero
-       tau(j,2) = mu(j)
+       tau(j,2) = amu(j)
     enddo
 
     ! ** Initialization of homogeneous sphere
@@ -489,10 +649,10 @@ contains
     AC  = 1.5D0*ACOE
     BC  = 1.5D0*BCOE
     do j = 1,NUMANG
-       S1(J,1) = AC*PI_tab(J,2) + BC*TAU(J,2)
-       S1(J,2) = AC*PI_tab(J,2) - BC*TAU(J,2)
-       S2(J,1) = BC*PI_tab(J,2) + AC*TAU(J,2)
-       S2(J,2) = BC*PI_tab(J,2) - AC*TAU(J,2)
+       S1(J) = AC*PI_tab(J,2) + BC*TAU(J,2)
+       S1(2*numang-J) = AC*PI_tab(J,2) - BC*TAU(J,2)
+       S2(J) = BC*PI_tab(J,2) + AC*TAU(J,2)
+       S2(2*numang-J) = BC*PI_tab(J,2) - AC*TAU(J,2)
     enddo
 
     ! ***************** Start of Mie summing loop ******************
@@ -506,8 +666,8 @@ contains
        T(2) = N - 1
 
        do j=1, NUMANG
-          PI_tab(J,3) = (T(1)*PI_tab(J,2)*MU(J) - N*PI_tab(J,1)) / T(2)
-          TAU(J,3) = MU(J)*(PI_tab(J,3) - PI_tab(J,1)) - T(1)*SI2THT(J)*PI_tab(J,2) + TAU(J, 1)
+          PI_tab(J,3) = (T(1)*PI_tab(J,2)*AMU(J) - N*PI_tab(J,1)) / T(2)
+          TAU(J,3) = AMU(J)*(PI_tab(J,3) - PI_tab(J,1)) - T(1)*SI2THT(J)*PI_tab(J,2) + TAU(J, 1)
        enddo
 
        ! ** Here set up homogeneous sphere
@@ -567,8 +727,8 @@ contains
        AC  = T(1)*ACOE
        BC  = T(1)*BCOE
        do j=1, NUMANG
-          S1(J,1) = S1(J,1) + AC*PI_tab(J,3) + BC*TAU(J,3)
-          S2(J,1) = S2(J,1) + BC*PI_tab(J,3) + AC*TAU(J,3)
+          S1(J) = S1(J) + AC*PI_tab(J,3) + BC*TAU(J,3)
+          S2(J) = S2(J) + BC*PI_tab(J,3) + AC*TAU(J,3)
        enddo
 
        ! ** Scattering matrix elements for
@@ -576,22 +736,26 @@ contains
        ! angles submitted by user
        if(mod(N,2) == 0) then
           do j= 1, NUMANG
-             S1(J,2) = S1(J,2) - AC*PI_tab(J,3) + BC*TAU(J,3)
-             S2(J,2) = S2(J,2) - BC*PI_tab(J,3) + AC*TAU(J,3)
+             JJ = 2*numang - j
+             S1(JJ) = S1(JJ) - AC*PI_tab(J,3) + BC*TAU(J,3)
+             S2(JJ) = S2(JJ) - BC*PI_tab(J,3) + AC*TAU(J,3)
           enddo
        else
           do j= 1, NUMANG
-             S1(J,2) = S1(J,2) + AC*PI_tab(J,3) - BC*TAU(J,3)
-             S2(J,2) = S2(J,2) + BC*PI_tab(J,3) - AC*TAU(J,3)
+             JJ = 2*numang - j
+             S1(JJ) = S1(JJ) + AC*PI_tab(J,3) - BC*TAU(J,3)
+             S2(JJ) = S2(JJ) + BC*PI_tab(J,3) - AC*TAU(J,3)
           enddo
        endif
 
        ! ** Test for convergence of sums
        if (T(4) >= 1.0e-14_db) then
           N  = N + 1
-          if (N > NMX2) CALL ERRMSG('MIELAY--Dimensions for W,ACAP not enough. Suggest'// &
-               ' get detailed output, modify routine', .true.)
-
+          if (N > NMX2) then
+             write(*,*) 2*pii/wvno,rcore,rshell
+             CALL ERRMSG('MIELAY--Dimensions for W,ACAP not enough. Suggest'// &
+                  ' get detailed output, modify routine', .true.)
+          endif
           do j = 1, NUMANG
              PI_tab(J,1) = PI_tab(J,2)
              PI_tab(J,2) = PI_tab(J,3)
@@ -615,14 +779,14 @@ contains
     ! ** Transform complex scattering amplitudes
     ! into elements of real scattering matrix
 
-    do j = 1, NUMANG
-       do K = 1, 2
-          M1(J,K) = DBLE(S1(J,K))**2 + DIMAG(S1(J,K))**2
-          M2(J,K) = DBLE(S2(J,K))**2 + DIMAG(S2(J,K))**2
-          S21(J,K) = DBLE( S1(J,K))*DBLE( S2(J,K)) + DIMAG(S1(J,K))*DIMAG(S2(J,K))
-          D21(J,K) = DIMAG(S1(J,K))*DBLE(S2(J,K)) - DIMAG(S2(J,K))*DBLE(S1(J,K))
-       enddo
-    enddo
+!    do j = 1, NUMANG
+!       do K = 1, 2
+!          M1(J,K) = DBLE(S1(J,K))**2 + DIMAG(S1(J,K))**2
+!          M2(J,K) = DBLE(S2(J,K))**2 + DIMAG(S2(J,K))**2
+!          S21(J,K) = DBLE( S1(J,K))*DBLE( S2(J,K)) + DIMAG(S1(J,K))*DIMAG(S2(J,K))
+!          D21(J,K) = DIMAG(S1(J,K))*DBLE(S2(J,K)) - DIMAG(S2(J,K))*DBLE(S1(J,K))
+!       enddo
+!    enddo
 
 
     T(1) = TWO*RX**2
@@ -631,6 +795,10 @@ contains
     GQSC   = TWO*T(1)*DGQSC
     SBACK  = 0.5*SBACK
     QBS    = (DBLE(SBACK)**2 + DIMAG(SBACK)**2) / (pi*XSHELL**2)
+
+    deallocate(acap,W)
+
+    return
 
   end subroutine dmilay
 

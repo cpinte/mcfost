@@ -10,6 +10,7 @@ module dust
   use dust_ray_tracing
 
   use scattering
+  use coated_sphere
   use input
   use output
 
@@ -27,21 +28,9 @@ subroutine taille_grains()
   real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
   real(kind=db) :: exp_grains
   real :: masse_pop
+  real :: correct_fact_r, correct_fact_S, correct_fact_M
 
   type(dust_pop_type), pointer :: dp
-
-!* --- masse moyenne d'un grain ( XMG ) ---
-!*     Volume = 4/3*pi * a**3 * 1E-12  ou a = rayon en micron
-!*     Rho1g = about 3 g/cm3
-!*
-!*      XMG = 4.1887E-12 * A**3 * RHO1G
-!*
-!* Avec une distribution en taille des grains, la formule est
-!* modifiee: il faut calculer la masse moyenne des grains, ponderee
-!* suivant la distribution. Avec une distribution du type n(a) = a**(-p),
-!* cela devient:
-
-  
 
   ! Boucle sur les populations de grains
   do i=1, n_pop
@@ -55,45 +44,47 @@ subroutine taille_grains()
 
      if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
         a=dp%amin
-        dp%xmg = 4.1887E-12 * a**3 * dp%rho1g
+        dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g
      else
-        if (abs(dp%aexp - 4.) > 1.0e-5)  then
+        if (abs(dp%aexp - 4.) > 1.0e-5) then
            if (abs(dp%aexp - 1.) > 1.0e-5) then
-              dp%xmg = 4.1887E-12 * dp%rho1g *(1-dp%aexp)/(4-dp%aexp) *(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g * &
+                   (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
                    (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
            else
-              dp%xmg = 4.1887E-12 * dp%rho1g /(4-dp%aexp) *(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g /(4-dp%aexp) * &
+                   (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
                    (log(dp%amax)-log(dp%amin))
            endif
         else
-           dp%xmg = 4.1887E-12 * dp%rho1g *(1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
+           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g *&
+                (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
                 (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
         endif
      endif
- 
 
      ! Proprietes des grains
      !exp_grains = (amax/amin)**(1./real(n_grains_tot))
-
      if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
         write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
         write(*,*) "If yes, press return"
         read(*,*)
      endif
-
-     exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
-     a = dp%amin*sqrt(exp_grains)
-     tab_a(dp%ind_debut) = a
-     nbre_grains(dp%ind_debut) = a**(-dp%aexp) * a
-     grain(dp%ind_debut)%methode_chauffage = dp%methode_chauffage
-     grain(dp%ind_debut)%zone = dp%zone
-     grain(dp%ind_debut)%pop = i
-        
+     
      ! Taille des grains (recursif)
      masse_pop = nbre_grains(dp%ind_debut)
-     do  k=dp%ind_debut+1, dp%ind_fin
-        a= tab_a(k-1) * exp_grains
-        tab_a(k) = a
+     exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
+     do  k=dp%ind_debut, dp%ind_fin
+        if (k==1) then
+           a = dp%amin*sqrt(exp_grains)
+        else
+           a= r_grain(k-1) * exp_grains
+        endif
+        
+        r_grain(k) = a ! micron
+        S_grain(k) = pi * a**2 ! micron^2
+        M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g ! masse en g
+
         ! Multiplication par a car da = a.dln(a)
         nbre_grains(k) = a**(-dp%aexp) * a
         grain(k)%methode_chauffage = dp%methode_chauffage
@@ -102,7 +93,7 @@ subroutine taille_grains()
         masse_pop = masse_pop + nbre_grains(k)
      enddo !k
 
-     masse_pop = masse_pop * dp%xmg
+     masse_pop = masse_pop * dp%avg_grain_mass
 
      ! Normalisation du nombre de grains pour atteindre la bonne masse
      nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
@@ -117,6 +108,22 @@ subroutine taille_grains()
      do  k=dp%ind_debut,dp%ind_fin
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
+
+
+     ! Increase grain radius, surface & mass to take into account coating
+     if (dp%lcoating .eqv. .true.) then
+        correct_fact_r =  1.0 / (1-dp%coating_frac)**(1./3)  ! r_tot = r_core * correct_fact_r
+        correct_fact_S = correct_fact_r**2
+        correct_fact_M = 1.0 + (dp%coating_frac*dp%rho1g_coating) / ((1.-dp%coating_frac)*dp%rho1g)
+     
+        dp%avg_grain_mass = dp%avg_grain_mass * correct_fact_M
+        do k=dp%ind_debut,dp%ind_fin
+           r_core(k) = r_grain(k) 
+           r_grain(k) = r_grain(k) * correct_fact_r
+           S_grain(k) = S_grain(k) * correct_fact_S
+           M_grain(k) = M_grain(k) * correct_fact_M
+        enddo ! k
+     endif
 
   enddo !i
 
@@ -311,6 +318,179 @@ subroutine init_indices_optiques()
         enddo ! lambda
         
         deallocate(tab_l,tab_a1,tab_a2)
+
+        ! Layer coating
+        if (dust_pop(pop)%lcoating.and.dust_pop(pop)%lmantle) then
+           ! Lecture fichier indices
+           filename = trim(dust_dir)//trim(dust_pop(pop)%indices_coating)
+           
+           open(unit=1,file=filename, status='old', iostat=ios)
+           if (ios /=0) then
+              write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
+              write(*,*) "Exiting"
+              stop
+           endif
+           
+           ! On elimine les lignes avec des commentaires
+           status = 1
+           n_comment = 0 
+           do while (status /= 0)
+              n_comment = n_comment + 1
+              read(1,*,iostat=status) fbuffer
+           enddo
+           n_comment = n_comment - 1
+           
+           ! On compte les lignes avec des donnees
+           status=0
+           n_ind=1 ! On a deja lu une ligne en cherchant les commentaires
+           do while(status==0)
+              n_ind=n_ind+1
+              read(1,*,iostat=status)
+           enddo
+           n_ind = n_ind - 1
+           
+           ! On enleve les 2 premieres lignes
+           n_ind = n_ind - 2 
+           
+           ! Allocation de tab
+           allocate(tab_l(n_ind), tab_a1(n_ind), tab_a2(n_ind), stat=alloc_status)
+           if (alloc_status > 0) then
+              write(*,*) 'Allocation error zsup'
+              stop
+           endif
+           tab_l=0.0 ; tab_a1=0.0 ; tab_a2=0.0 
+           
+           
+           ! Lecture proprement dite
+           rewind(1)
+           ! On passe les commentaires
+           do i=1, n_comment
+              read(1,*)
+           enddo
+           
+           ! lecture densite
+           read(1,*) dust_pop(pop)%rho1g_coating
+           if (dust_pop(pop)%rho1g_coating > 10.) then
+              write(*,*) "ERROR: optical indices for coating material file has the wrong format"
+              write(*,*) "Exiting"
+              stop
+           endif
+
+           
+           ! ligne vide
+           read(1,*)
+           
+           ! Lecture indices
+           do i=1,n_ind
+              read(1,*) tab_l(n_ind-i+1), tab_a1(n_ind-i+1), tab_a2(n_ind-i+1)
+           enddo
+           
+           close(unit=1)
+           
+           if (tab_l(2) > tab_l(1)) then
+              l_ordre_decroissant = .false. 
+           else
+              l_ordre_decroissant = .true.
+           endif
+           
+!           if (porosity_coating > tiny_real) then 
+!              f2 = porosity_coating
+!              f1 = 1. - f2
+!              
+!              ! On corrige la densite 
+!              rho1g_coating  = rho1g_coating * f1
+!              
+!              ! On corrige les indices optiques
+!              do i=1, n_ind
+!                 m1 = cmplx(tab_a1(i),tab_a2(i))
+!                 m2 = cmplx(1.0,0.0) ! Vide
+!                 eps1 = m1*m1
+!                 eps2 = m2*m2
+!                 
+!                 ! Effective medium theory (Bruggeman rule)
+!                 b = 2*f1*eps1 -f1*eps2 + 2*f2*eps2 -f2*eps1
+!                 c = eps1 * eps2
+!                 a = -2.   ! --> 1/2a  = -0.25
+!                 delta = b*b - 4*a*c 
+!                 eavg1 = (-b - sqrt(delta)) * (-0.25)
+!                 eavg2 = (-b + sqrt(delta)) * (-0.25) 
+!                 
+!                 write(*,*) porosity_coating,i,tab_l(i),tab_a1(i),tab_a2(i),eavg1,eavg2
+!                 
+!                 ! Selection (et verif) de l'unique racine positive (a priori c'est eavg1)
+!                 if (aimag(eavg1) > 0) then
+!                    if (aimag(eavg2) > 0) then
+!                       write(*,*) "Error in Bruggeman EMT rule !!!"
+!                       write(*,*) "All imaginary parts are > 0"
+!                       write(*,*) "Exiting."
+!                       stop
+!                    endif
+!                    eavg = eavg1
+!                 else
+!                    if (aimag(eavg2) < 0) then
+!                       write(*,*) "Error in Bruggeman EMT rule !!!"
+!                       write(*,*) "All imaginary parts are < 0"
+!                       write(*,*) "Exiting."
+!                       stop
+!                    endif
+!                    eavg = eavg2
+!                 endif
+!                 
+!                 mavg = sqrt(eavg)
+!                 !     write(*,*) "verif Bruggeman", (abs(f1 * (eps1 - eavg)/(eps1 + 2*eavg) + &
+!                 !     f2 * (eps2 - eavg)/(eps2 + 2*eavg))) ;
+!                 
+!                 ! Moyennage a la Mathis & Whieffen 89
+!                 ! Valeur max pour indices Voschnikov 2005, A&A, 429, 371 : p380
+!                 !    eavg = f1 * eps1 + f2 * eps2
+!                 !    mavg = sqrt(eavg)
+!                 
+!                 ! Valeur min pour indices Voschnikov 2005, A&A, 429, 371 : p380
+!                 ! eavg = 1.0 / (f1/eps1 + f2/eps2)
+!                 ! mavg = sqrt(eavg)
+!                 
+!                 
+!                 ! Evite la chute d'opacite a grand lambda : proche M&W 
+!                 ! Opcaite un peu plus faible dans le mm
+!                 ! mavg = f1 * m1 + f2 * m2 
+!                 
+!                 tab_a1(i) = real(mavg)
+!                 tab_a2(i) = aimag(mavg)
+!                 
+!                 !             write(*,*) tab_lambda(i), tab_amu1(i,pop), tab_amu2(i,pop)
+!                 
+!              enddo ! n_ind
+!              
+!           endif ! porosity_coating
+           
+           ! Calcul des indices par interpolation lineaire
+           do i=1, n_lambda
+              if (l_ordre_decroissant) then
+                 k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                 do while((tab_lambda(i) < tab_l(k)).and.(k <= n_ind-1))
+                    k=k+1
+                 enddo
+                 
+                 frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
+                 tab_amu1_coating(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
+                 tab_amu2_coating(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
+                 
+              else ! ordre croissant
+                 k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                 do while((tab_lambda(i) > tab_l(k)).and.(k <= n_ind-1))
+                    k=k+1
+                 enddo
+                 
+                 frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
+                 tab_amu1_coating(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
+                 tab_amu2_coating(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
+              endif ! croissant ou decroissant
+              
+           enddo ! lambda_coating
+           
+           deallocate(tab_l,tab_a1,tab_a2)
+        endif ! lcoating & lmantle
+
      else ! notPAH       
         dust_pop(pop)%rho1g = 2.5
      endif ! notPAH       
@@ -333,7 +513,7 @@ subroutine prop_grains(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
-  real :: a, alfa, qext, qsca, fact, gsca, amu1, amu2
+  real :: a, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
   integer :: k, alloc_status, i, pop, l
 
   type(dust_pop_type) :: dp
@@ -393,15 +573,16 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,alfa,qext,qsca,fact,gsca,amu1,amu2,pop) &
-  !$omp shared(tab_a,q_ext,q_sca,q_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
+  !$omp shared(r_grain,q_ext,q_sca,q_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot,is_pop_PAH,is_grain_PAH) &
+  !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop) 
   !$omp do schedule(dynamic,10)
   ! on fait la boucle a l'envers pour optimiser la parallelisation
   ! et savoir des le debut si l'alloc. mem. ds bhmie passe ou pas
   do  k=1,n_grains_tot
      pop = grain(k)%pop
-     a = tab_a(k)
+     a = r_grain(k)
      if (.not.dust_pop(pop)%is_PAH) then ! theorie de mie ou gmm
         amu1=tab_amu1(lambda,pop)
         amu2=tab_amu2(lambda,pop)
@@ -409,8 +590,20 @@ subroutine prop_grains(lambda, p_lambda)
         if (laggregate) then
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
-           call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
-        endif
+           if (.not.(dust_pop(pop)%lcoating)) then
+              call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
+           else
+              if (dust_pop(pop)%lmantle) then
+                 amu1_coat=tab_amu1_coating(lambda,pop)
+                 amu2_coat=tab_amu2_coating(lambda,pop)
+                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
+              else
+                  ! EMT MIXING - THIS IS NOT CODED YET...
+              endif ! lmantle
+           endif ! lcoating
+!           write(*,*) wavel, qext,qsca,gsca
+
+        endif ! laggregate
      else ! grain de PAH
         is_grain_PAH(k) = .true.
         call mueller_PAH(lambda,p_lambda,k,qext,qsca,gsca)
@@ -919,7 +1112,7 @@ subroutine opacite2(lambda)
 
 ! write(*,*) tab_lambda(lambda), kappa(lambda, 1, 40,1) !, kappa_abs_eg(lambda, 1, 1,1), densite_pouss(1,1,1,1)
 
-!  write(*,*) sum(densite_pouss),   q_abs(lambda,1), tab_a(1)
+!  write(*,*) sum(densite_pouss),   q_abs(lambda,1), r_grain(1)
 !  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then 
