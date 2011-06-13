@@ -1,5 +1,4 @@
-#!/bin/sh
-export CC=icc
+CC=icc
 
 mkdir lib
 mkdir include
@@ -45,3 +44,7 @@ cd nr
 \cp sort/libnr_sort.a ../lib/nr/sort
 ./clean.com
 cd ..
+
+cp -r include $MCFOST_INSTALL
+mkdir $MCFOST_INSTALL/lib
+cp -r lib $MCFOST_INSTALL/lib/ifort

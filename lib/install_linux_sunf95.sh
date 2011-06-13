@@ -1,5 +1,3 @@
-#!/bin/sh
-
 mkdir lib
 mkdir include
 
@@ -43,3 +41,7 @@ cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
 cp spline/libnr_splin.a ../lib/nr/spline
 ./clean.com
 cd ..
+
+cp -r include $MCFOST_INSTALL
+mkdir $MCFOST_INSTALL/lib
+cp -r lib $MCFOST_INSTALL/lib/sunf95
