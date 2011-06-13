@@ -1,5 +1,3 @@
-#!/bin/sh
-
 mkdir lib
 mkdir include
 
@@ -44,3 +42,7 @@ cp spline/libnr_splin.a ../lib/nr/spline
 cp sort/libnr_sort.a ../lib/nr/sort
 ./clean.com
 cd ..
+
+cp -r include $MCFOST_INSTALL
+mkdir $MCFOST_INSTALL/lib
+cp -r lib $MCFOST_INSTALL/lib/ifort32
