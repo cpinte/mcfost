@@ -240,7 +240,7 @@ subroutine define_grid4()
         if (lprint) write(*,*) "Delta_r", delta_r, delta_r_in
 
         ! Selection de la zone correpondante : pente la plus forte
-        puiss = -1.e30
+        puiss = 0.0_db
         do iz=1, n_zones
            if (region(iz) == ir) then
               p=1+dz%surf-dz%exp_beta

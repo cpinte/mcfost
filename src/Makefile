@@ -582,7 +582,7 @@ clean :
 	rm -rf *.o *.exe *.mod outils/*.o outils/*.exe core*
 
 cleandata :
-	rm -rf data* seed*
+	rm -rf data* seed* density.fits.gz volume.fits.gz grid.fits.gz
 
 cleanall : clean cleandata
 	rm -rf mcfost
