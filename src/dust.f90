@@ -75,7 +75,7 @@ subroutine taille_grains()
      masse_pop = nbre_grains(dp%ind_debut)
      exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
      do  k=dp%ind_debut, dp%ind_fin
-        if (k==1) then
+        if (k==dp%ind_debut) then
            a = dp%amin*sqrt(exp_grains)
         else
            a= r_grain(k-1) * exp_grains
