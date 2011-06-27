@@ -392,7 +392,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         endif !letape_th or lscatt
      endif ! lcellule_non_vide
 
-     if (abs(xio - 1.028122097156825E-003 ) < 1e-12) write(*,*) "stop test"
+     !if (abs(xio - 1.028122097156825E-003 ) < 1e-12) write(*,*) "stop test"
 
 
      ! On a fini d'integrer : sortie de la routine
