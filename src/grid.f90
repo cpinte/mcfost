@@ -125,7 +125,7 @@ subroutine define_physical_zones()
      Rmax_region(ir) = 0
      do i=1, n_zones
         if (region(i) == ir) then
-           Rmin_region(ir) = min(Rmin_region(ir),disk_zone(i)%rin)
+           Rmin_region(ir) = min(Rmin_region(ir),disk_zone(i)%rmin)
            Rmax_region(ir) = max(Rmax_region(ir),disk_zone(i)%rout)
         endif
      enddo !i
@@ -190,6 +190,7 @@ subroutine define_grid4()
   else
      grid_rmin=rmin
   endif
+
 
   if (llinear_grid) then
      
@@ -293,7 +294,7 @@ subroutine define_grid4()
      
         if (lprint) write(*,*) "n_rad"
 
-
+        ! Grille log apres subdivision "1ere" cellule
         do i=istart + n_rad_in_region+1, istart+n_rad_region
            tab_r(i) = tab_r(i-1) * delta_r
            tab_r2(i) = tab_r(i) * tab_r(i)
@@ -334,8 +335,8 @@ subroutine define_grid4()
   r_lim_3(0) = grid_rmin**3
   do i=1, n_rad
      r_lim(i)=tab_r(i+1)
-     r_lim_2(i)= r_lim(i)**2
-     r_lim_3(i)= r_lim(i)**3
+     r_lim_2(i)= tab_r2(i+1)
+     r_lim_3(i)= tab_r3(i+1)
   enddo !i
 
 
@@ -911,7 +912,7 @@ subroutine indice_cellule(xin,yin,zin,ri_out,zj_out)
 
   r2 = xin*xin+yin*yin
 
-    
+  
   if (r2 < r_lim_2(0)) then
      ri_out=0
      zj_out=1
