@@ -405,7 +405,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
  
         ! Patch pour eviter BUG sur position radiale
         ! a cause de limite de precision
-        if ((ri/=ri0).or.(zj/=zj0).or.(zj > nz)) then
+!        if ((ri/=ri0).or.(zj/=zj0).or.(zj > nz)) then
 !           factor = rmin/ sqrt(xio*xio+yio*yio+zio*zio) * correct_plus
 !           xio = xio * factor
 !           yio = yio * factor
@@ -418,7 +418,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 !              write(*,*) "Exiting"
 !              stop
 !           endif
-        endif
+!        endif
 
         if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
            ! On resort le paquet 
