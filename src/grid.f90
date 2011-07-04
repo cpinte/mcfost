@@ -91,8 +91,8 @@ subroutine define_physical_zones()
               r2 = disk_zone(j)%rout
               
               ! Test if the 2 zones are imbrigated
-              test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 < maxR))
-              test_i_in_j = ((minR > r1).and.(minR < r2)) .or. ((minR > r1).and.(maxR < r2))
+              test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 <= maxR))
+              test_i_in_j = ((minR > r1).and.(minR < r2)) .or. ((maxR > r1).and.(maxR <= r2))
 
               if ( test_j_in_i .or. test_i_in_j ) then
                  if (.not.zone_scanned(j)) then
@@ -131,11 +131,11 @@ subroutine define_physical_zones()
      enddo !i
   enddo !ir
 
-  !write(*,*) "Number of regions detected =", n_regions
-  !do i=1, n_zones
-  !   write(*,*) "zone=", i, "region=", region(i), real(Rmin_region(region(i))), real(Rmax_region(region(i)))
-  !enddo
-    
+  write(*,fmt='(" Number of regions detected:",i2)') n_regions
+  do i=1, n_zones
+     write(*,fmt='(" zone",i2," --> region=",i2," : R=",f6.2," to ",f6.2,"AU")') i, region(i), real(Rmin_region(region(i))), real(Rmax_region(region(i)))
+  enddo
+
   return
 
 end subroutine define_physical_zones
@@ -337,8 +337,12 @@ subroutine define_grid4()
      r_lim(i)=tab_r(i+1)
      r_lim_2(i)= tab_r2(i+1)
      r_lim_3(i)= tab_r3(i+1)
+     if (r_lim(i) < r_lim(i-1)) then
+        write(*,*) "ERROR in gridding: this is likely to be a bug"
+        write(*,*) "i", i, r_lim(i), r_lim(i-1)
+        write(*,*) "Exiting"
+     endif
   enddo !i
-
 
   if (lcylindrical) then
      ! Calcul volume des cellules (pour calculer leur masse)
@@ -349,6 +353,7 @@ subroutine define_grid4()
      do i=1, n_rad
         rcyl = 0.5*(r_lim(i) +r_lim(i-1))        
         r_grid(i,:) = rcyl!sqrt(r_lim(i) +r_lim(i-1)))
+
 
         ! Estimation du zmax proprement
         ! Recherche de l'echelle de hauteur max des zones pertinentes au rayon donne
