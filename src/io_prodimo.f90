@@ -80,6 +80,7 @@ contains
 
     integer :: alloc_status, nl
 
+
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
 
@@ -230,7 +231,7 @@ contains
     allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz))
     
     filename = trim(data_dir)//"/"//trim(mcfost2ProDiMo_file)
-    
+
     ! Initialize parameters about the FITS image
     simple=.true.
     extend=.true.
@@ -471,6 +472,7 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
+
     do lambda=1, n_lambda
        n_photons_envoyes = sum(n_phot_envoyes_ISM(:,lambda))
               
@@ -485,6 +487,8 @@ contains
           enddo
        enddo
     enddo ! lambda
+
+
     
     ! Inversion de l'ordre des dimensions + passage en simple precision
     do ri=1, n_rad
@@ -520,7 +524,6 @@ contains
     enddo
 
     call ftppre(unit,group,fpixel,nelements,J_io,status)
-
 
     !------------------------------------------------------------------------------
     ! HDU 10 : Densite de gaz pour un rapport de masse de 100 / poussiere
@@ -578,9 +581,7 @@ contains
              enddo ! lambda
           endif
        enddo ! ri
-    enddo !zj
-
-    
+    enddo !zj    
 
     call ftppre(unit,group,fpixel,nelements,opacite,status)
 
@@ -605,9 +606,15 @@ contains
           ! Nbre total de grain : le da est deja dans densite_pouss
           N = sum(densite_pouss(ri,zj,1,:))
           N_grains(ri,zj,0) = N
-          N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
-          N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
-          N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
+          if (N > 0) then
+             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
+          else 
+             N_grains(ri,zj,1) = 0.0
+             N_grains(ri,zj,2) = 0.0
+             N_grains(ri,zj,3) = 0.0
+          endif
        enddo
     enddo
 
@@ -616,7 +623,6 @@ contains
 
 !    write(*,*)  "TEST_0", sum(N_grains(1,:,0))
 !    write(*,*)  "TEST_3", sum(N_grains(1,:,3) * N_grains(1,:,0))
-
 
     call ftppre(unit,group,fpixel,nelements,N_grains,status)
     
@@ -890,7 +896,7 @@ contains
 
     real :: sigma2, vmax, sigma2_m1, r_cyl
     real(kind=db) :: S, dz, dV, Somme
-    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed, l, status
+    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed, l, keyword_status
 
 
     ! TMP
@@ -948,8 +954,8 @@ contains
        write(*,*) trim(filename)
 
        ! reading keywords
-       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,status)
-       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,status)
+       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,keyword_status)
+       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,keyword_status)
 
        if (used_mcfost_version /= mcfost_release) then
           write(*,*) "************************************************"

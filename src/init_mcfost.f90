@@ -1101,7 +1101,7 @@ subroutine save_data
            call appel_syst(cmd,syst_status)
            cmd = 'uname -a >> '//trim(local_data_dir)//'/'//trim(para)
            call appel_syst(cmd,syst_status)
-           if ((.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
+           if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
               cmd = 'cp '//trim(lambda_filename)//' '//trim(local_data_dir)
               call appel_syst(cmd,syst_status)
            endif
