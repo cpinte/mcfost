@@ -532,7 +532,7 @@ subroutine alloc_dynamique()
   endif
 
   if (lnRE) then
-     if ( (.not.ltemp).and.(lsed.or.lmono0.or.lProDiMo) ) then ! si ltemp --> tableau alloue ci-dessous
+     if ( (.not.ltemp).and.(lsed.or.lmono0.or.lProDiMo.or.lProDiMo2mcfost) ) then ! si ltemp --> tableau alloue ci-dessous
         allocate(tab_Temp(n_T), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_Temp'
@@ -1055,12 +1055,12 @@ subroutine realloc_dust_mol()
 
   integer :: alloc_status
 
-  allocate(tab_lambda(n_lambda), tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
+  allocate(tab_lambda(n_lambda), tab_delta_lambda(n_lambda), tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda'
      stop
   endif
-  tab_lambda=0.0 ; tab_amu1=0.0 ; tab_amu2=0.0
+  tab_lambda=0.0 ; tab_delta_lambda= 0.0 ; tab_amu1=0.0 ; tab_amu2=0.0
 
     allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
