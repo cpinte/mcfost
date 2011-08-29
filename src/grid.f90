@@ -64,6 +64,7 @@ subroutine define_physical_zones()
   logical, dimension(n_zones) :: zone_scanned
   
   real(kind=db) :: r1, r2, minR, maxR
+  character :: n1, n2
 
   logical :: test_j_in_i, test_i_in_j
 
@@ -132,8 +133,14 @@ subroutine define_physical_zones()
   enddo !ir
 
   write(*,fmt='(" Number of regions detected:",i2)') n_regions
+
   do i=1, n_zones
-     write(*,fmt='(" zone",i2," --> region=",i2," : R=",f6.2," to ",f6.2,"AU")') i, region(i), real(Rmin_region(region(i))), real(Rmax_region(region(i)))
+     R1 = real(Rmin_region(region(i)))
+     R2 = real(Rmax_region(region(i)))
+     n1 = achar(int(log10(R1)+1)+iachar('3'))
+     n2 = achar(int(log10(R2)+1)+iachar('3'))
+     write(*,fmt='(" zone",i2," --> region=",i2," : R=",f'//n1//'.2," to ",f'//n2//'.2," AU")') &
+          i, region(i), R1, R2 
   enddo
 
   return
