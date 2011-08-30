@@ -949,24 +949,11 @@ contains
 
 
        filename = "data_ProDiMo/forMCFOST.fits.gz"
-       write(*,*) "*******************************"
+       write(*,*)
        write(*,*) "Reading ProDiMo calculations"
        write(*,*) trim(filename)
 
-       ! reading keywords
-       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,keyword_status)
-       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,keyword_status)
-
-       if (used_mcfost_version /= mcfost_release) then
-          write(*,*) "************************************************"
-          write(*,*) "WARNING: MCFOST has been updated"
-          write(*,*) "initial model was computed with mcfost "//trim(used_mcfost_version)
-          write(*,*) "this is mcfost "//trim(mcfost_release)
-          write(*,*) "Problems can occur"
-          write(*,*) "************************************************"
-       endif
-
-       fits_status = 0 
+              fits_status = 0 
        !  Get an unused Logical Unit Number to use to open the FITS file.
        call ftgiou(unit,fits_status)
 
@@ -982,6 +969,22 @@ contains
        group=1
        firstpix=1
        nullval=-999
+
+       ! reading keywords
+       used_mcfost_version = 'unknown'
+       comment = ' '
+       ProDiMo2mcfost_version = 0
+       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,keyword_status)
+       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,keyword_status)
+
+       if (used_mcfost_version /= mcfost_release) then
+          write(*,*) "************************************************"
+          write(*,*) "WARNING: MCFOST has been updated"
+          write(*,*) "- initial model was computed with mcfost "//trim(used_mcfost_version)
+          write(*,*) "- this is mcfost "//trim(mcfost_release)
+          write(*,*) "Problems can occur"
+          write(*,*) "************************************************"
+       endif
 
        !---------------------------------------------------------
        ! HDU 1 : MCgrid, to make a test inside mcfost
@@ -1290,7 +1293,7 @@ contains
     enddo !j
 
     write(*,*) "Done"
-    write(*,*) "*******************************"
+    write(*,*) " "
      
     return
     

@@ -605,6 +605,8 @@ subroutine opacite_mol_loc(ri,zj,phik)
   integer :: iTrans, iiTrans
   real(kind=db) :: nu, nl, kap, eps
 
+  logical, save :: no_maser = .true.
+
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
      nu = tab_nLevel(ri,zj,iTransUpper(iiTrans))
@@ -615,11 +617,16 @@ subroutine opacite_mol_loc(ri,zj,phik)
      eps =  nu*fAul(iiTrans)
 
      if (kap < 0.) then
-        write(*,*) "WARNING Ri=", ri, "Zi=", zj, "iTrans=", iiTrans
-        write(*,*) "Masering effect, forcing kappa = 0."
+        if (no_maser) then
+           write(*,*) "*****************************************"
+           write(*,*) "WARNING : Masering effect, forcing kappa = 0."
+           write(*,*) "1st cell : Ri=", ri, "Zi=", zj, "iTrans=", iiTrans
+           write(*,*) "*****************************************"
+           no_maser = .false.
+        endif
         kap = 0.
      endif
-
+     
      ! longueur de vol en AU, a multiplier par le profil de raie
      kappa_mol_o_freq(ri,zj,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m  
      emissivite_mol_o_freq(ri,zj,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m 
