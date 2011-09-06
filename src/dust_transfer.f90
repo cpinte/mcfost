@@ -332,10 +332,14 @@ subroutine transfert_poussiere()
               call chauffage_interne()
            endif
 
+           !$omp parallel default(none) private(lambda) shared(n_lambda)
+           !$omp do schedule(static,1)
            do lambda=1, n_lambda
               call repartition_energie(lambda)
            enddo
-           
+           !$omp end do
+           !$omp end parallel
+ 
            call repartition_wl_em()        
 
            if (lnRE) call init_emissivite_nRE()
@@ -455,11 +459,9 @@ subroutine transfert_poussiere()
       
         if (lweight_emission) call define_proba_weight_emission(lambda)
         
-        call  repartition_energie(lambda)
+        call repartition_energie(lambda)
         if (lmono0) write(*,*) "frac. energy emitted by star : ", frac_E_stars(1)         
         
-
-
      endif !letape_th
 
      if (ind_etape==etape_start) then
