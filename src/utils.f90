@@ -3,6 +3,7 @@ module utils
   use parametres
   use naleat, only : stream, gauss_random_saved, lgauss_random_saved
   use constantes
+  use sha
 
   implicit none
 
@@ -549,8 +550,10 @@ subroutine mcfost_v()
 
   write(*,*) "This is MCFOST version: ", mcfost_release
   write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
+  write(*,*) "SHA-1 id = ", sha_id
   write(*,*) " "
   
+
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(webpage)//"version.txt -O -s"

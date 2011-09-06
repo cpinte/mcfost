@@ -976,27 +976,27 @@ subroutine save_data
         cmd = 'rm -Rf '//trim(data_dir)
         call appel_syst(cmd,syst_status)
      endif
+     
+
+     ! Cree le dossier data
      write (*,*) 'Creating directory '//trim(data_dir)
-     cmd = 'mkdir -p '//trim(data_dir)
-     call appel_syst(cmd,syst_status)
-     !*************************************************
-     ! Fichier de parametres
-     !*************************************************
-     cmd = 'cp '//trim(para)//' '//trim(data_dir)
-     call appel_syst(cmd,syst_status)
-     ! options de la ligne de commande
-     cmd = 'echo " " >>  '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-     cmd = 'echo "command line used: '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-     cmd = 'date >> '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-     cmd = 'uname -a >> '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-     if ((.not.lsed_complete).and.(lsed)) then
-        cmd = 'cp '//trim(lambda_filename)//' '//trim(data_dir)
-        call appel_syst(cmd,syst_status)
+     cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
+          ! copie le fichier de parametres
+          'cp '//trim(para)//' '//trim(data_dir)//" ; "// & 
+          ! options de la ligne de commande
+          'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          ! date du calcul
+          'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          ! machine de calcul
+          'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          ! id SHA
+          'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
+     ! Copie du fichier lambda si besoin
+     if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
+        cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(data_dir)
      endif
+     call appel_syst(cmd,syst_status)
 
   else
 
@@ -1079,30 +1079,27 @@ subroutine save_data
         endif
         
         if (lnew_run) then
+           ! Cree le dossier data
            write (*,*) 'Creating directory '//trim(local_data_dir)
-           cmd = 'mkdir -p '//trim(local_data_dir)
-           call appel_syst(cmd,syst_status)
-           !*************************************************
-           ! Fichier de parametres
-           !*************************************************
-           cmd = 'cp '//trim(para)//' '//trim(local_data_dir)
-           call appel_syst(cmd,syst_status)
-           ! options de la ligne de commande
-           cmd = 'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)
-           call appel_syst(cmd,syst_status)
-           cmd = 'echo "command line options : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)
-           call appel_syst(cmd,syst_status)
-           cmd = 'date >> '//trim(local_data_dir)//'/'//trim(para)
-           call appel_syst(cmd,syst_status)
-           cmd = 'uname -a >> '//trim(local_data_dir)//'/'//trim(para)
-           call appel_syst(cmd,syst_status)
+           cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
+                ! copie le fichier de parametres
+                'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// & 
+                ! options de la ligne de commande
+                'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                ! date du calcul
+                'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                ! machine de calcul
+                'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                ! id SHA
+                'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
+           ! Copie du fichier lambda si besoin
            if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-              cmd = 'cp '//trim(lambda_filename)//' '//trim(local_data_dir)
-              call appel_syst(cmd,syst_status)
+              cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
            endif
+           call appel_syst(cmd,syst_status)
         endif
-        
-     enddo ! etape
+      enddo ! etape
      
   endif ! ldust_prop
 
