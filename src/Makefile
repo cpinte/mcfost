@@ -506,7 +506,7 @@ ifeq ($(devp), yes)
 FF = $(FC_OMP) -O1
 endif
 
-SOURCES = modules.f90 mem.f90 utils.f90 input.f90 output.f90 \
+SOURCES = modules.f90 sha.f90 mem.f90 utils.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 init_mcfost.f90 \
 	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 dust.f90 \
 	molecules.f90 grid.f90 optical_depth.f90 \
@@ -530,12 +530,20 @@ modules.o : modules.f90
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # Fichier compile sans optimisation
-mem.o : mem.f90  modules.o
+mem.o : mem.f90  modules.o sha.f90
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # defaut
-%.o : %.f90  modules.o
+%.o : %.f90  modules.o sha.f90
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG) $(COMP_FITS)
+
+# Le fichier sha.f90 n'est cree que sur mon mac
+ifeq ($(ARCH),DARWIN)
+sha.f90 : ../.git
+	echo "module sha\n  implicit none" > sha.f90
+	git show-ref --heads | awk '{print "  character(len=40), parameter :: sha_id = \"" $$1 "\""}' >> sha.f90
+	echo "end module sha" >> sha.f90
+endif
 
 mcfost2prodimo: mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90  $(COMP_FITS)  $(LIBS_FITS)
@@ -543,6 +551,7 @@ mcfost2prodimo: mcfost mcfost2prodimo.o
 #*************************************************************
 # Release
 #*************************************************************
+
 release : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
