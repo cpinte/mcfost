@@ -714,7 +714,7 @@ end function bubble_sort
 function is_diff(a,b)
 
   logical is_diff
-  real(kind=db) :: a,b
+  real(kind=db), intent(in) :: a,b
   
   if (abs(a-b) > 0.5e-5 * abs(a+b)) then
      is_diff = .true.
@@ -725,5 +725,49 @@ function is_diff(a,b)
 end function is_diff
 
 !************************************************************
+
+subroutine lgnd(lmax,x,p)
+  ! Subroutine to generate Legendre polynomials P_L(X)
+  ! for L = 0,1,...,LMAX with given X.
+
+  ! This computer program is part of the book, "An Introduction to
+  ! Computational Physics," written by Tao Pang and published and
+  ! copyrighted by Cambridge University Press in 1997.
+  ! Program 5.4 : originally named LGND
+
+  ! 29/08/11 : C. Pinte : translated in fortran 90 TODO : regarder NR
+
+  integer, intent(in) :: lmax
+  real(kind=db), intent(in) :: x
+  real(kind=db), dimension(0:lmax), intent(out) :: P
+
+  integer :: l
+
+  P(0) = 1._db
+  P(1) = x
+  do l = 1, lmax-1
+     P(l+1) = ((2.0*l+1)*x*P(l)-l*P(l-1))/(l+1)
+  enddo
+     
+  return
+
+end subroutine lgnd
+
+!************************************************************
+
+logical function is_dir(filename) 
+ 
+  character(len=*), intent(in) :: filename
+  logical :: is_existing
+   
+#if defined (__INTEL_COMPILER)
+  inquire(directory=trim(filename),exist=is_dir) 
+#else
+  inquire(file=trim(filename),exist=is_dir) 
+#endif
+
+  return
+  
+end function is_dir
 
 end module utils
