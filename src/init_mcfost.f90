@@ -15,6 +15,7 @@ module init_mcfost
   use input
   use mem
   use ProdiMo
+  use utils
 
   implicit none
 
@@ -970,9 +971,7 @@ subroutine save_data
   if (lsed.and.(.not.ltemp)) return 
 
   if (ldust_prop) then
-     cmd = 'ls '//trim(data_dir)//' > /dev/null'
-     call appel_syst(cmd,syst_status)
-     if (.not.(syst_status == 256)) then ! le dossier data existe deja
+     if (is_dir(trim(data_dir))) then
         write(*,*) "Directory data_dust already exists! Erasing it..."
         cmd = 'rm -Rf '//trim(data_dir)
         call appel_syst(cmd,syst_status)
@@ -1027,22 +1026,18 @@ subroutine save_data
            local_basename_data_dir = basename_data_dir2(etape-1)
         endif
         
-        cmd = 'ls '//trim(root_dir)//' | grep '//trim(seed_dir)//' > /dev/null'
-        
-        call appel_syst(cmd,syst_status)
-        if (syst_status == 256) then ! le dossier data n'existe pas
-           lnew_run = .true.
-        else
-           cmd = 'ls '//trim(seed_dir)//' | grep '//trim(local_basename_data_dir)!//' > /dev/null'
-           call appel_syst(cmd,syst_status)
-           if (syst_status == 256) then ! le dossier data n'existe pas
+
+        if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
+           if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
+              ! le dossier data existe       
               lnew_run = .true.
-              lmove_data=.false.
-           else  ! le dossier data existe       
-              if (.not.lcheckpoint) then
+              lmove_data=.true.
+           else ! le dossier data n'existe pas
+              if (.not.lcheckpoint) then 
                  lnew_run=.true.
-                 lmove_data=.true.
-              else
+                 lmove_data=.false.
+              else ! Recherche checkpoint
+                 write(*,*) "Trying to load checkpooint data"
                  cmd = 'ls '//trim(local_data_dir)//"/checkpoint*"
                  call appel_syst(cmd,syst_status)
                  if (syst_status == 256) then ! il n'y pas a des checkpoints
@@ -1063,8 +1058,10 @@ subroutine save_data
                     endif ! checkpoint_level
                  endif ! il y ades checkpoint ?
               endif ! lchekcpoint
-           endif ! il y a un data
-        endif ! il y a un dossier seed
+           endif ! if y a un dossier data
+        else
+           lnew_run = .true. ! le dossier data n'existe pas
+        endif
         
         if (lmove_data) then
            if (lno_backup) then
@@ -1072,9 +1069,7 @@ subroutine save_data
               stop
            else
               write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
-              cmd = 'ls '//trim(seed_dir)//' | grep '//trim(local_basename_data_dir)//'_old  > /dev/null'
-              call appel_syst(cmd,syst_status)
-              if (syst_status == 0) then
+              if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
                  write (*,*) 'Directory '//trim(local_data_dir)//'_old already exists : exiting!'
                  stop
               endif

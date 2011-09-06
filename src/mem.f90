@@ -1055,7 +1055,8 @@ subroutine realloc_dust_mol()
 
   integer :: alloc_status
 
-  allocate(tab_lambda(n_lambda), tab_delta_lambda(n_lambda), tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
+  allocate(tab_lambda(n_lambda), tab_delta_lambda(n_lambda), &
+       tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda'
      stop
