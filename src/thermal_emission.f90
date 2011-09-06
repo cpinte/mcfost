@@ -832,7 +832,8 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss)
 
      id =1 ! pour code sequentiel     
-     !$omp do
+     ! ganulation faible car le temps calcul depend fortement des cellules    
+     !$omp do schedule(dynamic,1) 
      do i=1, n_rad
         !$ id = omp_get_thread_num() + 1
         do j=1,nz
@@ -1119,110 +1120,110 @@ subroutine emission_nRE()
   !E_abs_nRE est en nbre de paquets !!! 
   frac_E_abs_nRE =  E_abs_nRE / nbre_photons_tot
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
-!  if (frac_E_abs_nRE >  precision ) then ! On va iterer
-     write(*,*) "Re-emitting this amount of energy"
-     status = .false.
+  write(*,*) "Re-emitting this amount of energy"
+  status = .false.
      
-     ! Quantite energie a reemettre
-     ! energie des paquets en supposant que ce soit le meme nombre que pour la premiere etape
-     E_paquet = frac_E_abs_nRE
+  ! Quantite energie a reemettre
+  ! energie des paquets en supposant que ce soit le meme nombre que pour la premiere etape
+  E_paquet = frac_E_abs_nRE
 
-     ! Pour iteration suivante
-     E_abs_nRE = 0.0
+  ! Pour iteration suivante
+  E_abs_nRE = 0.0
 
-     ! Repartion spatiale energie
-     cst_wl_max = log(huge_real)-1.0e-4
+  ! Repartion spatiale energie
+  cst_wl_max = log(huge_real)-1.0e-4
 
-     if (l3D) then
-        n_max = n_rad*2*nz*n_az
-     else
-        n_max = n_rad*nz
-     endif
+  if (l3D) then
+     n_max = n_rad*2*nz*n_az
+  else
+     n_max = n_rad*nz
+  endif
 
-     allocate(E_cell(n_max), E_cell_old(n_max), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error'
-        stop
-     endif
+  allocate(E_cell(n_max), E_cell_old(n_max), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error'
+     stop
+  endif
   
-     spectre_emission_cumul(0) = 0.0
-     do lambda=1, n_lambda
+  spectre_emission_cumul(0) = 0.0
+  do lambda=1, n_lambda        
+     wl = tab_lambda(lambda)*1.e-6
+     delta_wl = tab_delta_lambda(lambda)*1.e-6
+     E_cell=0.0
+     
+     ! Emission par cellule des PAHs
 
-        wl = tab_lambda(lambda)*1.e-6
-        delta_wl = tab_delta_lambda(lambda)*1.e-6
-        E_cell=0.0
-
-        ! Emission par cellule des PAHs
-        do i=1,n_rad
-           do j=1,nz
-              ! Combinaison des 2 indices pour dichotomie
-              l=j+nz*(i-1)
-              E_emise = 0.0
-              do k=grain_nRE_start,grain_nRE_end
-                 if (l_RE(i,j,k)) then ! le grain a une temperature
-                    Temp = Temperature_1grain_nRE(i,j,k) 
+     !$omp parallel default(none) &
+     !$omp private(i,j,l,k,E_emise,Temp,cst_wl,T) &
+     !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end,n_max) &
+     !$omp shared(n_rad,nz,l_RE, Temperature_1grain_nRE,n_T,q_abs,densite_pouss,volume,tab_Temp,Proba_Temperature) &
+     !$omp shared(Emissivite_nRE_old,cst_wl_max)
+     !$omp do 
+     do i=1,n_rad
+        do j=1,nz
+           ! Combinaison des 2 indices pour dichotomie
+           l=j+nz*(i-1)
+           E_emise = 0.0
+           do k=grain_nRE_start,grain_nRE_end
+              if (l_RE(i,j,k)) then ! le grain a une temperature
+                 Temp = Temperature_1grain_nRE(i,j,k) 
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < cst_wl_max) then
+                    E_emise = E_emise + 4.0*q_abs(lambda,k)*densite_pouss(i,j,1,k)* &
+                         volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                 endif
+              else ! densite de proba de Temperature
+                 do T=1,n_T
+                    temp=tab_Temp(T)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
                        E_emise = E_emise + 4.0*q_abs(lambda,k)*densite_pouss(i,j,1,k)* &
-                            volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                    endif
-                 else ! densite de proba de Temperature
-                    do T=1,n_T
-                       temp=tab_Temp(T)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*q_abs(lambda,k)*densite_pouss(i,j,1,k)* &
-                               volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k) &
-                               * delta_wl
-                       endif !cst_wl
-                    enddo !T
-                 endif
-              enddo !k
-              E_cell(l) =   E_emise
-              ! Recup et mise a jour de l'ancienne emmissivite
-              E_cell_old(l) = Emissivite_nRE_old(lambda,i,j,1)
-              if (E_cell(l) >   E_cell_old(l)) then 
-                 Emissivite_nRE_old(lambda,i,j,1) = E_emise
-              else ! Test en cas de pb d'arrondis
-                 ! On ne met pas a jour
-                 E_cell(l) = E_cell_old(l)
+                            volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k) &
+                            * delta_wl
+                    endif !cst_wl
+                 enddo !T
               endif
-           enddo !j
-        enddo !i
-        
+           enddo !k
+           E_cell(l) =   E_emise
+           ! Recup et mise a jour de l'ancienne emmissivite
+           E_cell_old(l) = Emissivite_nRE_old(lambda,i,j,1)
+           if (E_cell(l) >   E_cell_old(l)) then 
+              Emissivite_nRE_old(lambda,i,j,1) = E_emise
+           else ! Test en cas de pb d'arrondis
+              ! On ne met pas a jour
+              E_cell(l) = E_cell_old(l)
+           endif
+        enddo !j
+     enddo !i
+     !$omp end do
+     !$omp end parallel
+   
 
-        prob_E_cell(lambda,0)=0.0
-        do l=1, n_max
-           Delta_E = E_cell(l) - E_cell_old(l)
-         !  if (Delta_E < 0.0_db) then
-         !     write(*,*) "Pb pour emission_nRE", Delta_E, Delta_E/E_cell(l), l
-         !  endif
-           prob_E_cell(lambda,l) = prob_E_cell(lambda,l-1) + Delta_E
-        enddo
-  
-        spectre_emission_cumul(lambda) =  spectre_emission_cumul(lambda-1) + prob_E_cell(lambda,n_max)
-
-        ! Les etoiles ont deja emis
-        frac_E_stars(lambda) = 0.0 
-     
-        if (prob_E_cell(lambda,n_max) > tiny_real) then
-           prob_E_cell(lambda,:)=prob_E_cell(lambda,:)/prob_E_cell(lambda,n_max)
-        else
-           prob_E_cell(lambda,:)=0.0
-        endif
-     enddo ! lambda
-
-     ! Normalisation de la proba d'emission / fct lambda des grains hors equilibre
-     do lambda=1,n_lambda
-        spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
+     prob_E_cell(lambda,0)=0.0
+     do l=1, n_max
+        Delta_E = E_cell(l) - E_cell_old(l)
+        prob_E_cell(lambda,l) = prob_E_cell(lambda,l-1) + Delta_E
      enddo
+  
+     spectre_emission_cumul(lambda) =  spectre_emission_cumul(lambda-1) + prob_E_cell(lambda,n_max)
      
-     deallocate(E_cell, E_cell_old)
+     ! Les etoiles ont deja emis
+     frac_E_stars(lambda) = 0.0 
+     
+     if (prob_E_cell(lambda,n_max) > tiny_real) then
+        prob_E_cell(lambda,:)=prob_E_cell(lambda,:)/prob_E_cell(lambda,n_max)
+     else
+        prob_E_cell(lambda,:)=0.0
+     endif
+  enddo ! lambda
 
-!  else ! Convergence atteinte
-!     write(*,*) "Convergence criteria reached" 
-!     status = .true.
-!  endif
+
+  ! Normalisation de la proba d'emission / fct lambda des grains hors equilibre
+  do lambda=1,n_lambda
+     spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
+  enddo
+  
+  deallocate(E_cell, E_cell_old)
 
   return
 
@@ -1419,6 +1420,7 @@ subroutine repartition_energie(lambda)
         enddo
      endif
 
+ 
      do i=1,n_rad
         do j=1,nz
            ! Combinaison des 2 indices pour dichotomie
@@ -1465,6 +1467,7 @@ subroutine repartition_energie(lambda)
            endif
         enddo !j
      enddo !i
+  
   endif
 
 
@@ -1544,6 +1547,8 @@ subroutine chauffage_interne()
 
   ! Energie emise aux differente longueurs d'onde : repartition_energie
   call Temp_finale()
+
+  return
 
 end subroutine chauffage_interne
 

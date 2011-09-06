@@ -553,8 +553,8 @@ release : main
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
-	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
+	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	rm -rf web
 
 release_mac : main
@@ -564,8 +564,8 @@ release_mac : main
 	cp mcfost web/macos_intel_64bits
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
-	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
+	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	rm -rf web
 
 
