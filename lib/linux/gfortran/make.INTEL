@@ -9,7 +9,7 @@ CLD = $(CC)
 F77 = gfortran
 #F77 = echo
 F77LD = $(F77)
-FFXN = -DAdd__
+FFXN = -DAdd_  # 1 underscore with gfortran
 FSUFFIX = F
 
 MPIF77 = mpif77
@@ -27,10 +27,10 @@ MPICC = mpicc
 # Please include mpi header file path, if needed
 
 #CFLAGS = -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  -I/usr/local/mpi/include -I/usr/local/mpi/build/LINUX/ch_p4/include
-CFLAGS = -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  
-CLDFLAGS =  -O3 
+CFLAGS = -m32 -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  
+CLDFLAGS =  -m32 -O3 
 #FFLAGS = -O3 $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  -I/usr/local/mpi/include -I/usr/local/mpi/build/LINUX/ch_p4/include -I.
-FFLAGS = -O3 $(PMLCGDEF) $(MPIDEF) -D$(PLAT)
-F77LDFLAGS =  -O3 
+FFLAGS = -m32 -O3 $(PMLCGDEF) $(MPIDEF) -D$(PLAT)
+F77LDFLAGS =  -m32 -O3 
 
 CPP = cpp -P
