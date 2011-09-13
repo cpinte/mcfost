@@ -707,8 +707,9 @@ function bubble_sort(data_in)
      end do ! i
      pass = pass +1
 
-     return
   end do ! while
+
+  return
 
 end function bubble_sort
 
