@@ -1,3 +1,4 @@
+#!/bin/sh
 mkdir lib
 mkdir include
 
@@ -8,17 +9,20 @@ tar xzvf sprng2.0b.tar.gz
 cp -f  linux/gfortran/make.CHOICES sprng2.0
 cp -f  linux/gfortran/make.INTEL sprng2.0/SRC
 cd sprng2.0
-make
+make -B
 mv lib/libsprng.a ../lib
 mv include/*.h ../include
 cd ..
 rm -rf sprng2.0
+
 
 # cfitsio
 # g77 ou f77 needed by configure to set up the fotran wrapper in Makefile 
 #wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
+export CFLAGS="-m32"
+export FC="gfortran"
 ./configure
 make
 cp libcfitsio.a ../lib

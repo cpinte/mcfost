@@ -416,7 +416,7 @@ endif
 # Linux ou Mac x86, gfortran
 ifeq ($(COMPILO),gfortran)
 FC_SER = gfortran -cpp 
-FC_OMP = gfortran -cpp
+FC_OMP = gfortran -cpp -fopenmp
 OPTS = -O3 -ffast-math #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse 
 DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private 
