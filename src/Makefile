@@ -539,7 +539,7 @@ mem.o : mem.f90  modules.o sha.f90
 
 # Le fichier sha.f90 n'est cree que sur mon mac
 ifeq ($(ARCH),DARWIN)
-sha.f90 : ../.git
+sha.f90 : ../.git/COMMIT_EDITMSG
 	echo "module sha\n  implicit none" > sha.f90
 	git show-ref --heads | awk '{print "  character(len=40), parameter :: sha_id = \"" $$1 "\""}' >> sha.f90
 	echo "end module sha" >> sha.f90
