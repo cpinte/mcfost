@@ -605,7 +605,11 @@ subroutine opacite_mol_loc(ri,zj,phik)
   integer :: iTrans, iiTrans
   real(kind=db) :: nu, nl, kap, eps
 
-  logical, save :: no_maser = .true.
+  logical, save :: lmaser = .false. 
+  
+  character(len=128) :: filename
+
+  filename = "maser_map.fits.gz"
 
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
@@ -617,20 +621,31 @@ subroutine opacite_mol_loc(ri,zj,phik)
      eps =  nu*fAul(iiTrans)
 
      if (kap < 0.) then
-        if (no_maser) then
-           write(*,*) "*****************************************"
-           write(*,*) "WARNING : Masering effect, forcing kappa = 0."
-           write(*,*) "1st cell : Ri=", ri, "Zi=", zj, "iTrans=", iiTrans
-           write(*,*) "*****************************************"
-           no_maser = .false.
-        endif
+        lmaser = .true.
+        ! inversion value (inversion population is > 1 )
+        maser_map(ri,zj,iTrans) = (nu * poids_stat_g(iTransLower(iiTrans))) / &
+             (poids_stat_g(iTransUpper(iiTrans)) * nl) 
         kap = 0.
+!        write(*,*) ri, zj, iiTrans
+!        write(*,*) maser_map(ri,zj,iTrans)   
      endif
-     
+          
      ! longueur de vol en AU, a multiplier par le profil de raie
      kappa_mol_o_freq(ri,zj,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m  
      emissivite_mol_o_freq(ri,zj,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m 
   enddo
+
+  if ( (lmaser) .and. (ri==n_rad) .and. (zj==nz) ) then
+      write(*,*) "*************************************************"
+      write(*,*) "WARNING : There are some inversion populations"
+      write(*,*) "   --> forcing kappa = 0."
+      write(*,*) "Inversion values written to :"
+      write(*,*) trim(filename)
+      write(*,*) "Max. inversion value =", maxval(maser_map)
+      write(*,*) "*************************************************"
+      call cfitsWrite(trim(filename),maser_map,shape(maser_map))
+  endif
+
 
   if (ldouble_RT) then
      do iTrans=1,nTrans

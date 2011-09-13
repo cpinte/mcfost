@@ -12,6 +12,7 @@ module ProDiMo
   use utils
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_ibin, lRT_i_centered 
   use read_params
+  use sha
 
   implicit none
 
@@ -20,7 +21,6 @@ module ProDiMo
   character(len=32), parameter :: mcfost2ProDiMo_file = "forProDiMo.fits.gz"
   integer :: mcfost2ProDiMo_version, ProDiMo2mcfost_version
   
-
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
   real :: fUV_ProDiMo, slope_UV_ProDiMo
@@ -54,7 +54,7 @@ module ProDiMo
   ! Lecture du fichier for MCFOST.fits.gz
   integer, parameter :: nLevel_CII = 2
   integer, parameter :: nLevel_OI = 3
-  integer, parameter :: nLevel_CO = 52
+  integer, parameter :: nLevel_CO = 33  !52
   integer, parameter :: nLevel_oH2O = 10
   integer, parameter :: nLevel_pH2O = 9
 
@@ -64,7 +64,6 @@ module ProDiMo
   real, dimension(:,:,:), allocatable :: pop_CO
   real, dimension(:,:,:), allocatable :: pop_oH2O
   real, dimension(:,:,:), allocatable :: pop_pH2O
-
 
 
 contains
@@ -257,14 +256,14 @@ contains
     naxes(3)=2
     nelements=naxes(1)*naxes(2)*naxes(3)
 
-    !  Write the required header keywords.
+    ! Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    ! Write  optional keywords to the header
-    call ftpkys(unit,'MCFOST',trim(mcfost_release),'',status)
-    call ftpkyj(unit,'MCFOST2PRODIMO',mcfost2ProDiMo_version,'',status)
-    !FTPKY[EDFG](unit,keyword,keyval,decimals,comment, > status)
-    call ftpkys(unit,'model_name',trim(para),'',status)
+    ! Write optional keywords to the header
+    call ftpkys(unit,'mcfost',mcfost_release,'',status)
+    call ftpkys(unit,'mcfost_id',sha_id,'',status)
+    call ftpkyj(unit,'mcfost2prodimo',mcfost2ProDiMo_version,'',status)
+    call ftpkys(unit,'mcfost_model_name',trim(para),'',status)
 
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
     call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
@@ -882,7 +881,11 @@ contains
     character(len=30) errtext
     character (len=80) errmessage, comment
     character(len=512) :: filename
-    character(8) :: used_mcfost_version
+    
+    character(len=40) :: used_sha_id
+    character(len=8) :: used_mcfost_version
+    integer :: used_mcfost2ProDiMo_version
+  
       
     logical, save :: l_first_time = .true.
 
@@ -953,7 +956,7 @@ contains
        write(*,*) "Reading ProDiMo calculations"
        write(*,*) trim(filename)
 
-              fits_status = 0 
+       fits_status = 0 
        !  Get an unused Logical Unit Number to use to open the FITS file.
        call ftgiou(unit,fits_status)
 
@@ -969,22 +972,6 @@ contains
        group=1
        firstpix=1
        nullval=-999
-
-       ! reading keywords
-       used_mcfost_version = 'unknown'
-       comment = ' '
-       ProDiMo2mcfost_version = 0
-       call ftgkys(unit,'MCFOST',used_mcfost_version,comment,keyword_status)
-       call ftgkyj(unit,'PRODIMO2MCFOST',ProDiMo2mcfost_version,comment,keyword_status)
-
-       if (used_mcfost_version /= mcfost_release) then
-          write(*,*) "************************************************"
-          write(*,*) "WARNING: MCFOST has been updated"
-          write(*,*) "- initial model was computed with mcfost "//trim(used_mcfost_version)
-          write(*,*) "- this is mcfost "//trim(mcfost_release)
-          write(*,*) "Problems can occur"
-          write(*,*) "************************************************"
-       endif
 
        !---------------------------------------------------------
        ! HDU 1 : MCgrid, to make a test inside mcfost
@@ -1003,6 +990,60 @@ contains
           stop
        endif
        npixels=naxes(1)*naxes(2)*naxes(3)
+
+       ! reading keywords
+       used_mcfost_version = 'unknown'
+       comment = ' '
+       used_sha_id = 'unknown'
+       used_mcfost2ProDiMo_version = 0
+       ProDiMo2mcfost_version = 0
+       
+       ! Read model info 
+       keyword_status = 0
+       call ftgkys(unit,'mcfost',used_mcfost_version,comment,keyword_status)
+       if (keyword_status /= 0) then
+          write(*,*) "Fits keyword error: mcfost"
+          keyword_status = 0
+       endif
+       call ftgkys(unit,'mcfost_id',used_sha_id,comment,keyword_status)
+       if (keyword_status /= 0) then
+          write(*,*) "Fits keyword error: mcfost_id"
+          keyword_status = 0
+       endif
+       call ftgkyj(unit,'mcfost2prodimo',used_mcfost2ProDiMo_version,comment,keyword_status)
+       if (keyword_status /= 0) then
+          write(*,*) "Fits keyword error: mcfost2prodimo"
+          keyword_status = 0
+       endif
+       call ftgkyj(unit,'prodimo2mcfost',ProDiMo2mcfost_version,comment,keyword_status)
+       if (keyword_status /= 0) then
+          write(*,*) "Fits keyword error: prodimo2mcfost"
+          keyword_status = 0
+       endif
+       
+       if (used_mcfost_version /= mcfost_release) then
+          write(*,*) "************************************************"
+          write(*,*) "WARNING: MCFOST has been updated"
+          write(*,*) "- initial model was computed with mcfost "//trim(used_mcfost_version)
+          write(*,*) "id="//used_sha_id
+          write(*,*) "- this is mcfost "//trim(mcfost_release)
+          write(*,*) "id="//sha_id
+          write(*,*) "Problems can occur"
+          write(*,*) "************************************************"
+       else 
+          if (used_sha_id /= sha_id) then
+             write(*,*) "************************************************"
+             write(*,*) "WARNING: MCFOST has been updated"
+             write(*,*) "- initial model was computed with mcfost:"
+             write(*,*) "id="//used_sha_id
+             write(*,*) "- this is mcfost:"
+             write(*,*) "id="//sha_id
+             write(*,*) "Problems can occur"
+             write(*,*) "************************************************"
+          endif
+       endif
+
+
        
        ! read_image
        call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,fits_status)
@@ -1155,7 +1196,6 @@ contains
                 MCpops(l,:,:) = MCpops(l,:,:) / sum_pops(:,:)
              enddo !l
           endif ! interface_version
-
           
           if (i==1) pop_CII = MCpops
           if (i==2) pop_OI = MCpops
@@ -1194,9 +1234,11 @@ contains
     ! Niveaux
     tab_nLevel(:,:,:) = 0.0
     do i=1, n_rad
-       do j=1, nz  
+       do j=1, nz    
           if (lCII) tab_nLevel(i,j,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
           if (lOI) tab_nLevel(i,j,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
+          !write(*,*) i, j, shape(tab_nLevel(i,j,1:nLevel_CO)), shape(tab_nLevel(i,j,1:nLevel_CO))
+          ! ca a l'air de planter en OpenMP (???)
           if (lCO) tab_nLevel(i,j,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
           if (loH2O) tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j) 
           if (lpH2O) tab_nLevel(i,j,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
