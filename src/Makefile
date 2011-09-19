@@ -530,23 +530,26 @@ modules.o : modules.f90
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # Fichier compile sans optimisation
-mem.o : mem.f90  modules.o sha.f90
+mem.o : mem.f90  modules.o
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # defaut
-%.o : %.f90  modules.o sha.f90
+%.o : %.f90  modules.o 
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG) $(COMP_FITS)
+
+io_prodimo.o : sha.f90
+utils.o :      sha.f90
 
 # Le fichier sha.f90 n'est cree que sur mon mac
 ifeq ($(ARCH),DARWIN)
 sha.f90 : ../.git/COMMIT_EDITMSG
-	echo "module sha\n  implicit none" > sha.f90
-	git show-ref --heads | awk '{print "  character(len=40), parameter :: sha_id = \"" $$1 "\""}' >> sha.f90
-	echo "end module sha" >> sha.f90
+	printf "module sha\n  implicit none\n" > sha.f90
+	git show-ref --heads | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
+	printf "end module sha\n" >> sha.f90
 endif
 
-mcfost2prodimo: mcfost mcfost2prodimo.o
-	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90  $(COMP_FITS)  $(LIBS_FITS)
+mcfost2prodimo : mcfost mcfost2prodimo.o
+	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
 
 #*************************************************************
 # Release
@@ -560,10 +563,9 @@ release : main
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
-	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
+	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
-	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	rm -rf web
 
 release_mac : main
@@ -571,26 +573,25 @@ release_mac : main
 	rm -rf web
 	mkdir web web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
-	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"// | sed s/\"// > web/version.txt
+	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
-	scp -r web/* horus:/server/laog/public/pintec/mcfost
 	rm -rf web
 
 
 #*************************************************************
 # Sauvegarde
 #*************************************************************
-save :
+save : 
 	zip -9 ~/sauvegarde/mcfost5_`date +%d_%m_%y`.zip *.f90 *.sh Makefile todo.mcfost ../yorick/init/mcfost*  && scp ~/sauvegarde/mcfost5_`date +%d_%m_%y`.zip horus:sauvegarde/
 
 #*************************************************************
 # Nettoyage
 #*************************************************************
-clean :
-	rm -rf *.o *.exe *.mod outils/*.o outils/*.exe core*
+clean : 
+	rm -rf sha.f90 *.o *.exe *.mod outils/*.o outils/*.exe core*
 
-cleandata :
+cleandata : 
 	rm -rf data* seed* density.fits.gz volume.fits.gz grid.fits.gz
 
 cleanall : clean cleandata
