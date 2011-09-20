@@ -2167,6 +2167,7 @@ subroutine ecriture_spectre(imol)
   real, dimension(nTrans) :: freq
 
   integer :: n_speed_rt, nTrans_raytracing
+  real :: pixel_scale_x, pixel_scale_y
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
   
@@ -2208,6 +2209,19 @@ subroutine ecriture_spectre(imol)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  ! RAC, DEC, reference pixel & pixel scale en degres
+  call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
+  pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x',status)
+
+  call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
+  pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
