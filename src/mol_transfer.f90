@@ -97,7 +97,7 @@ subroutine mol_line_transfer()
      !     call equilibre_othin_mol()
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
         
-     call opacite_mol()
+     call opacite_mol(imol)
      call integ_tau_mol(imol)
   
      ! Resolution population des niveaux nLTE
@@ -316,7 +316,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp default(none) &
         !$omp private(id,ri,zj,phik,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv) &
-        !$omp shared(stream,n_rad,nz,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
+        !$omp shared(imol,stream,n_rad,nz,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape) 
         !$omp do schedule(static,1)
@@ -422,7 +422,7 @@ subroutine NLTE_mol_line_transfer(imol)
                           lconverged_loc = .true.
                        else
                           ! On est pas converge, on recalcule les opacites et fonctions source
-                          call opacite_mol_loc(ri,zj,phik)
+                          call opacite_mol_loc(ri,zj,phik,imol)
                        endif
                        
                     enddo ! while : convergence champ local            
