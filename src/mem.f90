@@ -1719,17 +1719,13 @@ subroutine alloc_emission_mol(imol)
   ! Methode d'echantillonnage
   if (igridx > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
+     allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
+          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
-  endif
-  
-  if (RT_line_method == 1) then
-     allocate(spectre(-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin,1,1), &
-             continu(nTrans_raytracing,RT_n_ibin,1,1), stat=alloc_status)
-  else
-     allocate(spectre(-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin,igridx,igridy), &
-          continu(nTrans_raytracing,RT_n_ibin,igridx,igridy), stat=alloc_status)
-  endif
+     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
+          continu(1,1,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
+  endif  
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre'
      stop

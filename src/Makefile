@@ -544,7 +544,7 @@ utils.o :      sha.f90
 ifeq ($(ARCH),DARWIN)
 sha.f90 : ../.git/COMMIT_EDITMSG
 	printf "module sha\n  implicit none\n" > sha.f90
-	git show-ref --heads | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
+	git log --pretty=format:"%H %d" | grep HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
 	printf "end module sha\n" >> sha.f90
 endif
 
