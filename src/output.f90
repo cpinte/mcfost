@@ -2191,16 +2191,16 @@ subroutine ecriture_spectre(imol)
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis=5
-  naxes(1)=2*n_speed_rt+1
-  naxes(2)=ntrans
-  naxes(3)=RT_n_ibin
   if (RT_line_method==1) then
-     naxes(4)=1
-     naxes(5)=1
+     naxes(1)=1
+     naxes(2)=1
   else
-     naxes(4)=igridx
-     naxes(5)=igridy
+     naxes(1)=igridx
+     naxes(2)=igridy
   endif
+  naxes(3)=2*n_speed_rt+1
+  naxes(4)=ntrans
+  naxes(5)=RT_n_ibin
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
    
   ! create new hdu
@@ -2215,26 +2215,26 @@ subroutine ecriture_spectre(imol)
      if (RT_line_method==1) then
         ! On ajoute les 2 parties du spectres
         do iv = -n_speed_rt, -1
-           spectre(iv,:,:,1,1) = spectre(iv,:,:,1,1) + spectre(-iv,:,:,1,1)
+           spectre(1,1,iv,:,:) = spectre(1,1,iv,:,:) + spectre(1,1,-iv,:,:)
         enddo
         ! On symetrise
         do iv =1, n_speed_rt
-           spectre(iv,:,:,1,1) = spectre(-iv,:,:,1,1)
+           spectre(1,1,iv,:,:) = spectre(1,1,-iv,:,:)
         enddo
-        spectre(0,:,:,1,1) = spectre(0,:,:,1,1) * 2.
+        spectre(1,1,0,:,:) = spectre(1,1,0,:,:) * 2.
         ! On divise par deux
-        spectre = spectre / 2.
+        spectre = spectre * 0.5
      else
         xcenter = igridx/2 + modulo(igridx,2)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
            do i=xcenter+1,igridx
               do iv=-n_speed_rt,n_speed_rt
-                 spectre(iv,:,:,i,:) = spectre(-iv,:,:,igridx-i+1,:)
+                 spectre(i,:,iv,:,:) = spectre(igridx-i+1,:,-iv,:,:)
               enddo
            enddo
         else ! infall : meme profil de raie des 2 cotes
            do i=xcenter+1,igridx
-              spectre(:,:,:,i,:) = spectre(:,:,:,igridx-i+1,:)
+              spectre(i,:,:,:,:) = spectre(igridx-i+1,:,:,:,:)
            enddo
         endif
      endif ! lkeplerian
@@ -2248,15 +2248,15 @@ subroutine ecriture_spectre(imol)
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis=4
-  naxes(1)=ntrans
-  naxes(2)=RT_n_ibin
   if (RT_line_method==1) then
-     naxes(3)=1
-     naxes(4)=1
+     naxes(1)=1
+     naxes(2)=1
   else
-     naxes(3)=igridx
-     naxes(4)=igridy
+     naxes(1)=igridx
+     naxes(2)=igridy
   endif
+  naxes(3)=ntrans
+  naxes(4)=RT_n_ibin
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   ! create new hdu
@@ -2268,7 +2268,7 @@ subroutine ecriture_spectre(imol)
   if (l_sym_ima.and.(RT_line_method==2)) then 
      xcenter = igridx/2 + modulo(igridx,2)
      do i=xcenter+1,igridx
-        continu(:,:,i,:) = continu(:,:,igridx-i+1,:)
+        continu(i,:,:,:) = continu(igridx-i+1,:,:,:)
      enddo
   endif ! l_sym_image
 

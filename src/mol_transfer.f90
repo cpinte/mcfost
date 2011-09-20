@@ -852,11 +852,11 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   ! profil de raie non convolue teste ok avec torus
 
   if (RT_line_method==1) then ! Sommation implicite sur les pixels
-     spectre(:,:,ibin,1,1) = spectre(:,:,ibin,1,1) + IP(:,:)
-     continu(:,ibin,1,1) = continu(:,ibin,1,1) + IPc(:)
+     spectre(1,1,:,:,ibin) = spectre(:,:,ibin,1,1) + IP(:,:)
+     continu(1,1,:,ibin) = continu(:,ibin,1,1) + IPc(:)
   else
-     spectre(:,:,ibin,ipix,jpix) = IP(:,:)
-     continu(:,ibin,ipix,jpix) = IPc(:)
+     spectre(ipix,jpix,:,:,ibin) = IP(:,:)
+     continu(ipix,jpix,:,ibin) = IPc(:)
   endif
 
   return
