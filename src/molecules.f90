@@ -570,7 +570,7 @@ end subroutine init_tab_Cmb_mol
 
 !***********************************************************
 
-subroutine opacite_mol()
+subroutine opacite_mol(imol)
   ! Calcule la fonction source dans chaque cellule
   ! etant donne les populations des niveaux
   ! C. Pinte
@@ -578,11 +578,12 @@ subroutine opacite_mol()
 
   implicit none
 
+  integer, intent(in) :: imol
   integer :: i,j
 
   do i=1,n_rad
      do j=1,nz
-        call opacite_mol_loc(i,j,1)
+        call opacite_mol_loc(i,j,1,imol)
      enddo ! j
   enddo ! i
   
@@ -592,7 +593,7 @@ end subroutine opacite_mol
 
 !***********************************************************
 
-subroutine opacite_mol_loc(ri,zj,phik)
+subroutine opacite_mol_loc(ri,zj,phik,imol)
   ! Calcule la fonction source dans chaque cellule
   ! etant donne les populations des niveaux
   ! C. Pinte
@@ -600,7 +601,7 @@ subroutine opacite_mol_loc(ri,zj,phik)
 
   implicit none
 
-  integer, intent(in) :: ri, zj, phik
+  integer, intent(in) :: ri, zj, phik, imol
 
   integer :: iTrans, iiTrans
   real(kind=db) :: nu, nl, kap, eps
@@ -609,7 +610,7 @@ subroutine opacite_mol_loc(ri,zj,phik)
   
   character(len=128) :: filename
 
-  filename = "maser_map.fits.gz"
+  filename = trim(data_dir2(imol))//"/maser_map.fits.gz"
 
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
