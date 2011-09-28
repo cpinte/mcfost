@@ -17,8 +17,8 @@ contains
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme
+    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    real(kind=db) :: size_neb_tmp, somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -449,7 +449,27 @@ contains
           somme=0.0
           do i=1, n_especes(j)
              n_pop = n_pop+1
-             read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+                dust_pop_tmp(n_pop)%lcoating = .true.
+             else
+                dust_pop_tmp(n_pop)%lcoating = .false.
+             endif
+             if (dust_pop_tmp(n_pop)%n_components > 2) then
+                write(*,*) "ERROR : only 2 components allowed per population at the moment"
+                write(*,*) "Exiting"
+                stop
+             endif
+             V_somme = 0.0
+             do k=1, dust_pop_tmp(n_pop)%n_components
+                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             enddo
+             ! renormalisation des fraction en volume
+             do k=1, dust_pop_tmp(n_pop)%n_components
+                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
+             enddo
              read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
              read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -466,21 +486,21 @@ contains
           enddo
 
           ! Coated sphere properties
-          read(1,*) dust_pop_tmp(n_pop)%lcoating, dust_pop_tmp(n_pop)%coating_frac, &
-               dust_pop_tmp(n_pop)%indices_coating, dust_pop_tmp(n_pop)%lmantle
-        if ((dust_pop_tmp(n_pop)%coating_frac > 1.).or.(dust_pop_tmp(n_pop)%coating_frac < 0.)) then
-           write(*,*) "Error: Volume fraction of coating must be in the [0 ..1 ] range"
-           stop
-        endif
-        if ((dust_pop_tmp(n_pop)%coating_frac == 1.).or.(dust_pop_tmp(n_pop)%coating_frac == 0.)) then
-           write(*,*) "Error: if core or coating volume is null, do not use coating!"
-           stop
-        endif
-        if (dust_pop_tmp(n_pop)%lmantle .eqv. .false.) then
-           write(*,*) "Use of EMT mixing instead of layer coating is not coded yet."
-           stop
-        endif
-
+       !  read(1,*) dust_pop_tmp(n_pop)%lcoating, dust_pop_tmp(n_pop)%coating_frac, &
+       !       dust_pop_tmp(n_pop)%indices_coating, dust_pop_tmp(n_pop)%lmantle
+       !  if ((dust_pop_tmp(n_pop)%coating_frac > 1.).or.(dust_pop_tmp(n_pop)%coating_frac < 0.)) then
+       !     write(*,*) "Error: Volume fraction of coating must be in the [0 ..1 ] range"
+       !     stop
+       !  endif
+       !  if ((dust_pop_tmp(n_pop)%coating_frac == 1.).or.(dust_pop_tmp(n_pop)%coating_frac == 0.)) then
+       !     write(*,*) "Error: if core or coating volume is null, do not use coating!"
+       !     stop
+       !  endif
+       !  if (dust_pop_tmp(n_pop)%lmantle .eqv. .false.) then
+       !     write(*,*) "Use of EMT mixing instead of layer coating is not coded yet."
+       !     stop
+       !  endif
+          
        enddo !n_zones
     endif ! lfits
 
@@ -537,7 +557,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -1000,7 +1020,8 @@ contains
           somme=0.0
           do i=1, n_especes(j)
              n_pop = n_pop+1
-             read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
              read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
              read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -1072,7 +1093,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -1479,7 +1500,8 @@ contains
              somme=0.0
              do i=1, n_especes(j)
                 n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+                dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
                 if (ios/=0) then
                    write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
                    write(*,*) 'Check the coherence of the number of species'
@@ -1512,7 +1534,8 @@ contains
           somme=0.0
           do i=1, n_especes(j)
              n_pop = n_pop+1
-             read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
              read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
              read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -1584,7 +1607,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -1994,7 +2017,8 @@ contains
              somme=0.0
              do i=1, n_especes(j)
                 n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+                dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
                 if (ios/=0) then
                    write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
                    write(*,*) 'Check the coherence of the number of species'
@@ -2027,7 +2051,8 @@ contains
           somme=0.0
           do i=1, n_especes(j)
              n_pop = n_pop+1
-             read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
              read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
              read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -2099,7 +2124,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -2403,7 +2428,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -2474,7 +2500,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -2761,7 +2787,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -2834,7 +2861,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -3128,7 +3155,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -3201,7 +3229,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -3496,7 +3524,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -3569,7 +3598,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -3862,7 +3891,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -3935,7 +3965,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -4200,7 +4230,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -4273,7 +4304,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -4529,7 +4560,8 @@ contains
        somme=0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
@@ -4602,7 +4634,7 @@ contains
           if (dust_pop_tmp(i)%methode_chauffage == 3) then
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)              
-             if (dust_pop(ind_pop)%indices(1:3) == "PAH") then
+             if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -4850,7 +4882,8 @@ contains
        somme = 0.0
        do i=1, n_especes(j)
           n_pop = n_pop+1
-          read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%rho1g, dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0 
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%component_rho1g(1), dust_pop_tmp(n_pop)%frac_mass
           read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
           somme = somme + dust_pop_tmp(n_pop)%frac_mass
           dust_pop_tmp(n_pop)%zone = j

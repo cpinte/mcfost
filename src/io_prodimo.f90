@@ -286,8 +286,8 @@ contains
     call ftpkye(unit,'aexp',dust_pop(1)%aexp,-8,'slope of grain size distribution',status)
     call ftpkye(unit,'strat',exp_strat,-8,'stratification exponent',status)
     call ftpkye(unit,'a_settle',a_strat,-8,'[micron]',status)
-    call ftpkye(unit,'rho_grain',dust_pop(1)%rho1g,-8,'[g.cm^-3]',status)
-    call ftpkys(unit,'optical_indices',trim(dust_pop(1)%indices),'',status)
+    call ftpkye(unit,'rho_grain',dust_pop(1)%component_rho1g(1),-8,'[g.cm^-3]',status)
+    call ftpkys(unit,'optical_indices',trim(dust_pop(1)%indices(1)),'',status)
 
     call ftpkyj(unit,'n_grains',dust_pop(1)%n_grains,' ',status)
     call ftpkyj(unit,'n_rad',n_rad,' ',status)
