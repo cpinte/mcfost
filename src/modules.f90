@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.13
-  character(8), parameter :: mcfost_release = "2.13.2"
+  character(8), parameter :: mcfost_release = "2.13.3"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   character(len=128), parameter :: webpage="http://ipag.osug.fr/public/pintec/mcfost/"
 
@@ -367,11 +367,14 @@ module grains
 
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
-     ! en cas de coating, rho1g est la densite du coeur
-     real :: amin, amax, aexp, frac_mass, rho1g, avg_grain_mass, masse, porosity, sblow
-     real :: rho1g_coating, coating_frac
-     character(len=512) :: indices, indices_coating
-     logical :: is_PAH, lcoating, lmantle
+     real :: amin, amax, aexp, frac_mass, avg_grain_mass, masse, porosity, sblow, rho1g_avg
+     
+     integer ::  mixing_rule, n_components ! en cas de coating, composant 1 est le coeur 2 est le manteau
+     ! mixing rule : 1 = EMT, 2 = coating
+     character(len=512), dimension(10) :: indices
+     real, dimension(10) :: component_rho1g, component_volume_fraction
+    
+     logical :: is_PAH, lcoating
      integer :: ind_debut, ind_fin
      integer :: pop_geo
   end type dust_pop_type

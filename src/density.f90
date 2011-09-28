@@ -1542,7 +1542,7 @@ subroutine densite_data_SPH_TTauri_2()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g * 4.*pi/3. * &
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * (dust_pop(grain(k)%pop)%rho1g_avg * 4.*pi/3. * &
                 (r_grain(k)*1.e-4)**3) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
@@ -1854,8 +1854,8 @@ subroutine densite_eqdiff()
         pas_z = delta_z(i)
         do k=1, n_grains_tot
            ! Coeff dependant de a
-           coeff1 = (omega**2*dust_pop(1)%rho1g*r_grain(k)*mum_to_cm)/(c_sound*D0*cst_gaz*fact_exp)
-           coeff2 = (omega*dust_pop(1)%rho1g*r_grain(k)*mum_to_cm)/(c_sound**cst_gaz*fact_exp)
+           coeff1 = (omega**2*dust_pop(1)%rho1g_avg*r_grain(k)*mum_to_cm)/(c_sound*D0*cst_gaz*fact_exp)
+           coeff2 = (omega*dust_pop(1)%rho1g_avg*r_grain(k)*mum_to_cm)/(c_sound**cst_gaz*fact_exp)
            ! Integration main loop
            y(1) = 1.0
            correct_strat(k,1) = 1.0
@@ -2801,7 +2801,7 @@ real(kind=db) function omega_tau(rho,H,a)
   real(kind=db), intent(in) :: rho,H
   real, intent(in) :: a
 
-  omega_tau=dust_pop(1)%rho1g*(a*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
+  omega_tau=dust_pop(1)%rho1g_avg*(a*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
 
 end function omega_tau
 

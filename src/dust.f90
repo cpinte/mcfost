@@ -44,20 +44,20 @@ subroutine taille_grains()
 
      if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
         a=dp%amin
-        dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g
+        dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
      else
         if (abs(dp%aexp - 4.) > 1.0e-5) then
            if (abs(dp%aexp - 1.) > 1.0e-5) then
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g * &
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
                    (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
                    (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
            else
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g /(4-dp%aexp) * &
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
                    (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
                    (log(dp%amax)-log(dp%amin))
            endif
         else
-           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g *&
+           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
                 (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
                 (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
         endif
@@ -83,7 +83,7 @@ subroutine taille_grains()
         
         r_grain(k) = a ! micron
         S_grain(k) = pi * a**2 ! micron^2
-        M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g ! masse en g
+        M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
 
         ! Multiplication par a car da = a.dln(a)
         nbre_grains(k) = a**(-dp%aexp) * a
@@ -109,19 +109,11 @@ subroutine taille_grains()
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
 
-
-     ! Increase grain radius, surface & mass to take into account coating
-     if (dp%lcoating .eqv. .true.) then
-        correct_fact_r =  1.0 / (1-dp%coating_frac)**(1./3)  ! r_tot = r_core * correct_fact_r
-        correct_fact_S = correct_fact_r**2
-        correct_fact_M = 1.0 + (dp%coating_frac*dp%rho1g_coating) / ((1.-dp%coating_frac)*dp%rho1g)
-     
-        dp%avg_grain_mass = dp%avg_grain_mass * correct_fact_M
+     ! Total radius is kept constant with coating 
+     if (dp%lcoating) then
+        correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
         do k=dp%ind_debut,dp%ind_fin
-           r_core(k) = r_grain(k) 
-           r_grain(k) = r_grain(k) * correct_fact_r
-           S_grain(k) = S_grain(k) * correct_fact_S
-           M_grain(k) = M_grain(k) * correct_fact_M
+           r_core(k) = r_grain(k)  * correct_fact_r
         enddo ! k
      endif
 
@@ -141,196 +133,34 @@ subroutine init_indices_optiques()
 
   implicit none
 
-  complex :: m1, m2, mavg, eps1, eps2, eavg1, eavg2, eavg, a, b, c, delta
+  complex :: m1, m2, mavg
   real :: frac, f1, f2, fbuffer
-  integer :: n, i, k, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment
+  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment
 
   character(len=512) :: filename
 
-  real, dimension(:), allocatable :: tab_l, tab_a1, tab_a2
+  real, dimension(:), allocatable :: tab_l, tab_n, tab_k
+  real, dimension(:,:), allocatable :: tab_tmp_amu1, tab_tmp_amu2
 
   logical :: l_ordre_decroissant
+
 
   do pop=1, n_pop
      if (.not.dust_pop(pop)%is_PAH) then 
 
+        allocate(tab_tmp_amu1(n_lambda, dust_pop(pop)%n_components), tab_tmp_amu2(n_lambda, dust_pop(pop)%n_components))
+
         ! Lecture fichier indices
-        filename = trim(dust_dir)//trim(dust_pop(pop)%indices)
+        do k=1, dust_pop(pop)%n_components
+           filename = trim(dust_dir)//trim(dust_pop(pop)%indices(k))
 
-        open(unit=1,file=filename, status='old', iostat=ios)
-        if (ios /=0) then
-           write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
-           write(*,*) "Exiting"
-           stop
-        endif
-
-        ! On elimine les lignes avec des commentaires
-        status = 1
-        n_comment = 0 
-        do while (status /= 0)
-           n_comment = n_comment + 1
-           read(1,*,iostat=status) fbuffer
-        enddo
-        n_comment = n_comment - 1
-
-        ! On compte les lignes avec des donnees
-        status=0
-        n_ind=1 ! On a deja lu une ligne en cherchant les commentaires
-        do while(status==0)
-           n_ind=n_ind+1
-           read(1,*,iostat=status)
-        enddo
-        n_ind = n_ind - 1
-
-        ! On enleve les 2 premieres lignes
-        n_ind = n_ind - 2 
-        
-        ! Allocation de tab
-        allocate(tab_l(n_ind), tab_a1(n_ind), tab_a2(n_ind), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error zsup'
-           stop
-        endif
-        tab_l=0.0 ; tab_a1=0.0 ; tab_a2=0.0 
-        
-        
-        ! Lecture proprement dite
-        rewind(1)
-        ! On passe les commentaires
-        do i=1, n_comment
-           read(1,*)
-        enddo
-
-        ! lecture densite
-        read(1,*) dust_pop(pop)%rho1g
-        if (dust_pop(pop)%rho1g > 10.) then
-           write(*,*) "ERROR: optical indices file has the wrong format"
-           write(*,*) "Exiting"
-           stop
-        endif
-        ! ligne vide
-        read(1,*)
-
-        ! Lecture indices
-        do i=1,n_ind
-           read(1,*) tab_l(n_ind-i+1), tab_a1(n_ind-i+1), tab_a2(n_ind-i+1)
-        enddo
-           
-        close(unit=1)
-
-        if (tab_l(2) > tab_l(1)) then
-           l_ordre_decroissant = .false. 
-        else
-           l_ordre_decroissant = .true.
-        endif
-
-        if (dust_pop(pop)%porosity > tiny_real) then 
-           f2 = dust_pop(pop)%porosity
-           f1 = 1. - f2
-
-           ! On corrige la densite 
-           dust_pop(pop)%rho1g  = dust_pop(pop)%rho1g * f1
-
-           ! On corrige les indices optiques
-           do i=1, n_ind
-              m1 = cmplx(tab_a1(i),tab_a2(i))
-              m2 = cmplx(1.0,0.0) ! Vide
-              eps1 = m1*m1
-              eps2 = m2*m2
-              
-              ! Effective medium theory (Bruggeman rule)
-              b = 2*f1*eps1 -f1*eps2 + 2*f2*eps2 -f2*eps1
-              c = eps1 * eps2
-              a = -2.   ! --> 1/2a  = -0.25
-              delta = b*b - 4*a*c 
-              eavg1 = (-b - sqrt(delta)) * (-0.25)
-              eavg2 = (-b + sqrt(delta)) * (-0.25) 
-
-              ! Selection (et verif) de l'unique racine positive (a priori c'est eavg1)
-              if (aimag(eavg1) > 0) then
-                 if (aimag(eavg2) > 0) then
-                    write(*,*) "Error in Bruggeman EMT rule !!!"
-                    write(*,*) "All imaginary parts are > 0"
-                    write(*,*) "Exiting."
-                    stop
-                 endif
-                 eavg = eavg1
-              else
-                 if (aimag(eavg2) < 0) then
-                    write(*,*) "Error in Bruggeman EMT rule !!!"
-                    write(*,*) "All imaginary parts are < 0"
-                    write(*,*) "Exiting."
-                    stop
-                 endif
-                 eavg = eavg2
-              endif
-
-              mavg = sqrt(eavg)
-         !     write(*,*) "verif Bruggeman", (abs(f1 * (eps1 - eavg)/(eps1 + 2*eavg) + &
-         !     f2 * (eps2 - eavg)/(eps2 + 2*eavg))) ;
-
-              ! Moyennage a la Mathis & Whieffen 89
-              ! Valeur max pour indices Voschnikov 2005, A&A, 429, 371 : p380
-          !    eavg = f1 * eps1 + f2 * eps2
-          !    mavg = sqrt(eavg)
-              
-              ! Valeur min pour indices Voschnikov 2005, A&A, 429, 371 : p380
-              ! eavg = 1.0 / (f1/eps1 + f2/eps2)
-              ! mavg = sqrt(eavg)
-
-
-              ! Evite la chute d'opacite a grand lambda : proche M&W 
-              ! Opcaite un peu plus faible dans le mm
-              ! mavg = f1 * m1 + f2 * m2 
-
-              tab_a1(i) = real(mavg)
-              tab_a2(i) = aimag(mavg)
-           
- !             write(*,*) tab_lambda(i), tab_amu1(i,pop), tab_amu2(i,pop)
-
-           enddo ! n_ind
-
-        endif ! porosity
-
-        ! Calcul des indices par interpolation lineaire
-        do i=1, n_lambda
-           if (l_ordre_decroissant) then
-              k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-              do while((tab_lambda(i) < tab_l(k)).and.(k <= n_ind-1))
-                 k=k+1
-              enddo
-           
-              frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
-              tab_amu1(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
-              tab_amu2(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
-              
-           else ! ordre croissant
-              k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-              do while((tab_lambda(i) > tab_l(k)).and.(k <= n_ind-1))
-                 k=k+1
-              enddo
-           
-              frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
-              tab_amu1(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
-              tab_amu2(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
-           endif ! croissant ou decroissant
-           
-        enddo ! lambda
-        
-        deallocate(tab_l,tab_a1,tab_a2)
-
-        ! Layer coating
-        if (dust_pop(pop)%lcoating.and.dust_pop(pop)%lmantle) then
-           ! Lecture fichier indices
-           filename = trim(dust_dir)//trim(dust_pop(pop)%indices_coating)
-           
            open(unit=1,file=filename, status='old', iostat=ios)
            if (ios /=0) then
               write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
               write(*,*) "Exiting"
               stop
            endif
-           
+
            ! On elimine les lignes avec des commentaires
            status = 1
            n_comment = 0 
@@ -339,7 +169,7 @@ subroutine init_indices_optiques()
               read(1,*,iostat=status) fbuffer
            enddo
            n_comment = n_comment - 1
-           
+
            ! On compte les lignes avec des donnees
            status=0
            n_ind=1 ! On a deja lu une ligne en cherchant les commentaires
@@ -351,155 +181,219 @@ subroutine init_indices_optiques()
            
            ! On enleve les 2 premieres lignes
            n_ind = n_ind - 2 
-           
+        
            ! Allocation de tab
-           allocate(tab_l(n_ind), tab_a1(n_ind), tab_a2(n_ind), stat=alloc_status)
+           allocate(tab_l(n_ind), tab_n(n_ind), tab_k(n_ind), stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error zsup'
               stop
            endif
-           tab_l=0.0 ; tab_a1=0.0 ; tab_a2=0.0 
-           
-           
+           tab_l=0.0 ; tab_n=0.0 ; tab_k=0.0 
+                   
            ! Lecture proprement dite
            rewind(1)
            ! On passe les commentaires
            do i=1, n_comment
               read(1,*)
            enddo
-           
+
            ! lecture densite
-           read(1,*) dust_pop(pop)%rho1g_coating
-           if (dust_pop(pop)%rho1g_coating > 10.) then
-              write(*,*) "ERROR: optical indices for coating material file has the wrong format"
+           read(1,*) dust_pop(pop)%component_rho1g(k)
+           if (dust_pop(pop)%component_rho1g(k) > 10.) then
+              write(*,*) "ERROR: optical indices file has the wrong format"
               write(*,*) "Exiting"
               stop
            endif
-
-           
            ! ligne vide
            read(1,*)
-           
+
            ! Lecture indices
            do i=1,n_ind
-              read(1,*) tab_l(n_ind-i+1), tab_a1(n_ind-i+1), tab_a2(n_ind-i+1)
+              read(1,*) tab_l(n_ind-i+1), tab_n(n_ind-i+1), tab_k(n_ind-i+1)
            enddo
-           
-           close(unit=1)
-           
+
            if (tab_l(2) > tab_l(1)) then
               l_ordre_decroissant = .false. 
            else
               l_ordre_decroissant = .true.
            endif
-           
-!           if (porosity_coating > tiny_real) then 
-!              f2 = porosity_coating
-!              f1 = 1. - f2
-!              
-!              ! On corrige la densite 
-!              rho1g_coating  = rho1g_coating * f1
-!              
-!              ! On corrige les indices optiques
-!              do i=1, n_ind
-!                 m1 = cmplx(tab_a1(i),tab_a2(i))
-!                 m2 = cmplx(1.0,0.0) ! Vide
-!                 eps1 = m1*m1
-!                 eps2 = m2*m2
-!                 
-!                 ! Effective medium theory (Bruggeman rule)
-!                 b = 2*f1*eps1 -f1*eps2 + 2*f2*eps2 -f2*eps1
-!                 c = eps1 * eps2
-!                 a = -2.   ! --> 1/2a  = -0.25
-!                 delta = b*b - 4*a*c 
-!                 eavg1 = (-b - sqrt(delta)) * (-0.25)
-!                 eavg2 = (-b + sqrt(delta)) * (-0.25) 
-!                 
-!                 write(*,*) porosity_coating,i,tab_l(i),tab_a1(i),tab_a2(i),eavg1,eavg2
-!                 
-!                 ! Selection (et verif) de l'unique racine positive (a priori c'est eavg1)
-!                 if (aimag(eavg1) > 0) then
-!                    if (aimag(eavg2) > 0) then
-!                       write(*,*) "Error in Bruggeman EMT rule !!!"
-!                       write(*,*) "All imaginary parts are > 0"
-!                       write(*,*) "Exiting."
-!                       stop
-!                    endif
-!                    eavg = eavg1
-!                 else
-!                    if (aimag(eavg2) < 0) then
-!                       write(*,*) "Error in Bruggeman EMT rule !!!"
-!                       write(*,*) "All imaginary parts are < 0"
-!                       write(*,*) "Exiting."
-!                       stop
-!                    endif
-!                    eavg = eavg2
-!                 endif
-!                 
-!                 mavg = sqrt(eavg)
-!                 !     write(*,*) "verif Bruggeman", (abs(f1 * (eps1 - eavg)/(eps1 + 2*eavg) + &
-!                 !     f2 * (eps2 - eavg)/(eps2 + 2*eavg))) ;
-!                 
-!                 ! Moyennage a la Mathis & Whieffen 89
-!                 ! Valeur max pour indices Voschnikov 2005, A&A, 429, 371 : p380
-!                 !    eavg = f1 * eps1 + f2 * eps2
-!                 !    mavg = sqrt(eavg)
-!                 
-!                 ! Valeur min pour indices Voschnikov 2005, A&A, 429, 371 : p380
-!                 ! eavg = 1.0 / (f1/eps1 + f2/eps2)
-!                 ! mavg = sqrt(eavg)
-!                 
-!                 
-!                 ! Evite la chute d'opacite a grand lambda : proche M&W 
-!                 ! Opcaite un peu plus faible dans le mm
-!                 ! mavg = f1 * m1 + f2 * m2 
-!                 
-!                 tab_a1(i) = real(mavg)
-!                 tab_a2(i) = aimag(mavg)
-!                 
-!                 !             write(*,*) tab_lambda(i), tab_amu1(i,pop), tab_amu2(i,pop)
-!                 
-!              enddo ! n_ind
-!              
-!           endif ! porosity_coating
-           
-           ! Calcul des indices par interpolation lineaire
+           close(unit=1)
+
+
+           ! Interpolation des indices optiques aux longeurs d'onde de MCFOST
            do i=1, n_lambda
               if (l_ordre_decroissant) then
-                 k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-                 do while((tab_lambda(i) < tab_l(k)).and.(k <= n_ind-1))
-                    k=k+1
+                 ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                 do while((tab_lambda(i) < tab_l(ii)).and.(ii <= n_ind-1))
+                    ii=ii+1
                  enddo
-                 
-                 frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
-                 tab_amu1_coating(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
-                 tab_amu2_coating(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
-                 
+           
+                 frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
+                 tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
+                 tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
+
               else ! ordre croissant
-                 k=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-                 do while((tab_lambda(i) > tab_l(k)).and.(k <= n_ind-1))
-                    k=k+1
+                 ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                 do while((tab_lambda(i) > tab_l(ii)).and.(ii <= n_ind-1))
+                    ii=ii+1
                  enddo
                  
-                 frac=(log(tab_l(k))-log(tab_lambda(i)))/(log(tab_l(k))-log(tab_l(k-1)))
-                 tab_amu1_coating(i,pop)=exp(log(tab_a1(k-1))*frac+log(tab_a1(k))*(1.0-frac))
-                 tab_amu2_coating(i,pop)=exp(log(tab_a2(k-1))*frac+log(tab_a2(k))*(1.0-frac))
+                 frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
+                 tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
+                 tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
               endif ! croissant ou decroissant
               
-           enddo ! lambda_coating
-           
-           deallocate(tab_l,tab_a1,tab_a2)
-        endif ! lcoating & lmantle
+           enddo ! lambda
+        
+           deallocate(tab_l,tab_n,tab_k)
 
-     else ! notPAH       
-        dust_pop(pop)%rho1g = 2.5
-     endif ! notPAH       
+        enddo ! k , boucle components
+
+
+        if (dust_pop(pop)%n_components == 1) then
+           tab_amu1(:,pop) = tab_tmp_amu1(:,1)
+           tab_amu2(:,pop) = tab_tmp_amu2(:,1)
+        else  
+           if (dust_pop(pop)%mixing_rule == 1) then
+              ! Regle de melange
+              !write(*,*) "Applying Bruggeman mixing rule for pop.", pop
+              do i=1, n_lambda 
+                 ! 2 composants par grains pour le moment 
+                 m1 = cmplx(tab_tmp_amu1(i,1),tab_tmp_amu2(i,1))
+                 m2 = cmplx(tab_tmp_amu1(i,2),tab_tmp_amu2(i,2))
+                 f1 = dust_pop(pop)%component_volume_fraction(1)
+                 f2 = dust_pop(pop)%component_volume_fraction(2)
+
+                 mavg = Bruggeman_EMT(m1,m2,f1,f2)
+                 
+                 tab_amu1(i,pop) = real(mavg)
+                 tab_amu2(i,pop) = aimag(mavg)
+              enddo
+           else ! coating : 2 composants max pour coating
+              !write(*,*) "Applying coating for pop.", pop
+              tab_amu1(:,pop) = tab_tmp_amu1(:,1)
+              tab_amu2(:,pop) = tab_tmp_amu2(:,1)
+              tab_amu1_coating(:,pop) = tab_tmp_amu1(:,2)
+              tab_amu2_coating(:,pop) = tab_tmp_amu2(:,2)
+           endif
+
+        endif ! n_components
+
+        ! Ajout porosite
+        if (dust_pop(pop)%porosity > tiny_real) then 
+           f2 = dust_pop(pop)%porosity
+           f1 = 1. - f2
+
+           ! On corrige la densite 
+           dust_pop(pop)%rho1g_avg  = dust_pop(pop)%rho1g_avg * f1
+
+           ! On corrige les indices optiques
+           do i=1, n_lambda
+              m1 = cmplx(tab_amu1(i,pop),tab_amu2(i,pop))
+              m2 = cmplx(1.0,0.0) ! Vide
+
+              mavg = Bruggeman_EMT(m1,m2,f1,f2)
+
+              tab_amu1(i,pop) = real(mavg)
+              tab_amu2(i,pop) = aimag(mavg)
+           enddo ! n_ind
+        endif ! porosity
+
+        deallocate(tab_tmp_amu1,tab_tmp_amu2)
+
+
+        ! Compute average material density
+        dust_pop(pop)%rho1g_avg = 0.0
+        do k=1, dust_pop(pop)%n_components 
+           dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg  + dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
+        enddo
+     else ! PAH       
+        ! we only set the material density
+        dust_pop(pop)%component_rho1g(1) = 2.5
+        dust_pop(pop)%rho1g_avg = 2.5
+
+        if (dust_pop(pop)%n_components > 1) then
+           write(*,*) "ERROR : cannot mix PAH with other component"
+           write(*,*) "Exiting"
+           stop
+        endif
+
+     endif ! fin test PAH       
      
   enddo ! pop
 
   return
 
 end subroutine init_indices_optiques
+
+!******************************************************************************
+
+function Bruggeman_EMT(m1,m2,f1,f2) result(mavg)
+  ! Effective medium theroy following Bruggeman rule
+  ! valid for 2 components only
+  ! for more than 2 components, the solution is not analytical
+  ! and requires iteration
+  ! C. Pinte
+  ! 28/09/11
+
+  complex, intent(in) :: m1, m2
+  real, intent(in) :: f1, f2
+  complex ::  mavg
+
+  complex :: eps1, eps2, eavg1, eavg2, eavg, a, b, c, delta
+
+  eps1 = m1*m1
+  eps2 = m2*m2
+              
+  ! Effective medium theory (Bruggeman rule)
+  b = 2*f1*eps1 -f1*eps2 + 2*f2*eps2 -f2*eps1
+  c = eps1 * eps2
+  a = -2.   ! --> 1/2a  = -0.25
+  delta = b*b - 4*a*c 
+  eavg1 = (-b - sqrt(delta)) * (-0.25)
+  eavg2 = (-b + sqrt(delta)) * (-0.25) 
+  
+  ! Selection (et verif) de l'unique racine positive (a priori c'est eavg1)
+  if (aimag(eavg1) > 0) then
+     if (aimag(eavg2) > 0) then
+        write(*,*) "Error in Bruggeman EMT rule !!!"
+        write(*,*) "All imaginary parts are > 0"
+        write(*,*) "Exiting."
+        stop
+     endif
+     eavg = eavg1
+  else
+     if (aimag(eavg2) < 0) then
+        write(*,*) "Error in Bruggeman EMT rule !!!"
+        write(*,*) "All imaginary parts are < 0"
+        write(*,*) "Exiting."
+        stop
+     endif
+     eavg = eavg2
+  endif
+  
+  mavg = sqrt(eavg)
+  
+  ! write(*,*) "verif Bruggeman", (abs(f1 * (eps1 - eavg)/(eps1 + 2*eavg) + &
+  ! f2 * (eps2 - eavg)/(eps2 + 2*eavg))) ;
+
+  ! Moyennage a la Mathis & Whieffen 89
+  ! Valeur max pour indices Voschnikov 2005, A&A, 429, 371 : p380
+  !    eavg = f1 * eps1 + f2 * eps2
+  !    mavg = sqrt(eavg)
+  
+  ! Valeur min pour indices Voschnikov 2005, A&A, 429, 371 : p380
+  ! eavg = 1.0 / (f1/eps1 + f2/eps2)
+  ! mavg = sqrt(eavg)
+
+
+  ! Evite la chute d'opacite a grand lambda : proche M&W 
+  ! Opcaite un peu plus faible dans le mm
+  ! mavg = f1 * m1 + f2 * m2 
+
+  return
+
+end function Bruggeman_EMT
 
 !******************************************************************************
 
@@ -544,7 +438,7 @@ subroutine prop_grains(lambda, p_lambda)
         do i=1, n_pop
            dp = dust_pop(i)
            if (dp%is_PAH) then 
-              opt_file = trim(dust_dir)//"/"//trim(dp%indices)
+              opt_file = trim(dust_dir)//"/"//trim(dp%indices(1))
               ! load optical data from file
               call draine_load(opt_file, PAH_n_lambda, PAH_n_rad, 10, 1, &
                    tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
@@ -593,16 +487,11 @@ subroutine prop_grains(lambda, p_lambda)
            if (.not.(dust_pop(pop)%lcoating)) then
               call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
            else
-              if (dust_pop(pop)%lmantle) then
-                 amu1_coat=tab_amu1_coating(lambda,pop)
-                 amu2_coat=tab_amu2_coating(lambda,pop)
-                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
-              else
-                  ! EMT MIXING - THIS IS NOT CODED YET...
-              endif ! lmantle
+              amu1_coat=tab_amu1_coating(lambda,pop)
+              amu2_coat=tab_amu2_coating(lambda,pop)
+              call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
            endif ! lcoating
 !           write(*,*) wavel, qext,qsca,gsca
-
         endif ! laggregate
      else ! grain de PAH
         is_grain_PAH(k) = .true.

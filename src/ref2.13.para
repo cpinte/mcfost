@@ -58,10 +58,11 @@
 
 #Grain properties
   1  Number of species
-  Draine_Si_sUV.dat 0.0  1.0   optical indices file , porosity, mass fraction
+  2  2  0.0  1.0   N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
+  Draine_Si_sUV.dat  0.8   optical indices file, volume fraction
+  ice_opct.dat  0.2   optical indices file, volume fraction	
   1	  heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
   0.03  1.0 3.5 100 	  amin, amax, aexp, nbr_grains     
-  T  0.5  ice_opct.dat  T  add ice to dust?, volume fraction, optical indices file, coating (vs EMT mixing)?
 
 #Molecular RT settings
   T T T 15.	          lpop, laccurate_pop, LTE, profile width 
