@@ -787,7 +787,26 @@ subroutine opacite2(lambda)
                  tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
               endif
                  
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = q_sca_tot/q_ext_tot * 1.e-4!sum(tab_s11_ray_tracing(lambda,i,j,:)) / (nang_scatt + 1) 
+              if (lisotropic) then                  
+                 tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
+                 
+               !  ! Verification normalization
+               !  norme = 0.0
+               !  do thetaj=0,nang_scatt
+               !     angle = real(thetaj)/real(nang_scatt)*pi
+               !     norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+               !  enddo
+               !  write(*,*) "test norme ", norme * deux_pi ! doit faire 1
+              endif
+
+             
+
+             ! norme = 0.0
+             ! do thetaj=0,nang_scatt
+             !    angle = real(thetaj)/real(nang_scatt)*pi
+             !    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+             ! enddo
+             ! write(*,*) norme
 
            endif !lscatt_ray_tracing
 
