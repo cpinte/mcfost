@@ -561,7 +561,7 @@ release : main
 	mkdir web web/linux_64bits web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make"
+	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost mcfost_cigri"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt

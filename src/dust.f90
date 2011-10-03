@@ -540,7 +540,7 @@ subroutine opacite2(lambda)
   real, dimension(1:n_prob) :: xa,ya,y2
   real :: delta_prob1, delta_probn, yp1, ypn
 
-  real :: yp_p1, yp_m1, ypp, somme
+  real :: yp_p1, yp_m1, ypp, somme, gsca
 
   real :: z, rcyl
 
@@ -691,7 +691,7 @@ subroutine opacite2(lambda)
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,valeur_prob,amax_reel,somme) &
-  !$omp private(i,j,k,pk,density,k_min,proba,q_sca_tot,q_ext_tot,norme,angle)&
+  !$omp private(i,j,k,pk,density,k_min,proba,q_sca_tot,q_ext_tot,norme,angle,gsca)&
   !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(q_ext,q_sca,densite_pouss,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
@@ -745,6 +745,11 @@ subroutine opacite2(lambda)
               endif !scattering_method
            enddo !k
            
+
+           if (q_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = q_sca_tot/q_ext_tot 
+           if (q_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/q_sca_tot
+              
+
            
            if (lcompute_obs.and.lscatt_ray_tracing) then
               if (scattering_method == 1) then
@@ -752,70 +757,67 @@ subroutine opacite2(lambda)
                  stop
               endif
 
-              ! Normalisation : total energie diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
-              norme = 0.0_db
-              do thetaj=0,nang_scatt
-                 angle = real(thetaj)/real(nang_scatt)*pi
-                 norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
-              enddo
+              if (aniso_method == 1) then
+                 ! Normalisation : total energie diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
+                 norme = 0.0_db
+                 do thetaj=0,nang_scatt
+                    angle = real(thetaj)/real(nang_scatt)*pi
+                    norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
+                 enddo
               
-              if (abs(norme) > 0.0_db) then
-                 norme = 1.0_db / (norme * deux_pi)
-
-                 tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
-                 if (lsepar_pola) then 
-                    ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard 
-                    ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer 
-                    ! le signe de la matrice de Mueller
-                    ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                    tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
-                    tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
-                    tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
-                 endif
-              else
-                 tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
+                 if (abs(norme) > 0.0_db) then
+                    norme = 1.0_db / (norme * deux_pi)
+                    
+                    tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
+                    if (lsepar_pola) then 
+                       ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard 
+                       ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer 
+                       ! le signe de la matrice de Mueller
+                       ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
+                       tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
+                       tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
+                       tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
+                    endif
+                 else
+                    tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
+                    if (lsepar_pola) then
+                       tab_s12_ray_tracing(lambda,i,j,:) =  0.0_db
+                       tab_s33_ray_tracing(lambda,i,j,:) =  0.0_db
+                       tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
+                    endif
+                 endif ! norme
+                 
                  if (lsepar_pola) then
-                    tab_s12_ray_tracing(lambda,i,j,:) =  0.0_db
-                    tab_s33_ray_tracing(lambda,i,j,:) =  0.0_db
-                    tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
                  endif
-              endif ! norme
+              else ! aniso_method =2 --> HG                 
+                 gsca = tab_g_pos(lambda,i,j,pk)
 
-              if (lsepar_pola) then
-                 tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                 tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                 tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
+                 norme = 0.0
+                 do thetaj=0,nang_scatt
+                    angle = real(thetaj)/real(nang_scatt)*pi
+                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
+                    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+                 enddo
+                 tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)
               endif
-                 
-              if (lisotropic) then                  
-                 tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
-                 
-               !  ! Verification normalization
-               !  norme = 0.0
-               !  do thetaj=0,nang_scatt
-               !     angle = real(thetaj)/real(nang_scatt)*pi
-               !     norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
-               !  enddo
-               !  write(*,*) "test norme ", norme * deux_pi ! doit faire 1
-              endif
-
-             
-
-             ! norme = 0.0
-             ! do thetaj=0,nang_scatt
-             !    angle = real(thetaj)/real(nang_scatt)*pi
-             !    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
-             ! enddo
-             ! write(*,*) norme
-
+              
+              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)               
+              
+            !  ! Verification normalization
+            !  norme = 0.0
+            !  do thetaj=0,nang_scatt
+            !     angle = real(thetaj)/real(nang_scatt)*pi
+            !     norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+            !  enddo
+            !  write(*,*) "test norme ", norme * deux_pi, gsca ! doit faire 1
            endif !lscatt_ray_tracing
 
            if (sum(densite_pouss(i,j,pk,:)) > tiny_real) then
 
-              if (q_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = q_sca_tot/q_ext_tot  ! NEW TEST STRAT LAURE
-              if (q_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/q_sca_tot ! NEW TEST STRAT LAURE
-              
-              if (scattering_method==2) then
+               if (scattering_method==2) then
                  if (aniso_method==1) then
                     ! Propriétés optiques des cellules
                     prob_s11_pos(lambda,i,j,pk,0)=0.0
