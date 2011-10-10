@@ -608,7 +608,7 @@ subroutine transfert_poussiere()
            !        call crea_noyau_2mass()
            !        call observables_2mass()
         else
-           call write_stokes_fits()
+           if (loutput_mc) call write_stokes_fits()
         endif
 
         ! Carte ray-tracing 

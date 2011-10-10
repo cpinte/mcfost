@@ -883,7 +883,7 @@ module ray_tracing
   implicit none
   save
 
-  logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2
+  logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
 
   ! inclinaisons
   real :: RT_imin, RT_imax
