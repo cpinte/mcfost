@@ -30,8 +30,9 @@ subroutine initialisation_mcfost()
   
   character(len=512) :: cmd, s, str_seed
 
-  logical :: lresol, lzoom, ldust_emisison_in_images
+  logical :: lresol, lzoom, ldust_emisison_in_images, lmc
 
+  lmc = .false.
 
   call get_environment_variable('HOME',home)
   if (home == "") then
@@ -92,6 +93,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing=.false.
   lscatt_ray_tracing1=.false.
   lscatt_ray_tracing2=.false.
+  loutput_mc=.true.
   lgap_laure=.false.
   ldebris=.false.
   lkappa_abs_grain=.false.
@@ -491,16 +493,23 @@ subroutine initialisation_mcfost()
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.false.
         lscatt_ray_tracing2=.false.
+        if (.not.lmc) loutput_mc=.false.
      case("-rt1")
         i_arg = i_arg + 1 
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.true.
         lscatt_ray_tracing2=.false.
+        if (.not.lmc) loutput_mc=.false.
      case("-rt2")
         i_arg = i_arg + 1 
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.false.
         lscatt_ray_tracing2=.true.
+        if (.not.lmc) loutput_mc=.false.
+     case("-mc")
+        i_arg = i_arg + 1 
+        lmc=.true.
+        loutput_mc=.true.
      case("-gap_laure")
         i_arg = i_arg + 1 
         lgap_laure=.true.
@@ -889,6 +898,7 @@ subroutine display_help()
   write(*,*) "                             useful for optically thin disk in MC mode"
   write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
   write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
+  write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"  
