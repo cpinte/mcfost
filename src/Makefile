@@ -564,7 +564,7 @@ release : main
 	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost mcfost_cigri"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
+	git log --pretty=format:'%cd  %h %d %s" --date=short' > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
 	rm -rf web
 
@@ -574,7 +574,7 @@ release_mac : main
 	mkdir web web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd %d %s" --date=short > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 

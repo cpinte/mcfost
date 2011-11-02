@@ -133,8 +133,11 @@ subroutine init_indices_optiques()
 
   implicit none
 
-  complex :: m1, m2, mavg
-  real :: frac, f1, f2, fbuffer
+  complex :: mavg
+  complex, dimension(:), allocatable :: m
+
+  real :: frac, fbuffer
+  real, dimension(:), allocatable :: f
   integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment
 
   character(len=512) :: filename
@@ -254,21 +257,18 @@ subroutine init_indices_optiques()
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
         else  
-           if (dust_pop(pop)%mixing_rule == 1) then
-              ! Regle de melange
-              !write(*,*) "Applying Bruggeman mixing rule for pop.", pop
+           if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
+              allocate(m(dust_pop(pop)%n_components), f(dust_pop(pop)%n_components))
               do i=1, n_lambda 
-                 ! 2 composants par grains pour le moment 
-                 m1 = cmplx(tab_tmp_amu1(i,1),tab_tmp_amu2(i,1))
-                 m2 = cmplx(tab_tmp_amu1(i,2),tab_tmp_amu2(i,2))
-                 f1 = dust_pop(pop)%component_volume_fraction(1)
-                 f2 = dust_pop(pop)%component_volume_fraction(2)
-
-                 mavg = Bruggeman_EMT(m1,m2,f1,f2)
+                 m = cmplx(tab_tmp_amu1(i,:),tab_tmp_amu2(i,:))
+                 f = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components)
+                 
+                 mavg = Bruggeman_EMT(i, m, f)
                  
                  tab_amu1(i,pop) = real(mavg)
                  tab_amu2(i,pop) = aimag(mavg)
               enddo
+              deallocate(m,f)
            else ! coating : 2 composants max pour coating
               !write(*,*) "Applying coating for pop.", pop
               tab_amu1(:,pop) = tab_tmp_amu1(:,1)
@@ -276,23 +276,23 @@ subroutine init_indices_optiques()
               tab_amu1_coating(:,pop) = tab_tmp_amu1(:,2)
               tab_amu2_coating(:,pop) = tab_tmp_amu2(:,2)
            endif
-
         endif ! n_components
 
         ! Ajout porosite
         if (dust_pop(pop)%porosity > tiny_real) then 
-           f2 = dust_pop(pop)%porosity
-           f1 = 1. - f2
+           allocate(m(2),f(2))
+           f(2) = dust_pop(pop)%porosity
+           f(1) = 1. - f(2)
 
            ! On corrige la densite 
-           dust_pop(pop)%rho1g_avg  = dust_pop(pop)%rho1g_avg * f1
+           dust_pop(pop)%rho1g_avg  = dust_pop(pop)%rho1g_avg * f(1)
 
            ! On corrige les indices optiques
            do i=1, n_lambda
-              m1 = cmplx(tab_amu1(i,pop),tab_amu2(i,pop))
-              m2 = cmplx(1.0,0.0) ! Vide
+              m(1) = cmplx(tab_amu1(i,pop),tab_amu2(i,pop))
+              m(2) = cmplx(1.0,0.0) ! Vide
 
-              mavg = Bruggeman_EMT(m1,m2,f1,f2)
+              mavg = Bruggeman_EMT(i, m,f)
 
               tab_amu1(i,pop) = real(mavg)
               tab_amu2(i,pop) = aimag(mavg)
@@ -328,69 +328,137 @@ end subroutine init_indices_optiques
 
 !******************************************************************************
 
-function Bruggeman_EMT(m1,m2,f1,f2) result(mavg)
-  ! Effective medium theroy following Bruggeman rule
-  ! valid for 2 components only
-  ! for more than 2 components, the solution is not analytical
-  ! and requires iteration
+function Bruggeman_EMT(lambda,m,f) result(m_eff)
+  ! Effective medium theory following Bruggeman rule
+  !  - for 2 components : find 2nd degree polynomial root
+  !  - more than 2 components : iterative solution 
+  !
   ! C. Pinte
   ! 28/09/11
+  ! 27/10/11 : more than 2 components
 
-  complex, intent(in) :: m1, m2
-  real, intent(in) :: f1, f2
-  complex ::  mavg
+  implicit none
 
-  complex :: eps1, eps2, eavg1, eavg2, eavg, a, b, c, delta
-
-  eps1 = m1*m1
-  eps2 = m2*m2
-              
-  ! Effective medium theory (Bruggeman rule)
-  b = 2*f1*eps1 -f1*eps2 + 2*f2*eps2 -f2*eps1
-  c = eps1 * eps2
-  a = -2.   ! --> 1/2a  = -0.25
-  delta = b*b - 4*a*c 
-  eavg1 = (-b - sqrt(delta)) * (-0.25)
-  eavg2 = (-b + sqrt(delta)) * (-0.25) 
+  integer, intent(in) :: lambda
+  complex, dimension(:), intent(in) :: m ! optical indices of the components
+  real,    dimension(:), intent(in) :: f ! volume fractions of the components
+  complex ::  m_eff
   
-  ! Selection (et verif) de l'unique racine positive (a priori c'est eavg1)
-  if (aimag(eavg1) > 0) then
-     if (aimag(eavg2) > 0) then
-        write(*,*) "Error in Bruggeman EMT rule !!!"
-        write(*,*) "All imaginary parts are > 0"
-        write(*,*) "Exiting."
-        stop
-     endif
-     eavg = eavg1
-  else
-     if (aimag(eavg2) < 0) then
-        write(*,*) "Error in Bruggeman EMT rule !!!"
-        write(*,*) "All imaginary parts are < 0"
-        write(*,*) "Exiting."
-        stop
-     endif
-     eavg = eavg2
+  integer, parameter :: n_iter_max = 1000
+  real, parameter :: accuracy = 1.e-6
+  
+  complex, dimension(size(m)) :: eps, A_i ! 3*alpha dans la notoation de WF
+  real, dimension(size(m)):: f_i 
+  
+  integer :: n, i, imatrix, iter
+  integer, dimension(1) :: imatrix_tmp
+  real :: f_mat, verif
+
+  complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, eps_eff0, eps_mat, S
+
+  ! Number of components
+  n = size(m) ;
+
+  ! Sanity check
+  if (n /= size(f)) then
+     write(*,*) "Bruggeman rule error"
+     write(*,*) "Incorrect number of components"
+     write(*,*) "Exiting"
   endif
+
+  ! Constantes dielectriques
+  eps = m*m 
   
-  mavg = sqrt(eavg)
+  if (n==2) then ! equation du degre 2
+     b = 2*f(1)*eps(1) - f(1)*eps(2) + 2*f(2)*eps(2) -f(2)*eps(1)
+     c = eps(1) * eps(2)
+     a = -2.   ! --> 1/2a  = -0.25
+     delta = b*b - 4*a*c 
+     eps_eff1 = (-b - sqrt(delta)) * (-0.25)
+     eps_eff2 = (-b + sqrt(delta)) * (-0.25) 
   
-  ! write(*,*) "verif Bruggeman", (abs(f1 * (eps1 - eavg)/(eps1 + 2*eavg) + &
-  ! f2 * (eps2 - eavg)/(eps2 + 2*eavg))) ;
+     ! Selection (et verif) de l'unique racine positive (a priori c'est eps_eff1)
+     if (aimag(eps_eff1) > 0) then
+        if (aimag(eps_eff2) > 0) then
+           write(*,*) "Error in Bruggeman EMT rule !!!"
+           write(*,*) "All imaginary parts are > 0"
+           write(*,*) "Exiting."
+           stop
+        endif
+        eps_eff = eps_eff1
+     else
+        if (aimag(eps_eff2) < 0) then
+           write(*,*) "Error in Bruggeman EMT rule !!!"
+           write(*,*) "All imaginary parts are < 0"
+           write(*,*) "Exiting."
+           stop
+        endif
+        eps_eff = eps_eff2
+     endif
 
-  ! Moyennage a la Mathis & Whieffen 89
-  ! Valeur max pour indices Voschnikov 2005, A&A, 429, 371 : p380
-  !    eavg = f1 * eps1 + f2 * eps2
-  !    mavg = sqrt(eavg)
+  else ! n > 2, pas de solution analytique, methode iterative
+     ! TODO : comment etre sur que c'est la bonne racine ???
+     
+     ! Initial guess : Landau, Lifshitz, Looyenga rule
+     eps_eff0 = (sum(f(:) * eps(:)**(1./3)))**3
+     eps_eff = eps_eff0
+
+     ! Selecting matrix : component with the largest volume fraction
+     !imatrix_tmp = minloc(abs(eps(:) - eps_eff0))
+     imatrix_tmp = maxloc(f)
+     imatrix = imatrix_tmp(1) 
+     if (lambda==2) imatrix = 3
+     f_mat = f(imatrix)
+     eps_mat = eps(imatrix)
+
+     ! extra variable to avoid summing over the matrix component
+     f_i(:) = f(:) ; f_i(imatrix) = 0.0  
+          
+     ! valeurs pour la 1ere iteration
+     A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff) 
+     S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
+     verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
+
+     if (verif > accuracy) then
+        ! Iteration proprement-dite
+        iteration : do iter=1, n_iter_max
+           eps_eff = eps_mat * (f_mat + S) / (f_mat - 2*S)
+           
+           ! valeurs pour verif + iteration suivant
+           A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff) 
+           S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
+           
+           verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
+           if (verif < accuracy) exit iteration
+           
+           if (iter == n_iter_max) then
+              write(*,*) "****************************************************"
+              write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman not converging"
+              write(*,*) "Using Landau, Lifshitz, Looyenga instead"
+              write(*,*) "****************************************************"
+              eps_eff = eps_eff0
+           endif
+        enddo iteration
+     endif 
+
+     if (aimag(eps_eff) < 0) then
+        write(*,*) "****************************************************"
+        write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman converging"
+        write(*,*) "to unphysical solution"
+        write(*,*) "Using Landau, Lifshitz, Looyenga instead"
+        write(*,*) "****************************************************"
+        eps_eff = eps_eff0
+     endif
+
+  endif ! n > 2
+
+  ! Indices optiques
+  m_eff = sqrt(eps_eff)
+
+  ! Verification finale ---> OK 
+  !A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2* eps_eff) 
+  !write(*,*) "Verif Bruggeman", lambda, iter, abs(sum( f(:) * A_i(:)))
   
-  ! Valeur min pour indices Voschnikov 2005, A&A, 429, 371 : p380
-  ! eavg = 1.0 / (f1/eps1 + f2/eps2)
-  ! mavg = sqrt(eavg)
-
-
-  ! Evite la chute d'opacite a grand lambda : proche M&W 
-  ! Opcaite un peu plus faible dans le mm
-  ! mavg = f1 * m1 + f2 * m2 
-
   return
 
 end function Bruggeman_EMT
