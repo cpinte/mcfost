@@ -456,11 +456,6 @@ contains
              else
                 dust_pop_tmp(n_pop)%lcoating = .false.
              endif
-             if (dust_pop_tmp(n_pop)%n_components > 2) then
-                write(*,*) "ERROR : only 2 components allowed per population at the moment"
-                write(*,*) "Exiting"
-                stop
-             endif
              V_somme = 0.0
              do k=1, dust_pop_tmp(n_pop)%n_components
                 read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
