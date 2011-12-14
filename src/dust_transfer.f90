@@ -505,23 +505,23 @@ subroutine transfert_poussiere()
      endif
 
      id = 1 ! Pour code sequentiel
+     !$ id = omp_get_thread_num() + 1
 
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
-        !$ id = omp_get_thread_num() + 1
-
-        ! Checkpoint
-        if ((id==1).and.(lcheckpoint)) then
-           call cpu_time(time_checkpoint)
-           delta_time = time_checkpoint - time_checkpoint_old
-           if (delta_time > checkpoint_time) then
-              !$omp critical
-              write(*,*) "Checkpointing"
-              call save_checkpoint()
-              !$omp end critical
-              time_checkpoint_old = time_checkpoint 
-           endif
-        endif
+        
+       ! ! Checkpoint
+       ! if ((id==1).and.(lcheckpoint)) then
+       !    call cpu_time(time_checkpoint)
+       !    delta_time = time_checkpoint - time_checkpoint_old
+       !    if (delta_time > checkpoint_time) then
+       !       !$omp critical
+       !       write(*,*) "Checkpointing"
+       !       call save_checkpoint()
+       !       !$omp end critical
+       !       time_checkpoint_old = time_checkpoint 
+       !    endif
+       ! endif
         
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
         p_nnfot2(id) = 0
@@ -555,7 +555,6 @@ subroutine transfert_poussiere()
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
           
-
         enddo photon !nnfot2
      enddo !nnfot1
      !$omp end do
@@ -599,7 +598,7 @@ subroutine transfert_poussiere()
         enddo ! nnfot1
         !$omp end do
         !$omp end parallel
-     endif
+     endif ! champ ISM
 
      if (lmono0) then ! Creation image
         ! On resomme les resultats partiels des theads //
