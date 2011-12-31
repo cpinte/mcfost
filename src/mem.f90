@@ -832,7 +832,7 @@ subroutine alloc_dynamique()
      endif
      STOKE_io = 0.0
 
-     allocate(STOKEI(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+     allocate(STOKEI(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error STOKEI'
         stop
@@ -840,21 +840,21 @@ subroutine alloc_dynamique()
      STOKEI = 0.0
 
      if (lsepar_pola) then
-        allocate(STOKEQ(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEQ(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEQ'
            stop
         endif
         STOKEQ = 0.0
 
-        allocate(STOKEU(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEU(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEU'
            stop
         endif
         STOKEU=0.0
 
-        allocate(STOKEV(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEV(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEV'
            stop
@@ -863,14 +863,14 @@ subroutine alloc_dynamique()
      endif
      
      if (lsepar_contrib) then
-        allocate(STOKEI_star(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI_star(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_star'
            stop
         endif
         STOKEI_star = 0.0
 
-        allocate(STOKEI_star_scat(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI_star_scat(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_star_scat'
            stop
@@ -884,7 +884,7 @@ subroutine alloc_dynamique()
         endif
         STOKEI_disk = 0.0
 
-        allocate(STOKEI_disk_scat(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI_disk_scat(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_disk_scat'
            stop
@@ -893,7 +893,7 @@ subroutine alloc_dynamique()
      endif !lsepar
 
      if (n_cartes > 1) then
-        allocate(STOKEI1(nb_proc,n_lambda,IGRIDX2(1),IGRIDY2(1),capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI1(n_lambda,IGRIDX2(1),IGRIDY2(1),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI1'
            stop
@@ -901,7 +901,7 @@ subroutine alloc_dynamique()
         STOKEI1 = 0.0
      endif
      if (n_cartes > 2) then
-        allocate(STOKEI2(nb_proc,n_lambda,IGRIDX2(2),IGRIDY2(2),capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI2(n_lambda,IGRIDX2(2),IGRIDY2(2),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI1'
            stop
@@ -909,7 +909,7 @@ subroutine alloc_dynamique()
         STOKEI2 = 0.0
      endif
      if (n_cartes > 3) then
-        allocate(STOKEI3(nb_proc,n_lambda,IGRIDX2(3),IGRIDY2(3),capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI3(n_lambda,IGRIDX2(3),IGRIDY2(3),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI1'
            stop

@@ -161,30 +161,30 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
      if (l_sym_ima) then
         ! 1/2 photon
-        STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+        STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
         
         if (lsepar_pola) then
-           STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(2)
-           STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(3)
-           STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(4)
+           STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(2)
+           STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(3)
+           STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(4)
         endif
 
         if (lsepar_contrib) then
            if (flag_star) then ! photon étoile
               if (flag_scatt) then
-                 STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                 STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               else
-                 STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                 STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               endif
            else ! photon thermique
               if (flag_scatt) then
-                 STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                 STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               else
-                 STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                 STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
               endif
            endif ! type de photon
         endif !lsepar
@@ -206,88 +206,88 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
         if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
            ! on rajoute la 2eme moitie du photon
-           STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+           STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
 
            if (lsepar_pola) then
-              STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(2)
-              STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(3)
-              STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(4)
+              STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(2)
+              STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(3)
+              STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(4)
            endif
 
            if (lsepar_contrib) then
               if (flag_star) then ! photon étoile
                  if (flag_scatt) then
-                    STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                         STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                         STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  else
-                    STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                         STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                         STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
               else ! photon thermique
                  if (flag_scatt) then
-                    STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                         STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                         STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  else
-                    STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                         STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                         STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
               endif ! type de photon
            endif ! lsepar
         else ! symetrie
            ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-           STOKEI(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEI(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+           STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
 
            if (lsepar_pola) then
-              STOKEQ(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEQ(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(2)
-              STOKEU(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEU(id,lambda,IMAP2,JMAP2,capt,c_phi) - 0.5 * STOK(3)
-              STOKEV(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEV(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(4)
+              STOKEQ(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEQ(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(2)
+              STOKEU(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEU(lambda,IMAP2,JMAP2,capt,c_phi,id) - 0.5 * STOK(3)
+              STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEV(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(4)
            endif
 
            if (lsepar_contrib) then
               if (flag_star) then ! photon étoile
                  if (flag_scatt) then
-                    STOKEI_star_scat(id,lambda,IMAP2,JMAP2,capt,c_phi) = &
-                         STOKEI_star_scat(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
+                         STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  else
-                    STOKEI_star(id,lambda,IMAP2,JMAP2,capt,c_phi) = &
-                         STOKEI_star(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_star(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
+                         STOKEI_star(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
               else ! photon thermique
                  if (flag_scatt) then
-                    STOKEI_disk_scat(id,lambda,IMAP2,JMAP2,capt,c_phi) = &
-                         STOKEI_disk_scat(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_disk_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
+                         STOKEI_disk_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  else
-                    STOKEI_disk(id,lambda,IMAP2,JMAP2,capt,c_phi) = &
-                         STOKEI_disk(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+                    STOKEI_disk(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
+                         STOKEI_disk(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
                  endif
               endif ! type de photon
            endif !lsepar
         endif
      else
         ! Pas de symetrie
-        STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+        STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
       
         if (lsepar_pola) then
-           STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEQ(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(2)
-           STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEU(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(3)
-           STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEV(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(4)
+           STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(2)
+           STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(3)
+           STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(4)
         endif
         if (lsepar_contrib) then
            if (flag_star) then ! photon étoile
               if (flag_scatt) then
-                 STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_star_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+                 STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               else
-                 STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_star(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+                 STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_star(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               endif
            else ! photon thermique
               if (flag_scatt) then
-                 STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_disk_scat(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+                 STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_disk_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               else
-                 STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) = &
-                      STOKEI_disk(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+                 STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
+                      STOKEI_disk(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
               endif
            endif ! type de photon
         endif !lsepar
@@ -307,7 +307,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
         if (l_sym_ima) then
            ! 1/2 photon
-           STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+           STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
      
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
@@ -325,14 +325,14 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
            if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
               ! on rajoute la 2eme moitie du photon
-              STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
            else ! symetrie
               ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI1(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEI1(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI1(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI1(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
            endif
         else
            ! Pas de symetrie
-           STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI1(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+           STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
         endif
 !!!
      endif
@@ -348,7 +348,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
         if (l_sym_ima) then
            ! 1/2 photon
-           STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+           STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
      
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
@@ -366,14 +366,14 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
            if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
               ! on rajoute la 2eme moitie du photon
-              STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
            else ! symetrie
               ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI2(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEI2(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI2(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI2(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
            endif
         else
            ! Pas de symetrie
-           STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI2(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+           STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
         endif
 
      endif
@@ -389,7 +389,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
         if (l_sym_ima) then
            ! 1/2 photon
-           STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+           STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
      
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
@@ -407,14 +407,14 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
            if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
               ! on rajoute la 2eme moitie du photon
-              STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
            else ! symetrie
               ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI3(id,lambda,IMAP2,JMAP2,capt,c_phi) = STOKEI3(id,lambda,IMAP2,JMAP2,capt,c_phi) + 0.5 * STOK(1)
+              STOKEI3(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI3(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
            endif
         else
            ! Pas de symetrie
-           STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) = STOKEI3(id,lambda,IMAP1,JMAP1,capt,c_phi) + STOK(1)
+           STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
         endif
      endif !n_cartes
 
