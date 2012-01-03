@@ -524,25 +524,25 @@ subroutine write_stokes_fits()
 
   stoke_io(:,:,:,:,:)=0.0
   do id=1, nb_proc
-     stoke_io(:,:,:,:,1)=stoke_io(:,:,:,:,1)+stokei(id,lambda,:,:,:,:)
+     stoke_io(:,:,:,:,1)=stoke_io(:,:,:,:,1)+stokei(lambda,:,:,:,:,id)
   enddo
   deallocate(stokei)
 
   if (lsepar_pola) then
      do id=1, nb_proc
-        stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(id,lambda,:,:,:,:)
-        stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(id,lambda,:,:,:,:)
-        stoke_io(:,:,:,:,4)=stoke_io(:,:,:,:,4)+stokev(id,lambda,:,:,:,:)
+        stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,4)=stoke_io(:,:,:,:,4)+stokev(lambda,:,:,:,:,id)
      enddo
      deallocate(stokeq,stokeu,stokev)
   endif
 
   if (lsepar_contrib) then
      do id=1, nb_proc
-        stoke_io(:,:,:,:,n_Stokes+1)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star(id,lambda,:,:,:,:)
-        stoke_io(:,:,:,:,n_Stokes+2)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star_scat(id,lambda,:,:,:,:)
-        stoke_io(:,:,:,:,n_Stokes+3)=stoke_io(:,:,:,:,n_Stokes+2)+stokei_disk(id,lambda,:,:,:,:)
-        stoke_io(:,:,:,:,n_Stokes+4)=stoke_io(:,:,:,:,n_Stokes+3)+stokei_disk_scat(id,lambda,:,:,:,:)
+        stoke_io(:,:,:,:,n_Stokes+1)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+2)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star_scat(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+3)=stoke_io(:,:,:,:,n_Stokes+2)+stokei_disk(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+4)=stoke_io(:,:,:,:,n_Stokes+3)+stokei_disk_scat(lambda,:,:,:,:,id)
      enddo
      deallocate(stokei_star,stokei_star_scat,stokei_disk,stokei_disk_scat)
   endif
@@ -629,7 +629,7 @@ subroutine write_stokes_fits()
         write(*,*) 'Allocation error tmp 1'
         stop
      endif
-     tmp = real(sum(stokei1(:,lambda,:,:,:,:),dim=1))
+     tmp = real(sum(stokei1(lambda,:,:,:,:,:),dim=5))
      call ftppre(unit,group,fpixel,nelements,tmp,status)
      deallocate(tmp)
      
@@ -655,7 +655,7 @@ subroutine write_stokes_fits()
         write(*,*) 'Allocation error tmp 2'
         stop
      endif
-     tmp = real(sum(stokei2(:,lambda,:,:,:,:),dim=1))
+     tmp = real(sum(stokei2(lambda,:,:,:,:,:),dim=5))
      call ftppre(unit,group,fpixel,nelements,tmp,status)
      deallocate(tmp)
 
@@ -681,18 +681,18 @@ subroutine write_stokes_fits()
         write(*,*) 'Allocation error tmp 3'
         stop
      endif
-     tmp = real(sum(stokei3(:,lambda,:,:,:,:),dim=1))
+     tmp = real(sum(stokei3(lambda,:,:,:,:,:),dim=5))
      call ftppre(unit,group,fpixel,nelements,tmp,status)
      deallocate(tmp)
 
   endif
 
 
-  !  Close the file and free the unit number.
+  ! Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
-  !  Check for any error, and if so print out error messages
+  ! Check for any error, and if so print out error messages
   if (status > 0) then
      call print_error(status)
   end if
