@@ -627,7 +627,7 @@ subroutine initialisation_mcfost()
   star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
   lambda_dir = trim(mcfost_utils)//"/Lambda/"
 
-
+  call display_disclaimer()
 
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
@@ -961,6 +961,47 @@ end subroutine display_help
 
 !********************************************************************
 
+subroutine display_disclaimer()
+  
+  character(len=10) :: accept
+  
+  
+
+  if (.not.is_file(trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release)) then
+     write(*,*) "*******************************************"
+     write(*,*) "*             DISCLAMER                   *"
+     write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
+     write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
+     write(*,*) "*                                         *"
+     write(*,*) "* MCFOST is available on a collaboration  *"
+     write(*,*) "* basis. Using MCFOST implies to offer us *"
+     write(*,*) "* co-author right on any resulting        *"
+     write(*,*) "* publications ?                          *"
+     write(*,*) "*                                         *"
+     write(*,*) "* Do you accept ? (yes/no)"
+     read(*,*) accept
+
+     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES").or.(accept(1:1) == "Y") ) then
+        open(unit=1,file=trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release,status="new")
+        close(unit=1)
+        write(*,*) "* Thank you !                             *"
+        write(*,*) "* This screen will not appear again       *"
+        write(*,*) "*******************************************"
+     else 
+        write(*,*) "* Exiting MCFOST                          *"
+        write(*,*) "*******************************************"
+        stop
+     endif
+     
+
+  endif
+
+  return
+
+end subroutine display_disclaimer
+
+
+!********************************************************************
 
 subroutine save_data
   !*************************************************
