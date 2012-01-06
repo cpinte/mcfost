@@ -762,7 +762,6 @@ end subroutine lgnd
 logical function is_dir(filename) 
  
   character(len=*), intent(in) :: filename
-  logical :: is_existing
    
 #if defined (__INTEL_COMPILER)
   inquire(directory=trim(filename),exist=is_dir) 
@@ -773,5 +772,17 @@ logical function is_dir(filename)
   return
   
 end function is_dir
+
+!************************************************************
+
+logical function is_file(filename) 
+ 
+  character(len=*), intent(in) :: filename
+   
+  inquire(file=trim(filename),exist=is_file) 
+
+  return
+  
+end function is_file
 
 end module utils
