@@ -131,7 +131,7 @@ contains
     endif
     N_ProDiMo = 0.0
 
-    allocate(n_phot_envoyes_ISM(nb_proc,n_lambda2),  stat=alloc_status)
+    allocate(n_phot_envoyes_ISM(n_lambda2,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error n_phot_envoyes_ISM'
        stop
@@ -171,7 +171,7 @@ contains
     !    enddo
 
     ! Step2
-    n_photons_envoyes = sum(n_phot_envoyes(:,lambda))
+    n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
          * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
@@ -473,7 +473,7 @@ contains
 
 
     do lambda=1, n_lambda
-       n_photons_envoyes = sum(n_phot_envoyes_ISM(:,lambda))
+       n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
               
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda

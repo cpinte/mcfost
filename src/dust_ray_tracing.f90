@@ -587,7 +587,7 @@ subroutine init_dust_source_fct1(lambda,ibin)
      !energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
      !    * tab_lambda(lambda) * 1.0e-6 * 100!lambda.F_lambda
 
-     n_photons_envoyes = sum(n_phot_envoyes(:,lambda))
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
      energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda) ) / n_photons_envoyes &
          * tab_lambda(lambda) *1e-2/14.!lambda.F_lambda
   endif
@@ -834,7 +834,7 @@ subroutine calc_Isca2_new(lambda,ibin)
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
           (real(nbre_photons_loop)*real(nbre_photons_image) *  AU_to_cm * pi)
   else ! SED
-     n_photons_envoyes = sum(n_phot_envoyes(:,lambda))
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
           (n_photons_envoyes *  AU_to_cm * pi)
   endif
@@ -1185,7 +1185,7 @@ subroutine calc_Isca2_star(lambda,ibin)
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
           (real(nbre_photons_loop)*real(nbre_photons_image) *  AU_to_cm * pi)
   else ! SED
-     n_photons_envoyes = sum(n_phot_envoyes(:,lambda))
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
           (n_photons_envoyes *  AU_to_cm * pi)
   endif
