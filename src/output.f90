@@ -551,7 +551,7 @@ subroutine write_stokes_fits()
 
 
   lambda=1
-  n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(:,lambda)))
+  n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
   E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
   facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
   stoke_io = stoke_io * facteur
@@ -2016,7 +2016,7 @@ subroutine ecriture_sed(ised)
      ! Energie totale emise a une distance emise egale au rayon stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
      do lambda=1, n_lambda2
-        n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(:,lambda)))
+        n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
         E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
      enddo
 

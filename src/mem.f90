@@ -42,7 +42,7 @@ subroutine alloc_dynamique()
   n_phot_sed2 = 0.0     
 
 
-  allocate(n_phot_envoyes(nb_proc,n_lambda), n_phot_envoyes_loc(nb_proc,n_lambda),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda,nb_proc), n_phot_envoyes_loc(n_lambda,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
@@ -1336,7 +1336,7 @@ subroutine realloc_step2()
   wave2_io=0.0
 
   deallocate(n_phot_envoyes, n_phot_envoyes_loc)
-  allocate(n_phot_envoyes(nb_proc,n_lambda2), n_phot_envoyes_loc(nb_proc,n_lambda2),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda2,nb_proc), n_phot_envoyes_loc(n_lambda2,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
