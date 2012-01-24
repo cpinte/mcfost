@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.13
-  character(8), parameter :: mcfost_release = "2.13.5"
+  character(8), parameter :: mcfost_release = "2.13.6"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   character(len=128), parameter :: webpage="http://ipag.osug.fr/public/pintec/mcfost/"
 
