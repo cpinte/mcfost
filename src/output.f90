@@ -540,9 +540,9 @@ subroutine write_stokes_fits()
   if (lsepar_contrib) then
      do id=1, nb_proc
         stoke_io(:,:,:,:,n_Stokes+1)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star(lambda,:,:,:,:,id)
-        stoke_io(:,:,:,:,n_Stokes+2)=stoke_io(:,:,:,:,n_Stokes+1)+stokei_star_scat(lambda,:,:,:,:,id)
-        stoke_io(:,:,:,:,n_Stokes+3)=stoke_io(:,:,:,:,n_Stokes+2)+stokei_disk(lambda,:,:,:,:,id)
-        stoke_io(:,:,:,:,n_Stokes+4)=stoke_io(:,:,:,:,n_Stokes+3)+stokei_disk_scat(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+2)=stoke_io(:,:,:,:,n_Stokes+2)+stokei_star_scat(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+3)=stoke_io(:,:,:,:,n_Stokes+3)+stokei_disk(lambda,:,:,:,:,id)
+        stoke_io(:,:,:,:,n_Stokes+4)=stoke_io(:,:,:,:,n_Stokes+4)+stokei_disk_scat(lambda,:,:,:,:,id)
      enddo
      deallocate(stokei_star,stokei_star_scat,stokei_disk,stokei_disk_scat)
   endif
