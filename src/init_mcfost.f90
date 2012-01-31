@@ -965,18 +965,16 @@ subroutine display_disclaimer()
   
   character(len=10) :: accept
   
-  
-
   if (.not.is_file(trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release)) then
      write(*,*) "*******************************************"
-     write(*,*) "*             DISCLAMER                   *"
+     write(*,*) "*             DISCLAIMER                  *"
      write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
      write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
      write(*,*) "*                                         *"
-     write(*,*) "* MCFOST is available on a collaboration  *"
-     write(*,*) "* basis. Using MCFOST implies to offer us *"
-     write(*,*) "* co-author right on any resulting        *"
-     write(*,*) "* publications ?                          *"
+     write(*,*) "* MCFOST is available on a collaborative  *"
+     write(*,*) "* basis. Using MCFOST implies that you    *"
+     write(*,*) "* offer us co-author right on any         *"
+     write(*,*) "* resulting publication.                  *"
      write(*,*) "*                                         *"
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
@@ -992,7 +990,6 @@ subroutine display_disclaimer()
         write(*,*) "*******************************************"
         stop
      endif
-     
 
   endif
 
