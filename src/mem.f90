@@ -877,7 +877,7 @@ subroutine alloc_dynamique()
         endif
         STOKEI_star_scat = 0.0
 
-        allocate(STOKEI_disk(nb_proc,n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi), stat=alloc_status)
+        allocate(STOKEI_disk(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_disk'
            stop
