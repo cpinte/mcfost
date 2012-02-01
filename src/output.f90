@@ -234,7 +234,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
               endif ! type de photon
            endif ! lsepar
         else ! symetrie
-           ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
+           ! on rajoute la 2eme moitie du photon dans le pix oppose avec prop symetrie du vecteur de Stokes
            STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
 
            if (lsepar_pola) then
