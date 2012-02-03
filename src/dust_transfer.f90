@@ -451,7 +451,9 @@ subroutine transfert_poussiere()
         endif
         lambda = ind_etape - first_etape_obs + 1
            
-        if (.not.(lspherical.or.l3D)) then
+        if (lspherical.or.l3D) then
+           call no_dark_zone()
+        else
            call define_dark_zone(lambda,tau_dark_zone_obs,.false.)  
         endif
         !call no_dark_zone()
