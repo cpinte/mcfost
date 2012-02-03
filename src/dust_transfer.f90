@@ -528,15 +528,15 @@ subroutine transfert_poussiere()
         
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
         p_nnfot2(id) = 0
-        n_phot_envoyes_loc(id,lambda) = 0.0
-        photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(id,lambda) < n_phot_lim))
+        n_phot_envoyes_loc(lambda,id) = 0.0
+        photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(lambda,id) < n_phot_lim))
            !if (.not.letape_th) write(*,*) nnfot1,  real(P_nnfot2(id)), nbre_phot2, real(n_phot_envoyes_loc(id,lambda)),  real(n_phot_lim)
            !if (.not.letape_th) write(*,*) (p_nnfot2(id) < nbre_phot2), (n_phot_envoyes_loc(id,lambda) < n_phot_lim)
            
 
            nnfot2(id)=nnfot2(id)+1.0_db
-           n_phot_envoyes(id,lambda) = n_phot_envoyes(id,lambda) + 1.0_db
-           n_phot_envoyes_loc(id,lambda) = n_phot_envoyes_loc(id,lambda) + 1.0_db
+           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
+           n_phot_envoyes_loc(lambda,id) = n_phot_envoyes_loc(lambda,id) + 1.0_db
 
            ! Choix longueur d'onde
            if (.not.lmono) then
@@ -584,7 +584,7 @@ subroutine transfert_poussiere()
            !$ id = omp_get_thread_num() + 1
            nnfot2(id) = 0.0_db
            photon_ISM : do while (nnfot2(id) < nbre_photons_lambda)
-              n_phot_envoyes_ISM(id,lambda) = n_phot_envoyes_ISM(id,lambda) + 1.0_db
+              n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_db
 
               ! Emission du paquet
               call emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
