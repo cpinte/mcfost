@@ -1462,6 +1462,12 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
      endif
 
 
+     ! Patch : dans les cas ou frac_z est > 1 ou < 0  !!!!!
+     ! ca veut surement dire que l'on est pas dans la bonne cellule
+     frac_z = max(min(1.0,frac_z),0.0)
+     frac_r = max(min(1.0,frac_r),0.0)
+
+
      ! Calcul angle phi a la position
      phi_pos = modulo(atan2(y,x) + deux_pi,deux_pi)
 
