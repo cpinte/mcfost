@@ -1106,7 +1106,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                         S(1)=D(1)
                         S(4)=D(4)
 
-                        I_sca2(:,iscatt,dir,ri,zj,id) = I_sca2(:,iscatt,dir,ri,zj,id) + S(:)
+                        I_sca2(1:4,iscatt,dir,ri,zj,id) = I_sca2(1:4,iscatt,dir,ri,zj,id) + S(:)
 
                      else ! lsepar_pola
 
