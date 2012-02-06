@@ -25,7 +25,7 @@ subroutine initialisation_mcfost()
   
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol
+  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
   real :: wvl, opt_zoom
   
   character(len=512) :: cmd, s, str_seed
@@ -627,7 +627,11 @@ subroutine initialisation_mcfost()
   star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
   lambda_dir = trim(mcfost_utils)//"/Lambda/"
 
-  call display_disclaimer()
+  ! Display the disclaimer if needed
+  mcfost_no_disclaimer = 0 
+  call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
+  if (s/="") read(s,*) mcfost_no_disclaimer
+  if (.not.mcfost_no_disclaimer) call display_disclaimer()
 
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
@@ -965,33 +969,37 @@ subroutine display_disclaimer()
   
   character(len=10) :: accept
   
+  write(*,*) "*******************************************"
+  write(*,*) "*          MCFOST DISCLAIMER              *"
+  !write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
+  write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
+  write(*,*) "*                                         *"
+  write(*,*) "* MCFOST is available on a collaborative  *"
+  write(*,*) "* basis. Using MCFOST implies that you    *"
+  write(*,*) "* agree to :                              *"
+  write(*,*) "*  - offer us co-author right on any      *"
+  write(*,*) "* resulting publication.                  *"
+  write(*,*) "*  - not distribute MCFOST without our    *"
+  write(*,*) "* explicit agreement.                     *"
+
   if (.not.is_file(trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release)) then
-     write(*,*) "*******************************************"
-     write(*,*) "*             DISCLAIMER                  *"
-     write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
-     write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
-     write(*,*) "*                                         *"
-     write(*,*) "* MCFOST is available on a collaborative  *"
-     write(*,*) "* basis. Using MCFOST implies that you    *"
-     write(*,*) "* offer us co-author right on any         *"
-     write(*,*) "* resulting publication.                  *"
      write(*,*) "*                                         *"
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
-
-     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES").or.(accept(1:1) == "Y") ) then
+     
+     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES").or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
         open(unit=1,file=trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"
-        write(*,*) "* This screen will not appear again       *"
-        write(*,*) "*******************************************"
+        !write(*,*) "* This screen will not appear again       *"
      else 
         write(*,*) "* Exiting MCFOST                          *"
         write(*,*) "*******************************************"
         stop
      endif
-
-  endif
+  endif ! accept disclaimer
+  
+  write(*,*) "*******************************************"
 
   return
 
