@@ -97,11 +97,12 @@ contains
        ! on ne veut changer les lambda pour le step 2
        lsed_complete = .true.
     else 
-       if (lambda_min > 0.0912) then
+       if (tab_lambda2(1) > 0.0912 + 1e-6) then
           write(*,*) "*****************************************"
           write(*,*) "WARNING: lambda_min seems large"
           write(*,*) "UV radiation field is needed for ProDiMo"
           write(*,*) "lambda_min < 0.0912 is recommended"
+          write(*,*) "lambda_min=", tab_lambda2(1)
           write(*,*) "*****************************************"
        endif
     endif
