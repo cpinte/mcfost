@@ -2905,6 +2905,163 @@ subroutine densite_Seb_Charnoz()
 
 end subroutine densite_Seb_Charnoz
 
+!**********************************************************
+
+subroutine densite_Seb_Charnoz2()
+
+  implicit none
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: nullval
+  integer, dimension(2) :: naxes
+  logical :: anynull
+
+  integer :: k, l, i
+  real(kind=db) :: somme, mass, somme2
+
+  real, dimension(n_rad,nz) :: dens
+
+  dens = 0.
+
+  ! Lecture donnees
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  write(*,*) "Density structure from Seb. Charnoz" ;
+  write(*,*) "Reading density file : "//trim(density_file)
+  
+  readwrite=0
+  call ftopen(unit,density_file,readwrite,blocksize,status)
+  if (status /= 0) then ! le fichier de densite n'existe pas
+     write(*,*) "ERROR : density file needed"
+     stop
+  endif
+
+  group=1
+  firstpix=1
+  nullval=-999
+  
+  !  determine the size of density file
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if (nfound /= 2) then
+     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     stop
+  endif
+  
+  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then 
+     write(*,*) "Error : "//trim(density_file)//" does not have the"
+     write(*,*) "right dimensions. Exiting."
+     write(*,*) "# fits_file vs mcfost_grid"
+     write(*,*) naxes(1), n_rad
+     write(*,*) naxes(2), nz
+     stop
+  endif
+
+  npixels=naxes(1)*naxes(2)
+
+  nbuffer=npixels
+  ! read_image
+  call ftgpve(unit,group,firstpix,nbuffer,nullval,dens,anynull,status)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  ! Au cas ou
+  dens = dens + 1e-30
+
+  somme = 0
+  somme2 = 0
+  do j=1, nz
+     !write(*,*) j, z_lim(1,j+1)-z_lim(1,j)
+     somme2 = somme2 + dens(1,j) * (z_lim(1,j+1)-z_lim(1,j)) * AU_to_m * 2. ! SI : kg/m^2
+  enddo
+  write(*,*) "Surface density at 1st radius (g/cm-2) =", somme2 * 1000. / 100**2 ! g/cm-2
+  ! END VERIF
+
+
+  ! Tous les grains suivent le gas
+  ! dens est la densite volumique de poussiere en SI. kg/m^3
+  do k=1,n_grains_tot
+     densite_pouss(:,1:nz,1,k) = dens(:,:)
+  enddo
+
+  ! kg/m^3  ---> part/cm^3
+  densite_pouss = densite_pouss / ( (cm_to_m)**3  * dust_pop(1)%avg_grain_mass * 1e3)  
+
+  ! BUG correction : il manque un facteur 
+  densite_pouss = densite_pouss * 1e-6
+
+ 
+  do l=1,n_grains_tot
+     densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l)*nbre_grains(l)
+  enddo
+  
+!
+!  ! Normalisation : on a 1 grain de chaque taille dans le disque
+!  do l=1,n_grains_tot
+!     somme=0.0
+!     do i=1,n_rad
+!        do j=1,nz
+!           if (densite_pouss(i,j,1,l) <= 0.0) densite_pouss(i,j,1,l) = 1.0e-30
+!           somme=somme+densite_pouss(i,j,1,l)*volume(i)
+!        enddo !j
+!     enddo !i
+!     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)
+!  enddo !l
+!
+!  ! Normalisation : on a 1 grain en tout dans le disque
+!  do l=1,n_grains_tot
+!     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)*nbre_grains(l)
+!  enddo
+
+  search_not_empty : do l=1,n_grains_tot
+     do k=1,n_az
+        do j=1,nz
+           do i=1,n_rad
+              if (densite_pouss(i,j,k,l) > 0.0_db) then
+                 ri_not_empty = i
+                 zj_not_empty = j
+                 phik_not_empty = k
+                 exit search_not_empty
+              endif
+           enddo !i
+        enddo !j
+     enddo !k
+  enddo search_not_empty
+ 
+!  ! Normalisation : Calcul masse totale
+!  mass = 0.0
+!  do i=1,n_rad
+!     do j=1,nz
+!        do l=1,n_grains_tot
+!           mass=mass + densite_pouss(i,j,1,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
+!        enddo !l
+!     enddo !j
+!  enddo !i
+!  mass =  mass/Msun_to_g
+!  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
+
+  write(*,*) "Done"  
+
+  do i=1,n_rad
+     do j=1,nz
+        do l=1,n_grains_tot
+           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,l) * M_grain(l) * volume(i)
+        enddo !l
+     enddo !j
+  enddo ! i
+ 
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
+
+  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+  write(*,*) "Density from Seb. Charnoz set up OK"
+
+  return
+
+end subroutine densite_Seb_Charnoz2
+
 !**********************************************************************
 
 subroutine remove_specie()

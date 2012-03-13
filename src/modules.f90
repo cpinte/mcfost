@@ -110,7 +110,7 @@ module parametres
   logical :: letape_th, limg, lgap, lpah, lorigine, laggregate, l3D, lremove, lwarp, lcavity
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin, loutput_density_grid
   logical :: lopacite_only, lseed, ldust_prop, lopacity_map, lreemission_stats, lobs_HK_Tau
-  logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx
+  logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lgap_laure
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
@@ -143,7 +143,7 @@ module parametres
   ! Simu Sebastien Fromang
   logical :: lSeb_Fromang
   integer :: Seb_Fromang_model
-  logical :: lSeb_Charnoz, lread_Seb_Charnoz
+  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2
 
 end module parametres
 

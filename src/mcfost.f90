@@ -62,7 +62,7 @@ program BIGCRUNCH
   else
      time=int((time_end - time_begin)/time_tick)
   endif
- write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+  write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
   call cpu_time(cpu_time_end)
   time = int(cpu_time_end - cpu_time_begin)      
   write (*,'(" CPU time used          ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)

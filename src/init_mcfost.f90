@@ -420,6 +420,9 @@ subroutine initialisation_mcfost()
      case("-only_diff_approx")
         i_arg = i_arg+1
         lonly_diff_approx=.true.
+     case("-diff_approx")
+        i_arg = i_arg+1
+        lforce_diff_approx=.true.
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
@@ -602,6 +605,12 @@ subroutine initialisation_mcfost()
      case("-read_Seb_C")
         i_arg = i_arg+1
         lread_Seb_Charnoz=.true.
+    case("-read_Seb_C2")
+        i_arg = i_arg + 1 
+        lread_Seb_Charnoz2=.true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1 
      case("-force_1st_scatt")
         i_arg = i_arg+1
         lforce_1st_scatt=.true.
@@ -905,6 +914,7 @@ subroutine display_help()
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
+  write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."  
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"  
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
