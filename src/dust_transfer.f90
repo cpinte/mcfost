@@ -170,6 +170,8 @@ subroutine transfert_poussiere()
         call densite_data_LAURE_SED()
      else if (lread_Seb_Charnoz) then
         call densite_Seb_Charnoz()
+     else if (lread_Seb_Charnoz2) then
+        call densite_Seb_Charnoz2()
      else
         call define_density()
      endif
@@ -674,7 +676,7 @@ subroutine transfert_poussiere()
            call ecriture_temperature(1)
            call ecriture_sed(1)
            
-           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo)) then
+           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lforce_diff_approx)) then
               call Temp_approx_diffusion_vertical()
              ! call Temp_approx_diffusion()
               call ecriture_temperature(2)    
