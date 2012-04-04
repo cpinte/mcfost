@@ -993,7 +993,9 @@ end subroutine display_help
 subroutine display_disclaimer()
   
   character(len=10) :: accept
-  
+  character(len=512) :: cmd 
+  integer :: syst_status
+
   write(*,*) "*******************************************"
   write(*,*) "*          MCFOST DISCLAIMER              *"
   !write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
@@ -1007,14 +1009,16 @@ subroutine display_disclaimer()
   write(*,*) "*  - not distribute MCFOST without our    *"
   write(*,*) "* explicit agreement.                     *"
 
-  if (.not.is_file(trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release)) then
+  if (.not.is_file("~/.mcfost/accept_disclaimer_"//mcfost_release)) then
      write(*,*) "*                                         *"
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
      
      if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES") &
           .or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
-        open(unit=1,file=trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release,status="new")
+        cmd = 'mkdir -p ~/.mcfost'
+        call appel_syst(cmd,syst_status)
+        open(unit=1,file="~/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"
         !write(*,*) "* This screen will not appear again       *"
