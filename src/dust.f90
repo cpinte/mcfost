@@ -305,7 +305,8 @@ subroutine init_indices_optiques()
         ! Compute average material density
         dust_pop(pop)%rho1g_avg = 0.0
         do k=1, dust_pop(pop)%n_components 
-           dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg  + dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
+           dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg  + &
+                dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
         enddo
      else ! PAH       
         ! we only set the material density
@@ -866,7 +867,8 @@ subroutine opacite2(lambda)
                  norme = 0.0
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
+                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))* &
+                         (1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
                     norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
                  enddo
                  tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)

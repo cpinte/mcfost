@@ -1,0 +1,53 @@
+9
+H   12.00  1.0079
+He  10.99  4.0026
+C    8.56  12.011
+N    8.05  14.007
+O    8.93  15.999
+Mg   7.58  24.305
+Si   7.55  28.086
+S    7.21  32.066
+Fe   7.67  55.845
+
+*     -------------------------
+*     Anders + Grevesse (1989):
+*     -------------------------
+      eps(H)  = 12.00 D0
+      eps(He) = 10.99 D0
+      eps(C)  =  8.56 D0
+      eps(N)  =  8.05 D0
+      eps(O)  =  8.93 D0
+      eps(Ne) =  8.09 D0
+      eps(Na) =  6.33 D0
+      eps(Mg) =  7.58 D0
+      eps(Al) =  6.47 D0
+      eps(Si) =  7.55 D0
+      eps(S)  =  7.21 D0
+      eps(K)  =  5.12 D0
+      eps(Ca) =  6.36 D0
+      eps(Cr) =  5.67 D0
+      eps(Mn) =  5.39 D0
+      eps(Fe) =  7.67 D0
+      eps(Ni) =  6.25 D0
+      eps(Ti) =  4.99 D0
+*     -----------------------
+*     ***  atomic masses  ***
+*     -----------------------
+      mass(H)  = 1.0079 D0 * amu
+      mass(He) = 4.0026 D0 * amu
+      mass(C)  = 12.011 D0 * amu
+      mass(N)  = 14.007 D0 * amu
+      mass(O)  = 15.999 D0 * amu
+      mass(Ne) = 20.180 D0 * amu            
+      mass(Na) = 22.990 D0 * amu
+      mass(Mg) = 24.305 D0 * amu
+      mass(Al) = 26.982 D0 * amu
+      mass(Si) = 28.086 D0 * amu
+      mass(S)  = 32.066 D0 * amu
+      mass(K)  = 39.098 D0 * amu  
+      mass(Ca) = 40.078 D0 * amu
+      mass(Ti) = 47.867 D0 * amu
+      mass(Cr) = 51.996 D0 * amu
+      mass(Mn) = 54.938 D0 * amu
+      mass(Fe) = 55.845 D0 * amu
+      mass(Ni) = 58.693 D0 * amu

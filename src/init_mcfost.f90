@@ -99,9 +99,11 @@ subroutine initialisation_mcfost()
   lkappa_abs_grain=.false.
   lweight_emission=.false.
   lprodimo=.false.
+  lProDiMo_input_dir=.false.
+  lProDiMo2mcfost=.false.
+  lforce_ProDiMo_PAH = .false.
   lgap_ELT=.false.
   ldust_emisison_in_images=.false.
-  lProDiMo2mcfost=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
   lSeb_Fromang = .false.
@@ -561,6 +563,17 @@ subroutine initialisation_mcfost()
         lprodimo = .true.
         lsetup_gas=.true.
         mcfost2ProDiMo_version = 1
+     case("-prodimo_input_dir")
+        i_arg = i_arg + 1 
+        lprodimo_input_dir=.true.
+        call get_command_argument(i_arg,ProDiMo_input_dir)
+        i_arg = i_arg + 1 
+     case("-prodimo_fPAH")
+        i_arg = i_arg + 1
+        lforce_ProDiMo_PAH = .true.
+        call get_command_argument(i_arg,sProDiMo_fPAH)
+        i_arg = i_arg + 1 
+        read(sProDiMo_fPAH,*) ProDiMo_fPAH
      case("-gap_ELT")
         i_arg = i_arg+1
         lgap_ELT=.true.
@@ -640,7 +653,7 @@ subroutine initialisation_mcfost()
   mcfost_no_disclaimer = 0 
   call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
   if (s/="") read(s,*) mcfost_no_disclaimer
-  if (.not.mcfost_no_disclaimer) call display_disclaimer()
+  if (mcfost_no_disclaimer == 0) call display_disclaimer()
 
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
@@ -892,7 +905,7 @@ subroutine display_help()
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
   write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs"
   write(*,*) "        : -mol : calculates molecular emission"
-  write(*,*) "        : -prodimo"
+  write(*,*) "        : -prodimo : creates the files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -900,6 +913,7 @@ subroutine display_help()
   write(*,*) "        : -root_dir <root_dir> : results stored in 'root_dir' directory"
   write(*,*) "        : -no_backup  : stops if directory data_XX already exists"
   write(*,*) "                        without attempting to backup existing directory"
+  write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
   write(*,*) "        : -zoom <zoom> (override value in parameter file)"
@@ -969,6 +983,7 @@ subroutine display_help()
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze_out <T>"
   write(*,*) "        : -prodimo"
+  write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo" 
   stop
 
 end subroutine display_help
@@ -997,7 +1012,8 @@ subroutine display_disclaimer()
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
      
-     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES").or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
+     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES") &
+          .or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
         open(unit=1,file=trim(mcfost_utils)//"/.accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"

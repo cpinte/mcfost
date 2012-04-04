@@ -1,0 +1,78 @@
+-----------------------------------------
+***  Parameter Input-File for ProDiMo  ***
+------------------------------------------
+
+2.2         ! Mstar     [Msun]   : stellar mass 
+32.0        ! Lstar     [Lsun]   : stellar luminosity
+8600.0      ! Teff      [K]      : stellar effective temperature
+0.01        ! fUV       [-]      : UV excess
+1.0E-2      ! Mdisk     [Msun]   : disk mass
+0.5         ! Rin       [AU]     : inner disk radius
+150.0       ! Rout      [AU]     : outer disk radius 
+1.0         ! epsilon   [-]      : power index of vert. col.dens. as func of x 
+55.0        ! beta_max  [deg]    : maximum half opening angle of resolved disk
+0.01        ! dust_to_gas [-]    : the dust-to-gas mass ratio
+3.5         ! rho_gr    [g/cm^3] : dust grain material mass density
+0.05        ! amin      [mic]    : minimum dust particle size  
+1000.0      ! amax      [mic]    : maximum dust particle size
+3.5         ! apow      [-]      : dust size distr power index f(a)~a^-apow
+0.0         ! fPAH      [-]      : PAH abundance with respect to ISM
+5.0E-17     ! CRI       [1/s]    : cosmic ray ionisation of H2 (UMIST:1.36E-17)
+1.0         ! CHI_ISM   [-]      : strength of incident vertical UV  
+0.0         ! alpha_vis [-]      : viscous heating parameter
+0.15        ! v_turb    [km/s]   : turbulent Doppler width
+1           ! NDUST     [-]      : number of selected dust species
+1.0   AstroSilicate_Draine[s]    : volume fraction and name of condensate
+
+------ image and SED parameters ------
+.false.      ! calcSED            : calculate SED and images?
+.false.     ! monoSED            : use monochromatic mode?
+200         ! NlamSED            : number of lambda gridpoints
+0.1         ! lminSED            : minimum lambda[mic]
+1000.0      ! lmaxSED            : minimum lambda[mic]
+140.0       ! dist      [pc]     : distance
+62.5        ! incl      [deg]    : inclination (0=face-on)
+
+------ tolerances ------
+0.01        ! tol_convergence   : convergence criterion for global interation 
+1.0E-8      ! tol_diskstruc     : rel.&abs. tolerance for vertical disk struc
+1.0E-8      ! temp_precis       : rel. precision in T-determination 
+1.0E-9      ! chem_precis       : precision in solve_chemistry
+2.0E-5      ! rtol_chem         : rel. tolerance for advance_chemistry
+1.0E-99     ! atol_chem         : abs. tolerance for advance_chemistry
+99          ! maxit             : maximum number of global iterations
+43000.0     ! maxtime           : maximum computational time [sec]
+
+------ switches ------
+0           ! verbose_level     : how much output? (-1...4)
+.false.     ! solve_diskstruc   : solve the vertical hydrostatic eq.?
+.true.      ! solve_temp        : solve the heating/cooling balance?
+.false.     ! conserve_pressure : conserve pgas instead of n<H>?
+.false.     ! restart           : restart from checkpoint file?
+.false.     ! radtrans          : calculate dust continuum rad. transfer?
+.true.      ! chi_from_RT       : calculate chi from UV rad. transfer?
+.true.      ! Td_from_RT        : calculate dust temp. from rad. transfer?
+.true.      ! Jback_from_RT     : calculate background Jnu from rad. transfer?
+.true.      ! Rphoto_from_RT    : calculate photorates from rad. transfer?
+.false.     ! soft_edges        : add confining boundary layers?
+.true.      ! write_pop         : write output for line transfer?
+.true.      ! NewChemScan       : new initial abund. from down-right scan?
+.false.     ! freeze_RT         : freeze radiative transfer results Td/Jv?
+.false.     ! freeze_diskstruc  : freeze density/pressure structure?
+.false.     ! freeze_Tgas       : freeze gas temperature?
+.false.     ! freeze_chemistry  : freeze chemical concentrations?
+.false.     ! perfect_ice       : use long integration time for ices?
+onlyadd     ! handle_UMIST      : handle UMIST-data (erase/overwrite/onlyadd)
+0           ! num_noerase       : exceptions from erasing UMIST data
+
+------ mcfost ------
+.true. 	    ! readMCFOST
+forProDiMo.fits.gz
+.false.     ! onlyMCFOST
+.true.	    ! UVpumping : pour OI et Cplus
+.true. 	    ! Rphoto_bandint  : integration plus fine en bande V
+.true.      ! use_MCFOST_rgrid
+
+------ line transfer? ------
+.false.      ! line_transfer      : calculate line transfer? 
+.false.     ! immediate_lines    : line RT directly after init?
