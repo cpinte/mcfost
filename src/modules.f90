@@ -116,7 +116,7 @@ module parametres
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
   logical :: lspot, lforce_1st_scatt
 
-  character(len=512) :: mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir 
+  character(len=512) :: mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: dust_dir, mol_dir, star_dir, lambda_dir, lambda_filename
   character(len=512) :: para, band, model_pah, pah_grain, cmd_opt
   character(len=512), dimension(100) :: data_dir2, basename_data_dir2
@@ -135,7 +135,7 @@ module parametres
   character(len=512) :: Laure_SED_filename
 
   ! Prodimo
-  logical :: lprodimo
+  logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
 
   logical, parameter :: ltest_rt3 = .false. ! marche pas
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus

@@ -18,12 +18,18 @@ module ProDiMo
 
   save
 
-  character(len=32), parameter :: mcfost2ProDiMo_file = "forProDiMo.fits.gz"
+  character(len=512), parameter :: mcfost2ProDiMo_file = "forProDiMo.fits.gz"
   integer :: mcfost2ProDiMo_version, ProDiMo2mcfost_version
-  
+
+  ! directory with *.in files and output dir
+  character(len=512) :: ProDiMo_input_dir, data_ProDiMo  
+
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
-  real :: fUV_ProDiMo, slope_UV_ProDiMo
+  real :: fUV_ProDiMo, slope_UV_ProDiMo, ProDiMo_fPAH
+  ! fPAH = (2.2/mPAH) * dust_to_gas * eps_MCFOST/3e-7 
+  ! + PAH_NC, PAH_NH + distance + inclinaison
+  character(len=10) :: sProDiMo_fPAH
   
   ! Pour champ ISM
   real, parameter :: Wdil =  9.85357e-17 
@@ -77,9 +83,17 @@ contains
 
     ! TODO : linit_gaz
 
-    integer :: alloc_status, nl
+    integer :: alloc_status
 
-
+    ! Directories
+    if (.not.lprodimo_input_dir) then
+       ProDiMo_input_dir = trim(mcfost_utils)//"/forProDiMo"
+       write(*,*) "Using "//trim(ProDiMo_input_dir)//" for ProDiMo input"
+    endif
+    data_ProDiMo = trim(root_dir)//"/"//trim(seed_dir)//"/data_ProDiMo"
+    
+    if (lforce_ProDiMo_PAH) data_ProDiMo = trim(data_ProDiMO)//"_fPAH="//sProDiMo_fPAH
+    
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
 
@@ -226,11 +240,13 @@ contains
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
+    call create_input_ProDiMo()
+
     allocate(opacite(n_rad,nz,2,n_lambda))
     allocate(J_io(n_rad,nz,n_lambda))
     allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz))
     
-    filename = trim(data_dir)//"/"//trim(mcfost2ProDiMo_file)
+    filename = trim(data_ProDiMo)//"/"//trim(mcfost2ProDiMo_file)
 
     ! Initialize parameters about the FITS image
     simple=.true.
@@ -639,6 +655,64 @@ contains
     return
 
   end subroutine mcfost2ProDiMo
+
+  !********************************************************************
+
+  subroutine create_input_ProDiMo()
+    ! Create the *.in files for ProDiMo
+    ! C. Pinte 17/03/2012
+
+    character(len=512) :: cmd
+    character(len=128) :: line
+    character(len=10) :: fmt
+    integer :: j, status, syst_status
+    logical :: unchanged
+
+    write (*,*) 'Creating directory '//trim(data_ProDiMo)
+    ! Copy *.in files ()
+    cmd = 'mkdir -p '//trim(data_ProDiMo)//" ; "// &
+         "cp "//trim(ProDiMo_input_dir)//"/Elements.in "&
+         //trim(ProDiMo_input_dir)//"/LineTransferList.in "&
+         //trim(ProDiMo_input_dir)//"/Reactions.in "&
+         //trim(ProDiMo_input_dir)//"/Species.in "//trim(data_ProDiMo)
+    call appel_syst(cmd,syst_status)
+
+    ! Copy and modify Parameter.in 
+    open(unit=1,file=trim(ProDiMo_input_dir)//"/Parameter.in",status='old')
+    open(unit=2,file=trim(data_ProDiMo)//"/Parameter.in",status='replace')
+
+    status = 0 
+    read_loop : do 
+       read(1,'(A128)',iostat=status) line
+       if (status /= 0) exit read_loop
+       unchanged = .true.
+       if (INDEX(line,"! dust_to_gas") > 0) then
+          write(2,*) 1.0/gas_dust," ! dust_to_gas : set by MCFOST"
+          unchanged = .false.
+       endif
+
+       if (INDEX(line,"! fPAH") > 0) then
+          write(2,*) ProDiMo_fPAH," ! fPAH : set by MCFOST"
+          unchanged = .false.
+       endif
+
+       if (INDEX(line,"! Rout") > 0) then
+          write(2,*) Rout," ! Rout : set by MCFOST"
+          unchanged = .false.
+       endif
+       
+       if (unchanged) then
+          write(fmt,'("(A",I3.3,")")') len(trim(line)) 
+          write(2,fmt) trim(line)
+       endif
+    enddo read_loop
+
+    close(1)
+    close(2)
+
+    return
+
+  end subroutine create_input_ProDiMo
 
   !********************************************************************
 

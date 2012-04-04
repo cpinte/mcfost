@@ -450,7 +450,8 @@ contains
           do i=1, n_especes(j)
              n_pop = n_pop+1
              !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
              if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
                 dust_pop_tmp(n_pop)%lcoating = .true.
              else
