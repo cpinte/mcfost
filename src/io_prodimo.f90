@@ -31,6 +31,9 @@ module ProDiMo
   ! + PAH_NC, PAH_NH + distance + inclinaison
   character(len=10) :: sProDiMo_fPAH
   
+  ! Grille de longeurs d'onde
+  character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo.lambda"
+
   ! Pour champ ISM
   real, parameter :: Wdil =  9.85357e-17 
   real, parameter :: TCmb = 2.73 
@@ -83,6 +86,7 @@ contains
 
     ! TODO : linit_gaz
 
+    real :: wl_min
     integer :: alloc_status
 
     ! Directories
@@ -108,19 +112,9 @@ contains
        lambda_min = 0.0912
        lambda_max = 3410.85
 
-       ! on ne veut changer les lambda pour le step 2
+       ! on veut changer les lambda pour le step 2
        lsed_complete = .true.
-    else 
-       if (tab_lambda2(1) > 0.0912 + 1e-6) then
-          write(*,*) "*****************************************"
-          write(*,*) "WARNING: lambda_min seems large"
-          write(*,*) "UV radiation field is needed for ProDiMo"
-          write(*,*) "lambda_min < 0.0912 is recommended"
-          write(*,*) "lambda_min=", tab_lambda2(1)
-          write(*,*) "*****************************************"
-       endif
     endif
-
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV

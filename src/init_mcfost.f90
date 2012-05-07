@@ -662,9 +662,18 @@ subroutine initialisation_mcfost()
      call read_para()
   endif
 
+  if (lProDiMo) then
+     if ((lsed_complete).or.(tab_wavelength /= prodimo_tab_wavelength)) then
+        write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo.lambda" 
+        lsed_complete = .false.       
+        tab_wavelength = prodimo_tab_wavelength
+     endif
+  endif
+
   if (lProDiMo2mcfost_test) lProDiMo2mcfost = .true.
 
   if (ldust_prop) then
+     write(*,*) "Computation of dust properties as a function of wavelength"
      basename_data_dir = "data_dust"
      ! Make sure the full wavelength range is used to compute 
      ! the dust properties
@@ -756,10 +765,6 @@ subroutine initialisation_mcfost()
      else 
         write(*,*) "Temperature calculation without LTE approximation"
      endif
-  endif
-
-  if (ldust_prop) then
-     write(*,*) "Computation of dust properties as a function of wavelength"
   endif
 
   if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.ldust_prop)) then
