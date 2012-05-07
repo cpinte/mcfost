@@ -590,13 +590,13 @@ subroutine write_stokes_fits()
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
   
   !  Write the array to the FITS file.
@@ -763,13 +763,13 @@ subroutine ecriture_map_ray_tracing()
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
@@ -2215,13 +2215,13 @@ subroutine ecriture_spectre(imol)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
