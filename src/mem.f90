@@ -1058,14 +1058,14 @@ subroutine realloc_dust_mol()
   allocate(tab_lambda(n_lambda), tab_delta_lambda(n_lambda), &
        tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_lambda'
+     write(*,*) 'Allocation error tab_lambda (realloc)'
      stop
   endif
   tab_lambda=0.0 ; tab_delta_lambda= 0.0 ; tab_amu1=0.0 ; tab_amu2=0.0
 
-    allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo'
+     write(*,*) 'Allocation error tab_albedo (realloc)'
      stop
   endif
   tab_albedo = 0
@@ -1073,7 +1073,7 @@ subroutine realloc_dust_mol()
   allocate(q_ext(n_lambda,n_grains_tot), q_sca(n_lambda,n_grains_tot), &
        q_abs(n_lambda,n_grains_tot), tab_g(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error q_ext'
+     write(*,*) 'Allocation error q_ext (realloc)'
      stop
   endif
   q_ext = 0 ; q_sca = 0 ; q_abs = 0 ; tab_g = 0
@@ -1081,35 +1081,35 @@ subroutine realloc_dust_mol()
 
   allocate(prob_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_s11'
+     write(*,*) 'Allocation error prob_s11 (realloc)'
      stop
   endif
   prob_s11 = 0
 
   allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s11'
+     write(*,*) 'Allocation error tab_s11 (realloc)'
      stop
   endif
   tab_s11 = 0
 
   allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s12'
+     write(*,*) 'Allocation error tab_s12 (realloc)'
      stop
   endif
   tab_s12 = 0
 
   allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s33'
+     write(*,*) 'Allocation error tab_s33 (realloc)'
      stop
   endif
   tab_s33 = 0
 
   allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s34'
+     write(*,*) 'Allocation error tab_s34 (realloc)'
      stop
   endif
   tab_s34 = 0
@@ -1121,7 +1121,7 @@ subroutine realloc_dust_mol()
      allocate(probsizecumul(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error probsizecumul'
+     write(*,*) 'Allocation error probsizecumul (realloc)'
      stop
   endif
   probsizecumul = 0
@@ -1137,7 +1137,7 @@ subroutine realloc_dust_mol()
           amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error Jmol'
+     write(*,*) 'Allocation error Jmol (realloc)'
      stop
   endif
   kappa = 0.0 ; kappa_abs_eg = 0.0 ; emissivite_dust = 0.0
@@ -1149,7 +1149,7 @@ subroutine realloc_dust_mol()
      allocate(tab_albedo_pos(n_lambda,p_n_rad,p_nz,1), tab_g_pos(n_lambda,p_n_rad,p_nz,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
+     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos (realloc)'
      stop
   endif
   tab_albedo_pos = 0
@@ -1161,7 +1161,7 @@ subroutine realloc_dust_mol()
      allocate(ech_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error ech_prob'
+     write(*,*) 'Allocation error ech_prob (realloc)'
      stop
   endif
   ech_prob = 0
@@ -1172,7 +1172,7 @@ subroutine realloc_dust_mol()
      allocate(valeur_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error valeur_prob'
+     write(*,*) 'Allocation error valeur_prob (realloc)'
      stop
   endif
   valeur_prob = 0
@@ -1188,8 +1188,7 @@ subroutine clean_mem_dust_mol()
   integer :: alloc_status
 
   ! Ne reste que kappa et emissivite_dust
-
-  deallocate(tab_lambda, tab_amu1, tab_amu2)
+  deallocate(tab_lambda, tab_delta_lambda, tab_amu1, tab_amu2)
   deallocate(tab_albedo)
   deallocate(q_ext, q_sca, q_abs, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
@@ -1733,15 +1732,12 @@ subroutine alloc_emission_mol(imol)
   spectre=0.0
   continu=0.0
 
-
-  allocate(maser_map(n_rad,nz,nTrans_raytracing), stat=alloc_status)
+  allocate(maser_map(n_rad,nz,nTrans_tot), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error maser_map'
      stop
   endif
   maser_map = 0.0
-
-
 
   return
 
