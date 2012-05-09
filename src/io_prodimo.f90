@@ -234,14 +234,31 @@ contains
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
+
     call create_input_ProDiMo()
 
-    allocate(opacite(n_rad,nz,2,n_lambda))
-    allocate(J_io(n_rad,nz,n_lambda))
-    allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz))
-    
-    filename = trim(data_ProDiMo)//"/"//trim(mcfost2ProDiMo_file)
+    allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
+    if (alloc_status > 0) then
+       write(*,*) 'Allocation error opacite forProDiMo.fits.gz'
+       stop
+    endif
+    opacite = 0
+   
+    allocate(J_io(n_rad,nz,n_lambda), stat=alloc_status)
+    if (alloc_status > 0) then
+       write(*,*) 'Allocation error J_io forProDiMo.fits.gz'
+       stop
+    endif
+    J_io = 0    
 
+    allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz), stat=alloc_status)
+     if (alloc_status > 0) then
+       write(*,*) 'Allocation error J_ProDiMo_ISM forProDiMo.fits.gz'
+       stop
+    endif
+    J_ProDiMo_ISM = 0  
+
+    filename = trim(data_ProDiMo)//"/"//trim(mcfost2ProDiMo_file)
     ! Initialize parameters about the FITS image
     simple=.true.
     extend=.true.
@@ -250,12 +267,11 @@ contains
 
     !  Get an unused Logical Unit Number to use to open the FITS file.
     status=0
-    call ftgiou (unit,status)
+    call ftgiou(unit,status)
 
     !  Create the new empty FITS file.
     blocksize=1
     call ftinit(unit,trim(filename),blocksize,status)
-
 
     !------------------------------------------------------------------------------
     ! HDU 1 : Grille
@@ -458,8 +474,8 @@ contains
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
     
     ! Inversion de l'ordre des dimensions 
-    do ri=1, n_rad
-       do zj=1,nz
+    do zj=1,nz
+       do ri=1, n_rad
           J_io(ri,zj,:) = N_ProDiMo(:,ri,zj) 
        enddo
     enddo
@@ -524,16 +540,16 @@ contains
 
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    
-    N_ProDiMo(:,:,:) =  sum(xN_abs(:,:,:,:), dim=4)
-    ! Inversion de l'ordre des dimensions 
-    do ri=1, n_rad
-       do zj=1,nz
-          J_io(ri,zj,:) = N_ProDiMo(:,ri,zj) 
+   
+    ! Inversion de l'ordre des dimensions et somaation
+    do zj=1,nz
+       do ri=1, n_rad
+          J_io(ri,zj,:) = sum(xN_abs(:,ri,zj,:), dim=2) 
        enddo
     enddo
 
     call ftppre(unit,group,fpixel,nelements,J_io,status)
+
 
     !------------------------------------------------------------------------------
     ! HDU 10 : Densite de gaz pour un rapport de masse de 100 / poussiere
