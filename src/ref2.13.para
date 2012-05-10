@@ -8,7 +8,7 @@
 
 #Wavelength
   50  0.1 3000.0      n_lambda
-  T T T 		  ltemp, lsed, lsed_complete
+  T T F 		  ltemp, lsed, lsed_complete
   IMLup.lambda		  wavelength file
   T			  consider disk emission in images
   F F			  separation of different contributions, stokes parameters
@@ -58,9 +58,8 @@
 
 #Grain properties
   1  Number of species
-  2  2  0.0  1.0   N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
+  1  2  0.0  1.0   N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
   Draine_Si_sUV.dat  0.8   optical indices file, volume fraction
-  ice_opct.dat  0.2   optical indices file, volume fraction	
   1	  heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
   0.03  1.0 3.5 100 	  amin, amax, aexp, nbr_grains     
 

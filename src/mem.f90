@@ -1137,7 +1137,7 @@ subroutine realloc_dust_mol()
           amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error Jmol (realloc)'
+     write(*,*) 'Allocation error kappa (realloc)'
      stop
   endif
   kappa = 0.0 ; kappa_abs_eg = 0.0 ; emissivite_dust = 0.0
@@ -1694,7 +1694,7 @@ subroutine alloc_emission_mol(imol)
   if (ldouble_RT) then
      allocate(kappa_mol_o_freq2(n_rad,nz+1,nTrans_tot), emissivite_mol_o_freq2(n_rad,nz+1,nTrans_tot), stat=alloc_status)
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_mol'
+        write(*,*) 'Allocation error kappa_mol2'
         stop
      endif
      kappa_mol_o_freq2=0.0
@@ -1702,14 +1702,14 @@ subroutine alloc_emission_mol(imol)
      
      allocate(tab_nLevel2(n_rad,nz,nLevels), stat=alloc_status)
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_nLevel'
+        write(*,*) 'Allocation error tab_nLevel2'
         stop
      endif
      tab_nLevel2 = 0.0
   
      allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error Jmol'
+        write(*,*) 'Allocation error Jmol2'
         stop
      endif
      Jmol2 = 0.0_db
@@ -1754,8 +1754,8 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower,indice_Trans)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, tab_deltaV, spectre, continu, tab_Cmb_mol, Jmol, maser_map)
-  
+       tab_v, tab_deltaV, spectre,continu, tab_Cmb_mol,maser_map)
+
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 
   deallocate(I0, I0c, tab_speed_rt) ! besoin de dealoue tab_speed_rt pour plusieyrs ray

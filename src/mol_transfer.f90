@@ -95,8 +95,12 @@ subroutine mol_line_transfer()
 
      ! Condition initiale : equilibre avec Cmb
      !     call equilibre_othin_mol()
+
+  write(*,*) "lmol_LTE", lmol_LTE
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
         
+     write(*,*) "lmol_LTE", lmol_LTE
+
      call opacite_mol(imol)
      call integ_tau_mol(imol)
   
@@ -157,8 +161,8 @@ subroutine NLTE_mol_line_transfer(imol)
   integer, parameter :: n_speed3 = 1
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp 
-  real, parameter :: precision_sub = 1.0e-4
-  real, parameter :: precision = 1.0e-2
+  real, parameter :: precision_sub = 1.0e-3
+  real, parameter :: precision = 1.0e-1
   
   integer :: etape, etape_start, etape_end, ri, zj, phik, l, iray, iTrans, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
@@ -238,13 +242,13 @@ subroutine NLTE_mol_line_transfer(imol)
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
         n_rayons = 2 ! TR 1D : 1 rayon qui monte, 1 rayon qui descend 
         iray_start=1
-        fac_etape = 0.1
+        fac_etape = 1.0
         lprevious_converged = .false.
      else if (etape==2) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
         n_rayons = n_rayons_start
         iray_start=1
-        fac_etape = 0.1
+        fac_etape = 1.0
         lprevious_converged = .false.
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = n_speed3
@@ -454,6 +458,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
+        write(*,*) "Threshold =", precision*fac_etape
 
         if (maxdiff < precision*fac_etape) then
            if (lprevious_converged) then
@@ -462,7 +467,7 @@ subroutine NLTE_mol_line_transfer(imol)
               lprevious_converged = .true.
            endif
         else
-            lprevious_converged = .false.
+           lprevious_converged = .false.
            if (.not.lfixed_rays) then
               n_rayons = n_rayons * 2
              ! if (n_rayons > n_rayons_max) then

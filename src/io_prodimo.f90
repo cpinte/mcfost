@@ -592,7 +592,6 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-
     do zj=1,nz
        do ri=1,n_rad
           opacite(ri,zj,1,:) = kappa(:,ri,zj,1)
@@ -939,7 +938,7 @@ contains
     enddo
     vitesse_turb = 0.0
     largeur_profile = 15.
-    lpop = .true. ; lprecise_pop = .true. ; lmol_LTE = .true.
+    lpop = .true. ; lprecise_pop = .true. !; lmol_LTE = .true.
     para_version = mcfost_version
 
     
