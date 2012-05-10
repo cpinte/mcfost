@@ -1601,7 +1601,7 @@ subroutine integ_tau(lambda)
   integer, intent(in) :: lambda
 
   real :: integ, integ2,c_thet, s_thet, z, r, det_r, norme
-  integer :: i, h, ri, zj
+  integer :: i, h, ri, zj, j
 
   real(kind=db), dimension(4) :: Stokes
   ! angle de visee en deg
@@ -1623,14 +1623,25 @@ subroutine integ_tau(lambda)
   enddo
   !stop
 
-  tau_max=norme
-  tau_min=0.0
-
-  w0 = cos((angle)*pi/180.)
-  u0 = sqrt(1.0-w0*w0)
-  v0 = 0.0
-
+  norme = norme 
   write(*,*) 'Integ tau dans plan eq. = ', norme
+  ! 1.49597870691e13 car kappa est en AU**-1
+  ! Ok si pas de sedimentation
+  if (.not.lstrat) then
+     if (kappa(lambda,1,1,1) > tiny_real) then
+        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1,1,1)/(volume(1)*AU_to_cm**3))/ &
+             (kappa(lambda,1,1,1)/AU_to_cm))
+     endif
+  endif
+
+
+  norme=0.0
+  do j=1, nz
+     norme=norme+kappa(lambda,1,j,1)*(z_lim(1,j+1)-z_lim(1,j))
+  enddo
+  norme = norme * 2.
+
+  write(*,*) 'Integ tau vert = ', norme
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
   if (.not.lstrat) then
@@ -1642,6 +1653,9 @@ subroutine integ_tau(lambda)
 
   ri=0 ; zj=1 ; x0=0.0 ; y0=0.0 ; z0=0.0
   Stokes = 0.0_db ; Stokes(1) = 1.0_db
+  w0 = cos((angle)*pi/180.)
+  u0 = sqrt(1.0-w0*w0)
+  v0 = 0.0
 
   call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,y0,u0,v0,w0,tau,lmin,lmax) 
   
