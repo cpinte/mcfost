@@ -412,6 +412,7 @@ subroutine define_grid4()
            volume(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
            dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
         else
+           rcyl = r_grid(i,1)
            volume(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
            dr2_grid(i) = 2.0_db * rcyl*(tab_r(i+1)-tab_r(i)) 
         endif
