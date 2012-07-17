@@ -1718,6 +1718,8 @@ subroutine alloc_emission_mol(imol)
   ! Methode d'echantillonnage
   if (igridx > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
+     
+     write(*,*) "WARNING : memory size if lots of pixels" 
      allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
           continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
   else
@@ -1754,7 +1756,7 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower,indice_Trans)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, tab_deltaV, spectre,continu, tab_Cmb_mol,maser_map)
+       tab_v, tab_deltaV, spectre,continu, tab_Cmb_mol, Jmol, maser_map)
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 

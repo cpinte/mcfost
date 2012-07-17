@@ -82,24 +82,21 @@ subroutine mol_line_transfer()
      ! Freeze out eventuel
      if (lfreeze_out) call freeze_out()
 
+     if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
+     
      ! Absorption et emissivite poussiere
      call init_dust_mol(imol) 
 
      call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
 
-     ! population dans le cas limite optiquement mince
-     if (ldouble_RT) call equilibre_othin_mol_pop2()
+     ! Population des niveaux initiale
+     if (.not.lProDiMo2mcfost) then
+        ! population dans le cas limite optiquement mince
+        if (ldouble_RT) call equilibre_othin_mol_pop2()
      
-     ! Condition initiale : population a l'ETL
-     call equilibre_LTE_mol()
-
-     ! Condition initiale : equilibre avec Cmb
-     !     call equilibre_othin_mol()
-
-  write(*,*) "lmol_LTE", lmol_LTE
-     if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
-        
-     write(*,*) "lmol_LTE", lmol_LTE
+        ! Condition initiale : population a l'ETL
+        call equilibre_LTE_mol()
+     endif
 
      call opacite_mol(imol)
      call integ_tau_mol(imol)
@@ -181,12 +178,20 @@ subroutine NLTE_mol_line_transfer(imol)
   integer, dimension(2) :: ispeed
   real(kind=db), dimension(:,:), allocatable :: tab_speed
 
+
   labs = .true.
 
   id = 1
 
   n_speed = mol(imol)%n_speed
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
+
+  if (n_level_comp < 2) then
+     write(*,*) "ERROR : n_level_comp must be > 2"
+     write(*,*) "Exiting."
+     stop
+  endif
+  write(*,*) "NLTE line transfer on", n_level_comp, "levels"
 
   etape_start=1
   if (lprecise_pop) then
@@ -294,6 +299,9 @@ subroutine NLTE_mol_line_transfer(imol)
      lconverged = .false.
      n_iter = 0
 
+
+   
+
      do while (.not.lconverged)
         n_iter = n_iter + 1
 
@@ -311,7 +319,6 @@ subroutine NLTE_mol_line_transfer(imol)
 
         ! Sauvegarde des populations globales
         tab_nLevel_old = tab_nLevel
-
         max_n_iter_loc = 0
 
         ! Boucle sur les cellules
@@ -419,9 +426,8 @@ subroutine NLTE_mol_line_transfer(imol)
                        pop(:,id) = tab_nLevel(ri,zj,:)
 
                        ! Critere de convergence locale
-                       diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) / pop_old(1:n_level_comp,id))
+                       diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) / (pop_old(1:n_level_comp,id) + 1e-30) )
                        
-                  
                        if (diff < precision_sub) then 
                           lconverged_loc = .true.
                        else
@@ -446,11 +452,12 @@ subroutine NLTE_mol_line_transfer(imol)
         do ri=1,n_rad
            do zj=1,nz
               if (lcompute_molRT(ri,zj)) then
-                 diff = maxval( abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
+                 diff = maxval( abs( tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp) ) / &
                       tab_nLevel_old(ri,zj,1:n_level_comp) )
                  
              !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
               !        tab_nLevel_old(ri,zj,1:n_level_comp)
+               !  write(*,*) ri, zj, diff, tab_nLevel_old(ri,zj,1:n_level_comp) 
                  if (diff > maxdiff) maxdiff = diff
               endif
            enddo
@@ -483,12 +490,13 @@ subroutine NLTE_mol_line_transfer(imol)
            endif
         endif
 
+        write(*,*) "STAT", minval(tab_nLevel(:,:,1:n_level_comp)), maxval(tab_nLevel(:,:,1:n_level_comp))
         call integ_tau_mol(imol)
 
      enddo ! while : convergence totale     
   enddo ! etape
 
-  deallocate(Jmol, ds, Doppler_P_x_freq, I0, I0c)
+  deallocate(ds, Doppler_P_x_freq, I0, I0c)
 
   return
 
@@ -857,8 +865,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   ! profil de raie non convolue teste ok avec torus
 
   if (RT_line_method==1) then ! Sommation implicite sur les pixels
-     spectre(1,1,:,:,ibin) = spectre(:,:,ibin,1,1) + IP(:,:)
-     continu(1,1,:,ibin) = continu(:,ibin,1,1) + IPc(:)
+     spectre(1,1,:,:,ibin) = spectre(1,1,:,:,ibin) + IP(:,:)
+     continu(1,1,:,ibin) = continu(1,1,:,ibin) + IPc(:)
   else
      spectre(ipix,jpix,:,:,ibin) = IP(:,:)
      continu(ipix,jpix,:,ibin) = IPc(:)
