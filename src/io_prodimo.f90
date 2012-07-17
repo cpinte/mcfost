@@ -735,7 +735,7 @@ contains
     ! C.Pinte
     ! 12/07/09
 
-    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype, imol, syst_status
+    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype, imol, syst_status, n_files
     real :: nullval, buffer
     logical :: anynull
 
@@ -758,6 +758,22 @@ contains
     
     ! Copie temporaire et lecture du fichier de parametres
     ! car je ne connais pas le nom du fichier .par dans data_th
+    n_files = 0
+    cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call appel_syst(cmd, syst_status)
+    open(unit=1, file="n_files.tmp", status='old')
+    read(1,*) n_files
+    close(unit=1,status="delete")
+    
+    if (n_files > 1) then
+       write(*,*) "There are more than 1 parameter file in data_th"
+       write(*,*) "Exiting"
+       stop
+    else if (n_files < 1) then
+       write(*,*) "There are less than 1 parameter file in data_th"
+       write(*,*) "Exiting"
+       stop
+    endif
+    
     cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
     para = "data_th/forMCFOST.par" ; call read_para()
     cmd = "rm -rf data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
@@ -935,13 +951,17 @@ contains
        read(1,*) mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
+    
+
+       mol(imol)%lcst_abundance = .true.
+       mol(imol)%abundance = 1e-6
+       mol(imol)%iLevel_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)) + 2
     enddo
     vitesse_turb = 0.0
     largeur_profile = 15.
-    lpop = .true. ; lprecise_pop = .true. !; lmol_LTE = .true.
+    lpop = .true. ; lprecise_pop = .false. !; lmol_LTE = .true.
     para_version = mcfost_version
 
-    
     close(unit=1)
 
     return
@@ -1139,13 +1159,13 @@ contains
              if (abs(r_grid(ri,zj) - grid(ri,zj,1)) > 1e-5 * r_grid(ri,zj)) then 
                 write(*,*) "ERROR R. Exiting."
                 write(*,*) ri, "MCFOST=", r_grid(ri,zj), "ProDiMo=", grid(ri,zj,1)
-                stop
+                !stop
              endif
              
              if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then 
                 write(*,*) "ERROR Z. Exiting."
                 write(*,*) ri, zj, z_grid(ri,zj), grid(ri,zj,2)
-                stop
+                !stop
              endif
           enddo
        enddo
