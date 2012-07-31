@@ -37,14 +37,18 @@ module grid
 
    ! Reordoring zones
    do i=1, n_zones
-       disk_zone(i) =  disk_zone_tmp(order(i))
-   enddo
-   
-   ! reordering zone index in pops
-   do ipop=1,n_pop
-      dust_pop(ipop)%zone = order(Izone_tmp(ipop))
+      disk_zone(i) =  disk_zone_tmp(order(i))
+      do ipop=1,n_pop  ! reordering zone index in pops
+         if (Izone_tmp(ipop) == order(i))  dust_pop(ipop)%zone = i
+      enddo
    enddo
 
+   ! Verif
+ !  do ipop=1,n_pop  
+ !     write(*,*) ipop,  dust_pop(ipop)%zone
+ !  enddo
+ !  stop
+   
    return
 
  end subroutine order_zones
