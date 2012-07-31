@@ -926,8 +926,7 @@ subroutine Temp_nRE(lconverged)
                  write(*,*) "ERROR : temperature of non equilibrium grains"
                  write(*,*) "is larger than maximum temperature set in the"
                  write(*,*) "parameter file. Exiting !"
-                 write(*,*) "cell", i, "R=", r_grid(i,1), densite_pouss(i,j,1,l)
-                 !stop  ! BUG : sur xlfmac
+                 write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
               endif
 
               !           t_cool=1.0 ; t_abs = 0.0
