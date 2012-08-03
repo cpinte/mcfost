@@ -19,9 +19,7 @@ program BIGCRUNCH
   ! - ifort n'aime pas le retypage a la volee des tableaux
   !
   !***********************************************************
-  use parametres
-
-  
+  use parametres  
   use init_mcfost
   use dust_transfer
   use mol_transfer

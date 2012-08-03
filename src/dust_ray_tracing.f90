@@ -27,6 +27,7 @@ subroutine alloc_ray_tracing()
   ! 13/10/08
   
   integer :: alloc_status
+  real :: mem_size
 
   ! 15 15 90 90 OK pour benchmark
 
@@ -89,6 +90,10 @@ subroutine alloc_ray_tracing()
   
   if (lscatt_ray_tracing1) then
      allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     
+     mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2 
+     if (mem_size > 500) write(*,*) "Trying to allocate", mem_size, "MB for ray-tracing"
+        
      if (alloc_status > 0) then 
         write(*,*) 'Allocation error xI_scatt'
         stop
