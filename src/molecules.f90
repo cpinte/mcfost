@@ -401,6 +401,7 @@ subroutine init_molecular_disk(imol)
 
   ! Abondance
   if (mol(imol)%lcst_abundance) then
+     write(*,*) "Setting constant abundance"
      tab_abundance = mol(imol)%abundance
   else
      call read_abundance(imol)
@@ -627,8 +628,6 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
         maser_map(ri,zj,iTrans) = (nu * poids_stat_g(iTransLower(iiTrans))) / &
              (poids_stat_g(iTransUpper(iiTrans)) * nl) 
         kap = 0.
-!        write(*,*) ri, zj, iiTrans
-!        write(*,*) maser_map(ri,zj,iTrans)   
      endif
           
      ! longueur de vol en AU, a multiplier par le profil de raie
@@ -636,16 +635,16 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
      emissivite_mol_o_freq(ri,zj,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m 
   enddo
 
-  if ( (lmaser) .and. (ri==n_rad) .and. (zj==nz) ) then
-      write(*,*) "*************************************************"
-      write(*,*) "WARNING : There are some inversion populations"
-      write(*,*) "   --> forcing kappa = 0."
-      write(*,*) "Inversion values written to :"
-      write(*,*) trim(filename)
-      write(*,*) "Max. inversion value =", maxval(maser_map)
-      write(*,*) "*************************************************"
-      call cfitsWrite(trim(filename),maser_map,shape(maser_map))
-  endif
+!  if ( (lmaser) .and. (ri==n_rad) .and. (zj==nz) ) then
+!      write(*,*) "*************************************************"
+!      write(*,*) "WARNING : There are some inversion populations"
+!      write(*,*) "   --> forcing kappa = 0."
+!      write(*,*) "Inversion values written to :"
+!      write(*,*) trim(filename)
+!      write(*,*) "Max. inversion value =", maxval(maser_map)
+!      write(*,*) "*************************************************"
+!      call cfitsWrite(trim(filename),maser_map,shape(maser_map))
+!  endif
 
 
   if (ldouble_RT) then
