@@ -953,13 +953,20 @@ contains
        mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
     
 
-       mol(imol)%lcst_abundance = .true.
        mol(imol)%abundance = 1e-6
        mol(imol)%iLevel_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)) + 2
     enddo
     vitesse_turb = 0.0
     largeur_profile = 15.
-    lpop = .true. ; lprecise_pop = .false. !; lmol_LTE = .true.
+
+    !lpop = .false. ; lprecise_pop = .false. ; lmol_LTE = .true. ! lmol_LTE force l'utilisation des pop de ProDiMo
+    if (lpop) then
+       write(*,*) "Calculating level population"
+    endif
+    if (lmol_LTE) then
+       write(*,*) "Using ProDiMo levels"
+    endif
+
     para_version = mcfost_version
 
     close(unit=1)
@@ -1335,20 +1342,40 @@ contains
 
     endif ! l_first_time
 
-    ! Niveaux
+    ! Niveaux et populations
+    write(*,*) "Setting ProDiMo abundances, population levels and Tgas"
+    tab_abundance(:,:) = 0.0
     tab_nLevel(:,:,:) = 0.0
     do i=1, n_rad
        do j=1, nz    
-          if (lCII) tab_nLevel(i,j,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
-          if (lOI) tab_nLevel(i,j,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
-          !write(*,*) i, j, shape(tab_nLevel(i,j,1:nLevel_CO)), shape(tab_nLevel(i,j,1:nLevel_CO))
-          ! ca a l'air de planter en OpenMP (???)
-          if (lCO) tab_nLevel(i,j,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
-          if (loH2O) tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j) 
-          if (lpH2O) tab_nLevel(i,j,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
+          if (lCII) then
+             tab_nLevel(i,j,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
+             tab_abundance(i,j) = nCII(i,j)
+          endif
+          if (lOI) then
+             tab_nLevel(i,j,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
+             tab_abundance(i,j) = nOI(i,j)
+          endif
+          if (lCO) then
+             tab_nLevel(i,j,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
+             tab_abundance(i,j) = nCO(i,j)
+          endif
+          if (loH2O) then
+             tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j) 
+             tab_abundance(i,j) = noH2O(i,j)
+          endif
+          if (lpH2O) then
+             tab_nLevel(i,j,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
+             tab_abundance(i,j) = npH2O(i,j)
+          endif
        enddo
     enddo
+    tab_abundance = tab_abundance / densite_gaz(:,:,1) ! conversion nbre en abondance
+    write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
     
+    Tcin(:,:,1) = Tgas
+
+
 
 !    iTrans = 2 ; 
 !    iUp = iTransUpper(iTrans)
