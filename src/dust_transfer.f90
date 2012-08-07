@@ -17,6 +17,7 @@ module dust_transfer
   use density
   use PAH
   use thermal_emission
+  use disk_physics
   use output
   use input
   use benchmarks
@@ -321,7 +322,7 @@ subroutine transfert_poussiere()
                  call ecriture_temperature(2)  
                  return
               endif
-
+              
            else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
               frac_E_stars=1.0 
               call lect_section_eff
