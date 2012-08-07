@@ -26,7 +26,7 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
-  real :: wvl, opt_zoom
+  real :: wvl, opt_zoom, mcfost_utils_version
   
   character(len=512) :: cmd, s, str_seed
 
@@ -648,6 +648,18 @@ subroutine initialisation_mcfost()
   mol_dir = trim(mcfost_utils)//"/Molecules/"
   star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
   lambda_dir = trim(mcfost_utils)//"/Lambda/"
+
+  open(unit=1, file=trim(mcfost_utils)//"/Version.txt", status='old',iostat=ios)
+  read(1,*,iostat=ios) mcfost_utils_version
+  close(unit=1)
+  if (ios /= 0) mcfost_utils_version = 0.0
+  if (mcfost_utils_version /= mcfost_version) then
+     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
+     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
+     write(*,*) "Please update with mcfost -update_utils"
+     write(*,*) "Exiting."
+     stop
+  endif
 
   ! Display the disclaimer if needed
   mcfost_no_disclaimer = 0 
