@@ -120,6 +120,32 @@ subroutine initialisation_mcfost()
   ! Methodes par defaut
   RT_sed_method = 1
 
+
+  ! Test if MCFOST_UTILS is defined
+  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
+  if (mcfost_utils == "") then
+     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
+     write(*,*) "Exiting."
+     stop
+  endif
+  
+  dust_dir = trim(mcfost_utils)//"/Dust/"
+  mol_dir = trim(mcfost_utils)//"/Molecules/"
+  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
+  lambda_dir = trim(mcfost_utils)//"/Lambda/"
+
+  open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
+  read(1,*,iostat=ios) mcfost_utils_version
+  close(unit=1)
+  if (ios /= 0) mcfost_utils_version = 0.0
+  if (mcfost_utils_version /= mcfost_version) then
+     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
+     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
+     write(*,*) "Please update with mcfost -update_utils"
+     write(*,*) "Exiting."
+     stop
+  endif
+
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
   if (nbr_arg < 1) call display_help
@@ -129,6 +155,8 @@ subroutine initialisation_mcfost()
   if (para(1:1)=="-") then
      if (para(2:2)=="v") then
         call mcfost_v()
+     else if (para(2:13)=="update_utils") then
+        call update_utils(mcfost_utils_version)
      else if (para(2:2)=="u") then
         call mcfost_update(.false.)
      else if (para(2:3)=="fu") then
@@ -636,31 +664,6 @@ subroutine initialisation_mcfost()
      end select
   enddo ! while
 
-  ! Test if MCFOST_UTILS is defined
-  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
-  if (mcfost_utils == "") then
-     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
-     write(*,*) "Exiting."
-     stop
-  endif
-  
-  dust_dir = trim(mcfost_utils)//"/Dust/"
-  mol_dir = trim(mcfost_utils)//"/Molecules/"
-  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
-  lambda_dir = trim(mcfost_utils)//"/Lambda/"
-
-  open(unit=1, file=trim(mcfost_utils)//"/Version.txt", status='old',iostat=ios)
-  read(1,*,iostat=ios) mcfost_utils_version
-  close(unit=1)
-  if (ios /= 0) mcfost_utils_version = 0.0
-  if (mcfost_utils_version /= mcfost_version) then
-     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
-     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
-     write(*,*) "Please update with mcfost -update_utils"
-     write(*,*) "Exiting."
-     stop
-  endif
-
   ! Display the disclaimer if needed
   mcfost_no_disclaimer = 0 
   call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
@@ -916,6 +919,7 @@ subroutine display_help()
   write(*,*)
   write(*,*) "mcfost -v displays version number, and available updates"
   write(*,*) "mcfost -u updates MCFOST to most recent version"
+  write(*,*) "mcfost -update_utils updates MCFOST_UTILS to most recent version"
   write(*,*) "mcfost -h displays full MCFOST history since v2.12.9"
   write(*,*) " "
   write(*,*) " Main mcfost options" 

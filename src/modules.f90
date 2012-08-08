@@ -10,6 +10,8 @@ module parametres
   character(8), parameter :: mcfost_release = "2.14.0"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   character(len=128), parameter :: webpage="http://ipag.osug.fr/public/pintec/mcfost/"
+  character(len=128), parameter :: utils_webpage="ftplaog.obs.ujf-grenoble.fr:outgoing/cpinte/mcfost_utils/"
+  
 
   real :: para_version
 
