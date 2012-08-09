@@ -9,12 +9,13 @@ module disk_physics
 contains
   
 
-subroutine compute_sublimation_radius()
+subroutine compute_othin_sublimation_radius()
   ! Dans le cas optiquement mince, ne dépend que de la température de l'étoile
   
   implicit none
 
-  real :: E_dust, E_etoile, cst, cst_wl, coeff_exp, wl, delta_wl
+  real(kind=db) :: E_dust, E_etoile
+  real :: cst, cst_wl, coeff_exp, wl, delta_wl
   integer :: lambda, k, i
   real(kind=db) :: sublimation_radius, Rsub, Hsub
 
@@ -48,11 +49,11 @@ subroutine compute_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_dust = E_dust + 4.0*sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))!*delta_wl 
+        E_dust = E_dust + 4.0*sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))*delta_wl 
      endif
   enddo
 
-  ! emission étoile
+  ! emission étoile : BB seulement pour le moment
   E_etoile = 0.0
   cst=cst_th/etoile(1)%T
   do lambda=1, n_lambda
@@ -62,7 +63,7 @@ subroutine compute_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))!*delta_wl 
+        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))*delta_wl 
      endif
   enddo
 
@@ -74,21 +75,29 @@ subroutine compute_sublimation_radius()
   !   Rsub = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(1 +  min(Hsub/Rsub,1.0_db))
   !enddo
 
-  Rsub = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(2.0_db)
+  Rsub = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(2.)
 
   sublimation_radius = Rsub
   
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
-  write(*,*) "sublimation radius =", real(sublimation_radius), "AU"
-  if (correct_Rsub > 1.+1e-6) write(*,*) "Inner radius =", real(sublimation_radius * correct_Rsub), "AU"
+  write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
 
-  disk_zone(1)%rmin = sublimation_radius * correct_Rsub
-  disk_zone(1)%rin = disk_zone(1)%rmin + 5*disk_zone(1)%edge
-  rmin=disk_zone(1)%rmin
+  do i=1,n_zones
+     if (sublimation_radius > disk_zone(i)%rmin) then
+        disk_zone(i)%rmin = sublimation_radius
+        disk_zone(i)%rin = disk_zone(i)%rmin !+ 5* disk_zone(1)%edge
+        disk_zone(i)%edge = 0.0
+     endif
+  enddo !i
+  rmin = minval(disk_zone(:)%rmin)
 
+  do i = 1, n_regions
+     Rmin_region(i) = max(Rmin_region(i),sublimation_radius)
+  enddo !i
+  
   return
 
-end subroutine compute_sublimation_radius
+end subroutine compute_othin_sublimation_radius
 
 !***********************************************************
 
@@ -99,6 +108,8 @@ subroutine sublimate_dust()
 
   integer :: i, j, pk, k, ipop
   real :: mass
+
+  write(*,*) "Sublimating dust"
     
   do i=1,n_rad
      do j=1,nz

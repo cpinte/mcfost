@@ -234,7 +234,7 @@ subroutine transfert_poussiere()
            Temperature=0.0
         endif !l_em_disk_image
         
-     else ! lmono
+     else ! not lmono
 
         if (aniso_method==1) then
            lmethod_aniso1 = .true.
@@ -280,8 +280,8 @@ subroutine transfert_poussiere()
               enddo !n
        
               if (ldust_sublimation)  then
-                 call compute_sublimation_radius()
-                 call define_grid3()
+                 call compute_othin_sublimation_radius()
+                 call define_grid4()
                  call define_density()
                                
                  do lambda=1,n_lambda
@@ -668,6 +668,9 @@ subroutine transfert_poussiere()
            endif
         endif
  
+        if (ldust_sublimation) then
+           call sublimate_dust()
+        endif
 
         ! A-t-on fini le calcul des grains hors eq ?
         if (.not.letape_th) then ! oui, on passe a la suite

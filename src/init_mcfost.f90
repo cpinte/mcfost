@@ -30,7 +30,7 @@ subroutine initialisation_mcfost()
   
   character(len=512) :: cmd, s, str_seed
 
-  logical :: lresol, lzoom, ldust_emisison_in_images, lmc
+  logical :: lresol, lzoom, ldust_emisison_in_images, lmc, ln_zone
 
   lmc = .false.
 
