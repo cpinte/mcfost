@@ -17,19 +17,16 @@ subroutine compute_othin_sublimation_radius()
   real(kind=db) :: E_dust, E_etoile
   real :: cst, cst_wl, coeff_exp, wl, delta_wl
   integer :: lambda, k, i
-  real(kind=db) :: sublimation_radius, Rsub, Hsub
+  real(kind=db) :: sublimation_radius
 
   if (n_etoiles > 1) then
      write(*,*) "Sublimation radius calculation not implemented"
      write(*,*) "in case of several stars"
      stop
+     ! PB de normalization spectre_etoiles en bb et non-bb
   endif
 
-  if (n_zones > 1) then
-     write(*,*) "Sublimation radius calculation not implemented"
-     write(*,*) "in case of several zones"
-     stop
-  endif
+  ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
      
 
   !  if (lstrat) then
@@ -41,7 +38,9 @@ subroutine compute_othin_sublimation_radius()
 
   !  Emission poussière
   E_dust = 0.0
-  cst=cst_th/T_max
+  cst=cst_th/dust_pop(1)%T_sub
+  cst=cst_th/1500.
+
   do lambda=1, n_lambda
      ! longueur d'onde en metre
      wl = tab_lambda(lambda)*1.e-6
@@ -49,9 +48,10 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_dust = E_dust + 4.0*sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))*delta_wl 
+        E_dust = E_dust + 4.0 * sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0)) *delta_wl 
      endif
   enddo
+  E_dust = E_dust * 2.0*pi*hp*c_light**2  
 
   ! emission étoile : BB seulement pour le moment
   E_etoile = 0.0
@@ -63,21 +63,41 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0))*delta_wl 
+!        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl 
+        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi*etoile(1)%r**2 * AU_to_m**2)
+        
+
+       ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)
      endif
   enddo
 
-  ! sublimation_radius = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(1 + disk_zone(1)%sclht / disk_zone(1)%rref)
- 
-  !Rsub = disk_zone(1)%rmin
-  !do i=1,10 ! pour iteration, converge tres vite
-  !   Hsub = disk_zone(1)%sclht * (Rsub/disk_zone(1)%rref)**disk_zone(1)%exp_beta    
-  !   Rsub = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(1 +  min(Hsub/Rsub,1.0_db))
-  !enddo
+  sublimation_radius = etoile(1)%r * sqrt(E_etoile/E_dust)
 
-  Rsub = etoile(1)%r * sqrt(E_etoile/E_dust) * sqrt(2.)
 
-  sublimation_radius = Rsub
+
+  ! -------------
+!---
+!---  log_frac_E_abs=log(J_abs*n_phot_L_tot + E0(ri,zj,phik))
+!---
+!---
+!---  Cst0 = 2.0*hp*c_light**2 * 1e-6 * pi*Rsun_to_AU**2  / (pc_to_AU**2)
+!---
+!---  ! pour le spectre de MCFOST
+!---  tab_spectre(i,l) = Cst0/ ( ((exp(cst_w)) -1.)) * (wl**5))  ;
+!---  terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda)))
+!4*pi*(etoile(i)%r**2)
+!---  terme = terme / N * (surface / Cst0)   
+!---
+!---  spectre = spectre + terme * delta_wl
+
+!---  spectre_etoiles(:) =  spectre_etoiles(:) * cst_spectre_etoiles
+! 2.0*pi*hp*c_light**2 * (AU_to_m)**2
+!---   surface=4*pi*(etoile(i)%r**2)
+!---     cst_spectre_etoiles = 2.0*pi*hp*c_light**2 * (AU_to_m)**2 ! cst BB + r_etoile est en AU
+!---  ---> spectre_etoile = B * surface * cst_spectre_etoiles * delta_wl
+!---
+  ! ---------------
+
   
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
@@ -90,6 +110,7 @@ subroutine compute_othin_sublimation_radius()
      endif
   enddo !i
   rmin = minval(disk_zone(:)%rmin)
+  write(*,*) "New minimum radius = ", rmin
 
   do i = 1, n_regions
      Rmin_region(i) = max(Rmin_region(i),sublimation_radius)
