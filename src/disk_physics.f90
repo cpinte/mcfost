@@ -19,13 +19,6 @@ subroutine compute_othin_sublimation_radius()
   integer :: lambda, k, i
   real(kind=db) :: sublimation_radius
 
-  if (n_etoiles > 1) then
-     write(*,*) "Sublimation radius calculation not implemented"
-     write(*,*) "in case of several stars"
-     stop
-     ! PB de normalization spectre_etoiles en bb et non-bb
-  endif
-
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
      
 
@@ -64,14 +57,14 @@ subroutine compute_othin_sublimation_radius()
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
 !        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl 
-        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi*etoile(1)%r**2 * AU_to_m**2)
+        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
         
 
        ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)
      endif
   enddo
 
-  sublimation_radius = etoile(1)%r * sqrt(E_etoile/E_dust)
+  sublimation_radius = sqrt(E_etoile/E_dust)
 
 
 
