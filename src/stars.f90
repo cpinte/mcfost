@@ -229,7 +229,6 @@ subroutine repartition_energie_etoiles()
      endif
   enddo
 
-
      
   if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
@@ -243,17 +242,16 @@ subroutine repartition_energie_etoiles()
                 tab_spectre(n_etoiles,n_lambda_spectre), tab_spectre0(n_etoiles,n_lambda_spectre), &
                 tab_bb(n_etoiles,n_lambda_spectre))
            tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
-
-           tab_lambda_spectre(i,:) = 1.0_db * spanl(lambda_min, lambda_max, n_lambda_spectre) 
            allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre)) 
         endif
-
+        tab_lambda_spectre(i,:) = 1.0_db * spanl(lambda_min, lambda_max, n_lambda_spectre)
 
         do l=1, n_lambda_spectre
            wl = tab_lambda_spectre(i,l) *1.e-6
            cst_wl=cst_th/(etoile(i)%T*wl)
            tab_spectre(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_db) ;
         enddo ! l
+
      enddo !i
 
   else ! les étoiles ne sont pas des corps noirs
@@ -404,7 +402,9 @@ subroutine repartition_energie_etoiles()
   ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
   !---------------------------------------------------------------------------  
 
+  !---------------------------------------------------
   ! Integration du spectre dans les bandes de MCFOST
+  !---------------------------------------------------
   wl_spectre_max = maxval(tab_lambda_spectre(1,:))
   wl_spectre_min = minval(tab_lambda_spectre(1,:))
 
@@ -432,10 +432,10 @@ subroutine repartition_energie_etoiles()
         
         wl_spectre_avg = 0.0
         do l=1, n_lambda_spectre
-           if ( (tab_lambda_spectre(1,l) > wl_inf).and.(tab_lambda_spectre(1,l) < wl_sup) ) then        
-              terme = terme + tab_spectre(1,l)
-              terme0 = terme0 + tab_spectre0(1,l)
-              wl_spectre_avg = wl_spectre_avg + tab_lambda_spectre(1,l)
+           if ( (tab_lambda_spectre(i,l) > wl_inf).and.(tab_lambda_spectre(i,l) < wl_sup) ) then
+              terme = terme + tab_spectre(i,l)
+              terme0 = terme0 + tab_spectre0(i,l)
+              wl_spectre_avg = wl_spectre_avg + tab_lambda_spectre(i,l)
               N = N + 1
            endif
         enddo ! l
@@ -462,7 +462,6 @@ subroutine repartition_energie_etoiles()
               terme0 = (surface / Cst0) * exp(interp(log_spectre0, log_wl_spectre, log_lambda(lambda))) 
            endif
         endif ! Fin correction
-        
         spectre = spectre + terme * delta_wl
         spectre0 = spectre0 + terme0 * delta_wl
 
@@ -472,7 +471,6 @@ subroutine repartition_energie_etoiles()
      spectre_etoiles(lambda) = spectre
      spectre_etoiles0(lambda) = spectre0
              
-
      ! Emission totale des etoiles
      ! Correction par le Teff dans le fichier de parametres
      E_stars(lambda) = prob_E_star(lambda,n_etoiles)  * correct_step2
