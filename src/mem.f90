@@ -1129,10 +1129,12 @@ subroutine realloc_dust_mol()
   ! Tableaux relatifs aux prop optiques des cellules
   if (l3D) then
      allocate(kappa(n_lambda,n_rad,-nz-1:nz+1,n_az),kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), & 
+          kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), & 
           emissivite_dust(n_lambda,n_rad,-nz-1:nz+1,n_az),proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
      allocate(kappa(n_lambda,n_rad,nz+1,1),kappa_abs_eg(n_lambda,n_rad,nz+1,1), &
+          kappa_sca(n_lambda,n_rad,nz+1,1), &
           emissivite_dust(n_lambda,n_rad,nz+1,1),proba_abs_RE(n_lambda,n_rad,nz+1,1),&
           amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
@@ -1140,7 +1142,7 @@ subroutine realloc_dust_mol()
      write(*,*) 'Allocation error kappa (realloc)'
      stop
   endif
-  kappa = 0.0 ; kappa_abs_eg = 0.0 ; emissivite_dust = 0.0
+  kappa = 0.0 ; kappa_abs_eg = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
   
   if (l3D) then
      allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
