@@ -9,6 +9,8 @@ module molecules
   use dust
   use mem
 
+  use ProDiMo, only : m2p ! to get the continuum radiation field
+
   implicit none
 
   contains
@@ -26,7 +28,7 @@ real function tau_collision(temperature, iPart, iTrans)
   real :: frac
   integer :: k, kmin, kmax
 
-  if (nCollTemps(iPart) ==1) then ! Pas d'interpolation
+  if (nCollTemps(iPart) == 1) then ! Pas d'interpolation
      tau_collision = collRates(iPart, iTrans, 1)
   else if (temperature < collTemps(iPart,1)) then ! extrapolation cubique
      tau_collision = collRates(iPart, iTrans, 1) * sqrt(temperature/collTemps(iPart,1))
@@ -682,7 +684,7 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
   integer :: iTrans, iiTrans, ri, zj, p_lambda
-  real(kind=db) :: f
+  real(kind=db) :: f, Jnu
   real :: T, wl, kap
 
   real(kind=db) :: cst_wl, coeff_exp, cst_E
@@ -762,19 +764,12 @@ subroutine init_dust_mol(imol)
         ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
         do ri=1,n_rad
            do zj=1,nz
+              ! Interpolation champ de radiation en longeur d'onde
+              Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+              
               T = Temperature(ri,zj,1)
-             ! write(*,*) ri, zj, T
-              emissivite_dust(iTrans,ri,zj,1) = kappa_abs_eg(iTrans,ri,zj,1) * Bnu(f,T) 
-           
-       !!!!       wl = c_light / f                   
-       !!!!       cst_wl=cst_th/(T*wl)
-       !!!!       if (cst_wl < 500.0) then
-       !!!!          coeff_exp=exp(cst_wl)
-       !!!!          emissivite_dust(iTrans,ri,zj,1) = cst_E/((wl**5)*(coeff_exp-1.0)) * kappa_abs_eg(iTrans,ri,zj,1) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
-       !!!!       else
-       !!!!          emissivite_dust(iTrans,ri,zj,1)  = 0.0_db
-       !!!!       endif
-
+              ! On ne fait que du scattering isotropique dans les raies pour le moment ...
+              emissivite_dust(iTrans,ri,zj,1) = kappa_abs_eg(iTrans,ri,zj,1) * Bnu(f,T) + kappa_sca(iTrans,ri,zj,1) * Jnu
            enddo ! zj
         enddo ! ri
      enddo ! itrans
