@@ -693,7 +693,7 @@ subroutine opacite2(lambda)
               enddo
            endif
 
-           if (lcompute_obs.and.lscatt_ray_tracing) then
+           if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
               kappa_sca(lambda,i,j,pk) = 0.0
               do k=1,n_grains_tot
                  density=densite_pouss(i,j,pk,k)
