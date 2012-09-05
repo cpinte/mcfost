@@ -7,7 +7,13 @@ module utils
 
   implicit none
 
-  contains
+  public :: interp
+  interface interp
+     module procedure  interp_sp
+     module procedure  interp_dp
+  end interface
+
+contains
 
 function span(xmin,xmax,n)
   
@@ -143,11 +149,62 @@ end subroutine polint
 
 !***************************************************
 
-real(kind=db) function interp(y, x, xp)
+real(kind=sl) function interp_sp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
-! Modif : pas d'interpolation : renvoie valeur mini en dehors de l'intervalle
+! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
+! C. Pinte
+! 26/01/07
+    
+  implicit none
+  
+  real(kind=sl), dimension(:), intent(in) :: x, y
+  real(kind=sl) :: xp
+
+  integer :: n, np, j, ny
+    
+  real :: frac
+
+  n=size(x) !; ny=size(y)
+    
+  !if (n /= ny) then
+  !   write(*,*) "Error in interp : y and x must have same dim"
+  !endif
+
+
+  ! PAS D'EXTRAPOLATION
+  if ((xp < minval(x)) .or. (xp > maxval(x))) then
+     interp_sp = minval(y) 
+     return
+  endif
+
+  ! Suivant la croissance ou decroissance de x
+  if (x(n) > x(1)) then ! xcroissant
+     search : do j=2,n-1
+        if (x(j) > xp) exit search
+     enddo search
+     frac = (xp-x(j-1))/(x(j)-x(j-1))
+     interp_sp = y(j-1) * (1.-frac)   + y(j) * frac
+  else ! x decroissant
+     search2 : do j=2,n-1
+        if (x(j) < xp) exit search2
+     enddo search2
+     frac = (xp-x(j))/(x(j-1)-x(j))
+     interp_sp = y(j) * (1.-frac)   + y(j-1) * frac
+  endif
+  
+  return
+
+end function interp_sp
+
+!----------------------------
+
+real(kind=db) function interp_dp(y, x, xp)
+! interpole lineaire entre les points
+! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
+! en cas de point cp en dehors de x
+! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
 ! C. Pinte
 ! 26/01/07
     
@@ -169,7 +226,7 @@ real(kind=db) function interp(y, x, xp)
 
   ! PAS D'EXTRAPOLATION
   if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp = minval(y) 
+     interp_dp = minval(y) 
      return
   endif
 
@@ -179,20 +236,21 @@ real(kind=db) function interp(y, x, xp)
         if (x(j) > xp) exit search
      enddo search
      frac = (xp-x(j-1))/(x(j)-x(j-1))
-     interp = y(j-1) * (1.-frac)   + y(j) * frac
+     interp_dp = y(j-1) * (1.-frac)   + y(j) * frac
   else ! x decroissant
      search2 : do j=2,n-1
         if (x(j) < xp) exit search2
      enddo search2
      frac = (xp-x(j))/(x(j-1)-x(j))
-     interp = y(j) * (1.-frac)   + y(j-1) * frac
+     interp_dp = y(j) * (1.-frac)   + y(j-1) * frac
   endif
   
   return
 
-end function interp
+end function interp_dp
 
 !**********************************************************************
+
 
 subroutine GaussSlv(a, b, n)
   ! Resolution d'un systeme d'equation par methode de Gauss

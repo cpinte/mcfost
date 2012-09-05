@@ -64,8 +64,9 @@ module ProDiMo
   integer, parameter :: nLevel_CII = 2
   integer, parameter :: nLevel_OI = 3
   integer, parameter :: nLevel_CO = 33  !52
-  integer, parameter :: nLevel_oH2O = 10
-  integer, parameter :: nLevel_pH2O = 9
+  !integer, parameter :: nLevel_oH2O = 30 !10
+  !integer, parameter :: nLevel_pH2O = 30 !9
+  integer :: nLevel_oH2O, nLevel_pH2O
 
   real, dimension(:,:), allocatable :: nCII, dvCII, nOI, dvOI,  noH2O, dvoH2O, npH2O, dvpH2O, nCO, dvCO
   real, dimension(:,:,:), allocatable :: pop_CII
@@ -73,6 +74,63 @@ module ProDiMo
   real, dimension(:,:,:), allocatable :: pop_CO
   real, dimension(:,:,:), allocatable :: pop_oH2O
   real, dimension(:,:,:), allocatable :: pop_pH2O
+
+
+  type mcfost2ProDiMo_model
+
+     ! parameters
+     real*4  :: diskmass, Teff, Rstar, Mstar, fUV, pUV, rin, rout
+     real*4  :: h0, rref, alpha, beta, amin, amax, aexp, settle, asettle
+
+     ! Spatial grid (Unit: AU)
+     real*8, allocatable,dimension(:,:) :: r_grid, z_grid
+  
+     ! dust material density
+     real*4, allocatable,dimension(:) :: rho_grain
+
+     ! dust temperature structure (Unit: K)
+     real*4, allocatable,dimension(:,:) :: Tdust
+
+     ! Wavelength bins (Unit: microns)
+     real*4, allocatable,dimension(:) :: wavelengths
+
+     ! Fraquency bins (Unit: Hz)
+     real*4, allocatable,dimension(:) :: nu
+
+     ! Stellar spectrum (lambda.I_lambda) (Units : W/m^2/sr)
+     ! int I_lambda x dlambda = sigma/pi Teff^4 in case without extra UV excess
+     real*4, allocatable,dimension(:) :: lamIlamStar
+
+     ! ISM spectrum (lambda.F_lambda) (Units : W/m^2/sr)
+     real*4, allocatable,dimension(:) :: lamIlamISM
+
+     ! Radiation field
+     ! lambda*J_lambda (Unit: W/m^2/sr)
+     real*4, allocatable,dimension(:,:,:) :: lamJlam,lamJlamStar,lamJlamISM
+     real*4, allocatable,dimension(:,:,:) :: Jnu !(Unit : W/m^2/sr/Hz)
+ 
+     ! Statistics of the radiation field (number of packets)
+     real*4, allocatable,dimension(:,:,:) :: nJ, nJ_Star, nJ_ISM
+
+     ! Gas mass density assuming a gas/dust mass ratio of 100 (Unit: g cm^-3)
+     real*4, allocatable,dimension(:,:) :: density
+
+     ! 0th, 1st, 2nd and 3rd moment of the grain size distribution
+     ! 0th moment: unit = part.m-3
+     ! 1th, 2nd and 3rd moment: units = micron, micron^2, micron^3
+     real*4, allocatable,dimension(:,:,:) :: grain_size
+
+     ! Dust opacities (Units : AU^-1)
+     real*4, allocatable,dimension(:,:,:) :: kappa_ext, kappa_abs
+
+     ! local dust/gas ratio
+     real*4, allocatable,dimension(:,:) :: dust_to_gas
+
+     character(len=8) :: version
+     integer*4 :: mcfost2prodimo
+  end type mcfost2ProDiMo_model
+
+  type(mcfost2ProDiMo_model) :: m2p
 
 
 contains
@@ -201,6 +259,46 @@ contains
 
   !********************************************************************
 
+  subroutine allocate_m2p(n_rad,nz,n_lambda)
+    ! Routine similaire a celle de ProDiMo dans readMCFOST
+    ! pour le moment, ne sert que pour recuperer le champ de radiation 
+    ! calcule par le run initial de mcfost
+    ! C. Pinte
+    ! 29/08/2012
+
+    integer, intent(in) :: n_lambda, n_rad, nz
+   
+    integer, dimension(8) :: istat
+    integer :: i
+    
+    istat = 0
+    allocate(m2p%r_grid(n_rad,nz), &
+           & m2p%z_grid(n_rad,nz),m2p%Tdust(n_rad,nz), &
+           & m2p%density(n_rad,nz),m2p%dust_to_gas(n_rad,nz),stat=istat(2))
+    !allocate(m2p%rho_grain(n_rad),stat=istat(3))
+    allocate(m2p%wavelengths(n_lambda),m2p%nu(n_lambda),m2p%lamIlamStar(n_lambda), &
+           & m2p%lamIlamISM(n_lambda),stat=istat(4))
+    allocate(m2p%lamJlam(n_rad,nz,n_lambda),m2p%lamJlamStar(n_rad,nz,n_lambda), &
+           & m2p%lamJlamISM(n_rad,nz,n_lambda),m2p%Jnu(n_rad,nz,n_lambda),stat=istat(5))
+    allocate(m2p%nJ(n_rad,nz,n_lambda), m2p%nJ_Star(n_rad,nz,n_lambda), &
+           & m2p%nJ_ISM(n_rad,nz,n_lambda), stat=istat(6))
+    !allocate(m2p%kappa_ext(n_rad,nz,n_lambda),m2p%kappa_abs(n_rad,nz,n_lambda), &
+    !       & stat=istat(7))
+    !allocate(m2p%grain_size(n_rad,nz,0:3),stat=istat(8))
+    do i=1,8
+       if(istat(i) /= 0) then
+          write(*,*) "ERROR: memory allocation problem in allocate_m2p"
+          write(*,*) istat(i)," at ",i
+          stop 
+       endif   
+    enddo   
+
+    return
+
+  end subroutine allocate_m2p
+
+  !********************************************************************
+
   subroutine mcfost2ProDiMo()
     ! C. Pinte
     ! 18/02/09
@@ -230,7 +328,7 @@ contains
     real, dimension(n_lambda) :: spectre
 
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
-    real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz)
+    real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
@@ -735,8 +833,9 @@ contains
     ! C.Pinte
     ! 12/07/09
 
-    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype, imol, syst_status, n_files
-    real :: nullval, buffer
+    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdunum, hdutype
+    integer :: imol, syst_status, n_files, n_rad_m2p, nz_m2p, n_lambda_m2p, i, j, l
+    real :: nullval, buffer, Tdust
     logical :: anynull
 
     integer, dimension(4) :: naxes
@@ -745,13 +844,12 @@ contains
     character (len=80) :: errmessage, comment
     character(len=512) :: filename, mol_para, cmd
 
-
     real, dimension(:,:), allocatable :: temperature_ProDiMo
 
 
-    !*********************************************************
-    ! Lecture des parametres dans le fichier .para de data_th
-    !*********************************************************
+    !**************************************************************
+    ! 1) Lecture des parametres dans le fichier .para de data_th
+    !**************************************************************
 
     ! Sauvegarde du nom du fichier de parametres pour les raies
     mol_para = para
@@ -796,138 +894,6 @@ contains
 
     deallocate(mol) ! car on va le remplacer
 
-    
-!---    !**********************************************
-!---    ! Lecture des parametres dans le fichier fits
-!---    !**********************************************
-!---    
-!---    filename = "data_th/"//trim(mcfost2ProDiMo_file)
-!---
-!---
-!---    ! Parametres par defaut
-!---    lcheckpoint=.false.
-!---    ltemp = .false.
-!---    lsed = .false.
-!---    lemission_mol = .true.
-!---    lsetup_gas=.true.
-!---    lfits = .false.
-!---    n_lambda = 39
-!---    lambda_min = 0.0912
-!---    lambda_max = 3410.85
-!---    grid_type=1
-!---    n_az =1
-!---    angle_interet = 45. ! TODO
-!---    lcavity = .false.
-!---    lRE_LTE = .true.
-!---    lRE_nLTE = .false.
-!---    lnRE = .false.
-!---
-!---    l_sym_ima=.true.
-!---    l_sym_centrale=.true.
-!---    l_sym_axiale=.true.
-!---
-!---    n_etoiles = 1
-!---    n_zones = 1
-!---    n_pop = 1
-!---    allocate(etoile(n_etoiles))
-!---    allocate(disk_zone(n_zones))
-!---    allocate(dust_pop(n_pop))
-!---    dust_pop(1)%zone = 1
-!---    disk_zone(1)%geometry = 1
-!---
-!---    !  Get an unused Logical Unit Number to use to open the FITS file.
-!---    status=0
-!---    call ftgiou (unit,status)
-!---
-!---    write(*,*) "Reading "//trim(filename)
-!---
-!---    ! Open file
-!---    readwrite=0
-!---    call ftopen(unit,filename,readwrite,blocksize,status)
-!---    if (status /= 0) then ! le fichier temperature n'existe pas
-!---       write(*,*) "ERROR : "//trim(mcfost2ProDiMo_file)//" file needed"
-!---       stop
-!---    endif
-!---
-!---    !------------------------------------------------------------------------------
-!---    ! Spatial grid : pas besoin de relire
-!---    !------------------------------------------------------------------------------
-!---    ! hdu 1
-!---
-!---    ! Keywords
-!---    ! FTGKY[EDJKLS](unit,keyword, > keyval,comment,status)
-!---    call ftgkye(unit,'Teff',etoile(1)%T,comment,status)
-!---    call ftgkye(unit,'Rstar',buffer,comment,status)
-!---    etoile(1)%R = buffer/AU_to_Rsun
-!---    call ftgkye(unit,'Mstar',buffer,comment,status)
-!---    etoile(1)%M = buffer
-!---    call ftgkye(unit,'fUV',fUV_ProDiMo,comment,status)
-!---    call ftgkye(unit,'distance',buffer,comment,status)
-!---    distance = buffer
-!---
-!---    call ftgkye(unit,'disk_dust_mass',buffer,comment,status)
-!---    disk_zone(1)%diskmass = buffer    
-!---    diskmass = buffer
-!---    call ftgkye(unit,'Rin',buffer,comment,status)
-!---    disk_zone(1)%rin = buffer
-!---    call ftgkye(unit,'Rout',buffer,comment,status)
-!---    disk_zone(1)%rout = buffer
-!---    call ftgkye(unit,'Rref',buffer,comment,status)
-!---    disk_zone(1)%rref = buffer
-!---    call ftgkye(unit,'H0',buffer,comment,status)
-!---    disk_zone(1)%sclht = buffer
-!---    call ftgkye(unit,'edge',buffer,comment,status)
-!---    disk_zone(1)%edge = buffer
-!---    call ftgkye(unit,'beta',buffer,comment,status)
-!---    disk_zone(1)%exp_beta = buffer
-!---    call ftgkye(unit,'alpha',buffer,comment,status)
-!---    disk_zone(1)%surf = buffer
-!---
-!---    rmin = disk_zone(1)%rin - 5 * disk_zone(1)%edge
-!---    grid_rmin = rmin
-!---    rout = disk_zone(1)%rout
-!---    
-!---    call ftgkye(unit,'amin',dust_pop(1)%amin,comment,status)
-!---    call ftgkye(unit,'amax',dust_pop(1)%amax,comment,status)
-!---    call ftgkye(unit,'aexp',dust_pop(1)%aexp,comment,status)
-!---    call ftgkye(unit,'strat',exp_strat,comment,status)
-!---    call ftgkye(unit,'rho_grain',dust_pop(1)%rho1g,comment,status)
-!---    call ftgkys(unit,'optical_indices',dust_pop(1)%indices,comment,status)
-!---
-!---    call ftgkyj(unit,'n_grains',dust_pop(1)%n_grains,comment,status)
-!---    call ftgkyj(unit,'n_rad',n_rad,comment,status)
-!---    call ftgkyj(unit,'nz',nz,comment,status)
-!---    call ftgkyj(unit,'n_rad_in',n_rad_in,comment,status)
-!---
-!---    dust_pop(1)%ind_debut = 1
-!---    dust_pop(1)%ind_fin = dust_pop(1)%n_grains
-!---    n_grains_RE_LTE = dust_pop(1)%n_grains
-!---    n_grains_RE_nLTE = 0
-!---    n_grains_nRE = 0
-!---    n_grains_tot = dust_pop(1)%n_grains
-!---    grain_RE_LTE_start = 1
-!---    grain_RE_LTE_end = dust_pop(1)%n_grains
-!---    dust_pop(1)%masse = disk_zone(1)%diskmass
-!---
-!---    !  Close the file and free the unit number.
-!---    call ftclos(unit, status)
-!---    call ftfiou(unit, status)
-!---
-!---    !  Check for any error, and if so print out error messages
-!---    !  Get the text string which describes the error
-!---    if (status > 0) then
-!---       call ftgerr(status,errtext)
-!---       write(*,*) "ERROR : "//trim(filename)
-!---       print *,'FITSIO Error Status =',status,': ',errtext
-!---
-!---       !  Read and print out all the error messages on the FITSIO stack
-!---       call ftgmsg(errmessage)
-!---       do while (errmessage .ne. ' ')
-!---          print *,errmessage
-!---          call ftgmsg(errmessage)
-!---       end do
-!---    endif
-
     open(unit=1, file=para, status='old')
     
     ! Inclinaisons
@@ -960,16 +926,236 @@ contains
     largeur_profile = 15.
 
     !lpop = .false. ; lprecise_pop = .false. ; lmol_LTE = .true. ! lmol_LTE force l'utilisation des pop de ProDiMo
+   
+    write(*,*) "**************  TMP ", lpop, lmol_LTE
     if (lpop) then
        write(*,*) "Calculating level population"
     endif
-    if (lmol_LTE) then
+    if (lmol_LTE) then 
        write(*,*) "Using ProDiMo levels"
     endif
 
     para_version = mcfost_version
-
     close(unit=1)
+
+
+    !******************************************************************
+    ! 2) Lecture du champ de radiation continu dans forProDiMo.fits.gz
+    !******************************************************************
+    filename = "data_ProDiMo/"//trim(mcfost2ProDiMo_file)
+
+    write(*,*) "Reading "//trim(filename) 
+
+    status=0
+    group=1
+    firstpix=1
+    nullval=-999
+
+    !  Get an unused Logical Unit Number to use to open the FITS file.
+    call ftgiou(unit,status)
+
+    ! Open file
+    readwrite=0 ; blocksize = 1 
+    call ftopen(unit,filename,readwrite,blocksize,status)
+    if (status /= 0) then ! le fichier forProDiMo n'existe pas
+       write(*,*) "ERROR : "//trim(mcfost2ProDiMo_file)//" file needed"
+       stop
+    endif
+
+
+    !------------------------------------------------------------------------
+    ! HDU 6 : Read dimensions : radiation field(n_rad,nz,n_lambda)
+    !------------------------------------------------------------------------
+    call ftmahd(unit,6,hdutype,status) 
+    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    if (nfound /= 3) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 6 file.',nfound,' Exiting.'
+       stop
+    endif
+    n_rad_m2p    = naxes(1)
+    nz_m2p       = naxes(2)
+    n_lambda_m2p = naxes(3)
+    
+    if ( (n_rad_m2p /= n_rad) .or. (nz_m2p /= nz) ) then
+       write(*,*) "Spatial grid if forProDiMo.fits.gz must be the same as the mcfost's one"
+       write(*,*) "forProDiMo.fits.gz: n_rad=", n_rad_m2p, "nz=", nz_m2p
+       write(*,*) "Exiting"
+       stop
+    endif
+
+    call allocate_m2p(n_rad_m2p,nz_m2p,n_lambda_m2p)
+
+    !------------------------------------------------------------------------
+    ! HDU 6: Radiation field caused by stellar photons
+    !------------------------------------------------------------------------  
+    npixels=naxes(1)*naxes(2)*naxes(3)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%lamJlamStar,anynull,status)
+    
+    !------------------------------------------------------------------------
+    ! HDU 2: Temperature 
+    !------------------------------------------------------------------------
+    !  move to hdu 2
+    call ftmahd(unit,2,hdutype,status) 
+
+    ! Check dimensions
+    call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+    if (nfound /= 2) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 2 file. Exiting.'
+       stop
+    endif
+    if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
+       write(*,*) "Error : HDU 2 does not have the"
+       write(*,*) "right dimensions. Exiting."
+       write(*,*) naxes(1), n_lambda
+       stop
+    endif
+    npixels=naxes(1)*naxes(2)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%Tdust,anynull,status)
+
+
+    !------------------------------------------------------------------------
+    ! HDU 3: Wavelengths
+    !------------------------------------------------------------------------
+    !  move to hdu 3
+    call ftmahd(unit,3,hdutype,status) 
+    
+    ! Check dimensions
+    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    if (nfound /= 1) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 3 file.',nfound,' Exiting.'
+       stop
+    endif
+    if (naxes(1) /= n_lambda_m2p) then
+       write(*,*) "Error : HDU 3 does not have the"
+       write(*,*) "right dimensions. Exiting."
+       write(*,*) naxes(1), n_lambda_m2p
+       stop
+    endif
+    npixels=naxes(1)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%wavelengths,anynull,status)    
+    m2p%nu(:) = c_light * m_to_mum / m2p%wavelengths(:) ! Hz
+   
+    !--------------------------------------------------------------------------
+    ! HDU 7 : Statistic of the radiation fied
+    !--------------------------------------------------------------------------
+    !  move to hdu 7
+    call ftmahd(unit,7,hdutype,status) 
+
+
+    ! Check dimensions
+    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    if (nfound /= 3) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 7 file. Exiting.'
+       stop
+    endif
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
+       write(*,*) "Error : HDU 7 does not have the"
+       write(*,*) "right dimensions. Exiting."
+       stop
+    endif
+    npixels=naxes(1)*naxes(2)*naxes(3)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%nJ_Star,anynull,status)
+    
+    !--------------------------------------------------------------------------
+    ! HDU 8 : Radiation field caused by ISM photons
+    !--------------------------------------------------------------------------
+    !  move to hdu 8
+    call ftmahd(unit,8,hdutype,status) 
+
+    ! Check dimensions
+    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    if (nfound /= 3) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 8 file. Exiting.'
+       stop
+    endif
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
+       write(*,*) "Error : HDU 8 does not have the"
+       write(*,*) "right dimensions. Exiting."
+       stop
+    endif
+    npixels=naxes(1)*naxes(2)*naxes(3)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%lamJlamISM,anynull,status)
+    
+    !--------------------------------------------------------------------------
+    ! HDU 9 : Statistic of the ISM radiation field
+    !--------------------------------------------------------------------------
+    !  move to hdu 9
+    call ftmahd(unit,9,hdutype,status) 
+
+    ! Check dimensions
+    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    if (nfound /= 3) then
+       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+       write(*,*) 'of HDU 9 file. Exiting.'
+       stop
+    endif
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
+       write(*,*) "Error : HDU 9 does not have the"
+       write(*,*) "right dimensions. Exiting."
+       stop
+    endif
+    npixels=naxes(1)*naxes(2)*naxes(3)
+
+    ! read_image
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%nJ_ISM,anynull,status)
+   
+    ! close the file and free the unit number.
+    call ftclos(unit, status)
+    call ftfiou(unit, status)
+
+    !  Check for any error, and if so print out error messages
+    !  Get the text string which describes the error
+    if (status > 0) then
+       call ftgerr(status,errtext)
+       write(*,*) "ERROR : "//trim(filename)
+       print *,'FITSIO Error Status =',status,': ',errtext
+
+       !  Read and print out all the error messages on the FITSIO stack
+       call ftgmsg(errmessage)
+       do while (errmessage .ne. ' ')
+          print *,errmessage
+          call ftgmsg(errmessage)
+       end do
+    endif
+
+
+    !---------------------------------------------------------------------
+    ! Suppress Jnu for low-number statistics : same criteria as in ProDiMo
+    !---------------------------------------------------------------------
+    m2p%nJ = m2p%nJ_Star + m2p%nJ_ISM
+    do i=1,n_rad
+       do j=1,nz
+          Tdust = m2p%Tdust(i,j)
+          do l=1,n_lambda_m2p 
+             if (m2p%nJ(i,j,l) < 10) then 
+                m2p%lamJlamStar(i,j,l) = m2p%nu(l) * Bnu(m2p%nu(l)*1.0_db,Tdust)
+                m2p%lamJlamISM(i,j,l) = 0.0
+          endif  
+        enddo  !l
+      enddo ! j
+    enddo ! i
+    m2p%lamJlam = m2p%lamJlamStar + m2p%lamJlamISM
+   
+    do i=1,n_rad
+       do j=1,nz
+          m2p%Jnu(i,j,:) = m2p%lamJlam(i,j,:) / m2p%nu(:)
+       enddo !j
+    enddo !i
 
     return
 
@@ -1027,39 +1213,10 @@ contains
     if (mol(imol)%name=="o-H2O") loH2O = .true.
     if (mol(imol)%name=="p-H2O") lpH2O = .true.
 
-    lpops%lmax(1) = nlevel_CII
-    lpops%lmax(2) = nlevel_OI
-    lpops%lmax(3) = nlevel_CO
-    lpops%lmax(4) = nlevel_oH2O
-    lpops%lmax(5) = nlevel_pH2O
-
     ldust_mol = .true.
-
 
     if (l_first_time) then
        l_first_time = .false.
-
-       allocate(nCII(n_rad,nz), dvCII(n_rad,nz), nOI(n_rad,nz), dvOI(n_rad,nz),  &
-            noH2O(n_rad,nz), dvoH2O(n_rad,nz), npH2O(n_rad,nz), dvpH2O(n_rad,nz), &
-            nCO(n_rad,nz), dvCO(n_rad,nz), stat=alloc_status )
-       if (alloc_status > 0) then
-          write(*,*) 'Allocation error nCII'
-          stop
-       endif
-       nCII = 0.0 ; dvCII = 0.0 ; nOI = 0.0 ; dvOI = 0.0 ; nCO=0.0 ;  dvCO = 0.0
-       noH2O = 0.0 ;  dvoH2O = 0.0 ;  npH2O = 0.0 ;  dvpH2O = 0.0 
-       
-
-       allocate(pop_CII(nLevel_CII, n_rad, nz), stat=alloc_status )
-       allocate(pop_OI(nLevel_OI, n_rad, nz), stat=alloc_status )
-       allocate(pop_CO(nLevel_CO, n_rad, nz), stat=alloc_status )
-       allocate(pop_oH2O(nLevel_oH2O, n_rad, nz), stat=alloc_status )
-       allocate(pop_pH2O(nLevel_pH2O,n_rad, nz) , stat=alloc_status )
-       if (alloc_status > 0) then
-          write(*,*) 'Allocation error pop_CII'
-          stop
-       endif
-       pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ; 
 
 
        filename = "data_ProDiMo/forMCFOST.fits.gz"
@@ -1154,9 +1311,46 @@ contains
           endif
        endif
 
+       !---------------------------------------------------------
+       ! Memory allocation
+       !---------------------------------------------------------
+       write(*,*) "ProDiMo2mcfost version:", ProDiMo2mcfost_version
+       if (ProDiMo2mcfost_version <= 2) then
+            nLevel_oH2O = 10
+            nLevel_pH2O = 9
+       else 
+          nLevel_oH2O = 30
+          nLevel_pH2O = 30
+       endif
+       lpops%lmax(1) = nlevel_CII
+       lpops%lmax(2) = nlevel_OI
+       lpops%lmax(3) = nlevel_CO
+       lpops%lmax(4) = nlevel_oH2O
+       lpops%lmax(5) = nlevel_pH2O
+
+       allocate(nCII(n_rad,nz), dvCII(n_rad,nz), nOI(n_rad,nz), dvOI(n_rad,nz),  &
+            noH2O(n_rad,nz), dvoH2O(n_rad,nz), npH2O(n_rad,nz), dvpH2O(n_rad,nz), &
+            nCO(n_rad,nz), dvCO(n_rad,nz), stat=alloc_status )
+       if (alloc_status > 0) then
+          write(*,*) 'Allocation error nCII'
+          stop
+       endif
+       nCII = 0.0 ; dvCII = 0.0 ; nOI = 0.0 ; dvOI = 0.0 ; nCO=0.0 ;  dvCO = 0.0
+       noH2O = 0.0 ;  dvoH2O = 0.0 ;  npH2O = 0.0 ;  dvpH2O = 0.0 
+       
+       allocate(pop_CII(nLevel_CII, n_rad, nz), stat=alloc_status )
+       allocate(pop_OI(nLevel_OI, n_rad, nz), stat=alloc_status )
+       allocate(pop_CO(nLevel_CO, n_rad, nz), stat=alloc_status )
+       allocate(pop_oH2O(nLevel_oH2O, n_rad, nz), stat=alloc_status )
+       allocate(pop_pH2O(nLevel_pH2O,n_rad, nz) , stat=alloc_status )
+       if (alloc_status > 0) then
+          write(*,*) 'Allocation error pop_CII'
+          stop
+       endif
+       pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ; 
 
        
-       ! read_image
+       ! read_image : HDU 1 : MCgrid, to make a test inside mcfost
        call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,fits_status)
        !   write(*,*) "Status1 = ", status
     
@@ -1277,7 +1471,7 @@ contains
           endif
           if ((naxes(1) /= lpops%lmax(i)).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) then
              write(*,*) "Error : HDU ",i+4," does not have the"
-             write(*,*) "right dimensions. Exiting."
+             write(*,*) "right dimensions (Level pop). Exiting."
              write(*,*) naxes(1:3)
              write(*,*) lpops%lmax(i)
              stop

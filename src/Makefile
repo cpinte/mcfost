@@ -566,7 +566,7 @@ release : main
 	rm -rf ../utils/Version
 	grep mcfost_version modules.f90 | awk '{print $$6}' | sed s/\"//g > ../utils/Version
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
 	rm -rf web
 
@@ -578,16 +578,9 @@ release_mac : main
 	rm -rf ../utils/Version
 	grep mcfost_version modules.f90 | awk '{print $$6}' | sed s/\"//g > ../utils/Version
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h  %d %s" --date=short > web/history.txt
+	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
-
-
-#*************************************************************
-# Sauvegarde
-#*************************************************************
-save : 
-	zip -9 ~/sauvegarde/mcfost5_`date +%d_%m_%y`.zip *.f90 *.sh Makefile todo.mcfost ../yorick/init/mcfost*  && scp ~/sauvegarde/mcfost5_`date +%d_%m_%y`.zip horus:sauvegarde/
 
 #*************************************************************
 # Nettoyage

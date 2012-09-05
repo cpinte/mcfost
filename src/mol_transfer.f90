@@ -104,8 +104,8 @@ subroutine mol_line_transfer()
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) call NLTE_mol_line_transfer(imol)
      
-     !call ecriture_pops()
-     !call ecriture_Tex()
+     call ecriture_pops(imol)
+     call ecriture_Tex(imol)
      
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
@@ -197,7 +197,7 @@ subroutine NLTE_mol_line_transfer(imol)
   if (lprecise_pop) then
      etape_end = 3
   else
-     etape_end = 2
+     etape_end = 1  ! 2
   endif
 
   allocate(tab_speed(-n_speed:n_speed,nb_proc), stat=alloc_status)
@@ -426,7 +426,8 @@ subroutine NLTE_mol_line_transfer(imol)
                        pop(:,id) = tab_nLevel(ri,zj,:)
 
                        ! Critere de convergence locale
-                       diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) / (pop_old(1:n_level_comp,id) + 1e-30) )
+                       diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
+                            / (pop_old(1:n_level_comp,id) + 1e-30) )
                        
                        if (diff < precision_sub) then 
                           lconverged_loc = .true.
@@ -453,7 +454,7 @@ subroutine NLTE_mol_line_transfer(imol)
            do zj=1,nz
               if (lcompute_molRT(ri,zj)) then
                  diff = maxval( abs( tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp) ) / &
-                      tab_nLevel_old(ri,zj,1:n_level_comp) )
+                      tab_nLevel_old(ri,zj,1:n_level_comp) + 1e-300_db)
                  
              !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
               !        tab_nLevel_old(ri,zj,1:n_level_comp)
