@@ -165,6 +165,7 @@ end subroutine define_physical_zones
 subroutine define_grid4()
   ! Definit la grille du code
   ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+  ! et la variable rout 2
   ! Version 4 gere les subdivisions pour les zones multiples
   ! C. Pinte 
   ! 03/05/11, version 3 :  27/04/05 
@@ -186,6 +187,8 @@ subroutine define_grid4()
   type(disk_zone_type) :: dz
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+  rout2 = rout*rout
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -524,6 +527,7 @@ end subroutine define_grid4
 subroutine define_grid3()
 ! Definit la grille du code
 ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+! et la variable rout2
 ! C. Pinte 
 ! 27/04/05 
 
