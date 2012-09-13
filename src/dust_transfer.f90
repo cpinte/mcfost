@@ -53,6 +53,7 @@ subroutine transfert_poussiere()
   real :: n_phot_lim
   logical :: lpacket_alive, lintersect
 
+  logical :: lscatt_ray_tracing1_save, lscatt_ray_tracing2_save
 
   ! NEW
   integer, target :: lambda, lambda0
@@ -570,6 +571,12 @@ subroutine transfert_poussiere()
      if ((.not.letape_th).and.lProDiMo) then
         !write(*,*) "ISM"
 
+        ! Pas de ray-tracing avec les packets ISM
+        lscatt_ray_tracing1_save = lscatt_ray_tracing1
+        lscatt_ray_tracing2_save = lscatt_ray_tracing2
+        lscatt_ray_tracing1 = .false.
+        lscatt_ray_tracing2 = .false.
+
         ! Sauvegarde champ stellaire et th separement
         call save_J_ProDiMo(lambda)
         
@@ -603,8 +610,13 @@ subroutine transfert_poussiere()
         enddo ! nnfot1
         !$omp end do
         !$omp end parallel
+
+        lscatt_ray_tracing1 = lscatt_ray_tracing1_save
+        lscatt_ray_tracing2 = lscatt_ray_tracing2_save
+
      endif ! champ ISM
 
+     !----------------------------------------------------
      if (lmono0) then ! Creation image
         ! On resomme les resultats partiels des theads //
         if (lobs_HK_Tau) then
