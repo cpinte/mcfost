@@ -413,9 +413,6 @@ subroutine initialisation_mcfost()
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.
-     case("-obs_HK_Tau")
-        i_arg = i_arg+1
-        lobs_HK_Tau=.true.
      case("-no_diff_approx")
         i_arg = i_arg+1
         lapprox_diffusion = .false.
