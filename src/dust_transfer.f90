@@ -185,10 +185,6 @@ subroutine transfert_poussiere()
      endif
 
      if (lmono) then ! code monochromatique
-        ! Selection des cellules où peuvent emettrent les PAHs
-        !   call init_pah
-        ! 1 étape pour code monochromatique
-
         lambda=1
         etape_i=1
         etape_f=1
@@ -216,7 +212,6 @@ subroutine transfert_poussiere()
 
         call opacite2(1)
         call integ_tau(1) !TODO
-        if (lobs_HK_Tau) call crea_noyau
 
         if (lopacity_map) call calc_opacity_map(1)
 
@@ -312,9 +307,6 @@ subroutine transfert_poussiere()
                  endif
               endif
 
-              ! TMP !!!
-              !call no_dark_zone()
-
               if (lonly_diff_approx) then
                  call lect_temperature()
                  call Temp_approx_diffusion_vertical()
@@ -353,10 +345,7 @@ subroutine transfert_poussiere()
           
      if (laverage_grain_size) call taille_moyenne_grains()
      
-     ! Calcul de l'angle maximal d'ouverture du disque
-     
-     ! TODO : revoir ce bout !!
-
+     ! Calcul de l'angle maximal d'ouverture du disque : TODO : revoir ce bout !!
      call angle_disque()
      
      if (lopacity_wall) call init_opacity_wall()
@@ -533,10 +522,6 @@ subroutine transfert_poussiere()
         p_nnfot2(id) = 0
         n_phot_envoyes_loc(lambda,id) = 0.0
         photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(lambda,id) < n_phot_lim))
-           !if (.not.letape_th) write(*,*) nnfot1,  real(P_nnfot2(id)), nbre_phot2, real(n_phot_envoyes_loc(id,lambda)),  real(n_phot_lim)
-           !if (.not.letape_th) write(*,*) (p_nnfot2(id) < nbre_phot2), (n_phot_envoyes_loc(id,lambda) < n_phot_lim)
-           
-
            nnfot2(id)=nnfot2(id)+1.0_db
            n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
            n_phot_envoyes_loc(lambda,id) = n_phot_envoyes_loc(lambda,id) + 1.0_db
@@ -569,8 +554,6 @@ subroutine transfert_poussiere()
 
      ! Champ de radiation interstellaire 
      if ((.not.letape_th).and.lProDiMo) then
-        !write(*,*) "ISM"
-
         ! Pas de ray-tracing avec les packets ISM
         lscatt_ray_tracing1_save = lscatt_ray_tracing1
         lscatt_ray_tracing2_save = lscatt_ray_tracing2
@@ -618,15 +601,8 @@ subroutine transfert_poussiere()
 
      !----------------------------------------------------
      if (lmono0) then ! Creation image
-        ! On resomme les resultats partiels des theads //
-        if (lobs_HK_Tau) then
-           call  observables_HK_tau()
-           !        call crea_noyau_2mass()
-           !        call observables_2mass()
-        else
-           if (loutput_mc) call write_stokes_fits()
-        endif
-
+        if (loutput_mc) call write_stokes_fits()
+        
         ! Carte ray-tracing 
         if (lscatt_ray_tracing) then
 
