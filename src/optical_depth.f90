@@ -315,81 +315,83 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
                 * l * Stokes(1)
            if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
 
-        else if (lProDiMo) then 
-           xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-           ! Pour statistique: nbre de paquet contribuant a intensite specifique
-           xN_abs(lambda,ri0,zj0,id) = xN_abs(lambda,ri0,zj0,id) + 1.0
+        else 
+           if (lProDiMo) then 
+              xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+              ! Pour statistique: nbre de paquet contribuant a intensite specifique
+              xN_abs(lambda,ri0,zj0,id) = xN_abs(lambda,ri0,zj0,id) + 1.0
+           endif ! lProDiMo
 
-        else if (lscatt_ray_tracing1) then 
-           xm = 0.5_db * (x0 + x1)
-           ym = 0.5_db * (y0 + y1)
-           zm = 0.5_db * (z0 + z1)
-              
-           phi_pos = atan2(ym,xm) 
-           phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-           if (phi_k > n_az_rt) phi_k=n_az_rt
-           
-           if (zm > 0.0_db) then
-              psup = 1
-           else
-              psup = 0
-           endif
-           
-           ! Les indices sont 4, RT_ibin
-           if (lsepar_pola) then
-              ! call calc_new_stokes_rt1_pola(id,lambda,p_ri0,p_zj0,Stokes(:))
-              ! xI_scatt(:,:,ri0,zj0,phi_k,psup,id) =  xI_scatt(:,:,ri0,zj0,phi_k,psup,id) + &
-              ! l * new_stokes_rt1(:,:,id) 
-              write(*,*) "ERROR: implementation of polarizarion mode is not finished"
-              write(*,*) "       in the ray-tracing mode 1"
-              write(*,*) "       Exiting."
-              stop
-           else
-              ! ralentit d'un facteur 5 le calcul de SED
-              ! facteur limitant
-              call calc_xI_scatt(id,lambda,ri0,zj0,phi_k,psup,l,Stokes(1),flag_star)
-           endif
-
-        else if (lscatt_ray_tracing2) then  
-           if (flag_direct_star) then
-              xI_star(ri0,zj0,id) = xI_star(ri0,zj0,id) + l * Stokes(1)
-              xw_star(ri0,zj0,id) = xw_star(ri0,zj0,id) + l * abs(w)
-              !     xl_star(ri0,zj0,id) = xl_star(ri0,zj0,id) + l 
-           else
+           if (lscatt_ray_tracing1) then 
               xm = 0.5_db * (x0 + x1)
               ym = 0.5_db * (y0 + y1)
               zm = 0.5_db * (z0 + z1)
-              phi_pos = atan2(ym,xm) 
-
-            !  if (l_sym_ima) then
-            !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-            !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
-            !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
-            !     if (phi_I > n_phi_I) phi_I = n_phi_I
-            !  else
-                 phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
-                 if (phi_I > n_phi_I) phi_I = 1
-            !  endif
               
+              phi_pos = atan2(ym,xm) 
+              phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
+              if (phi_k > n_az_rt) phi_k=n_az_rt
+           
               if (zm > 0.0_db) then
-                 theta_I = floor(0.5_db*( w + 1.0_db) * n_theta_I) + 1
+                 psup = 1
               else
-                 theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
+                 psup = 0
               endif
               
-              xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
-                                             
-              if (lsepar_contrib) then
-                 if (flag_star) then
-                    xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+              ! Les indices sont 4, RT_ibin
+              if (lsepar_pola) then
+                 ! call calc_new_stokes_rt1_pola(id,lambda,p_ri0,p_zj0,Stokes(:))
+                 ! xI_scatt(:,:,ri0,zj0,phi_k,psup,id) =  xI_scatt(:,:,ri0,zj0,phi_k,psup,id) + &
+                 ! l * new_stokes_rt1(:,:,id) 
+                 write(*,*) "ERROR: implementation of polarizarion mode is not finished"
+                 write(*,*) "       in the ray-tracing mode 1"
+                 write(*,*) "       Exiting."
+                 stop
+              else
+                 ! ralentit d'un facteur 5 le calcul de SED
+                 ! facteur limitant
+                 call calc_xI_scatt(id,lambda,ri0,zj0,phi_k,psup,l,Stokes(1),flag_star)
+              endif
+
+           else if (lscatt_ray_tracing2) then  
+              if (flag_direct_star) then
+                 xI_star(ri0,zj0,id) = xI_star(ri0,zj0,id) + l * Stokes(1)
+                 xw_star(ri0,zj0,id) = xw_star(ri0,zj0,id) + l * abs(w)
+                 !     xl_star(ri0,zj0,id) = xl_star(ri0,zj0,id) + l 
+              else
+                 xm = 0.5_db * (x0 + x1)
+                 ym = 0.5_db * (y0 + y1)
+                 zm = 0.5_db * (z0 + z1)
+                 phi_pos = atan2(ym,xm) 
+
+                 !  if (l_sym_ima) then
+                 !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
+                 !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
+                 !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
+                 !     if (phi_I > n_phi_I) phi_I = n_phi_I
+                 !  else
+                 phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
+                 if (phi_I > n_phi_I) phi_I = 1
+                 !  endif
+                 
+                 if (zm > 0.0_db) then
+                    theta_I = floor(0.5_db*( w + 1.0_db) * n_theta_I) + 1
                  else
-                    xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+                    theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
                  endif
-              endif ! lsepar_contrib
+                 
+                 xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
+                                             
+                 if (lsepar_contrib) then
+                    if (flag_star) then
+                       xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+                    else
+                       xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+                    endif
+                 endif ! lsepar_contrib
 
-           endif ! flag_direct_star
-
-        endif !letape_th or lscatt
+              endif ! flag_direct_star
+           endif !lscatt_ray_tracing
+        endif !letape_th
      endif ! lcellule_non_vide
 
      !if (abs(xio - 1.028122097156825E-003 ) < 1e-12) write(*,*) "stop test"
