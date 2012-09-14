@@ -751,8 +751,8 @@ subroutine repartition_energie_etoiles()
      spectre0 = 0.0 ;
      prob_E_star(lambda,0) = 0.0
         
-     wl_inf =  tab_lambda(lambda) - tab_delta_lambda(lambda)/2
-     wl_sup =  tab_lambda(lambda) + tab_delta_lambda(lambda)/2
+     wl_inf =  tab_lambda_inf(lambda)
+     wl_sup =  tab_lambda_sup(lambda)
 
      do i=1,n_etoiles
         surface=4*pi*(etoile(i)%r**2)

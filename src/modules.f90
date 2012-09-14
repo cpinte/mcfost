@@ -403,10 +403,10 @@ module grains
   real :: wavel
 
   ! Tab de lambda
-  real, dimension(:), allocatable :: tab_lambda, tab_delta_lambda !n_lambda
+  real, dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
   real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
   real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
-  real, dimension(:), allocatable :: tab_lambda2, tab_delta_lambda2
+  real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2
 
   ! Parametres de diffusion des grains
   real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34 !n_lambda,n_grains,180

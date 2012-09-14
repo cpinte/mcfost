@@ -1118,29 +1118,31 @@ end subroutine indice_cellule_3D
 subroutine init_lambda()
   ! Initialisation table de longueurs d'onde
 
-  implicit none
-
-  real :: facteur_largeur
   integer :: i
 
   if (lmono0) then
      ! Lecture longueur d'onde
      read(band,*) tab_lambda(1)
      tab_delta_lambda(1) = 1.0
+     tab_lambda_inf(1) = tab_lambda(1)
+     tab_lambda_sup(1) = tab_lambda(1)
 
   else
      ! Initialisation longueurs d'onde
      !delta_lambda = (lambda_max/lambda_min)**(1.0/real(n_lambda))
-     delta_lambda =  exp((1.0_db/real(n_lambda,kind=db)) * log(lambda_max/lambda_min))
+     delta_lambda =  exp( (1.0_db/real(n_lambda,kind=db)) * log(lambda_max/lambda_min) )
      
+     tab_lambda_inf(1) = lambda_min
      tab_lambda(1)=lambda_min*sqrt(delta_lambda)
+     tab_lambda_sup(1) = lambda_min*delta_lambda
      do i=2, n_lambda
         tab_lambda(i)= tab_lambda(i-1)*delta_lambda
+        tab_lambda_sup(i)= tab_lambda_sup(i-1)*delta_lambda
+        tab_lambda_inf(i)= tab_lambda_sup(i-1)        
      enddo
      
-     facteur_largeur=sqrt(delta_lambda)-1.0/sqrt(delta_lambda)
      do i=1, n_lambda
-        tab_delta_lambda(i) = tab_lambda(i) * facteur_largeur
+        tab_delta_lambda(i) = tab_lambda_sup(i) - tab_lambda_inf(i)
      enddo
 
   endif
@@ -1162,9 +1164,10 @@ subroutine init_lambda2()
   n_lambda=n_lambda2
   do i=1, n_lambda2
      tab_lambda(i)= tab_lambda2(i)
+     tab_lambda_inf(i)= tab_lambda2_inf(i)
+     tab_lambda_sup(i)= tab_lambda2_sup(i)
      tab_delta_lambda(i)= tab_delta_lambda2(i)
   enddo
-  
 
   return
   
