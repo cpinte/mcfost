@@ -903,8 +903,8 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   ! Moyennage en longueur d'onde
   ! tableau decroissant
-  wl_min = tab_lambda(lambda) - 0.5 * tab_delta_lambda(lambda)
-  wl_max = tab_lambda(lambda) + 0.5 * tab_delta_lambda(lambda)
+  wl_min = tab_lambda_inf(lambda)
+  wl_max = tab_lambda_sup(lambda)
 
   qext = 0.0 ; qsca = 0.0 ; gsca = 0.0 ; norme = 0 ; N=0
   do i=1,PAH_n_lambda

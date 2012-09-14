@@ -474,6 +474,8 @@ subroutine lect_lambda()
   integer :: alloc_status, lambda, status, n_comment, i
   real :: fbuffer
 
+  real, parameter :: wl_factor = 1.025
+
   lambda_filename = trim(lambda_dir)//trim(tab_wavelength)
   open(unit=1,file=lambda_filename,status="old",iostat=status)
   if (status /= 0) then
@@ -517,20 +519,43 @@ subroutine lect_lambda()
   enddo
 
   ! Allocations des tab
-  allocate(tab_lambda2(n_lambda2), tab_delta_lambda2(n_lambda2), stat=alloc_status)
+  allocate(tab_lambda2(n_lambda2), tab_lambda2_inf(n_lambda2),tab_lambda2_sup(n_lambda2), tab_delta_lambda2(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda2'
      stop
   endif
-  tab_lambda2 = 0.
-  tab_delta_lambda2 = 1.
 
   ! Lecture proprement dite
   do lambda=1, n_lambda2
      read(1,*) tab_lambda2(lambda)!, tab_delta_lambda2(lambda)
+     tab_lambda2_inf(lambda) = tab_lambda2(lambda) / wl_factor
+     tab_lambda2_sup(lambda) = tab_lambda2(lambda) * wl_factor
+     tab_delta_lambda2(lambda) = tab_lambda2_sup(lambda) - tab_lambda2_inf(lambda)
   enddo
   close(unit=1)
-  tab_delta_lambda2(:) = 0.05 * tab_lambda2(:)
+
+
+  if (lProDiMo) then
+     write(*,*) "WARNING:  matching step2 wavelength bins to ProDiMo set-up"
+     tab_lambda2_inf(1) = 0.0912
+     tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
+     tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
+     do lambda=2, n_lambda2
+        tab_lambda2_inf(lambda) = tab_lambda2_sup(lambda-1)
+        tab_lambda2_sup(lambda) = tab_lambda2(lambda)  * tab_lambda2(lambda)/tab_lambda2_inf(lambda)
+        tab_delta_lambda2(lambda) = tab_lambda2_sup(lambda) - tab_lambda2_inf(lambda)
+     enddo
+
+     do lambda=1, n_lambda2
+        if (tab_delta_lambda2(lambda) <= 0.0) then
+           write(*,*) "ERROR in ProDiMo wavelength grid."
+           write(*,*) "Exiting"
+           write(*,*) lambda, "wl=", tab_lambda2(lambda), "delta=", tab_delta_lambda2(lambda)
+           write(*,*) "            min, max =", tab_lambda2_inf(lambda), tab_lambda2_sup(lambda)
+           stop
+        endif
+     enddo
+  endif ! lProDiMo
 
   return
 

@@ -32,7 +32,7 @@ module ProDiMo
   character(len=10) :: sProDiMo_fPAH
   
   ! Grille de longeurs d'onde
-  character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo.lambda"
+  character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
 
   ! Pour champ ISM
   real, parameter :: Wdil =  9.85357e-17 

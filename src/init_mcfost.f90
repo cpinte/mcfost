@@ -660,8 +660,8 @@ subroutine initialisation_mcfost()
   endif
 
   if (lProDiMo) then
-     if ((lsed_complete).or.(tab_wavelength /= prodimo_tab_wavelength)) then
-        write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo.lambda" 
+     if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
+        write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda" 
         lsed_complete = .false.       
         tab_wavelength = prodimo_tab_wavelength
      endif
