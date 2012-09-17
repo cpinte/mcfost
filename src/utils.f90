@@ -618,7 +618,7 @@ subroutine mcfost_v()
 
   call appel_syst(cmd, syst_status)           
   if (syst_status/=0) then 
-     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "ERROR: Cannot get MCFOST last version number (Error 1)"
      write(*,*) "Exiting"
      stop
   endif
@@ -627,7 +627,7 @@ subroutine mcfost_v()
   close(unit=1,status="delete")
 
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
-     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "ERROR: Cannot get MCFOST last version number (Error 2)"
      write(*,*) "Exiting"
      stop
   endif
@@ -680,10 +680,91 @@ end subroutine mcfost_v
 
 !***********************************************************
 
+subroutine update_utils(utils_current_version,lforce_update)
+
+  real, intent(in) :: utils_current_version
+  logical, intent(in) :: lforce_update
+  real :: last_version
+
+  character(len=512) :: cmd, s_last_version
+  integer ::  syst_status, ios
+  logical :: lupdate
+
+  ! Last version
+  write(*,*) "Version ", utils_current_version
+  write(*,*) "Checking last version of MCFOST UTILS ..."
+
+  cmd = "curl "//trim(utils_webpage)//"Version -O -s"
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then 
+     write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 1)"
+     write(*,*) "Exiting"
+     stop
+  endif
+  open(unit=1, file="Version", status='old')
+  read(1,*,iostat=ios) s_last_version
+  close(unit=1,status="delete")
+
+  if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then 
+     write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 2)"
+     write(*,*) "Exiting"
+     stop
+  endif
+  read(s_last_version,*) last_version
+
+
+  ! Do we need to update ?
+  if (last_version == mcfost_version) then
+     !Ok we have the correct version of mcfost
+     if (last_version == utils_current_version) then
+        write(*,*) "MCFOST UTILS is up-to-date"
+        lupdate = .false.
+     else ! we update
+        lupdate = .true.
+     endif
+  else ! We need to update MCFOST first
+     write(*,*) "New MCFOST version available: ", trim(s_last_version)
+     write(*,*) "Please update mcfost first with mcfost -u"
+     lupdate = .false.
+  endif
+
+  if (lforce_update) then
+     write(*,*) "Forcing update"
+     lupdate = .true.
+  endif
+
+  if (lupdate) then
+     write(*,*) "Updating MCFOST UTILS ..."
+     call get_utils()
+  endif
+
+  return
+
+end subroutine update_utils
+
+!***********************************************************
+
+subroutine get_utils()
+
+  character(len=512) :: cmd
+  integer :: syst_status
+
+  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzvf - -C"//trim(mcfost_utils)
+  call appel_syst(cmd, syst_status)  
+  if (syst_status == 0) then
+     write(*,*) "Done"
+  else
+     write(*,*) "Error during download."
+  endif
+
+  return
+
+end subroutine get_utils
+
+!***********************************************************
+
 function indgen(n)
-   
-  implicit none
- 
+    
   integer, intent(in) :: n
   integer, dimension(n) :: indgen
    

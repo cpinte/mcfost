@@ -68,7 +68,7 @@ subroutine define_physical_zones()
   logical, dimension(n_zones) :: zone_scanned
   
   real(kind=db) :: r1, r2, minR, maxR
-  character :: n1, n2
+  character(len=10) :: n1, n2
 
   logical :: test_j_in_i, test_i_in_j
 
@@ -141,9 +141,18 @@ subroutine define_physical_zones()
   do i=1, n_zones
      R1 = real(Rmin_region(region(i)))
      R2 = real(Rmax_region(region(i)))
-     n1 = achar(int(log10(R1)+1)+iachar('3'))
-     n2 = achar(int(log10(R2)+1)+iachar('3'))
-     write(*,fmt='(" zone",i2," --> region=",i2," : R=",f'//n1//'.2," to ",f'//n2//'.2," AU")') &
+     ! Format
+     if ((R1 <= 1e-2).or.(R1>=1e6)) then
+        n1 = "es8.2"
+     else 
+        n1 = "f"//achar(int(abs(log10(R1))+1)+iachar('3'))//".2"
+     endif
+     if ((R2 <= 1e-2).or.(R2>=1e6)) then
+        n2 = "es8.2"
+     else 
+        n2 = "f"//achar(int(abs(log10(R2))+1)+iachar('3'))//".2"
+     endif
+     write(*,fmt='(" zone",i2," --> region=",i2," : R=",'//trim(n1)//'," to ",'//trim(n2)//'," AU")') &
           i, region(i), R1, R2 
   enddo
 
@@ -156,6 +165,7 @@ end subroutine define_physical_zones
 subroutine define_grid4()
   ! Definit la grille du code
   ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+  ! et la variable rout 2
   ! Version 4 gere les subdivisions pour les zones multiples
   ! C. Pinte 
   ! 03/05/11, version 3 :  27/04/05 
@@ -168,6 +178,7 @@ subroutine define_grid4()
   !tab en cylindrique ou spherique suivant grille
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3 
   real(kind=db) ::   r_i, r_f, dr, fac, r0, rout_cell, H, hzone
+  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
   integer :: ir, iz, n_cells, n_rad_region, n_rad_in_region, n_empty, istart
 
   real(kind=db), dimension(n_rad-n_rad_in+2) :: tab_r_tmp
@@ -177,13 +188,7 @@ subroutine define_grid4()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
- ! calcul des parametres de la table log
-!  delta_r = (rout/(rmin))**(1.0/(real(resol)-1.0))
-
- ! rmin2=rmin*rmin
-  rout2=rout*rout
- ! rmin_1 = 1.0/rmin
- ! rmin2_1 = 1.0/(rmin2)
+  rout2 = rout*rout
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -193,20 +198,10 @@ subroutine define_grid4()
      lspherical = .true.
   endif
        
-  if ((.not.lcylindrical).and.(is_there_disk)) then
-     !w = 0.5_db / real(nz,kind=db)
-!     w = 0.15_db  ! Empirique pour echantilloner suffisamment le bord interne verticalement
-!    grid_rmin = rmin / sqrt(1.0_db -w*w)     ! ---> Ca cree un bug dans indice_cellule_sph    
-     grid_rmin=rmin
-  else
-     grid_rmin=rmin
-  endif
-
-
   if (llinear_grid) then
      
      do i=1, n_rad+1
-        tab_r(i) = grid_rmin + (rout - grid_rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = rmin + (rout - rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i) 
      enddo
@@ -339,11 +334,9 @@ subroutine define_grid4()
      
   endif ! llinear_grid
 
-
-  
-  r_lim(0)= grid_rmin
-  r_lim_2(0)= grid_rmin**2
-  r_lim_3(0) = grid_rmin**3
+  r_lim(0)= rmin
+  r_lim_2(0)= rmin**2
+  r_lim_3(0) = rmin**3
   do i=1, n_rad
      r_lim(i)=tab_r(i+1)
      r_lim_2(i)= tab_r2(i+1)
@@ -352,6 +345,7 @@ subroutine define_grid4()
         write(*,*) "ERROR in gridding: this is likely to be a bug"
         write(*,*) "i", i, r_lim(i), r_lim(i-1)
         write(*,*) "Exiting"
+        stop
      endif
   enddo !i
 
@@ -438,7 +432,7 @@ subroutine define_grid4()
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
 
-     if (linteg_dic) delta0(0)=0.5*grid_rmin
+     if (linteg_dic) delta0(0)=0.5*rmin
 
   else !lspherical
      izone=1
@@ -533,6 +527,7 @@ end subroutine define_grid4
 subroutine define_grid3()
 ! Definit la grille du code
 ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+! et la variable rout2
 ! C. Pinte 
 ! 27/04/05 
 
@@ -546,19 +541,14 @@ subroutine define_grid3()
   !tab en cylindrique ou spherique suivant grille
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3 
   real(kind=db) ::   r_i, r_f, dr, fac, r0, rout_cell, H, hzone
+  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
 
   real(kind=db), dimension(n_rad-n_rad_in+2) :: tab_r_tmp
   real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
 
- ! calcul des parametres de la table log
-!  delta_r = (rout/(rmin))**(1.0/(real(resol)-1.0))
-
- ! rmin2=rmin*rmin
   rout2=rout*rout
- ! rmin_1 = 1.0/rmin
- ! rmin2_1 = 1.0/(rmin2)
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -568,29 +558,20 @@ subroutine define_grid3()
      lspherical = .true.
   endif
        
-  if ((.not.lcylindrical).and.(is_there_disk)) then
-     !w = 0.5_db / real(nz,kind=db)
-!     w = 0.15_db  ! Empirique pour echantilloner suffisamment le bord interne verticalement
-!    grid_rmin = rmin / sqrt(1.0_db -w*w)     ! ---> Ca cree un bug dans indice_cellule_sph    
-     grid_rmin=rmin
-  else
-     grid_rmin=rmin
-  endif
-
   if (llinear_grid) then
      
      do i=1, n_rad+1
-        tab_r(i) = grid_rmin + (rout - grid_rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = rmin + (rout - rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i) 
      enddo
 
   else if (lr_subdivide) then
-     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/grid_rmin) 
+     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/rmin) 
      delta_r = exp(ln_delta_r)
 
      ! Repartition des cellules "entieres" en log
-     tab_r_tmp(1) = grid_rmin
+     tab_r_tmp(1) = rmin
      do i=2, n_rad - n_rad_in + 2
         tab_r_tmp(i) = tab_r_tmp(i-1) * delta_r
      enddo
@@ -679,7 +660,7 @@ subroutine define_grid3()
      
   else ! Grille log avec subdivision cellule interne
      !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/grid_rmin) 
+     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/rmin) 
      delta_r = exp(ln_delta_r)
   
      !delta_r_in = delta_r**(1.0/real(n_rad_in))
@@ -697,22 +678,22 @@ subroutine define_grid3()
      
      ! Calcul recursif hors boucle //
      ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
-     tab_r(1) = grid_rmin
-     tab_r2(1) = grid_rmin*grid_rmin
-     tab_r3(1) = grid_rmin*grid_rmin*grid_rmin
+     tab_r(1) = rmin
+     tab_r2(1) = rmin*rmin
+     tab_r3(1) = rmin*rmin*rmin
      if (puiss == 0.0) then
         do i=2, n_rad_in+1
-           tab_r(i) = exp(log(grid_rmin) - (log(grid_rmin)-log(grid_rmin*delta_r))*(2.0**(i-1)-1.0)/(2.0**n_rad_in-1.0))
+           tab_r(i) = exp(log(rmin) - (log(rmin)-log(rmin*delta_r))*(2.0**(i-1)-1.0)/(2.0**n_rad_in-1.0))
            tab_r2(i) = tab_r(i) * tab_r(i)
            tab_r3(i) = tab_r2(i) * tab_r(i)
         enddo
      else
-        r_i = exp(puiss*log(grid_rmin))
-        r_f = exp(puiss*log(grid_rmin*delta_r))
+        r_i = exp(puiss*log(rmin))
+        r_f = exp(puiss*log(rmin*delta_r))
         dr=r_f-r_i
         fac = 1.0/(2.0**(n_rad_in+1)-1.0)
         do i=2, n_rad_in+1
-           tab_r(i) = (grid_rmin**puiss - (grid_rmin**puiss-(grid_rmin*delta_r)**puiss) & 
+           tab_r(i) = (rmin**puiss - (rmin**puiss-(rmin*delta_r)**puiss) & 
                 *(2.0**(i)-1.0)/(2.0**(n_rad_in+1)-1.0))**(1.0/puiss)
            !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
            !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
@@ -734,9 +715,9 @@ subroutine define_grid3()
   endif ! llinear_grid
 
   
-  r_lim(0)= grid_rmin
-  r_lim_2(0)= grid_rmin**2
-  r_lim_3(0) = grid_rmin**3
+  r_lim(0)= rmin
+  r_lim_2(0)= rmin**2
+  r_lim_3(0) = rmin**3
   do i=1, n_rad
      r_lim(i)=tab_r(i+1)
      r_lim_2(i)= r_lim(i)**2
@@ -825,7 +806,7 @@ subroutine define_grid3()
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
 
-     if (linteg_dic) delta0(0)=0.5*grid_rmin
+     if (linteg_dic) delta0(0)=0.5*rmin
 
   else !lspherical
      izone=1

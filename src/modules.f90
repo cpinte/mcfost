@@ -6,10 +6,12 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.13
-  character(8), parameter :: mcfost_release = "2.13.12"
+  real, parameter :: mcfost_version = 2.14
+  character(8), parameter :: mcfost_release = "2.14.1"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
-  character(len=128), parameter :: webpage="http://ipag.osug.fr/public/pintec/mcfost/"
+  character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
+  character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
+  
 
   real :: para_version
 
@@ -189,7 +191,7 @@ module disk
   type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
   type(cavity_type) :: cavity
 
-  real(kind=db) :: rmin, rout, rmin2,rout2,diskmass, grid_rmin, correct_Rsub
+  real(kind=db) :: rmin, rout, rout2, diskmass, correct_Rsub
 
   real :: r_subdivide
   logical :: lr_subdivide
@@ -219,12 +221,7 @@ module disk
   ! Grille
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
-  ! Echelle log
-  real(kind=db) :: delta_r, ln_delta_r
-  real(kind=db) :: delta_r_in, ln_delta_r_in, ln_delta_r_in_1, ln_delta_r_in_2_1
-  real(kind=db) :: rmin2_1, rmin_1, delta_0, delta_test
-
-
+  
   ! Tableau des longueurs de vol
   integer :: n_cell_max
   integer, dimension(:), allocatable :: n_cell_traversees !n_cpu
@@ -233,8 +230,7 @@ module disk
   real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
 
   ! Disque decrit en une ou n zones
-  logical :: ln_zone
-  integer :: n_zones
+    integer :: n_zones
   
   ! Definition des regions = zones deconnectees
   logical :: lold_grid
@@ -367,12 +363,14 @@ module grains
 
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
-     real :: amin, amax, aexp, frac_mass, avg_grain_mass, masse, porosity, sblow, rho1g_avg
+     real :: amin, amax, aexp, frac_mass, porosity
+     
+     real :: avg_grain_mass, masse, sblow, rho1g_avg, T_sub
      
      integer ::  mixing_rule, n_components ! en cas de coating, composant 1 est le coeur 2 est le manteau
      ! mixing rule : 1 = EMT, 2 = coating
      character(len=512), dimension(10) :: indices
-     real, dimension(10) :: component_rho1g, component_volume_fraction
+     real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
     
      logical :: is_PAH, lcoating
      integer :: ind_debut, ind_fin
