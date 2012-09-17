@@ -201,7 +201,7 @@ subroutine init_indices_optiques()
            enddo
 
            ! lecture densite
-           read(1,*) dust_pop(pop)%component_rho1g(k)
+           read(1,*) dust_pop(pop)%component_rho1g(k), dust_pop(pop)%component_T_sub(k)
            if (dust_pop(pop)%component_rho1g(k) > 10.) then
               write(*,*) "ERROR: optical indices file has the wrong format"
               write(*,*) "Exiting"
@@ -256,6 +256,7 @@ subroutine init_indices_optiques()
         if (dust_pop(pop)%n_components == 1) then
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
+           dust_pop(pop)%T_sub = dust_pop(pop)%component_T_sub(1)
         else  
            if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
               allocate(m(dust_pop(pop)%n_components), f(dust_pop(pop)%n_components))
@@ -276,6 +277,10 @@ subroutine init_indices_optiques()
               tab_amu1_coating(:,pop) = tab_tmp_amu1(:,2)
               tab_amu2_coating(:,pop) = tab_tmp_amu2(:,2)
            endif
+        
+           ! On suppose que le grain est detruit des que le premier composant se vaporise
+           write(*,*) "WARNING : T_sub is set to the minimum T_sub of the individual components"
+           dust_pop(pop)%T_sub = minval(dust_pop(pop)%component_T_sub(1:dust_pop(pop)%n_components))
         endif ! n_components
 
         ! Ajout porosite

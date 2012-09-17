@@ -509,7 +509,7 @@ endif
 SOURCES = modules.f90 sha.f90 mem.f90 utils.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 init_mcfost.f90 \
 	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 dust.f90 \
-	molecules.f90 grid.f90 optical_depth.f90 \
+	molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
 	thermal_emission.f90 dust_transfer.f90\
 	mol_transfer.f90 \
@@ -563,8 +563,10 @@ release : main
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost mcfost_cigri"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
+	rm -rf ../utils/Version
+	grep mcfost_version modules.f90 | awk '{print $$6}' | sed s/\"//g > ../utils/Version
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
 	rm -rf web
 
@@ -573,10 +575,17 @@ release_mac : main
 	rm -rf web
 	mkdir web web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
+	rm -rf ../utils/Version
+	grep mcfost_version modules.f90 | awk '{print $$6}' | sed s/\"//g > ../utils/Version
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
+
+release_utils : 
+	tar czvf mcfost_utils.tgz -C../utils .
+	scp -r mcfost_utils.tgz ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
+	rm -f mcfost_utils.tgz 
 
 #*************************************************************
 # Nettoyage
