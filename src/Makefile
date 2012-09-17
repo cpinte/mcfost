@@ -582,6 +582,11 @@ release_mac : main
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
+release_utils : 
+	tar czvf mcfost_utils.tgz -C../utils .
+	scp -r mcfost_utils.tgz ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
+	rm -f mcfost_utils.tgz 
+
 #*************************************************************
 # Nettoyage
 #*************************************************************
