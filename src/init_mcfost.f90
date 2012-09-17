@@ -134,6 +134,27 @@ subroutine initialisation_mcfost()
   star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
   lambda_dir = trim(mcfost_utils)//"/Lambda/"
 
+
+  ! Nbre d'arguments
+  nbr_arg = command_argument_count()
+  if (nbr_arg < 1) call display_help
+
+  call get_command_argument(1,para)
+  
+  ! Basic options
+  if (para(1:1)=="-") then
+     if (para(2:2)=="v") then
+        call mcfost_v()
+     else if (para(2:2)=="h") then
+        call mcfost_history()
+     else if (para(2:13)=="setup") then
+        call get_utils()
+     endif
+  else
+     call display_help()
+  endif
+
+  ! Check utils directory
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
   read(1,*,iostat=ios) mcfost_utils_version
   close(unit=1)
@@ -146,25 +167,16 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  ! Nbre d'arguments
-  nbr_arg = command_argument_count()
-  if (nbr_arg < 1) call display_help
-
-  call get_command_argument(1,para)
-  
+  ! Updating options
   if (para(1:1)=="-") then
-     if (para(2:2)=="v") then
-        call mcfost_v()
-     else if (para(2:13)=="update_utils") then
-        call update_utils(mcfost_utils_version)
+     if (para(2:13)=="update_utils") then
+        call update_utils(mcfost_utils_version,.false.)
+     else if (para(2:14)=="fupdate_utils") then
+        call update_utils(mcfost_utils_version,.true.)
      else if (para(2:2)=="u") then
         call mcfost_update(.false.)
      else if (para(2:3)=="fu") then
         call mcfost_update(.true.)
-     else if (para(2:2)=="h") then
-        call mcfost_history()
-     else
-        call display_help
      endif
      stop
   endif

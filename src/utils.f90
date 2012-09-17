@@ -680,19 +680,21 @@ end subroutine mcfost_v
 
 !***********************************************************
 
-subroutine update_utils(utils_current_version)
+subroutine update_utils(utils_current_version,lforce_update)
 
   real, intent(in) :: utils_current_version
+  logical, intent(in) :: lforce_update
   real :: last_version
 
   character(len=512) :: cmd, s_last_version
   integer ::  syst_status, ios
+  logical :: lupdate
 
   ! Last version
   write(*,*) "Version ", utils_current_version
   write(*,*) "Checking last version of MCFOST UTILS ..."
 
-  cmd = "rsync -q "//trim(utils_webpage)//"/Version ."
+  cmd = "curl "//trim(utils_webpage)//"Version -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then 
      write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 1)"
@@ -709,32 +711,55 @@ subroutine update_utils(utils_current_version)
      stop
   endif
   read(s_last_version,*) last_version
-  
-  
+
+
   ! Do we need to update ?
   if (last_version == mcfost_version) then
      !Ok we have the correct version of mcfost
      if (last_version == utils_current_version) then
         write(*,*) "MCFOST UTILS is up-to-date"
+        lupdate = .false.
      else ! we update
-        write(*,*) "Updating MCFOST UTILS ..."
-        cmd = "rsync -qur "//trim(utils_webpage)//" "//trim(mcfost_utils)
-        write(*,*) trim(cmd)
-        call appel_syst(cmd, syst_status)  
-        if (syst_status == 0) then
-           write(*,*) "Done"
-        else
-           write(*,*) "Error during download."
-        endif
+        lupdate = .true.
      endif
   else ! We need to update MCFOST first
      write(*,*) "New MCFOST version available: ", trim(s_last_version)
      write(*,*) "Please update mcfost first with mcfost -u"
+     lupdate = .false.
+  endif
+
+  if (lforce_update) then
+     write(*,*) "Forcing update"
+     lupdate = .true.
+  endif
+
+  if (lupdate) then
+     write(*,*) "Updating MCFOST UTILS ..."
+     call get_utils()
   endif
 
   return
 
 end subroutine update_utils
+
+!***********************************************************
+
+subroutine get_utils()
+
+  character(len=512) :: cmd
+  integer :: syst_status
+
+  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzvf - -C"//trim(mcfost_utils)
+  call appel_syst(cmd, syst_status)  
+  if (syst_status == 0) then
+     write(*,*) "Done"
+  else
+     write(*,*) "Error during download."
+  endif
+
+  return
+
+end subroutine get_utils
 
 !***********************************************************
 
