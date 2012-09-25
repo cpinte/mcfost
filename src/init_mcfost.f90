@@ -26,7 +26,7 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
-  real :: wvl, opt_zoom, mcfost_utils_version
+  real :: wvl, opt_zoom, utils_version
   
   character(len=512) :: cmd, s, str_seed
 
@@ -137,7 +137,7 @@ subroutine initialisation_mcfost()
 
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
-  if (nbr_arg < 1) call display_help
+  if (nbr_arg < 1) call display_help()
 
   call get_command_argument(1,para)
   
@@ -149,37 +149,21 @@ subroutine initialisation_mcfost()
         call mcfost_history()
      else if (para(2:13)=="setup") then
         call get_utils()
-     else
-        call display_help()
-     endif
-  endif
-
-  ! Check utils directory
-  open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
-  read(1,*,iostat=ios) mcfost_utils_version
-  close(unit=1)
-  if (ios /= 0) mcfost_utils_version = 0.0
-  if (mcfost_utils_version /= mcfost_version) then
-     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
-     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
-     write(*,*) "Please update with mcfost -update_utils"
-     write(*,*) "Exiting."
-     stop
-  endif
-
-  ! Updating options
-  if (para(1:1)=="-") then
-     if (para(2:13)=="update_utils") then
-        call update_utils(mcfost_utils_version,.false.)
+     else  if (para(2:13)=="update_utils") then
+        call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then
-        call update_utils(mcfost_utils_version,.true.)
+        call update_utils(.true.)
      else if (para(2:2)=="u") then
         call mcfost_update(.false.)
      else if (para(2:3)=="fu") then
         call mcfost_update(.true.)
+     else
+        call display_help()
      endif
      stop
   endif
+
+  utils_version =  mcfost_utils_version()
 
   ! Les benchmarks
   if (para(1:8)=="Pascucci") then

@@ -480,16 +480,18 @@ subroutine mcfost_update(lforce_update)
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)           
   if (syst_status/=0) then 
-     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "ERROR: Cannot get MCFOST last version number."
+     write(*,*) "Current version file not found."
      write(*,*) "Exiting"
      stop
   endif
+
   open(unit=1, file="version.txt", status='old')
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete")
-
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
-     write(*,*) "ERROR: Cannot get MCFOST last version number"
+     write(*,*) "ERROR: Cannot get MCFOST last version number."
+     write(*,*) "Cannot read version file."
      write(*,*) "Exiting"
      stop
   endif
@@ -680,17 +682,17 @@ end subroutine mcfost_v
 
 !***********************************************************
 
-subroutine update_utils(utils_current_version,lforce_update)
+subroutine update_utils(lforce_update)
 
-  real, intent(in) :: utils_current_version
   logical, intent(in) :: lforce_update
-  real :: last_version
+  real :: utils_current_version, last_version
 
   character(len=512) :: cmd, s_last_version
   integer ::  syst_status, ios
   logical :: lupdate
 
   ! Last version
+  utils_current_version =  mcfost_utils_version()
   write(*,*) "Version ", utils_current_version
   write(*,*) "Checking last version of MCFOST UTILS ..."
 
@@ -760,6 +762,27 @@ subroutine get_utils()
   return
 
 end subroutine get_utils
+
+!***********************************************************
+
+real function mcfost_utils_version()
+
+  integer :: ios
+
+  ! Check utils directory
+  open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
+  read(1,*,iostat=ios) mcfost_utils_version
+  close(unit=1)
+  if (ios /= 0) mcfost_utils_version = 0.0
+  if (mcfost_utils_version /= mcfost_version) then
+     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
+     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
+     write(*,*) "Please update with mcfost -update_utils"
+     write(*,*) "Exiting."
+     stop
+  endif
+
+end function mcfost_utils_version
 
 !***********************************************************
 
