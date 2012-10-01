@@ -722,12 +722,13 @@ module constantes
   real(kind=db), parameter :: deg_to_arcsec = 3600.
 
   ! Longueurs
-  real(kind=db), parameter :: AU_to_cm = 1.49597870691e13_db
+  real(kind=db), parameter :: AU_to_m = 149597870700._db ! IAU 2012 definition
+  real(kind=db), parameter :: m_to_AU = 1.0_db/AU_to_m
+
+  real(kind=db), parameter :: AU_to_cm = AU_to_m * 100._db
   real(kind=db), parameter :: cm_to_AU = 1.0_db/AU_to_cm
   real(kind=db), parameter :: AU3_to_cm3 = AU_to_cm**3
 
-  real(kind=db), parameter :: AU_to_m = 1.49595e11_db
-  real(kind=db), parameter :: m_to_AU = 1.0_db/AU_to_m
 
   real(kind=db), parameter :: mum_to_m = 1.0e-6_db
   real(kind=db), parameter :: m_to_mum = 1.0e6_db
