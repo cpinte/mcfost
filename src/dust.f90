@@ -151,12 +151,17 @@ subroutine init_indices_optiques()
   do pop=1, n_pop
      if (.not.dust_pop(pop)%is_PAH) then 
 
-        allocate(tab_tmp_amu1(n_lambda, dust_pop(pop)%n_components), tab_tmp_amu2(n_lambda, dust_pop(pop)%n_components))
+        allocate(tab_tmp_amu1(n_lambda, dust_pop(pop)%n_components), &
+             tab_tmp_amu2(n_lambda, dust_pop(pop)%n_components), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error tab_tmp_amu1'
+           stop
+        endif
+        tab_tmp_amu1 = 0. ; tab_tmp_amu2 = 0.
 
         ! Lecture fichier indices
         do k=1, dust_pop(pop)%n_components
            filename = trim(dust_dir)//trim(dust_pop(pop)%indices(k))
-
            open(unit=1,file=filename, status='old', iostat=ios)
            if (ios /=0) then
               write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
@@ -183,16 +188,16 @@ subroutine init_indices_optiques()
            n_ind = n_ind - 1
            
            ! On enleve les 2 premieres lignes
-           n_ind = n_ind - 2 
-        
+           n_ind = n_ind - 2
+
            ! Allocation de tab
            allocate(tab_l(n_ind), tab_n(n_ind), tab_k(n_ind), stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error zsup'
               stop
            endif
-           tab_l=0.0 ; tab_n=0.0 ; tab_k=0.0 
-                   
+           tab_l=0.0 ; tab_n=0.0 ; tab_k=0.0
+
            ! Lecture proprement dite
            rewind(1)
            ! On passe les commentaires
