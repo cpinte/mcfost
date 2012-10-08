@@ -519,7 +519,8 @@ subroutine lect_lambda()
   enddo
 
   ! Allocations des tab
-  allocate(tab_lambda2(n_lambda2), tab_lambda2_inf(n_lambda2),tab_lambda2_sup(n_lambda2), tab_delta_lambda2(n_lambda2), stat=alloc_status)
+  allocate(tab_lambda2(n_lambda2), tab_lambda2_inf(n_lambda2),tab_lambda2_sup(n_lambda2), &
+       tab_delta_lambda2(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda2'
      stop

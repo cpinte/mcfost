@@ -1140,7 +1140,7 @@ subroutine init_lambda2()
   integer :: i
   
   ! reorganisation memoire
-  call realloc_step2
+  call realloc_step2()
   
   n_lambda=n_lambda2
   do i=1, n_lambda2

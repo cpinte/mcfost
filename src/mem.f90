@@ -1233,7 +1233,7 @@ subroutine realloc_step2()
 
   ! Liberation memoire step1 et reallocation step 2
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
-  allocate(tab_lambda(n_lambda),tab_lambda_inf(n_lambda),tab_lambda_sup(n_lambda),tab_delta_lambda(n_lambda2),&
+  allocate(tab_lambda(n_lambda2),tab_lambda_inf(n_lambda2),tab_lambda_sup(n_lambda2),tab_delta_lambda(n_lambda2),&
        tab_amu1(n_lambda2,n_pop),tab_amu2(n_lambda2,n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda in init_lambda2'
