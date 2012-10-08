@@ -561,7 +561,7 @@ release : main
 	mkdir web web/linux_64bits web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost mcfost_cigri"
+	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
 	rm -rf ../utils/Version
 	grep mcfost_version modules.f90 | awk '{print $$6}' | sed s/\"//g > ../utils/Version
@@ -586,6 +586,11 @@ release_utils :
 	tar czvf mcfost_utils.tgz -C../utils .
 	scp -r mcfost_utils.tgz ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
 	rm -f mcfost_utils.tgz 
+
+
+fosti : 
+	rsync -Pu *.f90 Makefile fosti:mcfost/src
+	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri/"
 
 #*************************************************************
 # Nettoyage
