@@ -685,7 +685,7 @@ subroutine alloc_dynamique()
            stop
         endif
         frac_E_em_1grain_nRE=0.0
-        frac_E_em_1grain_nRE=0.0
+        log_frac_E_em_1grain_nRE=0.0
 
         !allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         !if (alloc_status > 0) then
@@ -1030,7 +1030,7 @@ subroutine dealloc_em_th()
      endif
 
      if (lnRE) then
-        deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,log_frac_E_em_1grain)        
+        deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE)
         deallocate(Temperature_1grain_nRE_old)
         deallocate(Emissivite_nRE_old)        
         deallocate(Tpeak_old)        

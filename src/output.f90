@@ -1622,7 +1622,7 @@ subroutine ecriture_temperature(iTemperature)
      end if
   endif
 
-  if (lRE_nLTE) then
+  if (lRE_nLTE .and. iTemperature==1) then
      if (l3D) then
         write(*,*) "ERROR : 3D nLTE version not written yet"
         stop
@@ -1672,7 +1672,7 @@ subroutine ecriture_temperature(iTemperature)
 
   
 
-  if (lnRE) then
+  if (lnRE .and. iTemperature==1) then
      if (l3D) then
         write(*,*) "ERROR : 3D nRE version not written yet"
         stop

@@ -335,7 +335,7 @@ subroutine lect_Temperature()
     
 
      write(*,*) "Reading temperature file : "//trim(Tfile_nRE)
-     call init_tab_Temp()
+     !call init_tab_Temp()
           
      readwrite=0
      call ftopen(unit,Tfile_nRE,readwrite,blocksize,status)
