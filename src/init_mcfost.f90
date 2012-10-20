@@ -112,6 +112,8 @@ subroutine initialisation_mcfost()
   lread_Seb_Charnoz = .false.
   lforce_1st_scatt = .false.
   lold_grid = .false.
+  lonly_bottom = .false.
+  lonly_top = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -652,6 +654,12 @@ subroutine initialisation_mcfost()
      case("-old_grid")
         i_arg = i_arg+1
         lold_grid=.true.
+     case("-only_top")
+        i_arg = i_arg+1
+        lonly_top=.true.
+     case("-only_bottom")
+        i_arg = i_arg+1
+        lonly_bottom=.true.
      case default
         call display_help()
      end select
@@ -998,6 +1006,8 @@ subroutine display_help()
   write(*,*) "        : -freeze_out <T>"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo" 
+  write(*,*) "        : -only_top : molecular emssion from the top half of the disk"
+  write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   stop
 
 end subroutine display_help

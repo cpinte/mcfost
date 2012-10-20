@@ -66,7 +66,7 @@ module parametres
   character(len=512) :: tab_wavelength
 
   ! Emission moleculaire
-  logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lsetup_gas
+  logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lsetup_gas, lonly_top, lonly_bottom
   
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
