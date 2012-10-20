@@ -2496,7 +2496,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
   integer :: ulevel, lLevel, iTrans, i, iv, ivpoint, iiTrans, n_vpoints
 
-  real :: nl, nu
+  real :: nl, nu, facteur_tau
 
   logical :: lcellule_non_vide
 
@@ -2813,8 +2813,13 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
                    exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
            endif
 
+           ! surface superieure ou inf
+           facteur_tau = 1.0
+           if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0 
+           if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0 
+
            ! Mise a jour profondeur optique pour cellule suivante
-           tau(:,iTrans) = tau(:,iTrans) + dtau(:)
+           tau(:,iTrans) = tau(:,iTrans) + dtau(:) * facteur_tau
            tau_c(iTrans) = tau_c(iTrans) + dtau_c
         enddo
         
@@ -2895,7 +2900,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
   integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1
   integer :: ulevel, lLevel, iTrans, i, iv, nbr_cell, n, ivpoint, iiTrans, n_vpoints
 
-  real :: nl, nu
+  real :: nl, nu, facteur_tau
 
   logical :: lcellule_non_vide
 
@@ -3214,9 +3219,14 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
            Snu(:) = ( emissivite_mol_o_freq(ri0,thetaj0,iiTrans) * P(:) + &
                 emissivite_dust(iiTrans,ri0,thetaj0,1) ) / (opacite(:) + 1.0e-30_db)
            I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
+
+           ! surface superieure ou inf
+           facteur_tau = 1.0
+           if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0 
+           if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0 
          
            ! Mise a jour profondeur optique pour cellule suivante
-           tau(:,iTrans) = tau(:,iTrans) + dtau(:)                  
+           tau(:,iTrans) = tau(:,iTrans) + dtau(:) * facteur_tau                  
         enddo
         
         if (ldouble_RT) then
