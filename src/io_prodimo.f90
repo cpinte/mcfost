@@ -26,10 +26,10 @@ module ProDiMo
 
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
-  real :: fUV_ProDiMo, slope_UV_ProDiMo, ProDiMo_fPAH
+  real :: fUV_ProDiMo, slope_UV_ProDiMo, ProDiMo_fPAH, ProDiMo_fPAH2, ProDiMo_fPAH3, ProDiMo_fPAH4
   ! fPAH = (2.2/mPAH) * dust_to_gas * eps_MCFOST/3e-7 
   ! + PAH_NC, PAH_NH + distance + inclinaison
-  character(len=10) :: sProDiMo_fPAH
+  character(len=10) :: sProDiMo_fPAH, sProDiMo_fPAH1, sProDiMo_fPAH2, sProDiMo_fPAH3, sProDiMo_fPAH4
   
   ! Grille de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
@@ -772,8 +772,11 @@ contains
     character(len=512) :: cmd
     character(len=128) :: line
     character(len=10) :: fmt
-    integer :: j, status, syst_status
+    integer :: i, j, pop, k, NC, NH, status, syst_status
     logical :: unchanged
+
+    real :: fPAH, eps_PAH, mPAH, masse_PAH, norme, a
+    
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
     ! Copy *.in files ()
@@ -783,6 +786,45 @@ contains
          //trim(ProDiMo_input_dir)//"/Reactions.in "&
          //trim(ProDiMo_input_dir)//"/Species.in "//trim(data_ProDiMo)
     call appel_syst(cmd,syst_status)
+
+
+    ! Calcul des fPAH pour ProDiMo
+    do i=1, n_zones
+       fPAH = 0.0 ; 
+       do pop=1, n_pop
+          if (dust_pop(pop)%zone == i) then
+             if (dust_pop(pop)%is_PAH) then
+                masse_PAH = 0.0 ;
+                norme = 0.0 ;
+                do  k=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                   a = r_grain(k)
+                   NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
+                   NH = get_NH(NC)               ! number of Hydrogen atoms
+                   mPAH = 12 * NC + NH    ! masse du PAH
+                  
+                   masse_PAH = masse_PAH + mPAH * nbre_grains(k) 
+                   norme = norme + nbre_grains(k)
+                enddo ! k
+                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs
+                eps_PAH = dust_pop(pop)%frac_mass  ! fraction en masse des PAHS
+
+                fPAH = fPAH + (2.2/masse_PAH) / gas_dust * eps_PAH/3e-7 
+              endif  ! PAH                
+          endif ! pop dans la zone
+       enddo ! pop
+
+       if (i==1) then
+          ProDiMo_fPAH = fPAH
+       else if (i==2) then
+          ProDiMo_fPAH2 = fPAH
+       else if (i==2) then
+          ProDiMo_fPAH3 = fPAH
+       else if (i==2) then
+          ProDiMo_fPAH4 = fPAH
+       endif
+    enddo ! i
+
+
 
     ! Copy and modify Parameter.in 
     open(unit=1,file=trim(ProDiMo_input_dir)//"/Parameter.in",status='old')
@@ -800,11 +842,25 @@ contains
 
        if (INDEX(line,"! fPAH") > 0) then
           write(2,*) ProDiMo_fPAH," ! fPAH : set by MCFOST"
+          if (n_zones>=2) write(2,*) ProDiMo_fPAH2," ! fPAH2 : set by MCFOST"
+          if (n_zones>=3) write(2,*) ProDiMo_fPAH3," ! fPAH3 : set by MCFOST"
+          if (n_zones>=4) write(2,*) ProDiMo_fPAH4," ! fPAH4 : set by MCFOST"
           unchanged = .false.
        endif
 
        if (INDEX(line,"! Rout") > 0) then
-          write(2,*) Rout," ! Rout : set by MCFOST"
+          write(2,*) disk_zone(1)%rout," ! Rout : set by MCFOST"
+          if (n_zones>=2) write(2,*) disk_zone(2)%rout," ! R2out : set by MCFOST"
+          if (n_zones>=3) write(2,*) disk_zone(3)%rout," ! R3out : set by MCFOST"
+          if (n_zones>=4) write(2,*) disk_zone(4)%rout," ! R4out : set by MCFOST"
+          unchanged = .false.
+       endif
+
+       if (INDEX(line,"! Rin") > 0) then
+          write(2,*) disk_zone(1)%rmin," ! Rin : set by MCFOST"
+          if (n_zones>=2) write(2,*) disk_zone(2)%rmin," ! R2in : set by MCFOST"
+          if (n_zones>=3) write(2,*) disk_zone(3)%rmin," ! R2in : set by MCFOST"
+          if (n_zones>=4) write(2,*) disk_zone(4)%rmin," ! R2in : set by MCFOST"
           unchanged = .false.
        endif
        

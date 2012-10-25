@@ -462,6 +462,30 @@ function Blambda(wl,T)
 
 end function Blambda
 
+!******************************************************
+
+function get_NH(NC) 
+  ! returns the number of Hydrogen atoms given the number of Carbon
+  ! atoms (DL01 eq. 8)
+  ! C. Pinte
+  ! 30/01/07  
+  implicit none
+
+  integer, intent(in) :: NC
+  integer :: get_NH
+
+  if (NC <= 25) then 
+     get_NH = floor(0.5*NC+0.5)
+  else if (NC <= 100) then 
+     get_NH = floor(2.5*sqrt(real(NC))+0.5)
+  else 
+     get_NH = floor(0.25*NC+0.5) 
+  endif
+
+  return
+
+end function get_NH
+
 !***********************************************************
 
 subroutine mcfost_update(lforce_update)
