@@ -147,6 +147,13 @@ contains
     real :: wl_min
     integer :: alloc_status
 
+    ! Maximum 4 zones dans ProDiMo
+    if (n_zones >4) then
+       write(*,*) "ERROR: ProDiMo cannot deal with more than 4 zones."
+       write(*,*) "Exiting."
+       stop
+    endif
+
     ! Directories
     if (.not.lprodimo_input_dir) then
        ProDiMo_input_dir = trim(mcfost_utils)//"/forProDiMo"
@@ -170,7 +177,7 @@ contains
        lambda_min = 0.0912
        lambda_max = 3410.85
 
-       ! on veut changer les lambda pour le step 2
+       ! on veut changer les lambda pour le step >=2
        lsed_complete = .true.
     endif
 
@@ -315,7 +322,7 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l, i
+    integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l, i, iRegion
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme
 
@@ -326,6 +333,8 @@ contains
     real, dimension(n_rad,nz) :: dens
     real, dimension(n_rad,nz,0:3) :: N_grains
     real, dimension(n_lambda) :: spectre
+    integer, dimension(n_rad) :: which_region
+    
 
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
     real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
@@ -397,14 +406,54 @@ contains
     call ftpkye(unit,'slope_UV',slope_UV_ProDiMo+2.0,-3,'',status) ! on remet le 2 
     call ftpkye(unit,'distance',real(distance),-8,'[pc]',status)
 
-    call ftpkye(unit,'disk_dust_mass',real(diskmass),-8,'[Msun]',status)
-    call ftpkye(unit,'Rin',real(disk_zone(1)%rin),-8,'[AU]',status)
+    if (mcfost2ProDiMo_version >=3) then
+       call ftpkyj(unit,'n_zones',n_zones,' ',status)
+       call ftpkye(unit,'disk_dust_mass_tot',real(diskmass),-8,'[Msun]',status)
+    endif
+
+    call ftpkye(unit,'disk_dust_mass',real(disk_zone(1)%diskmass),-8,'[Msun]',status)
+    call ftpkye(unit,'Rin',real(disk_zone(1)%rmin),-8,'[AU]',status)
     call ftpkye(unit,'Rout',real(disk_zone(1)%rout),-8,'[AU]',status)
     call ftpkye(unit,'Rref',real(disk_zone(1)%rref),-8,'[AU]',status)
     call ftpkye(unit,'H0',real(disk_zone(1)%sclht),-8,'[AU]',status)
     call ftpkye(unit,'edge',real(disk_zone(1)%edge),-8,'[AU]',status)
     call ftpkye(unit,'beta',real(disk_zone(1)%exp_beta),-8,'',status)
     call ftpkye(unit,'alpha',real(disk_zone(1)%surf),-8,'',status)
+
+    if (mcfost2ProDiMo_version >=3) then
+       if (n_zones>=2) then
+          call ftpkye(unit,'disk_dust_mass_2',real(disk_zone(2)%diskmass),-8,'[Msun]',status)
+          call ftpkye(unit,'Rin_2',real(disk_zone(2)%rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rout_2',real(disk_zone(2)%rout),-8,'[AU]',status)
+          call ftpkye(unit,'Rref_2',real(disk_zone(2)%rref),-8,'[AU]',status)
+          call ftpkye(unit,'H0_2',real(disk_zone(2)%sclht),-8,'[AU]',status)
+          call ftpkye(unit,'edge_2',real(disk_zone(2)%edge),-8,'[AU]',status)
+          call ftpkye(unit,'beta_2',real(disk_zone(2)%exp_beta),-8,'',status)
+          call ftpkye(unit,'alpha_2',real(disk_zone(2)%surf),-8,'',status)
+       endif
+
+       if (n_zones>=3) then
+          call ftpkye(unit,'disk_dust_mass_3',real(disk_zone(3)%diskmass),-8,'[Msun]',status)
+          call ftpkye(unit,'Rin_3',real(disk_zone(3)%rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rout_3',real(disk_zone(3)%rout),-8,'[AU]',status)
+          call ftpkye(unit,'Rref_3',real(disk_zone(3)%rref),-8,'[AU]',status)
+          call ftpkye(unit,'H0_3',real(disk_zone(3)%sclht),-8,'[AU]',status)
+          call ftpkye(unit,'edge_3',real(disk_zone(3)%edge),-8,'[AU]',status)
+          call ftpkye(unit,'beta_3',real(disk_zone(3)%exp_beta),-8,'',status)
+          call ftpkye(unit,'alpha_3',real(disk_zone(3)%surf),-8,'',status)
+       endif
+
+       if (n_zones>=4) then
+          call ftpkye(unit,'disk_dust_mass_4',real(disk_zone(4)%diskmass),-8,'[Msun]',status)
+          call ftpkye(unit,'Rin_4',real(disk_zone(4)%rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rout_4',real(disk_zone(4)%rout),-8,'[AU]',status)
+          call ftpkye(unit,'Rref_4',real(disk_zone(4)%rref),-8,'[AU]',status)
+          call ftpkye(unit,'H0_4',real(disk_zone(4)%sclht),-8,'[AU]',status)
+          call ftpkye(unit,'edge_4',real(disk_zone(4)%edge),-8,'[AU]',status)
+          call ftpkye(unit,'beta_4',real(disk_zone(4)%exp_beta),-8,'',status)
+          call ftpkye(unit,'alpha_4',real(disk_zone(4)%surf),-8,'',status)
+       endif
+    endif ! mcfost2ProDiMo_version 3
 
     call ftpkye(unit,'amin',dust_pop(1)%amin,-8,'[micron]',status)
     call ftpkye(unit,'amax',dust_pop(1)%amax,-8,'[micron]',status)
@@ -743,11 +792,33 @@ contains
 
     ! part.cm^-3 --> part.m^-3
     N_grains(:,:,0) = N_grains(:,:,0) /  (cm_to_m**3)
-
-!    write(*,*)  "TEST_0", sum(N_grains(1,:,0))
-!    write(*,*)  "TEST_3", sum(N_grains(1,:,3) * N_grains(1,:,0))
-
     call ftppre(unit,group,fpixel,nelements,N_grains,status)
+
+
+    if (mcfost2ProDiMo_version >=3) then       
+       !------------------------------------------------------------------------------
+       ! HDU 13 : Region index
+       !------------------------------------------------------------------------------
+       bitpix=32
+       naxis=1
+       nelements=naxes(1)
+       
+       ! create new hdu
+       call ftcrhd(unit, status)
+       
+       ! Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+    
+       which_region = 0
+       do iRegion=1,n_regions
+          do i=1, n_rad
+             if ( (r_grid(i,1) > Rmin_region(iRegion)).and.(r_grid(i,1) < Rmax_region(iRegion)) ) which_region(i) = iRegion 
+          enddo !i
+       enddo ! iRegion
+       call ftpprj(unit,group,fpixel,nelements,which_region,status)
+
+    endif ! mcfost2ProDiMo_version >=3
+
     
     !  Close the file and free the unit number.
     call ftclos(unit, status)
@@ -842,9 +913,9 @@ contains
 
        if (INDEX(line,"! fPAH") > 0) then
           write(2,*) ProDiMo_fPAH," ! fPAH : set by MCFOST"
-          if (n_zones>=2) write(2,*) ProDiMo_fPAH2," ! fPAH2 : set by MCFOST"
-          if (n_zones>=3) write(2,*) ProDiMo_fPAH3," ! fPAH3 : set by MCFOST"
-          if (n_zones>=4) write(2,*) ProDiMo_fPAH4," ! fPAH4 : set by MCFOST"
+          if (n_zones>=2) write(2,*) ProDiMo_fPAH2," ! f2PAH : set by MCFOST"
+          if (n_zones>=3) write(2,*) ProDiMo_fPAH3," ! f3PAH : set by MCFOST"
+          if (n_zones>=4) write(2,*) ProDiMo_fPAH4," ! f4PAH : set by MCFOST"
           unchanged = .false.
        endif
 
@@ -859,8 +930,16 @@ contains
        if (INDEX(line,"! Rin") > 0) then
           write(2,*) disk_zone(1)%rmin," ! Rin : set by MCFOST"
           if (n_zones>=2) write(2,*) disk_zone(2)%rmin," ! R2in : set by MCFOST"
-          if (n_zones>=3) write(2,*) disk_zone(3)%rmin," ! R2in : set by MCFOST"
-          if (n_zones>=4) write(2,*) disk_zone(4)%rmin," ! R2in : set by MCFOST"
+          if (n_zones>=3) write(2,*) disk_zone(3)%rmin," ! R3in : set by MCFOST"
+          if (n_zones>=4) write(2,*) disk_zone(4)%rmin," ! R4in : set by MCFOST"
+          unchanged = .false.
+       endif
+
+       if (INDEX(line,"! dust_to_gas") > 0) then
+          write(2,*) 1.0/gas_dust," ! dust_to_gas : set by MCFOST"
+          if (n_zones>=2) write(2,*) 1.0/gas_dust," ! d2ust_to_gas : set by MCFOST"
+          if (n_zones>=3) write(2,*) 1.0/gas_dust," ! d3ust_to_gas : set by MCFOST"
+          if (n_zones>=4) write(2,*) 1.0/gas_dust," ! d4ust_to_gas : set by MCFOST"
           unchanged = .false.
        endif
        

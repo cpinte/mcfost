@@ -580,6 +580,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1 
         lprodimo = .true.
         lsetup_gas=.true.
+        mcfost2ProDiMo_version = 3
+     case("-prodimo2")
+        i_arg = i_arg + 1 
+        lprodimo = .true.
+        lsetup_gas=.true.
         mcfost2ProDiMo_version = 2
      case("-prodimo1")
         i_arg = i_arg + 1 
