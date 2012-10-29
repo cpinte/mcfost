@@ -42,12 +42,12 @@
   1
 
 #Density structure
-  1                       zone type : 1 = disk, 2 = envelope	
+  2                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope	
   1.e-3                   disk dust mass
   10.  100.0              scale height, reference radius (AU), unused for envelope
-  1.0  300.0 350. 0.00    rin, rout, size_neb, edge (AU)
+  1.0  300.0 1500. 0.00   Rin, Rout (or Rc), size_neb, edge (AU)
   1.125                   flaring exponent, unused for envelope
-  -0.5      	          surface density exponent
+  -0.5      	          surface density exponent (or gamma for tappered-edge disk)
 
 #Cavity : everything is empty above the surface
  F	  	     	  cavity ?    	

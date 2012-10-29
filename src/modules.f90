@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.14
-  character(8), parameter :: mcfost_release = "2.14.4"
+  character(8), parameter :: mcfost_release = "2.14.5"
   !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
@@ -180,8 +180,8 @@ module disk
   real(kind=db) :: size_neb
   
   type disk_zone_type 
-     real(kind=db) :: rin, rint, rout, edge, exp_beta, surf, sclht, diskmass, rref, rmin
-     integer :: geometry ! 1=disk, 2=envelope
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rref, edge, exp_beta, surf, sclht, diskmass
+     integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
   end type disk_zone_type
 
   type cavity_type

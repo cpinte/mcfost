@@ -328,13 +328,17 @@ contains
        do j=1,n_zones 
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
           read(1,*) disk_zone(j)%diskmass
           read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
           read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge 
+          if (disk_zone(j)%geometry == 2) then! tappered-edge
+             disk_zone(j)%rc =  disk_zone(j)%rout
+             disk_zone(j)%rout = 4* disk_zone(j)%rc
+          endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
 
