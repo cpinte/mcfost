@@ -23,6 +23,8 @@ contains
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
 
+    real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
+
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old')
 
@@ -144,8 +146,14 @@ contains
     ! -------------------------
     read(1,*)
     read(1,*)
-    read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;  
-    read(1,*) nbre_photons_image 
+    read(1,*) fnbre_photons_eq_th ; 
+    read(1,*) fnbre_photons_lambda ;  
+    read(1,*) fnbre_photons_image 
+    nbre_photons_loop = 128 ;
+    nbre_photons_eq_th = fnbre_photons_eq_th / nbre_photons_loop
+    nbre_photons_lambda = fnbre_photons_lambda / nbre_photons_loop
+    nbre_photons_image = fnbre_photons_image / nbre_photons_loop
+
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
     lcheckpoint=.false.
