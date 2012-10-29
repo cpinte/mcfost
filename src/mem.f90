@@ -31,18 +31,33 @@ subroutine alloc_dynamique()
   gauss_random_saved = 0.0_db
   lgauss_random_saved = .false.
 
-  allocate(nnfot2(nb_proc))
+  !allocate(nnfot2(nb_proc))
   nnfot2=0.0_db
 
-  allocate(n_phot_sed2(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+  
+
+  !$omp parallel threadprivate(alloc_status) private(n_phot_sed2)
+  allocate(n_phot_sed2(n_lambda,N_thet,N_phi), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_sed2'
      stop
   endif
   n_phot_sed2 = 0.0     
 
+  write(*,*) "A", shape(n_phot_sed2)
+  !$omp end parallel
 
-  allocate(n_phot_envoyes(n_lambda,nb_proc), n_phot_envoyes_loc(n_lambda,nb_proc),  stat=alloc_status)
+  write(*,*) " "
+  write(*,*) "B", shape(n_phot_sed2)
+  write(*,*) " "
+
+  !$omp parallel firstprivate(n_phot_sed2)
+  write(*,*) "C", shape(n_phot_sed2)
+  !$omp end parallel
+
+  stop
+
+  allocate(n_phot_envoyes(n_lambda), n_phot_envoyes_loc(n_lambda),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
@@ -984,7 +999,8 @@ end subroutine alloc_dynamique
 
 subroutine dealloc_em_th()
   
-  deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
+  !deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
+  deallocate(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
 
   deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
 
@@ -1243,13 +1259,12 @@ subroutine realloc_step2()
   tab_amu1=0.0 ; tab_amu2=0.0
 
   deallocate(n_phot_sed2)
-  allocate(n_phot_sed2(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(n_phot_sed2(n_lambda2,N_thet,N_phi), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_sed2'
      stop
   endif
   n_phot_sed2 = 0.0     
-
 
   deallocate(sed)
   allocate(sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1335,7 +1350,7 @@ subroutine realloc_step2()
   wave2_io=0.0
 
   deallocate(n_phot_envoyes, n_phot_envoyes_loc)
-  allocate(n_phot_envoyes(n_lambda2,nb_proc), n_phot_envoyes_loc(n_lambda2,nb_proc),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda2), n_phot_envoyes_loc(n_lambda2),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
