@@ -425,7 +425,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      sed_u(id,lambda,capt,c_phi) = sed_u(id,lambda,capt,c_phi) + stok(3)
      sed_v(id,lambda,capt,c_phi) = sed_v(id,lambda,capt,c_phi) + stok(4)
      n_phot_sed(id,lambda,capt,c_phi) = n_phot_sed(id,lambda,capt,c_phi) + 1.0_db
-     n_phot_sed2(id,lambda,capt,c_phi) = n_phot_sed2(id,lambda,capt,c_phi) + 1.0_db
+     n_phot_sed2(lambda,capt,c_phi) = n_phot_sed2(lambda,capt,c_phi) + 1.0_db
      if (flag_star) then ! photon étoile
         if (flag_scatt) then
            sed_star_scat(id,lambda,capt,c_phi) = sed_star_scat(id,lambda,capt,c_phi) + stok(1)
@@ -551,7 +551,8 @@ subroutine write_stokes_fits()
 
 
   lambda=1
-  n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+  !n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+  n_photons_envoyes(lambda) = real(n_phot_envoyes(lambda))
   E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
   facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
   stoke_io = stoke_io * facteur
@@ -2016,7 +2017,9 @@ subroutine ecriture_sed(ised)
      ! Energie totale emise a une distance emise egale au rayon stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
      do lambda=1, n_lambda2
-        n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+        !n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+        n_photons_envoyes(lambda) = real(n_phot_envoyes(lambda))
+  
         E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
      enddo
 

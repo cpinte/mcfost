@@ -70,7 +70,7 @@ subroutine transfert_poussiere()
   ! Paramètres parallelisation
   integer :: id=1, iargc
 
-  real(kind=db), dimension(:), pointer :: p_nnfot2 
+  real(kind=db), pointer :: p_nnfot2 
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
@@ -123,7 +123,10 @@ subroutine transfert_poussiere()
 
   ! Allocation dynamique
   call alloc_dynamique()
-  allocate(p_nnfot2(nb_proc))
+
+  !$omp parallel
+  allocate(p_nnfot2)
+  !$omp end parallel
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -473,13 +476,13 @@ subroutine transfert_poussiere()
      !$omp parallel &
      !$omp default(none) &  
      !$omp firstprivate(lambda) &
-     !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,rand) &
+     !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim) &
-     !$omp shared(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc,nbre_phot2,nnfot2,lforce_1st_scatt) &
+     !$omp shared(nbre_phot2,lforce_1st_scatt) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
      !$omp shared(time_checkpoint, checkpoint_time, delta_time, time_checkpoint_old, lcheckpoint,lscatt_ray_tracing1) &
-     !$omp reduction(+:E_abs_nRE) 
+     !$omp reduction(+:E_abs_nRE,n_phot_envoyes,n_phot_envoyes_loc) 
   
      if (letape_th) then
         p_nnfot2 => nnfot2
@@ -488,7 +491,7 @@ subroutine transfert_poussiere()
         if (lmono0) then
            p_nnfot2 => nnfot2
         else
-           p_nnfot2 => n_phot_sed2(:,lambda,capt_sup,1)
+           p_nnfot2 => n_phot_sed2(lambda,capt_sup,1)
            
            if (lProDiMo)  then 
               p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
@@ -519,12 +522,17 @@ subroutine transfert_poussiere()
        ! endif
         
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
-        p_nnfot2(id) = 0
-        n_phot_envoyes_loc(lambda,id) = 0.0
-        photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(lambda,id) < n_phot_lim))
-           nnfot2(id)=nnfot2(id)+1.0_db
-           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
-           n_phot_envoyes_loc(lambda,id) = n_phot_envoyes_loc(lambda,id) + 1.0_db
+        p_nnfot2 = 0
+        n_phot_envoyes_loc(lambda) = 0.0
+        photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_loc(lambda) < n_phot_lim))
+           
+        !   if (.not. letape_th) then
+        !      write(*,*) id, p_nnfot2, nbre_phot2, n_phot_envoyes_loc(lambda),  n_phot_lim
+        !   endif
+
+           nnfot2=nnfot2+1.0_db
+           n_phot_envoyes(lambda) = n_phot_envoyes(lambda) + 1.0_db
+           n_phot_envoyes_loc(lambda) = n_phot_envoyes_loc(lambda) + 1.0_db
 
            ! Choix longueur d'onde
            if (.not.lmono) then
@@ -574,8 +582,8 @@ subroutine transfert_poussiere()
         !$omp do schedule(dynamic,1)
         do nnfot1=1,nbre_photons_loop
            !$ id = omp_get_thread_num() + 1
-           nnfot2(id) = 0.0_db
-           photon_ISM : do while (nnfot2(id) < nbre_photons_lambda)
+           nnfot2 = 0.0_db
+           photon_ISM : do while (nnfot2 < nbre_photons_lambda)
               n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_db
 
               ! Emission du paquet
@@ -585,7 +593,7 @@ subroutine transfert_poussiere()
               if (.not.lintersect) then 
                  cycle photon_ISM              
               else
-                 nnfot2(id) = nnfot2(id) + 1.0_db 
+                 nnfot2 = nnfot2 + 1.0_db 
                  ! Propagation du packet
                  call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
               endif
