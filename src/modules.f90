@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.14
-  character(8), parameter :: mcfost_release = "2.14.4"
+  real, parameter :: mcfost_version = 2.15
+  character(8), parameter :: mcfost_release = "2.15.1"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -162,8 +162,6 @@ module disk
   implicit none
   save
 
-!*     size_neb est la dimension maxi de la nebuleuse spherique
-! Ne pas modifier par n_rad
   real :: distance ! Distance du disque en pc
 
 !* Parametres du disque
@@ -173,26 +171,25 @@ module disk
 !* en masse solaire
 !*     exp_beta.......... exposant decrivant le "flaring"
 !*     surf.......... exposant de la distribution SURFACIQUE de densite
-!*                    surf .neq. -2.0 !!!!!
 !*     rin, rout..... limites interne et externe du disque
 !*     rref.......... rayon de reference ("r0")
 !*     sclht......... echelle de hauteur a r0 ("h0")
 !*
-  real(kind=db) :: size_neb
+  real(kind=db) :: map_size
   
   type disk_zone_type 
-     real(kind=db) :: rin, rint, rout, edge, exp_beta, surf, sclht, diskmass, rref, rmin
-     integer :: geometry ! 1=disk, 2=envelope
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, sclht, diskmass
+     integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
   end type disk_zone_type
 
   type cavity_type
-     real(kind=db) ::  exp_beta, sclht, rref
+     real(kind=db) ::  exp_beta, sclht, Rref
   end type cavity_type
 
   type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
   type(cavity_type) :: cavity
 
-  real(kind=db) :: rmin, rout, rout2, diskmass, correct_Rsub
+  real(kind=db) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
 
   real :: r_subdivide
   logical :: lr_subdivide

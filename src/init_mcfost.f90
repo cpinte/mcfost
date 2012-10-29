@@ -835,7 +835,7 @@ subroutine initialisation_mcfost()
          deltapix_x = 1 - (igridy/2) + (igridx/2)
          deltapix_y = 1
       endif
-      size_pix=maxigrid/(2.0*size_neb)
+      size_pix=maxigrid/(map_size)
   endif
 
   if (lzoom) then

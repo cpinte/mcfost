@@ -573,7 +573,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   w2=1.0_db-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  l = R_ISM * size_neb
+  l = R_ISM * Rmax
   x = x * l
   y = y * l
   z = z * l

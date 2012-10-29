@@ -151,11 +151,11 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      yprim = ytmp * cos_disk + ztmp * sin_disk
      zprim = ztmp * cos_disk - ytmp * sin_disk
 
-     IMAP1 = int((YPRIM*zoom + size_neb)*size_pix) + deltapix_x
+     IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix) + deltapix_x
      if (IMAP1 <= 0 ) return !cycle photon
      if (IMAP1 > IGRIDX)  return !cycle photon
 
-     JMAP1 = int((ZPRIM*zoom + size_neb)*size_pix)  + deltapix_y
+     JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_y
      if (JMAP1 <= 0) return !cycle photon
      if (JMAP1 > IGRIDY) return !cycle photon
 
@@ -194,12 +194,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
         yprim = ytmp * cos_disk - ztmp * sin_disk
         zprim = ztmp * cos_disk + ytmp * sin_disk
 
-        IMAP2 = int((YPRIM*zoom + size_neb)*size_pix)  + deltapix_x
+        IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_x
         if (IMAP2 <= 0 ) return !cycle photon
         if (IMAP2 > IGRIDX)  return !cycle photon
 
 
-        JMAP2 = int((ZPRIM*zoom + size_neb)*size_pix)  + deltapix_y
+        JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_y
         if (JMAP2 <= 0) return !cycle photon
         if (JMAP2 > IGRIDY) return !cycle photon
 
@@ -296,12 +296,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 !!!!!!!!!!!!!!
      !Warning : marche que sans rotation !!!
      if (n_cartes > 1) then
-        IMAP1 = int((YPRIM*zoom + size_neb)*size_pix2(1)) + deltapix_x2(1)
+        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(1)) + deltapix_x2(1)
         if (IMAP1 <= 0 ) return !cycle photon
         if (IMAP1 > IGRIDX2(1))  return !cycle photon
 
 
-        JMAP1 = int((ZPRIM*zoom + size_neb)*size_pix2(1))  + deltapix_y2(1)
+        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_y2(1)
         if (JMAP1 <= 0) return !cycle photon
         if (JMAP1 > IGRIDY2(1)) return !cycle photon
 
@@ -314,12 +314,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
           ! zprim = ztmp * cos_disk + ytmp * sin_disk
 
-           IMAP2 = int((YPRIM*zoom + size_neb)*size_pix2(1))  + deltapix_x2(1)
+           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_x2(1)
            if (IMAP2 <= 0 ) return !cycle photon
            if (IMAP2 > IGRIDX2(1))  return !cycle photon
 
 
-           JMAP2 = int((ZPRIM*zoom + size_neb)*size_pix2(1))  + deltapix_y2(1)
+           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_y2(1)
            if (JMAP2 <= 0) return !cycle photon
            if (JMAP2 > IGRIDY2(1)) return !cycle photon
 
@@ -337,12 +337,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 !!!
      endif
      if (n_cartes > 2) then
-        IMAP1 = int((YPRIM*zoom + size_neb)*size_pix2(2)) + deltapix_x2(2)
+        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(2)) + deltapix_x2(2)
         if (IMAP1 <= 0 ) return !cycle photon
         if (IMAP1 > IGRIDX2(2))  return !cycle photon
 
 
-        JMAP1 = int((ZPRIM*zoom + size_neb)*size_pix2(2))  + deltapix_y2(2)
+        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_y2(2)
         if (JMAP1 <= 0) return !cycle photon
         if (JMAP1 > IGRIDY2(2)) return !cycle photon
 
@@ -355,12 +355,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
           ! zprim = ztmp * cos_disk + ytmp * sin_disk
 
-           IMAP2 = int((YPRIM*zoom + size_neb)*size_pix2(2))  + deltapix_x2(2)
+           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_x2(2)
            if (IMAP2 <= 0 ) return !cycle photon
            if (IMAP2 > IGRIDX2(2))  return !cycle photon
 
 
-           JMAP2 = int((ZPRIM*zoom + size_neb)*size_pix2(2))  + deltapix_y2(2)
+           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_y2(2)
            if (JMAP2 <= 0) return !cycle photon
            if (JMAP2 > IGRIDY2(2)) return !cycle photon
 
@@ -378,12 +378,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
      endif
      if (n_cartes > 3) then
-        IMAP1 = int((YPRIM*zoom + size_neb)*size_pix2(3)) + deltapix_x2(3)
+        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(3)) + deltapix_x2(3)
         if (IMAP1 <= 0 ) return !cycle photon
         if (IMAP1 > IGRIDX2(3))  return !cycle photon
 
 
-        JMAP1 = int((ZPRIM*zoom + size_neb)*size_pix2(3))  + deltapix_y2(3)
+        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_y2(3)
         if (JMAP1 <= 0) return !cycle photon
         if (JMAP1 > IGRIDY2(3)) return !cycle photon
 
@@ -396,12 +396,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
           ! zprim = ztmp * cos_disk + ytmp * sin_disk
 
-           IMAP2 = int((YPRIM*zoom + size_neb)*size_pix2(3))  + deltapix_x2(3)
+           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_x2(3)
            if (IMAP2 <= 0 ) return !cycle photon
            if (IMAP2 > IGRIDX2(3))  return !cycle photon
 
 
-           JMAP2 = int((ZPRIM*zoom + size_neb)*size_pix2(3))  + deltapix_y2(3)
+           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_y2(3)
            if (JMAP2 <= 0) return !cycle photon
            if (JMAP2 > IGRIDY2(3)) return !cycle photon
 
@@ -589,13 +589,13 @@ subroutine write_stokes_fits()
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
+  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
   
@@ -762,13 +762,13 @@ subroutine ecriture_map_ray_tracing()
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
+  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
   !----- Images
@@ -2214,13 +2214,13 @@ subroutine ecriture_spectre(imol)
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -2.0*size_neb / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = 2.0*size_neb / (igridy * distance * zoom) * arcsec_to_deg
+  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
