@@ -8,7 +8,8 @@ module parametres
 
   real, parameter :: mcfost_version = 2.14
   character(8), parameter :: mcfost_release = "2.14.4"
-  !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
+  real, parameter :: required_utils_version = 2.14
+
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
   

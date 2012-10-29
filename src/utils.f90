@@ -716,7 +716,7 @@ subroutine update_utils(lforce_update)
   logical :: lupdate
 
   ! Last version
-  utils_current_version =  mcfost_utils_version()
+  utils_current_version =  get_mcfost_utils_version()
   write(*,*) "Version ", utils_current_version
   write(*,*) "Checking last version of MCFOST UTILS ..."
 
@@ -789,24 +789,19 @@ end subroutine get_utils
 
 !***********************************************************
 
-real function mcfost_utils_version()
+real function get_mcfost_utils_version()
 
   integer :: ios
 
   ! Check utils directory
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
-  read(1,*,iostat=ios) mcfost_utils_version
+  read(1,*,iostat=ios) get_mcfost_utils_version
   close(unit=1)
-  if (ios /= 0) mcfost_utils_version = 0.0
-  if (mcfost_utils_version /= mcfost_version) then
-     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
-     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
-     write(*,*) "Please update with mcfost -update_utils"
-     write(*,*) "Exiting."
-     stop
-  endif
+  if (ios /= 0) get_mcfost_utils_version = 0.0
+  
+  return
 
-end function mcfost_utils_version
+end function get_mcfost_utils_version
 
 !***********************************************************
 
