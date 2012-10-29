@@ -125,7 +125,7 @@ subroutine define_density()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
      
-     if (dz%geometry == 1) then ! Disque
+     if (dz%geometry <= 2) then ! Disque
         ! Calcul opacite et probabilite de diffusion
         !$o m p parallel &
         !$o m p default(none) &
@@ -151,12 +151,20 @@ subroutine define_density()
               else
                  puffed = 1.0
               endif
-              
+           
+
+              if (dz%geometry == 1) then ! power-law
+                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
+              else ! tappered-edge
+                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2-dz%surf) )
+              endif
+
+              coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
+
+   
               do k=1, n_az
                  phi = phi_grid(k)
 
-                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-                 coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
                                
                  ! Warp analytique
                  if (lwarp) then
@@ -274,7 +282,7 @@ subroutine define_density()
            endif ! model > 0
         endif ! lSeb_Fromang
 
-     else if (dz%geometry == 2) then ! enveloppe : 2D uniquement pour le moment
+     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
            do j=1,nz
               ! On calcule la densite au milieu de la cellule
@@ -310,32 +318,9 @@ subroutine define_density()
               endif ! lsetup_gas
            enddo !j
         enddo ! i
-     else if(dz%geometry == 3) then
-
-         do i=1, n_rad
-           do j=1,nz
-              ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
-              rsph = sqrt(rcyl**2+z**2)
-
-              do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 if (rsph > dz%rout) then
-                    density = 0.0
-                 else if (rsph < dz%rmin) then
-                    density = 0.0
-                 else
-                    density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
-                 endif
-                 densite_pouss(i,j,1,l) = density
-              enddo !l
-              
-
-           enddo !j
-        enddo !i
-
+        
      endif ! dz%geometry
-
+        
   enddo ! n_pop
 
 
