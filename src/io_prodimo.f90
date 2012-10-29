@@ -328,6 +328,7 @@ contains
 
     logical :: simple, extend
     character(len=512) :: filename
+    character :: s
 
     real(kind=db), dimension(n_rad,nz,2) :: grid
     real, dimension(n_rad,nz) :: dens
@@ -399,6 +400,11 @@ contains
     call ftpkyj(unit,'mcfost2prodimo',mcfost2ProDiMo_version,'',status)
     call ftpkys(unit,'mcfost_model_name',trim(para),'',status)
 
+    if (mcfost2ProDiMo_version >=3) then
+       call ftpkyj(unit,'n_zones',n_zones,' ',status)
+       call ftpkyj(unit,'n_regions',n_zones,' ',status)
+    endif
+
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
     call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
     call ftpkye(unit,'Mstar',real(etoile(1)%M),-8,'[Msun]',status)
@@ -407,10 +413,17 @@ contains
     call ftpkye(unit,'distance',real(distance),-8,'[pc]',status)
 
     if (mcfost2ProDiMo_version >=3) then
-       call ftpkyj(unit,'n_zones',n_zones,' ',status)
-       call ftpkye(unit,'disk_dust_mass_tot',real(diskmass),-8,'[Msun]',status)
-    endif
+       call ftpkye(unit,'disk_dust_mass_tot',real(diskmass),-8,'[Msun]',status) ! Version >=3
 
+       ! Adding regions information
+       do i=1,n_regions
+          write(s,'(i1)') i
+          call ftpkye(unit,'Rmin_region_'//s,real(Rmin_region(i)),-8,'[AU]',status)
+          call ftpkye(unit,'Rmax_region_'//s,real(Rmax_region(i)),-8,'[AU]',status)
+       enddo
+    endif ! mcfost2ProDiMo_version 3
+
+    ! 1st zone or only zone if mcfost2ProDiMo_version <=2 
     call ftpkye(unit,'disk_dust_mass',real(disk_zone(1)%diskmass),-8,'[Msun]',status)
     call ftpkye(unit,'Rin',real(disk_zone(1)%rmin),-8,'[AU]',status)
     call ftpkye(unit,'Rout',real(disk_zone(1)%rout),-8,'[AU]',status)
@@ -420,39 +433,19 @@ contains
     call ftpkye(unit,'beta',real(disk_zone(1)%exp_beta),-8,'',status)
     call ftpkye(unit,'alpha',real(disk_zone(1)%surf),-8,'',status)
 
-    if (mcfost2ProDiMo_version >=3) then
-       if (n_zones>=2) then
-          call ftpkye(unit,'disk_dust_mass_2',real(disk_zone(2)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_2',real(disk_zone(2)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_2',real(disk_zone(2)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_2',real(disk_zone(2)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_2',real(disk_zone(2)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_2',real(disk_zone(2)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_2',real(disk_zone(2)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_2',real(disk_zone(2)%surf),-8,'',status)
-       endif
-
-       if (n_zones>=3) then
-          call ftpkye(unit,'disk_dust_mass_3',real(disk_zone(3)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_3',real(disk_zone(3)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_3',real(disk_zone(3)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_3',real(disk_zone(3)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_3',real(disk_zone(3)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_3',real(disk_zone(3)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_3',real(disk_zone(3)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_3',real(disk_zone(3)%surf),-8,'',status)
-       endif
-
-       if (n_zones>=4) then
-          call ftpkye(unit,'disk_dust_mass_4',real(disk_zone(4)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_4',real(disk_zone(4)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_4',real(disk_zone(4)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_4',real(disk_zone(4)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_4',real(disk_zone(4)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_4',real(disk_zone(4)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_4',real(disk_zone(4)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_4',real(disk_zone(4)%surf),-8,'',status)
-       endif
+    if (mcfost2ProDiMo_version >=3) then       
+       ! Adding zones information
+       do i=2, n_zones
+          write(s,'(i1)') i
+          call ftpkye(unit,'disk_dust_mass_'//s,real(disk_zone(i)%diskmass),-8,'[Msun]',status)
+          call ftpkye(unit,'Rin_'//s,real(disk_zone(i)%rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rout_'//s,real(disk_zone(i)%rout),-8,'[AU]',status)
+          call ftpkye(unit,'Rref_'//s,real(disk_zone(i)%rref),-8,'[AU]',status)
+          call ftpkye(unit,'H0_'//s,real(disk_zone(i)%sclht),-8,'[AU]',status)
+          call ftpkye(unit,'edge_'//s,real(disk_zone(i)%edge),-8,'[AU]',status)
+          call ftpkye(unit,'beta_'//s,real(disk_zone(i)%exp_beta),-8,'',status)
+          call ftpkye(unit,'alpha_'//s,real(disk_zone(i)%surf),-8,'',status)
+       enddo
     endif ! mcfost2ProDiMo_version 3
 
     call ftpkye(unit,'amin',dust_pop(1)%amin,-8,'[micron]',status)
