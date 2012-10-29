@@ -165,7 +165,15 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  utils_version =  mcfost_utils_version()
+  utils_version =  get_mcfost_utils_version()
+  if (utils_version /= required_utils_version) then
+     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
+     write(*,*) "Utils:", utils_version, "required:",required_utils_version
+     write(*,*) "Please update with mcfost -update_utils"
+     write(*,*) "Exiting."
+     stop
+  endif
+
 
   ! Les benchmarks
   if (para(1:8)=="Pascucci") then
