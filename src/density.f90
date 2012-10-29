@@ -1631,7 +1631,7 @@ subroutine densite_data_LAURE_SED()
   enddo
   r_lim(0) = r_grid(1,1) / sqrt(r_grid(2,1)/r_grid(1,1)) 
   r_lim(n_rad) = r_grid(n_rad,1) * sqrt(r_grid(n_rad,1)/r_grid(n_rad-1,1)) 
-  rout = r_lim(n_rad) 
+  rmax = r_lim(n_rad) 
   rmin = r_lim(0)
   
 

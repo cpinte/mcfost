@@ -651,7 +651,7 @@ contains
               
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*(R_ISM*size_neb)**2) / n_photons_envoyes / pi
+           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi
               
        do ri=1, n_rad
           do zj=1,nz

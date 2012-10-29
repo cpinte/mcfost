@@ -611,13 +611,13 @@ subroutine emission_line_map(imol,ibin)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
-  l = 10.*rout  ! on se met loin
+  l = 10.*Rmax  ! on se met loin
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
   ! Coin en bas gauche de l'image
-  Icorner(:) = center(:) - size_neb * (Iaxis(1,:) + Iaxis(2,:) )
+  Icorner(:) = center(:) - 0.5 * map_size * (Iaxis(1,:) + Iaxis(2,:) )
 
   
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
@@ -631,7 +631,7 @@ subroutine emission_line_map(imol,ibin)
      j = 1
      
      rmin_RT = max(w*0.9_db,0.05_db) * rmin
-     rmax_RT = 2.0_db * rout
+     rmax_RT = 2.0_db * Rmax
 
      tab_r(1) = rmin_RT
      fact_r = exp( (1.0_db/(real(n_rad_RT,kind=db) -1))*log(rmax_RT/rmin_RT) )
@@ -678,7 +678,7 @@ subroutine emission_line_map(imol,ibin)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel 
-     taille_pix = 2.0_db * size_neb / real(max(igridx,igridy),kind=db) ! en AU
+     taille_pix = map_size / real(max(igridx,igridy),kind=db) ! en AU
      dx(:) = Iaxis(1,:) * taille_pix
      dy(:) = Iaxis(2,:) * taille_pix
 
