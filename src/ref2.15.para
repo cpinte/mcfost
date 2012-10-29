@@ -1,10 +1,9 @@
-2.14                      mcfost version
+2.15                      mcfost version
 
 #Number of photon packages
-  128			  nbr_parallel_loop 
-  1000                    nbr_photons_eq_th  : T computation 
-  10			  nbr_photons_lambda : SED computation
-  1000                    nbr_photons_image  : images computation
+  1.28e5                  nbr_photons_eq_th  : T computation 
+  1.28e3	          nbr_photons_lambda : SED computation
+  1.28e5                  nbr_photons_image  : images computation
 
 #Wavelength
   50  0.1 3000.0          n_lambda
@@ -17,7 +16,7 @@
   100 70 1 20             n_rad, nz (or n_theta), n_az, n_rad_in
 
 #Maps
-  101 101   1.0           grid (nx,ny), zoom factor
+  101 101 3000.  1.0      grid (nx,ny), size [AU], zoom factor
   10 1   1                MC : N_bin_incl, N_bin_az, # of bin where MC is converged 
   45.  45.  1  F          RT: imin, imax, n_incl, centered ?      
   140.0			  distance (pc)  
@@ -45,7 +44,7 @@
   2                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope	
   1.e-3                   disk dust mass
   10.  100.0              scale height, reference radius (AU), unused for envelope
-  1.0  300.0 1500. 0.00   Rin, Rout (or Rc), size_neb, edge (AU)
+  1.0  300.0 0.00         Rin, Rout (or Rc), edge (AU)
   1.125                   flaring exponent, unused for envelope
   -0.5      	          surface density exponent (or gamma for tappered-edge disk)
 

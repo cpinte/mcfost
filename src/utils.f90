@@ -740,7 +740,7 @@ subroutine update_utils(lforce_update)
 
 
   ! Do we need to update ?
-  if (last_version == mcfost_version) then
+  if (last_version == required_utils_version) then
      !Ok we have the correct version of mcfost
      if (last_version == utils_current_version) then
         write(*,*) "MCFOST UTILS is up-to-date"
