@@ -510,9 +510,9 @@ subroutine mcfost_update(lforce_update)
      stop
   endif
 
-  open(unit=1, file="version.txt", status='old')
+  open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
@@ -648,9 +648,9 @@ subroutine mcfost_v()
      write(*,*) "Exiting"
      stop
   endif
-  open(unit=1, file="version.txt", status='old')
+  open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST last version number (Error 2)"
@@ -678,9 +678,9 @@ subroutine mcfost_v()
      ! Getting line number of current version in history
      cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
      call appel_syst(cmd, syst_status)
-     open(unit=1, file="line_number.txt", status='old')
+     open(unit=1, file="line_number.txt", status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
-     close(unit=1,status="delete") 
+     close(unit=1,status="delete",iostat=ios) 
      
      ! Printing history
      if (ios==0) then
@@ -727,9 +727,9 @@ subroutine update_utils(lforce_update)
      write(*,*) "Exiting"
      stop
   endif
-  open(unit=1, file="Version", status='old')
+  open(unit=1, file="Version", status='old',iostat=ios)
   read(1,*,iostat=ios) s_last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 2)"
@@ -796,7 +796,7 @@ real function get_mcfost_utils_version()
   ! Check utils directory
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
   read(1,*,iostat=ios) get_mcfost_utils_version
-  close(unit=1)
+  close(unit=1,iostat=ios)
   if (ios /= 0) get_mcfost_utils_version = 0.0
   
   return
