@@ -145,19 +145,22 @@ subroutine initialisation_mcfost()
   
   ! Basic options
   if (para(1:1)=="-") then
-     if (para(2:2)=="v") then
+     if (para(2:2)=="v") then ! mcfost version
         call mcfost_v()
-     else if (para(2:2)=="h") then
+     else if (para(2:2)=="h") then ! mcfost history
         call mcfost_history()
-     else if (para(2:13)=="setup") then
+     else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
         call get_utils()
-     else  if (para(2:13)=="update_utils") then
+        call mcfost_get_ref_para()
+     else if (para(2:8)=="get_para") then ! download current reference file
+        call mcfost_get_ref_para()
+     else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
-     else if (para(2:14)=="fupdate_utils") then
+     else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
-     else if (para(2:2)=="u") then
+     else if (para(2:2)=="u") then ! update binary
         call mcfost_update(.false.)
-     else if (para(2:3)=="fu") then
+     else if (para(2:3)=="fu") then ! force update binary
         call mcfost_update(.true.)
      else
         call display_help()
@@ -931,10 +934,12 @@ subroutine display_help()
 
   write(*,*) "usage : mcfost parameter_file [options]"
   write(*,*)
-  write(*,*) "mcfost -v displays version number, and available updates"
-  write(*,*) "mcfost -u updates MCFOST to most recent version"
-  write(*,*) "mcfost -update_utils updates MCFOST_UTILS to most recent version"
-  write(*,*) "mcfost -h displays full MCFOST history since v2.12.9"
+  write(*,*) "mcfost -help : displays this help message"
+  write(*,*) "       -v : displays version number, and available updates"
+  write(*,*) "       -get_para : downloads the current version of the parameter file"
+  write(*,*) "       -u : updates MCFOST to most recent version"
+  write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
+  write(*,*) "       -h : displays full MCFOST history since v2.12.9"
   write(*,*) " "
   write(*,*) " Main mcfost options" 
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"

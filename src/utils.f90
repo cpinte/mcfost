@@ -626,6 +626,30 @@ end subroutine mcfost_history
 
 !***********************************************************
 
+subroutine mcfost_get_ref_para()
+
+  character(len=512) :: cmd
+  character(len=12) :: ref_file
+  integer ::  syst_status
+  
+  ref_file = "ref"//mcfost_release(1:4)//".para"
+  
+  write(*,*) "Getting MCFOST reference file: "//ref_file
+  cmd = "curl "//trim(webpage)//ref_file//" -O -s"
+  call appel_syst(cmd, syst_status)           
+  if (syst_status/=0) then 
+     write(*,*) "Cannot get MCFOST reference file"
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Done"
+
+  return
+
+end subroutine mcfost_get_ref_para
+
+!***********************************************************
+
 subroutine mcfost_v()
 
   character(len=512) :: cmd, last_version
