@@ -402,7 +402,7 @@ contains
 
     if (mcfost2ProDiMo_version >=3) then
        call ftpkyj(unit,'n_zones',n_zones,' ',status)
-       call ftpkyj(unit,'n_regions',n_zones,' ',status)
+       call ftpkyj(unit,'n_regions',n_regions,' ',status)
     endif
 
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
