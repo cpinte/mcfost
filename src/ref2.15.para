@@ -32,7 +32,6 @@
   T	                  axial symmetry (important only if N_phi > 1)  
 
 #Dust global properties
-  100.			  Gas-to-dust (integrated) mass ratio		
   F  0.00  1.0		  dust settling, exp_strat, a_strat
   F		  	  sublimate dust
   F  0.0		  viscous heating, viscosity
@@ -42,7 +41,7 @@
 
 #Density structure
   2                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope	
-  1.e-3                   disk dust mass
+  1.e-3    100.		  dust mass,  gas-to-dust mass ratio	
   10.  100.0              scale height, reference radius (AU), unused for envelope
   1.0  300.0 0.00         Rin, Rout (or Rc), edge (AU)
   1.125                   flaring exponent, unused for envelope

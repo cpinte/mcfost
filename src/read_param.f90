@@ -281,7 +281,6 @@ contains
     ! Dust global properties
     ! ----------------------
     if (lfits) then
-       gas_dust=100.
        lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
        ldust_sublimation=.false.
        lchauff_int=.false. ; alpha=0.0
@@ -289,7 +288,6 @@ contains
     else
        read(1,*)
        read(1,*) 
-       read(1,*) gas_dust
        read(1,*) lstrat, exp_strat, a_strat
        if (ldebris) then
           lstrat=.true.
@@ -336,6 +334,7 @@ contains
           disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0 
           disk_zone(j)%exp_beta=struct_file_beta
           disk_zone(j)%surf=0.0
+          disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
        read(1,*)
@@ -347,7 +346,7 @@ contains
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
-          read(1,*) disk_zone(j)%diskmass
+          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
           read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
           read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge 
           if (disk_zone(j)%geometry == 1) then ! disc
@@ -358,7 +357,6 @@ contains
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
-
        enddo ! n_zones
     endif ! lfits
 
@@ -663,6 +661,7 @@ contains
 
     integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -896,6 +895,7 @@ contains
        enddo ! n_zones
     endif ! lfits
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
     Rmax = maxval(disk_zone(:)%Rmax)
@@ -1198,6 +1198,7 @@ contains
 
     integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1423,6 +1424,7 @@ contains
        enddo ! n_zones
     endif ! lfits
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -1724,6 +1726,7 @@ contains
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1949,6 +1952,7 @@ contains
        enddo ! n_zones
     endif ! lfits
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -2235,8 +2239,8 @@ contains
     implicit none
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop, status, imol
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2459,6 +2463,7 @@ contains
        enddo ! n_zones
     endif ! lfits
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -2744,8 +2749,8 @@ contains
     implicit none
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2974,6 +2979,7 @@ contains
        enddo ! n_zones
     endif ! lfits
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -3257,8 +3263,8 @@ contains
     implicit none
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -3404,6 +3410,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -3622,8 +3629,8 @@ contains
     implicit none
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -3759,6 +3766,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     rmax = maxval(disk_zone(:)%rout)
@@ -3978,8 +3986,8 @@ contains
     implicit none
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -4122,6 +4130,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -4345,8 +4354,8 @@ contains
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
     real :: version
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -4487,6 +4496,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -4711,8 +4721,8 @@ contains
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
     real :: version
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -4850,6 +4860,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -5074,8 +5085,8 @@ contains
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
     real :: version
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -5185,6 +5196,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -5402,8 +5414,8 @@ contains
 
     integer :: i, j, alloc_status, ios, tmpint, ind_pop
     real :: version
-
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -5511,6 +5523,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout
@@ -5718,6 +5731,7 @@ contains
 
     integer :: i, alloc_status, ios, tmpint, j, ind_pop
     real(kind=db) :: size_neb_tmp, somme
+    real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -5831,6 +5845,7 @@ contains
        endif
     enddo
 
+    disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
     disk_zone(:)%Rmax = disk_zone(:)%rout

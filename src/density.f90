@@ -64,7 +64,7 @@ subroutine define_density()
 
      if (dz%geometry == 3) lwall = .true. 
 
-     if (dz%geometry == 1) then ! Disque
+     if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
            cst(i)=(((2.0+dz%surf)*dust_pop(i)%masse)/(((2*pi)**1.5)*dz%sclht*(dz%rin**2)*&
                 ((dz%rout/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
@@ -78,12 +78,12 @@ subroutine define_density()
            cst(i)= dust_pop(i)%masse/( 4*pi * log(dz%rout/dz%rin) )
         endif
      end if
-  enddo
+  enddo !i pop
   
   ! facteur multiplicatif pour passer en g/cm**3: 
   cst=cst * Msun_to_g / AU3_to_cm3
 
-  ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
+  ! facteur multiplicatif pour passer en part/cm**3: avg_grain_mass
   do i=1, n_pop
      cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
@@ -91,7 +91,8 @@ subroutine define_density()
   ! Facteur multiplicatif pour passer en masse de gaz
   ! puis en nH2/cm**3 puis en nH2/m**3
   do i=1, n_pop
-     cst_gaz(i) = cst(i) * gas_dust / masse_mol_gaz * m3_to_cm3
+     izone=dust_pop(i)%zone
+     cst_gaz(i) = cst(i) * disk_zone(izone)%gas_to_dust / masse_mol_gaz * m3_to_cm3
   enddo
 
   do  l=1,n_grains_tot
@@ -152,20 +153,16 @@ subroutine define_density()
                  puffed = 1.0
               endif
            
-
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
               else ! tappered-edge
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2-dz%surf) )
               endif
-
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
    
               do k=1, n_az
-                 phi = phi_grid(k)
-
-                               
+                 phi = phi_grid(k)                               
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
@@ -1746,6 +1743,7 @@ subroutine densite_eqdiff()
   implicit none
 
   real, parameter :: G = 6.672e-8
+  real, parameter :: gas_dust = 100
 
   integer :: i,j, k, l, k_min, jj
   real :: cst, cst_pous, cst_gaz, M_star, a
@@ -2263,6 +2261,8 @@ subroutine equilibre_hydrostatique()
   real, dimension(nz) :: rho, ln_rho
   real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
   integer :: i,j, k
+
+  real, parameter :: gas_dust = 100
 
   M_etoiles = sum(etoile(:)%M) * Msun_to_kg
   M_mol = masse_mol_gaz * g_to_kg
