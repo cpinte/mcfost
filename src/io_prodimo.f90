@@ -878,13 +878,13 @@ contains
        enddo ! pop
 
        if (i==1) then
-          ProDiMo_fPAH = fPAH
+          ProDiMo_fPAH  = max(fPAH,1e-9)
        else if (i==2) then
-          ProDiMo_fPAH2 = fPAH
+          ProDiMo_fPAH2 = max(fPAH,1e-9)
        else if (i==2) then
-          ProDiMo_fPAH3 = fPAH
+          ProDiMo_fPAH3 = max(fPAH,1e-9)
        else if (i==2) then
-          ProDiMo_fPAH4 = fPAH
+          ProDiMo_fPAH4 = max(fPAH,1e-9)
        endif
     enddo ! i
 
