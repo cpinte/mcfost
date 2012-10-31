@@ -71,7 +71,9 @@ forProDiMo.fits.gz
 .false.     ! onlyMCFOST
 .true.	    ! UVpumping : pour OI et Cplus
 .true. 	    ! Rphoto_bandint  : integration plus fine en bande V
-.true.      ! use_MCFOST_rgrid
+.false.     ! use_MCFOST_rgrid
+50	    ! NXX
+50	    ! NZZ
 
 ------ line transfer? ------
 .false.      ! line_transfer      : calculate line transfer? 

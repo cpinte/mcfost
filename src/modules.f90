@@ -177,16 +177,27 @@ module disk
 !*
   real(kind=db) :: map_size
   
+  ! Disque decrit en une ou n zones
+  integer :: n_zones, n_regions
+
   type disk_zone_type 
      real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, sclht, diskmass, gas_to_dust
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
+     integer :: region
   end type disk_zone_type
+
+  type disk_region_type
+     integer :: n_zones
+     real(kind=db) :: Rmin, Rmax
+     integer, dimension(:), allocatable :: zones
+  end type disk_region_type
 
   type cavity_type
      real(kind=db) ::  exp_beta, sclht, Rref
   end type cavity_type
 
   type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
+  type(disk_region_type), dimension(:), allocatable, target :: regions
   type(cavity_type) :: cavity
 
   real(kind=db) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
@@ -224,14 +235,9 @@ module disk
   real(kind=db), dimension(:,:), allocatable :: tab_length, tab_tau, tab_length_tot ! n_cpu, n_cellule
   real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
 
-  ! Disque decrit en une ou n zones
-    integer :: n_zones
   
-  ! Definition des regions = zones deconnectees
+  ! Definition des regions = zones connectees
   logical :: lold_grid
-  integer :: n_regions
-  integer, dimension(:), allocatable :: region ! n_zones
-  real(kind=db), dimension(:), allocatable :: Rmin_region, Rmax_region ! n_regions
   
 
   real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
