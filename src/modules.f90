@@ -178,7 +178,7 @@ module disk
   real(kind=db) :: map_size
   
   type disk_zone_type 
-     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, sclht, diskmass
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, sclht, diskmass, gas_to_dust
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
   end type disk_zone_type
 
@@ -198,9 +198,6 @@ module disk
 
   ! Dullemond et Dubrulle
   real :: alpha
-
-  ! Ratio gaz poussiere
-  real :: gas_dust
 
   ! Vitesses (en m/s) (Dullemond et Dubrulle)
   real, parameter :: v_sound = 380.0
