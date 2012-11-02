@@ -659,6 +659,17 @@ subroutine mcfost_v()
   write(*,*) "This is MCFOST version: ", mcfost_release
   write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
   write(*,*) "SHA-1 id = ", sha_id
+  !write(*,*) 1.0/0.0 , __LINE__, __FILE__
+  write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
+#if defined (__INTEL_COMPILER)
+  write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
+#endif
+#if defined (__GFORTRAN__)
+  write(*,fmt='(" with GFORTAN compiler version ",i1,".",i1,"."i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
+#endif
+#if defined (__G95__)
+  write(*,fmt='(" with G95 compiler version ",i1,".",i2)') __G95__, __G95_MINOR__
+#endif
   write(*,*) " "
   
 
