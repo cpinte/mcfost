@@ -873,7 +873,18 @@ subroutine initialisation_mcfost()
 
   endif
 
-  if (lProDiMo) call setup_ProDiMo()
+  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then 
+     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
+     write(*,*) "***************************"
+     write(*,*) "* Modelling for ProDiMo   *"
+     write(*,*) "* Forcing wavelength grid *"
+     write(*,*) "***************************"
+     n_lambda = 39
+     lambda_min = 0.0912
+     lambda_max = 3410.85
+     lsed_complete = .true.
+  endif
+
 
   if (lpara) then
      if (nb_proc==1) then
@@ -900,6 +911,7 @@ subroutine initialisation_mcfost()
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
+
   call save_data()   
 
   if ((l3D).and.(n_az==1)) then
