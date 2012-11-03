@@ -141,9 +141,8 @@ contains
   subroutine setup_ProDiMo()
     ! - distance 100pc
     ! - 1 pop de grains loi de puissance
-
-    ! lambda : 13 bins entre 0.0912 et 3410.85 microns
-    ! donne les 11 bins de ProDiMo
+    !
+    ! Must be run after routines taille_grain & define_physical_zones()
 
     ! TODO : linit_gaz
 
@@ -169,21 +168,6 @@ contains
     
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
-
-    ! TODO : verif fichier parametres : pour relecture avec Yorick
-    ! N_etoiles = 1
-    if (mcfost2ProDiMo_version == 1) then
-       write(*,*) "***************************"
-       write(*,*) "* Modelling for ProDiMo   *"
-       write(*,*) "* Forcing wavelength grid *"
-       write(*,*) "***************************"
-       n_lambda = 39
-       lambda_min = 0.0912
-       lambda_max = 3410.85
-
-       ! on veut changer les lambda pour le step >=2
-       lsed_complete = .true.
-    endif
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
@@ -220,8 +204,8 @@ contains
     ! Calcul des fPAH pour ProDiMo
     allocate(fPAH(n_zones))
     NC_0 = 0
+    fPAH = 0.0 ; 
     do i=1, n_zones
-       fPAH = 0.0 ; 
        do pop=1, n_pop
           if (dust_pop(pop)%zone == i) then
              if (dust_pop(pop)%is_PAH) then
@@ -264,7 +248,7 @@ contains
        ProDiMo_PAH_NH = NH
     endif
 
-    allocate(ProDiMo_fPAH(n_regions), ProDiMo_dust_gas(n_regions), ProDiMo_Mdisk(n_regions))
+    allocate(ProDiMo_fPAH(n_regions), ProDiMo_dust_gas(n_regions), ProDiMo_Mdisk(n_regions))    
     do ir=1, n_regions
        iz = regions(ir)%zones(1)
 
@@ -276,12 +260,18 @@ contains
           iz = regions(ir)%zones(i)
           if ( abs(ProDiMo_fPAH(ir)-fPAH(iz)) > 1e-3*ProDiMo_fPAH(ir)) then
              write(*,*) "ERROR: fPAH must be contant within a region for ProDiMo"
+             do k=1, n_zones
+                write(*,*) "zone ", k,  "region", disk_zone(k)%region, "fPAH =", fPAH(k)
+             enddo ! k
              write(*,*) "Exiting"
              stop
           endif
 
           if ( abs(ProDiMo_dust_gas(ir)-1.0/disk_zone(iz)%gas_to_dust) > 1e-3*ProDiMo_dust_gas(ir)) then
              write(*,*) "ERROR: gas_to_dust must be contant within a region for ProDiMo"
+              do k=1, n_zones
+                write(*,*) "zone ", k, "region", disk_zone(k)%region, "gas_dust =", disk_zone(k)%gas_to_dust
+             enddo ! k
              write(*,*) "Exiting"
              stop
           endif
@@ -290,9 +280,6 @@ contains
        enddo ! i
 
     enddo ! ir
- 
-
-
 
     return
 
@@ -965,7 +952,7 @@ contains
 
        ! Mdisk, dust_to_gas ratio and fPAH
        if (INDEX(line,"! dust_to_gas") > 0) then
-          write(2,*) ProDiMO_dust_gas(1), " ! dust_to_gas : set by MCFOST"
+          write(2,*) ProDiMo_dust_gas(1), " ! dust_to_gas : set by MCFOST"
           write(2,*) ProDiMo_fPAH(1),     " ! fPAH : set by MCFOST"
           write(2,*) ProDiMo_Mdisk(1),    " ! Mdisk : set by MCFOST"
 
@@ -1008,10 +995,9 @@ contains
        endif
 
        if (INDEX(line,"! incl") > 0) then
-          write(2,*) tab_RT_incl(1), " ! incl : set by MCFOST"
+          write(2,*) RT_imin, " ! incl : set by MCFOST" ! tab_RT_incl n'est pas necessairement alloue
           unchanged = .false.
        endif
-
 
        if (unchanged) then
           write(fmt,'("(A",I3.3,")")') len(trim(line)) 
