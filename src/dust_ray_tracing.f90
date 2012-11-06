@@ -818,10 +818,6 @@ subroutine calc_Isca2_new(lambda,ibin)
 
   real, dimension(:,:), allocatable :: s11, sum_s11, s12, s33, s34
 
-  integer :: syst_status
-
-  real :: rnd
-
   ! Direction observateur dans repere refence
   uv0 = tab_u_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
 

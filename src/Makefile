@@ -44,7 +44,6 @@ FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -74,7 +73,6 @@ FFLAGS_EXE = $(PREC)
 LIBS = $(MCFOST_INSTALL)/lib/sunf95/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -M$(LIBS)/nr
@@ -111,7 +109,6 @@ FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -141,7 +138,6 @@ FFLAGS_EXE = $(PREC)  -static-libcxa -i-static
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -172,7 +168,6 @@ LIBS = $(MCFOST_INSTALL)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio 
 COMP_FITS = -qextname=ftclos:ftcrhd:ftfiou:ftgerr:ftgiou:ftgmsg:ftinit:ftphpr:ftpkye:ftppre:ftgknj:ftgpve:ftopen:ftpprd:ftpprj:ftgpvj:ftmahd:ftpkys:ftpkyj
-LIBS_SYST =  -L $(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -I $(LIBS)/nr
@@ -207,7 +202,6 @@ FFLAGS_EXE =  -bmaxdata:0x80000000 -bmaxstack:0x20000000
 LIBS = $(MCFOST_INSTALL)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio
-LIBS_SYST =  -L $(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -I $(LIBS)/nr
@@ -248,7 +242,6 @@ FFLAGS_EXE = $(PREC)
 LIBS = $(MCFOST_INSTALL)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11
 LIBS_FITS = -L $(LIBS) -lcfitsio -lnsl -lsocket
-LIBS_SYST = -L $(LIBS) -lappel_syst
 
 # Numerical recipes
 MODS_NR = -M$(LIBS)/nr 
@@ -290,7 +283,6 @@ FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-st
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst 
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -323,9 +315,8 @@ FFLAGS_EXE = $(PREC)
 LIBS = /Users/gaspardduchene/Work/Science/Disks/MC_simus/mcfost/lib
 LIBS_PGPLOT = -lpgplot
 LIBS_FITS = -lcfitsio
-LIBS_SYST = -lappel_syst
-# Numerical Recipes
 
+# Numerical Recipes
 MODS_NR = -I $(LIBS)/lib/nr
 LIBS_NR =  -lnr
 LIBS_NR_EQDIFF = -lnr_eq_diff
@@ -355,7 +346,6 @@ LIBS = $(MCFOST_INSTALL)/lib/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -lX11
 LIBS_FITS =  -L $(LIBS) -lcfitsio 
 COMP_FITS = -qextname=ftclos:ftcrhd:ftfiou:ftgerr:ftgiou:ftgmsg:ftinit:ftphpr:ftpkye:ftppre:ftgknj:ftgpve:ftopen:ftpprd:ftpprj:ftgpvj:ftmahd:ftpkys:ftpkyj
-LIBS_SYST =  -L $(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -I $(LIBS)/nr
@@ -392,7 +382,6 @@ FFLAGS_EXE = $(PREC)
 LIBS = $(MCFOST_INSTALL)/lib/g95/
 LIBS_PGPLOT = -L$(LIBS) -lpgplot
 LIBS_FITS = -L$(LIBS) -lcfitsio
-LIBS_SYST = -L$(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -I$(LIBS)/nr
@@ -417,7 +406,8 @@ endif
 ifeq ($(COMPILO),gfortran)
 FC_SER = gfortran -cpp 
 FC_OMP = gfortran -cpp -fopenmp
-OPTS = -O3 -ffast-math #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse 
+OPTS = -O3 -ffast-math  -funroll-loops 
+#-mtune=athlon -mcpu=athlon -mfpmath=sse -msse 
 DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private 
 
@@ -430,7 +420,6 @@ FFLAGS_EXE = $(PREC)
 LIBS = $(MCFOST_INSTALL)/lib/gfortran/
 LIBS_PGPLOT = -L$(LIBS) -lpgplot
 LIBS_FITS = -L$(LIBS) -lcfitsio
-LIBS_SYST = -L$(LIBS) -lappel_syst
 
 # Numerical Recipes
 MODS_NR = -I$(LIBS)/nr
@@ -469,7 +458,6 @@ FFLAGS_EXE = $(PREC)  -static-intel
 LIBS = $(MCFOST_INSTALL)/lib/ifort32/
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_SYST = -L $(LIBS) -lappel_syst -Vaxlib
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr 
@@ -506,7 +494,7 @@ ifeq ($(devp), yes)
 FF = $(FC_OMP) -O1
 endif
 
-SOURCES = modules.f90 sha.f90 mem.f90 utils.f90 input.f90 output.f90 \
+SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 init_mcfost.f90 \
 	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 dust.f90 \
 	molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
@@ -523,7 +511,7 @@ main : mcfost
 # Code séquentiel et parallèle
 #*************************************************************
 mcfost : $(OBJECTS)  
-	$(FF) $(FFLAGS_EXE) -o mcfost $(OBJECTS) $(COMP_FITS) $(LIBS_SYST) $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+	$(FF) $(FFLAGS_EXE) -o mcfost $(OBJECTS) $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90

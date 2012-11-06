@@ -829,11 +829,18 @@ real function get_mcfost_utils_version()
   integer :: ios
 
   ! Check utils directory
+  get_mcfost_utils_version = 0.0
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
   read(1,*,iostat=ios) get_mcfost_utils_version
   close(unit=1,iostat=ios)
   if (ios /= 0) get_mcfost_utils_version = 0.0
-  
+
+  if (abs(get_mcfost_utils_version) < 1e-6) then
+     write(*,*) "ERROR : could not find current MCFOST utils version"
+     write(*,*) "Exiting"
+     stop
+  endif
+
   return
 
 end function get_mcfost_utils_version
@@ -1000,5 +1007,25 @@ logical function is_file(filename)
   return
   
 end function is_file
+
+!************************************************************
+
+subroutine appel_syst(cmd, status)
+
+#if defined (__INTEL_COMPILER)
+  use IFPORT, only : system
+#endif
+
+  implicit none
+
+  character(len=*), intent(in) :: cmd
+  integer, intent(out), optional :: status
+
+  status = system(cmd) ! limux
+  !call system(cmd, status) ! aix
+
+  return
+
+end subroutine appel_syst
 
 end module utils

@@ -171,7 +171,7 @@ subroutine repartition_energie_etoiles()
 
   implicit none
 
-  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, syst_status, n_lambda_spectre, l
+  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l
   real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0
   real(kind=db) :: somme_spectre, somme_bb
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo

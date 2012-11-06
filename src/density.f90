@@ -13,7 +13,7 @@ module density
   use ode_data
   use wall  
   use grid
-
+  use utils
   use output
 
   implicit none
