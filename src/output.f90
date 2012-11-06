@@ -9,7 +9,6 @@ module output
   use opacity
   use molecular_emission
   use ray_tracing
-  
   use utils
 
   implicit none
@@ -1206,6 +1205,7 @@ subroutine ecriture_densite_gaz()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
+  naxes(3)=1
 
   if (l3D) then
      naxis=3
@@ -1221,7 +1221,7 @@ subroutine ecriture_densite_gaz()
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)
   
-  dens =  densite_gaz(i,j,k) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  dens =  densite_gaz * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
   

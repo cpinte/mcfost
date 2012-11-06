@@ -230,17 +230,21 @@ contains
                    masse_PAH = masse_PAH + mPAH * nbre_grains(k) 
                    norme = norme + nbre_grains(k)
                 enddo ! k
-                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs
-                eps_PAH = dust_pop(pop)%frac_mass  ! fraction en masse des PAHS
+                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs en mH
+                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
 
-                fPAH(i) = fPAH(i) + (2.2/masse_PAH) / disk_zone(i)%gas_to_dust * eps_PAH/3e-7 
-              endif  ! PAH                
+                ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
+                ! abondance en nombre par rapport à H-nuclei + correction pour NC
+                fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.) 
+                !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
+             endif  ! PAH
           endif ! pop dans la zone
        enddo ! pop
 
        fPAH(i) = max(fPAH(i),1e-9)
     enddo ! i
     
+
     ProDiMo_other_PAH = .false.
     if (NC_0 > 0) then
        ProDiMo_other_PAH = .true.
@@ -254,7 +258,7 @@ contains
 
        ProDiMo_fPAH(ir) = fPAH(iz)
        ProDiMo_dust_gas(ir) = 1.0/disk_zone(iz)%gas_to_dust
-       ProDiMo_Mdisk(ir) = disk_zone(iz)%diskmass
+       ProDiMo_Mdisk(ir) = disk_zone(iz)%diskmass * disk_zone(iz)%gas_to_dust
        
        do i=2,regions(ir)%n_zones
           iz = regions(ir)%zones(i)
@@ -280,6 +284,8 @@ contains
        enddo ! i
 
     enddo ! ir
+
+    call create_input_ProDiMo()
 
     return
 
@@ -412,8 +418,6 @@ contains
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
 
-    call create_input_ProDiMo()
-
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error opacite forProDiMo.fits.gz'
@@ -516,6 +520,8 @@ contains
           call ftpkye(unit,'alpha_'//s,real(disk_zone(i)%surf),-8,'',status)
        enddo
     endif ! mcfost2ProDiMo_version 3
+
+
 
     call ftpkye(unit,'amin',dust_pop(1)%amin,-8,'[micron]',status)
     call ftpkye(unit,'amax',dust_pop(1)%amax,-8,'[micron]',status)
@@ -934,52 +940,46 @@ contains
        if (status /= 0) exit read_loop
        unchanged = .true.
 
-       ! Rin and Rout
+       ! Rin, Rout, Mdisk, dust_to_gas ratio and fPAH
        if (INDEX(line,"! Rout") > 0) then
-          write(2,*) Rmin, " ! Rin  : set by MCFOST"
-          write(2,*) Rmax, " ! Rout : set by MCFOST"
-          do i=1, n_regions
-             iProDiMo = i+1  ;if (i==n_regions) iProDiMo = 1 
+          write(2,*)  n_regions, " ! NZONES : number of MCFOST regions"
+          ! 1st ProDiMo zone is the last region (no number)
+          if (n_regions==1) then
+             write(2,'(A)') "----- single ProDiMo-zone ----- : set by MCFOST"
+          else
+             write(2,'(A)') "------ outer ProDiMo-zone ----- : MCFOST region"
+          endif
+          write(2,*) real(regions(n_regions)%Rmin)," ! Rin  : set by MCFOST"
+          write(2,*) real(regions(n_regions)%Rmax)," ! Rout : set by MCFOST"
+          write(2,*) ProDiMo_dust_gas(n_regions),  " ! dust_to_gas : set by MCFOST"
+          write(2,*) ProDiMo_fPAH(n_regions),      " ! fPAH : set by MCFOST"
+          write(2,*) ProDiMo_Mdisk(n_regions),     " ! Mdisk : set by MCFOST"
+
+          do i=1, n_regions-1
+             iProDiMo = i+1 
              write(s,'(i1)') iProDiMo
+             write(2,'(A)') "------ ProDiMo-zone #"//s//"----- : set by MCFOST"
              write(2,*) real(regions(i)%Rmin)," ! R"//s//"in  : weird ProDiMo order, set by MCFOST"
-             write(2,*) real(regions(i)%Rmax)," ! R"//s//"out : weird ProDiMo order, set by MCFOST"
-          enddo
-          unchanged = .false.
-       endif
-       if (INDEX(line,"! Rin") > 0) then
-          unchanged = .false.
-       endif
-
-       ! Mdisk, dust_to_gas ratio and fPAH
-       if (INDEX(line,"! dust_to_gas") > 0) then
-          write(2,*) ProDiMo_dust_gas(1), " ! dust_to_gas : set by MCFOST"
-          write(2,*) ProDiMo_fPAH(1),     " ! fPAH : set by MCFOST"
-          write(2,*) ProDiMo_Mdisk(1),    " ! Mdisk : set by MCFOST"
-
-          do i=2, n_regions
-             iProDiMo = i+1  ;if (i==n_regions) iProDiMo = 1 
-             write(s,'(i1)') iProDiMo
+             write(2,*) real(regions(i)%Rmax)," ! R"//s//"out : set by MCFOST"
              write(2,*) ProDiMo_dust_gas(i), " ! d"//s//"ust_to_gas : set by MCFOST"
              write(2,*) ProDiMo_fPAH(i),     " ! f"//s//"PAH : set by MCFOST"
              write(2,*) ProDiMo_Mdisk(i),    " ! M"//s//"disk : set by MCFOST"
           enddo
-                 
+  
           write(2,*) ProDiMo_other_PAH, " ! other_PAH : set by MCFOST"
           if (ProDiMo_other_PAH) then
              write(2,*) ProDiMo_PAH_NC, " ! PAH_NC : set by MCFOST"
              write(2,*) ProDiMo_PAH_NH, " ! PAH_NH : set by MCFOST"
           endif
-          
-          unchanged = .false.
-       endif
-       if (INDEX(line,"! fPAH") > 0) then
-          unchanged = .false.
-       endif
-       if (INDEX(line,"! Mdisk") > 0) then
-          unchanged = .false.
-       endif
 
-
+          unchanged = .false.
+       endif
+       ! On zappe Rin, dust_to_gas, fPAH et Mdisk
+       if ( (INDEX(line,"! Rin") > 0).or.(INDEX(line,"! dust_to_gas") > 0).or. &
+          (INDEX(line,"! fPAH") > 0).or.(INDEX(line,"! Mdisk") > 0) ) then
+          unchanged = .false.
+       endif
+ 
        if (INDEX(line,"! Rphoto_bandint") > 0) then
           if ((etoile(1)%T > 6000.).or.(etoile(1)%fUV > 0.05)) then
              write(2,*) .true.,  " ! Rphoto_bandint : set by MCFOST"
@@ -990,18 +990,22 @@ contains
        endif
 
        if (INDEX(line,"! v_turb") > 0) then
-          write(2,*) vitesse_turb * m_to_km, " ! v_turb [km/s] : set by MCFOST"
+          write(2,*) real(vitesse_turb * m_to_km), " ! v_turb [km/s] : set by MCFOST"
           unchanged = .false.
        endif
 
        if (INDEX(line,"! incl") > 0) then
-          write(2,*) RT_imin, " ! incl : set by MCFOST" ! tab_RT_incl n'est pas necessairement alloue
+          write(2,*) RT_imin, " ! incl : set by MCFOST (1st MCFOST inclination)" ! tab_RT_incl n'est pas necessairement alloue
           unchanged = .false.
        endif
 
        if (unchanged) then
-          write(fmt,'("(A",I3.3,")")') len(trim(line)) 
-          write(2,fmt) trim(line)
+          if (len(trim(line)) > 0) then
+             write(fmt,'("(A",I3.3,")")') len(trim(line)) 
+             write(2,fmt) trim(line)
+          else
+             write(2,*) ""
+          endif
        endif
     enddo read_loop
 
