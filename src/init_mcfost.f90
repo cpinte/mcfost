@@ -9,7 +9,6 @@ module init_mcfost
   use molecular_emission
   use ray_tracing
   !$ use omp_lib
-
   use benchmarks
   use read_params
   use input
@@ -394,6 +393,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1 
      case("-output_density_grid")
+        lsetup_gas = .true.
         loutput_density_grid=.true.
         i_arg = i_arg+1
      case("-output_J")

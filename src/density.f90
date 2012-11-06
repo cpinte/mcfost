@@ -56,7 +56,7 @@ subroutine define_density()
      izone=dust_pop(i)%zone
      dz=disk_zone(izone)
 
-     if ((1.0_db+1e-10_db) * dz%rin >=  dz%rout) then
+     if ((1.0_db+1e-10_db) * dz%rin >=  dz%rmax) then
         write(*,*) "ERROR: Rout must be larger than than Rin in zone", izone
         write(*,*) "Exiting"
         stop
@@ -67,15 +67,15 @@ subroutine define_density()
      if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
            cst(i)=(((2.0+dz%surf)*dust_pop(i)%masse)/(((2*pi)**1.5)*dz%sclht*(dz%rin**2)*&
-                ((dz%rout/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
+                ((dz%rmax/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
         else
-           cst(i)=dust_pop(i)%masse/((2*pi)**1.5*dz%sclht*(dz%rref**2) * log(dz%rout/dz%rin))
+           cst(i)=dust_pop(i)%masse/((2*pi)**1.5*dz%sclht*(dz%rref**2) * log(dz%rmax/dz%rin))
         endif
      else ! envelope
         if (abs(dz%surf+3.0) > 1.0e-5) then
-           cst(i)=((3.0+dz%surf)*dust_pop(i)%masse)/ (4*pi*(dz%rout**(3.+dz%surf) - dz%rin**(3.+dz%surf)))
+           cst(i)=((3.0+dz%surf)*dust_pop(i)%masse)/ (4*pi*(dz%rmax**(3.+dz%surf) - dz%rin**(3.+dz%surf)))
         else
-           cst(i)= dust_pop(i)%masse/( 4*pi * log(dz%rout/dz%rin) )
+           cst(i)= dust_pop(i)%masse/( 4*pi * log(dz%rmax/dz%rin) )
         endif
      end if
   enddo !i pop
@@ -171,7 +171,7 @@ subroutine define_density()
                  endif
               
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    if (rcyl > dz%rout) then
+                    if (rcyl > dz%rmax) then
                        density = 0.0
                     else if (rcyl < dz%rmin) then
                        density = 0.0
@@ -194,7 +194,7 @@ subroutine define_density()
                  enddo !l
                  
                  if (lsetup_gas) then
-                    if (rcyl > dz%rout) then
+                    if (rcyl > dz%rmax) then
                        density = 0.0 
                     else if (rcyl < dz%rmin) then
                        density = 0.0
@@ -288,7 +288,7 @@ subroutine define_density()
               rsph = sqrt(rcyl**2+z**2)
               
               do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 if (rsph > dz%rout) then
+                 if (rsph > dz%rmax) then
                     density = 0.0
                  else if (rsph < dz%rmin) then
                     density = 0.0
@@ -301,7 +301,7 @@ subroutine define_density()
               enddo !l
 
               if (lsetup_gas) then
-                 if (rsph > dz%rout) then
+                 if (rsph > dz%rmax) then
                     density = 0.0
                  else if (rsph < dz%rmin) then
                     density = 0.0
@@ -518,7 +518,7 @@ subroutine define_density_wall3D()
            stop
         endif
 
-        write(*,*) "Wall between", real(dz%rin), "and", real(dz%rout), "AU"
+        write(*,*) "Wall between", real(dz%rin), "and", real(dz%rmax), "AU"
         h_wall = real(dz%sclht)
         write(*,*) "h_wall =", real(h_wall)
 
@@ -535,7 +535,7 @@ subroutine define_density_wall3D()
                  phi = phi_grid(k)
 
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    if (rcyl > dz%rout) then
+                    if (rcyl > dz%rmax) then
                        density = 0.0
                     else if (rcyl < dz%rin) then
                        density = 0.0
@@ -1321,9 +1321,9 @@ subroutine densite_data_SPH_TTauri_1()
      ! Cste densite disque (depend de a par surf, ... et nbre_grains(k))
      if (abs(tab_surf(k)+2.0) > 1.0e-5) then
         cst=(((2+tab_surf(k))*diskmass)/(((2*pi)**1.5)*tab_h0(k)*(dz%rin**2) &
-             *((dz%rout/dz%rin)**(2+tab_surf(k))-1)))*((dz%rref/dz%rin)**tab_surf(k))
+             *((dz%rmax/dz%rin)**(2+tab_surf(k))-1)))*((dz%rref/dz%rin)**tab_surf(k))
      else
-        cst=diskmass/((2*pi)**1.5*tab_h0(k)*(dz%rref**2)) * log(dz%rin/dz%rout)
+        cst=diskmass/((2*pi)**1.5*tab_h0(k)*(dz%rref**2)) * log(dz%rin/dz%rmax)
      endif
 
      ! facteur multiplicatif pour passer en g/cm**3: 
@@ -1768,9 +1768,9 @@ subroutine densite_eqdiff()
   ! Cste densite disque
   if (abs(dz%surf+2.0) > 1.0e-5) then
      cst=(((2.0+dz%surf)*dz%diskmass)/(((2*pi)**1.5)*dz%sclht*(dz%rin**2)*&
-          ((dz%rout/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
+          ((dz%rmax/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
   else
-     cst=diskmass/((2*pi)**1.5*dz%sclht*(dz%rref**2)) * log(dz%rin/dz%rout)
+     cst=diskmass/((2*pi)**1.5*dz%sclht*(dz%rref**2)) * log(dz%rin/dz%rmax)
   endif
   ! facteur multiplicatif pour passer en g/cm**3: 
   cst=cst * Msun_to_g / AU3_to_cm3
