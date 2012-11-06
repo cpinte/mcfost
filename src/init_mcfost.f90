@@ -1096,7 +1096,7 @@ subroutine save_data
 
   implicit none
   integer :: syst_status
-  character(len=512) :: cmd
+  character(len=1024) :: cmd
 
   logical :: lnew_run, lmove_data
   integer :: etape, etape_start, etape_end
