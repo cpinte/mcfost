@@ -29,7 +29,7 @@ subroutine initialisation_mcfost()
   
   character(len=512) :: cmd, s, str_seed
 
-  logical :: lresol, lzoom, ldust_emisison_in_images, lmc, ln_zone
+  logical :: lresol, lzoom, lmc, ln_zone
 
   lmc = .false.
 
@@ -86,6 +86,7 @@ subroutine initialisation_mcfost()
   llinear_grid=.false.
   lr_subdivide=.false.
   lfreeze_out = .false.
+  l_em_disk_image = .true.
   lisotropic = .false.
   lno_scattering = .false.
   lqsca_equal_qabs = .false.
@@ -102,7 +103,6 @@ subroutine initialisation_mcfost()
   lProDiMo2mcfost=.false.
   lforce_ProDiMo_PAH = .false.
   lgap_ELT=.false.
-  ldust_emisison_in_images=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
   lSeb_Fromang = .false.
@@ -151,7 +151,7 @@ subroutine initialisation_mcfost()
      else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
         call get_utils()
         call mcfost_get_ref_para()
-     else if (para(2:8)=="get_para") then ! download current reference file
+     else if (para(2:9)=="get_para") then ! download current reference file
         call mcfost_get_ref_para()
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
@@ -622,9 +622,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) sigma_gap_ELT
-     case("-dust_emission_in_images")
+     case("-only_scatt")
         i_arg = i_arg+1
-        ldust_emisison_in_images=.true.
+        l_em_disk_image=.false.
      case("-p2m")
         i_arg = i_arg+1
         lProDiMo2mcfost=.true.
@@ -748,7 +748,6 @@ subroutine initialisation_mcfost()
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
   if (limg) then
-     if (ldust_emisison_in_images) l_em_disk_image=.true.
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
      else
@@ -970,9 +969,7 @@ subroutine display_help()
   write(*,*) " Options related to images"
   write(*,*) "        : -zoom <zoom> (override value in parameter file)"
   write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
-  write(*,*) "        : -dust_emission_in_images : include thermal emission "
-  write(*,*) "                            from the disk in image calculation"  
-  write(*,*) "                            (override value in parameter file)"  
+  write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
   write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"

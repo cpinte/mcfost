@@ -168,7 +168,6 @@ contains
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
-    l_em_disk_image = .true.
     read(1,*) lsepar_contrib, lsepar_pola
     
     if (lsepar_pola) then
@@ -692,7 +691,6 @@ contains
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
-    l_em_disk_image = .true.
     read(1,*) lsepar_contrib, lsepar_pola
     
     if (lsepar_pola) then
