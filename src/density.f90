@@ -156,7 +156,7 @@ subroutine define_density()
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
               else ! tappered-edge
-                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2-dz%surf) )
+                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%surf) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
