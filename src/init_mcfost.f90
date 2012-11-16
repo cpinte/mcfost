@@ -29,7 +29,7 @@ subroutine initialisation_mcfost()
   
   character(len=512) :: cmd, s, str_seed
 
-  logical :: lresol, lzoom, lmc, ln_zone
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
 
   lmc = .false.
 
@@ -113,6 +113,8 @@ subroutine initialisation_mcfost()
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
+  lonly_scatt = .false.
+  lHG = .false. 
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -624,7 +626,10 @@ subroutine initialisation_mcfost()
         read(s,*) sigma_gap_ELT
      case("-only_scatt")
         i_arg = i_arg+1
-        l_em_disk_image=.false.
+        lonly_scatt = .true.
+     case("-HG")
+        i_arg = i_arg+1
+        lHG=.true.
      case("-p2m")
         i_arg = i_arg+1
         lProDiMo2mcfost=.true.
@@ -694,6 +699,17 @@ subroutine initialisation_mcfost()
      call read_para()
   endif
 
+  if (lemission_mol.and.para_version < 2.11) then
+     write(*,*) "ERROR: parameter version must be larger than 2.10"
+     write(*,*) "line transfer"
+     write(*,*) "Exiting."
+     stop
+  endif
+
+  write(*,*) 'Input file read successfully'
+
+  
+  ! Correction sur les valeurs du .para
   if (lProDiMo) then
      if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
         write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda" 
@@ -730,20 +746,14 @@ subroutine initialisation_mcfost()
 
   if (lread_Seb_Charnoz) lstrat = .true.
 
-  if (lemission_mol.and.para_version < 2.11) then
-     write(*,*) "ERROR: parameter version must be larger than 2.10"
-     write(*,*) "line transfer"
-     write(*,*) "Exiting."
-     stop
-  endif
-
-
-  write(*,*) 'Input file read successfully'
+  
+  if (lonly_scatt) l_em_disk_image=.false.
+  if (lHG) aniso_method=2
+  
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
   ! verification cohérence du fichier de paramètres
-
   n_lambda2 = n_lambda
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
@@ -814,12 +824,6 @@ subroutine initialisation_mcfost()
      write(*,*) "Exiting"
      stop
   endif
-
-!  if ((abs(exp_strat)>tiny(0.0)).and.(.not.lstrat)) then
-!     write(*,*) "Error : dust settling exponent is different from 0 but dust settling is turned off"
-!     write(*,*) 'Exiting'
-!     stop
-!  endif
 
   if (lresol) then
      igridx = nx
