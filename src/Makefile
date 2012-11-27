@@ -430,7 +430,12 @@ LIBS_SORT = -L$(LIBS)/nr/sort -lnr_sort
 LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
+ifeq ($(ARCH),DARWIN) # 32bits par defaut sur mac
 FLAGS_SPRNG = $(FLAGS) 
+endif
+ifeq ($(ARCH),LINUX)  # 64 bits par defaut sur linux
+FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
+endif
 INCLUDE_SPRNG = -I$(MCFOST_INSTALL)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
@@ -485,7 +490,7 @@ ifeq ($(mono), yes)
 FF = $(FC_SER)  $(MACH) $(OPTS)
 endif
 ifeq ($(prof), yes)
-FF = $(FC_SER) -O0 -pg
+FF = $(FC_SER) -O0 -g
 endif
 ifeq ($(dev), yes)
 FF = $(FC_SER) -O1

@@ -542,10 +542,10 @@ subroutine mcfost_update(lforce_update)
 
      
      ! get the correct url corresponding to the system
-     if (ostype=="linux") then
-        if (machtype=="i386") then
+     if (ostype(1:5)=="linux") then
+        if (machtype(1:4)=="i386") then
            url = trim(webpage)//"linux_32bits/mcfost"
-        else if (machtype=="x86_64") then
+        else if (machtype(1:6)=="x86_64") then
            url = trim(webpage)//"linux_64bits/mcfost"
         else
            write(*,*) "Linux system but unknown architecture"
