@@ -385,7 +385,12 @@ subroutine init_molecular_disk(imol)
   linfall = .false.
 
   ! Temperature gaz = poussiere
-  Tcin(:,:,:) = Temperature(:,:,:)
+  if (lcorrect_Tgas) then
+     write(*,*) "Correcting Tgas by", correct_Tgas
+     Tcin(:,:,:) = Temperature(:,:,:)  * correct_Tgas
+  else
+     Tcin(:,:,:) = Temperature(:,:,:)
+  endif
 
   ! En m.s-1
   do i=1, n_rad
