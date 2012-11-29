@@ -113,8 +113,11 @@ subroutine initialisation_mcfost()
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
+  lcorrect_Tgas = .false.
+
   lonly_scatt = .false.
   lHG = .false. 
+  
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -681,6 +684,12 @@ subroutine initialisation_mcfost()
      case("-only_bottom")
         i_arg = i_arg+1
         lonly_bottom=.true.
+     case("-correct_Tgas")
+        i_arg = i_arg+1
+        lcorrect_Tgas=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1 
+        read(s,*) correct_Tgas
      case default
         call display_help()
      end select
@@ -1039,6 +1048,8 @@ subroutine display_help()
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo" 
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
+  write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
+
   stop
 
 end subroutine display_help

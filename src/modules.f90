@@ -812,6 +812,8 @@ module molecular_emission
   real, dimension(:,:,:), pointer :: collRates
 
   real, dimension(:,:,:), allocatable :: Tcin ! Temperature cinetique
+  real :: correct_Tgas
+  logical :: lcorrect_Tgas
 
   real :: nH2, masse_mol
   real, parameter :: masse_mol_gaz = 2. * masseH ! en g,  2.3 selon Walker 2004 
