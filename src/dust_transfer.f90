@@ -1328,21 +1328,15 @@ subroutine dust_map(lambda,ibin)
   integer, intent(in) :: lambda, ibin
   real(kind=db) :: u,v,w
   
-  real(kind=db) :: x0,y0,z0,l, norme
   real(kind=db), dimension(2,3) :: Iaxis
   real(kind=db), dimension(3) :: center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
-  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, lmin, lmax
-  real :: rand, rand2
-  real(kind=db) :: x, y, z, argmt, srw02, cos_thet
 
-  real :: tau
+  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, l, x0, y0, z0
   integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, nethod, ech_method, cx, cy, k
 
-  real(kind=db), dimension(4) :: Stokes
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
-  integer, parameter :: n_ray_star = 1000
   real(kind=db), dimension(n_rad_RT) :: tab_r
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
 
@@ -1511,7 +1505,47 @@ subroutine dust_map(lambda,ibin)
      
   endif ! method
 
-  ! Ajout etoile
+  ! Flux etoile
+  Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
+
+  ! Pixel central
+  if (ech_method==1) then
+     cx = 1
+     cy = 1
+  else
+     cx = igridx/2+1
+     cy = igridy/2+1
+  endif
+
+  ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
+  id = 1 ! le flux de l'etoile n'est que sur le 1 cpu
+  Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) + Flux_etoile
+  if (lsepar_contrib) then
+     Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) + Flux_etoile
+  endif
+
+  if (lmono0) write(*,*) "Done"
+
+  return
+
+end subroutine dust_map
+
+!***********************************************************
+
+function flux_etoile_ray_tracing(lambda,u,v,w) result(Flux)
+
+  integer, intent(in) :: lambda
+  real(kind=db), intent(in) :: u,v,w
+
+  integer, parameter :: n_ray_star = 1000
+
+  real(kind=db), dimension(4) :: Stokes
+  real(kind=db) :: Flux, x0,y0,z0, lmin, lmax,l, norme, x, y, z, argmt, srw02, cos_thet
+  real :: rand, rand2, tau
+  integer :: id, i, j, k
+
+
+    ! Ajout etoile
   id = 1 ; i=0 ; j=1 ;
   
   ! Etoile ponctuelle
@@ -1522,7 +1556,7 @@ subroutine dust_map(lambda,ibin)
 !  write(*,*)  "F0", Flux_etoile
 
   ! Etoile non ponctuelle
-  Flux_etoile = 0.0_db
+  Flux = 0.0_db
   norme = 0.0_db
   do k=1,n_ray_star
      ! Position aleatoire sur la disque stellaire
@@ -1547,37 +1581,21 @@ subroutine dust_map(lambda,ibin)
      
      Stokes = 0.0_db 
      call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax) 
-     Flux_etoile = Flux_etoile + exp(-tau) * cos_thet
+     Flux = Flux + exp(-tau) * cos_thet
      norme = norme + cos_thet
   enddo
-  Flux_etoile = Flux_etoile / norme
+  Flux = Flux / norme
 
-!  write(*,*) Flux_etoile
-
-  Flux_etoile = Flux_etoile * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
+  write(*,*) "S", shape(E_stars), shape(tab_lambda), lambda
+  write(*,*) E_stars(lambda)
+  write(*,*) tab_lambda(lambda)
+  Flux = Flux * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12 
 
-  ! Pixel central
-  if (ech_method==1) then
-     cx = 1
-     cy = 1
-  else
-     cx = igridx/2+1
-     cy = igridy/2+1
-  endif
-
-  ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
-  id = 1 ! le flux de l'etoile n'est que sur le 1 cpu
-  Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) + Flux_etoile
-  if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) + Flux_etoile
-  endif
-
-  if (lmono0) write(*,*) "Done"
 
   return
 
-end subroutine dust_map
+end function flux_etoile_ray_tracing
 
 !***********************************************************
 
