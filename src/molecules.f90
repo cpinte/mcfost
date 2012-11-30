@@ -385,7 +385,12 @@ subroutine init_molecular_disk(imol)
   linfall = .false.
 
   ! Temperature gaz = poussiere
-  Tcin(:,:,:) = Temperature(:,:,:)
+  if (lcorrect_Tgas) then
+     write(*,*) "Correcting Tgas by", correct_Tgas
+     Tcin(:,:,:) = Temperature(:,:,:)  * correct_Tgas
+  else
+     Tcin(:,:,:) = Temperature(:,:,:)
+  endif
 
   ! En m.s-1
   do i=1, n_rad
@@ -689,6 +694,8 @@ subroutine init_dust_mol(imol)
 
   real(kind=db) :: cst_wl, coeff_exp, cst_E
 
+  real, parameter :: gas_dust = 100
+
   cst_E=2.0*hp*c_light**2 
 
   p_n_lambda = n_lambda
@@ -722,7 +729,7 @@ subroutine init_dust_mol(imol)
               do zj=1,nz
                  !kappa_abs_eg(iTrans,ri,zj,1) =  kap * masse(ri,zj,1)/(volume(ri) * AU_to_cm**2)
                  kappa_abs_eg(iTrans,ri,zj,1) =  kap * (densite_gaz(ri,1,1) * cm_to_m**3) * masse_mol_gaz / &
-                      gas_dust / cm_to_AU * 1.0
+                      gas_dust / cm_to_AU 
               enddo
            enddo
            

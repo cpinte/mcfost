@@ -6,9 +6,10 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.14
-  character(8), parameter :: mcfost_release = "2.14.4"
-  !character(len=128), parameter :: webpage="http://www-laog.obs.ujf-grenoble.fr/public/pintec/mcfost/"
+  real, parameter :: mcfost_version = 2.15
+  character(8), parameter :: mcfost_release = "2.15.1"
+  real, parameter :: required_utils_version = 2.14
+
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
   
@@ -161,8 +162,6 @@ module disk
   implicit none
   save
 
-!*     size_neb est la dimension maxi de la nebuleuse spherique
-! Ne pas modifier par n_rad
   real :: distance ! Distance du disque en pc
 
 !* Parametres du disque
@@ -172,26 +171,36 @@ module disk
 !* en masse solaire
 !*     exp_beta.......... exposant decrivant le "flaring"
 !*     surf.......... exposant de la distribution SURFACIQUE de densite
-!*                    surf .neq. -2.0 !!!!!
 !*     rin, rout..... limites interne et externe du disque
 !*     rref.......... rayon de reference ("r0")
 !*     sclht......... echelle de hauteur a r0 ("h0")
 !*
-  real(kind=db) :: size_neb
+  real(kind=db) :: map_size
   
+  ! Disque decrit en une ou n zones
+  integer :: n_zones, n_regions
+
   type disk_zone_type 
-     real(kind=db) :: rin, rint, rout, edge, exp_beta, surf, sclht, diskmass, rref, rmin
-     integer :: geometry ! 1=disk, 2=envelope
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, sclht, diskmass, gas_to_dust
+     integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
+     integer :: region
   end type disk_zone_type
 
+  type disk_region_type
+     integer :: n_zones
+     real(kind=db) :: Rmin, Rmax
+     integer, dimension(:), allocatable :: zones
+  end type disk_region_type
+
   type cavity_type
-     real(kind=db) ::  exp_beta, sclht, rref
+     real(kind=db) ::  exp_beta, sclht, Rref
   end type cavity_type
 
   type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
+  type(disk_region_type), dimension(:), allocatable, target :: regions
   type(cavity_type) :: cavity
 
-  real(kind=db) :: rmin, rout, rout2, diskmass, correct_Rsub
+  real(kind=db) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
 
   real :: r_subdivide
   logical :: lr_subdivide
@@ -200,9 +209,6 @@ module disk
 
   ! Dullemond et Dubrulle
   real :: alpha
-
-  ! Ratio gaz poussiere
-  real :: gas_dust
 
   ! Vitesses (en m/s) (Dullemond et Dubrulle)
   real, parameter :: v_sound = 380.0
@@ -229,14 +235,9 @@ module disk
   real(kind=db), dimension(:,:), allocatable :: tab_length, tab_tau, tab_length_tot ! n_cpu, n_cellule
   real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
 
-  ! Disque decrit en une ou n zones
-    integer :: n_zones
   
-  ! Definition des regions = zones deconnectees
+  ! Definition des regions = zones connectees
   logical :: lold_grid
-  integer :: n_regions
-  integer, dimension(:), allocatable :: region ! n_zones
-  real(kind=db), dimension(:), allocatable :: Rmin_region, Rmax_region ! n_regions
   
 
   real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
@@ -811,6 +812,8 @@ module molecular_emission
   real, dimension(:,:,:), pointer :: collRates
 
   real, dimension(:,:,:), allocatable :: Tcin ! Temperature cinetique
+  real :: correct_Tgas
+  logical :: lcorrect_Tgas
 
   real :: nH2, masse_mol
   real, parameter :: masse_mol_gaz = 2. * masseH ! en g,  2.3 selon Walker 2004 

@@ -33,7 +33,7 @@ module grid
    Izone_tmp(:) =  dust_pop(:)%zone
 
    ! order following Rin
-   order = bubble_sort(disk_zone(:)%rin)
+   order = bubble_sort(disk_zone(:)%Rmin)
 
    ! Reordoring zones
    do i=1, n_zones
@@ -61,7 +61,7 @@ subroutine define_physical_zones()
   ! C. Pinte
   ! 03/05/11
 
-  integer :: i, j, index, i_region, iter, ir
+  integer :: i, j, index, i_region, iter, ir, k
   type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
   type(disk_zone_type) :: dz
 
@@ -72,28 +72,26 @@ subroutine define_physical_zones()
 
   logical :: test_j_in_i, test_i_in_j
 
-  allocate(region(n_zones)) 
-
   ! Detecting connected zones 
   zone_scanned(:) = .false.
   index = 0 
   do i=1, n_zones
      if (.not.zone_scanned(i)) then
         index = index + 1 
-        region(i) = index 
+        disk_zone(i)%region = index 
         zone_scanned(i) = .true.
 
         ! Current minimum & maximum radii of region
-        minR = disk_zone(i)%rin
-        maxR = disk_zone(i)%rout
+        minR = disk_zone(i)%Rmin
+        maxR = disk_zone(i)%Rmax
 
         ! Besoin d'iterer au cas ou les connections entre zones sont multiples
         ! probablement pas autant mais ca ne coute rien en calcul
         do iter=1, n_zones-1 
            do j=i+1, n_zones
            
-              r1 = disk_zone(j)%rin
-              r2 = disk_zone(j)%rout
+              r1 = disk_zone(j)%Rmin
+              r2 = disk_zone(j)%Rmax
               
               ! Test if the 2 zones are imbrigated
               test_j_in_i = ((r1 > minR).and.(r1 < maxR)) .or. ((r2 > minR).and.(r2 <= maxR))
@@ -103,10 +101,10 @@ subroutine define_physical_zones()
                  if (.not.zone_scanned(j)) then
                     i_region = index
                  else
-                    i_region = region(j) 
+                    i_region = disk_zone(j)%region
                  endif ! zone_scanned
                  
-                 region(j) = i_region
+                 disk_zone(j)%region = i_region
                  zone_scanned(j) = .true.
                  
                  ! Updating minimum & maximum radii of region
@@ -119,19 +117,34 @@ subroutine define_physical_zones()
      endif !.not.zone_scanned(i)
   enddo !i
 
-  
+  n_regions = maxval(disk_zone(:)%region)
 
-  n_regions = maxval(region(:))
+  allocate(regions(n_regions))
+  do ir=1,n_regions
+     k = 0
+     do i=1, n_zones
+        if (disk_zone(i)%region == ir)  k=k+1
+     enddo ! i
+     regions(ir)%n_zones = k
+     allocate(regions(ir)%zones(regions(ir)%n_zones))
 
-  allocate(Rmin_region(n_regions),Rmax_region(n_regions))
+     k = 0
+     do i=1, n_zones
+        if (disk_zone(i)%region == ir)  then
+           k=k+1
+           regions(ir)%zones(k) = i
+        endif
+     enddo ! i
+  enddo ! ir
+
 
   do ir = 1, n_regions
-     Rmin_region(ir) = 1e30 
-     Rmax_region(ir) = 0
+     regions(ir)%Rmin = 1e30 
+     regions(ir)%Rmax = 0
      do i=1, n_zones
-        if (region(i) == ir) then
-           Rmin_region(ir) = min(Rmin_region(ir),disk_zone(i)%rmin)
-           Rmax_region(ir) = max(Rmax_region(ir),disk_zone(i)%rout)
+        if (disk_zone(i)%region == ir) then
+           regions(ir)%Rmin = min(regions(ir)%Rmin,disk_zone(i)%Rmin)
+           regions(ir)%Rmax = max(regions(ir)%Rmax,disk_zone(i)%Rmax)
         endif
      enddo !i
   enddo !ir
@@ -139,8 +152,8 @@ subroutine define_physical_zones()
   write(*,fmt='(" Number of regions detected:",i2)') n_regions
 
   do i=1, n_zones
-     R1 = real(Rmin_region(region(i)))
-     R2 = real(Rmax_region(region(i)))
+     R1 = real(regions(disk_zone(i)%region)%Rmin)
+     R2 = real(regions(disk_zone(i)%region)%Rmax)
      ! Format
      if ((R1 <= 1e-2).or.(R1>=1e6)) then
         n1 = "es8.2"
@@ -153,7 +166,7 @@ subroutine define_physical_zones()
         n2 = "f"//achar(int(abs(log10(R2))+1)+iachar('3'))//".2"
      endif
      write(*,fmt='(" zone",i2," --> region=",i2," : R=",'//trim(n1)//'," to ",'//trim(n2)//'," AU")') &
-          i, region(i), R1, R2 
+          i, disk_zone(i)%region, R1, R2 
   enddo
 
   return
@@ -165,7 +178,7 @@ end subroutine define_physical_zones
 subroutine define_grid4()
   ! Definit la grille du code
   ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
-  ! et la variable rout 2
+  ! et la variable Rmax2
   ! Version 4 gere les subdivisions pour les zones multiples
   ! C. Pinte 
   ! 03/05/11, version 3 :  27/04/05 
@@ -188,7 +201,7 @@ subroutine define_grid4()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-  rout2 = rout*rout
+  Rmax2 = Rmax*Rmax
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -201,7 +214,7 @@ subroutine define_grid4()
   if (llinear_grid) then
      
      do i=1, n_rad+1
-        tab_r(i) = rmin + (rout - rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = Rmin + (Rmin - Rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i) 
      enddo
@@ -221,7 +234,7 @@ subroutine define_grid4()
         if (lprint) write(*,*) "**********************"
         if (lprint) write(*,*) "New region", ir 
         if (lprint) write(*,*) "istart", istart, n_rad_in_region, n_rad_in
-        if (lprint) write(*,*) "R=", Rmin_region(ir), Rmax_region(ir)
+        if (lprint) write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
 
 
         if (ir == n_regions) then
@@ -229,16 +242,16 @@ subroutine define_grid4()
         endif
 
         ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
-        R0 =  Rmin_region(ir)
+        R0 =  regions(ir)%Rmin
         if (ir > 1) then
-           if (Rmin_region(ir) == Rmax_region(ir-1)) then
-              R0 =  Rmin_region(ir) * 1.00001_db
+           if (regions(ir)%Rmin == regions(ir-1)%Rmax) then
+              R0 =  regions(ir)%Rmin * 1.00001_db
            endif
         endif
 
         ! Grille log avec subdivision cellule interne
         !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-        ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(Rmax_region(ir)/R0) 
+        ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(regions(ir)%Rmax/R0) 
         delta_r = exp(ln_delta_r)
 
         ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
@@ -249,7 +262,7 @@ subroutine define_grid4()
         ! Selection de la zone correpondante : pente la plus forte
         puiss = 0.0_db
         do iz=1, n_zones
-           if (region(iz) == ir) then
+           if (disk_zone(iz)%region == ir) then
               p=1+dz%surf-dz%exp_beta
               if (p > puiss) then
                  puiss = p
@@ -314,9 +327,9 @@ subroutine define_grid4()
 
         ! Cellules vides
         if (ir < n_regions) then
-           if ( (Rmin_region(ir+1) > Rmax_region(ir)) ) then
+           if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
               if (lprint) write(*,*) "empty cells"
-              ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(Rmin_region(ir+1)/Rmax_region(ir)) 
+              ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(regions(ir+1)%Rmin/regions(ir)%Rmax) 
               delta_r = exp(ln_delta_r)
               do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
                  tab_r(i) = tab_r(i-1) * delta_r
@@ -365,7 +378,7 @@ subroutine define_grid4()
         H = 0.
         do izone=1,n_zones
            dz=disk_zone(izone)
-           if ((dz%rmin < rcyl).and.(rcyl < dz%rout)) then
+           if ((dz%rmin < rcyl).and.(rcyl < dz%Rmax)) then
               hzone = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               if (hzone > H) H = hzone
            endif ! test rcyl
@@ -470,7 +483,7 @@ subroutine define_grid4()
            z_grid(i,j)=rsph * w
         enddo
 
-        if (rsph > dz%rout) then
+        if (rsph > dz%Rmax) then
            izone = izone +1
            dz=disk_zone(izone)
         endif
@@ -527,7 +540,7 @@ end subroutine define_grid4
 subroutine define_grid3()
 ! Definit la grille du code
 ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
-! et la variable rout2
+! et la variable Rmax2
 ! C. Pinte 
 ! 27/04/05 
 
@@ -548,7 +561,7 @@ subroutine define_grid3()
 
   type(disk_zone_type) :: dz
 
-  rout2=rout*rout
+  Rmax2=Rmax*Rmax
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -561,13 +574,13 @@ subroutine define_grid3()
   if (llinear_grid) then
      
      do i=1, n_rad+1
-        tab_r(i) = rmin + (rout - rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = rmin + (Rmax - rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i) 
      enddo
 
   else if (lr_subdivide) then
-     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/rmin) 
+     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(Rmax/rmin) 
      delta_r = exp(ln_delta_r)
 
      ! Repartition des cellules "entieres" en log
@@ -591,7 +604,7 @@ subroutine define_grid3()
      puiss = -1.e30
      do i=1, n_zones
         dz=disk_zone(i)
-        if ((dz%rin <= r_subdivide).and.(dz%rout >= r_subdivide)) then
+        if ((dz%Rmin <= r_subdivide).and.(dz%Rmax >= r_subdivide)) then
            p=1+dz%surf-dz%exp_beta
            if (p > puiss) then
               puiss = p
@@ -660,7 +673,7 @@ subroutine define_grid3()
      
   else ! Grille log avec subdivision cellule interne
      !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rout/rmin) 
+     ln_delta_r = (1.0_db/real(n_rad-n_rad_in+1,kind=db))*log(rmax/rmin) 
      delta_r = exp(ln_delta_r)
   
      !delta_r_in = delta_r**(1.0/real(n_rad_in))
@@ -740,7 +753,7 @@ subroutine define_grid3()
         H = 0.
         do izone=1,n_zones
            dz=disk_zone(izone)
-           if ((dz%rmin < rcyl).and.(rcyl < dz%rout)) then
+           if ((dz%rmin < rcyl).and.(rcyl < dz%Rmax)) then
               hzone = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               if (hzone > H) H = hzone
            endif ! test rcyl
@@ -844,7 +857,7 @@ subroutine define_grid3()
            z_grid(i,j)=rsph * w
         enddo
 
-        if (rsph > dz%rout) then
+        if (rsph > dz%Rmax) then
            izone = izone +1
            dz=disk_zone(izone)
         endif
@@ -915,7 +928,7 @@ subroutine indice_cellule(xin,yin,zin,ri_out,zj_out)
      ri_out=0
      zj_out=1
      return
-  else if (r2 > rout2) then
+  else if (r2 > Rmax2) then
      ri_out=n_rad
   else
      ri_min=0
@@ -960,7 +973,7 @@ subroutine indice_cellule_sph(xin,yin,zin,ri_out,thetaj_out)
   ! Peut etre un bug en 0, 0 due a la correction sur grid_rmin dans define_grid3
   if (r2 < r_lim_2(0)) then
      ri_out=0
-  else if (r2 > rout2) then
+  else if (r2 > Rmax2) then
      ri_out=n_rad
   else
      ri_min=0
@@ -1059,7 +1072,7 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
     
   if (r2 < r_lim_2(0)) then
      ri_out=0
-  else if (r2 > rout2) then
+  else if (r2 > Rmax2) then
      ri_out=n_rad
   else
      ri_min=0

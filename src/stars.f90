@@ -171,7 +171,7 @@ subroutine repartition_energie_etoiles()
 
   implicit none
 
-  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, syst_status, n_lambda_spectre, l
+  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l
   real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0
   real(kind=db) :: somme_spectre, somme_bb
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo
@@ -573,7 +573,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   w2=1.0_db-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  l = R_ISM * size_neb
+  l = R_ISM * Rmax
   x = x * l
   y = y * l
   z = z * l

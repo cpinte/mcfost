@@ -26,10 +26,13 @@ module ProDiMo
 
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
-  real :: fUV_ProDiMo, slope_UV_ProDiMo, ProDiMo_fPAH, ProDiMo_fPAH2, ProDiMo_fPAH3, ProDiMo_fPAH4
-  ! fPAH = (2.2/mPAH) * dust_to_gas * eps_MCFOST/3e-7 
-  ! + PAH_NC, PAH_NH + distance + inclinaison
-  character(len=10) :: sProDiMo_fPAH, sProDiMo_fPAH1, sProDiMo_fPAH2, sProDiMo_fPAH3, sProDiMo_fPAH4
+  real :: fUV_ProDiMo, slope_UV_ProDiMo
+
+  ! Variables a passer dans le Parameter.in
+  real, dimension(:), allocatable :: ProDiMo_fPAH, ProDiMo_dust_gas, ProDiMo_Mdisk  ! n_regions
+  integer :: ProDiMo_PAH_NC, ProDiMo_PAH_NH
+  logical :: ProDiMo_other_PAH
+  character(len=10) :: sProDiMo_fPAH
   
   ! Grille de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
@@ -138,17 +141,17 @@ contains
   subroutine setup_ProDiMo()
     ! - distance 100pc
     ! - 1 pop de grains loi de puissance
-
-    ! lambda : 13 bins entre 0.0912 et 3410.85 microns
-    ! donne les 11 bins de ProDiMo
+    !
+    ! Must be run after routines taille_grain & define_physical_zones()
 
     ! TODO : linit_gaz
 
-    real :: wl_min
-    integer :: alloc_status
+    real :: wl_min, eps_PAH, mPAH, masse_PAH, norme, a
+    integer :: i, j, pop, k, NC, NH, alloc_status, ir, iz, NC_0
+    real, dimension(:), allocatable :: fPAH
 
     ! Maximum 4 zones dans ProDiMo
-    if (n_zones >4) then
+    if (n_zones > 4) then
        write(*,*) "ERROR: ProDiMo cannot deal with more than 4 zones."
        write(*,*) "Exiting."
        stop
@@ -165,21 +168,6 @@ contains
     
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     tau_dark_zone_eq_th = 15000. 
-
-    ! TODO : verif fichier parametres : pour relecture avec Yorick
-    ! N_etoiles = 1
-    if (mcfost2ProDiMo_version == 1) then
-       write(*,*) "***************************"
-       write(*,*) "* Modelling for ProDiMo   *"
-       write(*,*) "* Forcing wavelength grid *"
-       write(*,*) "***************************"
-       n_lambda = 39
-       lambda_min = 0.0912
-       lambda_max = 3410.85
-
-       ! on veut changer les lambda pour le step >=2
-       lsed_complete = .true.
-    endif
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
@@ -211,6 +199,93 @@ contains
        stop
     endif
     n_phot_envoyes_ISM = 0.0
+
+
+    ! Calcul des fPAH pour ProDiMo
+    allocate(fPAH(n_zones))
+    NC_0 = 0
+    fPAH = 0.0 ; 
+    do i=1, n_zones
+       do pop=1, n_pop
+          if (dust_pop(pop)%zone == i) then
+             if (dust_pop(pop)%is_PAH) then
+                masse_PAH = 0.0 ;
+                norme = 0.0 ;
+                do  k=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                   a = r_grain(k)
+                   NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
+                   NH = get_NH(NC)               ! number of Hydrogen atoms
+                   mPAH = 12 * NC + NH    ! masse du PAH
+           
+                   if (NC_0 > 0) then
+                      if (NC /= NC_0) then
+                         write(*,*) "ERROR: there can be only 1 type of PAH for ProDiMo"
+                         write(*,*) "Exiting"
+                         stop
+                      endif
+                   else
+                      NC_0 = NC
+                   endif
+       
+                   masse_PAH = masse_PAH + mPAH * nbre_grains(k) 
+                   norme = norme + nbre_grains(k)
+                enddo ! k
+                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs en mH
+                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
+
+                ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
+                ! abondance en nombre par rapport à H-nuclei + correction pour NC
+                fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.) 
+                !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
+             endif  ! PAH
+          endif ! pop dans la zone
+       enddo ! pop
+
+       fPAH(i) = max(fPAH(i),1e-9)
+    enddo ! i
+    
+
+    ProDiMo_other_PAH = .false.
+    if (NC_0 > 0) then
+       ProDiMo_other_PAH = .true.
+       ProDiMo_PAH_NC = NC
+       ProDiMo_PAH_NH = NH
+    endif
+
+    allocate(ProDiMo_fPAH(n_regions), ProDiMo_dust_gas(n_regions), ProDiMo_Mdisk(n_regions))    
+    do ir=1, n_regions
+       iz = regions(ir)%zones(1)
+
+       ProDiMo_fPAH(ir) = fPAH(iz)
+       ProDiMo_dust_gas(ir) = 1.0/disk_zone(iz)%gas_to_dust
+       ProDiMo_Mdisk(ir) = disk_zone(iz)%diskmass * disk_zone(iz)%gas_to_dust
+       
+       do i=2,regions(ir)%n_zones
+          iz = regions(ir)%zones(i)
+          if ( abs(ProDiMo_fPAH(ir)-fPAH(iz)) > 1e-3*ProDiMo_fPAH(ir)) then
+             write(*,*) "ERROR: fPAH must be contant within a region for ProDiMo"
+             do k=1, n_zones
+                write(*,*) "zone ", k,  "region", disk_zone(k)%region, "fPAH =", fPAH(k)
+             enddo ! k
+             write(*,*) "Exiting"
+             stop
+          endif
+
+          if ( abs(ProDiMo_dust_gas(ir)-1.0/disk_zone(iz)%gas_to_dust) > 1e-3*ProDiMo_dust_gas(ir)) then
+             write(*,*) "ERROR: gas_to_dust must be contant within a region for ProDiMo"
+              do k=1, n_zones
+                write(*,*) "zone ", k, "region", disk_zone(k)%region, "gas_dust =", disk_zone(k)%gas_to_dust
+             enddo ! k
+             write(*,*) "Exiting"
+             stop
+          endif
+
+          ProDiMo_Mdisk(ir) = ProDiMo_Mdisk(ir) + disk_zone(iz)%diskmass
+       enddo ! i
+
+    enddo ! ir
+
+    call create_input_ProDiMo()
 
     return
 
@@ -329,6 +404,7 @@ contains
 
     logical :: simple, extend
     character(len=512) :: filename
+    character :: s
 
     real(kind=db), dimension(n_rad,nz,2) :: grid
     real, dimension(n_rad,nz) :: dens
@@ -342,8 +418,6 @@ contains
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
-
-    call create_input_ProDiMo()
 
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
@@ -400,6 +474,11 @@ contains
     call ftpkyj(unit,'mcfost2prodimo',mcfost2ProDiMo_version,'',status)
     call ftpkys(unit,'mcfost_model_name',trim(para),'',status)
 
+    if (mcfost2ProDiMo_version >=3) then
+       call ftpkyj(unit,'n_zones',n_zones,' ',status)
+       call ftpkyj(unit,'n_regions',n_regions,' ',status)
+    endif
+
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
     call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
     call ftpkye(unit,'Mstar',real(etoile(1)%M),-8,'[Msun]',status)
@@ -408,10 +487,17 @@ contains
     call ftpkye(unit,'distance',real(distance),-8,'[pc]',status)
 
     if (mcfost2ProDiMo_version >=3) then
-       call ftpkyj(unit,'n_zones',n_zones,' ',status)
-       call ftpkye(unit,'disk_dust_mass_tot',real(diskmass),-8,'[Msun]',status)
-    endif
+       call ftpkye(unit,'disk_dust_mass_tot',real(diskmass),-8,'[Msun]',status) ! Version >=3
 
+       ! Adding regions information
+       do i=1,n_regions
+          write(s,'(i1)') i
+          call ftpkye(unit,'Rmin_region_'//s,real(regions(i)%Rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rmax_region_'//s,real(regions(i)%Rmax),-8,'[AU]',status)
+       enddo
+    endif ! mcfost2ProDiMo_version 3
+
+    ! 1st zone or only zone if mcfost2ProDiMo_version <=2 
     call ftpkye(unit,'disk_dust_mass',real(disk_zone(1)%diskmass),-8,'[Msun]',status)
     call ftpkye(unit,'Rin',real(disk_zone(1)%rmin),-8,'[AU]',status)
     call ftpkye(unit,'Rout',real(disk_zone(1)%rout),-8,'[AU]',status)
@@ -421,40 +507,22 @@ contains
     call ftpkye(unit,'beta',real(disk_zone(1)%exp_beta),-8,'',status)
     call ftpkye(unit,'alpha',real(disk_zone(1)%surf),-8,'',status)
 
-    if (mcfost2ProDiMo_version >=3) then
-       if (n_zones>=2) then
-          call ftpkye(unit,'disk_dust_mass_2',real(disk_zone(2)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_2',real(disk_zone(2)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_2',real(disk_zone(2)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_2',real(disk_zone(2)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_2',real(disk_zone(2)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_2',real(disk_zone(2)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_2',real(disk_zone(2)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_2',real(disk_zone(2)%surf),-8,'',status)
-       endif
-
-       if (n_zones>=3) then
-          call ftpkye(unit,'disk_dust_mass_3',real(disk_zone(3)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_3',real(disk_zone(3)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_3',real(disk_zone(3)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_3',real(disk_zone(3)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_3',real(disk_zone(3)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_3',real(disk_zone(3)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_3',real(disk_zone(3)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_3',real(disk_zone(3)%surf),-8,'',status)
-       endif
-
-       if (n_zones>=4) then
-          call ftpkye(unit,'disk_dust_mass_4',real(disk_zone(4)%diskmass),-8,'[Msun]',status)
-          call ftpkye(unit,'Rin_4',real(disk_zone(4)%rmin),-8,'[AU]',status)
-          call ftpkye(unit,'Rout_4',real(disk_zone(4)%rout),-8,'[AU]',status)
-          call ftpkye(unit,'Rref_4',real(disk_zone(4)%rref),-8,'[AU]',status)
-          call ftpkye(unit,'H0_4',real(disk_zone(4)%sclht),-8,'[AU]',status)
-          call ftpkye(unit,'edge_4',real(disk_zone(4)%edge),-8,'[AU]',status)
-          call ftpkye(unit,'beta_4',real(disk_zone(4)%exp_beta),-8,'',status)
-          call ftpkye(unit,'alpha_4',real(disk_zone(4)%surf),-8,'',status)
-       endif
+    if (mcfost2ProDiMo_version >=3) then       
+       ! Adding zones information
+       do i=2, n_zones
+          write(s,'(i1)') i
+          call ftpkye(unit,'disk_dust_mass_'//s,real(disk_zone(i)%diskmass),-8,'[Msun]',status)
+          call ftpkye(unit,'Rin_'//s,real(disk_zone(i)%Rmin),-8,'[AU]',status)
+          call ftpkye(unit,'Rout_'//s,real(disk_zone(i)%Rmax),-8,'[AU]',status)
+          call ftpkye(unit,'Rref_'//s,real(disk_zone(i)%Rref),-8,'[AU]',status)
+          call ftpkye(unit,'H0_'//s,real(disk_zone(i)%sclht),-8,'[AU]',status)
+          call ftpkye(unit,'edge_'//s,real(disk_zone(i)%edge),-8,'[AU]',status)
+          call ftpkye(unit,'beta_'//s,real(disk_zone(i)%exp_beta),-8,'',status)
+          call ftpkye(unit,'alpha_'//s,real(disk_zone(i)%surf),-8,'',status)
+       enddo
     endif ! mcfost2ProDiMo_version 3
+
+
 
     call ftpkye(unit,'amin',dust_pop(1)%amin,-8,'[micron]',status)
     call ftpkye(unit,'amax',dust_pop(1)%amax,-8,'[micron]',status)
@@ -652,7 +720,7 @@ contains
               
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*(R_ISM*size_neb)**2) / n_photons_envoyes / pi
+           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi
               
        do ri=1, n_rad
           do zj=1,nz
@@ -813,7 +881,7 @@ contains
        which_region = 0
        do iRegion=1,n_regions
           do i=1, n_rad
-             if ( (r_grid(i,1) > Rmin_region(iRegion)).and.(r_grid(i,1) < Rmax_region(iRegion)) ) which_region(i) = iRegion 
+             if ( (r_grid(i,1) > regions(iRegion)%Rmin).and.(r_grid(i,1) < regions(iRegion)%Rmax) ) which_region(i) = iRegion 
           enddo !i
        enddo ! iRegion
        call ftpprj(unit,group,fpixel,nelements,which_region,status)
@@ -842,12 +910,15 @@ contains
     ! C. Pinte 17/03/2012
 
     character(len=512) :: cmd
+
     character(len=128) :: line
     character(len=10) :: fmt
-    integer :: i, j, pop, k, NC, NH, status, syst_status
-    logical :: unchanged
+ 
+    integer :: status, i, iProDiMo, syst_status
+    logical :: unchanged, other_PAH
 
-    real :: fPAH, eps_PAH, mPAH, masse_PAH, norme, a
+
+    character :: s
     
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
@@ -860,44 +931,6 @@ contains
     call appel_syst(cmd,syst_status)
 
 
-    ! Calcul des fPAH pour ProDiMo
-    do i=1, n_zones
-       fPAH = 0.0 ; 
-       do pop=1, n_pop
-          if (dust_pop(pop)%zone == i) then
-             if (dust_pop(pop)%is_PAH) then
-                masse_PAH = 0.0 ;
-                norme = 0.0 ;
-                do  k=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                   a = r_grain(k)
-                   NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
-                   NH = get_NH(NC)               ! number of Hydrogen atoms
-                   mPAH = 12 * NC + NH    ! masse du PAH
-                  
-                   masse_PAH = masse_PAH + mPAH * nbre_grains(k) 
-                   norme = norme + nbre_grains(k)
-                enddo ! k
-                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs
-                eps_PAH = dust_pop(pop)%frac_mass  ! fraction en masse des PAHS
-
-                fPAH = fPAH + (2.2/masse_PAH) / gas_dust * eps_PAH/3e-7 
-              endif  ! PAH                
-          endif ! pop dans la zone
-       enddo ! pop
-
-       if (i==1) then
-          ProDiMo_fPAH = fPAH
-       else if (i==2) then
-          ProDiMo_fPAH2 = fPAH
-       else if (i==2) then
-          ProDiMo_fPAH3 = fPAH
-       else if (i==2) then
-          ProDiMo_fPAH4 = fPAH
-       endif
-    enddo ! i
-
-
-
     ! Copy and modify Parameter.in 
     open(unit=1,file=trim(ProDiMo_input_dir)//"/Parameter.in",status='old')
     open(unit=2,file=trim(data_ProDiMo)//"/Parameter.in",status='replace')
@@ -907,46 +940,73 @@ contains
        read(1,'(A128)',iostat=status) line
        if (status /= 0) exit read_loop
        unchanged = .true.
-       if (INDEX(line,"! dust_to_gas") > 0) then
-          write(2,*) 1.0/gas_dust," ! dust_to_gas : set by MCFOST"
-          unchanged = .false.
-       endif
 
-       if (INDEX(line,"! fPAH") > 0) then
-          write(2,*) ProDiMo_fPAH," ! fPAH : set by MCFOST"
-          if (n_zones>=2) write(2,*) ProDiMo_fPAH2," ! f2PAH : set by MCFOST"
-          if (n_zones>=3) write(2,*) ProDiMo_fPAH3," ! f3PAH : set by MCFOST"
-          if (n_zones>=4) write(2,*) ProDiMo_fPAH4," ! f4PAH : set by MCFOST"
-          unchanged = .false.
-       endif
-
+       ! Rin, Rout, Mdisk, dust_to_gas ratio and fPAH
        if (INDEX(line,"! Rout") > 0) then
-          write(2,*) disk_zone(1)%rout," ! Rout : set by MCFOST"
-          if (n_zones>=2) write(2,*) disk_zone(2)%rout," ! R2out : set by MCFOST"
-          if (n_zones>=3) write(2,*) disk_zone(3)%rout," ! R3out : set by MCFOST"
-          if (n_zones>=4) write(2,*) disk_zone(4)%rout," ! R4out : set by MCFOST"
+          write(2,*)  n_regions, " ! NZONES : number of MCFOST regions"
+          ! 1st ProDiMo zone is the last region (no number)
+          if (n_regions==1) then
+             write(2,'(A)') "----- single ProDiMo-zone ----- : set by MCFOST"
+          else
+             write(2,'(A)') "------ outer ProDiMo-zone ----- : MCFOST region"
+          endif
+          write(2,*) real(regions(n_regions)%Rmin)," ! Rin  : set by MCFOST"
+          write(2,*) real(regions(n_regions)%Rmax)," ! Rout : set by MCFOST"
+          write(2,*) ProDiMo_dust_gas(n_regions),  " ! dust_to_gas : set by MCFOST"
+          write(2,*) ProDiMo_fPAH(n_regions),      " ! fPAH : set by MCFOST"
+          write(2,*) ProDiMo_Mdisk(n_regions),     " ! Mdisk : set by MCFOST"
+
+          do i=1, n_regions-1
+             iProDiMo = i+1 
+             write(s,'(i1)') iProDiMo
+             write(2,'(A)') "------ ProDiMo-zone #"//s//"----- : set by MCFOST"
+             write(2,*) real(regions(i)%Rmin)," ! R"//s//"in  : weird ProDiMo order, set by MCFOST"
+             write(2,*) real(regions(i)%Rmax)," ! R"//s//"out : set by MCFOST"
+             write(2,*) ProDiMo_dust_gas(i), " ! d"//s//"ust_to_gas : set by MCFOST"
+             write(2,*) ProDiMo_fPAH(i),     " ! f"//s//"PAH : set by MCFOST"
+             write(2,*) ProDiMo_Mdisk(i),    " ! M"//s//"disk : set by MCFOST"
+          enddo
+  
+          write(2,*) ProDiMo_other_PAH, " ! other_PAH : set by MCFOST"
+          if (ProDiMo_other_PAH) then
+             write(2,*) ProDiMo_PAH_NC, " ! PAH_NC : set by MCFOST"
+             write(2,*) ProDiMo_PAH_NH, " ! PAH_NH : set by MCFOST"
+          endif
+
+          unchanged = .false.
+       endif
+       ! On zappe Rin, dust_to_gas, fPAH et Mdisk
+       if ( (INDEX(line,"! Rin") > 0).or.(INDEX(line,"! dust_to_gas") > 0).or. &
+          (INDEX(line,"! fPAH") > 0).or.(INDEX(line,"! Mdisk") > 0) ) then
+          unchanged = .false.
+       endif
+ 
+       if (INDEX(line,"! Rphoto_bandint") > 0) then
+          if ((etoile(1)%T > 6000.).or.(etoile(1)%fUV > 0.05)) then
+             write(2,*) .true.,  " ! Rphoto_bandint : set by MCFOST"
+          else
+             write(2,*) .false., " ! Rphoto_bandint : set by MCFOST"
+          endif
           unchanged = .false.
        endif
 
-       if (INDEX(line,"! Rin") > 0) then
-          write(2,*) disk_zone(1)%rmin," ! Rin : set by MCFOST"
-          if (n_zones>=2) write(2,*) disk_zone(2)%rmin," ! R2in : set by MCFOST"
-          if (n_zones>=3) write(2,*) disk_zone(3)%rmin," ! R3in : set by MCFOST"
-          if (n_zones>=4) write(2,*) disk_zone(4)%rmin," ! R4in : set by MCFOST"
+       if (INDEX(line,"! v_turb") > 0) then
+          write(2,*) real(vitesse_turb * m_to_km), " ! v_turb [km/s] : set by MCFOST"
           unchanged = .false.
        endif
 
-       if (INDEX(line,"! dust_to_gas") > 0) then
-          write(2,*) 1.0/gas_dust," ! dust_to_gas : set by MCFOST"
-          if (n_zones>=2) write(2,*) 1.0/gas_dust," ! d2ust_to_gas : set by MCFOST"
-          if (n_zones>=3) write(2,*) 1.0/gas_dust," ! d3ust_to_gas : set by MCFOST"
-          if (n_zones>=4) write(2,*) 1.0/gas_dust," ! d4ust_to_gas : set by MCFOST"
+       if (INDEX(line,"! incl") > 0) then
+          write(2,*) RT_imin, " ! incl : set by MCFOST (1st MCFOST inclination)" ! tab_RT_incl n'est pas necessairement alloue
           unchanged = .false.
        endif
-       
+
        if (unchanged) then
-          write(fmt,'("(A",I3.3,")")') len(trim(line)) 
-          write(2,fmt) trim(line)
+          if (len(trim(line)) > 0) then
+             write(fmt,'("(A",I3.3,")")') len(trim(line)) 
+             write(2,fmt) trim(line)
+          else
+             write(2,*) ""
+          endif
        endif
     enddo read_loop
 

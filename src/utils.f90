@@ -510,9 +510,9 @@ subroutine mcfost_update(lforce_update)
      stop
   endif
 
-  open(unit=1, file="version.txt", status='old')
+  open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
@@ -542,10 +542,10 @@ subroutine mcfost_update(lforce_update)
 
      
      ! get the correct url corresponding to the system
-     if (ostype=="linux") then
-        if (machtype=="i386") then
+     if (ostype(1:5)=="linux") then
+        if (machtype(1:4)=="i386") then
            url = trim(webpage)//"linux_32bits/mcfost"
-        else if (machtype=="x86_64") then
+        else if (machtype(1:6)=="x86_64") then
            url = trim(webpage)//"linux_64bits/mcfost"
         else
            write(*,*) "Linux system but unknown architecture"
@@ -626,6 +626,30 @@ end subroutine mcfost_history
 
 !***********************************************************
 
+subroutine mcfost_get_ref_para()
+
+  character(len=512) :: cmd
+  character(len=12) :: ref_file
+  integer ::  syst_status
+  
+  ref_file = "ref"//mcfost_release(1:4)//".para"
+  
+  write(*,*) "Getting MCFOST reference file: "//ref_file
+  cmd = "curl "//trim(webpage)//ref_file//" -O -s"
+  call appel_syst(cmd, syst_status)           
+  if (syst_status/=0) then 
+     write(*,*) "Cannot get MCFOST reference file"
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Done"
+
+  return
+
+end subroutine mcfost_get_ref_para
+
+!***********************************************************
+
 subroutine mcfost_v()
 
   character(len=512) :: cmd, last_version
@@ -635,6 +659,17 @@ subroutine mcfost_v()
   write(*,*) "This is MCFOST version: ", mcfost_release
   write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
   write(*,*) "SHA-1 id = ", sha_id
+  !write(*,*) 1.0/0.0 , __LINE__, __FILE__
+  write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
+#if defined (__INTEL_COMPILER)
+  write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
+#endif
+#if defined (__GFORTRAN__)
+  write(*,fmt='(" with GFORTAN compiler version ",i1,".",i1,"."i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
+#endif
+#if defined (__G95__)
+  write(*,fmt='(" with G95 compiler version ",i1,".",i2)') __G95__, __G95_MINOR__
+#endif
   write(*,*) " "
   
 
@@ -648,9 +683,9 @@ subroutine mcfost_v()
      write(*,*) "Exiting"
      stop
   endif
-  open(unit=1, file="version.txt", status='old')
+  open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST last version number (Error 2)"
@@ -678,9 +713,9 @@ subroutine mcfost_v()
      ! Getting line number of current version in history
      cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
      call appel_syst(cmd, syst_status)
-     open(unit=1, file="line_number.txt", status='old')
+     open(unit=1, file="line_number.txt", status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
-     close(unit=1,status="delete") 
+     close(unit=1,status="delete",iostat=ios) 
      
      ! Printing history
      if (ios==0) then
@@ -716,7 +751,7 @@ subroutine update_utils(lforce_update)
   logical :: lupdate
 
   ! Last version
-  utils_current_version =  mcfost_utils_version()
+  utils_current_version =  get_mcfost_utils_version()
   write(*,*) "Version ", utils_current_version
   write(*,*) "Checking last version of MCFOST UTILS ..."
 
@@ -727,9 +762,9 @@ subroutine update_utils(lforce_update)
      write(*,*) "Exiting"
      stop
   endif
-  open(unit=1, file="Version", status='old')
+  open(unit=1, file="Version", status='old',iostat=ios)
   read(1,*,iostat=ios) s_last_version
-  close(unit=1,status="delete")
+  close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then 
      write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 2)"
@@ -740,7 +775,7 @@ subroutine update_utils(lforce_update)
 
 
   ! Do we need to update ?
-  if (last_version == mcfost_version) then
+  if (last_version == required_utils_version) then
      !Ok we have the correct version of mcfost
      if (last_version == utils_current_version) then
         write(*,*) "MCFOST UTILS is up-to-date"
@@ -789,24 +824,26 @@ end subroutine get_utils
 
 !***********************************************************
 
-real function mcfost_utils_version()
+real function get_mcfost_utils_version()
 
   integer :: ios
 
   ! Check utils directory
+  get_mcfost_utils_version = 0.0
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
-  read(1,*,iostat=ios) mcfost_utils_version
-  close(unit=1)
-  if (ios /= 0) mcfost_utils_version = 0.0
-  if (mcfost_utils_version /= mcfost_version) then
-     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
-     write(*,*) "Utils:", mcfost_utils_version, "required:",mcfost_version
-     write(*,*) "Please update with mcfost -update_utils"
-     write(*,*) "Exiting."
+  read(1,*,iostat=ios) get_mcfost_utils_version
+  close(unit=1,iostat=ios)
+  if (ios /= 0) get_mcfost_utils_version = 0.0
+
+  if (abs(get_mcfost_utils_version) < 1e-6) then
+     write(*,*) "ERROR : could not find current MCFOST utils version"
+     write(*,*) "Exiting"
      stop
   endif
 
-end function mcfost_utils_version
+  return
+
+end function get_mcfost_utils_version
 
 !***********************************************************
 
@@ -970,5 +1007,25 @@ logical function is_file(filename)
   return
   
 end function is_file
+
+!************************************************************
+
+subroutine appel_syst(cmd, status)
+
+#if defined (__INTEL_COMPILER)
+  use IFPORT, only : system
+#endif
+
+  implicit none
+
+  character(len=*), intent(in) :: cmd
+  integer, intent(out), optional :: status
+
+  status = system(cmd) ! limux
+  !call system(cmd, status) ! aix
+
+  return
+
+end subroutine appel_syst
 
 end module utils
