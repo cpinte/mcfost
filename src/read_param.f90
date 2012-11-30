@@ -352,7 +352,7 @@ contains
              disk_zone(j)%Rmax = disk_zone(j)%Rout
           else if (disk_zone(j)%geometry == 2) then ! tappered-edge
              disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 4* disk_zone(j)%Rc
+             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
@@ -876,7 +876,7 @@ contains
              disk_zone(j)%Rmax = disk_zone(j)%Rout
           else if (disk_zone(j)%geometry == 2) then ! tappered-edge
              disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 4* disk_zone(j)%Rc
+             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
