@@ -45,7 +45,7 @@
   10.  100.0              scale height, reference radius (AU), unused for envelope
   1.0  300.0 0.00         Rin, Rout (or Rc), edge (AU)
   1.125                   flaring exponent, unused for envelope
-  -0.5      	          surface density exponent (or gamma for tappered-edge disk)
+  -0.5      	          surface density exponent (or -gamma for tappered-edge disk), usually < 0
 
 #Cavity : everything is empty above the surface
  F	  	     	  cavity ?    	
