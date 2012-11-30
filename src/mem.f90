@@ -987,13 +987,12 @@ subroutine dealloc_em_th()
   
   deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
 
-  deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
-
-  deallocate(tab_x0,tab_y0,tab_z0)
+  !deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
+  !deallocate(tab_x0,tab_y0,tab_z0)
 
   deallocate(tab_albedo,q_ext,q_sca,q_abs,q_geo,tab_g)
 
-  deallocate(E_stars,E_disk,frac_E_stars,E_totale)
+  !deallocate(E_stars,E_disk,frac_E_stars,E_totale)
 
   deallocate(spectre_etoiles_cumul,spectre_etoiles, spectre_emission_cumul)
 
