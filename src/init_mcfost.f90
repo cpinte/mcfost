@@ -9,7 +9,6 @@ module init_mcfost
   use molecular_emission
   use ray_tracing
   !$ use omp_lib
-
   use benchmarks
   use read_params
   use input
@@ -30,7 +29,7 @@ subroutine initialisation_mcfost()
   
   character(len=512) :: cmd, s, str_seed
 
-  logical :: lresol, lzoom, ldust_emisison_in_images, lmc, ln_zone
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
 
   lmc = .false.
 
@@ -87,6 +86,7 @@ subroutine initialisation_mcfost()
   llinear_grid=.false.
   lr_subdivide=.false.
   lfreeze_out = .false.
+  l_em_disk_image = .true.
   lisotropic = .false.
   lno_scattering = .false.
   lqsca_equal_qabs = .false.
@@ -103,7 +103,6 @@ subroutine initialisation_mcfost()
   lProDiMo2mcfost=.false.
   lforce_ProDiMo_PAH = .false.
   lgap_ELT=.false.
-  ldust_emisison_in_images=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
   lSeb_Fromang = .false.
@@ -114,6 +113,11 @@ subroutine initialisation_mcfost()
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
+  lcorrect_Tgas = .false.
+
+  lonly_scatt = .false.
+  lHG = .false. 
+  
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -145,19 +149,22 @@ subroutine initialisation_mcfost()
   
   ! Basic options
   if (para(1:1)=="-") then
-     if (para(2:2)=="v") then
+     if (para(2:2)=="v") then ! mcfost version
         call mcfost_v()
-     else if (para(2:2)=="h") then
+     else if (para(2:2)=="h") then ! mcfost history
         call mcfost_history()
-     else if (para(2:13)=="setup") then
+     else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
         call get_utils()
-     else  if (para(2:13)=="update_utils") then
+        call mcfost_get_ref_para()
+     else if (para(2:9)=="get_para") then ! download current reference file
+        call mcfost_get_ref_para()
+     else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
-     else if (para(2:14)=="fupdate_utils") then
+     else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
-     else if (para(2:2)=="u") then
+     else if (para(2:2)=="u") then ! update binary
         call mcfost_update(.false.)
-     else if (para(2:3)=="fu") then
+     else if (para(2:3)=="fu") then ! force update binary
         call mcfost_update(.true.)
      else
         call display_help()
@@ -165,7 +172,15 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  utils_version =  mcfost_utils_version()
+  utils_version =  get_mcfost_utils_version()
+  if (utils_version /= required_utils_version) then
+     write(*,*) "ERROR: wrong version of the MCFOST_UTILS database"
+     write(*,*) "Utils:", utils_version, "required:",required_utils_version
+     write(*,*) "Please update with mcfost -update_utils"
+     write(*,*) "Exiting."
+     stop
+  endif
+
 
   ! Les benchmarks
   if (para(1:8)=="Pascucci") then
@@ -383,6 +398,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1 
      case("-output_density_grid")
+        lsetup_gas = .true.
         loutput_density_grid=.true.
         i_arg = i_arg+1
      case("-output_J")
@@ -611,9 +627,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1 
         read(s,*) sigma_gap_ELT
-     case("-dust_emission_in_images")
+     case("-only_scatt")
         i_arg = i_arg+1
-        ldust_emisison_in_images=.true.
+        lonly_scatt = .true.
+     case("-HG")
+        i_arg = i_arg+1
+        lHG=.true.
      case("-p2m")
         i_arg = i_arg+1
         lProDiMo2mcfost=.true.
@@ -665,6 +684,12 @@ subroutine initialisation_mcfost()
      case("-only_bottom")
         i_arg = i_arg+1
         lonly_bottom=.true.
+     case("-correct_Tgas")
+        i_arg = i_arg+1
+        lcorrect_Tgas=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1 
+        read(s,*) correct_Tgas
      case default
         call display_help()
      end select
@@ -683,6 +708,17 @@ subroutine initialisation_mcfost()
      call read_para()
   endif
 
+  if (lemission_mol.and.para_version < 2.11) then
+     write(*,*) "ERROR: parameter version must be larger than 2.10"
+     write(*,*) "line transfer"
+     write(*,*) "Exiting."
+     stop
+  endif
+
+  write(*,*) 'Input file read successfully'
+
+  
+  ! Correction sur les valeurs du .para
   if (lProDiMo) then
      if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
         write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda" 
@@ -719,25 +755,18 @@ subroutine initialisation_mcfost()
 
   if (lread_Seb_Charnoz) lstrat = .true.
 
-  if (lemission_mol.and.para_version < 2.11) then
-     write(*,*) "ERROR: parameter version must be larger than 2.10"
-     write(*,*) "line transfer"
-     write(*,*) "Exiting."
-     stop
-  endif
-
-
-  write(*,*) 'Input file read successfully'
+  
+  if (lonly_scatt) l_em_disk_image=.false.
+  if (lHG) aniso_method=2
+  
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
   ! verification cohérence du fichier de paramètres
-
   n_lambda2 = n_lambda
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
   if (limg) then
-     if (ldust_emisison_in_images) l_em_disk_image=.true.
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
      else
@@ -805,12 +834,6 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-!  if ((abs(exp_strat)>tiny(0.0)).and.(.not.lstrat)) then
-!     write(*,*) "Error : dust settling exponent is different from 0 but dust settling is turned off"
-!     write(*,*) 'Exiting'
-!     stop
-!  endif
-
   if (lresol) then
      igridx = nx
      igridy = ny
@@ -827,7 +850,7 @@ subroutine initialisation_mcfost()
          deltapix_x = 1 - (igridy/2) + (igridx/2)
          deltapix_y = 1
       endif
-      size_pix=maxigrid/(2.0*size_neb)
+      size_pix=maxigrid/(map_size)
   endif
 
   if (lzoom) then
@@ -862,7 +885,18 @@ subroutine initialisation_mcfost()
 
   endif
 
-  if (lProDiMo) call setup_ProDiMo()
+  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then 
+     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
+     write(*,*) "***************************"
+     write(*,*) "* Modelling for ProDiMo   *"
+     write(*,*) "* Forcing wavelength grid *"
+     write(*,*) "***************************"
+     n_lambda = 39
+     lambda_min = 0.0912
+     lambda_max = 3410.85
+     lsed_complete = .true.
+  endif
+
 
   if (lpara) then
      if (nb_proc==1) then
@@ -889,6 +923,7 @@ subroutine initialisation_mcfost()
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
+
   call save_data()   
 
   if ((l3D).and.(n_az==1)) then
@@ -923,10 +958,12 @@ subroutine display_help()
 
   write(*,*) "usage : mcfost parameter_file [options]"
   write(*,*)
-  write(*,*) "mcfost -v displays version number, and available updates"
-  write(*,*) "mcfost -u updates MCFOST to most recent version"
-  write(*,*) "mcfost -update_utils updates MCFOST_UTILS to most recent version"
-  write(*,*) "mcfost -h displays full MCFOST history since v2.12.9"
+  write(*,*) "mcfost -help : displays this help message"
+  write(*,*) "       -v : displays version number, and available updates"
+  write(*,*) "       -get_para : downloads the current version of the parameter file"
+  write(*,*) "       -u : updates MCFOST to most recent version"
+  write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
+  write(*,*) "       -h : displays full MCFOST history since v2.12.9"
   write(*,*) " "
   write(*,*) " Main mcfost options" 
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
@@ -945,9 +982,7 @@ subroutine display_help()
   write(*,*) " Options related to images"
   write(*,*) "        : -zoom <zoom> (override value in parameter file)"
   write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
-  write(*,*) "        : -dust_emission_in_images : include thermal emission "
-  write(*,*) "                            from the disk in image calculation"  
-  write(*,*) "                            (override value in parameter file)"  
+  write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
   write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
@@ -1013,6 +1048,8 @@ subroutine display_help()
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo" 
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
+  write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
+
   stop
 
 end subroutine display_help
@@ -1074,7 +1111,7 @@ subroutine save_data
 
   implicit none
   integer :: syst_status
-  character(len=512) :: cmd
+  character(len=1024) :: cmd
 
   logical :: lnew_run, lmove_data
   integer :: etape, etape_start, etape_end

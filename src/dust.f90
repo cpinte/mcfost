@@ -307,6 +307,7 @@ subroutine init_indices_optiques()
               tab_amu1(i,pop) = real(mavg)
               tab_amu2(i,pop) = aimag(mavg)
            enddo ! n_ind
+           deallocate(m,f)
         endif ! porosity
 
         deallocate(tab_tmp_amu1,tab_tmp_amu2)

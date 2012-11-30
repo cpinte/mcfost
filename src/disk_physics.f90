@@ -106,7 +106,7 @@ subroutine compute_othin_sublimation_radius()
   write(*,*) "New minimum radius = ", rmin
 
   do i = 1, n_regions
-     Rmin_region(i) = max(Rmin_region(i),sublimation_radius)
+     regions(i)%Rmin = max(regions(i)%Rmin,sublimation_radius)
   enddo !i
   
   return

@@ -26,15 +26,6 @@ cp libcfitsio.a ../lib
 cd ..
 rm -rf cfitsio
 
-# appels systemes
-cd appels_systeme/linux/g95
-make
-cp libappel_syst.a ../../../lib
-make clean
-cd ../../..
-
-
-pwd
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
 cd nr

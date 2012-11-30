@@ -157,6 +157,8 @@ subroutine transfert_poussiere()
         call define_grid4()
      endif
 
+     if (lProDiMo) call setup_ProDiMo()
+
      !call densite_data_hd32297(para) ! grille redefinie dans routine
      if (lgap_laure) then
         call densite_gap_laure2()
@@ -1403,13 +1405,13 @@ subroutine dust_map(lambda,ibin)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
-  l = 10.*rout  ! on se met loin
+  l = 10.*Rmax  ! on se met loin
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
   ! Coin en bas gauche de l'image
-  Icorner(:) = center(:) -  (size_neb / zoom) * (Iaxis(1,:) + Iaxis(2,:) ) 
+  Icorner(:) = center(:) -  (0.5 * map_size / zoom) * (Iaxis(1,:) + Iaxis(2,:) ) 
 
   ! Methode 1 = echantillonage log en r et uniforme en phi
   ! Methode 2 = echantillonage lineaire des pixels (carres donc) avec iteration sur les sous-pixels
@@ -1429,8 +1431,8 @@ subroutine dust_map(lambda,ibin)
      i = 1
      j = 1
      
-     rmin_RT = 0.01_db * rmin
-     rmax_RT = 2.0_db * rout
+     rmin_RT = 0.01_db * Rmin
+     rmax_RT = 2.0_db * Rmax
 
      tab_r(1) = rmin_RT
      fact_r = exp( (1.0_db/(real(n_rad_RT,kind=db) -1))*log(rmax_RT/rmin_RT) )
@@ -1475,7 +1477,7 @@ subroutine dust_map(lambda,ibin)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel 
-     taille_pix = 2.0_db * (size_neb/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
+     taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
      dx(:) = Iaxis(1,:) * taille_pix
      dy(:) = Iaxis(2,:) * taille_pix
   

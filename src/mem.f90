@@ -9,6 +9,7 @@ module mem
   use naleat
   use molecular_emission
   use ray_tracing
+  use utils
 
   implicit none
 
