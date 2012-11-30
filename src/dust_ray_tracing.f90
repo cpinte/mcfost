@@ -599,27 +599,29 @@ subroutine init_dust_source_fct1(lambda,ibin)
   endif
 
   ! Intensite specifique diffusion
-  do i=1,n_rad
-     facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
-     do j=1,nz
-        if (kappa(lambda,i,j,1) > tiny_db) then
-           ! TODO : pb de pola 
-           do itype=1,N_type_flux
-              norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3),tiny_db) 
-              I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
-           enddo ! itype
-
-           eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j) ) / kappa(lambda,i,j,1) 
-           if (lsepar_contrib) then
-              eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1) 
-              eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j) / kappa(lambda,i,j,1) 
-              eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1) 
-           endif ! lsepar_contrib
-        else
-           eps_dust1(:,i,j,:,:) = 0.0_db
-        endif ! kappa > 0
-     enddo ! j
-  enddo !i
+  do j=1,nz
+     do i=1,n_rad
+        facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
+        
+        ! TODO : les lignes suivantes sont tres chers en OpenMP
+         if (kappa(lambda,i,j,1) > tiny_db) then
+            ! TODO : pb de pola 
+            norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3) ,tiny_db) 
+            do itype=1,N_type_flux
+               I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
+            enddo ! itype
+            
+            eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j) ) / kappa(lambda,i,j,1) 
+            if (lsepar_contrib) then
+               eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1) 
+               eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j) / kappa(lambda,i,j,1) 
+               eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1) 
+            endif ! lsepar_contrib
+         else
+            eps_dust1(:,i,j,:,:) = 0.0_db
+         endif ! kappa > 0
+      enddo ! j
+   enddo !i
   
   
 !  write(*,*) maxval(eps_dust1(1,:,:,:,:)), maxval(eps_dust1(2,:,:,:,:)), maxval(eps_dust1(3,:,:,:,:)), maxval(eps_dust1(4,:,:,:,:)), maxval(eps_dust1(5,:,:,:,:))
