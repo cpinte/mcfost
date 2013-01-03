@@ -1072,8 +1072,10 @@ subroutine display_disclaimer()
   write(*,*) "* agree to :                              *"
   write(*,*) "*  - offer us co-author right on any      *"
   write(*,*) "* resulting publication.                  *"
-  write(*,*) "*  - not distribute MCFOST without our    *"
+  write(*,*) "*  - NOT distribute MCFOST without our    *"
   write(*,*) "* explicit agreement.                     *"
+  write(*,*) "*  - contact us if you initiate a new     *"
+  write(*,*) "* scientific project with MCFOST.         *"
 
   if (.not.is_file("~/.mcfost/accept_disclaimer_"//mcfost_release)) then
      write(*,*) "*                                         *"
