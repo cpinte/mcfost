@@ -553,9 +553,11 @@ release : main
 	rm -rf web
 	mkdir web web/linux_64bits web/macos_intel_64bits
 	cp mcfost web/macos_intel_64bits
+	openssl sha1 mcfost | awk '{print $$2}' > web/macos_intel_64bits/mcfost.sha1
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri"
+	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
 	scp fosti:mcfost/src/mcfost web/linux_64bits/
+	scp fosti:mcfost/src/mcfost.sha1 web/linux_64bits/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para"}' ` web
@@ -569,6 +571,7 @@ release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/macos_intel_64bits
+	openssl sha1 mcfost | awk '{print $$2}' > web/macos_intel_64bits/mcfost.sha1
 	cp mcfost web/macos_intel_64bits
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
@@ -580,8 +583,9 @@ release_mac : main
 
 release_utils : 
 	tar czvf mcfost_utils.tgz -C../utils .
-	scp -r mcfost_utils.tgz ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
-	rm -f mcfost_utils.tgz 
+	openssl sha1 mcfost_utils.tgz | awk '{print $2}' > mcfost_utils.sha1
+	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
+	rm -f mcfost_utils.tgz mcfost_utils.sha1
 
 
 fosti : 

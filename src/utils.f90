@@ -493,9 +493,11 @@ subroutine mcfost_update(lforce_update)
   logical, intent(in) :: lforce_update
   logical :: lupdate
 
-  character(len=512) :: cmd, url, last_version, machtype, ostype, system
+  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system
+  character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
+  
   write(*,*) "Version ", mcfost_release
   
   ! Last version
@@ -545,8 +547,10 @@ subroutine mcfost_update(lforce_update)
      if (ostype(1:5)=="linux") then
         if (machtype(1:4)=="i386") then
            url = trim(webpage)//"linux_32bits/mcfost"
+           url_sha1 = trim(webpage)//"linux_32bits/mcfost.sha1"
         else if (machtype(1:6)=="x86_64") then
            url = trim(webpage)//"linux_64bits/mcfost"
+           url_sha1 = trim(webpage)//"linux_64bits/mcfost.sha1"
         else
            write(*,*) "Linux system but unknown architecture"
            write(*,*) "Cannot download new binary"
@@ -557,6 +561,7 @@ subroutine mcfost_update(lforce_update)
      else if (ostype(1:6)=="darwin") then
         system = "MacOS X x86_64" 
         url = trim(webpage)//"macos_intel_64bits/mcfost"
+        url_sha1 = trim(webpage)//"macos_intel_64bits/mcfost.sha1"
      else
         write(*,*) "Unknown operating system"
         write(*,*) "Cannot download new binary"
@@ -582,20 +587,56 @@ subroutine mcfost_update(lforce_update)
      !cmd = "wget -q "//trim(url)//" -O mcfost_update"
      cmd = "curl "//trim(url)//" -o mcfost_update -s"
      call appel_syst(cmd, syst_status)  
+     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s"
+     call appel_syst(cmd, syst_status)  
      if (syst_status==0) then 
         write(*,*) "Done"
-        cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
-        call appel_syst(cmd, syst_status)    
-        write(*,*) " "
-        write(*,*) "MCFOST has been updated"
-        write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)
      else
-        cmd = "rm -rf mcfost_update"
+        cmd = "rm -rf mcfost_update*"
         call appel_syst(cmd, syst_status) 
-        write(*,*) "Download error"
+        write(*,*) "ERROR during download. MCFOST has not been updated."
         write(*,*) "Exiting"
+        stop
      endif
         
+     
+     ! check sha
+     write(*,'(a20, $)') "Checking binary ..."
+     if (ostype(1:5)=="linux") then
+        cmd = "sha1sum  mcfost_update > mcfost_update.sha1"
+     else if (ostype(1:6)=="darwin") then
+        cmd = "openssl sha1 mcfost_update | awk '{print $2}' > mcfost_update.sha1"
+     endif
+     call appel_syst(cmd, syst_status)
+     
+     open(unit=1, file="mcfost.sha1", status='old',iostat=ios)
+     read(1,*,iostat=ios) mcfost_sha1
+     close(unit=1,status="delete",iostat=ios)
+
+     open(unit=1, file="mcfost_update.sha1", status='old',iostat=ios)
+     read(1,*,iostat=ios) mcfost_update_sha1
+     close(unit=1,status="delete",iostat=ios)
+     
+     if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then 
+        cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
+        write(*,*) " "
+        write(*,*) "ERROR: binary sha1 is incorrect. MCFOST has not been updated."
+        write(*,*) mcfost_sha1
+        write(*,*) mcfost_update_sha1
+        write(*,*) "Exiting"
+        stop
+     else
+        write(*,*) "Done"
+     endif
+
+     ! make binary executable 
+     !cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
+     write(*,'(a20, $)') "Updating binary ..."
+     cmd = "chmod a+x mcfost_update ; mv mcfost_update mcfost"
+     call appel_syst(cmd, syst_status)    
+     write(*,*) "Done"
+     write(*,*) "MCFOST has been updated"
+     !write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)     
   endif ! lupdate
 
   return
@@ -658,7 +699,7 @@ subroutine mcfost_v()
 
   write(*,*) "This is MCFOST version: ", mcfost_release
   write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
-  write(*,*) "SHA-1 id = ", sha_id
+  write(*,*) "Source code SHA-1 = ", sha_id
   !write(*,*) 1.0/0.0 , __LINE__, __FILE__
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
