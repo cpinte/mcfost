@@ -1400,7 +1400,8 @@ contains
        do j=1,n_zones 
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
@@ -1928,7 +1929,8 @@ contains
        do j=1,n_zones 
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
@@ -2439,7 +2441,8 @@ contains
        do j=1,n_zones 
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
@@ -2955,7 +2958,8 @@ contains
        do j=1,n_zones 
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
              write(*,*) "WARNING : you are using an envelope density structure"
              write(*,*) "          with a cylindrical grid !!!!"
           endif
@@ -3387,7 +3391,8 @@ contains
     do j=1,n_zones 
        read(1,*) disk_zone(j)%geometry
        if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-       if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
           write(*,*) "WARNING : you are using an envelope density structure"
           write(*,*) "          with a cylindrical grid !!!!"
        endif
@@ -3744,7 +3749,8 @@ contains
     do j=1,n_zones 
        read(1,*) disk_zone(j)%geometry
        if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-       if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
           write(*,*) "WARNING : you are using an envelope density structure"
           write(*,*) "          with a cylindrical grid !!!!"
        endif
@@ -4108,7 +4114,8 @@ contains
     do j=1,n_zones 
        read(1,*) disk_zone(j)%geometry
        if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-       if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
           write(*,*) "WARNING : you are using an envelope density structure"
           write(*,*) "          with a cylindrical grid !!!!"
        endif
@@ -4474,7 +4481,8 @@ contains
     do j=1,n_zones 
        read(1,*) disk_zone(j)%geometry
        if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-       if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
           write(*,*) "WARNING : you are using an envelope density structure"
           write(*,*) "          with a cylindrical grid !!!!"
        endif
@@ -4838,7 +4846,8 @@ contains
     do j=1,n_zones 
        read(1,*) disk_zone(j)%geometry
        if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-       if ((disk_zone(j)%geometry == 2).and.(grid_type == 1)) then
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
           write(*,*) "WARNING : you are using an envelope density structure"
           write(*,*) "          with a cylindrical grid !!!!"
        endif

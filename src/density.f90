@@ -62,7 +62,7 @@ subroutine define_density()
         stop
      endif
 
-     if (dz%geometry == 3) lwall = .true. 
+     if (dz%geometry == 4) lwall = .true. 
 
      if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
@@ -372,7 +372,7 @@ subroutine define_density()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-     if (dz%geometry /= 3) then ! pas de wall ici
+     if (dz%geometry /= 4) then ! pas de wall ici
         dp => dust_pop(pop)
         mass = 0.0
 
