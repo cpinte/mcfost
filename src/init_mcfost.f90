@@ -156,8 +156,11 @@ subroutine initialisation_mcfost()
      else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
         call get_utils()
         call mcfost_get_ref_para()
+        call mcfost_get_manual()
      else if (para(2:9)=="get_para") then ! download current reference file
         call mcfost_get_ref_para()
+     else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
+        call mcfost_get_manual()
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then ! force update utils
@@ -960,7 +963,8 @@ subroutine display_help()
   write(*,*)
   write(*,*) "mcfost -help : displays this help message"
   write(*,*) "       -v : displays version number, and available updates"
-  write(*,*) "       -get_para : downloads the current version of the parameter file"
+  write(*,*) "       -get_para or get_doc : downloads the current version of the parameter file"
+  write(*,*) "       -get_manual : downloads the current version of manual"
   write(*,*) "       -u : updates MCFOST to most recent version"
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
   write(*,*) "       -h : displays full MCFOST history since v2.12.9"

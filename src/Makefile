@@ -563,6 +563,7 @@ release : main
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
+	cp -r Doc web/
 	scp -r web/* horus:/user/publicdir/pintec/mcfost	
 	rm -rf web
 
@@ -578,6 +579,7 @@ release_mac : main
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
+	cp -r Doc web/
 	scp -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 

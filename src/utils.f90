@@ -691,6 +691,31 @@ end subroutine mcfost_get_ref_para
 
 !***********************************************************
 
+subroutine mcfost_get_manual()
+
+  character(len=512) :: cmd
+  character(len=128) :: doc_dir, doc_file
+  integer ::  syst_status
+
+  doc_dir = "Doc/"
+  doc_file = "MCFOSTUnofficialPseudo-Manual.pdf"
+
+  write(*,*) "Getting MCFOST manual: ", trim(doc_file)
+  cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then
+     write(*,*) "Cannot get MCFOST manual"
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Done"
+
+  return
+
+end subroutine mcfost_get_manual
+
+!***********************************************************
+
 subroutine mcfost_v()
 
   character(len=512) :: cmd, last_version
@@ -836,7 +861,6 @@ subroutine update_utils(lforce_update)
   endif
 
   if (lupdate) then
-     write(*,*) "Updating MCFOST UTILS ..."
      call get_utils()
   endif
 
@@ -851,7 +875,8 @@ subroutine get_utils()
   character(len=512) :: cmd
   integer :: syst_status
 
-  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzvf - -C"//trim(mcfost_utils)
+  write(*,*) "Downloading MCFOST UTILS (this may take a while) ..."
+  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzf - -C"//trim(mcfost_utils)
   call appel_syst(cmd, syst_status)  
   if (syst_status == 0) then
      write(*,*) "Done"
