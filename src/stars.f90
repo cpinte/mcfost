@@ -343,6 +343,7 @@ subroutine repartition_energie_etoiles()
   
   tab_spectre0(:,:) = tab_spectre(:,:)
 
+
   ! Luminosite etoile integree sur le spectre
   L_star_spectre0 = 0.0
   do l = 2, n_lambda_spectre
@@ -375,6 +376,7 @@ subroutine repartition_energie_etoiles()
         if (UV_ProDiMo >  tab_spectre(1,l)) tab_spectre(1,l) = UV_ProDiMo
      endif
   enddo
+
 
   L_UV = 0.0
   do l = 2, n_lambda_spectre
@@ -485,6 +487,16 @@ subroutine repartition_energie_etoiles()
   ! Multiplication par rayon etoile et distance (en Rsun et pc)
   ! spectre_etoiles est F_lambda * dlambda
   spectre_etoiles(:) =  spectre_etoiles(:) * cst_spectre_etoiles
+
+
+  if (lProDiMo) then ! 1 seule etoile en mode ProDiMo
+     ! ProDiMo_star_HR est du lambda.Flambda (idem spectre_etoiles mais avec tab_lambda au lieu de tab_delta_lambda)
+     allocate(ProDiMo_star_HR(n_lambda_spectre,2))
+     ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
+     ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:)
+  endif
+
+
 
   !  TODO : L_etoile doit etre recalcule
   ! L_etoile fixe le flux dans sed1
