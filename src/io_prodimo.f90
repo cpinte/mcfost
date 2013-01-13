@@ -42,10 +42,11 @@ module ProDiMo
   real, parameter :: TCmb = 2.73 
   real, parameter :: T_ISM_stars = 20000.
   real, parameter :: chi_ISM = 1.0
-  real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
 
+  real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes_ISM
         
+  real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   ! ProDiMo2mcfost
   integer,parameter :: MC_NSP=5      ! number of species
@@ -869,6 +870,7 @@ contains
        !------------------------------------------------------------------------------
        bitpix=32
        naxis=1
+       naxes(1)=n_rad
        nelements=naxes(1)
        
        ! create new hdu
@@ -887,6 +889,30 @@ contains
 
     endif ! mcfost2ProDiMo_version >=3
 
+    if (mcfost2ProDiMo_version >=4) then       
+       !------------------------------------------------------------------------------
+       ! HDU 14 : Spectre stellaire HR
+       !------------------------------------------------------------------------------
+       bitpix=-32
+       naxis=2
+       naxes(1:2)=shape(ProDiMo_star_HR)
+       nelements=naxes(1)*naxes(2)
+
+       ! create new hdu
+       call ftcrhd(unit, status)
+
+       !  Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+       ! Conversion en lambda.F_lamda
+       ! Division par 4 * pi * (etoile(1)%r * AU_to_m)**2 pour passer de luminosite a flux
+       ! Division par pi pour passer en intensite
+       ProDiMo_star_HR(:,2) = ProDiMo_star_HR(:,2) & 
+            / (4 * pi * (etoile(1)%r * AU_to_m)**2) / pi
+     
+       !  Write the array to the FITS file.
+       call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)    
+    endif
     
     !  Close the file and free the unit number.
     call ftclos(unit, status)
