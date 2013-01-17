@@ -2449,17 +2449,18 @@ subroutine densite_gap_laure2()
   implicit none
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
-  integer :: nullval
+  integer :: nullval, stat
   integer, dimension(4) :: naxes
   logical :: anynull
+  character(len=80) :: comment
 
-  integer, parameter :: nbre_a = 4
-
-  real, dimension(4) :: a_sph
-  integer :: k, l, i
+  integer :: k, l, i, n_a 
   real(kind=db) :: somme, mass
+  real :: tmp
+  character :: s
 
-  real, dimension(n_rad,nz,n_az,nbre_a) :: sph_dens
+  real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
+  real, dimension(:), allocatable :: a_sph ! n_a
 
 
   sph_dens = 1.
@@ -2490,34 +2491,53 @@ subroutine densite_gap_laure2()
      stop
   endif
   
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az).or.(naxes(4) /= nbre_a)) then
+  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
      write(*,*) naxes(3), n_az
-     write(*,*) naxes(4), nbre_a
+     !write(*,*) naxes(4), n_a
      stop
   endif
-
+  n_a = naxes(4) 
+  write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-
   nbuffer=npixels
+
+  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a))
+
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
-
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
 
   ! Au cas ou
   sph_dens = sph_dens + 1e-20
 
-  ! Interpolation en tailles
-  a_sph(1) = 10. ! densite des grains <= 10 microns == celle du gas
-  a_sph(2) = 100.
-  a_sph(3) = 1000.
-  a_sph(4) = 10000.
+  ! Lecture des tailles de grains (en microns)
+  if (n_a > 9) then
+     write(*,*) "ERROR : max 9 grain sizes at the moment"
+     write(*,*) "code must be updated if you need more"
+     write(*,*) "Exiting."
+     stop
+  endif
+  do i=1,n_a
+     write(s,'(i1)') i ; call ftgkye(unit,'grain_size_'//s,tmp,comment,stat)
+     a_sph(i) = tmp ! cannot read directly into an array element
+     write(*,*) i, a_sph(i), "microns"
+  enddo
+
+  ! On verifie que les grains sont tries
+  do i=1, n_a-1 
+     if (a_sph(i) > a_sph(i+1)) then
+        write(*,*) "ERROR : grains must be ordered from small to large"
+        write(*,*) "Exiting"
+        stop
+     endif
+  enddo
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
 
 
   if (lstrat) then
@@ -2526,9 +2546,12 @@ subroutine densite_gap_laure2()
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
            densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-        else if (r_grain(k) > a_sph(nbre_a)) then ! Gros grains
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,nbre_a)
+           !write(*,*) k, r_grain(k), "p"
+        else if (r_grain(k) > a_sph(n_a)) then ! Gros grains
+           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
+           !write(*,*) k, r_grain(k), "g"
         else  ! Autres grains : interpolation
+           !write(*,*) k, r_grain(k), "i"
            if (r_grain(k) > a_sph(l+1)) l = l+1
            densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
                 ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
@@ -2614,6 +2637,7 @@ subroutine densite_gap_laure2()
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+  deallocate(sph_dens,a_sph)
 
   return
 
