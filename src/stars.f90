@@ -189,8 +189,6 @@ subroutine repartition_energie_etoiles()
   logical :: anynull
 
   real(kind=db) :: L_star_spectre, Cst0, L_UV, L_star_spectre0, correct_UV
-
-
   real(kind=db) :: wl_spectre_avg, wl_deviation
 
 
@@ -489,13 +487,13 @@ subroutine repartition_energie_etoiles()
   spectre_etoiles(:) =  spectre_etoiles(:) * cst_spectre_etoiles
 
 
-  if (lProDiMo) then ! 1 seule etoile en mode ProDiMo
+  if ( (lProDiMo).and.(.not.allocated(ProDiMo_star_HR)) ) then 
+     ! 1 seule etoile en mode ProDiMo
      ! ProDiMo_star_HR est du lambda.Flambda (idem spectre_etoiles mais avec tab_lambda au lieu de tab_delta_lambda)
      allocate(ProDiMo_star_HR(n_lambda_spectre,2))
      ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
      ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:)
   endif
-
 
 
   !  TODO : L_etoile doit etre recalcule
