@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.15
-  character(8), parameter :: mcfost_release = "2.15.2"
+  real, parameter :: mcfost_version = 2.16
+  character(8), parameter :: mcfost_release = "2.16.0"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -364,10 +364,11 @@ module grains
 
   type dust_pop_type     
      integer :: n_grains, methode_chauffage, zone
-     real :: amin, amax, aexp, frac_mass, porosity
+     real :: amin, amax, aexp, frac_mass, porosity ! aexp is > 0
      
      real :: avg_grain_mass, masse, sblow, rho1g_avg, T_sub
      
+     character(len=3) :: type ! Mie or DHS
      integer ::  mixing_rule, n_components ! en cas de coating, composant 1 est le coeur 2 est le manteau
      ! mixing rule : 1 = EMT, 2 = coating
      character(len=512), dimension(10) :: indices

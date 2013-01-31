@@ -602,6 +602,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
 
   call bhmie(X,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
 
+  ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
 
      !  QABS=QEXT-QSCA 

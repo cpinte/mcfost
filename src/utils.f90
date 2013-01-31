@@ -785,11 +785,14 @@ subroutine mcfost_v()
      
      ! Printing history
      if (ios==0) then
-        write(sline_number,*)  line_number-1
-        write(*,*) "Changes since your version:"
-        cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
-        call appel_syst(cmd, syst_status)
-
+        if (line_number > 1) then
+           write(sline_number,*)  line_number-1
+           write(*,*) "Changes since your version:"
+           cmd = "head -"//trim(adjustl(sline_number))//" history.txt ; rm -rf history.txt"
+           call appel_syst(cmd, syst_status)
+        else
+           write(*,*) "No changes found since your version (?????)"
+        endif
         write(*,*) " "
         write(*,*) "Full history is available with mcfost -h"
         write(*,*) "The new version can be downloaded with mcfost -u"
@@ -1093,5 +1096,78 @@ subroutine appel_syst(cmd, status)
   return
 
 end subroutine appel_syst
+
+
+!************************************************************
+
+subroutine gauleg(x1,x2,x,w,n)
+  ! Given the lower and upper limits of integration x1 and x2,
+  ! and given n, this routine returns arrays x(1:1) and w(1:w)
+  ! of length n, containing the abscissas and weights of the
+  ! Gauss-Legendre n-point quadrature formula.
+
+  ! Revision history:
+  ! - Original subroutine: gauleg.for (C) copr. 1986-92 copr. 1986-92
+  ! numerical recipes software &145i..
+  ! - modified: 20.06.05 by RGA.
+  ! - modified 31/01/13 by C. Pinte
+
+  implicit none
+
+  integer, intent(in) :: n  ! Order of the quadrature
+
+  real(kind=db), intent(in) :: x1, x2 ! Lower and upper integration limit
+  real(kind=db), dimension(n), intent(out) :: x, w ! abscissas and weights
+
+  real(kind=db), parameter :: eps = 3.0d-14
+  real(kind=db) :: dj, p1, p2, p3, pp, xl, xm, z, z1
+  integer :: i, j, m
+  logical :: conv
+
+  ! The roots are symmetric in the interval, so we only have to find half of them.
+  m = (n+1)/2
+  xm = 0.5d0 * (x2+x1)
+  xl = 0.5d0 * (x2-x1)
+
+  do i=1,m ! Loop over the desired roots
+     z = cos(pi*(dble(i)-0.25d0)/(dble(n)+0.5d0))
+     ! Starting with the above approximation to the ith root, we
+     ! enter the main loop of refinement by Newton's method
+     conv = .false.
+     do while (.not.conv)
+        p1 = 1.0d0
+        p2 = 0.0d0
+
+        !Loop up the recurrence relation to get the Legendre polynomial evaluated at z 
+        do j = 1, n
+           dj=dble(j)
+           p3 = p2
+           p2 = p1
+           p1 = ((2.0d0*dj-1.0d0)*z*p2 - (dj-1.0d0)*p3)/dj
+        enddo ! j
+
+        ! p1 is now the desired Legendre polynomial. We next compute pp, its
+        ! derivative, by a standard relation involving also p2, the
+        ! polynomial of one lower order.
+        pp = dble(n) * (z * p1 - p2) / (z * z - 1.0d0)
+
+        ! Newton's method.
+        z1 = z
+        z = z1 - p1 / pp
+        conv = abs(z-z1).le.eps
+     enddo ! conv
+
+     ! Scale the root to the desired interval, and put in its symmetric counterpart.
+     x(i) = xm - xl * z
+     x(n+1-i) = xm + xl * z
+
+     ! Compute the weight and its symmetric counterpart.
+     w(i) = 2.0d0 * xl / ((1.0d0 - z * z) * pp * pp)
+     w(n+1-i) = w(i)
+  enddo ! i
+
+  return
+
+end subroutine gauleg
 
 end module utils

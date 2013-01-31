@@ -564,13 +564,20 @@ subroutine prop_grains(lambda, p_lambda)
         if (laggregate) then
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
-           if (.not.(dust_pop(pop)%lcoating)) then
+           if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
               call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
-           else
-              amu1_coat=tab_amu1_coating(lambda,pop)
-              amu2_coat=tab_amu2_coating(lambda,pop)
-              call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
-           endif ! lcoating
+              if (dust_pop(pop)%lcoating) then
+                 amu1_coat=tab_amu1_coating(lambda,pop)
+                 amu2_coat=tab_amu2_coating(lambda,pop)
+                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
+              endif
+           else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
+              call mueller_DHS(p_lambda,k,wavel,amu1,amu2,qext,qsca,gsca)
+           else 
+              write(*,*) "Unknow dust type : ", dust_pop(pop)%type
+              write(*,*) "Exiting"
+              stop
+           endif
 !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
      else ! grain de PAH
@@ -585,7 +592,7 @@ subroutine prop_grains(lambda, p_lambda)
      ! longueur de vol en AU = 1.5e13 cm   / 
      fact =  pi * a * a * 149595.0
      !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-     q_ext(lambda,k) = qext * fact
+     q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
      q_sca(lambda,k) = qsca * fact
      q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)     
   enddo !k
@@ -1114,7 +1121,7 @@ subroutine opacite2(lambda)
      allocate(g_lambda(n_lambda))
      allocate(pol_lambda_theta(n_lambda,nang_scatt))
 
-     kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3)))
+     kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3))) ! cm^2/g
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
          
