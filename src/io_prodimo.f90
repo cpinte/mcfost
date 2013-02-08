@@ -281,7 +281,7 @@ contains
              stop
           endif
 
-          ProDiMo_Mdisk(ir) = ProDiMo_Mdisk(ir) + disk_zone(iz)%diskmass
+          ProDiMo_Mdisk(ir) = ProDiMo_Mdisk(ir) + disk_zone(iz)%diskmass * disk_zone(iz)%gas_to_dust
        enddo ! i
 
     enddo ! ir
