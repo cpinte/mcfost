@@ -156,9 +156,9 @@ contains
     read(1,*) fnbre_photons_lambda ;  
     read(1,*) fnbre_photons_image 
     nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = fnbre_photons_eq_th / nbre_photons_loop
-    nbre_photons_lambda = fnbre_photons_lambda / nbre_photons_loop
-    nbre_photons_image = fnbre_photons_image / nbre_photons_loop
+    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
+    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
+    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -293,7 +293,8 @@ contains
     else
        read(1,*)
        read(1,*) 
-       read(1,*) lstrat, exp_strat, a_strat
+       read(1,*) lstrat, settling_type, exp_strat, a_strat
+       write(*,*) settling_type
        if (ldebris) then
           lstrat=.true.
        endif
@@ -476,7 +477,8 @@ contains
              else
                 dust_pop_tmp(n_pop)%lcoating = .false.
              endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or.(dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. & 
+                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
                 write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
                 write(*,*) "Exiting"
                 stop
@@ -488,7 +490,8 @@ contains
              enddo
              ! renormalisation des fraction en volume
              do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
+                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) & 
+                     / V_somme
              enddo
              read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
              read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
@@ -693,9 +696,9 @@ contains
     read(1,*) fnbre_photons_lambda ;  
     read(1,*) fnbre_photons_image 
     nbre_photons_loop = 128 ;
-    nbre_photons_eq_th = fnbre_photons_eq_th / nbre_photons_loop
-    nbre_photons_lambda = fnbre_photons_lambda / nbre_photons_loop
-    nbre_photons_image = fnbre_photons_image / nbre_photons_loop
+    nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
+    nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
+    nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
