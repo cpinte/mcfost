@@ -4,6 +4,7 @@ module disk_physics
   use opacity
   use em_th
   use prop_star
+  use molecular_emission, only : densite_gaz
   use constantes
 
 contains
@@ -159,4 +160,58 @@ subroutine sublimate_dust()
     
 end subroutine sublimate_dust
 
+
+!**********************************************************
+
+subroutine equilibre_hydrostatique()
+  ! Calcul l'equilibre hydrostatique pour chaque rayon 
+  ! Equation 2.4.3 de la these (page 38, 52 du pdf)
+  ! Valable pour disque de gaz parfait, non-autogravitant, geometriquement mince
+  !
+  ! C. Pinte
+  ! 25/09/07
+ 
+  implicit none
+
+  real, dimension(nz) :: rho, ln_rho
+  real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
+  integer :: i,j, k
+
+  real, parameter :: gas_dust = 100
+
+  M_etoiles = sum(etoile(:)%M) * Msun_to_kg
+  M_mol = masse_mol_gaz * g_to_kg
+
+  cst = Ggrav * M_etoiles * M_mol / (kb * AU_to_m**2)
+
+  do k=1, n_az
+     do i=1, n_rad
+        ln_rho(1) = 0.
+        rho(1) = 1.
+        dz = delta_z(i)
+        dz_m1 = 1.0/dz
+        somme = rho(1)
+        do j = 2, nz
+           dTdz = (Temperature(i,j,k)-Temperature(i,j-1,k)) * dz_m1
+           fac1 = cst * z_grid(i,j)/ (r_grid(i,j)**3)
+           fac2 = -1.0 * (dTdz + fac1) / Temperature(i,j,k)
+           ln_rho(j) = ln_rho(j-1) + fac2 * dz
+           rho(j) = exp(ln_rho(j))
+           somme = somme + rho(j)
+        enddo !j
+
+        ! Renormalisation
+        fac = gas_dust * masse_rayon(i,k) / (volume(i) * somme) ! TODO : densite est en particule, non ???
+        densite_gaz(i,:,k) =  rho(:) * fac
+
+     enddo !i
+  enddo !k
+
+  return
+
+end subroutine equilibre_hydrostatique
+
+!**********************************************************
+
 end module disk_physics
+

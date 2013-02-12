@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.16
-  character(8), parameter :: mcfost_release = "2.16.0"
+  character(8), parameter :: mcfost_release = "2.16.1"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -47,6 +47,7 @@ module parametres
 
   ! lstrat = true si on prend en compte la stratification
   logical :: lstrat, ldust_sublimation, lRE_LTE, lRE_nLTE, lnRE, loutput_J, loutput_UV_field, lxJ_abs, lxJ_abs2
+  integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
   ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
   ! 0 -> automatique
@@ -712,6 +713,7 @@ module constantes
 
   real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
   real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g
+  real, parameter :: masse_mol_gaz = 2.3 * masseH ! en g,  2.3 selon Walker 2004
   real, parameter :: T_Cmb = 2.73
 
   ! Changements d'unites
@@ -817,7 +819,6 @@ module molecular_emission
   logical :: lcorrect_Tgas
 
   real :: nH2, masse_mol
-  real, parameter :: masse_mol_gaz = 2. * masseH ! en g,  2.3 selon Walker 2004 
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
   real(kind=db), dimension(:,:,:), allocatable :: frac_E_Trans ! n_rad, n_z, nTrans
   real(kind=db), dimension(:,:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_rad, nz, nTrans

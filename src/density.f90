@@ -32,7 +32,7 @@ subroutine define_density()
   integer :: i,j, k, ii, jj, kk, l, k_min, izone, pop
   real(kind=db), dimension(n_pop) :: cst, cst_pous, cst_gaz
   real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
-  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba
+  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, c_sound, coeff_strat, proba
   real(kind=db) :: puffed, facteur, z0, phi, surface, norme
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat
@@ -130,7 +130,7 @@ subroutine define_density()
         ! Calcul opacite et probabilite de diffusion
         !$o m p parallel &
         !$o m p default(none) &
-        !$o m p private(j,k,z,density,k_min,proba,z0,phi,rho,rho0,h,Ztilde,Omega)&
+        !$o m p private(j,k,z,density,k_min,proba,z0,phi,rho,rho0,h,Ztilde,OmegaTau)&
         !$o m p shared(i,rcyl,fact_exp,coeff_exp,delta_z,amax_reel,nz,n_rad,grain,dust_pop,pop) &
         !$o m p shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,z_lim,n_grains_tot,puffed) &
         !$o m p shared(nbre_grains,correct_strat,cst_pous,densite_pouss,r_grain,masse,dz,izone,volume) &
@@ -232,7 +232,7 @@ subroutine define_density()
 
                  do l=1,n_grains_tot
                     !calculate omega_tau in the disk midplane
-                    Omega = omega_tau(rho0,h,r_grain(l)) 
+                    OmegaTau = omega_tau(rho0,h,r_grain(l)) 
               
                     do j=j_start,nz
                        if (j==0) cycle 
@@ -243,11 +243,11 @@ subroutine define_density()
                     
                        ! dependence en z uniquement ici !!!!
                        if (Seb_Fromang_model == 1) then ! Fit Gaussien du profile de densite
-                          densite_pouss(i,j,1,l)=  exp(-(1+omega/dtilde) * (Ztilde**2/2.)) 
-                          !Hd = H * min(1.0, 0.7 * (omega/1e-3)**-0.2 ) 
+                          densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.)) 
+                          !Hd = H * min(1.0, 0.7 * (OmegaTau/1e-3)**-0.2 ) 
                           !densite_pouss(i,j,1,l)= nbre_grains(l) * rho0 * exp(- (z/Hd)**2/2.) ! formule 25
                        else if (Seb_Fromang_model == 2) then ! Coefficient de diffusion constant
-                          densite_pouss(i,j,1,l)=  exp( -omega/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                          densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
                        else
                           write(*,*) "ERROR: this model is not defined from Seb's calculations"
                           write(*,*) "Exiting."
@@ -275,7 +275,7 @@ subroutine define_density()
  
                  enddo ! l
               enddo ! i
-           
+              !lebara  25p359361l4g    0664959361
            endif ! model > 0
         endif ! lSeb_Fromang
 
@@ -632,7 +632,7 @@ subroutine densite_data2()
 
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba, r0
+  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
  
   real, dimension(nz) :: z
 
@@ -809,7 +809,7 @@ subroutine densite_data_SPH_binaire()
 
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba, r0
+  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
  
   real, dimension(nz) :: z
 
@@ -977,7 +977,7 @@ subroutine densite_data_SPH_TTauri()
   integer, parameter :: nbre_a = 6
   integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba, r0
+  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
  
   real :: z
 
@@ -1183,7 +1183,7 @@ subroutine densite_data_SPH_TTauri_1()
 
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba, r0
+  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
  
   real, dimension(nz) :: z
 
@@ -1421,7 +1421,7 @@ subroutine densite_data_SPH_TTauri_2()
   integer, parameter :: nbre_a = 6
   integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, omega, c_sound, coeff_strat, proba, r0
+  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
  
   real :: z
 
@@ -2246,57 +2246,6 @@ subroutine init_opacity_wall()
 end subroutine init_opacity_wall
 
 !********************************************************************
-
-subroutine equilibre_hydrostatique()
-  ! Calcul l'equilibre hydrostatique pour chaque rayon 
-  ! Equation 2.4.3 de la these
-  ! Valable pour disque de gaz parfait, non-autogravitant, geometriquement mince
-  !
-  ! C. Pinte
-  ! 25/09/07
- 
-
-  implicit none
-
-  real, dimension(nz) :: rho, ln_rho
-  real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
-  integer :: i,j, k
-
-  real, parameter :: gas_dust = 100
-
-  M_etoiles = sum(etoile(:)%M) * Msun_to_kg
-  M_mol = masse_mol_gaz * g_to_kg
-
-  cst = Ggrav * M_etoiles * M_mol / (kb * AU_to_m**2)
-
-  do k=1, n_az
-     do i=1, n_rad
-        ln_rho(1) = 0.
-        rho(1) = 1.
-        dz = delta_z(i)
-        dz_m1 = 1.0/dz
-        somme = rho(1)
-        do j = 2, nz
-           dTdz = (Temperature(i,j,k)-Temperature(i,j-1,k)) * dz_m1
-           fac1 = cst * z_grid(i,j)/ (r_grid(i,j)**3)
-           fac2 = -1.0 * (dTdz + fac1) / Temperature(i,j,k)
-           ln_rho(i) = ln_rho(i-1) + fac2 * dz
-           rho(i) = exp(ln_rho(i))
-           somme = somme + rho(i)
-        enddo !j
-
-        ! Renormalisation
-        fac = gas_dust * masse_rayon(i,k) / (volume(i) * somme) ! TODO : densite est en particule, non ???
-        densite_gaz(i,:,k) =  rho(:) * fac
-
-     enddo !i
-  enddo !k
-
-  return
-
-end subroutine equilibre_hydrostatique
-
-!**********************************************************
 
 subroutine densite_gap_laure()
   ! Remplace par densite_gap_laure2

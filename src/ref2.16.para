@@ -32,7 +32,7 @@
   T	                  axial symmetry (important only if N_phi > 1)  
 
 #Dust global properties
-  F  0.00  1.0		  dust settling, exp_strat, a_strat
+  F  1 0.00  1.0		  dust settling, exp_strat, a_strat
   F		  	  sublimate dust
   F  0.0		  viscous heating, viscosity
 
@@ -73,4 +73,4 @@
   1 Number of stars
   4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), is a blackbody?
   lte4000-3.5.NextGen.fits.gz
-  0.1	2.2  fUV, slope_fUV	
+  0.1	2.2  fUV, slope_fUV
