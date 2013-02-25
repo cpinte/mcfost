@@ -1105,7 +1105,6 @@ contains
     lsed = .false.
     lsed_complete = .false.
     lemission_mol = .true.
-    lsetup_gas=.true.
     lfits = .false.
 
     ! on ne force plus depuis version 2 de l'interface

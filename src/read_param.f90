@@ -294,7 +294,6 @@ contains
        read(1,*)
        read(1,*) 
        read(1,*) lstrat, settling_type, exp_strat, a_strat
-       write(*,*) settling_type
        if (ldebris) then
           lstrat=.true.
        endif
