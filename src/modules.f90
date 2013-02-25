@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.16
-  character(8), parameter :: mcfost_release = "2.16.1"
+  character(8), parameter :: mcfost_release = "2.16.2"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -68,7 +68,7 @@ module parametres
   character(len=512) :: tab_wavelength
 
   ! Emission moleculaire
-  logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lsetup_gas, lonly_top, lonly_bottom
+  logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
   
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
@@ -144,9 +144,6 @@ module parametres
   logical, parameter :: ltest_rt3 = .false. ! marche pas
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
-  ! Simu Sebastien Fromang
-  logical :: lSeb_Fromang
-  integer :: Seb_Fromang_model
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2
 
 end module parametres

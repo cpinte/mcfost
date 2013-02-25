@@ -32,7 +32,7 @@ subroutine define_density()
   integer :: i,j, k, ii, jj, kk, l, k_min, izone, pop
   real(kind=db), dimension(n_pop) :: cst, cst_pous, cst_gaz
   real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
-  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, c_sound, coeff_strat, proba
+  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, h_H2, coeff_strat, proba
   real(kind=db) :: puffed, facteur, z0, phi, surface, norme
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat
@@ -47,6 +47,9 @@ subroutine define_density()
 
   ! Pour simus Seb
   real, parameter :: Sc = 1.5 ! nbre de Schmidt
+
+  ! Pour simus Dubrulle
+  real, parameter :: gamma = 2.0 ! exposant de turbulence, 2 pour turbulence compressible
 
   ! Coefficient de diffusion constant
   Dtilde = alpha / Sc
@@ -100,7 +103,7 @@ subroutine define_density()
      if (lstrat) then 
         ! loi de puissance
         if (r_grain(l) > a_strat) then
-           correct_strat(l) = (r_grain(l)/a_strat)**exp_strat
+           correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
         else
            correct_strat(l) = 1.0
         endif
@@ -135,7 +138,7 @@ subroutine define_density()
         !$o m p shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,z_lim,n_grains_tot,puffed) &
         !$o m p shared(nbre_grains,correct_strat,cst_pous,densite_pouss,r_grain,masse,dz,izone,volume) &
         !$o m p shared(lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r,z_grid,r_grid) &
-        !$o m p shared(lsetup_gas,cst_gaz,densite_gaz,masse_gaz,j_start,n_az,z_warp,phi_grid,lwarp) &
+        !$o m p shared(cst_gaz,densite_gaz,masse_gaz,j_start,n_az,z_warp,phi_grid,lwarp) &
         !$o m p shared(lSeb_Fromang,Seb_Fromang_model,dtilde)
         !$o m p do schedule(dynamic,10)
         do i=1, n_rad
@@ -146,6 +149,8 @@ subroutine define_density()
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
            
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+
               ! Puffed-up rim analytique
               if (lpuffed_rim) then
                  puffed = 1.0 + (puffed_rim_h - 1.0) / (exp((rcyl - puffed_rim_r)/puffed_rim_delta_r) + 1.0)
@@ -160,7 +165,6 @@ subroutine define_density()
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
-   
               do k=1, n_az
                  phi = phi_grid(k)                               
                  ! Warp analytique
@@ -171,6 +175,35 @@ subroutine define_density()
                  endif
               
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    !  Densite du gaz (lsetup_gas avant)
+                    if (rcyl > dz%rmax) then
+                       density = 0.0
+                    else if (rcyl < dz%rmin) then
+                       density = 0.0
+                    else if (rcyl < dz%rin) then
+                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
+                            exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
+                    else
+                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
+                    endif
+                    densite_gaz(i,j,k) = densite_gaz(i,j,k) + density
+                    masse_gaz(i,j,k) = masse_gaz(i,j,k) + density * masse_mol_gaz * volume(i)
+
+                    ! Densite de la poussiere
+
+                    ! Settling a la Dubrulle
+                    if (lstrat.and.(settling_type == 2)) then
+                       !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
+                       !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
+                       rho0 = densite_gaz(i,1,1)
+
+                       OmegaTau = omega_tau(rho0,h,r_grain(l))
+                       h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
+                       !if (h_H2 )
+                       correct_strat(l) = (1 + h_H2) / h_H2
+                       !write(*,*) l, correct_strat(l), OmegaTau
+                    endif
+
                     if (rcyl > dz%rmax) then
                        density = 0.0
                     else if (rcyl < dz%rmin) then
@@ -193,91 +226,61 @@ subroutine define_density()
                     densite_pouss(i,j,k,l) = density
                  enddo !l
                  
-                 if (lsetup_gas) then
-                    if (rcyl > dz%rmax) then
-                       density = 0.0 
-                    else if (rcyl < dz%rmin) then
-                       density = 0.0
-                    else if (rcyl < dz%rin) then
-                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
-                            exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
-                    else
-                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
-                    endif
-                    densite_gaz(i,j,k) = densite_gaz(i,j,k) + density
-                    masse_gaz(i,j,k) = masse_gaz(i,j,k) + density * masse_mol_gaz * volume(i)
-                 endif ! lsetup_gas
-
               enddo !k
            enddo bz !j
         enddo ! i
         !$o m p end do
         !$o m p end parallel
-     
+
+        if (lstrat.and.(settling_type == 3)) then
+           ! Si strat a la Seb. Fromang : on ecrase le tableau de densite
+           ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
+           do i=1, n_rad
+              rho0 = densite_gaz(i,1,1) ! pour dependance en R
+
+              rcyl = r_grid(i,1)
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
 
-        ! Si strat a la Seb. Fromang
-        ! on ecrase le tableau de densite
-        ! je ne code que la dependence en z dans un premier temps puis normalise
-        ! et ajoute la dependence en R et taille de grain
-        if (lSeb_Fromang) then
-           if (Seb_Fromang_model > 0) then ! si 0 on ne change pas la densite
-
-              do i=1, n_rad
-                 rho0 = densite_gaz(i,1,1)
-
-                 rcyl = r_grid(i,1)
-                 H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-
-
-                 do l=1,n_grains_tot
-                    !calculate omega_tau in the disk midplane
-                    OmegaTau = omega_tau(rho0,h,r_grain(l)) 
+              do l=1,n_grains_tot
+                 !calculate omega_tau in the disk midplane
+                 OmegaTau = omega_tau(rho0,h,r_grain(l))
               
-                    do j=j_start,nz
-                       if (j==0) cycle 
+                 do j=j_start,nz ! dependence en z uniquement ici !!!!
+                    if (j==0) cycle
                     
-                       !calculate h & z/h
-                       z = z_grid(i,j)
-                       Ztilde=z/H
+                    !calculate h & z/h
+                    z = z_grid(i,j)
+                    Ztilde=z/H
+
+                    ! Fit Gaussien du profile de densite
+                    !densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.)) 
                     
-                       ! dependence en z uniquement ici !!!!
-                       if (Seb_Fromang_model == 1) then ! Fit Gaussien du profile de densite
-                          densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.)) 
-                          !Hd = H * min(1.0, 0.7 * (OmegaTau/1e-3)**-0.2 ) 
-                          !densite_pouss(i,j,1,l)= nbre_grains(l) * rho0 * exp(- (z/Hd)**2/2.) ! formule 25
-                       else if (Seb_Fromang_model == 2) then ! Coefficient de diffusion constant
-                          densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
-                       else
-                          write(*,*) "ERROR: this model is not defined from Seb's calculations"
-                          write(*,*) "Exiting."
-                          stop
-                       endif
-                    enddo!j
+                    ! Coefficient de diffusion constant
+                    densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                 enddo!j
                    
-                    ! normalization en z
-                    norme = 0.0
-                    do j=j_start,nz
-                       if (j==0) cycle 
-                       norme = norme + densite_pouss(i,j,1,l) 
-                    enddo !j
+                 ! normalization en z
+                 norme = 0.0
+                 do j=j_start,nz
+                    if (j==0) cycle
+                    norme = norme + densite_pouss(i,j,1,l)
+                 enddo !j
 
-                    ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then 
-                     !  densite_pouss(i,1,1,l)  = 1.0_db
-                     !  norme = 1.0_db
-                    endif
+                 ! Si tous les grains sont sedimentes, on les met dans le plan median
+                 if (norme < tiny_db) then
+                    densite_pouss(i,1,1,l)  = 1.0_db
+                    norme = 1.0_db
+                 endif
 
-                    do j=j_start,nz
-                       if (j==0) cycle 
-                       if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
-                    enddo !j
+                 do j=j_start,nz
+                    if (j==0) cycle
+                    if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
+                 enddo !j
  
-                 enddo ! l
-              enddo ! i
-              !lebara  25p359361l4g    0664959361
-           endif ! model > 0
-        endif ! lSeb_Fromang
+              enddo ! l
+           enddo ! i
+        endif ! Settling Fromang
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
@@ -300,19 +303,18 @@ subroutine define_density()
                  densite_pouss(i,j,1,l) = density
               enddo !l
 
-              if (lsetup_gas) then
-                 if (rsph > dz%rmax) then
-                    density = 0.0
-                 else if (rsph < dz%rmin) then
-                    density = 0.0
-                 else if (rsph < dz%rin) then
-                    density = cst_gaz(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-                 else
-                    density = cst_gaz(pop) * rsph**(dz%surf)
-                 endif
-                 densite_gaz(i,j,1) = densite_gaz(i,j,1)+ density
-                 masse_gaz(i,j,1) = masse_gaz(i,j,1) + density * masse_mol_gaz * volume(i)
-              endif ! lsetup_gas
+              ! Setup densite du gaz
+              if (rsph > dz%rmax) then
+                 density = 0.0
+              else if (rsph < dz%rmin) then
+                 density = 0.0
+              else if (rsph < dz%rin) then
+                 density = cst_gaz(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+              else
+                 density = cst_gaz(pop) * rsph**(dz%surf)
+              endif
+              densite_gaz(i,j,1) = densite_gaz(i,j,1)+ density
+              masse_gaz(i,j,1) = masse_gaz(i,j,1) + density * masse_mol_gaz * volume(i)
            enddo !j
         enddo ! i
         
@@ -342,7 +344,7 @@ subroutine define_density()
      enddo
   enddo search_not_empty
   
-  if (lsetup_gas) masse_gaz(:,:,:) = masse_gaz(:,:,:) * AU_to_m**3 
+  masse_gaz(:,:,:) = masse_gaz(:,:,:) * AU_to_m**3
 
 !  write(*,*) "Verif masse", sum(masse)/Msun_to_g, sum(masse_gaz)/Msun_to_g ! teste Ok pour gaz
 !  write(*,*) real(sum(masse_gaz)/sum(masse))
@@ -358,7 +360,7 @@ subroutine define_density()
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
            if (z_grid(i,j) > surface) then
               densite_pouss(i,j,1,:) = 0.0_db
-              if (lsetup_gas) densite_gaz(i,j,1) = 0.0_db
+              densite_gaz(i,j,1) = 0.0_db
            endif
         enddo
      enddo
@@ -432,10 +434,8 @@ subroutine define_density()
         if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
            densite_pouss(i,:,:,:) = densite_pouss(i,:,:,:) * correct_density_factor
            masse(i,:,:) = masse(i,:,:) *  correct_density_factor
-           if (lsetup_gas) then
-              densite_gaz(i,:,:) = densite_gaz(i,:,:) *  correct_density_factor
-              masse_gaz(i,:,:) = masse_gaz(i,:,:) *  correct_density_factor
-           endif
+           densite_gaz(i,:,:) = densite_gaz(i,:,:) *  correct_density_factor
+           masse_gaz(i,:,:) = masse_gaz(i,:,:) *  correct_density_factor
         endif
      enddo
 
@@ -446,10 +446,6 @@ subroutine define_density()
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
   if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
-
-
-  if (lSeb_Fromang.and.lsed) call cfitsWrite("data_th/densite_pouss.fits.gz",real(densite_pouss),shape(densite_pouss))
-
 
 !  ! Verification : Calcul masse totale
 !  ! masse en g, volume en AU**3
@@ -2748,6 +2744,7 @@ subroutine densite_fits
   enddo !i
 
   return
+
 end subroutine densite_fits
 
 !**********************************************************************
@@ -2760,6 +2757,8 @@ real(kind=db) function omega_tau(rho,H,a)
   real, intent(in) :: a
 
   omega_tau=dust_pop(1)%rho1g_avg*(a*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
+
+  return
 
 end function omega_tau
 

@@ -76,7 +76,6 @@ subroutine initialisation_mcfost()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
-  lsetup_gas=.false.
   lpuffed_rim = .false.
   lopacity_wall = .false.
   lno_backup = .false.
@@ -105,7 +104,6 @@ subroutine initialisation_mcfost()
   lgap_ELT=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
-  lSeb_Fromang = .false.
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
@@ -401,7 +399,6 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1 
      case("-output_density_grid")
-        lsetup_gas = .true.
         loutput_density_grid=.true.
         i_arg = i_arg+1
      case("-output_J")
@@ -470,7 +467,6 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
-        lsetup_gas=.true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) then
@@ -598,22 +594,18 @@ subroutine initialisation_mcfost()
      case("-prodimo")
         i_arg = i_arg + 1 
         lprodimo = .true.
-        lsetup_gas=.true.
         mcfost2ProDiMo_version = 4
      case("-prodimo3")
         i_arg = i_arg + 1 
         lprodimo = .true.
-        lsetup_gas=.true.
         mcfost2ProDiMo_version = 3
      case("-prodimo2")
         i_arg = i_arg + 1 
         lprodimo = .true.
-        lsetup_gas=.true.
         mcfost2ProDiMo_version = 2
      case("-prodimo1")
         i_arg = i_arg + 1 
         lprodimo = .true.
-        lsetup_gas=.true.
         mcfost2ProDiMo_version = 1
      case("-prodimo_input_dir")
         i_arg = i_arg + 1 
@@ -658,12 +650,6 @@ subroutine initialisation_mcfost()
          call get_command_argument(i_arg,Laure_SED_filename)
         i_arg = i_arg + 1
         lforce_T_Laure_SED = .true.
-     case("-Seb_F")
-        i_arg = i_arg + 1 
-        lSeb_Fromang=.true. ; lsetup_gas = .true. ; lstrat = .true.
-        call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
-        read(s,*) Seb_Fromang_model
      case("-spot")
         i_arg = i_arg+1
         lspot=.true.
