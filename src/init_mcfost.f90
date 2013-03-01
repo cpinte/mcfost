@@ -1072,7 +1072,7 @@ subroutine display_disclaimer()
   write(*,*) "*  - contact us if you initiate a new     *"
   write(*,*) "* scientific project with MCFOST.         *"
 
-  if (.not.is_file("~/.mcfost/accept_disclaimer_"//mcfost_release)) then
+  if (.not.is_file(trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release)) then
      write(*,*) "*                                         *"
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
@@ -1081,7 +1081,7 @@ subroutine display_disclaimer()
           .or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
         cmd = 'mkdir -p ~/.mcfost'
         call appel_syst(cmd,syst_status)
-        open(unit=1,file="~/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
+        open(unit=1,file=trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"
         !write(*,*) "* This screen will not appear again       *"
