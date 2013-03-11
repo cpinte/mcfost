@@ -32,18 +32,25 @@
   T	                  axial symmetry (important only if N_phi > 1)  
 
 #Dust global properties
-  3     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  0     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
   F		  	  sublimate dust
   F  1e-5		  viscous heating, alpha_viscosity
 
 #Number of zones : 1 zone = 1 density structure + corresponding grain properties
-  1
+  2
 
 #Density structure
   1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = wall	
+  1.e-8    100.		  dust mass,  gas-to-dust mass ratio	
+  10.  100.0              scale height, reference radius (AU), unused for envelope
+  1.0  5.0 0.00         Rin, Rout (or Rc), edge (AU)
+  1.125                   flaring exponent, unused for envelope
+  -0.5      	          surface density exponent (or -gamma for tappered-edge disk), usually < 0
+
+  1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = wall	
   1.e-3    100.		  dust mass,  gas-to-dust mass ratio	
   10.  100.0              scale height, reference radius (AU), unused for envelope
-  1.0  300.0 0.00         Rin, Rout (or Rc), edge (AU)
+  10.0  300.0 0.00         Rin, Rout (or Rc), edge (AU)
   1.125                   flaring exponent, unused for envelope
   -0.5      	          surface density exponent (or -gamma for tappered-edge disk), usually < 0
 
@@ -57,7 +64,20 @@
   Mie   1 2    0.0  1.0   Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
   Draine_Si_sUV.dat  1.0  Optical indices file, volume fraction
   1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
-  0.03  1000.0 3.5 100 	  amin, amax, aexp, n_grains
+  0.03  1000.0 3.5 50 	  amin, amax, aexp, n_grains     
+
+
+  2  Number of species
+  Mie   2 2    0.0  0.999   Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
+  Draine_Si_sUV.dat  0.8  Optical indices file, volume fraction
+  ice_opct.dat  0.2  Optical indices file, volume fraction
+  1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  0.03  1000.0 3.5 50 	  amin, amax, aexp, n_grains     
+
+  Mie   1 2    0.0  1.e-3   Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction 
+  PAHneu.dat  1.0  Optical indices file, volume fraction
+  3	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  5e-4  5e-4 3.5 1 	  amin, amax, aexp, n_grains     
 
 #Molecular RT settings
   T T T 15.	          lpop, laccurate_pop, LTE, profile width 

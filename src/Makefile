@@ -504,8 +504,7 @@ SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
 	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 dust.f90 \
 	molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
-	thermal_emission.f90 dust_transfer.f90\
-	mol_transfer.f90 \
+	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90 \
 	mcfost.f90
 
 OBJECTS = $(SOURCES:.f90=.o)
@@ -534,7 +533,7 @@ io_prodimo.o : sha.f90
 utils.o :      sha.f90
 
 # Le fichier sha.f90 n'est cree que sur mon mac
-ifeq ($(ARCH),DARWIN)
+ifeq ($(MCFOST_GIT),1)
 sha.f90 : ../.git/COMMIT_EDITMSG
 	printf "module sha\n  implicit none\n" > sha.f90
 	git log --pretty=format:"%H %d" | grep HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
@@ -560,7 +559,7 @@ release : main
 	scp fosti:mcfost/src/mcfost.sha1 web/linux_64bits/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para"}' ` web
+	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
 	cp -r Doc web/
@@ -576,7 +575,7 @@ release_mac : main
 	cp mcfost web/macos_intel_64bits
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para"}' ` web
+	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
@@ -598,7 +597,10 @@ fosti :
 # Nettoyage
 #*************************************************************
 clean : 
-	rm -rf sha.f90 *.o *.exe *.mod outils/*.o outils/*.exe core*
+	rm -rf *.o  *.mod
+	if test $(MCFOST_GIT) ; then \
+	   rm -rf sha.f90; \
+	fi
 
 cleandata : 
 	rm -rf data* seed* density.fits.gz volume.fits.gz grid.fits.gz
