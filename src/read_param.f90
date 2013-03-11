@@ -293,7 +293,12 @@ contains
     else
        read(1,*)
        read(1,*) 
-       read(1,*) lstrat, settling_type, exp_strat, a_strat
+       read(1,*) settling_type, exp_strat, a_strat
+       if (settling_type == 0) then
+          lstrat = .false.
+       else
+          lstrat = .true.
+       endif
        if (ldebris) then
           lstrat=.true.
        endif
