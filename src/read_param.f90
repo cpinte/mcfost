@@ -359,11 +359,11 @@ contains
           read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
           read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
           read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge 
-          if (disk_zone(j)%geometry == 1) then ! disc
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          else if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          if (disk_zone(j)%geometry == 2) then ! tappered-edge
              disk_zone(j)%Rc =  disk_zone(j)%Rout
              disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+          else
+             disk_zone(j)%Rmax = disk_zone(j)%Rout
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
@@ -898,11 +898,11 @@ contains
           read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
           read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
           read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge 
-          if (disk_zone(j)%geometry == 1) then ! disc
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          else if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          if (disk_zone(j)%geometry == 2) then ! tappered-edge
              disk_zone(j)%Rc =  disk_zone(j)%Rout
              disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+          else
+             disk_zone(j)%Rmax = disk_zone(j)%Rout
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
@@ -1425,11 +1425,11 @@ end subroutine read_para215
           read(1,*) disk_zone(j)%diskmass
           read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
           read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge 
-          if (disk_zone(j)%geometry == 1) then ! disc
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          else if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          if (disk_zone(j)%geometry == 2) then ! tappered-edge
              disk_zone(j)%Rc =  disk_zone(j)%Rout
              disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+          else
+             disk_zone(j)%Rmax = disk_zone(j)%Rout
           endif
           read(1,*) disk_zone(j)%exp_beta 
           read(1,*) disk_zone(j)%surf
