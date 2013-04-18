@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.16
-  character(8), parameter :: mcfost_release = "2.16.2"
+  character(8), parameter :: mcfost_release = "2.16.3"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -728,8 +728,9 @@ module constantes
 
   real(kind=db), parameter :: AU_to_cm = AU_to_m * 100._db
   real(kind=db), parameter :: cm_to_AU = 1.0_db/AU_to_cm
+  
+  real(kind=db), parameter :: AU3_to_m3 = AU_to_m**3
   real(kind=db), parameter :: AU3_to_cm3 = AU_to_cm**3
-
 
   real(kind=db), parameter :: mum_to_m = 1.0e-6_db
   real(kind=db), parameter :: m_to_mum = 1.0e6_db
