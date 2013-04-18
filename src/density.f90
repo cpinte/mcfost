@@ -173,22 +173,24 @@ subroutine define_density()
                  else
                     z0 = 0.0
                  endif
+
+
+                 !  Densite du gaz (lsetup_gas avant)
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else if (rcyl < dz%rin) then
+                    density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
+                         exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
+                 else
+                    density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
+                 endif
+                 densite_gaz(i,j,k) = densite_gaz(i,j,k) + density
+                 masse_gaz(i,j,k) = masse_gaz(i,j,k) + density * masse_mol_gaz * volume(i)
+
               
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    !  Densite du gaz (lsetup_gas avant)
-                    if (rcyl > dz%rmax) then
-                       density = 0.0
-                    else if (rcyl < dz%rmin) then
-                       density = 0.0
-                    else if (rcyl < dz%rin) then
-                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
-                            exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
-                    else
-                       density = cst_gaz(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
-                    endif
-                    densite_gaz(i,j,k) = densite_gaz(i,j,k) + density
-                    masse_gaz(i,j,k) = masse_gaz(i,j,k) + density * masse_mol_gaz * volume(i)
-
                     ! Densite de la poussiere
 
                     ! Settling a la Dubrulle
