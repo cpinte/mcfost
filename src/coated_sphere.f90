@@ -177,7 +177,7 @@ contains
     real, intent(in) :: wl
     real, intent(out) :: qext, qsca, gsca
 
-    integer :: i,j, nang
+    integer :: i,j, nang, ipop
 
     real :: qext_HS, qsca_HS, qbs_HS, gqsc_HS, gsca_HS ! pour 1 HS
     complex, dimension(nang_scatt+1) :: S1,S2, s1_HS, s2_HS
@@ -187,7 +187,6 @@ contains
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
-    real(kind=db), parameter :: maxf = 0.9
     integer, parameter :: N_vf = 20
     real(kind=db), dimension(N_vf) :: f, wf
 
@@ -212,8 +211,10 @@ contains
 
     wvno= 2.0 * pi / wl
 
+    ipop = grain(taille_grain)%pop
+
     ! Calcul des poids pour integration de Gauss-Legendre
-    call gauleg(0.0_db,maxf,f,wf,N_vf) ; wf = wf/sum(wf) ! todo : a ne faire que pour 1 taille de grain
+    call gauleg(0.0_db,real(dust_pop(ipop)%dhs_maxf,kind=db),f,wf,N_vf) ; wf = wf/sum(wf) ! todo : a ne faire que pour 1 taille de grain
 
     cext=0 ; csca=0 ; gsca=0 ; s1=0 ; s2=0
     do i=1,N_vf
