@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.17
-  character(8), parameter :: mcfost_release = "2.17.0"
+  character(8), parameter :: mcfost_release = "2.17.1"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -506,7 +506,12 @@ module opacity
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
 !  real, dimension(n_lambda,n_rad,nz+1,0:n_grains) :: probsizecumul 
   real, dimension(:,:,:,:,:), allocatable :: probsizecumul !n_lambda,n_rad,nz+1,(n_az),)0:n_grains
-  
+  !* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
+  !* certaine taille de grain. Ce tableau est utilise pour le tirage
+  !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
+  !* en compte le nombre de grains en meme temps que leur probabilite
+  !* individuelle de diffuser (donnee par qsca*pi*a**2). 
+
   integer, parameter :: n_prob = 3
   ! proba_resol doit etre inferieur a 1/n_prob
   real, parameter :: proba_resol = 0.1/n_prob
