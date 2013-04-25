@@ -32,7 +32,7 @@ rm -rf cfitsio
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
 cd nr
-./compile_gfortran.com
+./compile_gfortran64.com
 cp libnr.a *.mod ../lib/nr
 cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
 cp spline/libnr_splin.a ../lib/nr/spline
@@ -42,4 +42,4 @@ cd ..
 
 cp -r include $MCFOST_INSTALL
 mkdir $MCFOST_INSTALL/lib
-cp -r lib $MCFOST_INSTALL/lib/gfortran
+cp -r lib $MCFOST_INSTALL/lib/gfortran64

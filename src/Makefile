@@ -15,6 +15,9 @@ endif
 ifeq ($(gfortran),yes)
 COMPILO = gfortran
 endif
+ifeq ($(gfortran64),yes)
+COMPILO = gfortran64
+endif
 ifeq ($(sun),yes)
 COMPILO = sunf95
 endif
@@ -404,8 +407,8 @@ endif
 
 # Linux ou Mac x86, gfortran
 ifeq ($(COMPILO),gfortran)
-FC_SER = gfortran -cpp 
-FC_OMP = gfortran -cpp -fopenmp
+FC_SER = gfortran -m32 -cpp 
+FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops 
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse 
 DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
@@ -430,12 +433,41 @@ LIBS_SORT = -L$(LIBS)/nr/sort -lnr_sort
 LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
-ifeq ($(ARCH),DARWIN) # 32bits par defaut sur mac
 FLAGS_SPRNG = $(FLAGS) 
+INCLUDE_SPRNG = -I$(MCFOST_INSTALL)/include
+LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
-ifeq ($(ARCH),LINUX)  # 64 bits par defaut sur linux
+
+
+# Linux ou Mac x86, gfortran64
+ifeq ($(COMPILO),gfortran64)
+FC_SER = gfortran -m64 -cpp 
+FC_OMP = gfortran -m64 -cpp -fopenmp
+OPTS = -O3 -ffast-math  -funroll-loops 
+#-mtune=athlon -mcpu=athlon -mfpmath=sse -msse 
+DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+# -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private 
+
+#PARALLEL = -openmp
+MACH = #-march=athlon
+PREC = 
+FFLAGS = -c $(PREC) 
+FFLAGS_EXE = $(PREC) 
+
+LIBS = $(MCFOST_INSTALL)/lib/gfortran64/
+LIBS_PGPLOT = -L$(LIBS) -lpgplot
+LIBS_FITS = -L$(LIBS) -lcfitsio
+
+# Numerical Recipes
+MODS_NR = -I$(LIBS)/nr
+LIBS_NR =  -L$(LIBS)/nr -lnr
+LIBS_NR_EQDIFF = -L$(LIBS)/nr/eq_diff -lnr_eq_diff
+LIBS_SPLINE =  -L$(LIBS)/nr/spline -lnr_splin
+LIBS_SORT = -L$(LIBS)/nr/sort -lnr_sort
+LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
+
+# SPRNG
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
-endif
 INCLUDE_SPRNG = -I$(MCFOST_INSTALL)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 endif
@@ -473,7 +505,7 @@ LIBS_SORT = -L $(LIBS)/nr/sort -lnr_sort
 LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 
 # SPRNG
-FLAGS_SPRNG = $(FLAGS)  
+FLAGS_SPRNG = $(FLAGS)
 INCLUDE_SPRNG = -I $(MCFOST_INSTALL)/include
 LIBS_SPRNG =  -L $(LIBS) -lsprng
 endif
