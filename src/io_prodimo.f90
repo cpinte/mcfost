@@ -116,7 +116,7 @@ module ProDiMo
      ! Statistics of the radiation field (number of packets)
      real*4, allocatable,dimension(:,:,:) :: nJ, nJ_Star, nJ_ISM
 
-     ! Gas mass density assuming a gas/dust mass ratio of 100 (Unit: g cm^-3)
+     ! Gas mass density (Unit: g cm^-3)
      real*4, allocatable,dimension(:,:) :: density
 
      ! 0th, 1st, 2nd and 3rd moment of the grain size distribution
@@ -152,7 +152,7 @@ contains
     real, dimension(:), allocatable :: fPAH
 
     ! Maximum 4 zones dans ProDiMo
-    if (n_zones > 4) then
+    if (n_regions > 4) then
        write(*,*) "ERROR: ProDiMo cannot deal with more than 4 zones."
        write(*,*) "Exiting."
        stop
@@ -768,7 +768,7 @@ contains
 
 
     !------------------------------------------------------------------------------
-    ! HDU 10 : Densite de gaz pour un rapport de masse de 100 / poussiere
+    ! HDU 10 : Densite de gaz
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=2
@@ -785,7 +785,7 @@ contains
     !  Write the array to the FITS file.
     do ri=1, n_rad
        do zj=1,nz
-          dens(ri,zj) =  densite_gaz(ri,zj,1) * masse_mol_gaz / m_to_cm**3 ! g.cm^-3
+          dens(ri,zj) =  densite_gaz(ri,zj,1) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
