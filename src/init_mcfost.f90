@@ -399,7 +399,10 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1 
      case("-output_density_grid")
-        loutput_density_grid=.true.
+        ldisk_struct=.true.
+        i_arg = i_arg+1
+     case("-disk_struct")
+        ldisk_struct=.true.
         i_arg = i_arg+1
      case("-output_J")
         loutput_J=.true.
@@ -735,6 +738,11 @@ subroutine initialisation_mcfost()
      scattering_method=2
   endif
 
+  if (ldisk_struct) then
+     write(*,*) "Computation of disk structure"
+     basename_data_dir = "data_disk"
+  endif
+
   if (ln_zone) then
      !lstrat=.true.
      write(*,*) "WARNING: lstrat is not set automatically to TRUE !!!!!!!!!"
@@ -784,7 +792,7 @@ subroutine initialisation_mcfost()
      endif
   endif
   
-  if ((ltemp.or.lsed.or.lsed_complete).and.(.not.(ldust_prop))) then
+  if ((ltemp.or.lsed.or.lsed_complete).and.(.not.(ldust_prop .or. ldisk_struct))) then
      write(*,*) "Thermal equilibrium calculation"
      if (lforce_1st_scatt) then
         write(*,*) "The [-force_1st_scatt] option is not relevant for SED calculation"
@@ -798,7 +806,7 @@ subroutine initialisation_mcfost()
         write(*,*) 'Exiting'
         stop
      endif
-     if (.not.(ldust_prop)) then
+     if (.not.(ldust_prop .or. ldisk_struct)) then
         basename_data_dir = "data_th"
      endif
   endif
@@ -996,10 +1004,10 @@ subroutine display_help()
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
-  write(*,*) "        : -output_density_grid : computes the density map and stops;"
-  write(*,*) "                          density.fits.gz -> density map"
-  write(*,*) "                          grid.fits.gz -> radii and height in the grid"
-  write(*,*) "                          volume.fits.gz -> volume per cell at each radius"
+  write(*,*) "        : -disk_struct : computes the density structure and stops:"
+  write(*,*) "                         gas_density.fits.gz and dust_density.fits.gz -> density map"
+  write(*,*) "                         grid.fits.gz -> radii and height in the grid"
+  write(*,*) "                         volume.fits.gz -> volume per cell at each radius"
   write(*,*) "        : -r_subdivide <radius>  : forces cell subdivision elsewhere"
   write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
@@ -1119,14 +1127,13 @@ subroutine save_data
   if (lonly_diff_approx) return 
   if (lsed.and.(.not.ltemp)) return 
 
-  if (ldust_prop) then
+  if (ldust_prop .or. ldisk_struct) then
      if (is_dir(trim(data_dir))) then
-        write(*,*) "Directory data_dust already exists! Erasing it..."
+        write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
         cmd = 'rm -Rf '//trim(data_dir)
         call appel_syst(cmd,syst_status)
      endif
      
-
      ! Cree le dossier data
      write (*,*) 'Creating directory '//trim(data_dir)
      cmd = 'mkdir -p '//trim(data_dir)//" ; "// &

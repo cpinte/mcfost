@@ -1016,7 +1016,6 @@ subroutine calc_opacity_map(lambda)
 
   real, dimension(n_rad,nz,2) :: opacity_map
 
-
   lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
 
   if (lmilieu) then
@@ -1057,7 +1056,6 @@ subroutine calc_opacity_map(lambda)
   endif
 
   write(*,*) "Writing opacity_map.fits.gz"
-
   filename = "opacity_map.fits.gz"
 
   status=0
@@ -1174,7 +1172,7 @@ subroutine ecriture_densite_gaz()
   integer :: i, j, k
 
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(3) :: naxes
+  integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
 
   logical :: simple, extend
@@ -1186,7 +1184,7 @@ subroutine ecriture_densite_gaz()
 
 
   ! ********************************************************************************
-  filename = "density.fits.gz"
+  filename = trim(data_dir)//"/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1216,6 +1214,9 @@ subroutine ecriture_densite_gaz()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
@@ -1235,7 +1236,53 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = "volume.fits.gz"
+  filename = trim(data_dir)//"/dust_density.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-64
+  extend=.true.
+
+  naxis=4
+  naxes(1:4) = shape(densite_pouss)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"part.cm^-3",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  !  dens =  densite_pouss
+  ! le d signifie real*8
+  call ftpprd(unit,group,fpixel,nelements,densite_pouss,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+
+  ! ********************************************************************************
+  filename = trim(data_dir)//"/volume.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1257,6 +1304,9 @@ subroutine ecriture_densite_gaz()
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"AU^3",' ',status)
 
   !  Write the array to the FITS file.
   group=1
@@ -1280,7 +1330,7 @@ subroutine ecriture_densite_gaz()
 
 
   ! ********************************************************************************
-  filename = "grid.fits.gz"
+  filename = trim(data_dir)//"/grid.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1305,6 +1355,11 @@ subroutine ecriture_densite_gaz()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"AU",' ',status)
+  call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
+  call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
@@ -1318,7 +1373,7 @@ subroutine ecriture_densite_gaz()
      enddo
   enddo
 
-  ! le e signifie real*4
+  ! le d signifie real*8
   call ftpprd(unit,group,fpixel,nelements,grid,status)
   
   !  Close the file and free the unit number.
@@ -1957,12 +2012,12 @@ subroutine ecriture_sed(ised)
   
   logical :: simple, extend
 
-
   !! Ecriture SED
   if (ised ==1) then
      filename = trim(data_dir)//"/sed1.fits.gz"
   else
      filename = trim(data_dir)//"/sed2.fits.gz"
+     if (lProDiMo) write(*,*) "WARNING: sed2.fits.gz will be noisy due to the use of ProDiMo mode"
   endif
 
   !  Get an unused Logical Unit Number to use to open the FITS file.

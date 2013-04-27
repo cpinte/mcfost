@@ -635,7 +635,7 @@ clean :
 	fi
 
 cleandata : 
-	rm -rf data* seed* density.fits.gz volume.fits.gz grid.fits.gz
+	rm -rf data* seed*
 
 cleanall : clean cleandata
 	rm -rf mcfost

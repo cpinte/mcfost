@@ -181,7 +181,7 @@ subroutine transfert_poussiere()
 
      if (lwall) call define_density_wall3D()
 
-     if (loutput_density_grid) then
+     if (ldisk_struct) then
         call ecriture_densite_gaz
         stop
      endif
@@ -271,10 +271,12 @@ subroutine transfert_poussiere()
                  call init_directions_ray_tracing()
               endif
 
+              write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1,n_lambda
                  call prop_grains(lambda, p_lambda)
                  call opacite2(lambda)!_eqdiff!_data
               enddo !n
+              write(*,*) "Done"
        
               if (ldust_sublimation)  then
                  call compute_othin_sublimation_radius()
@@ -419,10 +421,12 @@ subroutine transfert_poussiere()
         if ((ind_etape==first_etape_obs).and.lremove) then
            call remove_specie
            if (ltemp.and.lsed_complete) then
+              write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda
                  call prop_grains(lambda, p_lambda) ! recalcul pour opacite2
                  call opacite2(lambda)
               enddo
+              write(*,*) "Done"
            endif
         endif
            
