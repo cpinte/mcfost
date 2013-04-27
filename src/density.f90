@@ -21,17 +21,219 @@ module density
   contains
 
 subroutine define_density()
+
+  call define_gas_density()
+  call define_dust_density()
+
+  return
+
+end subroutine define_density
+
+!*************************************************************
+
+subroutine define_gas_density()
+  ! Calcule la table de densite: densite_gaz et masse_gaz
+  ! C. Pinte : re-ecrit le 27/04/2013
+
+  implicit none
+
+  integer :: i,j, k, izone
+  real(kind=db), dimension(n_zones) :: cst_gaz
+  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C
+
+  type(disk_zone_type) :: dz
+
+  ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
+  ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
+  real(kind=db), dimension(n_rad,nz,1) :: densite_gaz_tmp
+
+  do izone=1, n_zones
+     dz = disk_zone(izone)
+     if (dz%geometry <= 2) then ! Disque
+        ! La constante n'est OK que pour les lois de puissance
+        ! mais sera renormalisee pour les tappered-edge, inner-edge, etc
+        if (abs(dz%surf+2.0) > 1.0e-5) then
+           C =(((2.0+dz%surf))/(((2*pi)**1.5)*dz%sclht*(dz%rin**2)*&
+                ((dz%rmax/dz%rin)**(2+dz%surf)-1)))*((dz%rref/dz%rin)**dz%surf)
+        else
+           C =1.0/((2*pi)**1.5*dz%sclht*(dz%rref**2) * log(dz%rmax/dz%rin))
+        endif
+     else ! envelope
+        if (abs(dz%surf+3.0) > 1.0e-5) then
+           C =((3.0+dz%surf))/ (4*pi*(dz%rmax**(3.+dz%surf) - dz%rin**(3.+dz%surf)))
+        else
+           C = 1.0/( 4*pi * log(dz%rmax/dz%rin) )
+        endif
+     end if
+
+     ! Facteur multiplicatif pour passer en masse de gaz
+     ! puis en nH2/AU**3 puis en nH2/m**3
+     cst_gaz(izone) = C * dz%diskmass * dz%gas_to_dust / masse_mol_gaz * Msun_to_g / AU3_to_m3
+  enddo
+
+  do izone=1, n_zones
+     dz=disk_zone(izone)
+     densite_gaz_tmp = 0.0
+
+     if (dz%geometry <= 2) then ! Disque
+        do i=1, n_rad
+           bz : do j=j_start,nz
+              if (j==0) cycle bz
+
+              ! On calcule la densite au milieu de la cellule
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+
+              ! Puffed-up rim analytique
+              if (lpuffed_rim) then
+                 puffed = 1.0 + (puffed_rim_h - 1.0) / (exp((rcyl - puffed_rim_r)/puffed_rim_delta_r) + 1.0)
+              else
+                 puffed = 1.0
+              endif
+
+              if (dz%geometry == 1) then ! power-law
+                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
+              else ! tappered-edge : dz%surf correspond a -gamma
+                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
+              endif
+              coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
+
+              do k=1, n_az
+                 phi = phi_grid(k)
+                 ! Warp analytique
+                 if (lwarp) then
+                    z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
+                 else
+                    z0 = 0.0
+                 endif
+
+                 !  Densite du gaz (lsetup_gas avant)
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else if (rcyl < dz%rin) then
+                    density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
+                         exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
+                 else
+                    density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
+                 endif
+                 densite_gaz_tmp(i,j,k) = density
+
+              enddo !k
+           enddo bz !j
+        enddo ! i
+
+     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
+        do i=1, n_rad
+           do j=1,nz
+              ! On calcule la densite au milieu de la cellule
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+              rsph = sqrt(rcyl**2+z**2)
+
+
+              ! Setup densite du gaz
+              if (rsph > dz%rmax) then
+                 density = 0.0
+              else if (rsph < dz%rmin) then
+                 density = 0.0
+              else if (rsph < dz%rin) then
+                 density = cst_gaz(izone) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+              else
+                 density = cst_gaz(izone) * rsph**(dz%surf)
+              endif
+              densite_gaz_tmp(i,j,1) = density
+           enddo !j
+        enddo ! i
+
+     endif ! dz%geometry
+
+     !----------------------------------------
+     ! Normalisation masse de gaz par zone
+     !----------------------------------------
+
+     ! Calcul de la masse de gaz de la zone
+     mass = 0.
+     do i=1,n_rad
+        bz_gas_mass : do j=j_start,nz
+           if (j==0) cycle bz_gas_mass
+           do k=1,n_az
+              mass = mass + densite_gaz_tmp(i,j,k) *  masse_mol_gaz * volume(i)
+           enddo  !k
+        enddo bz_gas_mass
+     enddo !i
+     mass =  mass * AU3_to_m3 * g_to_Msun
+
+     ! Normalisation
+     facteur = dz%diskmass * dz%gas_to_dust / mass
+!     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
+
+     ! Somme sur les zones pour densite finale
+     do i=1,n_rad
+        bz_gas_mass2 : do j=j_start,nz
+           if (j==0) cycle bz_gas_mass2
+           do k=1, n_az
+              densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
+           enddo !k
+        enddo bz_gas_mass2
+     enddo ! i
+
+  enddo ! n_zones
+
+  ! Ajout cavite vide
+  if (lcavity) then
+     do i=1, n_rad
+        do j = 1, nz
+           surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
+           if (z_grid(i,j) > surface) then
+              densite_gaz(i,j,1) = 0.0_db
+           endif
+        enddo
+     enddo
+  endif
+
+  ! Tableau de masse de gaz
+  do i=1,n_rad
+     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
+     bz_gas_mass3 : do j=j_start,nz
+        if (j==0) cycle bz_gas_mass3
+        do k=1, n_az
+           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+        enddo !k
+     enddo bz_gas_mass3
+  enddo ! i
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+
+  if (lcorrect_density) then
+     write(*,*) "Correcting density ..."
+     do i=1, n_rad
+        if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
+           densite_gaz(i,:,:) = densite_gaz(i,:,:) *  correct_density_factor
+           masse_gaz(i,:,:) = masse_gaz(i,:,:) *  correct_density_factor
+        endif
+     enddo
+  endif
+
+  return
+
+end subroutine define_gas_density
+
+!*************************************************************
+
+subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
 ! Calcule les tableaux densite_pouss et masse
-! + densite_gaz et masse_gaz
 ! et indique ri_not_empty, zj_not_empty et phik_not_empty
+! C. Pinte : re-ecrit le 27/04/2013
 
   implicit none
 
   integer :: i,j, k, ii, jj, kk, l, k_min, izone, pop
   real(kind=db), dimension(n_pop) :: cst, cst_pous
-  real(kind=db), dimension(n_zones) :: cst_gaz
   real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
   real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, h_H2, coeff_strat, proba
   real(kind=db) :: puffed, facteur, z0, phi, surface, norme
@@ -52,13 +254,8 @@ subroutine define_density()
   ! Pour simus Dubrulle
   real, parameter :: gamma = 2.0 ! exposant de turbulence, 2 pour turbulence compressible
 
-  ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
-  ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=db), dimension(n_rad,nz,1) :: densite_gaz_tmp
-
   ! Coefficient de diffusion constant
   Dtilde = alpha / Sc
-
 
   ! Cste densite disque : va eventuellement etre renormalise 
   ! mais donne la constante pour la pop de poussiere dans une zone donnee
@@ -98,12 +295,6 @@ subroutine define_density()
      cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
 
-  ! Facteur multiplicatif pour passer en masse de gaz
-  ! puis en nH2/cm**3 puis en nH2/m**3
-  do izone=1, n_zones
-     cst_gaz(izone) = cst(izone) * disk_zone(izone)%gas_to_dust / masse_mol_gaz * m3_to_cm3
-  enddo
-
   do  l=1,n_grains_tot
      ! Correction stratification
      if (lstrat) then 
@@ -120,9 +311,11 @@ subroutine define_density()
      endif
   enddo !k
 
-  do izone=1, n_zones
+
+  ! Boucle pop a l'exterieur pour pouvoir superposer differente pop
+  do pop=1, n_pop
+     izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
-     densite_gaz_tmp = 0.0
 
      if (dz%geometry <= 2) then ! Disque
                 
@@ -159,61 +352,40 @@ subroutine define_density()
                     z0 = 0.0
                  endif
 
-                 !  Densite du gaz (lsetup_gas avant)
-                 if (rcyl > dz%rmax) then
-                    density = 0.0
-                 else if (rcyl < dz%rmin) then
-                    density = 0.0
-                 else if (rcyl < dz%rin) then
-                    density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))*&
-                         exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
-                 else
-                    density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
-                 endif
-                 densite_gaz_tmp(i,j,k) = density
+                 ! Densite de la poussiere
+                 do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    ! Settling a la Dubrulle
+                    if (lstrat.and.(settling_type == 2)) then
+                       !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
+                       !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
+                       rho0 = densite_gaz(i,1,1)
 
-              
-                 do pop = 1, n_pop
-                    if (izone==dust_pop(pop)%zone) then
-                       do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                          ! Densite de la poussiere
-
-                          ! Settling a la Dubrulle
-                          if (lstrat.and.(settling_type == 2)) then
-                             !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
-                             !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
-                             rho0 = densite_gaz_tmp(i,1,1)
-
-                             OmegaTau = omega_tau(rho0,h,r_grain(l))
-                             h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
-                             !if (h_H2 )
-                             correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
-                             !write(*,*) l, correct_strat(l), OmegaTau
-                          endif
+                       OmegaTau = omega_tau(rho0,h,r_grain(l))
+                       h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
+                       correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
+                    endif
 
                           
-                          if (rcyl > dz%rmax) then
-                             density = 0.0
-                          else if (rcyl < dz%rmin) then
-                             density = 0.0
-                          else if (rcyl < dz%rin) then
-                             ! Strat radiale dans edge (pour GG Tau)
-                             ! density = nbre_grains(l) * sqrt(correct_strat(l)) *  &
-                             !      cst_pous(pop)*fact_exp * exp(-((z(j)/dz%sclht)**2*(correct_strat(l)))/(coeff_exp))*&
-                             !      exp(-((rcyl-dz%rin)**2*(correct_strat(l)))/(2.*dz%edge**2))
-                             
-                             ! Pas de strat radial dans edge
-                             density = nbre_grains(l) * sqrt(correct_strat(l)) *  &
-                                  cst_pous(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))*&
-                                  exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
-                          else
-                             density = nbre_grains(l) * sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
-                                  exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))
-                          endif
-                          densite_pouss(i,j,k,l) = density
-                       enddo !l
-                    endif ! dust pop in zone
-                 enddo ! pop
+                    if (rcyl > dz%rmax) then
+                       density = 0.0
+                    else if (rcyl < dz%rmin) then
+                       density = 0.0
+                    else if (rcyl < dz%rin) then
+                       ! Strat radiale dans edge (pour GG Tau)
+                       ! density = nbre_grains(l) * sqrt(correct_strat(l)) *  &
+                       !      cst_pous(pop)*fact_exp * exp(-((z(j)/dz%sclht)**2*(correct_strat(l)))/(coeff_exp))*&
+                       !      exp(-((rcyl-dz%rin)**2*(correct_strat(l)))/(2.*dz%edge**2))
+
+                       ! Pas de strat radial dans edge
+                       density = nbre_grains(l) * sqrt(correct_strat(l)) *  &
+                            cst_pous(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))*&
+                            exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
+                    else
+                       density = nbre_grains(l) * sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
+                            exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))
+                    endif
+                    densite_pouss(i,j,k,l) = density
+                 enddo !l
               enddo !k
            enddo bz !j
         enddo ! i
@@ -222,16 +394,15 @@ subroutine define_density()
            ! Si strat a la Seb. Fromang : on ecrase le tableau de densite
            ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
            do i=1, n_rad
-              rho0 = densite_gaz_tmp(i,1,1) ! pour dependance en R
+              rho0 = densite_gaz(i,1,1) ! pour dependance en R
 
               rcyl = r_grid(i,1)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
-
               do l=1,n_grains_tot
                  !calculate omega_tau in the disk midplane
                  OmegaTau = omega_tau(rho0,h,r_grain(l))
-              
+
                  do j=j_start,nz ! dependence en z uniquement ici !!!!
                     if (j==0) cycle
                     
@@ -257,13 +428,16 @@ subroutine define_density()
                  if (norme < tiny_db) then
                     densite_pouss(i,1,1,l)  = 1.0_db
                     norme = 1.0_db
+
+                    write(*,*) "Vertical settling unresolved for"
+                    write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl )
                  endif
 
                  do j=j_start,nz
                     if (j==0) cycle
                     if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
                  enddo !j
- 
+
               enddo ! l
            enddo ! i
         endif ! Settling Fromang
@@ -276,74 +450,25 @@ subroutine define_density()
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
               rsph = sqrt(rcyl**2+z**2)
-
-
-              ! Setup densite du gaz
-              if (rsph > dz%rmax) then
-                 density = 0.0
-              else if (rsph < dz%rmin) then
-                 density = 0.0
-              else if (rsph < dz%rin) then
-                 density = cst_gaz(izone) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-              else
-                 density = cst_gaz(izone) * rsph**(dz%surf)
-              endif
-              densite_gaz_tmp(i,j,1) = density
               
-              do pop = 1, n_pop
-                 if (dust_pop(pop)%zone==izone) then
-                    do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                       if (rsph > dz%rmax) then
-                          density = 0.0
-                       else if (rsph < dz%rmin) then
-                          density = 0.0
-                       else if (rsph < dz%rin) then
-                          density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-                       else
-                          density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
-                       endif
-                       densite_pouss(i,j,1,l) = density
-                    enddo !l
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 if (rsph > dz%rmax) then
+                    density = 0.0
+                 else if (rsph < dz%rmin) then
+                    density = 0.0
+                 else if (rsph < dz%rin) then
+                    density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+                 else
+                    density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
                  endif
-              enddo ! pop
-
+                 densite_pouss(i,j,1,l) = density
+              enddo !l
            enddo !j
         enddo ! i
-        
+
      endif ! dz%geometry
 
-     !----------------------------------------
-     ! Normalisation masse de gaz par zone
-     !----------------------------------------
-
-     ! Calcul de la masse de gaz de la zone
-     mass = 0.
-     do i=1,n_rad
-        bz_gas_mass : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass
-              
-           do k=1,n_az
-              mass = mass + densite_gaz_tmp(i,j,k) *  masse_mol_gaz * volume(i)
-           enddo  !k
-        enddo bz_gas_mass
-     enddo !i
-     mass =  mass * AU3_to_m3 * g_to_Msun 
-
-     ! Normalisation     
-     facteur = dz%diskmass * dz%gas_to_dust / mass
-     !write(*,*) "VERIFzone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
-
-     ! Somme sur les zones pour densite finale
-     do i=1,n_rad
-        bz_gas_mass2 : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass2
-           do k=1, n_az
-              densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
-           enddo !k
-        enddo bz_gas_mass2
-     enddo ! i
-     
-  enddo ! n_zones
+  enddo ! pop
 
   ! Ajout cavite vide
   if (lcavity) then
@@ -352,25 +477,11 @@ subroutine define_density()
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
            if (z_grid(i,j) > surface) then
               densite_pouss(i,j,1,:) = 0.0_db
-              densite_gaz(i,j,1) = 0.0_db
            endif
         enddo
      enddo
   endif
   
-  ! Tableau de masse de gaz
-  do i=1,n_rad
-     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
-     bz_gas_mass3 : do j=j_start,nz
-        if (j==0) cycle bz_gas_mass3
-        do k=1, n_az
-           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
-        enddo !k
-     enddo bz_gas_mass3
-  enddo ! i  
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-
-
   if (lgap_ELT) then
      do i=1, n_rad
         densite_pouss(i,:,:,:) = densite_pouss(i,:,:,:) * &
@@ -452,8 +563,6 @@ subroutine define_density()
         if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
            densite_pouss(i,:,:,:) = densite_pouss(i,:,:,:) * correct_density_factor
            masse(i,:,:) = masse(i,:,:) *  correct_density_factor
-           densite_gaz(i,:,:) = densite_gaz(i,:,:) *  correct_density_factor
-           masse_gaz(i,:,:) = masse_gaz(i,:,:) *  correct_density_factor
         endif
      enddo
 
@@ -466,7 +575,7 @@ subroutine define_density()
 
   return
 
-end subroutine define_density
+end subroutine define_dust_density
 
 !*************************************************************
 
