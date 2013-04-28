@@ -319,6 +319,7 @@ subroutine init_indices_optiques()
            dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg  + &
                 dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
         enddo
+        dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
      else ! PAH       
         ! we only set the material density
         dust_pop(pop)%component_rho1g(1) = 2.5
