@@ -24,7 +24,7 @@ subroutine draine_load(file,na,nb,nh,ns,a,b,x1,x2,x3,x4,nx)
   ! nh : n header ; ns : n_skip
 
   real, dimension(na) :: a
-  real, dimension(nb) :: b 
+  real, dimension(nb) :: b
 
   real, dimension(na,nb), intent(out) :: x1,x2,x3,x4
 
@@ -48,7 +48,7 @@ subroutine draine_load(file,na,nb,nh,ns,a,b,x1,x2,x3,x4,nx)
         do j=1,na
         !   n_ligne=n_ligne+1
         !   write(*,*) n_ligne
-           read(1,*) a(j), x1(j,i), x2(j,i), x3(j,i), x4(j,i) 
+           read(1,*) a(j), x1(j,i), x2(j,i), x3(j,i), x4(j,i)
         enddo
      else if (nx==3) then
         do j=1,na
@@ -67,7 +67,7 @@ subroutine draine_load(file,na,nb,nh,ns,a,b,x1,x2,x3,x4,nx)
   close(unit=1)
 
   return
-  
+
 end subroutine draine_load
 
 !*************************************************************
@@ -77,14 +77,14 @@ subroutine read_molecules_names(imol)
   implicit none
 
   integer, intent(in) :: imol
-  
+
   character(len=80) :: junk
 
   open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
-  
+
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
-  
+
   return
 
 end subroutine read_molecules_names
@@ -94,7 +94,7 @@ end subroutine read_molecules_names
 
 subroutine readmolecule(imol)
   ! Lit les parametres de la molecule etudiee
-  ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq, 
+  ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq,
   ! iTransUpper, iTransLower + les donnees de collisions
 
   implicit none
@@ -105,14 +105,14 @@ subroutine readmolecule(imol)
   integer :: i, j, iLow, iUp, iPart
   real :: a, freq, eu
   real, dimension(20) :: collrates_tmp, colltemps_tmp
-  
+
   character(len=10) :: buffer
 
   open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
-  
+
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
-  
+
   read(1,*) junk
   read(1,*) molecularWeight
   masse_mol = masseH * molecularWeight
@@ -121,12 +121,12 @@ subroutine readmolecule(imol)
   read(1,*) nLevels
 
   allocate(Level_energy(nLevels),poids_stat_g(nLevels),j_qnb(nLevels))
-  
+
   read(1,*) junk
   do i = 1, nLevels
   !   read(1,*) j, Level_energy(i), poids_stat_g(i) , j_qnb(i)
      read(1,*) j, Level_energy(i), poids_stat_g(i) !, buffer
-     Level_energy(i) = Level_energy(i) / 8065.541  ! per cm to ev      
+     Level_energy(i) = Level_energy(i) / 8065.541  ! per cm to ev
   enddo
 
   read(1,*) junk
@@ -141,14 +141,14 @@ subroutine readmolecule(imol)
   read(1,*) junk
   do i = 1, nTrans_tot
      read(1,*) j, iUp, iLow, a, freq, eu
-       
+
      Aul(i) = a ! en s-1
      transfreq(i) = freq*1.d9 ! passage en Hz
      itransUpper(i) = iUp
      itransLower(i) = iLow
-     
+
      ! Transformation Aul -> Bul
-     Bul(i) = a * (c_light**2)/(2.d0*hp*(transfreq(i))**3) 
+     Bul(i) = a * (c_light**2)/(2.d0*hp*(transfreq(i))**3)
      ! Transformation Bul -> Blu
      Blu(i) = Bul(i) * poids_stat_g(iUp)/poids_stat_g(iLow)
 
@@ -160,22 +160,22 @@ subroutine readmolecule(imol)
 
   read(1,*) junk
   read(1,*) nCollPart
-    
+
   allocate(nCollTrans(1:nCollPart))
   allocate(nCollTemps(1:nCollPart))
   allocate(collTemps(1:nCollPart, 1:20))
   allocate(collBetween(1:nCollPart))
 
- 
-    
+
+
   do iPart = 1, nCollPart
 
      read(1,*) junk
      read(1,*) collBetween(iPart)
-     
+
      read(1,*) junk
      read(1,*) nCollTrans(iPart)
-     
+
      read(1,*) junk
      read(1,*) nCollTemps(iPart)
 
@@ -183,7 +183,7 @@ subroutine readmolecule(imol)
      read(1,*) junk
      read(1,*) collTemps_tmp(1:nCollTemps(ipart))
      collTemps(iPart,1:nCollTemps(ipart)) = colltemps_tmp(1:nCollTemps(ipart))
-       
+
      if (iPart == 1) then
         allocate(collRates(1:nCollPart, 1:nCollTrans(iPart) + 50, 1:nCollTemps(ipart) + 50)) ! TODO : passage par des pointeurs, c'est crade
         allocate(iCollUpper(1:nCollPart, 1:nCollTrans(iPart) +50))
@@ -192,7 +192,7 @@ subroutine readmolecule(imol)
      endif
 
      read(1,*) junk
-     do j = 1, nCollTrans(iPart)       
+     do j = 1, nCollTrans(iPart)
         read(1,*) i, iCollUpper(ipart,j),  iCollLower(ipart,j), collRates_tmp(1:nCollTemps(iPart))
         collRates(iPart, j, 1:nCollTemps(iPart)) = collRates_tmp(1:nCollTemps(iPart))
      enddo
@@ -204,7 +204,7 @@ subroutine readmolecule(imol)
 
   return
 
-end subroutine readmolecule 
+end subroutine readmolecule
 
 !*************************************************************
 
@@ -251,7 +251,7 @@ subroutine lect_Temperature()
            write(*,*) naxes(1), n_rad
            write(*,*) naxes(2), nz
            write(*,*) naxes(3), n_az
-           
+
            stop
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
@@ -273,7 +273,7 @@ subroutine lect_Temperature()
      endif
 
 
-     
+
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,tmp_temp,anynull,status)
@@ -296,9 +296,9 @@ subroutine lect_Temperature()
      status=0
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
-    
+
      write(*,*) "Reading temperature file : "//trim(Tfile)
-     
+
      readwrite=0
      call ftopen(unit,Tfile,readwrite,blocksize,status)
      if (status /= 0) then ! le fichier temperature n'existe pas
@@ -325,18 +325,18 @@ subroutine lect_Temperature()
      call ftclos(unit, status)
      call ftfiou(unit, status)
   endif
-  
+
 
 
   if (lnRE) then
      status=0
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
-    
+
 
      write(*,*) "Reading temperature file : "//trim(Tfile_nRE)
      !call init_tab_Temp()
-          
+
      readwrite=0
      call ftopen(unit,Tfile_nRE,readwrite,blocksize,status)
      if (status /= 0) then ! le fichier temperature n'existe pas
@@ -348,12 +348,12 @@ subroutine lect_Temperature()
      firstpix=1
      nullval=-999
 
-     
+
 !     call ftcrhd(unit, hdunum,status)
 !     write(*,*) hdunum
 !     read(*,*)
 
-    
+
      !  determine the size of temperature file
      call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
      if (nfound /= 3) then
@@ -368,7 +368,7 @@ subroutine lect_Temperature()
 
      ! 2eme HDU
      call ftmahd(unit,2,hdutype,status)
- 
+
      call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
      if (nfound /= 4) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -382,7 +382,7 @@ subroutine lect_Temperature()
 
      ! 3eme HDU
      call ftmahd(unit,3,hdutype,status)
- 
+
      call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -397,7 +397,7 @@ subroutine lect_Temperature()
      call ftclos(unit, status)
      call ftfiou(unit, status)
   endif
-  
+
   return
 
 end subroutine lect_Temperature
@@ -411,7 +411,7 @@ subroutine read_abundance(imol)
   implicit none
 
   integer, intent(in) :: imol
- 
+
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
   real :: nullval
   integer, dimension(4) :: naxes
@@ -425,7 +425,7 @@ subroutine read_abundance(imol)
   call ftgiou(unit,status)
 
   write(*,*) "Reading abundance file : "//trim(abundance_file)
-  
+
   readwrite=0
   call ftopen(unit,abundance_file,readwrite,blocksize,status)
   if (status /= 0) then ! le fichier temperature n'existe pas
@@ -436,7 +436,7 @@ subroutine read_abundance(imol)
   group=1
   firstpix=1
   nullval=-999
-  
+
   !  determine the size of temperature file
   call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
   if (nfound /= 2) then
@@ -444,7 +444,7 @@ subroutine read_abundance(imol)
      write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
      stop
   endif
-  
+
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
      write(*,*) "Error : "//trim(abundance_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
@@ -495,7 +495,7 @@ subroutine lect_lambda()
 
   ! On elimine les lignes avec des commentaires
   status = 1
-  n_comment = 0 
+  n_comment = 0
   do while (status /= 0)
      n_comment = n_comment + 1
      read(1,*,iostat=status) fbuffer
@@ -670,12 +670,12 @@ subroutine init_tab_Temp()
 
   implicit none
 
-  real(kind=db) :: delta_T  
+  real(kind=db) :: delta_T
   integer :: t
 
   tab_Temp=0.0
   ! Echantillonage temperature
-  !delta_T=(T_max)**(1.0/(n_T-1)) 
+  !delta_T=(T_max)**(1.0/(n_T-1))
   delta_T=exp((1.0_db/(real(n_T,kind=db)))*log(T_max/T_min))
   tab_Temp(1)=T_min*sqrt(delta_T)
    do t=2,n_T

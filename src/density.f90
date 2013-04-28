@@ -11,7 +11,7 @@ module density
   use nr, only : rkqs
   use nrtype, only : sp
   use ode_data
-  use wall  
+  use wall
   use grid
   use utils
   use output
@@ -257,7 +257,7 @@ subroutine define_dust_density()
   ! Coefficient de diffusion constant
   Dtilde = alpha / Sc
 
-  ! Cste densite disque : va eventuellement etre renormalise 
+  ! Cste densite disque : va eventuellement etre renormalise
   ! mais donne la constante pour la pop de poussiere dans une zone donnee
   do i=1, n_pop
      izone=dust_pop(i)%zone
@@ -269,7 +269,7 @@ subroutine define_dust_density()
         stop
      endif
 
-     if (dz%geometry == 4) lwall = .true. 
+     if (dz%geometry == 4) lwall = .true.
 
      if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
@@ -286,8 +286,8 @@ subroutine define_dust_density()
         endif
      end if
   enddo !i pop
-  
-  ! facteur multiplicatif pour passer en g/cm**3: 
+
+  ! facteur multiplicatif pour passer en g/cm**3:
   cst=cst * Msun_to_g / AU3_to_cm3
 
   ! facteur multiplicatif pour passer en part/cm**3: avg_grain_mass
@@ -297,7 +297,7 @@ subroutine define_dust_density()
 
   do  l=1,n_grains_tot
      ! Correction stratification
-     if (lstrat) then 
+     if (lstrat) then
         ! loi de puissance
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
@@ -305,7 +305,7 @@ subroutine define_dust_density()
            correct_strat(l) = 1.0
         endif
         ! loi exponentielle (Garaud , Barriere 2004)
-        !        correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat) 
+        !        correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
      else
         correct_strat(l) = 1.0
      endif
@@ -318,15 +318,15 @@ subroutine define_dust_density()
      dz=disk_zone(izone)
 
      if (dz%geometry <= 2) then ! Disque
-                
+
         do i=1, n_rad
            bz : do j=j_start,nz
               if (j==0) cycle bz
-      
+
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
-           
+
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
               ! Puffed-up rim analytique
@@ -335,7 +335,7 @@ subroutine define_dust_density()
               else
                  puffed = 1.0
               endif
-           
+
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
               else ! tappered-edge : dz%surf correspond a -gamma
@@ -344,7 +344,7 @@ subroutine define_dust_density()
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
               do k=1, n_az
-                 phi = phi_grid(k)                               
+                 phi = phi_grid(k)
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
@@ -365,7 +365,7 @@ subroutine define_dust_density()
                        correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
                     endif
 
-                          
+
                     if (rcyl > dz%rmax) then
                        density = 0.0
                     else if (rcyl < dz%rmin) then
@@ -389,7 +389,7 @@ subroutine define_dust_density()
               enddo !k
            enddo bz !j
         enddo ! i
-        
+
         if (lstrat.and.(settling_type == 3)) then
            ! Si strat a la Seb. Fromang : on ecrase le tableau de densite
            ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
@@ -405,18 +405,18 @@ subroutine define_dust_density()
 
                  do j=j_start,nz ! dependence en z uniquement ici !!!!
                     if (j==0) cycle
-                    
+
                     !calculate h & z/h
                     z = z_grid(i,j)
                     Ztilde=z/H
 
                     ! Fit Gaussien du profile de densite
-                    !densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.)) 
-                    
+                    !densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
+
                     ! Coefficient de diffusion constant
                     densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
                  enddo!j
-                   
+
                  ! normalization en z
                  norme = 0.0
                  do j=j_start,nz
@@ -450,7 +450,7 @@ subroutine define_dust_density()
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
               rsph = sqrt(rcyl**2+z**2)
-              
+
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                  if (rsph > dz%rmax) then
                     density = 0.0
@@ -481,7 +481,7 @@ subroutine define_dust_density()
         enddo
      enddo
   endif
-  
+
   if (lgap_ELT) then
      do i=1, n_rad
         densite_pouss(i,:,:,:) = densite_pouss(i,:,:,:) * &
@@ -502,7 +502,7 @@ subroutine define_dust_density()
         enddo
      enddo
   enddo search_not_empty
-  
+
 
 
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
@@ -517,18 +517,18 @@ subroutine define_dust_density()
         do i=1,n_rad
            bz2 : do j=j_start,nz
               if (j==0) cycle bz2
-              
+
               do k=1,n_az
                  do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * volume(i) 
+                    mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
                  enddo !l
               enddo !k
            enddo bz2
         enddo !i
         mass =  mass * AU3_to_cm3 * g_to_Msun
-     
+
         facteur = dp%masse / mass
-        
+
         do i=1,n_rad
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
@@ -540,17 +540,17 @@ subroutine define_dust_density()
               enddo !k
            enddo bz3
         enddo ! i
-        
+
      endif ! test wall
   enddo ! pop
-  
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3  
+
+  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
 
   if (ldust_gas_ratio) then
      allocate(dust_gas_ratio(n_rad,nz))
      dust_gas_ratio = masse(:,:,1) / masse_gaz(:,:,1)
-     
+
      write(*,*) "Writing dust_gas_ratio"
      call cfitsWrite("dust_gas_ratio.fits.gz",dust_gas_ratio,shape(dust_gas_ratio))
      write(*,*) "Done"
@@ -589,10 +589,10 @@ subroutine define_density_wall3D()
   type(dust_pop_type), pointer :: dp
 
   real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass
-  
-  real(kind=db), dimension(:,:,:,:), allocatable :: density_wall 
-  real(kind=db), dimension(:,:,:), allocatable :: masse_wall 
-  
+
+  real(kind=db), dimension(:,:,:,:), allocatable :: density_wall
+  real(kind=db), dimension(:,:,:), allocatable :: masse_wall
+
 
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
@@ -603,14 +603,14 @@ subroutine define_density_wall3D()
      write(*,*) 'Allocation error wall'
      stop
   endif
-  density_wall = 0. 
-  masse_wall = 0. 
+  density_wall = 0.
+  masse_wall = 0.
 
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-     
+
      if (dz%geometry == 3) then ! wall
         if (abs(dz%exp_beta) > 1e-6) then
            write(*,*) "ERROR: the wall must have Beta = 0"
@@ -626,11 +626,11 @@ subroutine define_density_wall3D()
         do i=1, n_rad
            bz : do j=j_start,nz
               if (j==0) cycle bz
-      
+
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
-              
+
               do k=1, n_az
                  phi = phi_grid(k)
 
@@ -639,31 +639,31 @@ subroutine define_density_wall3D()
                        density = 0.0
                     else if (rcyl < dz%rin) then
                        density = 0.0
-                    else 
+                    else
                        density = nbre_grains(l) ! densite constante dans le mur
                     endif
-                    
+
                     ! Variation de hauteur du mur en cos(phi/2)
                     hh = h_wall * (1.+cos(phi+pi))/2.
-                    
+
                     if ((z > 0.).and.(z < hh)) then
-                       density_wall(i,j,k,l) = density 
-                       !if (density > 0.) write(*,*) i,j, k, l, density_wall(i,j,k,l) 
+                       density_wall(i,j,k,l) = density
+                       !if (density > 0.) write(*,*) i,j, k, l, density_wall(i,j,k,l)
                     else
                        density_wall(i,j,k,l) = 0.0
                     endif
                  enddo ! l
 
-              enddo !k 
+              enddo !k
            enddo bz !j
         enddo !i
-  
+
      endif ! wall
   enddo ! pop
 
   ! Normalisation de la masse du mur
   masse_wall(:,:,:) = 0.0
- 
+
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
@@ -675,18 +675,18 @@ subroutine define_density_wall3D()
         do i=1,n_rad
            bz2 : do j=j_start,nz
               if (j==0) cycle bz2
-       
+
               do k=1,n_az
                  do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + density_wall(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3) 
+                    mass=mass + density_wall(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
                  enddo !l
               enddo !k
            enddo bz2
         enddo !i
         mass =  mass*g_to_Msun
-        
+
         facteur = dp%masse / mass
-        
+
         do i=1,n_rad
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
@@ -701,7 +701,7 @@ subroutine define_density_wall3D()
 
      endif ! zone = wall
   enddo ! pop
-     
+
   masse_wall(:,:,:) = masse_wall(:,:,:) * AU3_to_cm3
   write(*,*) 'Wall dust mass:', real(sum(masse_wall)*g_to_Msun),' Msun'
 
@@ -713,7 +713,7 @@ subroutine define_density_wall3D()
   write(*,*) "Done"
   write(*,*) "*********************************************************"
 
-  
+
   return
 
 end subroutine define_density_wall3D
@@ -724,7 +724,7 @@ subroutine densite_data2()
 ! Lecture du 2eme jeux de simulation de Laure Barriere
 ! La densite de surface n'est plus une loi de puissance
 ! Premier fits de GG Tau
-! Mars 2005  
+! Mars 2005
 
   implicit none
 
@@ -733,7 +733,7 @@ subroutine densite_data2()
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
   real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
- 
+
   real, dimension(nz) :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
@@ -805,14 +805,14 @@ subroutine densite_data2()
      b0_int(:) = b0(1)
   endif
 
-  ! Constantes 
+  ! Constantes
   ! On divise ici par (AU/cm)**3 pour eviter overflow
-  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass 
+  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass
 
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
      ! On calcule la densite au milieu de la cellule
-     rcyl = sqrt(r_lim(i) * r_lim(i-1)) 
+     rcyl = sqrt(r_lim(i) * r_lim(i-1))
 
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
@@ -857,7 +857,7 @@ subroutine densite_data2()
   do k=1,n_grains_tot
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -870,7 +870,7 @@ subroutine densite_data2()
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  ! Verif 
+  ! Verif
 !  masse = 0.0
 !  do i=1,n_rad
 !     do j=1,nz
@@ -901,8 +901,8 @@ subroutine densite_data_SPH_binaire()
 ! La densite de surface n'est plus une loi de puissance
 ! 2eme fits de GG Tau
 ! cree tableaux densite_pouss et masse
-! 04/05/05  
- 
+! 04/05/05
+
   implicit none
 
   real, parameter :: G = 6.672e-8
@@ -910,7 +910,7 @@ subroutine densite_data_SPH_binaire()
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
   real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
- 
+
   real, dimension(nz) :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
@@ -977,14 +977,14 @@ subroutine densite_data_SPH_binaire()
      b0_int(:) = b0(1)
   endif
 
-  ! Constantes 
+  ! Constantes
   ! On divise ici par (AU/cm)**3 pour eviter overflow
   ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass
- 
+
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
      ! On calcule la densite au milieu de la cellule
-     rcyl = 0.5*(r_lim(i) + r_lim(i-1)) 
+     rcyl = 0.5*(r_lim(i) + r_lim(i-1))
 
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
@@ -1008,7 +1008,7 @@ subroutine densite_data_SPH_binaire()
      !$omp end do
      !$omp end parallel
   enddo !i
-  
+
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do k=1,n_grains_tot
@@ -1025,7 +1025,7 @@ subroutine densite_data_SPH_binaire()
   do k=1,n_grains_tot
      densite_pouss(:,:,1,k) = densite_pouss(:,:,1,k)*nbre_grains(k)
   enddo
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -1037,8 +1037,8 @@ subroutine densite_data_SPH_binaire()
   enddo
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
-  
-  ! Verif 
+
+  ! Verif
 !  masse = 0.0
 !  do i=1,n_rad
 !     do j=1,nz
@@ -1068,7 +1068,7 @@ subroutine densite_data_SPH_TTauri()
 ! Lecture du 2eme jeux de simulation de Laure Barriere
 ! La densite de surface n'est plus une loi de puissance
 ! 2eme fits de T Tauri
-! 22 juin 2005  
+! 22 juin 2005
 
   implicit none
 
@@ -1078,7 +1078,7 @@ subroutine densite_data_SPH_TTauri()
   integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
   real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
- 
+
   real :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
@@ -1162,19 +1162,19 @@ subroutine densite_data_SPH_TTauri()
      b0_int(:) = b0(1)
   endif
 
-  
-!  write(*,*) a0(1), a1(1), a2(1), a3(1), a4(1)
- 
 
-  ! Constantes 
+!  write(*,*) a0(1), a1(1), a2(1), a3(1), a4(1)
+
+
+  ! Constantes
   ! On divise ici par (AU/cm)**3 pour eviter overflow
-  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass 
-  
+  ntot_grains=diskmass*Msun_to_g/AU3_to_cm3 /dust_pop(1)%avg_grain_mass
+
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
      ! On calcule la densite au milieu de la cellule
-     rcyl = sqrt(r_lim(i) * r_lim(i-1)) 
- 
+     rcyl = sqrt(r_lim(i) * r_lim(i-1))
+
      do k=1, n_grains_tot
 !        H(k) = 100.0*exp(a4_int(k)*(0.01*rcyl)**4+a3_int(k)*(0.01*rcyl)**3+ &
 !             a2_int(k)*(0.01*rcyl)**2 + a1_int(k) * (0.01*rcyl) + a0_int(k))
@@ -1232,7 +1232,7 @@ subroutine densite_data_SPH_TTauri()
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
 
- 
+
   ! Normalisation : Calcul masse totale
   masse = 0.0
   do i=1,n_rad
@@ -1244,9 +1244,9 @@ subroutine densite_data_SPH_TTauri()
   enddo
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/sum(masse) * Msun_to_g
   masse =  masse* diskmass/sum(masse) * Msun_to_g
- 
 
- ! Verif 
+
+ ! Verif
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
@@ -1284,7 +1284,7 @@ subroutine densite_data_SPH_TTauri_1()
   integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
   real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
- 
+
   real, dimension(nz) :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
@@ -1426,18 +1426,18 @@ subroutine densite_data_SPH_TTauri_1()
         cst=diskmass/((2*pi)**1.5*tab_h0(k)*(dz%rref**2)) * log(dz%rin/dz%rmax)
      endif
 
-     ! facteur multiplicatif pour passer en g/cm**3: 
+     ! facteur multiplicatif pour passer en g/cm**3:
      cst=cst*Msun_to_g / AU3_to_cm3
      ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
      cst_pous = cst/dust_pop(1)%avg_grain_mass
      ! Facteur multiplicatif pour prendre en compte que les grains de taille a
-     tab_cst(k) = cst_pous*nbre_grains(k) 
+     tab_cst(k) = cst_pous*nbre_grains(k)
   enddo
 
   somme = 0.0
   do i=1, n_rad
      ! On calcule la densite au milieu de la cellule
-     rcyl = 0.5*(r_lim(i) + r_lim(i-1)) 
+     rcyl = 0.5*(r_lim(i) + r_lim(i-1))
      fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
      coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
@@ -1453,7 +1453,7 @@ subroutine densite_data_SPH_TTauri_1()
         z(j) = (real(j)-0.5)*delta_z(i)
         do  k=1,n_grains_tot
            densite_pouss(i,j,1,k) = tab_cst(k)*(rcyl/dz%rref)**(tab_surf(k)-tab_beta(k)) &
-           *exp(-((z(j)/(tab_h0(k)))**2)/(2*(rcyl/dz%rref)**(2*tab_beta(k)))) 
+           *exp(-((z(j)/(tab_h0(k)))**2)/(2*(rcyl/dz%rref)**(2*tab_beta(k))))
             somme=somme+densite_pouss(i,j,1,k)*volume(i)
         enddo !k
      enddo !j
@@ -1467,7 +1467,7 @@ subroutine densite_data_SPH_TTauri_1()
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
 
- 
+
   ! Normalisation : Calcul masse totale
   masse = 0.0
   do i=1,n_rad
@@ -1479,9 +1479,9 @@ subroutine densite_data_SPH_TTauri_1()
   enddo
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/sum(masse) * Msun_to_g
   masse =  masse* diskmass/sum(masse) * Msun_to_g
- 
-  
- ! Verif 
+
+
+ ! Verif
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
@@ -1522,7 +1522,7 @@ subroutine densite_data_SPH_TTauri_2()
   integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
   real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
   real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
- 
+
   real :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
@@ -1552,11 +1552,11 @@ subroutine densite_data_SPH_TTauri_2()
         do j=1, nz
            read(1,*) ii, jj, rr, zz, rho(i,j,l), HH, SS
         enddo
-     enddo     
+     enddo
      close(unit=1)
   enddo
 
-  
+
   l=0
   ! Interpolation
   if (.not.lno_strat_SPH) then
@@ -1578,7 +1578,7 @@ subroutine densite_data_SPH_TTauri_2()
         else
            ! Autres grains : interpolation
            if (r_grain(k) > a_sph(l+1)) l = l+1
-           !write(*,*) r_grain(k), l, a_sph(l), a_sph(l+1)         
+           !write(*,*) r_grain(k), l, a_sph(l), a_sph(l+1)
            !fact = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
            fact = (log(r_grain(k))-log(a_sph(l)))/(log(a_sph(l+1))-log(a_sph(l)))
            do i=1, n_rad
@@ -1618,7 +1618,7 @@ subroutine densite_data_SPH_TTauri_2()
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
 
- 
+
   ! Normalisation : Calcul masse totale
   masse = 0.0
   do i=1,n_rad
@@ -1631,9 +1631,9 @@ subroutine densite_data_SPH_TTauri_2()
   enddo
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/sum(masse) * Msun_to_g
   masse =  masse* diskmass/sum(masse) * Msun_to_g
- 
 
- ! Verif 
+
+ ! Verif
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
@@ -1726,11 +1726,11 @@ subroutine densite_data_LAURE_SED()
   do i=1, n_rad-1
      r_lim(i) = sqrt(r_grid(i,1) * r_grid(i+1,1))
   enddo
-  r_lim(0) = r_grid(1,1) / sqrt(r_grid(2,1)/r_grid(1,1)) 
-  r_lim(n_rad) = r_grid(n_rad,1) * sqrt(r_grid(n_rad,1)/r_grid(n_rad-1,1)) 
-  rmax = r_lim(n_rad) 
+  r_lim(0) = r_grid(1,1) / sqrt(r_grid(2,1)/r_grid(1,1))
+  r_lim(n_rad) = r_grid(n_rad,1) * sqrt(r_grid(n_rad,1)/r_grid(n_rad-1,1))
+  rmax = r_lim(n_rad)
   rmin = r_lim(0)
-  
+
 
   r_lim_2(:) = r_lim(:) * r_lim(:)
   r_lim_3(:) = r_lim_2(:) * r_lim(:)
@@ -1739,7 +1739,7 @@ subroutine densite_data_LAURE_SED()
      delta_z(i)=zmax(i)/real(nz)
      z_lim(i,nz+1)=zmax(i)
      do j=1,nz
-        z_lim(i,j) = (real(j,kind=db)-1.0_db)*delta_z(i) 
+        z_lim(i,j) = (real(j,kind=db)-1.0_db)*delta_z(i)
      enddo
   enddo
 
@@ -1765,7 +1765,7 @@ subroutine densite_data_LAURE_SED()
            densite_pouss(i,j,1,l) = Rho(i,j) * nbre_grains(l)
         enddo ! k
         !if (i==1) write(*,*) j, sum(densite_pouss(i,j,1,:))
-     enddo !j 
+     enddo !j
   enddo !i
 
   ! Normalisation : Calcul masse totale
@@ -1775,18 +1775,18 @@ subroutine densite_data_LAURE_SED()
      do i=1,n_rad
         bz2 : do j=j_start,nz
            if (j==0) cycle bz2
-       
+
            do k=1,n_az
               do l=dp%ind_debut,dp%ind_fin
-                 mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3) 
+                 mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
               enddo !l
            enddo !k
         enddo bz2
      enddo !i
      mass =  mass*g_to_Msun
-     
+
      facteur = M / mass * 0.01 ! masse de poussiere
-     
+
      masse = 0.0
      do i=1,n_rad
         bz3 : do j=j_start,nz
@@ -1799,13 +1799,13 @@ subroutine densite_data_LAURE_SED()
            enddo !k
         enddo bz3
      enddo ! i
-     
+
   enddo ! pop
-  
+
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
-  
+
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
-  
+
   cmd = "rm -rf T_Laure.fits.gz"
   call appel_syst(cmd, sys_status)
   call cfitsWrite("T_Laure.fits.gz",T,shape(T))
@@ -1820,7 +1820,7 @@ subroutine densite_data_LAURE_SED()
   phik_not_empty = 1
 
   if (lcylindrical) densite_pouss(:,nz+1,:,:) = 0. !densite_pouss(:,nz,:,:)
-  
+
   return
 
 end subroutine densite_data_LAURE_SED
@@ -1872,7 +1872,7 @@ subroutine densite_eqdiff()
   else
      cst=diskmass/((2*pi)**1.5*dz%sclht*(dz%rref**2)) * log(dz%rin/dz%rmax)
   endif
-  ! facteur multiplicatif pour passer en g/cm**3: 
+  ! facteur multiplicatif pour passer en g/cm**3:
   cst=cst * Msun_to_g / AU3_to_cm3
 
   ! facteur multiplicatif pour passer en part/cm**3: AVG_GRAIN_MASS
@@ -1891,25 +1891,25 @@ subroutine densite_eqdiff()
 
 
 !***************
-! Calcul proba cumulee en dessous d'une taille de grains 
+! Calcul proba cumulee en dessous d'une taille de grains
 ! et opacite pour chaque position
 !
 !* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
 !* certaine taille de grain. Ce tableau est utilise pour le tirage
 !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
 !* en compte le nombre de grains en meme temps que leur probabilite
-!* individuelle de diffuser (donnee par qsca*pi*a**2). 
+!* individuelle de diffuser (donnee par qsca*pi*a**2).
 
   do i=1, n_rad
 !     rcyl = i*1.0/real(resol)
      ! On calcule la densite au milieu de la cellule
-     rcyl = sqrt((r_lim(i) * r_lim(i-1))) 
+     rcyl = sqrt((r_lim(i) * r_lim(i-1)))
      fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
      coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
      c_sound = v_sound * 100. * (rcyl/rref_v)**(dz%exp_beta - 3./2.) ! 100 -> cm
-     omega =  sqrt(coeff_grav/(rcyl)**3) 
+     omega =  sqrt(coeff_grav/(rcyl)**3)
      D0 = alpha*c_sound*dz%sclht*(rcyl/dz%rref)**dz%exp_beta*1.5e13 !1.5e13 = schlt en cm
- 
+
      do j=1,nz
         z(j) = delta_z(i) * (real(j)-0.5)
         if (rcyl < dz%rin) then
@@ -1944,7 +1944,7 @@ subroutine densite_eqdiff()
            correct_strat(k,1) = 1.0
            vertical : do j=1,nz-1
               call odeint(y,z(j),z(j+1),eps,pas_z,0.,derivs,rkqs)
-              if (y(1) < 1.e-15) then  
+              if (y(1) < 1.e-15) then
                  ! On met tout ce qu'il y a au dessus a 0 et on ne reintegre pas
                  ! influe le tps de calcul et bug si precision trop grande
                  do jj = j,nz-1
@@ -1966,7 +1966,7 @@ subroutine densite_eqdiff()
            do j=1,nz
               correct_strat(k,j) = correct_strat(k,j)*correct
            enddo
-!           if ((rcyl > 10.0).and.(r_grain(k)>0.1)) then 
+!           if ((rcyl > 10.0).and.(r_grain(k)>0.1)) then
 !              do j=1,nz
 !                 write(*,*) z(j)/rcyl,  correct_strat(k,j)
 !              enddo
@@ -1988,14 +1988,14 @@ subroutine densite_eqdiff()
      !$omp do schedule(dynamic,10)
      do j=1,nz
         do  k=1,n_grains_tot
-           densite_pouss(i,j,1,k) = nbre_grains(k) * correct_strat(k,j) * rho(j) 
+           densite_pouss(i,j,1,k) = nbre_grains(k) * correct_strat(k,j) * rho(j)
         enddo !k
      enddo !j
      !$omp enddo
      !$omp end parallel
   enddo !i
 
-  
+
 !***************
 ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   do i=1,n_rad
@@ -2012,7 +2012,7 @@ end subroutine densite_eqdiff
 subroutine derivs(x,y,dydx)
 
   implicit none
-  
+
   REAL(SP), INTENT(IN) :: x
   REAL(SP), DIMENSION(:), INTENT(IN) :: y
   REAL(SP), DIMENSION(:), INTENT(OUT) :: dydx
@@ -2093,7 +2093,7 @@ subroutine densite_data_hd32297()
      read(1,*)
   enddo
 
-  ! On peut redefinir la grille 
+  ! On peut redefinir la grille
   call define_grid3
 
   do i=1,nr
@@ -2114,7 +2114,7 @@ subroutine densite_data_hd32297()
            kmin=k-1
            exit inter
         endif
-     enddo inter 
+     enddo inter
      density(i) = dens(kmin) + (dens(kmin+1)-dens(kmin)) * (rcyl-rayon(kmin))/(rayon(kmin+1)-rayon(kmin))
    !  write(*,*) i,  rayon(kmin), rcyl,  rayon(kmin+1), dens(kmin),  density(i), dens(kmin+1)
 
@@ -2130,7 +2130,7 @@ subroutine densite_data_hd32297()
 
 
 !***************
-! Remplissage a zero pour z > zmax 
+! Remplissage a zero pour z > zmax
   do i=1,n_rad
      do  k=1,n_grains_tot
         densite_pouss(i,nz+1,1,k) = densite_pouss(i,nz,1,k)
@@ -2156,7 +2156,7 @@ subroutine densite_data_hd32297()
   do k=1,n_grains_tot
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -2267,7 +2267,7 @@ subroutine densite_data_gap()
   ! Profil vertical
   do i=1,n_rad
      rcyl=0.5*(r_lim(i-1)+r_lim(i))
-     coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))   
+     coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
      do j=1,nz
      ! On calcule la densite au milieu de la cellule
         z(j) = (real(j)-0.5)*delta_z(i)
@@ -2279,7 +2279,7 @@ subroutine densite_data_gap()
 
 
 !***************
-! Remplissage a zero pour z > zmax 
+! Remplissage a zero pour z > zmax
   do i=1,n_rad
      do  k=1,n_grains_tot
         densite_pouss(i,nz+1,1,k) = densite_pouss(i,nz,1,k)
@@ -2305,7 +2305,7 @@ subroutine densite_data_gap()
   do k=1,n_grains_tot
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -2332,7 +2332,7 @@ subroutine init_opacity_wall()
 
   implicit none
 
-  ! Opacite du mur qui a pour largeur celle de la premiere cellule 
+  ! Opacite du mur qui a pour largeur celle de la premiere cellule
   kappa_wall = tau_wall / (r_lim(1) - r_lim(0))
 
   ! On ne vire pas les photons au-dessus de l'echelle de hauteur du disque
@@ -2374,7 +2374,7 @@ subroutine densite_gap_laure()
   call ftgiou(unit,status)
 
   write(*,*) "Reading density file : "//trim(density_file)
-  
+
   readwrite=0
   call ftopen(unit,density_file,readwrite,blocksize,status)
   if (status /= 0) then ! le fichier temperature n'existe pas
@@ -2385,7 +2385,7 @@ subroutine densite_gap_laure()
   group=1
   firstpix=1
   nullval=-999
-  
+
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
   if (nfound /= 3) then
@@ -2393,7 +2393,7 @@ subroutine densite_gap_laure()
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      stop
   endif
-  
+
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
@@ -2455,7 +2455,7 @@ subroutine densite_gap_laure()
   do k=1,n_grains_tot
      densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
   enddo
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -2468,7 +2468,7 @@ subroutine densite_gap_laure()
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  write(*,*) "Done"  
+  write(*,*) "Done"
 
   do i=1,n_rad
      do j=1,nz
@@ -2477,7 +2477,7 @@ subroutine densite_gap_laure()
         enddo !k
      enddo !j
   enddo ! i
- 
+
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
@@ -2503,7 +2503,7 @@ subroutine densite_gap_laure2()
   logical :: anynull
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a 
+  integer :: k, l, i, n_a
   real(kind=db) :: somme, mass
   real :: tmp
   character :: s
@@ -2518,9 +2518,9 @@ subroutine densite_gap_laure2()
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou(unit,status)
- 
+
   write(*,*) "Reading density file : "//trim(density_file)
-  
+
   readwrite=0
   call ftopen(unit,density_file,readwrite,blocksize,status)
   if (status /= 0) then ! le fichier temperature n'existe pas
@@ -2531,7 +2531,7 @@ subroutine densite_gap_laure2()
   group=1
   firstpix=1
   nullval=-999
-  
+
   !  determine the size of temperature file
   call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
   if (nfound /= 4) then
@@ -2539,7 +2539,7 @@ subroutine densite_gap_laure2()
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      stop
   endif
-  
+
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
@@ -2550,7 +2550,7 @@ subroutine densite_gap_laure2()
      !write(*,*) naxes(4), n_a
      stop
   endif
-  n_a = naxes(4) 
+  n_a = naxes(4)
   write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
   nbuffer=npixels
@@ -2577,7 +2577,7 @@ subroutine densite_gap_laure2()
   enddo
 
   ! On verifie que les grains sont tries
-  do i=1, n_a-1 
+  do i=1, n_a-1
      if (a_sph(i) > a_sph(i+1)) then
         write(*,*) "ERROR : grains must be ordered from small to large"
         write(*,*) "Exiting"
@@ -2653,7 +2653,7 @@ subroutine densite_gap_laure2()
      enddo !k
   enddo search_not_empty
 
- 
+
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
@@ -2669,12 +2669,12 @@ subroutine densite_gap_laure2()
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  write(*,*) "Done"  
+  write(*,*) "Done"
 
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
      do j=-nz,nz
-        if (j==0) cycle 
+        if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
               masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
@@ -2682,7 +2682,7 @@ subroutine densite_gap_laure2()
         enddo !k
      enddo !j
   enddo ! i
- 
+
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
@@ -2701,7 +2701,7 @@ subroutine densite_debris
   implicit none
 
   integer :: i, j, k, l
- 
+
   real, dimension(n_rad,nz,n_grains_tot) :: rho
 
   real(kind=db) :: mass
@@ -2717,7 +2717,7 @@ subroutine densite_debris
         do l=1, n_grains_tot
            read(1,*) rho(i,j,l)
         enddo
-     enddo     
+     enddo
   enddo
   close(unit=1)
   write(*,*) " ... done!"
@@ -2770,7 +2770,7 @@ subroutine densite_fits
   integer :: i, j, k, l, unit, status, readwrite, blocksize
   integer :: npixels, group, firstpix, nullval, nbuffer, alloc_status
   logical ::  anynull
- 
+
   real, allocatable, dimension(:,:,:,:) :: rho_tmp
 
   type(dust_pop_type), pointer :: dp
@@ -2815,7 +2815,7 @@ subroutine densite_fits
               densite_pouss(i,j,1,k+l*dp%n_grains)=rho_tmp(i,j,k,l+1)
            enddo
         enddo
-     enddo     
+     enddo
   enddo
 
   ! closing input file and freeing unit number and temporary memory
@@ -2856,7 +2856,7 @@ end subroutine densite_fits
 real(kind=db) function omega_tau(rho,H,a)
   ! Pour les calculs de Sebastien Fromang
   ! rho doit etre en g.cm-3
-  
+
   real(kind=db), intent(in) :: rho,H
   real, intent(in) :: a
 
@@ -2883,7 +2883,7 @@ subroutine densite_Seb_Charnoz()
   open(unit=1,file="/Volumes/home/cpinte/Seb_C/twhydra_simuturb_mcfost.dat",status="old")
   read(1,*)
   read(1,*) Nr_Seb, Nz_Seb, Na_Seb
-  
+
   if ((Nr_Seb /= n_rad).or.(Nz_Seb /= nz)) then
      write(*,*) "ERROR: Spatial grid does not match!"
      write(*,*) "Exiting"
@@ -2908,14 +2908,14 @@ subroutine densite_Seb_Charnoz()
         Dr_mcfost = r_lim(i) - r_lim(i-1)
         Zmin_mcfost = z_lim(i,j)
         Dz_mcfost = z_lim(i,j+1) -  z_lim(i,j)
-        
+
         read(1,*)  ii, jj, Rmin, Dr, Zmin, Dz, density_Seb(:)
 
         if (is_diff(Rmin,Rmin_mcfost).and.(j==1)) write(*,*) "Pb R cell", i, Rmin, Rmin_mcfost
         if (is_diff(Dr,Dr_mcfost).and.(j==1)) write(*,*) "Pb Dr cell", i, Dr, Dr_mcfost
         if (is_diff(Zmin,Zmin_mcfost)) write(*,*) "Pb Z cell", i,j, Zmin, Zmin_mcfost
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
-           
+
 
         densite_pouss(i,j,1,:) = density_Seb(:) / (volume(i)*AU3_to_cm3) ! comversion en densite volumique
         Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
@@ -2939,12 +2939,12 @@ subroutine densite_Seb_Charnoz()
 
   ! Re-population du tableau de grains
   ! les methodes de chauffages etc, ne changent pas
-  
+
   do k=1, n_grains_tot
      N_grains(k) = sum(densite_pouss(:,:,1,k))
   enddo
   nbre_grains(:) = N_grains(:)/sum(N_grains(:))
-  
+
 
   do i=1,n_rad
      bz : do j=j_start,nz
@@ -2958,7 +2958,7 @@ subroutine densite_Seb_Charnoz()
   enddo ! i
 
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3 * 1600./3500 ! TMP
-   
+
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
 
   write(*,*) "Done"
@@ -2991,7 +2991,7 @@ subroutine densite_Seb_Charnoz2()
 
   write(*,*) "Density structure from Seb. Charnoz" ;
   write(*,*) "Reading density file : "//trim(density_file)
-  
+
   readwrite=0
   call ftopen(unit,density_file,readwrite,blocksize,status)
   if (status /= 0) then ! le fichier de densite n'existe pas
@@ -3002,7 +3002,7 @@ subroutine densite_Seb_Charnoz2()
   group=1
   firstpix=1
   nullval=-999
-  
+
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
   if (nfound /= 2) then
@@ -3010,8 +3010,8 @@ subroutine densite_Seb_Charnoz2()
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      stop
   endif
-  
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then 
+
+  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
@@ -3049,16 +3049,16 @@ subroutine densite_Seb_Charnoz2()
   enddo
 
   ! kg/m^3  ---> part/cm^3
-  densite_pouss = densite_pouss / ( (cm_to_m)**3  * dust_pop(1)%avg_grain_mass * 1e3)  
+  densite_pouss = densite_pouss / ( (cm_to_m)**3  * dust_pop(1)%avg_grain_mass * 1e3)
 
-  ! BUG correction : il manque un facteur 
+  ! BUG correction : il manque un facteur
   densite_pouss = densite_pouss * 1e-6
 
- 
+
   do l=1,n_grains_tot
      densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l)*nbre_grains(l)
   enddo
-  
+
 !
 !  ! Normalisation : on a 1 grain de chaque taille dans le disque
 !  do l=1,n_grains_tot
@@ -3091,7 +3091,7 @@ subroutine densite_Seb_Charnoz2()
         enddo !j
      enddo !k
   enddo search_not_empty
- 
+
 !  ! Normalisation : Calcul masse totale
 !  mass = 0.0
 !  do i=1,n_rad
@@ -3104,7 +3104,7 @@ subroutine densite_Seb_Charnoz2()
 !  mass =  mass/Msun_to_g
 !  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  write(*,*) "Done"  
+  write(*,*) "Done"
 
   do i=1,n_rad
      do j=1,nz
@@ -3113,7 +3113,7 @@ subroutine densite_Seb_Charnoz2()
         enddo !l
      enddo !j
   enddo ! i
- 
+
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'

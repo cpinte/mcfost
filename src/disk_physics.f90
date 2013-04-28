@@ -8,11 +8,11 @@ module disk_physics
   use constantes
 
 contains
-  
+
 
 subroutine compute_othin_sublimation_radius()
   ! Dans le cas optiquement mince, ne dépend que de la température de l'étoile
-  
+
   implicit none
 
   real(kind=db) :: E_dust, E_etoile
@@ -21,7 +21,7 @@ subroutine compute_othin_sublimation_radius()
   real(kind=db) :: sublimation_radius
 
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
-     
+
 
   !  if (lstrat) then
   !     write(*,*) "Sublimation radius calculation not implemented"
@@ -42,10 +42,10 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_dust = E_dust + 4.0 * sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0)) *delta_wl 
+        E_dust = E_dust + 4.0 * sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0)) *delta_wl
      endif
   enddo
-  E_dust = E_dust * 2.0*pi*hp*c_light**2  
+  E_dust = E_dust * 2.0*pi*hp*c_light**2
 
   ! emission étoile : BB seulement pour le moment
   E_etoile = 0.0
@@ -57,9 +57,9 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-!        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl 
+!        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl
         E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
-        
+
 
        ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)
      endif
@@ -80,7 +80,7 @@ subroutine compute_othin_sublimation_radius()
 !---  tab_spectre(i,l) = Cst0/ ( ((exp(cst_w)) -1.)) * (wl**5))  ;
 !---  terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda)))
 !4*pi*(etoile(i)%r**2)
-!---  terme = terme / N * (surface / Cst0)   
+!---  terme = terme / N * (surface / Cst0)
 !---
 !---  spectre = spectre + terme * delta_wl
 
@@ -92,7 +92,7 @@ subroutine compute_othin_sublimation_radius()
 !---
   ! ---------------
 
-  
+
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
 
@@ -109,7 +109,7 @@ subroutine compute_othin_sublimation_radius()
   do i = 1, n_regions
      regions(i)%Rmin = max(regions(i)%Rmin,sublimation_radius)
   enddo !i
-  
+
   return
 
 end subroutine compute_othin_sublimation_radius
@@ -125,27 +125,27 @@ subroutine sublimate_dust()
   real :: mass
 
   write(*,*) "Sublimating dust"
-    
+
   do i=1,n_rad
      do j=1,nz
         do pk=1,n_az
-           
+
            ! Cas LTE
            do k=1,n_grains_tot
               ipop = grain(k)%pop
-  
+
               if (.not.dust_pop(ipop)%is_PAH) then
                  if (Temperature(i,j,pk) > dust_pop(ipop)%T_sub) then
                     densite_pouss(i,j,pk,k) = 0.0
                  endif
               endif
            enddo
-           
-           
+
+
         enddo !pk
      enddo !j
   enddo !i
-  
+
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
@@ -157,20 +157,20 @@ subroutine sublimate_dust()
   mass =  mass/Msun_to_g
 
   write(*,*) 'New total dust mass in model :', mass,' Msun'
-    
+
 end subroutine sublimate_dust
 
 
 !**********************************************************
 
 subroutine equilibre_hydrostatique()
-  ! Calcul l'equilibre hydrostatique pour chaque rayon 
+  ! Calcul l'equilibre hydrostatique pour chaque rayon
   ! Equation 2.4.3 de la these (page 38, 52 du pdf)
   ! Valable pour disque de gaz parfait, non-autogravitant, geometriquement mince
   !
   ! C. Pinte
   ! 25/09/07
- 
+
   implicit none
 
   real, dimension(nz) :: rho, ln_rho

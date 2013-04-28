@@ -11,11 +11,11 @@ module ProDiMo2mcfost
     real :: deltaV(MC_NSP,NXX,NZZ)          ! turbulent+thermal line widths
     real :: pops(MC_NSP,MC_LEVMAX,NXX,NZZ)  ! level populations
   END TYPE LPOP
-  TYPE(LPOP) :: lpops 
+  TYPE(LPOP) :: lpops
 end module
 
 !-----------------------------------------------------------------------
-  SUBROUTINE INIT_MCFOST 
+  SUBROUTINE INIT_MCFOST
 !-----------------------------------------------------------------------
     use ProDiMo2mcfost,ONLY: MC_NSP,lpops
     use Nature,ONLY: amu
@@ -29,7 +29,7 @@ end module
       lpops%isp(i) = SPindex(lpops%name(i))
     enddo
     lpops%name(4) = "oH2O"
-    lpops%name(5) = "pH2O"  
+    lpops%name(5) = "pH2O"
     lpops%amass(1) = 12.0*amu
     lpops%amass(2) = 16.0*amu
     lpops%amass(3) = 28.0*amu
@@ -41,9 +41,9 @@ end module
     lpops%lmax(4) = 10               ! oH2O
     lpops%lmax(5) = 9                ! pH2O
   end SUBROUTINE INIT_MCFOST
-  
+
 !-----------------------------------------------------------------------
-  REAL FUNCTION ProDiMoFIT(x,z,elog,extra) 
+  REAL FUNCTION ProDiMoFIT(x,z,elog,extra)
 !-----------------------------------------------------------------------
     use GRID,ONLY: Nx=>NXX,Nz=>NZZ,xx,zz
     use ProDiMo2mcfost,ONLY: var=>varP
@@ -54,7 +54,7 @@ end module
     real :: zpos,f11,f12,f21,f22,x1,x2,z1,z2
     real,save :: xold=-1.0,zold=-1.0,xfac,zfac
     integer,save :: ix=1,iz=1
-    
+
     if ((x.ne.xold).or.(z.ne.zold)) then
       xold = x
       zold = z
@@ -99,21 +99,21 @@ end module
       if(.not.extra) then
         xfac = MAX(0.0,MIN(1.0,xfac))
         zfac = MAX(0.0,MIN(1.0,zfac))
-      endif  
+      endif
 
-    endif  
-      
+    endif
+
     f11 = var(ix,iz)
     f12 = var(ix,iz+1)
     f21 = var(ix+1,iz)
     f22 = var(ix+1,iz+1)
     if ((.not.elog).or.(f11.le.0.0).or.(f12.le.0.0) &
                  & .or.(f21.le.0.0).or.(f22.le.0.0)) then
-      ! --- linear interpolation --- 
+      ! --- linear interpolation ---
       ProDiMoFIT = f11*(1.0-xfac)*(1.0-zfac) + f12*(1.0-xfac)*zfac &
       &          + f21*   xfac   *(1.0-zfac) + f22*   xfac   *zfac
-    else 
-      ! --- log interpolation --- 
+    else
+      ! --- log interpolation ---
       f11 = LOG(f11)
       f12 = LOG(f12)
       f21 = LOG(f21)
@@ -158,47 +158,47 @@ end module
     if (lpops%name(i).eq."oH2O") then
       do ix=1,NXX
         do iz=1,NZZ
-          call H2O_ORTHO_PARA(Tgas(ix,iz),fortho,fpara) 
+          call H2O_ORTHO_PARA(Tgas(ix,iz),fortho,fpara)
           varP(ix,iz) = fortho*varP(ix,iz)
         enddo
-      enddo  
+      enddo
     else if (lpops%name(i).eq."pH2O") then
       do ix=1,NXX
         do iz=1,NZZ
-          call H2O_ORTHO_PARA(Tgas(ix,iz),fortho,fpara) 
+          call H2O_ORTHO_PARA(Tgas(ix,iz),fortho,fpara)
           varP(ix,iz) = fpara*varP(ix,iz)
         enddo
-      enddo  
-    endif   
+      enddo
+    endif
     do ix=1,n_rad
       do iz=1,nz
         x = mcfost%r_grid(ix,iz)*AU
         z = mcfost%z_grid(ix,iz)*AU
-        nsp(i,ix,iz) = ProDiMoFIT(x,z,.true.,.false.) 
+        nsp(i,ix,iz) = ProDiMoFIT(x,z,.true.,.false.)
       enddo
-    enddo  
+    enddo
     rr(0) = Rin
     rr(n_rad) = Rout
     do ix=1,n_rad-1
-      rr(ix) = sqrt(mcfost%r_grid(ix,1)*mcfost%r_grid(ix+1,1))*AU  
+      rr(ix) = sqrt(mcfost%r_grid(ix,1)*mcfost%r_grid(ix+1,1))*AU
     enddo
     Ntot(i) = 0.0
     do ix=1,n_rad
-      dz = (mcfost%z_grid(ix,2)-mcfost%z_grid(ix,1))*AU 
+      dz = (mcfost%z_grid(ix,2)-mcfost%z_grid(ix,1))*AU
       do iz=1,nz
-        dV = pi*(rr(ix)**2-rr(ix-1)**2)*dz 
-        Ntot(i) = Ntot(i) + nsp(i,ix,iz)*dV 
+        dV = pi*(rr(ix)**2-rr(ix-1)**2)*dz
+        Ntot(i) = Ntot(i) + nsp(i,ix,iz)*dV
       enddo
-    enddo  
+    enddo
     Ntot(i) = 2.0*Ntot(i)   ! add lower side of the disk
     varP(:,:) = lpops%deltaV(i,:,:)      ! line broadening parameter [km/s]
     do ix=1,n_rad
       do iz=1,nz
         x = mcfost%r_grid(ix,iz)*AU
         z = mcfost%z_grid(ix,iz)*AU
-        delV(i,ix,iz) = ProDiMoFIT(x,z,.false.,.false.) 
+        delV(i,ix,iz) = ProDiMoFIT(x,z,.false.,.false.)
       enddo
-    enddo  
+    enddo
 
     do l=1,lpops%lmax(i)
       varP(:,:) = lpops%pops(i,l,:,:)    ! relative population numbers
@@ -206,16 +206,16 @@ end module
         do iz=1,nz
           x = mcfost%r_grid(ix,iz)*AU
           z = mcfost%z_grid(ix,iz)*AU
-          pops(i,l,ix,iz) = ProDiMoFIT(x,z,.false.,.false.) 
-        enddo  
+          pops(i,l,ix,iz) = ProDiMoFIT(x,z,.false.,.false.)
+        enddo
       enddo
-    enddo  
+    enddo
 
   enddo  ! end of loop over output species
 
 
   ! New fits interface
-  ! to be checked as I can't compile it and it is easy to make small 
+  ! to be checked as I can't compile it and it is easy to make small
   ! mistakes with cfitsio
 
    filename = "forMCFOST.fits.gz"
@@ -313,7 +313,7 @@ end module
 
   ! Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,pops,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -323,9 +323,9 @@ end module
      call print_error(status)
      stop
   end if
-  
+
 !$--  open(unit=12,file='forMCFOST.dat',status='replace')
-!$--  write(12,*) n_rad,nz 
+!$--  write(12,*) n_rad,nz
 !$--  write(12,'(2a4,99(a16))') "ix","iz","r/AU","z/AU", &
 !$--          & "nCII[cm^-3]","dvCII[km/s]","CIIpop_1","CIIpop_2", &
 !$--          & "nOI[cm^-3]","dvOI[km/s]","OIpop_1","OIpop_2","OIpop_3", &
@@ -354,7 +354,7 @@ end module
 !$--            & lpops%name(i),Ntot(i),Ntot(i)*lpops%amass(i)/Msun
 !$--    write(12,'(a10,"Ntotal=",1pE12.4,"   Mtot/Msun=",1pE12.4)') &
 !$--            & lpops%name(i),Ntot(i),Ntot(i)*lpops%amass(i)/Msun
-!$--  enddo  
+!$--  enddo
 !$--  close(12)
 
   end subroutine WRITE_MCFOST

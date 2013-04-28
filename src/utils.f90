@@ -16,13 +16,13 @@ module utils
 contains
 
 function span(xmin,xmax,n)
-  
+
   implicit none
 
   real, intent(in) :: xmin, xmax
   integer, intent(in) :: n
   real, dimension(n) :: span
-  
+
   integer :: i
   real :: delta_x
 
@@ -31,9 +31,9 @@ function span(xmin,xmax,n)
   do i=2,n
      span(i) = span(i-1) + delta_x
   enddo
-    
+
   return
-    
+
 end function span
 
 !************************************************************
@@ -84,7 +84,7 @@ function gauss_random(id)
      gauss_random_saved(id)= rand2 * rsq
      lgauss_random_saved(id)=.true.
   endif
-	
+
   return
 
 end function gauss_random
@@ -94,7 +94,7 @@ end function gauss_random
 subroutine polint(xa,ya,n,x,y,dy)
 ! Interpolation polynomiale
 ! xa, ya : tab des abscisses et ordonnees
-! n : degre du polynome + 1 = taille xa, ya 
+! n : degre du polynome + 1 = taille xa, ya
 ! x : abscisse du point considere
 ! y, dy : valeur et erreur
   implicit none
@@ -156,18 +156,18 @@ real(kind=sl) function interp_sp(y, x, xp)
 ! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
 ! C. Pinte
 ! 26/01/07
-    
+
   implicit none
-  
+
   real(kind=sl), dimension(:), intent(in) :: x, y
   real(kind=sl) :: xp
 
   integer :: n, np, j, ny
-    
+
   real :: frac
 
   n=size(x) !; ny=size(y)
-    
+
   !if (n /= ny) then
   !   write(*,*) "Error in interp : y and x must have same dim"
   !endif
@@ -175,7 +175,7 @@ real(kind=sl) function interp_sp(y, x, xp)
 
   ! PAS D'EXTRAPOLATION
   if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_sp = minval(y) 
+     interp_sp = minval(y)
      return
   endif
 
@@ -193,7 +193,7 @@ real(kind=sl) function interp_sp(y, x, xp)
      frac = (xp-x(j))/(x(j-1)-x(j))
      interp_sp = y(j) * (1.-frac)   + y(j-1) * frac
   endif
-  
+
   return
 
 end function interp_sp
@@ -207,18 +207,18 @@ real(kind=db) function interp_dp(y, x, xp)
 ! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
 ! C. Pinte
 ! 26/01/07
-    
+
   implicit none
-  
+
   real(kind=db), dimension(:), intent(in) :: x, y
   real(kind=db) :: xp
 
   integer :: n, np, j, ny
-    
+
   real :: frac
 
   n=size(x) !; ny=size(y)
-    
+
   !if (n /= ny) then
   !   write(*,*) "Error in interp : y and x must have same dim"
   !endif
@@ -226,7 +226,7 @@ real(kind=db) function interp_dp(y, x, xp)
 
   ! PAS D'EXTRAPOLATION
   if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_dp = minval(y) 
+     interp_dp = minval(y)
      return
   endif
 
@@ -244,7 +244,7 @@ real(kind=db) function interp_dp(y, x, xp)
      frac = (xp-x(j))/(x(j-1)-x(j))
      interp_dp = y(j) * (1.-frac)   + y(j-1) * frac
   endif
-  
+
   return
 
 end function interp_dp
@@ -259,10 +259,10 @@ subroutine GaussSlv(a, b, n)
   ! 22/09/07
 
   implicit none
-  
-  integer, intent(in) :: n 
+
+  integer, intent(in) :: n
   real(kind=db), dimension(n,n), intent(inout) :: a
-  real(kind=db), dimension(n), intent(inout) :: b    
+  real(kind=db), dimension(n), intent(inout) :: b
 
   real(kind=db) :: factor
   integer :: i, j, k, l
@@ -275,12 +275,12 @@ subroutine GaussSlv(a, b, n)
   ! Triangularisation de la matrice
   do i=1,n-1 ! Boucle sur colonnes
      do k=i+1,n ! Boucle sur lignes
-        factor = a(k,i)/a(i,i)   
+        factor = a(k,i)/a(i,i)
         ! Operation sur la ligne
         do j=i+1,n
            a(k,j) = a(k,j) - a(i,j) * factor
         end do
-        b(k) = b(k) - b(i) * factor     
+        b(k) = b(k) - b(i) * factor
      end do
   end do
   b(n) = b(n) / a(n,n)
@@ -317,7 +317,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
 
   real(kind=db) :: cost, sint, sing, prod, x, theta
 
-  if (w1 > 0.999999999_db) then 
+  if (w1 > 0.999999999_db) then
      cost = 1.0_db
      sint = 0.0_db
      sing = 0.0_db
@@ -340,7 +340,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
   endif
 
   prod=cost*xinit + sint*yinit
-       
+
   xfin = sing * prod + w1*zinit
   yfin = cost*yinit - sint*xinit
   zfin = sing*zinit - w1 * prod
@@ -371,7 +371,7 @@ function calc_mu0(mu,a)
   q = (a1**2 - 3.0_db*a2)/9.0_db
   r = (2.0_db*a1**3 - 9.0_db*a1*a2 + 27.0_db*a3)/54.0_db
   q3 = q**3
-  
+
   if ((q3 - r**2) >= 0.0_db) then
      qh = sqrt(q)
      denom = sqrt(q3)
@@ -384,7 +384,7 @@ function calc_mu0(mu,a)
         stop
      else if ((mu01 > 0.0_db).and.(mu03 > 0.0_db)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu03",mu01,mu03
-        stop 
+        stop
      elseif ((mu02 > 0.0_db).and.(mu03 > 0.0_db)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu02,mu03",mu02,mu03
         stop
@@ -393,13 +393,13 @@ function calc_mu0(mu,a)
      if (mu01 > 0.0_db) calc_mu0 = mu01
      if (mu02 > 0.0_db) calc_mu0 = mu02
      if (mu03 > 0.0_db) calc_mu0 = mu03
- 
+
   else
      factor = sqrt(r**2 - q3) + abs(r)
      factor3 = factor**un_tiers
-     calc_mu0 = -1.0_db*sign(1.0_db,r)*(factor3 + q/factor3) - a1/3.0_db   
+     calc_mu0 = -1.0_db*sign(1.0_db,r)*(factor3 + q/factor3) - a1/3.0_db
   endif
-  
+
   return
 
 end function calc_mu0
@@ -407,7 +407,7 @@ end function calc_mu0
 !***********************************************************
 
 function Bnu(nu,T)
-! Loi de Planck 
+! Loi de Planck
 ! Bnu en SI : W.m-2.Hz-1.sr-1
 ! nu en Hz
 ! C. Pinte
@@ -422,13 +422,13 @@ function Bnu(nu,T)
   real(kind=db) :: hnu_kT
 
   hnu_kT = (hp * nu) / (kb * T)
- 
+
   if (hnu_kT > 100._db) then
      Bnu = 0.0_db
   else
      Bnu = 2.0_db*hp/c_light**2 * nu**3 / (exp(hnu_kT)-1.0_db)
   endif
-     
+
   return
 
 end function Bnu
@@ -436,7 +436,7 @@ end function Bnu
 !***********************************************************
 
 function Blambda(wl,T)
-! Loi de Planck 
+! Loi de Planck
 ! Blambda en SI : W.m-2.s-1.sr-1
 ! wl en m
 ! C. Pinte
@@ -451,35 +451,35 @@ function Blambda(wl,T)
   real(kind=db) :: hnu_kT
 
   hnu_kT = (hp * c_light)/ (kb * T * wl)
- 
+
   if (hnu_kT > 100.) then
      Blambda = 0.0
   else
      Blambda = 2.0*hp*c_light**2 / wl**5 / (exp(hnu_kT)-1.0)
   endif
-     
+
   return
 
 end function Blambda
 
 !******************************************************
 
-function get_NH(NC) 
+function get_NH(NC)
   ! returns the number of Hydrogen atoms given the number of Carbon
   ! atoms (DL01 eq. 8)
   ! C. Pinte
-  ! 30/01/07  
+  ! 30/01/07
   implicit none
 
   integer, intent(in) :: NC
   integer :: get_NH
 
-  if (NC <= 25) then 
+  if (NC <= 25) then
      get_NH = floor(0.5*NC+0.5)
-  else if (NC <= 100) then 
+  else if (NC <= 100) then
      get_NH = floor(2.5*sqrt(real(NC))+0.5)
-  else 
-     get_NH = floor(0.25*NC+0.5) 
+  else
+     get_NH = floor(0.25*NC+0.5)
   endif
 
   return
@@ -497,15 +497,15 @@ subroutine mcfost_update(lforce_update)
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
-  
+
   write(*,*) "Version ", mcfost_release
-  
+
   ! Last version
   write(*,*) "Checking last version ..."
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
-  call appel_syst(cmd, syst_status)           
-  if (syst_status/=0) then 
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Current version file not found."
      write(*,*) "Exiting"
@@ -515,7 +515,7 @@ subroutine mcfost_update(lforce_update)
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
-  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
+  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
      write(*,*) "Exiting"
@@ -542,7 +542,7 @@ subroutine mcfost_update(lforce_update)
      call get_environment_variable('MACHTYPE',machtype)
      system = trim(ostype)//" "//trim(machtype)
 
-     
+
      ! get the correct url corresponding to the system
      if (ostype(1:5)=="linux") then
         if (machtype(1:4)=="i386") then
@@ -559,7 +559,7 @@ subroutine mcfost_update(lforce_update)
         endif
          system = trim(ostype)//" "//trim(machtype)
      else if (ostype(1:6)=="darwin") then
-        system = "MacOS X x86_64" 
+        system = "MacOS X x86_64"
         url = trim(webpage)//"macos_intel_64bits/mcfost"
         url_sha1 = trim(webpage)//"macos_intel_64bits/mcfost.sha1"
      else
@@ -574,32 +574,32 @@ subroutine mcfost_update(lforce_update)
         write(*,*) "Known values:"
         write(*,*) " - OSTYPE: linux or darwin"
         write(*,*) " - MACHTYPE: i386 or x86_64"
-        
+
         write(*,*) "Exiting."
         stop
      endif
 
      write(*,*) "Your system ", trim(system)
-     
-     
+
+
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
      !cmd = "wget -q "//trim(url)//" -O mcfost_update"
      cmd = "curl "//trim(url)//" -o mcfost_update -s"
-     call appel_syst(cmd, syst_status)  
+     call appel_syst(cmd, syst_status)
      cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s"
-     call appel_syst(cmd, syst_status)  
-     if (syst_status==0) then 
+     call appel_syst(cmd, syst_status)
+     if (syst_status==0) then
         write(*,*) "Done"
      else
         cmd = "rm -rf mcfost_update*"
-        call appel_syst(cmd, syst_status) 
+        call appel_syst(cmd, syst_status)
         write(*,*) "ERROR during download. MCFOST has not been updated."
         write(*,*) "Exiting"
         stop
      endif
-        
-     
+
+
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
      if (ostype(1:5)=="linux") then
@@ -608,7 +608,7 @@ subroutine mcfost_update(lforce_update)
         cmd = "openssl sha1 mcfost_update | awk '{print $2}' > mcfost_update.sha1"
      endif
      call appel_syst(cmd, syst_status)
-     
+
      open(unit=1, file="mcfost.sha1", status='old',iostat=ios)
      read(1,*,iostat=ios) mcfost_sha1
      close(unit=1,status="delete",iostat=ios)
@@ -616,8 +616,8 @@ subroutine mcfost_update(lforce_update)
      open(unit=1, file="mcfost_update.sha1", status='old',iostat=ios)
      read(1,*,iostat=ios) mcfost_update_sha1
      close(unit=1,status="delete",iostat=ios)
-     
-     if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then 
+
+     if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then
         cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
         write(*,*) " "
         write(*,*) "ERROR: binary sha1 is incorrect. MCFOST has not been updated."
@@ -629,14 +629,14 @@ subroutine mcfost_update(lforce_update)
         write(*,*) "Done"
      endif
 
-     ! make binary executable 
+     ! make binary executable
      !cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
      write(*,'(a20, $)') "Updating binary ..."
      cmd = "chmod a+x mcfost_update ; mv mcfost_update mcfost"
-     call appel_syst(cmd, syst_status)    
+     call appel_syst(cmd, syst_status)
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
-     !write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)     
+     !write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)
   endif ! lupdate
 
   return
@@ -649,12 +649,12 @@ subroutine mcfost_history()
 
   character(len=512) :: cmd
   integer ::  syst_status
-  
+
   ! Last version
   write(*,*) "Getting MCFOST history ..."
   cmd = "curl "//trim(webpage)//"history.txt"
-  call appel_syst(cmd, syst_status)           
-  if (syst_status/=0) then 
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST history"
      write(*,*) "Exiting"
      stop
@@ -673,16 +673,16 @@ subroutine mcfost_get_ref_para()
   character(len=12) :: ref_file
   character(len=18) :: ref_file_multi
   integer ::  syst_status
-  
+
   ref_file = "ref"//mcfost_release(1:4)//".para"
   ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
-  
+
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi
   cmd = "curl "//trim(webpage)//ref_file//" -O -s"
-  call appel_syst(cmd, syst_status)           
+  call appel_syst(cmd, syst_status)
   cmd = "curl "//trim(webpage)//ref_file_multi//" -O -s"
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then 
+  if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST reference file"
      write(*,*) "Exiting"
      stop
@@ -741,14 +741,14 @@ subroutine mcfost_v()
   write(*,fmt='(" with G95 compiler version ",i1,".",i2)') __G95__, __G95_MINOR__
 #endif
   write(*,*) " "
-  
+
 
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
 
-  call appel_syst(cmd, syst_status)           
-  if (syst_status/=0) then 
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then
      write(*,*) "ERROR: Cannot get MCFOST last version number (Error 1)"
      write(*,*) "Exiting"
      stop
@@ -757,7 +757,7 @@ subroutine mcfost_v()
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
-  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then 
+  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number (Error 2)"
      write(*,*) "Exiting"
      stop
@@ -768,13 +768,13 @@ subroutine mcfost_v()
      write(*,*) "MCFOST is up-to-date"
   else ! Print the history of new version
      write(*,*) "A new version of MCFOST is available: ", trim(last_version)
-     
+
      ! Last version
      write(*,*)
      write(*,*) "Getting MCFOST history ..."
      cmd = "curl "//trim(webpage)//"history.txt -O -s"
-     call appel_syst(cmd, syst_status)           
-     if (syst_status/=0) then 
+     call appel_syst(cmd, syst_status)
+     if (syst_status/=0) then
         write(*,*) "Cannot get MCFOST history"
         write(*,*) "Exiting"
         stop
@@ -785,8 +785,8 @@ subroutine mcfost_v()
      call appel_syst(cmd, syst_status)
      open(unit=1, file="line_number.txt", status='old',iostat=ios)
      read(1,*,iostat=ios) line_number
-     close(unit=1,status="delete",iostat=ios) 
-     
+     close(unit=1,status="delete",iostat=ios)
+
      ! Printing history
      if (ios==0) then
         if (line_number > 1) then
@@ -830,7 +830,7 @@ subroutine update_utils(lforce_update)
 
   cmd = "curl "//trim(utils_webpage)//"Version -O -s"
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then 
+  if (syst_status/=0) then
      write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 1)"
      write(*,*) "Exiting"
      stop
@@ -839,7 +839,7 @@ subroutine update_utils(lforce_update)
   read(1,*,iostat=ios) s_last_version
   close(unit=1,status="delete",iostat=ios)
 
-  if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then 
+  if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 2)"
      write(*,*) "Exiting"
      stop
@@ -884,7 +884,7 @@ subroutine get_utils()
 
   write(*,*) "Downloading MCFOST UTILS (this may take a while) ..."
   cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzf - -C"//trim(mcfost_utils)
-  call appel_syst(cmd, syst_status)  
+  call appel_syst(cmd, syst_status)
   if (syst_status == 0) then
      write(*,*) "Done"
   else
@@ -921,20 +921,20 @@ end function get_mcfost_utils_version
 !***********************************************************
 
 function indgen(n)
-    
+
   integer, intent(in) :: n
   integer, dimension(n) :: indgen
-   
+
   integer :: i
- 
+
   do i=1,n
      indgen(i) = i
   enddo
-     
+
   return
-     
+
 end function indgen
- 
+
 !************************************************************
 
 function is_digit(ch) result(res)
@@ -951,7 +951,7 @@ function is_digit(ch) result(res)
   case default
      res=.false.
   end select
-  
+
   return
 
 end function is_digit
@@ -960,15 +960,15 @@ end function is_digit
 
 function bubble_sort(data_in)
   ! Implementation of Bubble sort
-  ! Warning : this is N^2, only for small arrays 
+  ! Warning : this is N^2, only for small arrays
   ! Same behaviour as yorick to allow ordering of mutiple arrays
   ! Return the order of data, the sorted array would be data_in(order)
   !
   ! C. Pinte
   ! 02/05/11
 
-  real(kind=db), dimension(:), intent(in) :: data_in   
-  real(kind=db), dimension(:), allocatable :: data 
+  real(kind=db), dimension(:), intent(in) :: data_in
+  real(kind=db), dimension(:), allocatable :: data
   integer, dimension(:), allocatable :: bubble_sort ! indices
 
   integer :: i, pass, n, tmp_i
@@ -976,17 +976,17 @@ function bubble_sort(data_in)
   real ::  temp
 
   n = size(data_in)
-  allocate(bubble_sort(n),data(n)) 
+  allocate(bubble_sort(n),data(n))
   data = data_in
 
   bubble_sort = indgen(n) ;
 
   pass = 1
   sorted = .false.
-  
-  do while(.not.sorted) 
+
+  do while(.not.sorted)
      sorted = .true.
-     
+
      do i = 1,n-pass
         if(data(i) > data(i+1)) then
            temp = data(i)
@@ -995,10 +995,10 @@ function bubble_sort(data_in)
            sorted = .false.
 
            ! same operation on indices
-           tmp_i = bubble_sort(i) 
+           tmp_i = bubble_sort(i)
            bubble_sort(i) = bubble_sort(i+1)
            bubble_sort(i+1) = tmp_i
-           
+
         endif
      end do ! i
      pass = pass +1
@@ -1015,13 +1015,13 @@ function is_diff(a,b)
 
   logical is_diff
   real(kind=db), intent(in) :: a,b
-  
+
   if (abs(a-b) > 0.5e-5 * abs(a+b)) then
      is_diff = .true.
   else
      is_diff = .false.
   endif
-  
+
 end function is_diff
 
 !************************************************************
@@ -1048,37 +1048,37 @@ subroutine lgnd(lmax,x,p)
   do l = 1, lmax-1
      P(l+1) = ((2.0*l+1)*x*P(l)-l*P(l-1))/(l+1)
   enddo
-     
+
   return
 
 end subroutine lgnd
 
 !************************************************************
 
-logical function is_dir(filename) 
- 
+logical function is_dir(filename)
+
   character(len=*), intent(in) :: filename
-   
+
 #if defined (__INTEL_COMPILER)
-  inquire(directory=trim(filename),exist=is_dir) 
+  inquire(directory=trim(filename),exist=is_dir)
 #else
-  inquire(file=trim(filename),exist=is_dir) 
+  inquire(file=trim(filename),exist=is_dir)
 #endif
 
   return
-  
+
 end function is_dir
 
 !************************************************************
 
-logical function is_file(filename) 
- 
+logical function is_file(filename)
+
   character(len=*), intent(in) :: filename
-   
-  inquire(file=trim(filename),exist=is_file) 
+
+  inquire(file=trim(filename),exist=is_file)
 
   return
-  
+
 end function is_file
 
 !************************************************************
@@ -1142,7 +1142,7 @@ subroutine gauleg(x1,x2,x,w,n)
         p1 = 1.0d0
         p2 = 0.0d0
 
-        !Loop up the recurrence relation to get the Legendre polynomial evaluated at z 
+        !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
            dj=dble(j)
            p3 = p2

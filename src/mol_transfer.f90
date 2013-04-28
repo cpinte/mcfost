@@ -27,17 +27,17 @@ module mol_transfer
 subroutine mol_line_transfer()
 
   implicit none
-  
+
   real(kind=db) :: u0, v0, w0
   integer :: iTrans, imol, ibin
 
   if (lProDiMo2mcfost) ldust_mol = .true.
-    
+
   ! Liberation memoire
   call dealloc_em_th()
 
   call init_directions_ray_tracing() ! TODO : on peut le faire apres
- 
+
   do imol=1,n_molecules
      if (lbenchmark_vanzadelhoff1) then
         call readmolecule_benchmark1()
@@ -54,7 +54,7 @@ subroutine mol_line_transfer()
      do iTrans=1,nTrans
         indice_Trans(iTrans) = iTrans
      enddo
-  
+
      ! Champ externe
      call init_tab_Cmb_mol()
 
@@ -83,9 +83,9 @@ subroutine mol_line_transfer()
      if (lfreeze_out) call freeze_out()
 
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
-     
+
      ! Absorption et emissivite poussiere
-     call init_dust_mol(imol) 
+     call init_dust_mol(imol)
 
      call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
 
@@ -93,20 +93,20 @@ subroutine mol_line_transfer()
      if (.not.lProDiMo2mcfost) then
         ! population dans le cas limite optiquement mince
         if (ldouble_RT) call equilibre_othin_mol_pop2()
-     
+
         ! Condition initiale : population a l'ETL
         call equilibre_LTE_mol()
      endif
 
      call opacite_mol(imol)
      call integ_tau_mol(imol)
-  
+
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) call NLTE_mol_line_transfer(imol)
-     
+
      call ecriture_pops(imol)
      call ecriture_Tex(imol)
-     
+
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
         ! Selection des transitions
@@ -116,11 +116,11 @@ subroutine mol_line_transfer()
            allocate(indice_Trans(mol(imol)%nTrans_raytracing))
            indice_Trans(:) = mol(imol)%indice_Trans_raytracing(:)
         endif
-        
+
         u0 = sin(angle_interet/180._db*pi) ;  v0=0.0_db ; w0 = sqrt(1.0_db - u0*u0)
-   
+
         do ibin=1,RT_n_ibin
-           call emission_line_map(imol,ibin) 
+           call emission_line_map(imol,ibin)
         enddo
 
         call ecriture_spectre(imol)
@@ -151,16 +151,16 @@ subroutine NLTE_mol_line_transfer(imol)
 #include "sprng_f.h"
 
   integer, intent(in) :: imol
- 
+
   integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
   integer, parameter :: n_speed3 = 1
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(n_iter2_max-1))
-  integer :: n_level_comp 
+  integer :: n_level_comp
   real, parameter :: precision_sub = 1.0e-3
   real, parameter :: precision = 1.0e-1
-  
+
   integer :: etape, etape_start, etape_end, ri, zj, phik, l, iray, iTrans, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
   integer, dimension(nb_proc) :: max_n_iter_loc
@@ -215,7 +215,7 @@ subroutine NLTE_mol_line_transfer(imol)
   endif
   I0 = 0.0_db
   I0c = 0.0_db
-  
+
   if (ldouble_RT) then
      allocate(I02(-n_speed:n_speed,nTrans,n_rayons_start,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
@@ -239,13 +239,13 @@ subroutine NLTE_mol_line_transfer(imol)
   endif
   Doppler_P_x_freq = 0.0_db
 
-  ! 2 etapes : 1) direction des rayons fixee pour eliminer les fluctuations aletoires 
+  ! 2 etapes : 1) direction des rayons fixee pour eliminer les fluctuations aletoires
   ! et 2) direction aleatoire pour assurer un echantillonnage suffisant
   do etape=etape_start, etape_end  ! S'arreter a la 1 est OK pour les profils de raies :-)
-     
+
      if (etape==1) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
-        n_rayons = 2 ! TR 1D : 1 rayon qui monte, 1 rayon qui descend 
+        n_rayons = 2 ! TR 1D : 1 rayon qui monte, 1 rayon qui descend
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
@@ -270,7 +270,7 @@ subroutine NLTE_mol_line_transfer(imol)
            stop
         endif
         tab_speed = 0.0_db
-     
+
         allocate(I0(ispeed(1):ispeed(2),nTrans,n_rayons_max,nb_proc), &
              I0c(nTrans,n_rayons_start,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
@@ -286,7 +286,7 @@ subroutine NLTE_mol_line_transfer(imol)
            stop
         endif
         ds = 0.0_db
-        
+
         allocate(Doppler_P_x_freq(ispeed(1):ispeed(2),n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Doppler_P_x_freq'
@@ -300,7 +300,7 @@ subroutine NLTE_mol_line_transfer(imol)
      n_iter = 0
 
 
-   
+
 
      do while (.not.lconverged)
         n_iter = n_iter + 1
@@ -329,7 +329,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv) &
         !$omp shared(imol,stream,n_rad,nz,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian) &
-        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape) 
+        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape)
         !$omp do schedule(static,1)
         do ri=1, n_rad
            !$ id = omp_get_thread_num() + 1
@@ -337,16 +337,16 @@ subroutine NLTE_mol_line_transfer(imol)
 
               ! Echantillonage uniforme du profil de raie
               if (lfixed_rays) then
-                 tab_speed(:,id) = tab_deltaV(:,ri,zj)  
+                 tab_speed(:,id) = tab_deltaV(:,ri,zj)
               endif
 
               if (lcompute_molRT(ri,zj)) then
 
                  do phik=1, 1!n_az
-                 
-                    ! Propagation des rayons 
+
+                    ! Propagation des rayons
                     do iray=iray_start, iray_start-1+n_rayons
-                   
+
                        if (etape==1) then
                           ! Position = milieu de la cellule
                           x0 = r_grid(ri,zj)
@@ -380,7 +380,7 @@ subroutine NLTE_mol_line_transfer(imol)
                           rand2 = sprng(stream(id))
                           rand3 = sprng(stream(id))
                           call  pos_em_cellule(ri,zj,phik,rand,rand2,rand3,x0,y0,z0)
-                                                    
+
                           ! Direction de propagation aleatoire
                           rand = sprng(stream(id))
                           W0 = 2.0_db * rand - 1.0_db
@@ -393,20 +393,20 @@ subroutine NLTE_mol_line_transfer(imol)
                        endif
 
                        ! Echantillonnage aleatoire du champ de vitesse
-                       if (lnotfixed_Rays) then      
+                       if (lnotfixed_Rays) then
                           do iv=ispeed(1),ispeed(2)
-                             !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj) 
+                             !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
                              rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(ri,zj)
                           enddo
                        endif
 
-                       
+
                        ! Integration le long du rayon
                        call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
-                 
+
                     enddo ! iray
 
-                    
+
                     ! Resolution de l'equilibre statistique
                     n_iter_loc = 0
                     pop(:,id) = tab_nLevel(ri,zj,:)
@@ -415,7 +415,7 @@ subroutine NLTE_mol_line_transfer(imol)
                     ! avec champ externe fixe
                     do while (.not.lconverged_loc)
                        n_iter_loc = n_iter_loc + 1
-                       
+
                        ! Sauvegarde ancienne pop locale
                        pop_old(:,id) = pop(:,id)
 
@@ -428,21 +428,21 @@ subroutine NLTE_mol_line_transfer(imol)
                        ! Critere de convergence locale
                        diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
                             / (pop_old(1:n_level_comp,id) + 1e-30) )
-                       
-                       if (diff < precision_sub) then 
+
+                       if (diff < precision_sub) then
                           lconverged_loc = .true.
                        else
                           ! On est pas converge, on recalcule les opacites et fonctions source
                           call opacite_mol_loc(ri,zj,phik,imol)
                        endif
-                       
-                    enddo ! while : convergence champ local            
+
+                    enddo ! while : convergence champ local
                     if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
-                    
+
                  enddo ! phik
-             
+
               endif ! lcompute_molRT
-              
+
            enddo !zj
         enddo !ri
         !$omp end do
@@ -455,10 +455,10 @@ subroutine NLTE_mol_line_transfer(imol)
               if (lcompute_molRT(ri,zj)) then
                  diff = maxval( abs( tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp) ) / &
                       tab_nLevel_old(ri,zj,1:n_level_comp) + 1e-300_db)
-                 
+
              !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
               !        tab_nLevel_old(ri,zj,1:n_level_comp)
-               !  write(*,*) ri, zj, diff, tab_nLevel_old(ri,zj,1:n_level_comp) 
+               !  write(*,*) ri, zj, diff, tab_nLevel_old(ri,zj,1:n_level_comp)
                  if (diff > maxdiff) maxdiff = diff
               endif
            enddo
@@ -483,18 +483,18 @@ subroutine NLTE_mol_line_transfer(imol)
               write(*,*) "Warning : not enough rays to converge !!"
                  lconverged = .true.
               endif
-              
+
               ! On continue en calculant 2 fois plus de rayons
               ! On les ajoute a l'ensemble de ceux calcules precedemment
 !              iray_start = iray_start + n_rayons
-              
+
            endif
         endif
 
         write(*,*) "STAT", minval(tab_nLevel(:,:,1:n_level_comp)), maxval(tab_nLevel(:,:,1:n_level_comp))
         call integ_tau_mol(imol)
 
-     enddo ! while : convergence totale     
+     enddo ! while : convergence totale
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)
@@ -505,8 +505,8 @@ end subroutine NLTE_mol_line_transfer
 
 !***********************************************************
 
-subroutine emission_line_map(imol,ibin) 
-  ! Creation de la carte d'emission moleculaire 
+subroutine emission_line_map(imol,ibin)
+  ! Creation de la carte d'emission moleculaire
   ! (ou du spectre s'il n'y a qu'un seul pixel)
   ! par ray-tracing dans une direction donnee
   ! C. Pinte
@@ -573,9 +573,9 @@ subroutine emission_line_map(imol,ibin)
 
 !!$!!! Ancienne methode : c'est trop complique de faire une rotation du plan image
 !!$!!! dommage, j'aimais bien avec des produits vectoriels
-!!$  
+!!$
 !!$  ! Iaxis1 = - (u,v,w) ^ (0,0,1) normalise
-!!$  ! Iaxis2 = (u,v,w) ^ Iaxis1  
+!!$  ! Iaxis2 = (u,v,w) ^ Iaxis1
 !!$  norme = sqrt(v**2+u**2)
 !!$  if (norme > tiny_db) then
 !!$     Iaxis(1,1) = -v/norme ; Iaxis(1,2) = u/norme ; Iaxis(1,3) = 0.0_db  ! OK sans rotation
@@ -619,37 +619,37 @@ subroutine emission_line_map(imol,ibin)
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (Iaxis(1,:) + Iaxis(2,:) )
 
-  
+
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
      ! Pas de sous-pixel car les pixels ne sont pas carres
      n_iter_min = 1
-     n_iter_max = 1 
-        
+     n_iter_max = 1
+
      dx(:) = 0.0_db
      dy(:) = 0.0_db
      i = 1
      j = 1
-     
+
      rmin_RT = max(w*0.9_db,0.05_db) * rmin
      rmax_RT = 2.0_db * Rmax
 
      tab_r(1) = rmin_RT
      fact_r = exp( (1.0_db/(real(n_rad_RT,kind=db) -1))*log(rmax_RT/rmin_RT) )
-     
+
      do ri_RT = 2, n_rad_RT
         tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
      enddo
-        
+
      fact_A = sqrt(pi * (fact_r - 1.0_db/fact_r)  / n_phi_RT )
 
-        
+
      ! Boucle sur les rayons d'echantillonnage
      !$omp parallel &
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-     !$omp shared(tab_r,fact_A,Iaxis,center,dx,dy,u,v,w,i,j) & 
+     !$omp shared(tab_r,fact_A,Iaxis,center,dx,dy,u,v,w,i,j) &
      !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,imol,ibin)
-     id =1 ! pour code sequentiel    
+     id =1 ! pour code sequentiel
 
      if (l_sym_ima) then
         cst_phi = pi  / real(n_phi_RT,kind=db)
@@ -657,17 +657,17 @@ subroutine emission_line_map(imol,ibin)
         cst_phi = deux_pi  / real(n_phi_RT,kind=db)
      endif
 
-        
-     !$omp do schedule(dynamic,1)     
+
+     !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT
         !$ id = omp_get_thread_num() + 1
-        
+
         r = tab_r(ri_RT)
         taille_pix =  fact_A * r ! racine carree de l'aire du pixel
 
         do phi_RT=1,n_phi_RT ! de 0 a pi
            phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
-           
+
            pixelcorner(:,id) = center(:) + r * sin(phi) * Iaxis(1,:) + r * cos(phi) * Iaxis(2,:) ! C'est le centre en fait car dx = dy = 0.
            call intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
@@ -677,13 +677,13 @@ subroutine emission_line_map(imol,ibin)
 
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
-     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel 
+     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = map_size / real(max(igridx,igridy),kind=db) ! en AU
      dx(:) = Iaxis(1,:) * taille_pix
      dy(:) = Iaxis(2,:) * taille_pix
 
      if (l_sym_ima) then
-        igridx_max = igridx/2 + modulo(igridx,2) 
+        igridx_max = igridx/2 + modulo(igridx,2)
      else
         igridx_max = igridx
      endif
@@ -696,8 +696,8 @@ subroutine emission_line_map(imol,ibin)
      !$omp shared(n_iter_min,n_iter_max,imol,ibin)
 
      id =1 ! pour code sequentiel
-     n_iter_min = 1 ! 3 
-     n_iter_max = 1 ! 6 
+     n_iter_min = 1 ! 3
+     n_iter_max = 1 ! 6
 
      !$omp do schedule(dynamic,1)
      do i = 1,igridx_max
@@ -708,7 +708,7 @@ subroutine emission_line_map(imol,ibin)
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            call intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
-     enddo !i 
+     enddo !i
      !$omp end do
      !$omp end parallel
 
@@ -741,12 +741,12 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   real(kind=db), dimension(:), allocatable :: IPc
 
   integer, parameter :: maxSubPixels = 32
-    
+
   real(kind=db) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(3) :: sdx, sdy
   real :: npix2, diff, vmax_center_rt
 
-  real, parameter :: precision = 1.e-2 
+  real, parameter :: precision = 1.e-2
   integer :: i, j, subpixels, iray, ri, zj, phik , iv, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
 
   logical :: lintersect, labs
@@ -761,45 +761,45 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   ispeed(1) = -n_speed_rt ; ispeed(2) = n_speed_rt
 
   labs = .false.
-  
+
   ! Ray tracing : on se propage dans l'autre sens
   u0 = -u ; v0 = -v ; w0 = -w
-  
+
   IP = 0.0_db
   IPc = 0.0_db
 
   ! le nbre de subpixel en x est 2^(iter-1)
   subpixels = 1
-  iter = 1 
-  
+  iter = 1
+
   infinie : do ! Boucle infinie tant que le pixel n'est pas converge
      npix2 =  real(subpixels)**2
      IP_old = IP
      IP = 0.0_db
      IPc = 0.0_db
-     
+
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=db)
      sdy(:) = dy(:) / real(subpixels,kind=db)
-     
+
      iray = 1
-     
+
      ! L'obs est en dehors de la grille
      ri = 2*n_rad ; zj=1 ; phik=1
-     
+
      ! Boucle sur les sous-pixels qui calcule l'intensite au centre
      ! de chaque sous pixel
      do i = 1,subpixels
-        do j = 1,subpixels 
+        do j = 1,subpixels
            ! Centre du sous-pixel
            x0 = pixelcorner(1) + (i - 0.5_db) * sdx(1) + (j-0.5_db) * sdy(1)
            y0 = pixelcorner(2) + (i - 0.5_db) * sdx(2) + (j-0.5_db) * sdy(2)
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
-           
+
            ! On se met au bord de la grille : propagation a l'envers
            call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,lintersect)
 
-           if (lintersect) then ! On rencontre la grille, on a potentiellement du flux          
+           if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
               ! Flux recu dans le pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
@@ -811,7 +811,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
            endif
         enddo !j
      enddo !i
-     
+
      IP = IP / npix2
      IPc = IPc / npix2
 
@@ -823,8 +823,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
         ! write(*,*) "Warning : converging pb in ray-tracing"
         ! write(*,*) " Pixel", ipix, jpix
         exit infinie
-     else 
-        ! On fait le test sur a difference  
+     else
+        ! On fait le test sur a difference
         diff = maxval( abs(IP - IP_old) / (IP + 1e-300_db) )
         if (diff > precision ) then
            ! On est pas converge
@@ -833,8 +833,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
            ! On est converge
            exit infinie
         endif
-     endif ! iter 
-     
+     endif ! iter
+
      iter = iter + 1
 
      ! TODO : Integration Romberg
@@ -848,9 +848,9 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
 !!$        I = (real(2**(log(real(subpixels))/log(2.d0)))*I - Oldintensite_pixel) &
 !!$             /(real(2**(log(real(subpixels))/log(2.d0)))-1.d0) ! Richardson Extrapolation
 !!$        ! Ok mais n'utilise que les 2 derniers calculs : il doit y avoir mieux !!!
-!!$        
+!!$
 !!$     endif
-  enddo infinie 
+  enddo infinie
 
   ! Prise en compte de la surface du pixel (en sr)
   IP = IP * (pixelsize / (distance*pc_to_AU) )**2
@@ -859,8 +859,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   ! et multiplication par la frequence pour avoir du nu.F_nu
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans)
-     IP(:,iTrans) = IP(:,iTrans) * transfreq(iiTrans)      
-     IPc(iTrans) = IPc(iTrans) * transfreq(iiTrans)      
+     IP(:,iTrans) = IP(:,iTrans) * transfreq(iiTrans)
+     IPc(iTrans) = IPc(iTrans) * transfreq(iiTrans)
   enddo
   ! Unite teste OK pour le Cmb
   ! profil de raie non convolue teste ok avec torus

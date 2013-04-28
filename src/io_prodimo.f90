@@ -10,7 +10,7 @@ module ProDiMo
   use prop_star
   use resultats
   use utils
-  use ray_tracing, only:  RT_imin, RT_imax, RT_n_ibin, lRT_i_centered 
+  use ray_tracing, only:  RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
   use read_params
   use sha
 
@@ -22,7 +22,7 @@ module ProDiMo
   integer :: mcfost2ProDiMo_version, ProDiMo2mcfost_version
 
   ! directory with *.in files and output dir
-  character(len=512) :: ProDiMo_input_dir, data_ProDiMo  
+  character(len=512) :: ProDiMo_input_dir, data_ProDiMo
 
   ! Pour champ UV
   !real, parameter ::  slope_UV_ProDiMo = 2.2 - 2 ! Fnu -> F_lambda
@@ -33,26 +33,26 @@ module ProDiMo
   integer :: ProDiMo_PAH_NC, ProDiMo_PAH_NH
   logical :: ProDiMo_other_PAH
   character(len=10) :: sProDiMo_fPAH
-  
+
   ! Grille de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
 
   ! Pour champ ISM
-  real, parameter :: Wdil =  9.85357e-17 
-  real, parameter :: TCmb = 2.73 
+  real, parameter :: Wdil =  9.85357e-17
+  real, parameter :: TCmb = 2.73
   real, parameter :: T_ISM_stars = 20000.
   real, parameter :: chi_ISM = 1.0
 
   real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes_ISM
-        
+
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   ! ProDiMo2mcfost
   integer,parameter :: MC_NSP=5      ! number of species
   integer,parameter :: MC_LEVMAX=10  ! maximum number of levels
   integer, parameter :: NXX=1, NZZ=1 ! c'est pas dans le fichier de Peter
-  
+
   type lpop_prodimo
      character(len=10) :: name(MC_NSP)       ! species name
      integer :: isp(MC_NSP)                  ! species indices
@@ -61,8 +61,8 @@ module ProDiMo
      real :: deltaV(MC_NSP,NXX,NZZ)          ! turbulent+thermal line widths
      real :: pops(MC_NSP,MC_LEVMAX,NXX,NZZ)  ! level populations
   end type lpop_prodimo
- 
-  type(lpop_prodimo) :: lpops 
+
+  type(lpop_prodimo) :: lpops
 
   ! Lecture du fichier for MCFOST.fits.gz
   integer, parameter :: nLevel_CII = 2
@@ -88,7 +88,7 @@ module ProDiMo
 
      ! Spatial grid (Unit: AU)
      real*8, allocatable,dimension(:,:) :: r_grid, z_grid
-  
+
      ! dust material density
      real*4, allocatable,dimension(:) :: rho_grain
 
@@ -112,7 +112,7 @@ module ProDiMo
      ! lambda*J_lambda (Unit: W/m^2/sr)
      real*4, allocatable,dimension(:,:,:) :: lamJlam,lamJlamStar,lamJlamISM
      real*4, allocatable,dimension(:,:,:) :: Jnu !(Unit : W/m^2/sr/Hz)
- 
+
      ! Statistics of the radiation field (number of packets)
      real*4, allocatable,dimension(:,:,:) :: nJ, nJ_Star, nJ_ISM
 
@@ -164,11 +164,11 @@ contains
        write(*,*) "Using "//trim(ProDiMo_input_dir)//" for ProDiMo input"
     endif
     data_ProDiMo = trim(root_dir)//"/"//trim(seed_dir)//"/data_ProDiMo"
-    
+
     if (lforce_ProDiMo_PAH) data_ProDiMo = trim(data_ProDiMO)//"_fPAH="//sProDiMo_fPAH
-    
+
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
-    tau_dark_zone_eq_th = 15000. 
+    tau_dark_zone_eq_th = 15000.
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
@@ -205,7 +205,7 @@ contains
     ! Calcul des fPAH pour ProDiMo
     allocate(fPAH(n_zones))
     NC_0 = 0
-    fPAH = 0.0 ; 
+    fPAH = 0.0 ;
     do i=1, n_zones
        do pop=1, n_pop
           if (dust_pop(pop)%zone == i) then
@@ -217,7 +217,7 @@ contains
                    NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
                    NH = get_NH(NC)               ! number of Hydrogen atoms
                    mPAH = 12 * NC + NH    ! masse du PAH
-           
+
                    if (NC_0 > 0) then
                       if (NC /= NC_0) then
                          write(*,*) "ERROR: there can be only 1 type of PAH for ProDiMo"
@@ -227,8 +227,8 @@ contains
                    else
                       NC_0 = NC
                    endif
-       
-                   masse_PAH = masse_PAH + mPAH * nbre_grains(k) 
+
+                   masse_PAH = masse_PAH + mPAH * nbre_grains(k)
                    norme = norme + nbre_grains(k)
                 enddo ! k
                 masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs en mH
@@ -236,7 +236,7 @@ contains
 
                 ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
                 ! abondance en nombre par rapport à H-nuclei + correction pour NC
-                fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.) 
+                fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
           endif ! pop dans la zone
@@ -244,7 +244,7 @@ contains
 
        fPAH(i) = max(fPAH(i),1e-9)
     enddo ! i
-    
+
 
     ProDiMo_other_PAH = .false.
     if (NC_0 > 0) then
@@ -253,14 +253,14 @@ contains
        ProDiMo_PAH_NH = NH
     endif
 
-    allocate(ProDiMo_fPAH(n_regions), ProDiMo_dust_gas(n_regions), ProDiMo_Mdisk(n_regions))    
+    allocate(ProDiMo_fPAH(n_regions), ProDiMo_dust_gas(n_regions), ProDiMo_Mdisk(n_regions))
     do ir=1, n_regions
        iz = regions(ir)%zones(1)
 
        ProDiMo_fPAH(ir) = fPAH(iz)
        ProDiMo_dust_gas(ir) = 1.0/disk_zone(iz)%gas_to_dust
        ProDiMo_Mdisk(ir) = disk_zone(iz)%diskmass * disk_zone(iz)%gas_to_dust
-       
+
        do i=2,regions(ir)%n_zones
           iz = regions(ir)%zones(i)
           if ( abs(ProDiMo_fPAH(ir)-fPAH(iz)) > 1e-3*ProDiMo_fPAH(ir)) then
@@ -294,7 +294,7 @@ contains
 
 
   !********************************************************************
-  
+
   subroutine save_J_prodimo(lambda)
     ! C. Pinte
     ! 19/06/09
@@ -307,7 +307,7 @@ contains
 
     ! Step1
     ! 1/4pi est inclus dans n_phot_l_tot
-    !    J_ProDiMo(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi 
+    !    J_ProDiMo(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
     !
     !    do ri=1, n_rad
     !       J_ProDiMo(:,ri,:) = J_ProDiMo(:,ri,:) / volume(ri)
@@ -327,12 +327,12 @@ contains
 
     do ri=1, n_rad
        do zj=1,nz
-          facteur = energie_photon / volume(ri) 
+          facteur = energie_photon / volume(ri)
           J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
           N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(lambda,ri,zj,:))
        enddo
     enddo
-        
+
     xJ_abs(lambda,:,:,:) = 0.0
     xN_abs(lambda,:,:,:) = 0.0
 
@@ -344,16 +344,16 @@ contains
 
   subroutine allocate_m2p(n_rad,nz,n_lambda)
     ! Routine similaire a celle de ProDiMo dans readMCFOST
-    ! pour le moment, ne sert que pour recuperer le champ de radiation 
+    ! pour le moment, ne sert que pour recuperer le champ de radiation
     ! calcule par le run initial de mcfost
     ! C. Pinte
     ! 29/08/2012
 
     integer, intent(in) :: n_lambda, n_rad, nz
-   
+
     integer, dimension(8) :: istat
     integer :: i
-    
+
     istat = 0
     allocate(m2p%r_grid(n_rad,nz), &
            & m2p%z_grid(n_rad,nz),m2p%Tdust(n_rad,nz), &
@@ -372,9 +372,9 @@ contains
        if(istat(i) /= 0) then
           write(*,*) "ERROR: memory allocation problem in allocate_m2p"
           write(*,*) istat(i)," at ",i
-          stop 
-       endif   
-    enddo   
+          stop
+       endif
+    enddo
 
     return
 
@@ -393,7 +393,7 @@ contains
     ! - gas density pour un rapport gas sur poussiere fixe ---> pour
     ! verification seleument
     ! - zero, first et second moment of the grain size distribution
-    !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da 
+    !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da
     ! - separation of constribution
 
     integer :: status,unit,blocksize,bitpix,naxis
@@ -411,7 +411,7 @@ contains
     real, dimension(n_rad,nz,0:3) :: N_grains
     real, dimension(n_lambda) :: spectre
     integer, dimension(n_rad) :: which_region
-    
+
 
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
     real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
@@ -425,20 +425,20 @@ contains
        stop
     endif
     opacite = 0
-   
+
     allocate(J_io(n_rad,nz,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error J_io forProDiMo.fits.gz'
        stop
     endif
-    J_io = 0    
+    J_io = 0
 
     allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz), stat=alloc_status)
      if (alloc_status > 0) then
        write(*,*) 'Allocation error J_ProDiMo_ISM forProDiMo.fits.gz'
        stop
     endif
-    J_ProDiMo_ISM = 0  
+    J_ProDiMo_ISM = 0
 
     filename = trim(data_ProDiMo)//"/"//trim(mcfost2ProDiMo_file)
     ! Initialize parameters about the FITS image
@@ -483,7 +483,7 @@ contains
     call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
     call ftpkye(unit,'Mstar',real(etoile(1)%M),-8,'[Msun]',status)
     call ftpkye(unit,'fUV',fUV_ProDiMo,-3,'',status)
-    call ftpkye(unit,'slope_UV',slope_UV_ProDiMo+2.0,-3,'',status) ! on remet le 2 
+    call ftpkye(unit,'slope_UV',slope_UV_ProDiMo+2.0,-3,'',status) ! on remet le 2
     call ftpkye(unit,'distance',real(distance),-8,'[pc]',status)
 
     if (mcfost2ProDiMo_version >=3) then
@@ -497,7 +497,7 @@ contains
        enddo
     endif ! mcfost2ProDiMo_version 3
 
-    ! 1st zone or only zone if mcfost2ProDiMo_version <=2 
+    ! 1st zone or only zone if mcfost2ProDiMo_version <=2
     call ftpkye(unit,'disk_dust_mass',real(disk_zone(1)%diskmass),-8,'[Msun]',status)
     call ftpkye(unit,'Rin',real(disk_zone(1)%rmin),-8,'[AU]',status)
     call ftpkye(unit,'Rout',real(disk_zone(1)%rout),-8,'[AU]',status)
@@ -507,7 +507,7 @@ contains
     call ftpkye(unit,'beta',real(disk_zone(1)%exp_beta),-8,'',status)
     call ftpkye(unit,'alpha',real(disk_zone(1)%surf),-8,'',status)
 
-    if (mcfost2ProDiMo_version >=3) then       
+    if (mcfost2ProDiMo_version >=3) then
        ! Adding zones information
        do i=2, n_zones
           write(s,'(i1)') i
@@ -548,7 +548,7 @@ contains
     call ftpprd(unit,group,fpixel,nelements,grid,status)
 
     !------------------------------------------------------------------------------
-    ! HDU 2: Temperature 
+    ! HDU 2: Temperature
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=2
@@ -569,7 +569,7 @@ contains
              Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
           enddo !j
        enddo !i
-       
+
        write(*,*) "************************************************************"
        write(*,*) "WARNING: nLTE mode in MCFOST"
        write(*,*) "Crude averaging of the temperature distribution for ProDiMo"
@@ -622,7 +622,7 @@ contains
     ! Division par pi pour passer en intensite
     spectre(:) = spectre_etoiles(:) * tab_lambda(:) / tab_delta_lambda(:) &
          / (4 * pi * (etoile(1)%r * AU_to_m)**2) / pi
-     
+
     !  Write the array to the FITS file.
     call ftppre(unit,group,fpixel,nelements,spectre,status)
 
@@ -642,14 +642,14 @@ contains
 
     do lambda=1,n_lambda
        wl = tab_lambda(lambda) * 1e-6
-       spectre(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl  
+       spectre(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl
     enddo
- 
+
     !  Write the array to the FITS file.
     call ftppre(unit,group,fpixel,nelements,spectre,status)
 
     !------------------------------------------------------------------------------
-    ! HDU 6 : Champ de radiation en W.m-2 (lambda.F_lambda)  
+    ! HDU 6 : Champ de radiation en W.m-2 (lambda.F_lambda)
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=3
@@ -667,7 +667,7 @@ contains
     ! Inversion de l'ordre des dimensions + passage en simple precision
     do ri=1, n_rad
        do zj=1,nz
-          J_io(ri,zj,:) = J_ProDiMo(:,ri,zj) 
+          J_io(ri,zj,:) = J_ProDiMo(:,ri,zj)
        enddo
     enddo
 
@@ -688,18 +688,18 @@ contains
 
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    
-    ! Inversion de l'ordre des dimensions 
+
+    ! Inversion de l'ordre des dimensions
     do zj=1,nz
        do ri=1, n_rad
-          J_io(ri,zj,:) = N_ProDiMo(:,ri,zj) 
+          J_io(ri,zj,:) = N_ProDiMo(:,ri,zj)
        enddo
     enddo
 
     call ftppre(unit,group,fpixel,nelements,J_io,status)
 
     !------------------------------------------------------------------------------
-    ! HDU 8 : Champ de radiation ISM en W.m-2 (lambda.F_lambda)  
+    ! HDU 8 : Champ de radiation ISM en W.m-2 (lambda.F_lambda)
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=3
@@ -717,25 +717,25 @@ contains
 
     do lambda=1, n_lambda
        n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
-              
+
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
            * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi
-              
+
        do ri=1, n_rad
           do zj=1,nz
-             facteur = energie_photon / volume(ri) 
+             facteur = energie_photon / volume(ri)
              J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
           enddo
        enddo
     enddo ! lambda
 
 
-    
+
     ! Inversion de l'ordre des dimensions + passage en simple precision
     do ri=1, n_rad
        do zj=1,nz
-          J_io(ri,zj,:) = J_ProDiMo_ISM(:,ri,zj) 
+          J_io(ri,zj,:) = J_ProDiMo_ISM(:,ri,zj)
        enddo
     enddo
 
@@ -756,11 +756,11 @@ contains
 
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-   
+
     ! Inversion de l'ordre des dimensions et somaation
     do zj=1,nz
        do ri=1, n_rad
-          J_io(ri,zj,:) = sum(xN_abs(:,ri,zj,:), dim=2) 
+          J_io(ri,zj,:) = sum(xN_abs(:,ri,zj,:), dim=2)
        enddo
     enddo
 
@@ -811,10 +811,10 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           opacite(ri,zj,1,:) = kappa(:,ri,zj,1)
-          if (lRE_LTE) then 
+          if (lRE_LTE) then
              opacite(ri,zj,2,:) = kappa_abs_eg(:,ri,zj,1)
           else if (lRE_nLTE) then ! Patch, c'est pas super propre
-             do lambda=1,n_lambda 
+             do lambda=1,n_lambda
                 do l=grain_RE_nLTE_start,grain_RE_nLTE_end
                    opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
 
@@ -822,7 +822,7 @@ contains
              enddo ! lambda
           endif
        enddo ! ri
-    enddo !zj    
+    enddo !zj
 
     call ftppre(unit,group,fpixel,nelements,opacite,status)
 
@@ -851,7 +851,7 @@ contains
              N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
              N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
              N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
-          else 
+          else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
              N_grains(ri,zj,3) = 0.0
@@ -864,7 +864,7 @@ contains
     call ftppre(unit,group,fpixel,nelements,N_grains,status)
 
 
-    if (mcfost2ProDiMo_version >=3) then       
+    if (mcfost2ProDiMo_version >=3) then
        !------------------------------------------------------------------------------
        ! HDU 13 : Region index
        !------------------------------------------------------------------------------
@@ -872,24 +872,24 @@ contains
        naxis=1
        naxes(1)=n_rad
        nelements=naxes(1)
-       
+
        ! create new hdu
        call ftcrhd(unit, status)
-       
+
        ! Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    
+
        which_region = 0
        do iRegion=1,n_regions
           do i=1, n_rad
-             if ( (r_grid(i,1) > regions(iRegion)%Rmin).and.(r_grid(i,1) < regions(iRegion)%Rmax) ) which_region(i) = iRegion 
+             if ( (r_grid(i,1) > regions(iRegion)%Rmin).and.(r_grid(i,1) < regions(iRegion)%Rmax) ) which_region(i) = iRegion
           enddo !i
        enddo ! iRegion
        call ftpprj(unit,group,fpixel,nelements,which_region,status)
 
     endif ! mcfost2ProDiMo_version >=3
 
-    if (mcfost2ProDiMo_version >=4) then       
+    if (mcfost2ProDiMo_version >=4) then
        !------------------------------------------------------------------------------
        ! HDU 14 : Spectre stellaire HR
        !------------------------------------------------------------------------------
@@ -907,13 +907,13 @@ contains
        ! Conversion en lambda.F_lamda
        ! Division par 4 * pi * (etoile(1)%r * AU_to_m)**2 pour passer de luminosite a flux
        ! Division par pi pour passer en intensite
-       ProDiMo_star_HR(:,2) = ProDiMo_star_HR(:,2) & 
+       ProDiMo_star_HR(:,2) = ProDiMo_star_HR(:,2) &
             / (4 * pi * (etoile(1)%r * AU_to_m)**2) / pi
-     
+
        !  Write the array to the FITS file.
-       call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)    
+       call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)
     endif
-    
+
     !  Close the file and free the unit number.
     call ftclos(unit, status)
     call ftfiou(unit, status)
@@ -938,13 +938,13 @@ contains
 
     character(len=128) :: line
     character(len=10) :: fmt
- 
+
     integer :: status, i, iProDiMo, syst_status
     logical :: unchanged, other_PAH
 
 
     character :: s
-    
+
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
     ! Copy *.in files ()
@@ -956,12 +956,12 @@ contains
     call appel_syst(cmd,syst_status)
 
 
-    ! Copy and modify Parameter.in 
+    ! Copy and modify Parameter.in
     open(unit=1,file=trim(ProDiMo_input_dir)//"/Parameter.in",status='old')
     open(unit=2,file=trim(data_ProDiMo)//"/Parameter.in",status='replace')
 
-    status = 0 
-    read_loop : do 
+    status = 0
+    read_loop : do
        read(1,'(A128)',iostat=status) line
        if (status /= 0) exit read_loop
        unchanged = .true.
@@ -982,7 +982,7 @@ contains
           write(2,*) ProDiMo_Mdisk(n_regions),     " ! Mdisk : set by MCFOST"
 
           do i=1, n_regions-1
-             iProDiMo = i+1 
+             iProDiMo = i+1
              write(s,'(i1)') iProDiMo
              write(2,'(A)') "------ ProDiMo-zone #"//s//"----- : set by MCFOST"
              write(2,*) real(regions(i)%Rmin)," ! R"//s//"in  : weird ProDiMo order, set by MCFOST"
@@ -991,7 +991,7 @@ contains
              write(2,*) ProDiMo_fPAH(i),     " ! f"//s//"PAH : set by MCFOST"
              write(2,*) ProDiMo_Mdisk(i),    " ! M"//s//"disk : set by MCFOST"
           enddo
-  
+
           write(2,*) ProDiMo_other_PAH, " ! other_PAH : set by MCFOST"
           if (ProDiMo_other_PAH) then
              write(2,*) ProDiMo_PAH_NC, " ! PAH_NC : set by MCFOST"
@@ -1005,7 +1005,7 @@ contains
           (INDEX(line,"! fPAH") > 0).or.(INDEX(line,"! Mdisk") > 0) ) then
           unchanged = .false.
        endif
- 
+
        if (INDEX(line,"! Rphoto_bandint") > 0) then
           if ((etoile(1)%T > 6000.).or.(etoile(1)%fUV > 0.05)) then
              write(2,*) .true.,  " ! Rphoto_bandint : set by MCFOST"
@@ -1027,7 +1027,7 @@ contains
 
        if (unchanged) then
           if (len(trim(line)) > 0) then
-             write(fmt,'("(A",I3.3,")")') len(trim(line)) 
+             write(fmt,'("(A",I3.3,")")') len(trim(line))
              write(2,fmt) trim(line)
           else
              write(2,*) ""
@@ -1048,7 +1048,7 @@ contains
     ! Relit le fichier for ProDiMo.fits.gz cree par mcfost pour ProDiMo
     ! afin de redemarrer dessus pour le transfert dans les raies
     ! Lit les parametres et la structure en temperature
-    ! A terme le champ de radiation pour calculer le contribution de 
+    ! A terme le champ de radiation pour calculer le contribution de
     ! lumiere diffusee dans les raies
     !
     ! C.Pinte
@@ -1074,7 +1074,7 @@ contains
 
     ! Sauvegarde du nom du fichier de parametres pour les raies
     mol_para = para
-    
+
     ! Copie temporaire et lecture du fichier de parametres
     ! car je ne connais pas le nom du fichier .par dans data_th
     n_files = 0
@@ -1082,7 +1082,7 @@ contains
     open(unit=1, file="n_files.tmp", status='old')
     read(1,*) n_files
     close(unit=1,status="delete")
-    
+
     if (n_files > 1) then
        write(*,*) "There are more than 1 parameter file in data_th"
        write(*,*) "Exiting"
@@ -1092,7 +1092,7 @@ contains
        write(*,*) "Exiting"
        stop
     endif
-    
+
     cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
     para = "data_th/forMCFOST.par" ; call read_para()
     cmd = "rm -rf data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
@@ -1108,17 +1108,17 @@ contains
     lfits = .false.
 
     ! on ne force plus depuis version 2 de l'interface
-    !n_lambda = 39 
+    !n_lambda = 39
     !lambda_min = 0.0912
     !lambda_max = 3410.85
 
     deallocate(mol) ! car on va le remplacer
 
     open(unit=1, file=para, status='old')
-    
+
     ! Inclinaisons
-    read(1,*)     
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered 
+    read(1,*)
+    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
 
     read(1,*)
     read(1,*)
@@ -1137,7 +1137,7 @@ contains
        read(1,*) mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
        mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
-    
+
 
        mol(imol)%abundance = 1e-6
        mol(imol)%iLevel_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)) + 2
@@ -1146,12 +1146,12 @@ contains
     largeur_profile = 15.
 
     !lpop = .false. ; lprecise_pop = .false. ; lmol_LTE = .true. ! lmol_LTE force l'utilisation des pop de ProDiMo
-   
+
     write(*,*) "**************  TMP ", lpop, lmol_LTE
     if (lpop) then
        write(*,*) "Calculating level population"
     endif
-    if (lmol_LTE) then 
+    if (lmol_LTE) then
        write(*,*) "Using ProDiMo levels"
     endif
 
@@ -1164,7 +1164,7 @@ contains
     !******************************************************************
     filename = "data_ProDiMo/"//trim(mcfost2ProDiMo_file)
 
-    write(*,*) "Reading "//trim(filename) 
+    write(*,*) "Reading "//trim(filename)
 
     status=0
     group=1
@@ -1175,7 +1175,7 @@ contains
     call ftgiou(unit,status)
 
     ! Open file
-    readwrite=0 ; blocksize = 1 
+    readwrite=0 ; blocksize = 1
     call ftopen(unit,filename,readwrite,blocksize,status)
     if (status /= 0) then ! le fichier forProDiMo n'existe pas
        write(*,*) "ERROR : "//trim(mcfost2ProDiMo_file)//" file needed"
@@ -1186,7 +1186,7 @@ contains
     !------------------------------------------------------------------------
     ! HDU 6 : Read dimensions : radiation field(n_rad,nz,n_lambda)
     !------------------------------------------------------------------------
-    call ftmahd(unit,6,hdutype,status) 
+    call ftmahd(unit,6,hdutype,status)
     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -1196,7 +1196,7 @@ contains
     n_rad_m2p    = naxes(1)
     nz_m2p       = naxes(2)
     n_lambda_m2p = naxes(3)
-    
+
     if ( (n_rad_m2p /= n_rad) .or. (nz_m2p /= nz) ) then
        write(*,*) "Spatial grid if forProDiMo.fits.gz must be the same as the mcfost's one"
        write(*,*) "forProDiMo.fits.gz: n_rad=", n_rad_m2p, "nz=", nz_m2p
@@ -1208,17 +1208,17 @@ contains
 
     !------------------------------------------------------------------------
     ! HDU 6: Radiation field caused by stellar photons
-    !------------------------------------------------------------------------  
+    !------------------------------------------------------------------------
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
     call ftgpve(unit,group,firstpix,npixels,nullval,m2p%lamJlamStar,anynull,status)
-    
+
     !------------------------------------------------------------------------
-    ! HDU 2: Temperature 
+    ! HDU 2: Temperature
     !------------------------------------------------------------------------
     !  move to hdu 2
-    call ftmahd(unit,2,hdutype,status) 
+    call ftmahd(unit,2,hdutype,status)
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
@@ -1243,8 +1243,8 @@ contains
     ! HDU 3: Wavelengths
     !------------------------------------------------------------------------
     !  move to hdu 3
-    call ftmahd(unit,3,hdutype,status) 
-    
+    call ftmahd(unit,3,hdutype,status)
+
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
     if (nfound /= 1) then
@@ -1261,14 +1261,14 @@ contains
     npixels=naxes(1)
 
     ! read_image
-    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%wavelengths,anynull,status)    
+    call ftgpve(unit,group,firstpix,npixels,nullval,m2p%wavelengths,anynull,status)
     m2p%nu(:) = c_light * m_to_mum / m2p%wavelengths(:) ! Hz
-   
+
     !--------------------------------------------------------------------------
     ! HDU 7 : Statistic of the radiation fied
     !--------------------------------------------------------------------------
     !  move to hdu 7
-    call ftmahd(unit,7,hdutype,status) 
+    call ftmahd(unit,7,hdutype,status)
 
 
     ! Check dimensions
@@ -1287,12 +1287,12 @@ contains
 
     ! read_image
     call ftgpve(unit,group,firstpix,npixels,nullval,m2p%nJ_Star,anynull,status)
-    
+
     !--------------------------------------------------------------------------
     ! HDU 8 : Radiation field caused by ISM photons
     !--------------------------------------------------------------------------
     !  move to hdu 8
-    call ftmahd(unit,8,hdutype,status) 
+    call ftmahd(unit,8,hdutype,status)
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
@@ -1310,12 +1310,12 @@ contains
 
     ! read_image
     call ftgpve(unit,group,firstpix,npixels,nullval,m2p%lamJlamISM,anynull,status)
-    
+
     !--------------------------------------------------------------------------
     ! HDU 9 : Statistic of the ISM radiation field
     !--------------------------------------------------------------------------
     !  move to hdu 9
-    call ftmahd(unit,9,hdutype,status) 
+    call ftmahd(unit,9,hdutype,status)
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
@@ -1333,7 +1333,7 @@ contains
 
     ! read_image
     call ftgpve(unit,group,firstpix,npixels,nullval,m2p%nJ_ISM,anynull,status)
-   
+
     ! close the file and free the unit number.
     call ftclos(unit, status)
     call ftfiou(unit, status)
@@ -1361,16 +1361,16 @@ contains
     do i=1,n_rad
        do j=1,nz
           Tdust = m2p%Tdust(i,j)
-          do l=1,n_lambda_m2p 
-             if (m2p%nJ(i,j,l) < 10) then 
+          do l=1,n_lambda_m2p
+             if (m2p%nJ(i,j,l) < 10) then
                 m2p%lamJlamStar(i,j,l) = m2p%nu(l) * Bnu(m2p%nu(l)*1.0_db,Tdust)
                 m2p%lamJlamISM(i,j,l) = 0.0
-          endif  
+          endif
         enddo  !l
       enddo ! j
     enddo ! i
     m2p%lamJlam = m2p%lamJlamStar + m2p%lamJlamISM
-   
+
     do i=1,n_rad
        do j=1,nz
           m2p%Jnu(i,j,:) = m2p%lamJlam(i,j,:) / m2p%nu(:)
@@ -1382,13 +1382,13 @@ contains
   end subroutine read_mcfost2ProDiMo
 
   !********************************************************************
-  
+
   subroutine read_ProDiMo2mcfost(imol)
     ! C. Pinte  17/09/09
     ! Lit les resultats de ProDiMo et met a jour les valeurs dans mcfost
     ! -->  Tgas, abondances a terme
     ! population et vitesses pour le moment
-    
+
     integer, intent(in) :: imol
 
     integer :: fits_status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype,alloc_status
@@ -1398,21 +1398,21 @@ contains
     character(len=30) errtext
     character (len=80) errmessage, comment
     character(len=512) :: filename
-    
+
     character(len=40) :: used_sha_id
     character(len=8) :: used_mcfost_version
     integer :: used_mcfost2ProDiMo_version
-  
-      
+
+
     logical, save :: l_first_time = .true.
 
     real(kind=db), dimension(MC_NSP,n_rad,nz) :: TMP
-    real(kind=db), dimension(n_rad,nz) :: Tgas ! Pas utilise pour le moment, pour futurs calculs NLTE 
+    real(kind=db), dimension(n_rad,nz) :: Tgas ! Pas utilise pour le moment, pour futurs calculs NLTE
     real, dimension(n_rad,nz,2) :: grid ! Seulement pout test
     real, dimension(n_rad,nz) :: sum_pops
     real, dimension(:,:,:), allocatable :: MCpops
 
-    logical :: lCII, lOI, lCO, loH2O, lpH2O 
+    logical :: lCII, lOI, lCO, loH2O, lpH2O
 
     real :: sigma2, vmax, sigma2_m1, r_cyl
     real(kind=db) :: S, dz, dV, Somme
@@ -1426,7 +1426,7 @@ contains
 
     n_speed_rt = mol(imol)%n_speed_rt
 
-    lCII = .false. ; lOI = .false. ; lCO = .false. ; loH2O = .false. ;  lpH2O = .false. ; 
+    lCII = .false. ; lOI = .false. ; lCO = .false. ; loH2O = .false. ;  lpH2O = .false. ;
     if (mol(imol)%name=="C+") lCII = .true.
     if (mol(imol)%name=="O") lOI = .true.
     if (mol(imol)%name=="CO") lCO = .true.
@@ -1444,7 +1444,7 @@ contains
        write(*,*) "Reading ProDiMo calculations"
        write(*,*) trim(filename)
 
-       fits_status = 0 
+       fits_status = 0
        !  Get an unused Logical Unit Number to use to open the FITS file.
        call ftgiou(unit,fits_status)
 
@@ -1485,8 +1485,8 @@ contains
        used_sha_id = 'unknown'
        used_mcfost2ProDiMo_version = 0
        ProDiMo2mcfost_version = 0
-       
-       ! Read model info 
+
+       ! Read model info
        keyword_status = 0
        call ftgkys(unit,'mcfost',used_mcfost_version,comment,keyword_status)
        if (keyword_status /= 0) then
@@ -1508,7 +1508,7 @@ contains
           write(*,*) "Fits keyword error: prodimo2mcfost"
           keyword_status = 0
        endif
-       
+
        if (used_mcfost_version /= mcfost_release) then
           write(*,*) "************************************************"
           write(*,*) "WARNING: MCFOST has been updated"
@@ -1518,7 +1518,7 @@ contains
           write(*,*) "id="//sha_id
           write(*,*) "Problems can occur"
           write(*,*) "************************************************"
-       else 
+       else
           if (used_sha_id /= sha_id) then
              write(*,*) "************************************************"
              write(*,*) "WARNING: MCFOST has been updated"
@@ -1538,7 +1538,7 @@ contains
        if (ProDiMo2mcfost_version <= 2) then
             nLevel_oH2O = 10
             nLevel_pH2O = 9
-       else 
+       else
           nLevel_oH2O = 30
           nLevel_pH2O = 30
        endif
@@ -1556,8 +1556,8 @@ contains
           stop
        endif
        nCII = 0.0 ; dvCII = 0.0 ; nOI = 0.0 ; dvOI = 0.0 ; nCO=0.0 ;  dvCO = 0.0
-       noH2O = 0.0 ;  dvoH2O = 0.0 ;  npH2O = 0.0 ;  dvpH2O = 0.0 
-       
+       noH2O = 0.0 ;  dvoH2O = 0.0 ;  npH2O = 0.0 ;  dvpH2O = 0.0
+
        allocate(pop_CII(nLevel_CII, n_rad, nz), stat=alloc_status )
        allocate(pop_OI(nLevel_OI, n_rad, nz), stat=alloc_status )
        allocate(pop_CO(nLevel_CO, n_rad, nz), stat=alloc_status )
@@ -1567,23 +1567,23 @@ contains
           write(*,*) 'Allocation error pop_CII'
           stop
        endif
-       pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ; 
+       pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ;
 
-       
+
        ! read_image : HDU 1 : MCgrid, to make a test inside mcfost
        call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,fits_status)
        !   write(*,*) "Status1 = ", status
-    
+
        ! Verification grille
        do ri=1,n_rad
           do zj=1,nz
-             if (abs(r_grid(ri,zj) - grid(ri,zj,1)) > 1e-5 * r_grid(ri,zj)) then 
+             if (abs(r_grid(ri,zj) - grid(ri,zj,1)) > 1e-5 * r_grid(ri,zj)) then
                 write(*,*) "ERROR R. Exiting."
                 write(*,*) ri, "MCFOST=", r_grid(ri,zj), "ProDiMo=", grid(ri,zj,1)
                 !stop
              endif
-             
-             if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then 
+
+             if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then
                 write(*,*) "ERROR Z. Exiting."
                 write(*,*) ri, zj, z_grid(ri,zj), grid(ri,zj,2)
                 !stop
@@ -1595,8 +1595,8 @@ contains
        ! HDU 2 : gas temperature [K]  64 bits
        !---------------------------------------------------------
        !  move to next hdu
-       call ftmrhd(unit,1,hdutype,fits_status)    
-       
+       call ftmrhd(unit,1,hdutype,fits_status)
+
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,2,naxes,nfound,fits_status)
        if (nfound /= 2) then
@@ -1618,8 +1618,8 @@ contains
        ! HDU 3 : molecular particle densities [1/cm3]  64 bits
        !---------------------------------------------------------
        !  move to next hdu
-       call ftmrhd(unit,1,hdutype,fits_status)    
-       
+       call ftmrhd(unit,1,hdutype,fits_status)
+
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
        if (nfound /= 3) then
@@ -1637,20 +1637,20 @@ contains
 
        ! read_image
        call ftgpvd(unit,group,firstpix,npixels,nullval,TMP,anynull,fits_status)
-       
+
        ! Conversion en part.m^-3
        nCII = TMP(1,:,:) * m_to_cm**3
-       nOI = TMP(2,:,:) * m_to_cm**3 
-       nCO = TMP(3,:,:) * m_to_cm**3 
-       noH2O = TMP(4,:,:) * m_to_cm**3 
+       nOI = TMP(2,:,:) * m_to_cm**3
+       nCO = TMP(3,:,:) * m_to_cm**3
+       noH2O = TMP(4,:,:) * m_to_cm**3
        npH2O = TMP(5,:,:) * m_to_cm**3
 
        !------------------------------------------------------------------------------
        ! HDU 4 : line broadening parameter [km/s]   64bits
        !------------------------------------------------------------------------------
        !  move to next hdu
-       call ftmrhd(unit,1,hdutype,fits_status)    
-       
+       call ftmrhd(unit,1,hdutype,fits_status)
+
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
        if (nfound /= 3) then
@@ -1669,7 +1669,7 @@ contains
        call ftgpvd(unit,group,firstpix,npixels,nullval,TMP,anynull,fits_status)
 
        ! Conversion en m.s-1
-       dvCII = TMP(1,:,:) * km_to_m 
+       dvCII = TMP(1,:,:) * km_to_m
        dvOI = TMP(2,:,:) * km_to_m
        dvCO = TMP(3,:,:) * km_to_m
        dvoH2O = TMP(4,:,:) * km_to_m
@@ -1680,8 +1680,8 @@ contains
        !------------------------------------------------------------------------------
        do i=1,MC_NSP
           !  move to next hdu
-          call ftmrhd(unit,1,hdutype,fits_status)   
-          
+          call ftmrhd(unit,1,hdutype,fits_status)
+
           ! Check dimensions
           call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
           if (nfound /= 3) then
@@ -1715,13 +1715,13 @@ contains
                 MCpops(l,:,:) = MCpops(l,:,:) * MCpops(l-1,:,:)
                 sum_pops(:,:) = sum_pops(:,:) + MCpops(l,:,:)
              enddo !l
-             
+
              ! On renormalise pour avoir une somme des populations a 1
              do l=1, lpops%lmax(i)
                 MCpops(l,:,:) = MCpops(l,:,:) / sum_pops(:,:)
              enddo !l
           endif ! interface_version
-          
+
           if (i==1) pop_CII = MCpops
           if (i==2) pop_OI = MCpops
           if (i==3) pop_CO = MCpops
@@ -1734,12 +1734,12 @@ contains
 
        !  Close the file and free the unit number.
        if (fits_status > 0) write(*,*) "Status1=", fits_status ! renvoie non 0 sauf si on l'imprime (????)
-       call ftclos(unit, fits_status) 
+       call ftclos(unit, fits_status)
        if (fits_status > 0) write(*,*) "Status2=", fits_status ! renvoie non 0 sauf si on l'imprime (????)
        call ftfiou(unit, fits_status)
        !call ftfiou(-1, fits_status) ! deallocate toutes les unites fitsio, semble resoudre le probleme
        if (fits_status > 0) write(*,*) "Status3=", fits_status ! renvoie non 0 sauf si on l'imprime (????)
-       
+
        !  Check for any error, and if so print out error messages
        !  Get the text string which describes the error
        if (fits_status > 0) then
@@ -1761,7 +1761,7 @@ contains
     tab_abundance(:,:) = 0.0
     tab_nLevel(:,:,:) = 0.0
     do i=1, n_rad
-       do j=1, nz    
+       do j=1, nz
           if (lCII) then
              tab_nLevel(i,j,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
              tab_abundance(i,j) = nCII(i,j)
@@ -1775,7 +1775,7 @@ contains
              tab_abundance(i,j) = nCO(i,j)
           endif
           if (loH2O) then
-             tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j) 
+             tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
              tab_abundance(i,j) = noH2O(i,j)
           endif
           if (lpH2O) then
@@ -1786,15 +1786,15 @@ contains
     enddo
     tab_abundance = tab_abundance / densite_gaz(:,:,1) ! conversion nbre en abondance
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
-    
+
     Tcin(:,:,1) = Tgas
 
 
 
-!    iTrans = 2 ; 
+!    iTrans = 2 ;
 !    iUp = iTransUpper(iTrans)
 !       iLow = iTransLower(iTrans)
-!       cst = - hp * Transfreq(iTrans) / kb 
+!       cst = - hp * Transfreq(iTrans) / kb
 !
 !       write(*,*) "iTrans", iTrans, iLow, iUp
 !       write(*,*), "g", poids_stat_g(iLow), poids_stat_g(iUp)
@@ -1804,7 +1804,7 @@ contains
 !             nLow =  tab_nLevel(i,j,iLow)
 !             if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
 !                Tex = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
-!                
+!
 !                write(*,*) "Cell", i, j, nUp, nLow
 !                write(*,*) "ratio", nUp/nLow, poids_stat_g(iUp)/poids_stat_g(iLow) * exp(- hp * Transfreq(iTrans)/ (kb*Tgas(i,j)))
 !                write(*,*) Tex, Tgas(i,j)
@@ -1813,20 +1813,20 @@ contains
 !          enddo ! i
 !       enddo !j
 !    !enddo !iTrans
-!    
+!
 !    write(*,*) "test done"
 !    stop
 !
 !    Tcin(:,:,1) = Tgas
 !    do i=1, n_rad
-!       do j=1, nz 
+!       do j=1, nz
 !          tab_nLevel(i,j,1) = 1.0
 !          do l=2, nLevels
 !             tab_nLevel(i,j,l) = tab_nLevel(i,j,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
 !                  exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
 !          enddo
 !
-!          Somme = sum(tab_nLevel(i,l,:)) 
+!          Somme = sum(tab_nLevel(i,l,:))
 !          if (Somme < 1e-30) then
 !             write(*,*) "ERROR"
 !             stop
@@ -1844,17 +1844,17 @@ contains
           vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(i,j) * AU_to_m)**2 /  (r_cyl * AU_to_m)**3 )
        enddo
     enddo
-    
+
     ! Vitesse Doppler
     do i=1, n_rad
-       do j=1, nz        
+       do j=1, nz
           if (lCII) sigma2 =  dvCII(i,j)**2 !/ (2 * log(2.))
-          if (lOI) sigma2 =  dvOI(i,j)**2 
-          if (lCO) sigma2 =  dvCO(i,j)**2 
-          if (loH2O) sigma2 =  dvoH2O(i,j)**2 
-          if (lpH2O) sigma2 =  dvpH2O(i,j)**2 
+          if (lOI) sigma2 =  dvOI(i,j)**2
+          if (lCO) sigma2 =  dvCO(i,j)**2
+          if (loH2O) sigma2 =  dvoH2O(i,j)**2
+          if (lpH2O) sigma2 =  dvpH2O(i,j)**2
           v_line(i,j) = sqrt(sigma2)
-             
+
           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
           if (sigma2 <=0.) then
              write(*,*) "ERROR in ProDiMo data, dv = 0"
@@ -1865,10 +1865,10 @@ contains
           sigma2_phiProf_m1(i,j) = sigma2_m1
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-          norme_phiProf_m1(i,j) = c_light / sqrt(pi * sigma2) 
-          
+          norme_phiProf_m1(i,j) = c_light / sqrt(pi * sigma2)
+
 !----          ! Echantillonage du profil de vitesse dans la cellule
-!----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de 
+!----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
 !----          ! sa valeur au centre : exp(-2.15^2) = 0.01
 !----          vmax = sqrt(sigma2)
 !----          tab_dnu_o_freq(i,j) = largeur_profile * vmax / (real(n_speed) )
@@ -1881,9 +1881,9 @@ contains
 
     write(*,*) "Done"
     write(*,*) " "
-     
+
     return
-    
+
   end subroutine read_ProDiMo2mcfost
 
   !********************************************************************

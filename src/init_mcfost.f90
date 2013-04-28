@@ -21,12 +21,12 @@ module init_mcfost
   contains
 
 subroutine initialisation_mcfost()
-  
+
   implicit none
 
   integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
   real :: wvl, opt_zoom, utils_version
-  
+
   character(len=512) :: cmd, s, str_seed
 
   logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
@@ -40,7 +40,7 @@ subroutine initialisation_mcfost()
      home=trim(home)//"/"
   endif
 
-  ! Pour code sequentiel 
+  ! Pour code sequentiel
   nb_proc=1 ; lpara=.false.
 
   ! Pour code parallel
@@ -64,7 +64,7 @@ subroutine initialisation_mcfost()
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
-  seed_dir = "." 
+  seed_dir = "."
   lapprox_diffusion = .true.
   lonly_diff_approx = .false.
   lbenchmark_Pascucci = .false.
@@ -114,8 +114,8 @@ subroutine initialisation_mcfost()
   lcorrect_Tgas = .false.
 
   lonly_scatt = .false.
-  lHG = .false. 
-  
+  lHG = .false.
+
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -132,7 +132,7 @@ subroutine initialisation_mcfost()
      write(*,*) "Exiting."
      stop
   endif
-  
+
   dust_dir = trim(mcfost_utils)//"/Dust/"
   mol_dir = trim(mcfost_utils)//"/Molecules/"
   star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
@@ -144,7 +144,7 @@ subroutine initialisation_mcfost()
   if (nbr_arg < 1) call display_help()
 
   call get_command_argument(1,para)
-  
+
   ! Basic options
   if (para(1:1)=="-") then
      if (para(2:2)=="v") then ! mcfost version
@@ -228,7 +228,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Error : seed needed"
            stop
         endif
-        call get_command_argument(i_arg,str_seed) 
+        call get_command_argument(i_arg,str_seed)
         read(str_seed,*,iostat=ios) seed
         if (ios/=0) then
            write(*,*) "Error : seed needed"
@@ -397,7 +397,7 @@ subroutine initialisation_mcfost()
         endif
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
-        i_arg= i_arg+1 
+        i_arg= i_arg+1
      case("-output_density_grid")
         ldisk_struct=.true.
         i_arg = i_arg+1
@@ -430,7 +430,7 @@ subroutine initialisation_mcfost()
         endif
         call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_eq_th
-        i_arg = i_arg+1  
+        i_arg = i_arg+1
      case("-tau_dark_zone_obs")
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
@@ -439,7 +439,7 @@ subroutine initialisation_mcfost()
         endif
         call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_obs
-        i_arg = i_arg+1  
+        i_arg = i_arg+1
      case("-root_dir")
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
@@ -485,7 +485,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
-        i_arg = i_arg+1  
+        i_arg = i_arg+1
      case("-opacity_wall")
         lopacity_wall = .true.
         if (i_arg + 2 > nbr_arg) then
@@ -502,68 +502,68 @@ subroutine initialisation_mcfost()
      case("-spherical")
         lcylindrical=.false.
         lspherical=.true.
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-no_backup")
         lno_backup=.true.
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-Tfile")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         call get_command_argument(i_arg,Tfile)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-linear_grid")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         llinear_grid=.true.
      case("-r_subdivide")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lr_subdivide=.true.
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) r_subdivide
      case("-freeze_out")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lfreeze_out=.true.
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) T_freeze_out
      case("-isotropic")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lisotropic=.true.
      case("-no_scattering")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lno_scattering=.true.
      case("-qsca=qabs")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lqsca_equal_qabs=.true.
      case("-rt")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.false.
         lscatt_ray_tracing2=.false.
         if (.not.lmc) loutput_mc=.false.
      case("-rt1")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.true.
         lscatt_ray_tracing2=.false.
         if (.not.lmc) loutput_mc=.false.
      case("-rt2")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lscatt_ray_tracing=.true.
         lscatt_ray_tracing1=.false.
         lscatt_ray_tracing2=.true.
         if (.not.lmc) loutput_mc=.false.
      case("-mc")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lmc=.true.
         loutput_mc=.true.
      case("-gap_laure")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lgap_laure=.true.
         !llinear_grid=.true.  ! Ce n'est plus la gap pour densite_gap_laure2 !!!
         !write(*,*) "Using linear grid to read Laure's gap data"
         call get_command_argument(i_arg,s)
         density_file = s
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-debris")
         i_arg = i_arg+1
         ldebris=.true.
@@ -572,7 +572,7 @@ subroutine initialisation_mcfost()
            stop
         endif
         call get_command_argument(i_arg,debris_file)
-        i_arg = i_arg+1 
+        i_arg = i_arg+1
      case("-kappa_abs_grain")
         i_arg = i_arg+1
         lkappa_abs_grain = .true.
@@ -586,49 +586,49 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lcorrect_density=.true.
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) correct_density_factor
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) correct_density_Rin
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) correct_density_Rout
      case("-prodimo")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 4
      case("-prodimo3")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 3
      case("-prodimo2")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 2
      case("-prodimo1")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 1
      case("-prodimo_input_dir")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lprodimo_input_dir=.true.
         call get_command_argument(i_arg,ProDiMo_input_dir)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-prodimo_fPAH")
         i_arg = i_arg + 1
         lforce_ProDiMo_PAH = .true.
         call get_command_argument(i_arg,sProDiMo_fPAH)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(sProDiMo_fPAH,*) ProDiMo_fPAH
      case("-gap_ELT")
         i_arg = i_arg+1
         lgap_ELT=.true.
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) r_gap_ELT
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) sigma_gap_ELT
      case("-only_scatt")
         i_arg = i_arg+1
@@ -663,11 +663,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lread_Seb_Charnoz=.true.
     case("-read_Seb_C2")
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)
         density_file = s
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
      case("-force_1st_scatt")
         i_arg = i_arg+1
         lforce_1st_scatt=.true.
@@ -685,7 +685,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lcorrect_Tgas=.true.
         call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1 
+        i_arg = i_arg + 1
         read(s,*) correct_Tgas
      case default
         call display_help()
@@ -693,7 +693,7 @@ subroutine initialisation_mcfost()
   enddo ! while
 
   ! Display the disclaimer if needed
-  mcfost_no_disclaimer = 0 
+  mcfost_no_disclaimer = 0
   call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
   if (s/="") read(s,*) mcfost_no_disclaimer
   if (mcfost_no_disclaimer == 0) call display_disclaimer()
@@ -714,12 +714,12 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  
+
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
      if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
-        write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda" 
-        lsed_complete = .false.       
+        write(*,*) "WARNING: ProDiMo mode, forcing the wavelength grid using ProDiMo_UV3_9.lambda"
+        lsed_complete = .false.
         tab_wavelength = prodimo_tab_wavelength
      endif
   endif
@@ -729,7 +729,7 @@ subroutine initialisation_mcfost()
   if (ldust_prop) then
      write(*,*) "Computation of dust properties as a function of wavelength"
      basename_data_dir = "data_dust"
-     ! Make sure the full wavelength range is used to compute 
+     ! Make sure the full wavelength range is used to compute
      ! the dust properties
      limg=.false.
      lmono=.false.
@@ -757,10 +757,10 @@ subroutine initialisation_mcfost()
 
   if (lread_Seb_Charnoz) lstrat = .true.
 
-  
+
   if (lonly_scatt) l_em_disk_image=.false.
   if (lHG) aniso_method=2
-  
+
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
@@ -791,7 +791,7 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
      endif
   endif
-  
+
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.(ldust_prop .or. ldisk_struct))) then
      write(*,*) "Thermal equilibrium calculation"
      if (lforce_1st_scatt) then
@@ -799,7 +799,7 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
         lforce_1st_scatt = .false.
      endif
-     
+
      if (lmono) then
         write(*,*) "Error : thermal equilibrium cannot be calculated with only 1 wavelength!"
         write(*,*) "      Set n_lambda to a value higher than 1 in parameter file"
@@ -810,11 +810,11 @@ subroutine initialisation_mcfost()
         basename_data_dir = "data_th"
      endif
   endif
-  
+
   if ((lTemp).and.(.not.(ldust_prop))) then
      if (lRE_LTE) then
         write(*,*) "Temperature calculation under LTE approximation"
-     else 
+     else
         write(*,*) "Temperature calculation without LTE approximation"
      endif
   endif
@@ -829,7 +829,7 @@ subroutine initialisation_mcfost()
      write(*,*) 'Exiting'
      stop
   endif
-  
+
   if ( (lforce_1st_scatt).and.(lscatt_ray_tracing) ) then
      write(*,*) "ERROR: force_1st_scatt is not compatible with rt"
      write(*,*) "Exiting"
@@ -839,7 +839,7 @@ subroutine initialisation_mcfost()
   if (lresol) then
      igridx = nx
      igridy = ny
-     
+
       maxigrid = max(igridx, igridy)
 
       if (igridx == igridy) then
@@ -874,11 +874,11 @@ subroutine initialisation_mcfost()
         basename_data_dir2(imol) = "data_"//trim(mol(imol)%name)
      enddo
 
-     if (para_version < 2.07) then 
+     if (para_version < 2.07) then
         nTrans = nTrans_tot
         mol(1)%nTrans_raytracing = nTrans_tot
      endif
-     
+
      if (lmol_LTE) then
         write(*,*) "Molecular line transfer under LTE approximation"
      else
@@ -887,7 +887,7 @@ subroutine initialisation_mcfost()
 
   endif
 
-  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then 
+  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then
      ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
      write(*,*) "***************************"
      write(*,*) "* Modelling for ProDiMo   *"
@@ -926,7 +926,7 @@ subroutine initialisation_mcfost()
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
 
-  call save_data()   
+  call save_data()
 
   if ((l3D).and.(n_az==1)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
@@ -947,7 +947,7 @@ subroutine initialisation_mcfost()
   ! do i=1,17
   !    sig=signal(i,sig_handler,-1)
   ! enddo
-  
+
   return
 
 end subroutine initialisation_mcfost
@@ -955,7 +955,7 @@ end subroutine initialisation_mcfost
 !********************************************************************
 
 subroutine display_help()
-  
+
   implicit none
 
   write(*,*) "usage : mcfost parameter_file [options]"
@@ -968,7 +968,7 @@ subroutine display_help()
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
   write(*,*) "       -h : displays full MCFOST history since v2.12.9"
   write(*,*) " "
-  write(*,*) " Main mcfost options" 
+  write(*,*) " Main mcfost options"
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
   write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs"
   write(*,*) "        : -mol : calculates molecular emission"
@@ -993,8 +993,8 @@ subroutine display_help()
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
-  write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."  
-  write(*,*) "        : -no_diff_approx : compute T structure with only MC method"  
+  write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
+  write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
@@ -1020,11 +1020,11 @@ subroutine display_help()
   write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
   write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall,"
   write(*,*) "                            NOT a density wall"
-  write(*,*) "        : -linear_grid : linearly spaced grid" 
-  write(*,*) "        : -gap_laure <density_file>" 
+  write(*,*) "        : -linear_grid : linearly spaced grid"
+  write(*,*) "        : -gap_laure <density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
-  write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>" 
-  write(*,*) "        : -gap_ELT <R> <sigma>" 
+  write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
+  write(*,*) "        : -gap_ELT <R> <sigma>"
   write(*,*) "        : -Laure_SED <file>"
   write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
@@ -1033,7 +1033,7 @@ subroutine display_help()
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
   write(*,*) "                       polarizability and saves results in data_dust"
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
-  write(*,*) "                                    specified wavelength and stops" 
+  write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
   write(*,*) "        : -opacity_map : generates a map of integrated optical depth"
   write(*,*) "                         along radial and vertical directions and stops;"
@@ -1041,14 +1041,14 @@ subroutine display_help()
   write(*,*) "        : -average_grain_size : computes average grain size in each cell,"
   write(*,*) "                             weighted by their geometrical cross-section;"
   write(*,*) "                             results stored in average_grain_size.fits.gz"
-  write(*,*) "        : -isotropic : forces isotropic scattering" 
+  write(*,*) "        : -isotropic : forces isotropic scattering"
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze_out <T>"
   write(*,*) "        : -prodimo"
-  write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo" 
+  write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
@@ -1060,9 +1060,9 @@ end subroutine display_help
 !********************************************************************
 
 subroutine display_disclaimer()
-  
+
   character(len=10) :: accept
-  character(len=512) :: cmd 
+  character(len=512) :: cmd
   integer :: syst_status
 
   write(*,*) "*******************************************"
@@ -1084,7 +1084,7 @@ subroutine display_disclaimer()
      write(*,*) "*                                         *"
      write(*,*) "* Do you accept ? (yes/no)"
      read(*,*) accept
-     
+
      if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES") &
           .or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
         cmd = 'mkdir -p ~/.mcfost'
@@ -1093,13 +1093,13 @@ subroutine display_disclaimer()
         close(unit=1)
         write(*,*) "* Thank you !                             *"
         !write(*,*) "* This screen will not appear again       *"
-     else 
+     else
         write(*,*) "* Exiting MCFOST                          *"
         write(*,*) "*******************************************"
         stop
      endif
   endif ! accept disclaimer
-  
+
   write(*,*) "*******************************************"
 
   return
@@ -1111,7 +1111,7 @@ end subroutine display_disclaimer
 
 subroutine save_data
   !*************************************************
-  ! Si le dossier data existe on le sauve 
+  ! Si le dossier data existe on le sauve
   !*************************************************
 
   implicit none
@@ -1123,9 +1123,9 @@ subroutine save_data
   character(len=512) :: local_data_dir, local_basename_data_dir
 
   lmove_data = .false.
- 
-  if (lonly_diff_approx) return 
-  if (lsed.and.(.not.ltemp)) return 
+
+  if (lonly_diff_approx) return
+  if (lsed.and.(.not.ltemp)) return
 
   if (ldust_prop .or. ldisk_struct) then
      if (is_dir(trim(data_dir))) then
@@ -1133,19 +1133,19 @@ subroutine save_data
         cmd = 'rm -Rf '//trim(data_dir)
         call appel_syst(cmd,syst_status)
      endif
-     
+
      ! Cree le dossier data
      write (*,*) 'Creating directory '//trim(data_dir)
      cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
           ! copie le fichier de parametres
-          'cp '//trim(para)//' '//trim(data_dir)//" ; "// & 
+          'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
           ! options de la ligne de commande
-          'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// & 
-          'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
+          'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
           ! date du calcul
-          'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
           ! machine de calcul
-          'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// & 
+          'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
           ! id SHA
           'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
      ! Copie du fichier lambda si besoin
@@ -1171,9 +1171,9 @@ subroutine save_data
            etape_end=1
         endif
      endif
-     
+
      do etape=etape_start,etape_end
-        
+
         if (etape == 1) then
            local_data_dir = data_dir
            local_basename_data_dir = basename_data_dir
@@ -1181,15 +1181,15 @@ subroutine save_data
            local_data_dir = data_dir2(etape-1)
            local_basename_data_dir = basename_data_dir2(etape-1)
         endif
-        
+
 
         if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
            if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
-              ! le dossier data existe       
+              ! le dossier data existe
               lnew_run = .true.
               lmove_data=.true.
            else ! le dossier data n'existe pas
-              if (.not.lcheckpoint) then 
+              if (.not.lcheckpoint) then
                  lnew_run=.true.
                  lmove_data=.false.
               else ! Recherche checkpoint
@@ -1218,7 +1218,7 @@ subroutine save_data
         else
            lnew_run = .true. ! le dossier data n'existe pas
         endif
-        
+
         if (lmove_data) then
            if (lno_backup) then
               write (*,*) 'Directory '//trim(local_data_dir)//' already exists : exiting!'
@@ -1233,20 +1233,20 @@ subroutine save_data
               call appel_syst(cmd,syst_status)
            endif
         endif
-        
+
         if (lnew_run) then
            ! Cree le dossier data
            write (*,*) 'Creating directory '//trim(local_data_dir)
            cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
                 ! copie le fichier de parametres
-                'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// & 
+                'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
                 ! options de la ligne de commande
-                'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
-                'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+                'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
                 ! date du calcul
-                'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
                 ! machine de calcul
-                'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// & 
+                'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
                 ! id SHA
                 'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
            ! Copie du fichier lambda si besoin
@@ -1256,7 +1256,7 @@ subroutine save_data
            call appel_syst(cmd,syst_status)
         endif
       enddo ! etape
-     
+
   endif ! ldust_prop
 
   return
