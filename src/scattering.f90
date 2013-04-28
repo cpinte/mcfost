@@ -18,40 +18,40 @@ module scattering
 
 !***************************************************
 
-!$$$---  subroutine BHMIE_old(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA) 
-!$$$---  
+!$$$---  subroutine BHMIE_old(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
+!$$$---
 !$$$---    implicit none
-!$$$---  
-!$$$---  ! Declare parameters:                                                   
-!$$$---  ! Note: important that MXNANG be consistent with dimension of S1 and S2 
+!$$$---
+!$$$---  ! Declare parameters:
+!$$$---  ! Note: important that MXNANG be consistent with dimension of S1 and S2
 !$$$---  !       in calling routine!
-!$$$---  
+!$$$---
 !$$$---    ! Inutile depuis le passage en allocation dynamique
-!$$$---    !  integer, parameter :: NMXX=20000000 
+!$$$---    !  integer, parameter :: NMXX=20000000
 !$$$---    ! defaut : NMXX=20000
 !$$$---    ! On peut passer a  NMXX=2000000 : ca marche jusque a=10cm en bande B
 !$$$---    ! mais faut pas etre presse
 !$$$---    integer, parameter :: db = selected_real_kind(p=13,r=200)
-!$$$---  
-!$$$---  ! Arguments:                                                            
+!$$$---
+!$$$---  ! Arguments:
 !$$$---    integer, intent(in) :: NANG
 !$$$---    real, intent(in) :: x
-!$$$---    complex, intent(in) :: REFREL 
-!$$$---    real, intent(out) :: GSCA,QBACK,QEXT,QSCA 
+!$$$---    complex, intent(in) :: REFREL
+!$$$---    real, intent(out) :: GSCA,QBACK,QEXT,QSCA
 !$$$---    complex, dimension(2*NANG), intent(out) :: S1,S2
-!$$$---  
-!$$$---  
-!$$$---  ! Local variables:                                                      
-!$$$---    integer :: J,JJ,N,NSTOP,NMX,NN 
-!$$$---    real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD                                 
-!$$$---    real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU                                      
+!$$$---
+!$$$---
+!$$$---  ! Local variables:
+!$$$---    integer :: J,JJ,N,NSTOP,NMX,NN
+!$$$---    real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD
+!$$$---    real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU
 !$$$---    complex :: S1_0,S2_0
-!$$$---    real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0                                      
-!$$$---    complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y 
-!$$$---  !  complex (kind=db), dimension(nmxx):: D 
+!$$$---    real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0
+!$$$---    complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y
+!$$$---  !  complex (kind=db), dimension(nmxx):: D
 !$$$---    complex (kind=db), dimension(:), allocatable :: D
 !$$$---    integer :: alloc_status
-!$$$---  
+!$$$---
 !$$$---    ! Allocation dynamique sinon ca plante quand nmxx devient trop grand,
 !$$$---    ! permet de passer le tableau de la zone stack a la zone data
 !$$$---  !  allocate(D(nmxx), stat=alloc_status)
@@ -60,268 +60,268 @@ module scattering
 !$$$---  !     stop
 !$$$---  !  endif
 !$$$---  !  D = 0
-!$$$---  
-!$$$---  
+!$$$---
+!$$$---
 !$$$---  !***********************************************************************
-!$$$---  ! Subroutine BHMIE is the Bohren-Huffman Mie scattering subroutine      
-!$$$---  !    to calculate scattering and absorption by a homogenous isotropic   
-!$$$---  !    sphere.                                                            
-!$$$---  ! Given:                                                                
-!$$$---  !    X = 2*pi*a/lambda                                                  
-!$$$---  !    REFREL = (complex refr. index of sphere)/(real index of medium)    
-!$$$---  !    NANG = number of angles between 0 and 90 degrees                   
-!$$$---  !           (will calculate 2*NANG-1 directions from 0 to 180 deg.)     
-!$$$---  !           if called with NANG<2, will set NANG=2 and will compute     
-!$$$---  !           scattering for theta=0,90,180.                              
-!$$$---  ! Returns:                                                              
-!$$$---  !    S1(1 - 2*NANG-1) = -i*f_22 (incid. E perp. to scatt. plane,        
-!$$$---  !                                scatt. E perp. to scatt. plane)        
-!$$$---  !    S2(1 - 2*NANG-1) = -i*f_11 (incid. E parr. to scatt. plane,        
-!$$$---  !                                scatt. E parr. to scatt. plane)        
-!$$$---  !    QEXT = C_ext/pi*a**2 = efficiency factor for extinction            
-!$$$---  !    QSCA = C_sca/pi*a**2 = efficiency factor for scattering            
-!$$$---  !    QBACK = (dC_sca/domega)/pi*a**2                                    
-!$$$---  !          = backscattering efficiency [NB: this is (1/4*pi) smaller    
-!$$$---  !            than the "radar backscattering efficiency"; see Bohren &   
-!$$$---  !            Huffman 1983 pp. 120-123]                                  
-!$$$---  !    GSCA = <cos(theta)> for scattering                                 
-!$$$---  !                                                                       
-!$$$---  ! Original program taken from Bohren and Huffman (1983), Appendix A     
-!$$$---  ! Modified by B.T.Draine, Princeton Univ. Obs., 90/10/26                
-!$$$---  ! in order to compute <cos(theta)>                                      
-!$$$---  ! 91/05/07 (BTD): Modified to allow NANG=1                              
-!$$$---  ! 91/08/15 (BTD): Corrected error (failure to initialize P)             
-!$$$---  ! 91/08/15 (BTD): Modified to enhance vectorizability.                  
-!$$$---  ! 91/08/15 (BTD): Modified to make NANG=2 if called with NANG=1         
-!$$$---  ! 91/08/15 (BTD): Changed definition of QBACK.                          
-!$$$---  ! 92/01/08 (BTD): Converted to full double precision and double complex 
-!$$$---  !                 eliminated 2 unneed lines of code                     
-!$$$---  !                 eliminated redundant variables (e.g. APSI,APSI0)      
-!$$$---  !                 renamed RN -> EN = double precision N                 
-!$$$---  !                 Note that DOUBLE COMPLEX and DCMPLX are not part      
-!$$$---  !                 of f77 standard, so this version may not be fully     
-!$$$---  !                 portable.  In event that portable version is          
-!$$$---  !                 needed, use src/bhmie_f77.f                           
-!$$$---  ! 93/06/01 (BTD): Changed AMAX1 to generic function MAX                 
+!$$$---  ! Subroutine BHMIE is the Bohren-Huffman Mie scattering subroutine
+!$$$---  !    to calculate scattering and absorption by a homogenous isotropic
+!$$$---  !    sphere.
+!$$$---  ! Given:
+!$$$---  !    X = 2*pi*a/lambda
+!$$$---  !    REFREL = (complex refr. index of sphere)/(real index of medium)
+!$$$---  !    NANG = number of angles between 0 and 90 degrees
+!$$$---  !           (will calculate 2*NANG-1 directions from 0 to 180 deg.)
+!$$$---  !           if called with NANG<2, will set NANG=2 and will compute
+!$$$---  !           scattering for theta=0,90,180.
+!$$$---  ! Returns:
+!$$$---  !    S1(1 - 2*NANG-1) = -i*f_22 (incid. E perp. to scatt. plane,
+!$$$---  !                                scatt. E perp. to scatt. plane)
+!$$$---  !    S2(1 - 2*NANG-1) = -i*f_11 (incid. E parr. to scatt. plane,
+!$$$---  !                                scatt. E parr. to scatt. plane)
+!$$$---  !    QEXT = C_ext/pi*a**2 = efficiency factor for extinction
+!$$$---  !    QSCA = C_sca/pi*a**2 = efficiency factor for scattering
+!$$$---  !    QBACK = (dC_sca/domega)/pi*a**2
+!$$$---  !          = backscattering efficiency [NB: this is (1/4*pi) smaller
+!$$$---  !            than the "radar backscattering efficiency"; see Bohren &
+!$$$---  !            Huffman 1983 pp. 120-123]
+!$$$---  !    GSCA = <cos(theta)> for scattering
+!$$$---  !
+!$$$---  ! Original program taken from Bohren and Huffman (1983), Appendix A
+!$$$---  ! Modified by B.T.Draine, Princeton Univ. Obs., 90/10/26
+!$$$---  ! in order to compute <cos(theta)>
+!$$$---  ! 91/05/07 (BTD): Modified to allow NANG=1
+!$$$---  ! 91/08/15 (BTD): Corrected error (failure to initialize P)
+!$$$---  ! 91/08/15 (BTD): Modified to enhance vectorizability.
+!$$$---  ! 91/08/15 (BTD): Modified to make NANG=2 if called with NANG=1
+!$$$---  ! 91/08/15 (BTD): Changed definition of QBACK.
+!$$$---  ! 92/01/08 (BTD): Converted to full double precision and double complex
+!$$$---  !                 eliminated 2 unneed lines of code
+!$$$---  !                 eliminated redundant variables (e.g. APSI,APSI0)
+!$$$---  !                 renamed RN -> EN = double precision N
+!$$$---  !                 Note that DOUBLE COMPLEX and DCMPLX are not part
+!$$$---  !                 of f77 standard, so this version may not be fully
+!$$$---  !                 portable.  In event that portable version is
+!$$$---  !                 needed, use src/bhmie_f77.f
+!$$$---  ! 93/06/01 (BTD): Changed AMAX1 to generic function MAX
 !$$$---  ! 04/03/04 (CP): passage en fortran 90
 !$$$---  ! 13/10/04 (CP): passage a des angles demi-entier (milieu du bin) pour pouvoir faire l'integration de s11(theta)
 !$$$---  ! l'angle 0° est calcule a part car on en a besoin pour Qext
 !$$$---  ! de meme, on aurait besoin de 180° pour Qback mais ca ne sert pas donc je ne calcule pas
-!$$$---  ! 16/12/04 (CP): Remplacement imag par aimag (Pas forcement ok avec tous les 
+!$$$---  ! 16/12/04 (CP): Remplacement imag par aimag (Pas forcement ok avec tous les
 !$$$---  ! compilateurs) mais standard f95 et 2003
 !$$$---  ! 24/03/05 (CP): allocation dynamique de D. Permet de placer le tableau dans la zone data
 !$$$---  ! et de l'allouer avec juste le bon nombre de terme.
 !$$$---  !***********************************************************************
-!$$$---  
-!$$$---  !*** Safety checks                                                      
+!$$$---
+!$$$---  !*** Safety checks
 !$$$---  !  if(NANG > MXNANG) then
-!$$$---  !     write(*,*)'***Error: NANG > MXNANG in bhmie' 
+!$$$---  !     write(*,*)'***Error: NANG > MXNANG in bhmie'
 !$$$---  !     stop
 !$$$---  !  endif
 !$$$---  !  if(NANG < 2) then
 !$$$---  !     write(*,*)'***Error: NANG doit etre >= 2'
 !$$$---  !     stop
 !$$$---  !  endif
-!$$$---  !*** Obtain pi:                                                         
-!$$$---    PII=4.*atan(1.D0) 
-!$$$---    DX=X 
-!$$$---    DREFRL=REFREL 
-!$$$---    Y=X*DREFRL 
-!$$$---    YMOD=abs(Y) 
-!$$$---  !                                                                       
-!$$$---  !*** Series expansion terminated after NSTOP terms                      
-!$$$---  !    Logarithmic derivatives calculated from NMX on down                
-!$$$---  
-!$$$---    XSTOP=X+4.*X**0.3333+2. 
-!$$$---    NMX=max(XSTOP,YMOD)+15 
+!$$$---  !*** Obtain pi:
+!$$$---    PII=4.*atan(1.D0)
+!$$$---    DX=X
+!$$$---    DREFRL=REFREL
+!$$$---    Y=X*DREFRL
+!$$$---    YMOD=abs(Y)
+!$$$---  !
+!$$$---  !*** Series expansion terminated after NSTOP terms
+!$$$---  !    Logarithmic derivatives calculated from NMX on down
+!$$$---
+!$$$---    XSTOP=X+4.*X**0.3333+2.
+!$$$---    NMX=max(XSTOP,YMOD)+15
 !$$$---  ! Allocation ici : on connait la taille du tableau
-!$$$---  
+!$$$---
 !$$$---    allocate(D(nmx), stat=alloc_status)
 !$$$---    if (alloc_status > 0) then
 !$$$---       write(*,*) 'Allocation error BHMIE'
 !$$$---       stop
 !$$$---    endif
 !$$$---    D = 0
-!$$$---  
-!$$$---  
+!$$$---
+!$$$---
 !$$$---  ! BTD experiment 91/1/15: add one more term to series and compare result
-!$$$---  !      NMX=AMAX1(XSTOP,YMOD)+16                                         
-!$$$---  ! test: compute 7001 wavelengths between .0001 and 1000 micron          
-!$$$---  ! for a=1.0micron SiC grain.  When NMX increased by 1, only a single    
-!$$$---  ! computed number changed (out of 4*7001) and it only changed by 1/8387 
-!$$$---  ! conclusion: we are indeed retaining enough terms in series!           
-!$$$---    NSTOP=XSTOP 
-!$$$---  
-!$$$---  ! Inutile depuis que l'on est passé en allocation dynamique                                                                       
-!$$$---  !  if(NMX > NMXX)then 
-!$$$---  !     write(0,*)'Error: NMX =', NMX,' > NMXX=',NMXX,' for |m|x=',YMOD 
-!$$$---  !     stop 
+!$$$---  !      NMX=AMAX1(XSTOP,YMOD)+16
+!$$$---  ! test: compute 7001 wavelengths between .0001 and 1000 micron
+!$$$---  ! for a=1.0micron SiC grain.  When NMX increased by 1, only a single
+!$$$---  ! computed number changed (out of 4*7001) and it only changed by 1/8387
+!$$$---  ! conclusion: we are indeed retaining enough terms in series!
+!$$$---    NSTOP=XSTOP
+!$$$---
+!$$$---  ! Inutile depuis que l'on est passé en allocation dynamique
+!$$$---  !  if(NMX > NMXX)then
+!$$$---  !     write(0,*)'Error: NMX =', NMX,' > NMXX=',NMXX,' for |m|x=',YMOD
+!$$$---  !     stop
 !$$$---  !  endif
-!$$$---  
-!$$$---  !*** Require NANG.GE.1 in order to calculate scattering intensities     
-!$$$---    DANG=0. 
+!$$$---
+!$$$---  !*** Require NANG.GE.1 in order to calculate scattering intensities
+!$$$---    DANG=0.
 !$$$---    if (NANG > 1) then
-!$$$---       DANG=.5*PII/dble(NANG) 
+!$$$---       DANG=.5*PII/dble(NANG)
 !$$$---    endif
 !$$$---    AMU_0=1.0
-!$$$---    do J=1,NANG 
-!$$$---       THETA=(dble(J)-0.5)*DANG 
-!$$$---       AMU(J)=cos(THETA) 
+!$$$---    do J=1,NANG
+!$$$---       THETA=(dble(J)-0.5)*DANG
+!$$$---       AMU(J)=cos(THETA)
 !$$$---    end do
-!$$$---  
-!$$$---    PI0_0=0. 
+!$$$---
+!$$$---    PI0_0=0.
 !$$$---    PI1_0=1.
-!$$$---    do J=1,NANG 
-!$$$---       PI0(J)=0. 
-!$$$---       PI1(J)=1. 
+!$$$---    do J=1,NANG
+!$$$---       PI0(J)=0.
+!$$$---       PI1(J)=1.
 !$$$---    end do
-!$$$---    S1_0=(0.,0.) 
-!$$$---    S2_0=(0.,0.) 
-!$$$---    NN=2*NANG 
-!$$$---    do J=1,NN 
-!$$$---       S1(J)=(0.,0.) 
-!$$$---       S2(J)=(0.,0.) 
+!$$$---    S1_0=(0.,0.)
+!$$$---    S2_0=(0.,0.)
+!$$$---    NN=2*NANG
+!$$$---    do J=1,NN
+!$$$---       S1(J)=(0.,0.)
+!$$$---       S2(J)=(0.,0.)
 !$$$---    end do
-!$$$---  !                                                                       
-!$$$---  !*** Logarithmic derivative D(J) calculated by downward recurrence      
-!$$$---  !    beginning with initial value (0.,0.) at J=NMX                      
-!$$$---  !                                                                       
-!$$$---    D(NMX)=(0.,0.) 
-!$$$---    NN=NMX-1 
-!$$$---    do N=1,NN 
-!$$$---       EN=NMX-N+1 
-!$$$---       D(NMX-N)=(EN/Y)-(1./(D(NMX-N+1)+EN/Y)) 
+!$$$---  !
+!$$$---  !*** Logarithmic derivative D(J) calculated by downward recurrence
+!$$$---  !    beginning with initial value (0.,0.) at J=NMX
+!$$$---  !
+!$$$---    D(NMX)=(0.,0.)
+!$$$---    NN=NMX-1
+!$$$---    do N=1,NN
+!$$$---       EN=NMX-N+1
+!$$$---       D(NMX-N)=(EN/Y)-(1./(D(NMX-N+1)+EN/Y))
 !$$$---    end do
-!$$$---  !                                                                       
-!$$$---  !*** Riccati-Bessel functions with real argument X                      
-!$$$---  !    calculated by upward recurrence                                    
-!$$$---  !                                                                       
-!$$$---    PSI0=cos(DX) 
-!$$$---    PSI1=sin(DX) 
-!$$$---    CHI0=-sin(DX) 
-!$$$---    CHI1=cos(DX) 
-!$$$---    XI1=CMPLX(PSI1,-CHI1,db) 
-!$$$---    QSCA=0.E0 
-!$$$---    GSCA=0.E0 
-!$$$---    P=-1. 
-!$$$---    do N=1,NSTOP 
-!$$$---       EN=N 
-!$$$---       FN=(2.E0*EN+1.)/(EN*(EN+1.)) 
-!$$$---  ! for given N, PSI  = psi_n        CHI  = chi_n                         
-!$$$---  !              PSI1 = psi_{n-1}    CHI1 = chi_{n-1}                     
-!$$$---  !              PSI0 = psi_{n-2}    CHI0 = chi_{n-2}                     
-!$$$---  ! Calculate psi_n and chi_n                                             
-!$$$---       PSI=(2.E0*EN-1.)*PSI1/DX-PSI0 
-!$$$---       CHI=(2.E0*EN-1.)*CHI1/DX-CHI0 
-!$$$---       XI=CMPLX(PSI,-CHI,db) 
-!$$$---                                                                 
-!$$$---  !*** Store previous values of AN and BN for use                         
-!$$$---  !    in computation of g=<cos(theta)>                                   
-!$$$---       if(N > 1)then 
-!$$$---          AN1=AN 
-!$$$---          BN1=BN 
+!$$$---  !
+!$$$---  !*** Riccati-Bessel functions with real argument X
+!$$$---  !    calculated by upward recurrence
+!$$$---  !
+!$$$---    PSI0=cos(DX)
+!$$$---    PSI1=sin(DX)
+!$$$---    CHI0=-sin(DX)
+!$$$---    CHI1=cos(DX)
+!$$$---    XI1=CMPLX(PSI1,-CHI1,db)
+!$$$---    QSCA=0.E0
+!$$$---    GSCA=0.E0
+!$$$---    P=-1.
+!$$$---    do N=1,NSTOP
+!$$$---       EN=N
+!$$$---       FN=(2.E0*EN+1.)/(EN*(EN+1.))
+!$$$---  ! for given N, PSI  = psi_n        CHI  = chi_n
+!$$$---  !              PSI1 = psi_{n-1}    CHI1 = chi_{n-1}
+!$$$---  !              PSI0 = psi_{n-2}    CHI0 = chi_{n-2}
+!$$$---  ! Calculate psi_n and chi_n
+!$$$---       PSI=(2.E0*EN-1.)*PSI1/DX-PSI0
+!$$$---       CHI=(2.E0*EN-1.)*CHI1/DX-CHI0
+!$$$---       XI=CMPLX(PSI,-CHI,db)
+!$$$---
+!$$$---  !*** Store previous values of AN and BN for use
+!$$$---  !    in computation of g=<cos(theta)>
+!$$$---       if(N > 1)then
+!$$$---          AN1=AN
+!$$$---          BN1=BN
 !$$$---       endif
-!$$$---  !                                                                       
-!$$$---  !*** Compute AN and BN:                                                 
-!$$$---       AN=(D(N)/DREFRL+EN/DX)*PSI-PSI1 
-!$$$---       AN=AN/((D(N)/DREFRL+EN/DX)*XI-XI1) 
-!$$$---       BN=(DREFRL*D(N)+EN/DX)*PSI-PSI1 
-!$$$---       BN=BN/((DREFRL*D(N)+EN/DX)*XI-XI1) 
-!$$$---                                                                     
-!$$$---  !*** Augment sums for Qsca and g=<cos(theta)>                           
-!$$$---       QSCA=QSCA+(2.*EN+1.)*(abs(AN)**2+abs(BN)**2) 
+!$$$---  !
+!$$$---  !*** Compute AN and BN:
+!$$$---       AN=(D(N)/DREFRL+EN/DX)*PSI-PSI1
+!$$$---       AN=AN/((D(N)/DREFRL+EN/DX)*XI-XI1)
+!$$$---       BN=(DREFRL*D(N)+EN/DX)*PSI-PSI1
+!$$$---       BN=BN/((DREFRL*D(N)+EN/DX)*XI-XI1)
+!$$$---
+!$$$---  !*** Augment sums for Qsca and g=<cos(theta)>
+!$$$---       QSCA=QSCA+(2.*EN+1.)*(abs(AN)**2+abs(BN)**2)
 !$$$---       GSCA=GSCA+((2.*EN+1.)/(EN*(EN+1.)))*(real(AN)*real(BN)+aimag(AN)*aimag(BN))
-!$$$---       if(N > 1)then 
+!$$$---       if(N > 1)then
 !$$$---          GSCA=GSCA+((EN-1.)*(EN+1.)/EN)*(real(AN1)*real(AN)+aimag(AN1)*aimag(AN) &
-!$$$---               +real(BN1)*real(BN)+aimag(BN1)*aimag(BN))                   
+!$$$---               +real(BN1)*real(BN)+aimag(BN1)*aimag(BN))
 !$$$---       endif
-!$$$---  !                                                                       
-!$$$---  !*** Now calculate scattering intensity pattern                         
+!$$$---  !
+!$$$---  !*** Now calculate scattering intensity pattern
 !$$$---  ! 0° calcule a part car les angles sont demi-entier
 !$$$---  ! et on a besoin de S1_0 pour qext
-!$$$---       PI_0=PI1_0 
-!$$$---       TAU_0=EN*AMU_0*PI_0-(EN+1.)*PI0_0 
-!$$$---       S1_0=S1_0+FN*(AN*PI_0+BN*TAU_0) 
-!$$$---       S2_0=S2_0+FN*(AN*TAU_0+BN*PI_0) 
-!$$$---  !    First do angles from 0 to 90                                       
-!$$$---       do  J=1,NANG 
-!$$$---          PI(J)=PI1(J) 
-!$$$---          TAU(J)=EN*AMU(J)*PI(J)-(EN+1.)*PI0(J) 
-!$$$---          S1(J)=S1(J)+FN*(AN*PI(J)+BN*TAU(J)) 
-!$$$---          S2(J)=S2(J)+FN*(AN*TAU(J)+BN*PI(J)) 
+!$$$---       PI_0=PI1_0
+!$$$---       TAU_0=EN*AMU_0*PI_0-(EN+1.)*PI0_0
+!$$$---       S1_0=S1_0+FN*(AN*PI_0+BN*TAU_0)
+!$$$---       S2_0=S2_0+FN*(AN*TAU_0+BN*PI_0)
+!$$$---  !    First do angles from 0 to 90
+!$$$---       do  J=1,NANG
+!$$$---          PI(J)=PI1(J)
+!$$$---          TAU(J)=EN*AMU(J)*PI(J)-(EN+1.)*PI0(J)
+!$$$---          S1(J)=S1(J)+FN*(AN*PI(J)+BN*TAU(J))
+!$$$---          S2(J)=S2(J)+FN*(AN*TAU(J)+BN*PI(J))
 !$$$---       enddo
-!$$$---  !                                                                       
-!$$$---  !*** Now do angles greater than 90 using PI and TAU from                
-!$$$---  !    angles less than 90.                                               
-!$$$---  !    P=1 for N=1,3,...; P=-1 for N=2,4,...                              
-!$$$---       P=-P 
+!$$$---  !
+!$$$---  !*** Now do angles greater than 90 using PI and TAU from
+!$$$---  !    angles less than 90.
+!$$$---  !    P=1 for N=1,3,...; P=-1 for N=2,4,...
+!$$$---       P=-P
 !$$$---       do J=1,NANG
-!$$$---          JJ=2*NANG-J+1 
-!$$$---          S1(JJ)=S1(JJ)+FN*P*(AN*PI(J)-BN*TAU(J)) 
-!$$$---          S2(JJ)=S2(JJ)+FN*P*(BN*PI(J)-AN*TAU(J)) 
+!$$$---          JJ=2*NANG-J+1
+!$$$---          S1(JJ)=S1(JJ)+FN*P*(AN*PI(J)-BN*TAU(J))
+!$$$---          S2(JJ)=S2(JJ)+FN*P*(BN*PI(J)-AN*TAU(J))
 !$$$---       enddo
-!$$$---       PSI0=PSI1 
-!$$$---       PSI1=PSI 
-!$$$---       CHI0=CHI1 
-!$$$---       CHI1=CHI 
-!$$$---       XI1=CMPLX(PSI1,-CHI1,db) 
-!$$$---  !                                                                       
-!$$$---  !*** Compute pi_n for next value of n                                   
-!$$$---  !    For each angle J, compute pi_n+1                                   
-!$$$---  !    from PI = pi_n , PI0 = pi_n-1 
-!$$$---       PI1_0=((2.*EN+1.)*AMU_0*PI_0-(EN+1.)*PI0_0)/EN 
-!$$$---       PI0_0=PI_0 
-!$$$---       do J=1,NANG 
-!$$$---          PI1(J)=((2.*EN+1.)*AMU(J)*PI(J)-(EN+1.)*PI0(J))/EN 
-!$$$---          PI0(J)=PI(J) 
+!$$$---       PSI0=PSI1
+!$$$---       PSI1=PSI
+!$$$---       CHI0=CHI1
+!$$$---       CHI1=CHI
+!$$$---       XI1=CMPLX(PSI1,-CHI1,db)
+!$$$---  !
+!$$$---  !*** Compute pi_n for next value of n
+!$$$---  !    For each angle J, compute pi_n+1
+!$$$---  !    from PI = pi_n , PI0 = pi_n-1
+!$$$---       PI1_0=((2.*EN+1.)*AMU_0*PI_0-(EN+1.)*PI0_0)/EN
+!$$$---       PI0_0=PI_0
+!$$$---       do J=1,NANG
+!$$$---          PI1(J)=((2.*EN+1.)*AMU(J)*PI(J)-(EN+1.)*PI0(J))/EN
+!$$$---          PI0(J)=PI(J)
 !$$$---       enddo
 !$$$---    end do
-!$$$---  !                                                                       
-!$$$---  !*** Have summed sufficient terms.                                      
-!$$$---  !    Now compute QSCA,QEXT,QBACK,and GSCA                               
-!$$$---    GSCA=2.*GSCA/QSCA 
-!$$$---    QSCA=(2./(DX*DX))*QSCA 
-!$$$---    QEXT=(4./(DX*DX))*real(S1_0) 
-!$$$---    QBACK=(abs(S1(2*NANG-1))/DX)**2/PII 
-!$$$---  
+!$$$---  !
+!$$$---  !*** Have summed sufficient terms.
+!$$$---  !    Now compute QSCA,QEXT,QBACK,and GSCA
+!$$$---    GSCA=2.*GSCA/QSCA
+!$$$---    QSCA=(2./(DX*DX))*QSCA
+!$$$---    QEXT=(4./(DX*DX))*real(S1_0)
+!$$$---    QBACK=(abs(S1(2*NANG-1))/DX)**2/PII
+!$$$---
 !$$$---    deallocate(D)
 !$$$---    return
-!$$$---  
+!$$$---
 !$$$---  end subroutine BHMIE_OLD
 
 !***************************************************
 
-subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA) 
+subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
 
   implicit none
 
-! Declare parameters:                                                   
-! Note: important that MXNANG be consistent with dimension of S1 and S2 
+! Declare parameters:
+! Note: important that MXNANG be consistent with dimension of S1 and S2
 !       in calling routine!
 
   ! Inutile depuis le passage en allocation dynamique
-  !  integer, parameter :: NMXX=20000000 
+  !  integer, parameter :: NMXX=20000000
   ! defaut : NMXX=20000
   ! On peut passer a  NMXX=2000000 : ca marche jusque a=10cm en bande B
   ! mais faut pas etre presse
   integer, parameter :: db = selected_real_kind(p=13,r=200)
 
-! Arguments:                                                            
+! Arguments:
   integer, intent(in) :: NANG
   real, intent(in) :: x
-  complex, intent(in) :: REFREL 
-  real, intent(out) :: GSCA,QBACK,QEXT,QSCA 
+  complex, intent(in) :: REFREL
+  real, intent(out) :: GSCA,QBACK,QEXT,QSCA
   complex, dimension(2*NANG-1), intent(out) :: S1,S2
 
 
-! Local variables:                                                      
-  integer :: J,JJ,N,NSTOP,NMX,NN 
-  real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD                                 
-  real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU                                      
+! Local variables:
+  integer :: J,JJ,N,NSTOP,NMX,NN
+  real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD
+  real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU
   complex :: S1_0,S2_0
-!  real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0                                      
-  complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y 
-!  complex (kind=db), dimension(nmxx):: D 
+!  real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0
+  complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y
+!  complex (kind=db), dimension(nmxx):: D
   complex (kind=db), dimension(:), allocatable :: D
   integer :: alloc_status
 
@@ -337,51 +337,51 @@ subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
 
 
 !***********************************************************************
-! Subroutine BHMIE is the Bohren-Huffman Mie scattering subroutine      
-!    to calculate scattering and absorption by a homogenous isotropic   
-!    sphere.                                                            
-! Given:                                                                
-!    X = 2*pi*a/lambda                                                  
-!    REFREL = (complex refr. index of sphere)/(real index of medium)    
-!    NANG = number of angles between 0 and 90 degrees                   
-!           (will calculate 2*NANG-1 directions from 0 to 180 deg.)     
-!           if called with NANG<2, will set NANG=2 and will compute     
-!           scattering for theta=0,90,180.                              
-! Returns:                                                              
-!    S1(1 - 2*NANG-1) = -i*f_22 (incid. E perp. to scatt. plane,        
-!                                scatt. E perp. to scatt. plane)        
-!    S2(1 - 2*NANG-1) = -i*f_11 (incid. E parr. to scatt. plane,        
-!                                scatt. E parr. to scatt. plane)        
-!    QEXT = C_ext/pi*a**2 = efficiency factor for extinction            
-!    QSCA = C_sca/pi*a**2 = efficiency factor for scattering            
-!    QBACK = (dC_sca/domega)/pi*a**2                                    
-!          = backscattering efficiency [NB: this is (1/4*pi) smaller    
-!            than the "radar backscattering efficiency"; see Bohren &   
-!            Huffman 1983 pp. 120-123]                                  
-!    GSCA = <cos(theta)> for scattering                                 
-!                                                                       
-! Original program taken from Bohren and Huffman (1983), Appendix A     
-! Modified by B.T.Draine, Princeton Univ. Obs., 90/10/26                
-! in order to compute <cos(theta)>                                      
-! 91/05/07 (BTD): Modified to allow NANG=1                              
-! 91/08/15 (BTD): Corrected error (failure to initialize P)             
-! 91/08/15 (BTD): Modified to enhance vectorizability.                  
-! 91/08/15 (BTD): Modified to make NANG=2 if called with NANG=1         
-! 91/08/15 (BTD): Changed definition of QBACK.                          
-! 92/01/08 (BTD): Converted to full double precision and double complex 
-!                 eliminated 2 unneed lines of code                     
-!                 eliminated redundant variables (e.g. APSI,APSI0)      
-!                 renamed RN -> EN = double precision N                 
-!                 Note that DOUBLE COMPLEX and DCMPLX are not part      
-!                 of f77 standard, so this version may not be fully     
-!                 portable.  In event that portable version is          
-!                 needed, use src/bhmie_f77.f                           
-! 93/06/01 (BTD): Changed AMAX1 to generic function MAX                 
+! Subroutine BHMIE is the Bohren-Huffman Mie scattering subroutine
+!    to calculate scattering and absorption by a homogenous isotropic
+!    sphere.
+! Given:
+!    X = 2*pi*a/lambda
+!    REFREL = (complex refr. index of sphere)/(real index of medium)
+!    NANG = number of angles between 0 and 90 degrees
+!           (will calculate 2*NANG-1 directions from 0 to 180 deg.)
+!           if called with NANG<2, will set NANG=2 and will compute
+!           scattering for theta=0,90,180.
+! Returns:
+!    S1(1 - 2*NANG-1) = -i*f_22 (incid. E perp. to scatt. plane,
+!                                scatt. E perp. to scatt. plane)
+!    S2(1 - 2*NANG-1) = -i*f_11 (incid. E parr. to scatt. plane,
+!                                scatt. E parr. to scatt. plane)
+!    QEXT = C_ext/pi*a**2 = efficiency factor for extinction
+!    QSCA = C_sca/pi*a**2 = efficiency factor for scattering
+!    QBACK = (dC_sca/domega)/pi*a**2
+!          = backscattering efficiency [NB: this is (1/4*pi) smaller
+!            than the "radar backscattering efficiency"; see Bohren &
+!            Huffman 1983 pp. 120-123]
+!    GSCA = <cos(theta)> for scattering
+!
+! Original program taken from Bohren and Huffman (1983), Appendix A
+! Modified by B.T.Draine, Princeton Univ. Obs., 90/10/26
+! in order to compute <cos(theta)>
+! 91/05/07 (BTD): Modified to allow NANG=1
+! 91/08/15 (BTD): Corrected error (failure to initialize P)
+! 91/08/15 (BTD): Modified to enhance vectorizability.
+! 91/08/15 (BTD): Modified to make NANG=2 if called with NANG=1
+! 91/08/15 (BTD): Changed definition of QBACK.
+! 92/01/08 (BTD): Converted to full double precision and double complex
+!                 eliminated 2 unneed lines of code
+!                 eliminated redundant variables (e.g. APSI,APSI0)
+!                 renamed RN -> EN = double precision N
+!                 Note that DOUBLE COMPLEX and DCMPLX are not part
+!                 of f77 standard, so this version may not be fully
+!                 portable.  In event that portable version is
+!                 needed, use src/bhmie_f77.f
+! 93/06/01 (BTD): Changed AMAX1 to generic function MAX
 ! 04/03/04 (CP): passage en fortran 90
 ! 13/10/04 (CP): passage a des angles demi-entier (milieu du bin) pour pouvoir faire l'integration de s11(theta)
 ! l'angle 0° est calcule a part car on en a besoin pour Qext
 ! de meme, on aurait besoin de 180° pour Qback mais ca ne sert pas donc je ne calcule pas
-! 16/12/04 (CP): Remplacement imag par aimag (Pas forcement ok avec tous les 
+! 16/12/04 (CP): Remplacement imag par aimag (Pas forcement ok avec tous les
 ! compilateurs) mais standard f95 et 2003
 ! 24/03/05 (CP): allocation dynamique de D. Permet de placer le tableau dans la zone data
 ! et de l'allouer avec juste le bon nombre de terme.
@@ -390,27 +390,27 @@ subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
 !***********************************************************************
 
 
-!*** Safety checks                                                      
+!*** Safety checks
 !  if(NANG > MXNANG) then
-!     write(*,*)'***Error: NANG > MXNANG in bhmie' 
+!     write(*,*)'***Error: NANG > MXNANG in bhmie'
 !     stop
 !  endif
 !  if(NANG < 2) then
 !     write(*,*)'***Error: NANG doit etre >= 2'
 !     stop
 !  endif
-!*** Obtain pi:                                                         
-  PII=4.*atan(1.D0) 
-  DX=X 
-  DREFRL=REFREL 
-  Y=X*DREFRL 
-  YMOD=abs(Y) 
-!                                                                       
-!*** Series expansion terminated after NSTOP terms                      
-!    Logarithmic derivatives calculated from NMX on down                
+!*** Obtain pi:
+  PII=4.*atan(1.D0)
+  DX=X
+  DREFRL=REFREL
+  Y=X*DREFRL
+  YMOD=abs(Y)
+!
+!*** Series expansion terminated after NSTOP terms
+!    Logarithmic derivatives calculated from NMX on down
 
-  XSTOP=X+4.*X**0.3333+2. 
-  NMX=max(XSTOP,YMOD)+15 
+  XSTOP=X+4.*X**0.3333+2.
+  NMX=max(XSTOP,YMOD)+15
 ! Allocation ici : on connait la taille du tableau
 
   allocate(D(nmx), stat=alloc_status)
@@ -422,132 +422,132 @@ subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
 
 
 ! BTD experiment 91/1/15: add one more term to series and compare result
-!      NMX=AMAX1(XSTOP,YMOD)+16                                         
-! test: compute 7001 wavelengths between .0001 and 1000 micron          
-! for a=1.0micron SiC grain.  When NMX increased by 1, only a single    
-! computed number changed (out of 4*7001) and it only changed by 1/8387 
-! conclusion: we are indeed retaining enough terms in series!           
-  NSTOP=XSTOP 
+!      NMX=AMAX1(XSTOP,YMOD)+16
+! test: compute 7001 wavelengths between .0001 and 1000 micron
+! for a=1.0micron SiC grain.  When NMX increased by 1, only a single
+! computed number changed (out of 4*7001) and it only changed by 1/8387
+! conclusion: we are indeed retaining enough terms in series!
+  NSTOP=XSTOP
 
-! Inutile depuis que l'on est passé en allocation dynamique                                                                       
-!  if(NMX > NMXX)then 
-!     write(0,*)'Error: NMX =', NMX,' > NMXX=',NMXX,' for |m|x=',YMOD 
-!     stop 
+! Inutile depuis que l'on est passé en allocation dynamique
+!  if(NMX > NMXX)then
+!     write(0,*)'Error: NMX =', NMX,' > NMXX=',NMXX,' for |m|x=',YMOD
+!     stop
 !  endif
 
-!*** Require NANG.GE.1 in order to calculate scattering intensities     
-  DANG=0. 
+!*** Require NANG.GE.1 in order to calculate scattering intensities
+  DANG=0.
   if (NANG > 1) then
-     DANG=.5*PII/dble(NANG-1) 
+     DANG=.5*PII/dble(NANG-1)
   endif
-  do J=1,NANG 
-     THETA=(dble(J)-1.0)*DANG 
-     AMU(J)=cos(THETA) 
+  do J=1,NANG
+     THETA=(dble(J)-1.0)*DANG
+     AMU(J)=cos(THETA)
   end do
 
-  do J=1,NANG 
-     PI0(J)=0. 
-     PI1(J)=1. 
+  do J=1,NANG
+     PI0(J)=0.
+     PI1(J)=1.
   end do
 
-  NN=2*NANG-1 
-  do J=1,NN 
-     S1(J)=(0._db,0._db) 
-     S2(J)=(0._db,0._db) 
+  NN=2*NANG-1
+  do J=1,NN
+     S1(J)=(0._db,0._db)
+     S2(J)=(0._db,0._db)
   end do
-!                                                                       
-!*** Logarithmic derivative D(J) calculated by downward recurrence      
-!    beginning with initial value (0.,0.) at J=NMX                      
-!                                                                       
-  D(NMX)=(0.,0.) 
-  NN=NMX-1 
-  do N=1,NN 
-     EN=NMX-N+1 
-     D(NMX-N)=(EN/Y)-(1./(D(NMX-N+1)+EN/Y)) 
+!
+!*** Logarithmic derivative D(J) calculated by downward recurrence
+!    beginning with initial value (0.,0.) at J=NMX
+!
+  D(NMX)=(0.,0.)
+  NN=NMX-1
+  do N=1,NN
+     EN=NMX-N+1
+     D(NMX-N)=(EN/Y)-(1./(D(NMX-N+1)+EN/Y))
   end do
-!                                                                       
-!*** Riccati-Bessel functions with real argument X                      
-!    calculated by upward recurrence                                    
-!                                                                       
-  PSI0=cos(DX) 
-  PSI1=sin(DX) 
-  CHI0=-sin(DX) 
-  CHI1=cos(DX) 
-  XI1=CMPLX(PSI1,-CHI1,db) 
-  QSCA=0.E0 
-  GSCA=0.E0 
-  P=-1. 
-  do N=1,NSTOP 
-     EN=N 
-     FN=(2.E0*EN+1.)/(EN*(EN+1.)) 
-! for given N, PSI  = psi_n        CHI  = chi_n                         
-!              PSI1 = psi_{n-1}    CHI1 = chi_{n-1}                     
-!              PSI0 = psi_{n-2}    CHI0 = chi_{n-2}                     
-! Calculate psi_n and chi_n                                             
-     PSI=(2.E0*EN-1.)*PSI1/DX-PSI0 
-     CHI=(2.E0*EN-1.)*CHI1/DX-CHI0 
-     XI=CMPLX(PSI,-CHI,db) 
-                                                               
-!*** Store previous values of AN and BN for use                         
-!    in computation of g=<cos(theta)>                                   
-     if(N > 1)then 
-        AN1=AN 
-        BN1=BN 
+!
+!*** Riccati-Bessel functions with real argument X
+!    calculated by upward recurrence
+!
+  PSI0=cos(DX)
+  PSI1=sin(DX)
+  CHI0=-sin(DX)
+  CHI1=cos(DX)
+  XI1=CMPLX(PSI1,-CHI1,db)
+  QSCA=0.E0
+  GSCA=0.E0
+  P=-1.
+  do N=1,NSTOP
+     EN=N
+     FN=(2.E0*EN+1.)/(EN*(EN+1.))
+! for given N, PSI  = psi_n        CHI  = chi_n
+!              PSI1 = psi_{n-1}    CHI1 = chi_{n-1}
+!              PSI0 = psi_{n-2}    CHI0 = chi_{n-2}
+! Calculate psi_n and chi_n
+     PSI=(2.E0*EN-1.)*PSI1/DX-PSI0
+     CHI=(2.E0*EN-1.)*CHI1/DX-CHI0
+     XI=CMPLX(PSI,-CHI,db)
+
+!*** Store previous values of AN and BN for use
+!    in computation of g=<cos(theta)>
+     if(N > 1)then
+        AN1=AN
+        BN1=BN
      endif
-!                                                                       
-!*** Compute AN and BN:                                                 
-     AN=(D(N)/DREFRL+EN/DX)*PSI-PSI1 
-     AN=AN/((D(N)/DREFRL+EN/DX)*XI-XI1) 
-     BN=(DREFRL*D(N)+EN/DX)*PSI-PSI1 
-     BN=BN/((DREFRL*D(N)+EN/DX)*XI-XI1) 
-                                                                   
-!*** Augment sums for Qsca and g=<cos(theta)>                           
-     QSCA=QSCA+(2.*EN+1.)*(abs(AN)**2+abs(BN)**2) 
+!
+!*** Compute AN and BN:
+     AN=(D(N)/DREFRL+EN/DX)*PSI-PSI1
+     AN=AN/((D(N)/DREFRL+EN/DX)*XI-XI1)
+     BN=(DREFRL*D(N)+EN/DX)*PSI-PSI1
+     BN=BN/((DREFRL*D(N)+EN/DX)*XI-XI1)
+
+!*** Augment sums for Qsca and g=<cos(theta)>
+     QSCA=QSCA+(2.*EN+1.)*(abs(AN)**2+abs(BN)**2)
      GSCA=GSCA+((2.*EN+1.)/(EN*(EN+1.)))*(real(AN)*real(BN)+aimag(AN)*aimag(BN))
-     if(N > 1)then 
+     if(N > 1)then
         GSCA=GSCA+((EN-1.)*(EN+1.)/EN)*(real(AN1)*real(AN)+aimag(AN1)*aimag(AN) &
-             +real(BN1)*real(BN)+aimag(BN1)*aimag(BN))                   
+             +real(BN1)*real(BN)+aimag(BN1)*aimag(BN))
      endif
-!                                                                       
-!*** Now calculate scattering intensity pattern                         
-!    First do angles from 0 to 90                                       
-     do  J=1,NANG 
-        PI(J)=PI1(J) 
-        TAU(J)=EN*AMU(J)*PI(J)-(EN+1.)*PI0(J) 
-        S1(J)=S1(J)+FN*(AN*PI(J)+BN*TAU(J)) 
-        S2(J)=S2(J)+FN*(AN*TAU(J)+BN*PI(J)) 
+!
+!*** Now calculate scattering intensity pattern
+!    First do angles from 0 to 90
+     do  J=1,NANG
+        PI(J)=PI1(J)
+        TAU(J)=EN*AMU(J)*PI(J)-(EN+1.)*PI0(J)
+        S1(J)=S1(J)+FN*(AN*PI(J)+BN*TAU(J))
+        S2(J)=S2(J)+FN*(AN*TAU(J)+BN*PI(J))
      enddo
-!                                                                       
-!*** Now do angles greater than 90 using PI and TAU from                
-!    angles less than 90.                                               
-!    P=1 for N=1,3,...; P=-1 for N=2,4,...                              
-     P=-P 
+!
+!*** Now do angles greater than 90 using PI and TAU from
+!    angles less than 90.
+!    P=1 for N=1,3,...; P=-1 for N=2,4,...
+     P=-P
      do J=1,NANG-1
-        JJ=2*NANG-J 
-        S1(JJ)=S1(JJ)+FN*P*(AN*PI(J)-BN*TAU(J)) 
-        S2(JJ)=S2(JJ)+FN*P*(BN*PI(J)-AN*TAU(J)) 
+        JJ=2*NANG-J
+        S1(JJ)=S1(JJ)+FN*P*(AN*PI(J)-BN*TAU(J))
+        S2(JJ)=S2(JJ)+FN*P*(BN*PI(J)-AN*TAU(J))
      enddo
-     PSI0=PSI1 
-     PSI1=PSI 
-     CHI0=CHI1 
-     CHI1=CHI 
-     XI1=CMPLX(PSI1,-CHI1,db) 
-!                                                                       
-!*** Compute pi_n for next value of n                                   
-!    For each angle J, compute pi_n+1                                   
-!    from PI = pi_n , PI0 = pi_n-1 
-     do J=1,NANG 
-        PI1(J)=((2.*EN+1.)*AMU(J)*PI(J)-(EN+1.)*PI0(J))/EN 
-        PI0(J)=PI(J) 
+     PSI0=PSI1
+     PSI1=PSI
+     CHI0=CHI1
+     CHI1=CHI
+     XI1=CMPLX(PSI1,-CHI1,db)
+!
+!*** Compute pi_n for next value of n
+!    For each angle J, compute pi_n+1
+!    from PI = pi_n , PI0 = pi_n-1
+     do J=1,NANG
+        PI1(J)=((2.*EN+1.)*AMU(J)*PI(J)-(EN+1.)*PI0(J))/EN
+        PI0(J)=PI(J)
      enddo
   end do
-!                                                                       
-!*** Have summed sufficient terms.                                      
-!    Now compute QSCA,QEXT,QBACK,and GSCA                               
-  GSCA=2.*GSCA/QSCA 
-  QSCA=(2./(DX*DX))*QSCA 
-  QEXT=(4./(DX*DX))*real(S1(1)) 
-  QBACK=(abs(S1(2*NANG-1))/DX)**2/PII 
+!
+!*** Have summed sufficient terms.
+!    Now compute QSCA,QEXT,QBACK,and GSCA
+  GSCA=2.*GSCA/QSCA
+  QSCA=(2./(DX*DX))*QSCA
+  QEXT=(4./(DX*DX))*real(S1(1))
+  QBACK=(abs(S1(2*NANG-1))/DX)**2/PII
 
   deallocate(D)
   return
@@ -560,7 +560,7 @@ end subroutine BHMIE
 subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir de
-! la sous-routine bhmie (grains spheriques)   
+! la sous-routine bhmie (grains spheriques)
 !     GRAINS SPHERIQUES.
 !
 !        CALCULE AUSSI "G" = LE PARAMETRE D'ASYMETRIE
@@ -575,14 +575,14 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
   real, intent(out) :: qext, qsca, gsca
 
   integer :: j, nang
- 
+
   complex, dimension(nang_scatt+1) :: S1,S2
 
   real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
   complex :: refrel
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
-  
+
   refrel = cmplx(amu1,amu2)
 
   x = alfa
@@ -605,19 +605,19 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
 
-     !  QABS=QEXT-QSCA 
+     !  QABS=QEXT-QSCA
      ! Calcul des elements de la matrice de diffusion
-     ! indices decales de 1 par rapport a bhmie 
+     ! indices decales de 1 par rapport a bhmie
      do J=0,nang_scatt
         vi1 = cabs(S2(J+1))*cabs(S2(J+1))
         vi2 = cabs(S1(J+1))*cabs(S1(J+1))
         s11(j) = 0.5*(vi1 + vi2)
 !        write(*,*) j, s11(j), vi1, vi2 ! PB : s11(1) super grand
         s12(j) = 0.5*(vi1 - vi2)
-        s33(j)=real(S2(J+1)*conjg(S1(J+1))) 
-        s34(j)=aimag(S2(J+1)*conjg(S1(J+1))) 
+        s33(j)=real(S2(J+1)*conjg(S1(J+1)))
+        s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
      enddo !j
- 
+
      ! Integration S11 pour tirer angle
      somme_sin= 0.0
      somme2 = 0.0
@@ -651,21 +651,21 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
 !!$  enddo
 !!$  write(*,*) somme1, somme2
 !!$  close(unit=1)
-!!$!  stop 
+!!$!  stop
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
      do J=0,nang_scatt
 !     ! Normalisation pour diffusion isotrope et E_sca(theta)
-!     if (j == 1)  then 
+!     if (j == 1)  then
 !        norme = somme_prob/somme_sin
 !     endif
 
 ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
 ! PAR CELLULE)
-! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS 
+! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
 
    !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
-        
+
 
         if (scattering_method==1) then
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
@@ -675,7 +675,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
            s33(j) = s33(j) / norme
            s34(j) = s34(j) / norme
         endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
-        
+
         tab_s11(lambda,taille_grain,j) = s11(j)
         tab_s12(lambda,taille_grain,j) = s12(j)
         tab_s33(lambda,taille_grain,j) = s33(j)
@@ -693,12 +693,12 @@ end subroutine mueller2
 subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir du
-! code gmm01TrA (clusters de sphères)   
+! code gmm01TrA (clusters de sphères)
 !     Aggrégats
 !
 !        CALCULE AUSSI "G" = LE PARAMETRE D'ASYMETRIE
 !
-! C. Pinte 
+! C. Pinte
 ! 04/07/2005
 !****************************************************************
 
@@ -710,7 +710,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
   integer, parameter :: nang2 = 2*nang_scatt+1
 
   integer :: j, i
- 
+
   real :: gsca, norme, somme_sin, somme_prob, somme1, somme2, hg
   real :: cext,cabs,csca,cbak,cpr,assym
   real :: cextv,cabsv,cscav,cbakv,cprv
@@ -744,7 +744,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
 
   ! Lecture du fichier de résultats de gmm01TrA : 'gmm01TrA.out'
   open(unit=12,file=mueller_aggregate_file,status='old')
-  read(12,*) 
+  read(12,*)
   read(12,*)
   if(idscmt < 0) then
      read(12,*) string
@@ -768,7 +768,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
         !read(12,'(f6.1,e13.5,f8.4,4e13.5)') dang(i),inat(i),pol(i),i11(i),i21(i),i12(i),i22(i)
         read(12,*)
      enddo
-     read(12,*) 
+     read(12,*)
      read(12,*)  !'Scattering matrix (4X4 for each scattering angle):'
      read(12,*) string
     do i=1,nang2
@@ -785,7 +785,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
   close(unit=1)
 
 
-!  QABS=QEXT-QSCA 
+!  QABS=QEXT-QSCA
 ! Calcul des elements de la matrice de diffusion
 ! Calcul angle central du bin par interpolation linéaire
   do J=1,2*NANG_scatt
@@ -826,18 +826,18 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
 !!$  enddo
 !!$  write(*,*) somme1, somme2
 !!$  close(unit=1)
-!!$!  stop 
+!!$!  stop
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   do J=1,2*NANG_scatt
 !     ! Normalisation pour diffusion isotrope et E_sca(theta)
-!     if (j == 1)  then 
+!     if (j == 1)  then
 !        norme = somme_prob/somme_sin
 !     endif
 
 ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
 ! PAR CELLULE)
-! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS 
+! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
 
      if (scattering_method==1) then
         ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
@@ -859,7 +859,7 @@ end subroutine mueller_gmm
 !***************************************************
 
 subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
-  ! interpolation bi-lineaire (en log-log) des sections efficaces 
+  ! interpolation bi-lineaire (en log-log) des sections efficaces
   ! pour grains de PAH  apres lecture du fichier de Draine
   ! Suppose une HG pour la fonction de phase et une polarisabilite nulle !!
   ! C. Pinte
@@ -879,7 +879,7 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   log_a=log(r_grain(taille_grain))
   log_wavel = log(tab_lambda(lambda))
-  
+
   pop=grain(taille_grain)%pop
 
   if (r_grain(taille_grain) < exp(log_PAH_rad(1))) then
@@ -897,8 +897,8 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   ! Recherche en taille de grain
   ! tableau croissant
   do j=2,PAH_n_rad-1
-     if (log_PAH_rad(j) > log_a) exit 
-  enddo 
+     if (log_PAH_rad(j) > log_a) exit
+  enddo
   frac_a = (log_a-log_PAH_rad(j-1))/(log_PAH_rad(j)-log_PAH_rad(j-1))
   frac_a_m1 = 1- frac_a
 
@@ -920,7 +920,7 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   !write(*,*) lambda, N, norme
 
   if (norme > 0) then ! on fait la moyenne sur les points selectionnes
-     qext = qext / norme 
+     qext = qext / norme
      qsca = qsca / norme
      gsca = gsca / norme
   else ! on peut pas moyenner, on fait une interpolation en log
@@ -956,13 +956,13 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   !! Matrices de mueller
   if (aniso_method==1) then
-  
+
      ! HG avec le g interpole dans la table
      do j=0,nang_scatt
         s11(j)=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
      enddo
 
-     ! Polarisabilite nulle 
+     ! Polarisabilite nulle
      s12=0.0 ; s33 = 0.0 ; s34 = 0.0
 
      ! Integration S11 pour tirer angle
@@ -989,13 +989,13 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
            s33(j) = s33(j) / norme
            s34(j) = s34(j) / norme
         endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
-        
+
         tab_s11(p_lambda,taille_grain,j) = s11(j)
         tab_s12(p_lambda,taille_grain,j) = s12(j)
         tab_s33(p_lambda,taille_grain,j) = s33(j)
         tab_s34(p_lambda,taille_grain,j) = s34(j)
      enddo
-     
+
   endif ! aniso_method ==1
 
   return
@@ -1047,7 +1047,7 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
      aw0 = a*w0
      u1 = ( aw0*u0 - b*v0 ) * cm1 + cpsi*u0
      v1 = ( aw0*v0 + b*u0 ) * cm1 + cpsi*v0
-     w1 =  cpsi*w0 - a*c  
+     w1 =  cpsi*w0 - a*c
   else
      u1 = a
      v1 = b
@@ -1071,12 +1071,12 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
 !  et non plus en utilisant la taille du pas
 !  --> plus precis, important quand on reduit n_grains_tot
 !
-!  23 Fevrier 04 : ajout d'une prediction avant la 
+!  23 Fevrier 04 : ajout d'une prediction avant la
 !  premiere iteration de la dichotomie
 !-----------------------------------------------------
- 
+
   implicit none
- 
+
   integer, intent(in) :: lambda, ri, zj, phik
   real, intent(in) :: aleat
   real :: prob
@@ -1086,7 +1086,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   real :: test, norme
 
   prob = aleat  ! probsizecumul(lambda,ri,zj,n_grains_tot) est normalise a 1.0
-  
+
   ! Cas particulier prob=1.0
   if ((1.0-prob) < 1.e-6) then
      grainsize=amax_reel(lambda,ri,zj,phik)
@@ -1121,7 +1121,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
      else
         kmax = k
      endif
-        
+
      k = (kmin + kmax)/2
      if ((kmax-kmin) <= 1) then
         exit ! Sortie du while
@@ -1132,7 +1132,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   grainsize = k
 
 !  write(*,*) k, probsizecumul(lambda,ri,zj,k), probsizecumul(lambda,ri,zj,k+1)
-  
+
 end function grainsize
 
 !*******************************************************************
@@ -1180,7 +1180,7 @@ subroutine MULMAT (M, N, K, A, B, C)
 end subroutine MULMAT
 
 !*****************************************************
- 
+
 subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !***********************************************************
 !--------CALCUL LES QUATRES PARAMETRES DE STOKES------------
@@ -1360,7 +1360,7 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 
 !  norme=tab_albedo(l)*tab_s11(lambda,taille_grain,itheta)*(stok_I0/stok(1,1))
 !  write(*,*) tab_s11(lambda,taille_grain,itheta), stok_I0, stok(1,1)
-  norme=(tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1) &   
+  norme=(tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1) &
        * (stok_I0/stok(1))
   do i=1,4
      stok(i)=stok(i)*norme
@@ -1501,7 +1501,7 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   stok_I0 = stok(1,1)
 !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
 !  call MULMAT (4,4,1,ROP,STOK,C)
-  C=matmul(ROP,STOK) 
+  C=matmul(ROP,STOK)
 ! LE RESULTAT EST C(4,1)
 
 !  call MULMAT (4,4,1,XMUL,C,D)
@@ -1537,7 +1537,7 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
   ! 9/01/05 : Prop des grains par cellule
 
   implicit none
-  
+
   real, intent(in) :: frac
   real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda, itheta, ri, zj, phik
@@ -1655,13 +1655,13 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
 
   ! LE RESULTAT EST C(4,1)
-     
+
   !  call MULMAT (4,4,1,XMUL,C,D)
   ! LE RESULTAT EST D(4,1)
   !  D=matmul(XMUL,C)
   D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
   D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
-     
+
   !  call MULMAT (4,4,1,RPO,D,STOK)
   !  stok=matmul(RPO,D)
   stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
@@ -1674,9 +1674,9 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
   ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
-     
+
   !  norme=tab_albedo(l)*tab_s11(l,itheta)*(stok_I0/stok(1,1))
-  if (stok(1) > tiny_real) then      
+  if (stok(1) > tiny_real) then
      norme= XMUL(1,1) * (stok_I0/stok(1))
      do i=1,4
         stok(i)=stok(i)*norme
@@ -1684,7 +1684,7 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
   else
      stok(:)=0.0
   endif
-  
+
   return
 
 end subroutine new_stokes_pos
@@ -1728,10 +1728,10 @@ subroutine isotrope(aleat1,aleat2,u,v,w)
 ! 24/05/05
 
   implicit none
-  
+
   real, intent(in) :: aleat1, aleat2
   real(kind=db), intent(out) :: u,v,w
- 
+
   real(kind=db) :: SRW02, ARGMT, w02
 
   w = 2.0_db*aleat1-1.0_db
@@ -1760,10 +1760,10 @@ subroutine hg(lambda, g, aleat, itheta, cospsi)
 !********************************************************
 
   implicit none
- 
+
   ! Le calcul de cospsi se fait en double precision mais on
   ! renvoie cospsi en simple precision
-  ! Passage cospsi en db lors passage length_deg2 en db 
+  ! Passage cospsi en db lors passage length_deg2 en db
   integer, intent(in) :: lambda
   real, intent(in) :: g
   real, intent(in) :: aleat
@@ -1782,12 +1782,12 @@ subroutine hg(lambda, g, aleat, itheta, cospsi)
      d = b / c
      cospsi = ( (a - d*d) / (2.0_db * g1) )
   else ! g=0 --> diffusion isotrope
-     cospsi=2.0_db*rand-1.0_db 
+     cospsi=2.0_db*rand-1.0_db
   endif
-  
+
   if (cospsi > 1.0_db) write(*,*) g1, rand
-  itheta = floor(acos(cospsi)*180.0_db/pi)+1 
-  if (itheta > 180) itheta = 180 
+  itheta = floor(acos(cospsi)*180.0_db/pi)+1
+  if (itheta > 180) itheta = 180
 
   return
 end subroutine hg
@@ -1809,7 +1809,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
   real(kind=db), intent(out) :: cospsi
-  
+
   integer :: k, kmin, kmax
 
   kmin=0
@@ -1821,7 +1821,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
         kmin = k
      else
         kmax = k
-     endif       
+     endif
      k = (kmin + kmax)/2
    enddo   ! while
    k=kmax
@@ -1832,7 +1832,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
    ! Tirage aleatoire de l'angle de diffusion autour entre l'angle k et l'angle k-1
    ! diffusion uniforme (lineaire en cos)
    cospsi=cos((real(k)-1.0)*pi/180.) + aleat2*(cos((real(k))*pi/180.)-cos((real(k)-1.0)*pi/180.))
-   
+
    return
 
 end subroutine angle_diff_theta
@@ -1847,14 +1847,14 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
 ! itheta est utilise pour les valeurs pretabulee
 ! cospsi est utilise pour la direction de vol
 ! C. Pinte 9/01/05
- 
+
   implicit none
 
   integer, intent(in) :: lambda,ri,zj, phik
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
   real(kind=db), intent(out) :: cospsi
-  
+
   integer :: k, kmin, kmax
 
   kmin=0
@@ -1866,7 +1866,7 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
         kmin = k
      else
         kmax = k
-     endif       
+     endif
      k = (kmin + kmax)/2
    enddo   ! while
    k=kmax
@@ -1878,7 +1878,7 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
    ! diffusion uniforme (lineaire en cos)
    cospsi=cos((real(k,kind=db)-1.0_db)*pi/180._db) + &
         aleat2*(cos((real(k,kind=db))*pi/180._db)-cos((real(k,kind=db)-1.0_db)*pi/180._db))
-   
+
    return
 
 end subroutine angle_diff_theta_pos
@@ -1887,19 +1887,19 @@ end subroutine angle_diff_theta_pos
 
 subroutine funcd(x,fval,fderiv,ppp,A)
 ! Calcule la fonction de repartition de l'angle de diffusion phi
-! ainsi que sa dérivée pour déterminer le zero par la méthode des 
-! tangentes (Newton) 
+! ainsi que sa dérivée pour déterminer le zero par la méthode des
+! tangentes (Newton)
 ! C. Pinte    23/10/2004
 
   implicit none
-  
+
   real, intent(in) :: x,ppp,A
   real, intent(out) :: fval,fderiv
 
   ! T'es sur que c'est le bon signe la ?????????
   fval=2*x-ppp*sin(2*x)-A
   fderiv=2-ppp*2*cos(2*x)
-  
+
   return
 
 end subroutine funcd
@@ -1916,10 +1916,10 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
 
   integer, intent(in) :: lambda,taille_grain, itheta
   real, intent(in) :: frac, I, Q, U, aleat
-  real(kind=db), intent(out) :: phi 
+  real(kind=db), intent(out) :: phi
 
   real :: p, pp, ppp, phi1, phi2, frac_m1
-  
+
   real(kind=db) :: Q_db, U_db, Ip
 
   frac_m1 = 1.0 - frac
@@ -1932,12 +1932,12 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
   p=Ip/I
 
   ! polarisabilite
-  pp= (tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1) & 
+  pp= (tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1) &
   / (tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1)
 
   ppp=p*pp
 !  write(*,*) p,pp,ppp
-  
+
   if (abs(ppp) > 1.e-3) then
      ! Mesure de l'angle du plan de pola par rapport au Nord céleste
      phi1=0.5*acos(Q_db/Ip) ! C'est ici qu'on a besoin du db
@@ -1955,7 +1955,7 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
      phi= pi * (2._db*aleat -1.0_db)
   endif
 !  write(*,*) phi/pi
- 
+
   return
 
 end subroutine angle_diff_phi
@@ -2039,11 +2039,11 @@ end function rtsafe
 subroutine radius_aggregate()
 
   implicit none
-  
+
   integer :: i, alloc_status
   real :: wavelength
   real, dimension(:), allocatable :: x, y, z, r, eps1, eps2
-  
+
 
   open(unit=1,file=trim(aggregate_file), status='old')
   read(1,*) wavelength

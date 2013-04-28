@@ -16,8 +16,8 @@ module stars
   contains
 
 subroutine select_etoile(lambda,aleat,n_star)
-! Sélection d'étoile qui va émettre le photon 
-! C. Pinte 
+! Sélection d'étoile qui va émettre le photon
+! C. Pinte
 ! 21/05/05
 
   implicit none
@@ -37,22 +37,22 @@ subroutine select_etoile(lambda,aleat,n_star)
         kmin = k
      else
         kmax = k
-     endif       
+     endif
      k = (kmin + kmax)/2
    enddo   ! while
    n_star=kmax
 
    return
-  
+
 end subroutine select_etoile
 
 !**********************************************************************
 
 subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v,w,w2)
 ! Choisit la position d'emission uniformement
-! sur la surface de l'etoile et la direction de vol 
+! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
-! C. Pinte 
+! C. Pinte
 ! 21/05/05
 
   implicit none
@@ -94,7 +94,7 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v
   z=z+etoile(n_star)%z
 
   ri=0 ; zj=1
-  
+
   return
 
 end subroutine em_sphere_uniforme
@@ -103,7 +103,7 @@ end subroutine em_sphere_uniforme
 
 subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,x,y,z,u,v,w,w2)
 ! Emission isotrope
-! C. Pinte 
+! C. Pinte
 ! 21/05/05
 
   implicit none
@@ -129,7 +129,7 @@ subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,x,y,z,u,v,w,w2)
   z=etoile(n_star)%z
 
   ri=0 ; zj=1
-  
+
   return
 
 end subroutine em_etoile_ponctuelle
@@ -180,7 +180,7 @@ subroutine repartition_energie_etoiles()
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
   real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   real(kind=db), dimension(n_lambda) :: log_lambda, spectre_etoiles0
-  
+
   character(len=512) :: filename
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, naxes1_ref
@@ -227,20 +227,20 @@ subroutine repartition_energie_etoiles()
      endif
   enddo
 
-     
+
   if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
      ! R = 1Rsun et distance = 1pc
      n_lambda_spectre = 1000
 
      do i=1, n_etoiles
-        
+
         if (i==1) then
            allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre), &
                 tab_spectre(n_etoiles,n_lambda_spectre), tab_spectre0(n_etoiles,n_lambda_spectre), &
                 tab_bb(n_etoiles,n_lambda_spectre))
            tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
-           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre)) 
+           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre))
         endif
         tab_lambda_spectre(i,:) = 1.0_db * spanl(lambda_min, lambda_max, n_lambda_spectre)
 
@@ -255,7 +255,7 @@ subroutine repartition_energie_etoiles()
   else ! les étoiles ne sont pas des corps noirs
      ! On calcule 2 trucs en meme tps :
      ! - prob_E_star : proba a lambda fixe d'emission en fonction de l'etoile
-     ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles 
+     ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
      ! Lecture des spectres
      do i=1, n_etoiles
         ! --- Lecture du spectre stellaire
@@ -263,7 +263,7 @@ subroutine repartition_energie_etoiles()
         ! --- Unites : F_lambda : W.m-2 / micron
         !              lambda : micron
         !     ---> lambda x F_lambda : W.m-2
-        
+
         filename=trim(star_dir)//trim(etoile(i)%spectre)
 
         status=0
@@ -312,7 +312,7 @@ subroutine repartition_energie_etoiles()
 
         ! Il faut que tous les spectres aient la meme dim sinon ca merde
         if (i==1) allocate(spectre_tmp(n_lambda_spectre,3))
-    
+
         ! read_image
         call ftgpve(unit,group,firstpix,nbuffer,nullval,spectre_tmp,anynull,status)
 
@@ -321,8 +321,8 @@ subroutine repartition_energie_etoiles()
                 tab_spectre(n_etoiles,n_lambda_spectre), tab_spectre0(n_etoiles,n_lambda_spectre), &
            tab_bb(n_etoiles,n_lambda_spectre))
            tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
-        
-           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre)) 
+
+           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre))
         endif
 
         tab_lambda_spectre(i,:) = spectre_tmp(:,1)
@@ -336,41 +336,41 @@ subroutine repartition_energie_etoiles()
         if (i==n_etoiles) deallocate(spectre_tmp)
 
      enddo ! n_etoiles
-     
+
   endif ! bb
-  
+
   tab_spectre0(:,:) = tab_spectre(:,:)
 
 
   ! Luminosite etoile integree sur le spectre
   L_star_spectre0 = 0.0
   do l = 2, n_lambda_spectre
-     L_star_spectre0 = L_star_spectre0 + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) & 
-          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
+     L_star_spectre0 = L_star_spectre0 + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) &
+          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1))
   enddo
   correct_step2 = (sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2) / L_star_spectre0
 
 
-  ! Flux UV additionnel pour ProDiMo        
+  ! Flux UV additionnel pour ProDiMo
   fUV_ProDiMo = etoile(1)%fUV
   p = etoile(1)%slope_UV
 
   wl_inf = 91.2e-9 ; ! en m
   wl_sup = 250e-9 ; ! en m
-  
+
   ! wl doit etre en microns ici
   if (abs(p+1.0) > 1.0e-5) then
      cst_UV_ProDiMo =  fUV_ProDiMo * L_star_spectre0 * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
   else
      cst_UV_ProDiMo =  fUV_ProDiMo * L_star_spectre0 * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
   endif
-  
+
 
   ! On ajoute l'UV que avant le pic de Wien
   do l = 1, n_lambda_spectre
      if (tab_lambda_spectre(1,l)  < 2898./etoile(1)%T ) then
         wl = tab_lambda_spectre(1,l) * 1e-6
-        UV_ProDiMo =  cst_UV_ProDiMo * wl**p 
+        UV_ProDiMo =  cst_UV_ProDiMo * wl**p
         if (UV_ProDiMo >  tab_spectre(1,l)) tab_spectre(1,l) = UV_ProDiMo
      endif
   enddo
@@ -379,8 +379,8 @@ subroutine repartition_energie_etoiles()
   L_UV = 0.0
   do l = 2, n_lambda_spectre
      wl = tab_lambda_spectre(1,l) * 1e-6  ! en m
-     if ((wl > wl_inf).and.(wl < wl_sup)) then 
-        L_UV = L_UV + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
+     if ((wl > wl_inf).and.(wl < wl_sup)) then
+        L_UV = L_UV + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1))
      endif
   enddo
   ! OK: L_UV/L_star_spectre0 est egal a fUV
@@ -388,19 +388,19 @@ subroutine repartition_energie_etoiles()
   ! Luminosite etoile integree sur le spectre
   L_star_spectre = 0.0
   do l = 2, n_lambda_spectre
-     L_star_spectre = L_star_spectre + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) & 
-          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1)) 
+     L_star_spectre = L_star_spectre + 0.5 * (tab_spectre(1,l) + tab_spectre(1,l-1)) &
+          * (tab_lambda_spectre(1,l) - tab_lambda_spectre(1,l-1))
   enddo
 
   !correct_UV = L_star_spectre / L_star_spectre0 ! Bug --> donne une petite difference: le calcul doit etre fait apres resampling
-!  write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2) 
-  
-  
+!  write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)
+
+
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
   ! - prob_E_star : proba a lambda fixe d'emission en fonction de l'etoile
   ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
-  !---------------------------------------------------------------------------  
+  !---------------------------------------------------------------------------
 
   !---------------------------------------------------
   ! Integration du spectre dans les bandes de MCFOST
@@ -415,21 +415,21 @@ subroutine repartition_energie_etoiles()
 
   do lambda=1, n_lambda
      wl = tab_lambda(lambda)*1.e-6
-     delta_wl=tab_delta_lambda(lambda)*1.e-6     
+     delta_wl=tab_delta_lambda(lambda)*1.e-6
      ! delta_wl est la largeur du bin d'intégration
-     spectre = 0.0 ; 
+     spectre = 0.0 ;
      spectre0 = 0.0 ;
      prob_E_star(lambda,0) = 0.0
-        
+
      wl_inf =  tab_lambda_inf(lambda)
      wl_sup =  tab_lambda_sup(lambda)
 
      do i=1,n_etoiles
         surface=4*pi*(etoile(i)%r**2)
-        
+
         ! calcul de terme en binnant le spectre d'entree
-        terme = 0.0 ; terme0 = 0.0 ; N = 0 
-        
+        terme = 0.0 ; terme0 = 0.0 ; N = 0
+
         wl_spectre_avg = 0.0
         do l=1, n_lambda_spectre
            if ( (tab_lambda_spectre(i,l) > wl_inf).and.(tab_lambda_spectre(i,l) < wl_sup) ) then
@@ -440,13 +440,13 @@ subroutine repartition_energie_etoiles()
            endif
         enddo ! l
 
-        if (N>1) wl_spectre_avg = wl_spectre_avg / N 
+        if (N>1) wl_spectre_avg = wl_spectre_avg / N
         wl_deviation = wl_spectre_avg / tab_lambda(lambda) ! Deviation between bin center and averaged wl
-        
+
         ! Correction eventuelles
         if ((terme > tiny_db) .and. (N>3) .and. (abs(wl_deviation-1.0) < 3e-2)) then
-           terme = terme / N * (surface / Cst0)   
-           terme0 = terme0 / N * (surface / Cst0)   
+           terme = terme / N * (surface / Cst0)
+           terme0 = terme0 / N * (surface / Cst0)
         else ! on est en dehors du spectre fournit
            if (tab_lambda(lambda) < wl_spectre_min) then
               cst_wl=cst_th/(etoile(i)%T*wl)
@@ -458,19 +458,19 @@ subroutine repartition_energie_etoiles()
               terme = (surface / Cst0) * tab_spectre(i,n_lambda_spectre) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
               terme0 = (surface / Cst0) * tab_spectre0(i,n_lambda_spectre) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
            else
-              terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda))) 
-              terme0 = (surface / Cst0) * exp(interp(log_spectre0, log_wl_spectre, log_lambda(lambda))) 
+              terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda)))
+              terme0 = (surface / Cst0) * exp(interp(log_spectre0, log_wl_spectre, log_lambda(lambda)))
            endif
         endif ! Fin correction
         spectre = spectre + terme * delta_wl
         spectre0 = spectre0 + terme0 * delta_wl
 
         ! Pas de le delta_wl car il faut comparer a emission du disque
-        prob_E_star(lambda,i) = prob_E_star(lambda,i-1) +  terme 
+        prob_E_star(lambda,i) = prob_E_star(lambda,i-1) +  terme
      enddo ! i, etoiles
      spectre_etoiles(lambda) = spectre
      spectre_etoiles0(lambda) = spectre0
-             
+
      ! Emission totale des etoiles
      ! Correction par le Teff dans le fichier de parametres
      E_stars(lambda) = prob_E_star(lambda,n_etoiles)  * correct_step2
@@ -487,7 +487,7 @@ subroutine repartition_energie_etoiles()
   spectre_etoiles(:) =  spectre_etoiles(:) * cst_spectre_etoiles
 
 
-  if ( (lProDiMo).and.(.not.allocated(ProDiMo_star_HR)) ) then 
+  if ( (lProDiMo).and.(.not.allocated(ProDiMo_star_HR)) ) then
      ! 1 seule etoile en mode ProDiMo
      ! ProDiMo_star_HR est du lambda.Flambda (idem spectre_etoiles mais avec tab_lambda au lieu de tab_delta_lambda)
      allocate(ProDiMo_star_HR(n_lambda_spectre,2))
@@ -499,7 +499,7 @@ subroutine repartition_energie_etoiles()
   !  TODO : L_etoile doit etre recalcule
   ! L_etoile fixe le flux dans sed1
   ! E_stars fixe le flux dans sed2
-  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU 
+  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU
 
   !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
 
@@ -537,9 +537,9 @@ end subroutine repartition_energie_etoiles
 
 subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 ! Choisit la position d'emission uniformement
-! sur une sphere et la direction de vol 
+! sur une sphere et la direction de vol
 ! suivant le cos de l'angle / normale
-! C. Pinte 
+! C. Pinte
 ! 27/05/09
 
   implicit none
@@ -549,7 +549,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   integer, intent(in) :: id
   integer, intent(out) :: ri, zj
   real(kind=db), intent(out) :: x, y, z, u, v, w
-  real(kind=db), dimension(4), intent(out) :: stokes 
+  real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
   real :: aleat1, aleat2, aleat3, aleat4
@@ -557,7 +557,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 
   ! Energie a 1
   stokes(:) = 0. ; stokes(1)  = 1.
-  
+
   ! Position de depart aleatoire sur une sphere de rayon 1
   aleat1 = sprng(stream(id))
   aleat2 = sprng(stream(id))
@@ -573,7 +573,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   aleat3 = sprng(stream(id))
   aleat4 = sprng(stream(id))
 
-  cospsi = -sqrt(aleat3) 
+  cospsi = -sqrt(aleat3)
   phi = 2.0_db*pi*aleat4
   ! (x,y,z) definit la normale (ici, il a encore une norme=1)
   ! cospsi et phi sont definis / cette normale
@@ -589,8 +589,8 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   z = z * l
 
   call move_to_grid(x,y,z,u,v,w,ri,zj,lintersect)
-  
-  
+
+
   return
 
 end subroutine emit_packet_ISM

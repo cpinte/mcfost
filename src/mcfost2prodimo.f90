@@ -1,7 +1,7 @@
 module mcfost2ProDiMo
 
   use constantes, only : pi
-  
+
   implicit none
 
   ! Spatial grid of mcfost
@@ -14,13 +14,13 @@ module mcfost2ProDiMo
   character(len=512), parameter :: filename = "data_th/forProDiMo.fits.gz"
 
   type mcfost_model
-     
+
      ! parameters
      real :: diskmass, Teff, Rstar, Mstar, fUV, fUV_slope, rin, rout, amin, amax, aexp, rho_grain, a_settle
 
      ! Saptial grid (Unit: AU)
      real, dimension(n_rad,nz) :: r_grid, z_grid
-  
+
      ! Temperature structure (Unit: K)
      real, dimension(n_rad,nz) :: temperature
 
@@ -37,10 +37,10 @@ module mcfost2ProDiMo
      ! Radiation field
      ! lambda.J_lambda (Units : W.m^-2)
      real, dimension(n_rad,nz,n_lambda) :: J, J_ISM
-     
+
      ! Statictic of the radiation field (number of packets)
      real, dimension(n_rad,nz,n_lambda) :: nJ, nJ_ISM
-       
+
      ! Gas density assuming a gas/dust mass ratio of 100 (Unit: part.m-3)
      real, dimension(n_rad,nz) :: density
 
@@ -68,7 +68,7 @@ contains
 
     real, dimension(n_rad,nz,2) :: grid
     real, dimension(n_rad,nz,2,n_lambda) :: opacity
-    
+
     type(mcfost_model) :: mcfost
 
 
@@ -116,7 +116,7 @@ contains
     call ftgkye(unit,'Mstar',mcfost%Mstar,comment,status)
     call ftgkye(unit,'fUV',mcfost%fUV,comment,status)
     call ftgkye(unit,'slope_UV',mcfost%slope_UV,comment,status)
- 
+
     call ftgkye(unit,'Rin',mcfost%rin,comment,status)
     call ftgkye(unit,'Rout',mcfost%rout,comment,status)
 
@@ -130,12 +130,12 @@ contains
     call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,status)
     mcfost%r_grid(:,:) = grid(:,:,1)
     mcfost%z_grid(:,:) = grid(:,:,2)
-    
+
     !------------------------------------------------------------------------------
-    ! HDU 2: Temperature 
+    ! HDU 2: Temperature
     !------------------------------------------------------------------------------
     !  move to next hdu
-    call ftmrhd(unit,1,hdutype,status)    
+    call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
@@ -161,7 +161,7 @@ contains
     !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
-    
+
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
@@ -186,7 +186,7 @@ contains
     !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
-    
+
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
@@ -211,7 +211,7 @@ contains
     !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
-    
+
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
@@ -233,7 +233,7 @@ contains
 
     !------------------------------------------------------------------------------
     ! HDU 6 : Radiation fied
-    !------------------------------------------------------------------------------  
+    !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
@@ -256,7 +256,7 @@ contains
 
     !------------------------------------------------------------------------------
     ! HDU 7 : Statistic of the radiation fied
-    !------------------------------------------------------------------------------  
+    !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
@@ -279,7 +279,7 @@ contains
 
     !------------------------------------------------------------------------------
     ! HDU 8 : ISM radiation fied
-    !------------------------------------------------------------------------------  
+    !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
@@ -302,7 +302,7 @@ contains
 
     !------------------------------------------------------------------------------
     ! HDU 9 : Statistic of the ISM radiation fied
-    !------------------------------------------------------------------------------  
+    !------------------------------------------------------------------------------
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
@@ -426,9 +426,9 @@ program test
   use mcfost2ProDiMo
 
   implicit none
-  
+
   type(mcfost_model) :: mcfost
-  
+
   real :: fact_lambda, delta_lambda, wl, delta_wl, B, Sum_J, Sum_B, cst_th, T, Sum
   integer :: i, j, l
 
@@ -436,7 +436,7 @@ program test
   real, parameter :: c = 3.0e8
   real, parameter :: kb = 1.38e-23
   integer, parameter :: db = selected_real_kind(p=13,r=200)
- 
+
   integer :: iz
   real :: delz, int_dust1, int_dust2, int_dz, rho_gas, rho_dust1, n_dust, dust_to_gas_c, rho_gr, m_dust, rho_dust2
   real, dimension(nz) :: dz
@@ -444,7 +444,7 @@ program test
   dust_to_gas_c = 0.01
 
 
-  cst_th = hp*c/kb 
+  cst_th = hp*c/kb
 
   mcfost =  read_mcfost()
 
@@ -478,21 +478,21 @@ program test
 !  fact_lambda = (mcfost%wavelengths(n_lambda) /  mcfost%wavelengths(1))**(1./(n_lambda-1))
 !  delta_lambda = fact_lambda - 1./fact_lambda
 !  do i=1, n_rad
-!     Sum_J = 0. ;  Sum_B = 0. 
-!     
+!     Sum_J = 0. ;  Sum_B = 0.
+!
 !     do j=1,nz
 !        T = mcfost%temperature(i,j)
 !
 !        do l=1,n_lambda
 !           wl = mcfost%wavelengths(l) * 1.e-6
 !           delta_wl = wl * delta_lambda
-!           B = 2.*hp*c**2 *  1./ ( (exp(cst_th/(T*wl)) -1.) * wl**5 ) 
-!        
+!           B = 2.*hp*c**2 *  1./ ( (exp(cst_th/(T*wl)) -1.) * wl**5 )
+!
 !           ! mcfost%J is lambda.J_lambda
-!           Sum_J = Sum_J + mcfost%kappa_abs(i,j,l) * mcfost%J(i,j,l)/wl * delta_wl 
-!           Sum_B = Sum_B + mcfost%kappa_abs(i,j,l) * B * delta_wl 
+!           Sum_J = Sum_J + mcfost%kappa_abs(i,j,l) * mcfost%J(i,j,l)/wl * delta_wl
+!           Sum_B = Sum_B + mcfost%kappa_abs(i,j,l) * B * delta_wl
 !        enddo
-!     
+!
 !     enddo !j
 !     !   write(*,*) " "
 !     write(*,*) "Verification radiation field vs T", i, Sum_J, Sum_J/Sum_B ;
@@ -509,7 +509,7 @@ program test
       dz(iz) = dz(iz)+0.5*delz
       dz(iz-1) = dz(iz-1)+0.5*delz
     enddo
-    
+
 
     int_dust1 = 0.0
     int_dust2 = 0.0
@@ -519,13 +519,13 @@ program test
       rho_dust1 = rho_gas*dust_to_gas_c
       n_dust    = mcfost%grain_size(1,iz,0)
       m_dust    = 4.0/3.0 * pi * mcfost%rho_grain * mcfost%grain_size(1,iz,3)
-    
+
       rho_dust2 = n_dust*m_dust * 1e-18
-      
+
       int_dz    = int_dz+dz(iz)
       int_dust1 = int_dust1 + rho_dust1*dz(iz)
       int_dust2 = int_dust2 + rho_dust2*dz(iz)
-   !   write(*,*) rho_dust1,rho_dust2 
+   !   write(*,*) rho_dust1,rho_dust2
     enddo
 
     write(*,*) "TEST", sum(mcfost%grain_size(1,:,0))
@@ -534,10 +534,10 @@ program test
 
     write(*,*) "TEST_new", sum(mcfost%grain_size(1,:,3) * mcfost%grain_size(1,:,0))
 
-    
+
 
     write(*,*) "TEST_density", sum(mcfost%grain_size(1,:,3) * mcfost%grain_size(1,:,0)) * 4./3. * pi * mcfost%rho_grain * 100., sum(mcfost%density(1,:)) *1e18
- 
+
  !   write(*,*) int_dz,mcfost%z_grid(1,nz)-mcfost%z_grid(1,1)
     write(*,*) int_dust1,int_dust2
 

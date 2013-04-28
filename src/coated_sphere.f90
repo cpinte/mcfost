@@ -12,14 +12,14 @@ module coated_sphere
 
   integer, save ::   maxmsg = 0, nummsg = 100
   logical, save :: msglim = .false.
-  
+
 
 contains
 
   subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
     !***************************************************************
     ! calcule les elements de la matrice de diffusion a partir de
-    ! la sous-routine dmilay (coated grains)   
+    ! la sous-routine dmilay (coated grains)
     !
     !        calcule aussi "g" = le parametre d'asymetrie
     !
@@ -28,14 +28,14 @@ contains
     !****************************************************************
 
     implicit none
-    
+
     integer, intent(in) :: lambda, taille_grain
     real, intent(in) :: amu1, amu2, amu1_coat, amu2_coat
     real, intent(in) :: wl
     real, intent(out) :: qext, qsca, gsca
 
     integer :: j, nang
- 
+
     complex, dimension(nang_scatt+1) :: S1,S2
 
     real :: rcore, rshell, wvno, gqsc
@@ -44,7 +44,7 @@ contains
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
-  
+
     refrel = cmplx(amu1,amu2)
     refrel_coat = cmplx(amu1_coat,amu2_coat)
     refrel = conjg(refrel)  ! to match convetion in dmilay (negative img part)
@@ -66,9 +66,9 @@ contains
     rcore=r_core(taille_grain)
     rshell=r_grain(taille_grain)
 
-    !write(*,*) rcore, rshell 
+    !write(*,*) rcore, rshell
 
-    wvno= 2.0 * pi / wl 
+    wvno= 2.0 * pi / wl
 
     !write(*,*) wl,refrel,refrel_coat
 
@@ -77,20 +77,20 @@ contains
 
     ! Passage des valeurs dans les tableaux de mcfost
     if (aniso_method==1) then
-       
-       !  QABS=QEXT-QSCA 
+
+       !  QABS=QEXT-QSCA
        ! Calcul des elements de la matrice de diffusion
-       ! indices decales de 1 par rapport a bhmie 
+       ! indices decales de 1 par rapport a bhmie
        do J=0,nang_scatt
           vi1 = cabs(S2(J+1))*cabs(S2(J+1))
           vi2 = cabs(S1(J+1))*cabs(S1(J+1))
           s11(j) = 0.5*(vi1 + vi2)
           !        write(*,*) j, s11(j), vi1, vi2 ! PB : s11(1) super grand
           s12(j) = 0.5*(vi1 - vi2)
-          s33(j)=real(S2(J+1)*conjg(S1(J+1))) 
-          s34(j)=aimag(S2(J+1)*conjg(S1(J+1))) 
+          s33(j)=real(S2(J+1)*conjg(S1(J+1)))
+          s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
        enddo !j
-       
+
        ! Integration S11 pour tirer angle
        somme_sin= 0.0
        somme2 = 0.0
@@ -109,7 +109,7 @@ contains
        do j=1,nang_scatt
           prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
        enddo
-       
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!$  open(unit=1,file='diffusion.dat')
 !!$
@@ -124,22 +124,22 @@ contains
 !!$  enddo
 !!$  write(*,*) somme1, somme2
 !!$  close(unit=1)
-!!$!  stop 
+!!$!  stop
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-       
+
        do J=0,nang_scatt
           !     ! Normalisation pour diffusion isotrope et E_sca(theta)
-          !     if (j == 1)  then 
+          !     if (j == 1)  then
           !        norme = somme_prob/somme_sin
           !     endif
-          
+
           ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
           ! PAR CELLULE)
-          ! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS 
-          
+          ! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
+
           !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
-          
-          
+
+
           if (scattering_method==1) then
              ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
              norme=s11(j) !* qext/q sca
@@ -148,17 +148,17 @@ contains
              s33(j) = s33(j) / norme
              s34(j) = s34(j) / norme
           endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
-          
+
           tab_s11(lambda,taille_grain,j) = s11(j)
           tab_s12(lambda,taille_grain,j) = s12(j)
           tab_s33(lambda,taille_grain,j) = s33(j)
           tab_s34(lambda,taille_grain,j) = s34(j)
        enddo
-       
+
     endif ! aniso_method ==1
-    
+
     return
-    
+
   end subroutine mueller_coated_sphere
 
   ! **********************************************************************
@@ -354,12 +354,12 @@ contains
     !    stratified sphere (a particle with a spherical core surrounded
     !    by a spherical shell).  The surrounding medium is assumed to
     !    have refractive index unity.  The formulas, manipulated to avoid
-    !    the ill-conditioning that plagued earlier formulations, were 
+    !    the ill-conditioning that plagued earlier formulations, were
     !    published in:
     !
     !        Toon, O. and T. Ackerman, Applied Optics 20, 3657 (1981)
     !
-    !    The latest version of this program is available by anonymous ftp 
+    !    The latest version of this program is available by anonymous ftp
     !    from climate.gsfc.nasa.gov in directory pub/wiscombe.
     !
     !    The program was based on the famous homogeneous sphere
@@ -374,7 +374,7 @@ contains
     !
     !    This was done because the formulas are identical in structure to
     !    those for the homogeneous sphere, except that the coefficients of
-    !    the Mie series (commonly denoted by little-a-sub-n and 
+    !    the Mie series (commonly denoted by little-a-sub-n and
     !    little-b-sub-n) are much more complicated.
     !
     !    The address of the first author is:
@@ -396,21 +396,21 @@ contains
     !    After a number of years of experience, this program seems to have
     !    only two limitations:  a slow degradation as size increases,
     !    and a rapid degradation as size decreases due to lack of explicit
-    !    handling of the ill-conditioning in that limit. It has been used 
+    !    handling of the ill-conditioning in that limit. It has been used
     !    successfully for cases with large imaginary refractive index (both
-    !    in core and shell) and even with real refractive index less than 
+    !    in core and shell) and even with real refractive index less than
     !    unity.
     !
     !    For too-large particles, internal array sizes will be inadequate,
-    !    but this generates an error message and an abort.  
+    !    but this generates an error message and an abort.
     !
-    !    It is highly recommended to use the DOUBLE PRECISION version of 
+    !    It is highly recommended to use the DOUBLE PRECISION version of
     !    this program, called 'DMiLay', on machines with 32-bit floating-
-    !    point arithmetic (e.g. all IEEE arithmetic machines).  'DMiLay' 
+    !    point arithmetic (e.g. all IEEE arithmetic machines).  'DMiLay'
     !    is also available on the network.  'MieLay' may be adequate but
     !    this should be tested by running it back to back with 'DMiLay'.
     !
-    !        Note that in 32-bit arithmetic it was impossible to run 
+    !        Note that in 32-bit arithmetic it was impossible to run
     !        'MieLay' above shell radius = 3 (with WVNO=1, so shell size
     !        parameter = 3 also) due to overflow, whereas 'DMiLay' can be
     !        run well above this limit due to a larger range of exponents.
@@ -418,9 +418,9 @@ contains
     !    The original version of this program defaulted to a homogeneous
     !    sphere case when the core was less than 10**(-6) the size of the
     !    shell.  It could also have done so when core and shell radii were
-    !    equal although it did not.  But this option was dropped since 
+    !    equal although it did not.  But this option was dropped since
     !    it could better be tested for in the calling program;  if a
-    !    homogeneous sphere case is detected, it is far better to call one 
+    !    homogeneous sphere case is detected, it is far better to call one
     !    of the programs designed explicitly for that case.
     !
     !    NOTE:  This program requires input scattering angles between
@@ -428,7 +428,7 @@ contains
     !           those angles, plus all their supplements.  Thus, to get,
     !           e.g., 170 degrees, you must use 10 degrees.
     !
-    !    The program was modified and further documented by W. Wiscombe 
+    !    The program was modified and further documented by W. Wiscombe
     !    (wiscombe@climate.gsfc.nasa.gov; NASA Goddard, Code 913,
     !    Greenbelt, MD 20771), including:
     !    ** complex refractive indices of shell and core submitted as 2
@@ -439,7 +439,7 @@ contains
     !          shell and/or core sizes in order to integrate over size)
     !    ** returning scattering matrix elements M1, M2, D21, S21 separately
     !          rather than bundled into awkward data structure ELTRMX
-    !    ** defining new arrays S1 and S2, the complex scattering 
+    !    ** defining new arrays S1 and S2, the complex scattering
     !          amplitudes, for which ELTRMX had formerly been used as
     !          temporary storage (allowing easy modification to return S1
     !          and S2 through argument list rather than M1, M2, D21, S21)
@@ -461,7 +461,7 @@ contains
     !          Tool nag_apt
     !    ** certification by 'flint' (Fortran 'lint', for C folks)
     !
-    !    Suggestions for the future:  
+    !    Suggestions for the future:
     !    ** much of this program reflects the belief, true in the late
     !         1960s but not any longer, that complex arithmetic should
     !         be broken into real and imaginary parts for efficiency,
@@ -473,10 +473,10 @@ contains
     !    ** phrase program in terms of size parameters and eliminate
     !         input argument WVNO
     !    ** develop special-case formulas for Rcore-->0 for any Rshell,
-    !         and for Rshell-->0 (comparing single and double precision 
+    !         and for Rshell-->0 (comparing single and double precision
     !         versions showed larger and larger differences as size
     !         parameter fell below about 1.E-2, esp. for gQsc); the
-    !         layered sphere formulae are ill-conditioned in this limit 
+    !         layered sphere formulae are ill-conditioned in this limit
     !         just as the homogeneous sphere formulae are
     !
     !
@@ -538,21 +538,21 @@ contains
     !               and an,bn are ACOE,BCOE below.
     !
     !      M1(j,k)  Element M1 of scattering matrix F' (VDH Sec 5.14);
-    !                  M1(j,1) refers to angle with cosine MU(j); 
+    !                  M1(j,1) refers to angle with cosine MU(j);
     !                  M1(j,2) refers to supplement of that angle.
     !               (Be sure to type REAL in calling program.)
     !
     !      M2(j,k)  Element M2 of scattering matrix F' (VDH Sec 5.14);
-    !                  M2(j,1) refers to angle with cosine MU(j); 
+    !                  M2(j,1) refers to angle with cosine MU(j);
     !                  M2(j,2) refers to supplement of that angle.
     !               (Be sure to type REAL in calling program.)
     !
     !     S21(j,k)  Element S21 of scattering matrix F' (VDH Sec 5.14);
-    !                  S21(j,1) refers to angle with cosine MU(j); 
+    !                  S21(j,1) refers to angle with cosine MU(j);
     !                  S21(j,2) refers to supplement of that angle.
     !
     !     D21(j,k)  Element D21 of scattering matrix F' (VDH Sec 5.14);
-    !                  D21(j,1) refers to angle with cosine MU(j); 
+    !                  D21(j,1) refers to angle with cosine MU(j);
     !                  D21(j,2) refers to supplement of that angle.
     !
     !
@@ -588,13 +588,13 @@ contains
     !             usub7 = u(6)    usub8 = u(4)
     !             ratio of spherical Bessel to spherical Hankel func = u(8)
     !
-    !    The Bessel function ratio A is always computed by downward 
+    !    The Bessel function ratio A is always computed by downward
     !    recurrence.
     !
     ! **********************************************************************
     ! Modif : C. Pinte
     ! 19/03/08 : conversion en fortran 90, suppresion goto et continue,
-    ! ajout des intent, suppresion data, passage en module et interfacage 
+    ! ajout des intent, suppresion data, passage en module et interfacage
     ! mcfost
     ! 21/04/11 : skipping the computation of M1, M2, S21 and D21. Adjusting
     ! the angle values to match those used in mueller2/BHMIE.
@@ -604,7 +604,7 @@ contains
     ! .. Parameters ..
     !    integer, parameter ::   mxang = 100
     !  integer, parameter :: ll = 500000
-  
+
     real(kind=db), parameter :: zero = 0.0_db
     real(kind=db), parameter :: one = 1.0_db
     real(kind=db), parameter :: two = 2.0_db
@@ -639,7 +639,7 @@ contains
     real(kind=db), dimension(5) :: T
     real(kind=db), dimension(5) :: TA
     real(kind=db) :: DANG, PII
-    
+
     complex(kind=db), dimension(8) :: U
     complex(kind=db), dimension(2) :: wfn
     complex(kind=db), dimension(4) :: z
@@ -652,21 +652,21 @@ contains
     ! ==============================
     ! Bits copied over from BHMIE
     !
-    !*** Obtain pi:                                                         
-    PII=4.*atan(1.D0) 
-    DANG=0. 
+    !*** Obtain pi:
+    PII=4.*atan(1.D0)
+    DANG=0.
     if (numang > 1) then
-       DANG=.5*PII/dble(numang-1) 
+       DANG=.5*PII/dble(numang-1)
     endif
     do J=1,numang
        THETA=(dble(J)-1.0)*dang
-       AMU(J)=cos(THETA) 
+       AMU(J)=cos(THETA)
     end do
 
-    NN=2*numang-1 
-    do J=1,NN 
-       S1(J)=(0._db,0._db) 
-       S2(J)=(0._db,0._db) 
+    NN=2*numang-1
+    do J=1,NN
+       S1(J)=(0._db,0._db)
+       S2(J)=(0._db,0._db)
     end do
 
     xshell = rshell*wvno
@@ -676,13 +676,13 @@ contains
     NMX2   = NMX1 / 1.1
 
     ! Dynamical allocation
-    ll = nmx1 + 1 
+    ll = nmx1 + 1
     allocate(acap(ll), W(3,ll), stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error in Dmilay'
        stop
     endif
-    acap = czero ; W = czero ;    
+    acap = czero ; W = czero ;
 
     ! Nothing changed below this line (except skipping computation of M1, M2, S21 and D21)
     ! ==============================
@@ -822,7 +822,7 @@ contains
 
     N = 2
 
-    infinie : do 
+    infinie : do
        ! ** Recurrences for functions little-pi,
        ! little-tau of Mie theory
        T(1) = 2*N - 1
