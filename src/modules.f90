@@ -836,6 +836,7 @@ module molecular_emission
   integer, parameter :: n_largeur_Doppler = 15
   real(kind=db), dimension(:), allocatable :: tab_v ! n_speed
 
+  ! densite_gaz gives the midplane density for j=0
   real(kind=db), dimension(:,:,:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
 
   real(kind=db), dimension(:,:), allocatable :: ds

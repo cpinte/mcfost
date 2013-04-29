@@ -1179,8 +1179,16 @@ subroutine ecriture_densite_gaz()
   character(len=512) :: filename
 
   real, dimension(n_rad,nz,n_az) :: dens
+  real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
   real, dimension(n_rad) :: vol
   real(kind=db), dimension(n_rad,nz,2) :: grid
+
+
+  allocate(dust_dens(n_rad,nz,n_az,n_grains_tot), stat = alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error dust density table for fits file'
+     stop
+  endif
 
 
   ! ********************************************************************************
@@ -1253,14 +1261,17 @@ subroutine ecriture_densite_gaz()
   extend=.true.
 
   naxis=4
-  naxes(1:4) = shape(densite_pouss)
+  naxes(1) = n_rad
+  naxes(2) = nz
+  naxes(3) = n_az
+  naxes(4) = n_grains_tot
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
   ! Write  optional keywords to the header
-  call ftpkys(unit,'UNIT',"part.cm^-3",' ',status)
+  call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
 
   !  Write the array to the FITS file.
   group=1
@@ -1269,7 +1280,8 @@ subroutine ecriture_densite_gaz()
 
   !  dens =  densite_pouss
   ! le d signifie real*8
-  call ftpprd(unit,group,fpixel,nelements,densite_pouss,status)
+  dust_dens = densite_pouss(:,1:nz,:,:) * m3_to_cm3
+  call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1280,6 +1292,49 @@ subroutine ecriture_densite_gaz()
      call print_error(status)
   end if
 
+  ! ********************************************************************************
+  filename = trim(data_dir)//"/grain_sizes.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
 
   ! ********************************************************************************
   filename = trim(data_dir)//"/volume.fits.gz"
