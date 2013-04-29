@@ -1148,10 +1148,6 @@ subroutine save_data
           'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
           ! id SHA
           'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
-     ! Copie du fichier lambda si besoin
-     if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-        cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(data_dir)
-     endif
      call appel_syst(cmd,syst_status)
 
   else

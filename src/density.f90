@@ -45,7 +45,7 @@ subroutine define_gas_density()
 
   ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=db), dimension(n_rad,nz,1) :: densite_gaz_tmp
+  real(kind=db), dimension(n_rad,0:nz,1) :: densite_gaz_tmp
 
   do izone=1, n_zones
      dz = disk_zone(izone)
@@ -77,12 +77,17 @@ subroutine define_gas_density()
 
      if (dz%geometry <= 2) then ! Disque
         do i=1, n_rad
-           bz : do j=j_start,nz
-              if (j==0) cycle bz
+           bz : do j=min(0,j_start),nz
+              !if (j==0) cycle bz
 
               ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              if (j==0) then
+                 rcyl = r_grid(i,1)
+                 z = 0.0_db
+              else
+                 rcyl = r_grid(i,j)
+                 z = z_grid(i,j)
+              endif
 
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
@@ -128,10 +133,15 @@ subroutine define_gas_density()
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
-           do j=1,nz
+           do j=0,nz
               ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              if (j==0) then
+                 rcyl = r_grid(i,1)
+                 z = 0.0_db
+              else
+                 rcyl = r_grid(i,j)
+                 z = z_grid(i,j)
+              endif
               rsph = sqrt(rcyl**2+z**2)
 
 
@@ -173,8 +183,7 @@ subroutine define_gas_density()
 
      ! Somme sur les zones pour densite finale
      do i=1,n_rad
-        bz_gas_mass2 : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass2
+        bz_gas_mass2 : do j=min(0,j_start),nz
            do k=1, n_az
               densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
            enddo !k
@@ -297,7 +306,7 @@ subroutine define_dust_density()
 
   do  l=1,n_grains_tot
      ! Correction stratification
-     if (lstrat) then
+     if (lstrat.and.(settling_type == 1)) then
         ! loi de puissance
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
@@ -320,6 +329,8 @@ subroutine define_dust_density()
      if (dz%geometry <= 2) then ! Disque
 
         do i=1, n_rad
+           rho0 = densite_gaz(i,0,1) ! midplane density (j=0)
+
            bz : do j=j_start,nz
               if (j==0) cycle bz
 
@@ -356,11 +367,11 @@ subroutine define_dust_density()
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                     ! Settling a la Dubrulle
                     if (lstrat.and.(settling_type == 2)) then
+
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
-                       rho0 = densite_gaz(i,1,1)
+                       OmegaTau = omega_tau(rho0,H,l)
 
-                       OmegaTau = omega_tau(rho0,h,r_grain(l))
                        h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
                        correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
                     endif
@@ -388,57 +399,105 @@ subroutine define_dust_density()
                  enddo !l
               enddo !k
            enddo bz !j
+
+
+           if (lstrat.and.(settling_type == 2)) then
+              if (lspherical) then
+                 write(*,*) "ERROR: settling following Fromang's prescription is only"
+                 write(*,*) "implemented on a spharical grid"
+                 write(*,*) "Exiting"
+                 stop
+              endif
+
+              if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
+                 ! Renormalisation pour  les cas ou il y a peu de resolution en z
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    ! normalization en z
+                    norme = 0.0
+                    do j=j_start,nz
+                       if (j==0) cycle
+                       norme = norme + densite_pouss(i,j,1,l)
+                    enddo !j
+
+                    ! Si tous les grains sont sedimentes, on les met dans le plan median
+                    if (norme < tiny_db) then
+                       densite_pouss(i,1,1,l)  = 1.0_db
+                       norme = 1.0_db
+
+                       write(*,*) "WARNING: Vertical settling unresolved for"
+                       write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                    endif
+
+                    do j=j_start,nz
+                       if (j==0) cycle
+                       if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
+                    enddo !j
+                 enddo ! l
+              endif ! test r
+           endif ! settling==2
+
         enddo ! i
 
         if (lstrat.and.(settling_type == 3)) then
            ! Si strat a la Seb. Fromang : on ecrase le tableau de densite
            ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
+
+           if (lspherical) then
+              write(*,*) "ERROR: settling following Fromang's prescription is only"
+              write(*,*) "implemented on a spharical grid"
+              write(*,*) "Exiting"
+              stop
+           endif
+
            do i=1, n_rad
-              rho0 = densite_gaz(i,1,1) ! pour dependance en R
+              rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
 
               rcyl = r_grid(i,1)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
-              do l=1,n_grains_tot
-                 !calculate omega_tau in the disk midplane
-                 OmegaTau = omega_tau(rho0,h,r_grain(l))
+              if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
+                 ! Renormalisation pour  les cas ou il y a peu de resolution en z
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    !calculate omega_tau in the disk midplane
+                    OmegaTau = omega_tau(rho0,H,l)
 
-                 do j=j_start,nz ! dependence en z uniquement ici !!!!
-                    if (j==0) cycle
+                    do j=j_start,nz ! dependence en z uniquement ici !!!!
+                       if (j==0) cycle
 
-                    !calculate h & z/h
-                    z = z_grid(i,j)
-                    Ztilde=z/H
+                       !calculate h & z/h
+                       z = z_grid(i,j)
+                       Ztilde=z/H
 
-                    ! Fit Gaussien du profile de densite
-                    !densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
+                       ! Fit Gaussien du profile de densite
+                       !densite_pouss(i,j,1,l)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
 
-                    ! Coefficient de diffusion constant
-                    densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
-                 enddo!j
+                       ! Coefficient de diffusion constant
+                       densite_pouss(i,j,1,l)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                    enddo!j
 
-                 ! normalization en z
-                 norme = 0.0
-                 do j=j_start,nz
-                    if (j==0) cycle
-                    norme = norme + densite_pouss(i,j,1,l)
-                 enddo !j
+                    ! normalization en z
+                    norme = 0.0
+                    do j=j_start,nz
+                       if (j==0) cycle
+                       norme = norme + densite_pouss(i,j,1,l)
+                    enddo !j
 
-                 ! Si tous les grains sont sedimentes, on les met dans le plan median
-                 if (norme < tiny_db) then
-                    densite_pouss(i,1,1,l)  = 1.0_db
-                    norme = 1.0_db
+                    ! Si tous les grains sont sedimentes, on les met dans le plan median
+                    if (norme < tiny_db) then
+                       densite_pouss(i,1,1,l)  = 1.0_db
+                       norme = 1.0_db
 
-                    write(*,*) "Vertical settling unresolved for"
-                    write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl )
-                 endif
+                       write(*,*) "WARNING : Vertical settling unresolved for"
+                       write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl )
+                    endif
 
-                 do j=j_start,nz
-                    if (j==0) cycle
-                    if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
-                 enddo !j
+                    do j=j_start,nz
+                       if (j==0) cycle
+                       if (norme > tiny_db) densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l) / norme * rho0 * nbre_grains(l)
+                    enddo !j
 
-              enddo ! l
+                 enddo ! l
+              endif ! test r
            enddo ! i
         endif ! Settling Fromang
 
@@ -2853,14 +2912,17 @@ end subroutine densite_fits
 
 !**********************************************************************
 
-real(kind=db) function omega_tau(rho,H,a)
+real(kind=db) function omega_tau(rho,H,l)
   ! Pour les calculs de Sebastien Fromang
   ! rho doit etre en g.cm-3
 
-  real(kind=db), intent(in) :: rho,H
-  real, intent(in) :: a
+  real(kind=db), intent(in) :: rho, H
+  integer, intent(in) :: l
 
-  omega_tau=dust_pop(1)%rho1g_avg*(a*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
+  integer :: ipop
+
+  ipop = grain(l)%pop
+  omega_tau=dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
 
   return
 
