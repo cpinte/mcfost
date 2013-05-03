@@ -138,7 +138,7 @@ subroutine init_indices_optiques()
 
   real :: frac, fbuffer
   real, dimension(:), allocatable :: f
-  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment
+  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment, n_components
 
   character(len=512) :: filename
 
@@ -151,8 +151,9 @@ subroutine init_indices_optiques()
   do pop=1, n_pop
      if (.not.dust_pop(pop)%is_PAH) then
 
-        allocate(tab_tmp_amu1(n_lambda, dust_pop(pop)%n_components), &
-             tab_tmp_amu2(n_lambda, dust_pop(pop)%n_components), stat=alloc_status)
+        n_components = dust_pop(pop)%n_components
+        if (dust_pop(pop)%porosity > tiny_real) n_components = n_components + 1
+        allocate(tab_tmp_amu1(n_lambda,n_components), tab_tmp_amu2(n_lambda,n_components), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_tmp_amu1'
            stop
@@ -257,17 +258,26 @@ subroutine init_indices_optiques()
 
         enddo ! k , boucle components
 
+        ! Add vacuum as last component
+        if (dust_pop(pop)%porosity > tiny_real) then
+           tab_tmp_amu1(:,n_components) = 1.0_db
+           tab_tmp_amu1(:,n_components) = 1.0_db
+        endif
 
-        if (dust_pop(pop)%n_components == 1) then
+
+        if (n_components == 1) then
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
            dust_pop(pop)%T_sub = dust_pop(pop)%component_T_sub(1)
         else
            if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
-              allocate(m(dust_pop(pop)%n_components), f(dust_pop(pop)%n_components))
+              allocate(m(n_components), f(n_components))
               do i=1, n_lambda
                  m = cmplx(tab_tmp_amu1(i,:),tab_tmp_amu2(i,:))
-                 f = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components)
+                 f(1:dust_pop(pop)%n_components) = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components) &
+                      * (1.0_db - dust_pop(pop)%porosity)
+                 if (dust_pop(pop)%porosity > tiny_real)  f(n_components) = dust_pop(pop)%porosity
+
 
                  mavg = Bruggeman_EMT(i, m, f)
 
@@ -288,30 +298,7 @@ subroutine init_indices_optiques()
            dust_pop(pop)%T_sub = minval(dust_pop(pop)%component_T_sub(1:dust_pop(pop)%n_components))
         endif ! n_components
 
-        ! Ajout porosite
-        if (dust_pop(pop)%porosity > tiny_real) then
-           allocate(m(2),f(2))
-           f(2) = dust_pop(pop)%porosity
-           f(1) = 1. - f(2)
-
-           ! On corrige la densite
-           dust_pop(pop)%rho1g_avg  = dust_pop(pop)%rho1g_avg * f(1)
-
-           ! On corrige les indices optiques
-           do i=1, n_lambda
-              m(1) = cmplx(tab_amu1(i,pop),tab_amu2(i,pop))
-              m(2) = cmplx(1.0,0.0) ! Vide
-
-              mavg = Bruggeman_EMT(i, m,f)
-
-              tab_amu1(i,pop) = real(mavg)
-              tab_amu2(i,pop) = aimag(mavg)
-           enddo ! n_ind
-           deallocate(m,f)
-        endif ! porosity
-
         deallocate(tab_tmp_amu1,tab_tmp_amu2)
-
 
         ! Compute average material density
         dust_pop(pop)%rho1g_avg = 0.0
@@ -320,10 +307,13 @@ subroutine init_indices_optiques()
                 dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
         enddo
         dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
+
+        !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
      else ! PAH
         ! we only set the material density
         dust_pop(pop)%component_rho1g(1) = 2.5
         dust_pop(pop)%rho1g_avg = 2.5
+
 
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix PAH with other component"
@@ -420,7 +410,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
      !imatrix_tmp = minloc(abs(eps(:) - eps_eff0))
      imatrix_tmp = maxloc(f)
      imatrix = imatrix_tmp(1)
-     if (lambda==2) imatrix = 3
+     !if (lambda==2) imatrix = 3  ! je ne capte pas cette ligne
      f_mat = f(imatrix)
      eps_mat = eps(imatrix)
 
@@ -470,7 +460,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
 
   ! Verification finale ---> OK
   !A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2* eps_eff)
-  !write(*,*) "Verif Bruggeman", lambda, iter, abs(sum( f(:) * A_i(:)))
+  !write(*,*) "Verif Bruggeman", lambda, abs(sum( f(:) * A_i(:)))
 
   return
 
