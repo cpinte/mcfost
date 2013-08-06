@@ -865,10 +865,10 @@ subroutine opacite2(lambda)
                     endif
                  endif ! norme
 
-                 if (lsepar_pola.and.(tab_s11_ray_tracing(lambda,i,j,1) > tiny_real)) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
+                 if (lsepar_pola) then
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
                  endif
               else ! aniso_method =2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
