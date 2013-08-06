@@ -865,7 +865,7 @@ subroutine opacite2(lambda)
                     endif
                  endif ! norme
 
-                 if (lsepar_pola) then
+                 if (lsepar_pola.and.(tab_s11_ray_tracing(lambda,i,j,1) > tiny_real)) then
                     tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
                     tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
                     tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
