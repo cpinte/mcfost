@@ -177,19 +177,20 @@ subroutine define_gas_density()
      enddo !i
      mass =  mass * AU3_to_m3 * g_to_Msun
 
-     ! Normalisation
-     facteur = dz%diskmass * dz%gas_to_dust / mass
-!     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
+        ! Normalisation
+     if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+        facteur = dz%diskmass * dz%gas_to_dust / mass
+        !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
 
-     ! Somme sur les zones pour densite finale
-     do i=1,n_rad
-        bz_gas_mass2 : do j=min(0,j_start),nz
-           do k=1, n_az
-              densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
-           enddo !k
-        enddo bz_gas_mass2
-     enddo ! i
-
+        ! Somme sur les zones pour densite finale
+        do i=1,n_rad
+           bz_gas_mass2 : do j=min(0,j_start),nz
+              do k=1, n_az
+                 densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
+              enddo !k
+           enddo bz_gas_mass2
+        enddo ! i
+     endif
   enddo ! n_zones
 
   ! Ajout cavite vide

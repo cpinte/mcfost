@@ -13,7 +13,6 @@ module parametres
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
 
-
   real :: para_version
 
   ! Système
