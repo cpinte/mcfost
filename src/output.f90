@@ -1001,7 +1001,7 @@ end subroutine print_error
 
 !***********************************************************
 
-subroutine calc_opacity_map(lambda)
+subroutine calc_optical_depth_map(lambda)
 
   implicit none
 
@@ -1014,25 +1014,25 @@ subroutine calc_opacity_map(lambda)
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
 
-  real, dimension(n_rad,nz,2) :: opacity_map
+  real, dimension(n_rad,nz,2) :: optical_depth_map
 
   lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
 
   if (lmilieu) then
      ! Opacite radiale
      do j=1, nz
-        i=1 ; opacity_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
+        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
         do i=2, n_rad
-           opacity_map(i,j,1) = opacity_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
+           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
                 + 0.5 * kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; opacity_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
+        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
         do j=nz-1,1,-1
-           opacity_map(i,j,2) = opacity_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
+           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
                + 0.5 * kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         enddo
      enddo
@@ -1040,23 +1040,23 @@ subroutine calc_opacity_map(lambda)
   else
      ! Opacite radiale
      do j=1, nz
-        i=1 ; opacity_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         do i=2, n_rad
-           opacity_map(i,j,1) = opacity_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; opacity_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         do j=nz-1,1,-1
-           opacity_map(i,j,2) = opacity_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         enddo
      enddo
   endif
 
-  write(*,*) "Writing opacity_map.fits.gz"
-  filename = "opacity_map.fits.gz"
+  write(*,*) "Writing optical_depth_map.fits.gz"
+  filename = "optical_depth_map.fits.gz"
 
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1087,7 +1087,7 @@ subroutine calc_opacity_map(lambda)
   nelements=naxes(1)*naxes(2)*naxes(3)
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,opacity_map,status)
+  call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1103,7 +1103,7 @@ subroutine calc_opacity_map(lambda)
   stop
   return
 
-end subroutine calc_opacity_map
+end subroutine calc_optical_depth_map
 
 !***********************************************************
 

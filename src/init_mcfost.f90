@@ -60,7 +60,7 @@ subroutine initialisation_mcfost()
   lzoom=.false.
   lopacite_only=.false.
   lseed=.false.
-  lopacity_map=.false.
+  loptical_depth_map=.false.
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
@@ -453,9 +453,12 @@ subroutine initialisation_mcfost()
      case("-dust_prop")
         i_arg = i_arg+1
         ldust_prop=.true.
-     case("-opacity_map")
+     case("-optical_depth_map")
         i_arg = i_arg+1
-        lopacity_map=.true.
+        loptical_depth_map=.true.
+     case("-od") ! short option name
+        i_arg = i_arg+1
+        loptical_depth_map=.true.
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.
@@ -1042,9 +1045,9 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
-  write(*,*) "        : -opacity_map : generates a map of integrated optical depth"
-  write(*,*) "                         along radial and vertical directions and stops;"
-  write(*,*) "                         results stored in opacity_map.fits.gz"
+  write(*,*) "        : -optical_depth_map : generates a map of integrated optical depth"
+  write(*,*) "          -od                along radial and vertical directions and stops;"
+  write(*,*) "                             results stored in optical_depth_map.fits.gz"
   write(*,*) "        : -average_grain_size : computes average grain size in each cell,"
   write(*,*) "                             weighted by their geometrical cross-section;"
   write(*,*) "                             results stored in average_grain_size.fits.gz"
