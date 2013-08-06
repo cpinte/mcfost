@@ -101,6 +101,8 @@ subroutine initialisation_mcfost()
   lProDiMo_input_dir=.false.
   lProDiMo2mcfost=.false.
   lforce_ProDiMo_PAH = .false.
+  lstrat_SPH = .false.
+  lstrat_SPH_bin = .false.
   lgap_ELT=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
@@ -115,7 +117,6 @@ subroutine initialisation_mcfost()
 
   lonly_scatt = .false.
   lHG = .false.
-
 
   ! Geometrie Grille
   lcylindrical=.true.
