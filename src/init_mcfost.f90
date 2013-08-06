@@ -713,6 +713,12 @@ subroutine initialisation_mcfost()
      stop
   endif
 
+  if (map_size < tiny_real) then
+     write(*,*) "ERROR: map size is set to 0"
+     write(*,*) "Exiting"
+     stop
+  endif
+
   write(*,*) 'Input file read successfully'
 
 
