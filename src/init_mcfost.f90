@@ -666,7 +666,7 @@ subroutine initialisation_mcfost()
      case("-read_Seb_C")
         i_arg = i_arg+1
         lread_Seb_Charnoz=.true.
-    case("-read_Seb_C2")
+     case("-read_Seb_C2")
         i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)

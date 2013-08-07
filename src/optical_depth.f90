@@ -3540,14 +3540,20 @@ subroutine integ_tau_mol(imol)
   write(*,*) "tau_mol = ", norme
   write(*,*) "tau_dust=", norme1
 
-!!$  do i=1,n_rad
-!!$     norme=0.0
-!!$     do j=1, nz
-!!$        P(:) = local_Doppler_profile(i,j,1,0.0_db,0.0_db,1.0_db)
-!!$        norme=norme+2.0*kappa_mol_o_freq(i,j,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
-!!$     enddo
-!!$     write(*,*) r_grid(i,1), "tauv=", norme
-!!$  enddo
+  loop_r : do i=1,n_rad
+     if (r_grid(i,1) > 100.0) then
+        norme=0.0
+        loop_z : do j=nz, 1, -1
+           P(:) = phiProf(i,j,ispeed,tab_speed)
+           norme=norme+kappa_mol_o_freq(i,j,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+           if (norme > 1.0) then
+              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(i,j), "AU"
+              exit loop_z
+           endif
+        enddo loop_z
+        exit loop_r
+     endif
+  enddo loop_r
 
   !read(*,*)
 
