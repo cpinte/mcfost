@@ -1244,7 +1244,7 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/dust_density.fits.gz"
+  filename = trim(data_dir)//"/dust_particule_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1293,6 +1293,62 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
+  filename = trim(data_dir)//"/dust_mass_density.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=3
+  naxes(1) = n_rad
+  naxes(2) = nz
+  naxes(3) = n_az
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  !  dens =  densite_pouss
+  ! le d signifie real*8
+  dust_dens = densite_pouss(:,1:nz,:,:)
+  dens = 0.0
+  do k=1,n_az
+     do j=1,nz
+        do i=1,n_rad
+           dens(i,j,k) = sum(densite_pouss(i,j,k,:) * M_grain(:)) ! M_grain en g
+        enddo !i
+     enddo !j
+  enddo !k
+  call ftppre(unit,group,fpixel,nelements,dens,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
   filename = trim(data_dir)//"/grain_sizes.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1326,6 +1382,49 @@ subroutine ecriture_densite_gaz()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,r_grain,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+  ! ********************************************************************************
+  filename = trim(data_dir)//"/grain_masses.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,M_grain,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
