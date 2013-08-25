@@ -47,7 +47,7 @@ subroutine transfert_poussiere()
   ! Parametres simu
   integer :: time, lambda_seuil, ymap0, xmap0, ndifus, nbre_phot2, sig, signal
   integer :: n_dif_max, nbr_arg, i_arg, ind_etape, first_etape_obs
-  real ::  delta_time, time_checkpoint, time_checkpoint_old, cpu_time_begin, cpu_time_end
+  real ::  delta_time, cpu_time_begin, cpu_time_end
   integer :: etape_start, nnfot1_start, n_iter, iTrans, ibin
 
   real :: n_phot_lim
@@ -140,246 +140,228 @@ subroutine transfert_poussiere()
   enddo
 
 
-  if (checkpoint_level==0) then
-     call init_lambda()
-     call init_indices_optiques()
+  call init_lambda()
+  call init_indices_optiques()
 
-     call taille_grains()
+  call taille_grains()
 
-     if (lold_grid) then
-        call define_grid3()
-     else
-        call order_zones()
-        call define_physical_zones()
-        call define_grid4()
-     endif
-
-     if (lProDiMo) call setup_ProDiMo()
-
-     !call densite_data_hd32297(para) ! grille redefinie dans routine
-     if (lgap_laure) then
-        call densite_gap_laure2()
-     elseif (lgap) then
-       call densite_data_gap
-     else if (lstrat_SPH) then
-        call densite_data_SPH_TTauri_2
-     else if (lstrat_SPH_bin) then
-        call densite_data_SPH_binaire
-      else if (lfits) then
-        call densite_fits
-     else if (ldebris) then
-        call densite_debris
-     else if (lLaure_SED) then
-        call densite_data_LAURE_SED()
-     else if (lread_Seb_Charnoz) then
-        call densite_Seb_Charnoz()
-     else if (lread_Seb_Charnoz2) then
-        call densite_Seb_Charnoz2()
-     else
-        call define_density()
-     endif
-
-     if (lwall) call define_density_wall3D()
-
-     if (ldisk_struct) then
-        call ecriture_densite_gaz
-        stop
-     endif
-
-     if (lmono) then ! code monochromatique
-        lambda=1
-        etape_i=1
-        etape_f=1
-        letape_th = .false.
-        first_etape_obs=1
-
-        n_phot_lim=1.0e30
-
-        if (aniso_method==1) then
-           lmethod_aniso1=.true.
-        else
-           lmethod_aniso1=.false.
-           if (laggregate) then
-              write(*,*) "Error : you must use scattering method 1 when grains are aggregates"
-              stop
-           endif
-        endif
-        call repartition_energie_etoiles()
-        call prop_grains(1,1)
-
-        if (lscatt_ray_tracing) then
-           call alloc_ray_tracing()
-           call init_directions_ray_tracing()
-        endif
-
-        call opacite2(1)
-        call integ_tau(1) !TODO
-
-        if (loptical_depth_map) call calc_optical_depth_map(1)
-
-        write(*,*) ""
-        write(*,*) "Dust properties in cell (1,1,1): "
-        write(*,*) "g             ", tab_g_pos(1,1,1,1)
-        write(*,*) "albedo        ", tab_albedo_pos(1,1,1,1)
-        if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(1,1,1,1,:)/tab_s11_pos(1,1,1,1,:))
-
-        if (lopacite_only) stop
-
-        if (l_em_disk_image) then ! le disque émet
-           call lect_Temperature()
-        else ! Seule l'étoile émet
-           Temperature=0.0
-        endif !l_em_disk_image
-
-     else ! not lmono
-
-        if (aniso_method==1) then
-           lmethod_aniso1 = .true.
-        else
-           lmethod_aniso1 = .false.
-        endif
-
-        first_etape_obs=2
-        ! Nbre d'étapes à déterminer pour code thermique
-        if (ltemp) then
-           etape_i=1
-           letape_th=.true.
-        else
-           etape_i=2
-           letape_th=.false.
-           call lect_Temperature()
-        endif
-        if (lsed) then
-           if (lsed_complete) then
-              etape_f=1+n_lambda
-              n_lambda2 = n_lambda
-           else
-              etape_f=1+n_lambda2 ! modif nombre étape
-           endif
-        else
-           etape_f=1
-        endif
-
-
-        if (ltemp.or.lsed_complete) then
-           frac_E_stars=1.0 ! dans phase1 tous les photons partent de l'etoile
-           call repartition_energie_etoiles()
-
-           if (.not.lbenchmark_Pascucci) then
-              if (lscatt_ray_tracing.and.lsed_complete) then
-                 call alloc_ray_tracing()
-                 call init_directions_ray_tracing()
-              endif
-
-              write(*,'(a30, $)') "Computing dust properties ..."
-              do lambda=1,n_lambda
-                 call prop_grains(lambda, p_lambda)
-                 call opacite2(lambda)!_eqdiff!_data
-              enddo !n
-              write(*,*) "Done"
-
-              if (ldust_sublimation)  then
-                 call compute_othin_sublimation_radius()
-                 call define_grid4()
-                 call define_density()
-
-                 do lambda=1,n_lambda
-                    ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
-                    call prop_grains(lambda, p_lambda)
-                    call opacite2(lambda)
-                 enddo
-              endif ! ldust_sublimation
-
-              test_tau : do lambda=1,n_lambda
-                 if (tab_lambda(lambda) > wl_seuil) then
-                    lambda_seuil=lambda
-                    exit test_tau
-                 endif
-              enddo test_tau
-              write(*,*) "lambda =", tab_lambda(lambda_seuil)
-              call integ_tau(lambda_seuil)
-              if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
-
-              if (lspherical.or.l3D) then
-                 call no_dark_zone()
-                 lapprox_diffusion=.false.
-              else
-                 if (lapprox_diffusion) then
-                    call define_dark_zone(lambda_seuil,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
-                 else
-                    call no_dark_zone()
-                 endif
-              endif
-
-              if (lonly_diff_approx) then
-                 call lect_temperature()
-                 call Temp_approx_diffusion_vertical()
-                ! call Temp_approx_diffusion()
-                 call ecriture_temperature(2)
-                 return
-              endif
-
-           else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
-              frac_E_stars=1.0
-              call lect_section_eff
-              call repartition_energie_etoiles
-              if (lcylindrical) call integ_tau(15) !TODO
-           endif ! Fin bench
-
-           if (ltemp) then
-              call init_reemission()
-              call chauffage_interne()
-           endif
-
-           !$omp parallel default(none) private(lambda) shared(n_lambda)
-           !$omp do schedule(static,1)
-           do lambda=1, n_lambda
-              call repartition_energie(lambda)
-           enddo
-           !$omp end do
-           !$omp end parallel
-
-           call repartition_wl_em()
-
-           if (lnRE) call init_emissivite_nRE()
-
-        endif ! ltemp.or.lsed_complete
-
-     endif ! lmono
-
-     if (laverage_grain_size) call taille_moyenne_grains()
-
-     ! Calcul de l'angle maximal d'ouverture du disque : TODO : revoir ce bout !!
-     call angle_disque()
-
-     if (lopacity_wall) call init_opacity_wall()
-     if (lwall) cos_max2 = 0.0
-
-     if (lcylindrical) call angle_max(1) ! TODO
-     if (lspherical) cos_max2=0.0
-
-     ! checkpoint
-     if (lcheckpoint) then
-        write(*,*) "Checkpointing"
-        call  save_checkpoint_init()
-        call cpu_time(time_checkpoint_old)
-        checkpoint=0
-     endif
-
-     etape_start=etape_i
-     nnfot1_start=1
-  else if (checkpoint_level == 1) then
-     etape_start = etape_i
-     nnfot1_start=1
+  if (lold_grid) then
+     call define_grid3()
   else
-     etape_start = indice_etape
-     nnfot1_start=nnfot1
-  endif !checkpoint_level
+     call order_zones()
+     call define_physical_zones()
+     call define_grid4()
+  endif
 
+  if (lProDiMo) call setup_ProDiMo()
+
+  !call densite_data_hd32297(para) ! grille redefinie dans routine
+  if (lgap_laure) then
+     call densite_gap_laure2()
+  elseif (lgap) then
+     call densite_data_gap
+  else if (lstrat_SPH) then
+     call densite_data_SPH_TTauri_2
+  else if (lstrat_SPH_bin) then
+     call densite_data_SPH_binaire
+  else if (lfits) then
+     call densite_fits
+  else if (ldebris) then
+     call densite_debris
+  else if (lLaure_SED) then
+     call densite_data_LAURE_SED()
+  else if (lread_Seb_Charnoz) then
+     call densite_Seb_Charnoz()
+  else if (lread_Seb_Charnoz2) then
+     call densite_Seb_Charnoz2()
+  else
+     call define_density()
+  endif
+
+  if (lwall) call define_density_wall3D()
+
+  if (ldisk_struct) then
+     call ecriture_densite_gaz
+     stop
+  endif
+
+  if (lmono) then ! code monochromatique
+     lambda=1
+     etape_i=1
+     etape_f=1
+     letape_th = .false.
+     first_etape_obs=1
+
+     n_phot_lim=1.0e30
+
+     if (aniso_method==1) then
+        lmethod_aniso1=.true.
+     else
+        lmethod_aniso1=.false.
+        if (laggregate) then
+           write(*,*) "Error : you must use scattering method 1 when grains are aggregates"
+           stop
+        endif
+     endif
+     call repartition_energie_etoiles()
+     call prop_grains(1,1)
+
+     if (lscatt_ray_tracing) then
+        call alloc_ray_tracing()
+        call init_directions_ray_tracing()
+     endif
+
+     call opacite2(1)
+     call integ_tau(1) !TODO
+
+     if (loptical_depth_map) call calc_optical_depth_map(1)
+
+     write(*,*) ""
+     write(*,*) "Dust properties in cell (1,1,1): "
+     write(*,*) "g             ", tab_g_pos(1,1,1,1)
+     write(*,*) "albedo        ", tab_albedo_pos(1,1,1,1)
+     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(1,1,1,1,:)/tab_s11_pos(1,1,1,1,:))
+
+     if (lopacite_only) stop
+
+     if (l_em_disk_image) then ! le disque émet
+        call lect_Temperature()
+     else ! Seule l'étoile émet
+        Temperature=0.0
+     endif !l_em_disk_image
+
+  else ! not lmono
+
+     if (aniso_method==1) then
+        lmethod_aniso1 = .true.
+     else
+        lmethod_aniso1 = .false.
+     endif
+
+     first_etape_obs=2
+     ! Nbre d'étapes à déterminer pour code thermique
+     if (ltemp) then
+        etape_i=1
+        letape_th=.true.
+     else
+        etape_i=2
+        letape_th=.false.
+        call lect_Temperature()
+     endif
+     if (lsed) then
+        if (lsed_complete) then
+           etape_f=1+n_lambda
+           n_lambda2 = n_lambda
+        else
+           etape_f=1+n_lambda2 ! modif nombre étape
+        endif
+     else
+        etape_f=1
+     endif
+
+
+     if (ltemp.or.lsed_complete) then
+        frac_E_stars=1.0 ! dans phase1 tous les photons partent de l'etoile
+        call repartition_energie_etoiles()
+
+        if (.not.lbenchmark_Pascucci) then
+           if (lscatt_ray_tracing.and.lsed_complete) then
+              call alloc_ray_tracing()
+              call init_directions_ray_tracing()
+           endif
+
+           write(*,'(a30, $)') "Computing dust properties ..."
+           do lambda=1,n_lambda
+              call prop_grains(lambda, p_lambda)
+              call opacite2(lambda)!_eqdiff!_data
+           enddo !n
+           write(*,*) "Done"
+
+           if (ldust_sublimation)  then
+              call compute_othin_sublimation_radius()
+              call define_grid4()
+              call define_density()
+
+              do lambda=1,n_lambda
+                 ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
+                 call prop_grains(lambda, p_lambda)
+                 call opacite2(lambda)
+              enddo
+           endif ! ldust_sublimation
+
+           test_tau : do lambda=1,n_lambda
+              if (tab_lambda(lambda) > wl_seuil) then
+                 lambda_seuil=lambda
+                 exit test_tau
+              endif
+           enddo test_tau
+           write(*,*) "lambda =", tab_lambda(lambda_seuil)
+           call integ_tau(lambda_seuil)
+           if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
+
+           if (lspherical.or.l3D) then
+              call no_dark_zone()
+              lapprox_diffusion=.false.
+           else
+              if (lapprox_diffusion) then
+                 call define_dark_zone(lambda_seuil,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+              else
+                 call no_dark_zone()
+              endif
+           endif
+
+           if (lonly_diff_approx) then
+              call lect_temperature()
+              call Temp_approx_diffusion_vertical()
+              ! call Temp_approx_diffusion()
+              call ecriture_temperature(2)
+              return
+           endif
+
+        else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
+           frac_E_stars=1.0
+           call lect_section_eff
+           call repartition_energie_etoiles
+           if (lcylindrical) call integ_tau(15) !TODO
+        endif ! Fin bench
+
+        if (ltemp) then
+           call init_reemission()
+           call chauffage_interne()
+        endif
+
+        !$omp parallel default(none) private(lambda) shared(n_lambda)
+        !$omp do schedule(static,1)
+        do lambda=1, n_lambda
+           call repartition_energie(lambda)
+        enddo
+        !$omp end do
+        !$omp end parallel
+
+        call repartition_wl_em()
+
+        if (lnRE) call init_emissivite_nRE()
+
+     endif ! ltemp.or.lsed_complete
+
+  endif ! lmono
+
+  if (laverage_grain_size) call taille_moyenne_grains()
+
+  ! Calcul de l'angle maximal d'ouverture du disque : TODO : revoir ce bout !!
+  call angle_disque()
+
+  if (lopacity_wall) call init_opacity_wall()
+  if (lwall) cos_max2 = 0.0
+
+  if (lcylindrical) call angle_max(1) ! TODO
+  if (lspherical) cos_max2=0.0
+
+  etape_start=etape_i
+  nnfot1_start=1
   lambda=1 ! pour eviter depassement tab a l'initialisation
-
-
   ind_etape = etape_start
+
   ! Boucle principale sur les étapes du calcul
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
@@ -389,19 +371,6 @@ subroutine transfert_poussiere()
         nbre_phot2 = nbre_photons_eq_th
         n_phot_lim = 1.0e30 ! on ne tue pas les paquets
      else ! calcul des observables
-
-        ! Checkpointing
-        if ((ind_etape==first_etape_obs).and.(etape_start==1)) then
-           if ((id==1).and.(lcheckpoint)) then
-              !$omp critical
-              write(*,*) "Checkpointing"
-              call save_checkpoint()
-              !$omp end critical
-              time_checkpoint_old = time_checkpoint
-           endif
-        endif
-
-
         ! on devient monochromatique
         lmono=.true.
 
@@ -481,10 +450,9 @@ subroutine transfert_poussiere()
      !$omp firstprivate(lambda) &
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt) &
-     !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim) &
+     !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc,nbre_phot2,nnfot2,lforce_1st_scatt) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
-     !$omp shared(time_checkpoint, checkpoint_time, delta_time, time_checkpoint_old, lcheckpoint,lscatt_ray_tracing1) &
      !$omp reduction(+:E_abs_nRE)
 
      if (letape_th) then
@@ -510,20 +478,6 @@ subroutine transfert_poussiere()
 
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
-
-       ! ! Checkpoint
-       ! if ((id==1).and.(lcheckpoint)) then
-       !    call cpu_time(time_checkpoint)
-       !    delta_time = time_checkpoint - time_checkpoint_old
-       !    if (delta_time > checkpoint_time) then
-       !       !$omp critical
-       !       write(*,*) "Checkpointing"
-       !       call save_checkpoint()
-       !       !$omp end critical
-       !       time_checkpoint_old = time_checkpoint
-       !    endif
-       ! endif
-
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
         p_nnfot2(id) = 0
         n_phot_envoyes_loc(lambda,id) = 0.0

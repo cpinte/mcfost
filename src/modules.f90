@@ -16,8 +16,8 @@ module parametres
   real :: para_version
 
   ! Système
-  integer :: nb_proc, checkpoint, checkpoint_time, checkpoint_level
-  logical :: lpara, lcheckpoint
+  integer :: nb_proc
+  logical :: lpara
   integer, parameter :: sl = selected_real_kind(p=6,r=37)
   integer, parameter :: db = selected_real_kind(p=13,r=200)
   integer, parameter :: limite_stack = 5000000

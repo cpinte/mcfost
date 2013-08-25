@@ -168,7 +168,6 @@ contains
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -712,7 +711,6 @@ contains
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -1257,7 +1255,6 @@ contains
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -1784,7 +1781,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
+
 
     ! ----------
     ! Wavelength
@@ -2323,7 +2320,6 @@ end subroutine read_para215
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -2854,7 +2850,6 @@ end subroutine read_para215
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -3369,7 +3364,6 @@ end subroutine read_para215
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
-    lcheckpoint=.false.
 
     ! ----------
     ! Wavelength
@@ -3880,11 +3874,8 @@ end subroutine read_para215
     read(1,*)
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
-    if (lfits) then
-       lcheckpoint=.false. ; checkpoint_time=3600
-    else
-       read(1,*) lcheckpoint,  checkpoint_time
-    endif  ! lfits
+    read(1,*) !lcheckpoint,  checkpoint_time
+
     ! ----------
     ! Wavelength
     ! ----------
@@ -4394,7 +4385,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
 
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -4762,7 +4753,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
 
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -5121,7 +5112,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
 
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -5491,7 +5482,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
 
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -5861,7 +5852,7 @@ end subroutine read_para215
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image ; read(1,*) nbre_photons_spectre
 
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -6242,7 +6233,7 @@ end subroutine read_para215
     read(1,*)
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image ; read(1,*) nbre_photons_spectre
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -6571,7 +6562,7 @@ end subroutine read_para215
     read(1,*)
     read(1,*)
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;  read(1,*) nbre_photons_image
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda, lambda_min, lambda_max
@@ -6893,7 +6884,7 @@ end subroutine read_para215
     read(1,*)
     read(1,*)
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;  read(1,*) nbre_photons_image
-    read(1,*) lcheckpoint,  checkpoint_time
+    read(1,*) !lcheckpoint,  checkpoint_time
     read(1,*)
     read(1,*)
     read(1,*) n_lambda

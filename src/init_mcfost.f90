@@ -1195,31 +1195,8 @@ subroutine save_data
               lnew_run = .true.
               lmove_data=.true.
            else ! le dossier data n'existe pas
-              if (.not.lcheckpoint) then
-                 lnew_run=.true.
-                 lmove_data=.false.
-              else ! Recherche checkpoint
-                 write(*,*) "Trying to load checkpooint data"
-                 cmd = 'ls '//trim(local_data_dir)//"/checkpoint*"
-                 call appel_syst(cmd,syst_status)
-                 if (syst_status == 256) then ! il n'y pas a des checkpoints
-                    lnew_run=.true.
-                    lmove_data=.true.
-                 else !il y a des checkpoint
-                    lnew_run=.false.
-                    call restore_checkpoint()
-                    write(*,*) "checkpoint_level", checkpoint_level
-                    if (checkpoint_level == 0) then
-                       ! Pb dans le checkpoint
-                       write(*,*) "Checkpoint file is corrupted. Starting a new run."
-                       lmove_data=.true.
-                    else  if (checkpoint_level == 1) then
-                       write(*,*) "Restoring previous run from checkpoint file (initialization phase)"
-                    else
-                       write(*,*) "Restoring previous run from checkpoint file (MC phase)"
-                    endif ! checkpoint_level
-                 endif ! il y ades checkpoint ?
-              endif ! lchekcpoint
+              lnew_run=.true.
+              lmove_data=.false.
            endif ! if y a un dossier data
         else
            lnew_run = .true. ! le dossier data n'existe pas
