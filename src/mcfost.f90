@@ -51,8 +51,6 @@ program BIGCRUNCH
      call mol_line_transfer()
   endif
 
-  if (lcheckpoint) call clean_checkpoint()
-
   ! Temps d'execution
   call system_clock(time_end)
   if (time_end < time_begin) then
