@@ -60,11 +60,11 @@
   0.03  1000.0 3.5 100 	  amin, amax [mum], aexp, n_grains (log distribution)
 
 #Molecular RT settings
-  T T T 15.	          lpop, laccurate_pop, LTE, profile width
+  T T T 15.	          lpop, laccurate_pop, LTE, profile width (km.s^-1)
   0.2 			  v_turb (delta)
   1			  nmol
   co@xpol.dat 6           molecular data filename, level_max
-  1.0 20     	  	  vmax (m.s-1), n_speed
+  1.0 20     	  	  vmax (km.s^-1), n_speed
   T 1.e-6 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
   T  3                       ray tracing ?,  number of lines in ray-tracing
   1 2 3	 		  transition numbers
