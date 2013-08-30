@@ -1104,7 +1104,7 @@ end subroutine appel_syst
 
 !************************************************************
 
-subroutine gauleg(x1,x2,x,w,n)
+subroutine GauLeg(x1,x2,x,w,n)
   ! Given the lower and upper limits of integration x1 and x2,
   ! and given n, this routine returns arrays x(1:1) and w(1:w)
   ! of length n, containing the abscissas and weights of the

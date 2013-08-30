@@ -49,6 +49,10 @@ subroutine initialisation_mcfost()
   !$ nb_proc=omp_get_num_threads() ; lpara=.true.
   !$omp end parallel
 
+  ldisk_struct = .false.
+  ldust_prop = .false.
+  ldust_gas_ratio = .false.
+  lwall=.false.
   lgap=.false.
   lpah=.false.
   ln_zone=.false. ; n_zones=1
@@ -100,20 +104,25 @@ subroutine initialisation_mcfost()
   lprodimo=.false.
   lProDiMo_input_dir=.false.
   lProDiMo2mcfost=.false.
+  lProDiMo2mcfost_test = .false.
   lforce_ProDiMo_PAH = .false.
-  lstrat_SPH = .false.
-  lstrat_SPH_bin = .false.
+  lforce_diff_approx = .false.
+  lstrat_SPH = .false. ; lno_strat_SPH=.true.
+  lstrat_SPH_bin = .false. ; lno_strat_SPH_bin=.true.
   lgap_ELT=.false.
   lLaure_SED=.false.
   lforce_T_Laure_SED = .false.
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
+  lread_Seb_Charnoz2 = .false.
   lforce_1st_scatt = .false.
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
   lcorrect_Tgas = .false.
+  lcorrect_density=.false.
+  lremove = .false.
 
   lonly_scatt = .false.
   lHG = .false.
