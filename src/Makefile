@@ -100,7 +100,7 @@ OPTS = -O3 -ipo -no-prec-div #-fast (because -fast implies -xP, cannot be overwr
 # fpe0 bug avec openmp
 DEBUG_OPTS =  -check all -traceback  -fpstkchk  -C -g -d2  -fpe0
 #PARALLEL = -openmp
-MACH =  -xW -axP #-tpp7 #-xW -tune pn4
+MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX #-xW -axP #-tpp7 #-xW -tune pn4
 PREC = #-pc80 -prec_div -mp
 # Option de conservation de la precision
 # -mp : maintain precision fait prendre 1 facteur 2 dans le tps d'execution
