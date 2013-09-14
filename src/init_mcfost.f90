@@ -731,6 +731,11 @@ subroutine initialisation_mcfost()
      stop
   endif
 
+  if (lsed.and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
+     write(*,*) "WARNING: polarization is turned off in ray-traced SEDs"
+     lsepar_pola = .false.
+  endif
+
   write(*,*) 'Input file read successfully'
 
 
