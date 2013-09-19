@@ -314,7 +314,6 @@ subroutine init_indices_optiques()
         dust_pop(pop)%component_rho1g(1) = 2.5
         dust_pop(pop)%rho1g_avg = 2.5
 
-
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix PAH with other component"
            write(*,*) "Exiting"
@@ -339,6 +338,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   ! C. Pinte
   ! 28/09/11
   ! 27/10/11 : more than 2 components
+  ! 18/09/13 : changing iteration for a much more stable scheme
 
   implicit none
 
@@ -347,17 +347,13 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   real,    dimension(:), intent(in) :: f ! volume fractions of the components
   complex ::  m_eff
 
-  integer, parameter :: n_iter_max = 1000
+  integer, parameter :: n_iter_max = 100
   real, parameter :: accuracy = 1.e-6
 
-  complex, dimension(size(m)) :: eps, A_i ! 3*alpha dans la notoation de WF
-  real, dimension(size(m)):: f_i
+  complex, dimension(size(m)) :: eps
 
-  integer :: n, i, imatrix, iter
-  integer, dimension(1) :: imatrix_tmp
-  real :: f_mat, verif
-
-  complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, eps_eff0, eps_mat, S
+  integer :: n, i, iter, k
+  complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, S
 
   ! Number of components
   n = size(m) ;
@@ -400,57 +396,25 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
      endif
 
   else ! n > 2, pas de solution analytique, methode iterative
-     ! TODO : comment etre sur que c'est la bonne racine ???
+     eps_eff = (sum(f(:) * eps(:)**(1./3)))**3 ! Initial guess : Landau, Lifshitz, Looyenga rule
+     ! Marche aussi avec eps_eff = 1.0 mais necessite quelques iterations de plus
 
-     ! Initial guess : Landau, Lifshitz, Looyenga rule
-     eps_eff0 = (sum(f(:) * eps(:)**(1./3)))**3
-     eps_eff = eps_eff0
+     eps_eff1 = eps_eff ; k=0 ! in case the iteration does not work
+     iteration : do iter=1, n_iter_max
+        k=k+1
+        S = sum( (eps(:)-eps_eff)/(eps(:)+2*eps_eff) * f(:) )
+        eps_eff =  eps_eff * (2*S+1)/(1-S)
 
-     ! Selecting matrix : component with the largest volume fraction
-     !imatrix_tmp = minloc(abs(eps(:) - eps_eff0))
-     imatrix_tmp = maxloc(f)
-     imatrix = imatrix_tmp(1)
-     !if (lambda==2) imatrix = 3  ! je ne capte pas cette ligne
-     f_mat = f(imatrix)
-     eps_mat = eps(imatrix)
+        if (abs(S) < accuracy) exit iteration
+     enddo iteration
 
-     ! extra variable to avoid summing over the matrix component
-     f_i(:) = f(:) ; f_i(imatrix) = 0.0
-
-     ! valeurs pour la 1ere iteration
-     A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff)
-     S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
-     verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
-
-     if (verif > accuracy) then
-        ! Iteration proprement-dite
-        iteration : do iter=1, n_iter_max
-           eps_eff = eps_mat * (f_mat + S) / (f_mat - 2*S)
-
-           ! valeurs pour verif + iteration suivant
-           A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff)
-           S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
-
-           verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
-           if (verif < accuracy) exit iteration
-
-           if (iter == n_iter_max) then
-              write(*,*) "****************************************************"
-              write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman not converging"
-              write(*,*) "Using Landau, Lifshitz, Looyenga instead"
-              write(*,*) "****************************************************"
-              eps_eff = eps_eff0
-           endif
-        enddo iteration
-     endif
-
-     if (aimag(eps_eff) < 0) then
+     if (k==n_iter_max) then
         write(*,*) "****************************************************"
-        write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman converging"
-        write(*,*) "to unphysical solution"
+        write(*,*) "WARNING: lambda=",lambda, "wl=",tab_lambda(lambda)
+        write(*,*) "Bruggeman not converging"
         write(*,*) "Using Landau, Lifshitz, Looyenga instead"
         write(*,*) "****************************************************"
-        eps_eff = eps_eff0
+        eps_eff = eps_eff1
      endif
 
   endif ! n > 2
@@ -459,8 +423,8 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   m_eff = sqrt(eps_eff)
 
   ! Verification finale ---> OK
-  !A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2* eps_eff)
-  !write(*,*) "Verif Bruggeman", lambda, abs(sum( f(:) * A_i(:)))
+  !S = sum( (eps(:)-eps_eff)/(eps(:)+2*eps_eff) * f(:) )
+  !write(*,*) "Verif Bruggeman", lambda, iter, m_eff, abs(S)
 
   return
 
