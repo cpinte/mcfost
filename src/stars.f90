@@ -492,7 +492,7 @@ subroutine repartition_energie_etoiles()
      ! ProDiMo_star_HR est du lambda.Flambda (idem spectre_etoiles mais avec tab_lambda au lieu de tab_delta_lambda)
      allocate(ProDiMo_star_HR(n_lambda_spectre,2))
      ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
-     ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:)
+     ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:) * 1e-6
   endif
 
 
