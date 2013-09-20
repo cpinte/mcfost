@@ -261,9 +261,8 @@ subroutine init_indices_optiques()
         ! Add vacuum as last component
         if (dust_pop(pop)%porosity > tiny_real) then
            tab_tmp_amu1(:,n_components) = 1.0_db
-           tab_tmp_amu1(:,n_components) = 1.0_db
+           tab_tmp_amu2(:,n_components) = 0.0_db
         endif
-
 
         if (n_components == 1) then
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)

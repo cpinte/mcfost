@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.17
-  character(8), parameter :: mcfost_release = "2.17.5"
+  real, parameter :: mcfost_version = 2.18
+  character(8), parameter :: mcfost_release = "2.18.0"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -45,8 +45,10 @@ module parametres
   logical :: lmono0, lmono
 
   ! lstrat = true si on prend en compte la stratification
-  logical :: lstrat, ldust_sublimation, lRE_LTE, lRE_nLTE, lnRE, loutput_J, loutput_UV_field, lxJ_abs, lxJ_abs2
+  logical :: lstrat, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
+
+  logical :: lRE_LTE, lRE_nLTE, lnRE, loutput_J, loutput_UV_field, lxJ_abs, lxJ_abs2
 
   ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
   ! 0 -> automatique
