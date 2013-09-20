@@ -255,6 +255,8 @@ subroutine define_dust_density()
   ! Pour puffed-up inner rim
   real(kind=db) :: correct_H
 
+  real(kind=db) :: s_opt
+
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
@@ -331,6 +333,16 @@ subroutine define_dust_density()
 
         do i=1, n_rad
            rho0 = densite_gaz(i,0,1) ! midplane density (j=0)
+
+           !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
+           !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+
+           rcyl = r_grid(i,1)
+           H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+           s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+
+           !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
+           !write(*,*) "s_opt", rcyl, s_opt/1000.
 
            bz : do j=j_start,nz
               if (j==0) cycle bz
@@ -2923,7 +2935,7 @@ real(kind=db) function omega_tau(rho,H,l)
   integer :: ipop
 
   ipop = grain(l)%pop
-  omega_tau=dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm)/(rho * masse_mol_gaz/m_to_cm**3)/(H*AU_to_cm)
+  omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
 
   return
 
