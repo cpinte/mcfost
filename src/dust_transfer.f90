@@ -68,7 +68,7 @@ subroutine transfert_poussiere()
   logical :: laffichage, flag_em_nRE
 
   ! Paramètres parallelisation
-  integer :: id=1, iargc
+  integer :: id=1
 
   real(kind=db), dimension(:), pointer :: p_nnfot2
 
