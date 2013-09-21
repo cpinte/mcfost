@@ -280,7 +280,7 @@ subroutine transfert_poussiere()
            if (ldust_sublimation)  then
               call compute_othin_sublimation_radius()
               call define_grid4()
-              call define_density()
+              call define_dust_density()
 
               do lambda=1,n_lambda
                  ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem

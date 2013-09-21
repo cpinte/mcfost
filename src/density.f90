@@ -47,6 +47,8 @@ subroutine define_gas_density()
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
   real(kind=db), dimension(n_rad,0:nz,1) :: densite_gaz_tmp
 
+  densite_gaz = 0.0 ;
+
   do izone=1, n_zones
      dz = disk_zone(izone)
      if (dz%geometry <= 2) then ! Disque
@@ -246,9 +248,9 @@ subroutine define_dust_density()
   real(kind=db), dimension(n_pop) :: cst, cst_pous
   real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
   real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, h_H2, coeff_strat, proba
-  real(kind=db) :: puffed, facteur, z0, phi, surface, norme
+  real(kind=db) :: puffed, facteur, z0, phi, surface, norme, S
 
-  real(kind=db), dimension(n_grains_tot) :: correct_strat
+  real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
   real(kind=db) :: rho, rho0, ztilde, dtilde, h, hd
 
@@ -265,6 +267,10 @@ subroutine define_dust_density()
 
   ! Pour simus Dubrulle
   real, parameter :: gamma = 2.0 ! exposant de turbulence, 2 pour turbulence compressible
+
+  logical :: lwarning
+
+  densite_pouss = 0.0; masse = 0.0
 
   ! Coefficient de diffusion constant
   Dtilde = alpha / Sc
@@ -323,6 +329,8 @@ subroutine define_dust_density()
      endif
   enddo !k
 
+  ! Pour normalisation apres migration radiale
+  N_tot(:) = 0.0 ; N_tot2(:) = 0.0 ;
 
   ! Boucle pop a l'exterieur pour pouvoir superposer differente pop
   do pop=1, n_pop
@@ -333,13 +341,6 @@ subroutine define_dust_density()
 
         do i=1, n_rad
            rho0 = densite_gaz(i,0,1) ! midplane density (j=0)
-
-           !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
-           !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
-
-           rcyl = r_grid(i,1)
-           H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-           s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
            !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
            !write(*,*) "s_opt", rcyl, s_opt/1000.
@@ -416,8 +417,8 @@ subroutine define_dust_density()
 
            if (lstrat.and.(settling_type == 2)) then
               if (lspherical) then
-                 write(*,*) "ERROR: settling following Fromang's prescription is only"
-                 write(*,*) "implemented on a spharical grid"
+                 write(*,*) "ERROR: settling following Dubrulle's prescription is only"
+                 write(*,*) "implemented on a spherical grid"
                  write(*,*) "Exiting"
                  stop
               endif
@@ -463,6 +464,7 @@ subroutine define_dust_density()
            endif
 
            do i=1, n_rad
+              lwarning = .true.
               rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
 
               rcyl = r_grid(i,1)
@@ -500,8 +502,11 @@ subroutine define_dust_density()
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
-                       write(*,*) "WARNING : Vertical settling unresolved for"
-                       write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl )
+                       if (lwarning) then
+                          write(*,*) "WARNING : Vertical settling unresolved for"
+                          write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                          lwarning = .false. ! on ne fait un warning qu'1 fois par rayon
+                       endif
                     endif
 
                     do j=j_start,nz
@@ -514,6 +519,37 @@ subroutine define_dust_density()
            enddo ! i
         endif ! Settling Fromang
 
+        if (lmigration) then
+           do i=1, n_rad
+              rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
+              !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
+              !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+
+              rcyl = r_grid(i,1)
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+              s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+
+              !write(*,*) "s_opt", i, rcyl, s_opt
+
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 S = sum(densite_pouss(i,:,:,l))
+                 N_tot(l) = N_tot(l) + S
+                 if (r_grain(l) > s_opt) then ! grains plus gros que taille optimale de migration
+                    !write(*,*) "migration", i, rcyl, l, r_grain(l)
+                    densite_pouss(i,:,:,l) = 0.0
+                 else
+                    N_tot2(l) = N_tot2(l) + S
+                 endif
+              enddo ! l
+           enddo !i
+
+           ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
+           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              if (N_tot2(l) > tiny_db) then
+                 densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l) * N_tot(l)/N_tot2(l)
+              endif
+           enddo ! l
+        endif ! migration
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad

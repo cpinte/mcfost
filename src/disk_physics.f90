@@ -16,9 +16,9 @@ subroutine compute_othin_sublimation_radius()
   implicit none
 
   real(kind=db) :: E_dust, E_etoile
-  real :: cst, cst_wl, coeff_exp, wl, delta_wl
+  real :: cst, wl, delta_wl
   integer :: lambda, k, i
-  real(kind=db) :: sublimation_radius
+  real(kind=db) :: sublimation_radius, coeff_exp, cst_wl
 
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
 
@@ -97,7 +97,9 @@ subroutine compute_othin_sublimation_radius()
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
 
   do i=1,n_zones
+     !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
      if (sublimation_radius > disk_zone(i)%rmin) then
+        !write(*,*) "SUBLIMATING DUST IN ZONE", i
         disk_zone(i)%rmin = sublimation_radius
         disk_zone(i)%rin = disk_zone(i)%rmin !+ 5* disk_zone(1)%edge
         disk_zone(i)%edge = 0.0
