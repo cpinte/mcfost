@@ -503,6 +503,7 @@ subroutine define_dust_density()
                        norme = 1.0_db
 
                        if (lwarning) then
+                          write(*,*)
                           write(*,*) "WARNING : Vertical settling unresolved for"
                           write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
                           lwarning = .false. ! on ne fait un warning qu'1 fois par rayon
@@ -519,6 +520,7 @@ subroutine define_dust_density()
            enddo ! i
         endif ! Settling Fromang
 
+        lwarning = .true.
         if (lmigration) then
            do i=1, n_rad
               rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
@@ -528,6 +530,15 @@ subroutine define_dust_density()
               rcyl = r_grid(i,1)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+
+              if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
+                 write(*,*)
+                 write(*,*) "WARNING: a_migration = ", s_opt
+                 write(*,*) "is smaller than amin for dust pop #", pop
+                 write(*,*) "MCFOST will exit with an error is there are no smaller grains"
+                 if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
+                 lwarning = .false.
+              endif
 
               !write(*,*) "s_opt", i, rcyl, s_opt
 
@@ -634,6 +645,12 @@ subroutine define_dust_density()
            enddo bz2
         enddo !i
         mass =  mass * AU3_to_cm3 * g_to_Msun
+
+        if (mass < tiny_db) then
+           write(*,*)
+           write(*,*) "ERROR : something went wrong, there is no dust in the disk"
+           write(*,*) "Exiting." ; stop
+        endif
 
         facteur = dp%masse / mass
 
