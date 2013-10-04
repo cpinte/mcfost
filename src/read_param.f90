@@ -8,6 +8,7 @@ module read_params
   use molecular_emission
   use ray_tracing
   use input
+  use sha
 
   implicit none
 
@@ -55,6 +56,7 @@ contains
     lhydrostatic = .false.
 
     write(*,*) "You are running MCFOST "//trim(mcfost_release)
+    write(*,*) "Git SHA = ", sha_id
     if (abs(para_version - 2.18) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
        if (abs(para_version-2.17) < 1.e-4) then

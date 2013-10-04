@@ -4764,8 +4764,6 @@ subroutine no_dark_zone()
 
   implicit none
 
-  write(*,*) "No dark zone"
-
   r_in_opacite(:,:) = r_lim(1)
   r_in_opacite2(:,:) = r_lim_2(1)
 
