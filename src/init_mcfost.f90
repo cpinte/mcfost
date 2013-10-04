@@ -783,7 +783,7 @@ subroutine initialisation_mcfost()
 
 
   if (lonly_scatt) l_em_disk_image=.false.
-  if (lHG) aniso_method=2
+  if (lHG.or.lisotropic) aniso_method=2
 
 
   ! Discrimination type de run (image vs SED/Temp)
