@@ -37,7 +37,7 @@ subroutine define_gas_density()
 
   implicit none
 
-  integer :: i,j, k, izone
+  integer :: i,j, k, izone, alloc_status
   real(kind=db), dimension(n_zones) :: cst_gaz
   real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C
 
@@ -45,8 +45,15 @@ subroutine define_gas_density()
 
   ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=db), dimension(n_rad,0:nz,1) :: densite_gaz_tmp
+  real(kind=db), dimension(:,:,:), allocatable :: densite_gaz_tmp
 
+
+  if (l3D) then
+     allocate(densite_gaz_tmp(n_rad,-nz:nz,n_az), stat=alloc_status)
+  else
+     allocate(densite_gaz_tmp(n_rad,0:nz,1), stat=alloc_status)
+  endif
+  densite_gaz_tmp = 0.0
   densite_gaz = 0.0 ;
 
   do izone=1, n_zones

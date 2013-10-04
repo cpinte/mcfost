@@ -300,12 +300,14 @@ subroutine transfert_poussiere()
            if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
 
            if (lspherical.or.l3D) then
+              write(*,*) "No dark zone"
               call no_dark_zone()
               lapprox_diffusion=.false.
            else
               if (lapprox_diffusion) then
                  call define_dark_zone(lambda_seuil,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
               else
+                 write(*,*) "No dark zone"
                  call no_dark_zone()
               endif
            endif

@@ -968,7 +968,11 @@ subroutine alloc_dynamique()
      norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
   endif ! lemission_mol
 
-  allocate(densite_gaz(n_rad,0:nz,1), masse_gaz(n_rad,nz,1), stat=alloc_status)
+  if (l3D) then
+     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
+  else
+     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_gaz'
      stop
