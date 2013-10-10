@@ -26,8 +26,16 @@ contains
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
+    write(*,*) "You are running MCFOST "//trim(mcfost_release)
+    write(*,*) "Git SHA = ", sha_id
+
     ! Lecture du fichier de parametres
-    open(unit=1, file=para, status='old')
+    open(unit=1, file=para, status='old', iostat=ios)
+    if (ios/=0) then
+       write(*,*) "ERROR : cannot open "//trim(para)
+       write(*,*) "Exiting"
+       stop
+    endif
 
     read(1,*) para_version
 
@@ -55,8 +63,6 @@ contains
     lmigration = .false.
     lhydrostatic = .false.
 
-    write(*,*) "You are running MCFOST "//trim(mcfost_release)
-    write(*,*) "Git SHA = ", sha_id
     if (abs(para_version - 2.18) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
        if (abs(para_version-2.17) < 1.e-4) then
