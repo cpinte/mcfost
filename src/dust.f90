@@ -505,10 +505,10 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot,is_pop_PAH,is_grain_PAH) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop)
-  !$omp do schedule(dynamic,10)
+  !$omp do schedule(dynamic,1)
   ! on fait la boucle a l'envers pour optimiser la parallelisation
   ! et savoir des le debut si l'alloc. mem. ds bhmie passe ou pas
-  do  k=1,n_grains_tot
+  do  k=n_grains_tot,1,-1
      pop = grain(k)%pop
      a = r_grain(k)
      if (.not.dust_pop(pop)%is_PAH) then ! theorie de mie ou gmm
