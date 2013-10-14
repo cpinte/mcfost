@@ -202,9 +202,9 @@ contains
 
     ! Si fonction de HG, on ne calcule pas la fonction de phase
     if (aniso_method==2) then
-       nang=1
+       nang = 1
     else
-       nang= (nang_scatt+1) / 2 + 1
+       nang = (nang_scatt+1) / 2 + 1
     endif
 
     a = r_grain(taille_grain)

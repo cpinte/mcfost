@@ -537,9 +537,6 @@ module opacity
   real(kind=db), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
   real, dimension(:,:,:), allocatable :: DensE, DensE_m1 !n_rad, 0:n_z, n_az
 
-  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
-  real, dimension(:,:), allocatable :: pol_lambda_theta
-
 end module opacity
 
 

@@ -578,16 +578,21 @@ subroutine opacite2(lambda)
   logical :: lcompute_obs
 
   ! Pour spline
-  real, dimension(1:n_prob) :: xa,ya,y2
-  real :: delta_prob1, delta_probn, yp1, ypn
+!  real, dimension(1:n_prob) :: xa,ya,y2
+!  real :: delta_prob1, delta_probn, yp1, ypn
+!  real :: yp_p1, yp_m1, ypp
 
-  real :: yp_p1, yp_m1, ypp, somme, gsca
 
-  real :: z, rcyl
+
+  real :: z, rcyl, somme, gsca
 
   logical :: ldens0
 
   real(kind=db) :: kappa_abs_RE, kappa_abs_tot, angle
+
+  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
+
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
@@ -736,7 +741,7 @@ subroutine opacite2(lambda)
   !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(q_ext,q_sca,densite_pouss,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
-  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola)
+  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop)
   !$omp do schedule(dynamic,1)
   do i=1, p_n_rad
      bz2 : do j=pj_start,p_nz
@@ -836,7 +841,7 @@ subroutine opacite2(lambda)
                     tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / &
                          max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
                  endif
-              else ! aniso_method =2 --> HG
+              else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
 
                  norme = 0.0
@@ -879,7 +884,9 @@ subroutine opacite2(lambda)
                     do l=0,180
                        if (tab_s11_pos(lambda,i,j,pk,l) > tiny_real) then ! NEW TEST STRAT LAURE
                           norme=1.0/tab_s11_pos(lambda,i,j,pk,l)
-                          tab_s11_pos(lambda,i,j,pk,l)=tab_s11_pos(lambda,i,j,pk,l)*norme
+                          if (.not.ldust_prop) then
+                             tab_s11_pos(lambda,i,j,pk,l)=tab_s11_pos(lambda,i,j,pk,l)*norme
+                          endif
                           if (lsepar_pola) then
                              tab_s12_pos(lambda,i,j,pk,l)=tab_s12_pos(lambda,i,j,pk,l)*norme
                              tab_s33_pos(lambda,i,j,pk,l)=tab_s33_pos(lambda,i,j,pk,l)*norme
@@ -888,7 +895,7 @@ subroutine opacite2(lambda)
                        endif
                     enddo
                  else !aniso_method
-                    tab_s11_pos(lambda,i,j,pk,:)=1.0
+                    tab_s11_pos(lambda,i,j,pk,:) = 1.0
                     if (lsepar_pola) then
                        tab_s12_pos(lambda,i,j,pk,:)=0.0
                        tab_s33_pos(lambda,i,j,pk,:)=0.0
@@ -1071,12 +1078,14 @@ subroutine opacite2(lambda)
 !  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
+     write(*,*) "Writing dust prop."
+
      ! Only do it after the last pass through the wavelength table
      ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
      allocate(kappa_lambda(n_lambda))
      allocate(albedo_lambda(n_lambda))
      allocate(g_lambda(n_lambda))
-     allocate(pol_lambda_theta(n_lambda,nang_scatt))
+     allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
 
      kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3))) ! cm^2/g
      albedo_lambda=tab_albedo_pos(:,1,1,1)
@@ -1087,16 +1096,15 @@ subroutine opacite2(lambda)
      call cfitsWrite("data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("data_dust/g.fits.gz",g_lambda,shape(g_lambda))
 
+     S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
+     call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+
      if (lsepar_pola) then
-        do i=1,n_lambda
-           pol_lambda_theta(i,:)=-tab_s12_pos(i,1,1,1,:)/tab_s11_pos(i,1,1,1,:)
-        enddo
-        call cfitsWrite("data_dust/polar.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:)/tab_s11_pos(:,1,1,1,:)
+        call cfitsWrite("data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 
      deallocate(kappa_lambda,albedo_lambda,g_lambda,pol_lambda_theta)
-     write(*,*) "Writing dust prop."
-     write(*,*) "Exiting"
      stop
   endif !ldust_prop
 
