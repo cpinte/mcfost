@@ -180,10 +180,7 @@ subroutine transfert_poussiere()
 
   if (lwall) call define_density_wall3D()
 
-  if (ldisk_struct) then
-     call ecriture_densite_gaz
-     stop
-  endif
+  if (ldisk_struct) call write_disk_struct()
 
   if (lmono) then ! code monochromatique
      lambda=1

@@ -885,7 +885,7 @@ subroutine opacite2(lambda)
                        if (tab_s11_pos(lambda,i,j,pk,l) > tiny_real) then ! NEW TEST STRAT LAURE
                           norme=1.0/tab_s11_pos(lambda,i,j,pk,l)
                           if (.not.ldust_prop) then
-                             tab_s11_pos(lambda,i,j,pk,l)=tab_s11_pos(lambda,i,j,pk,l)*norme
+                             tab_s11_pos(lambda,i,j,pk,l)= 1.0 !tab_s11_pos(lambda,i,j,pk,l)*norme
                           endif
                           if (lsepar_pola) then
                              tab_s12_pos(lambda,i,j,pk,l)=tab_s12_pos(lambda,i,j,pk,l)*norme
@@ -1105,7 +1105,17 @@ subroutine opacite2(lambda)
      endif
 
      deallocate(kappa_lambda,albedo_lambda,g_lambda,pol_lambda_theta)
-     stop
+
+     if (lstop_after_init) then
+        write(*,*) "Exiting"
+        stop
+     else
+        ! Re-Normalisation S11
+        ! la normalisation n'a pas eu lieu dans le cas ldust_prop pour sauver S11 dans le fichier fits
+        ! on l'a fait donc maintenant pour comtinuer les calculs
+        if ((scattering_method==2).and.(aniso_method==1)) tab_s11_pos = 1.0
+     endif
+
   endif !ldust_prop
 
   return
