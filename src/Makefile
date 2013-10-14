@@ -27,7 +27,7 @@ endif
 
 # Linux, ifort
 ifeq ($(ARCH),LINUX)
-PLATFORM =  $(shell uname -m)
+PLATFORM =  $(shell uname -p)
 ifeq ($(PLATFORM),i686)
 FC_SER = ifort -fpp  -traceback
 FC_OMP = ifort -fpp  -openmp -traceback
@@ -264,7 +264,7 @@ endif
 
 # Les macs
 ifeq ($(ARCH),DARWIN)
-PLATFORM =  $(shell uname -m)
+PLATFORM =  $(shell uname -p)
 
 ifeq ($(PLATFORM),i386)
 FC_SER = ifort -fpp -traceback
@@ -304,7 +304,7 @@ endif
 
 
 ifeq ($(PLATFORM),Power Macintosh)
-NAME = $(shell uname -n)
+NAME = $(shell uname -p)
 
 # g95 par defaut
 FC_SER = g95 -cpp
@@ -567,7 +567,7 @@ utils.o :      sha.f90
 
 # Le fichier sha.f90 n'est cree que sur mon mac
 ifeq ($(MCFOST_GIT),1)
-sha.f90 : ../.git/COMMIT_EDITMSG
+sha.f90 : ../.git/objects
 	printf "module sha\n  implicit none\n" > sha.f90
 	git log --pretty=format:"%H %d" | grep HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
 	printf "end module sha\n" >> sha.f90
