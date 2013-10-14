@@ -1161,9 +1161,11 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine ecriture_densite_gaz()
-! Ecrit la table de densite du gaz en g/cm^3 (il vaut mieux strat=0)
+subroutine write_disk_struct()
+! Ecrit les table de densite du gaz en g/cm^3
+! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
+! + les tailles et masse des grains
 ! C. Pinte
 ! 3/06/06
 
@@ -1192,7 +1194,7 @@ subroutine ecriture_densite_gaz()
 
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/gas_density.fits.gz"
+  filename = "data_disk/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1244,7 +1246,7 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/dust_particule_density.fits.gz"
+  filename = "data_disk/dust_particule_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1293,7 +1295,7 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/dust_mass_density.fits.gz"
+  filename = "data_disk/dust_mass_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1349,7 +1351,7 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/grain_sizes.fits.gz"
+  filename = "data_disk/grain_sizes.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1392,7 +1394,7 @@ subroutine ecriture_densite_gaz()
      call print_error(status)
   end if
   ! ********************************************************************************
-  filename = trim(data_dir)//"/grain_masses.fits.gz"
+  filename = "data_disk/grain_masses.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1436,7 +1438,7 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/volume.fits.gz"
+  filename = "data_disk/volume.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1484,7 +1486,7 @@ subroutine ecriture_densite_gaz()
 
 
   ! ********************************************************************************
-  filename = trim(data_dir)//"/grid.fits.gz"
+  filename = "data_disk/grid.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1539,10 +1541,14 @@ subroutine ecriture_densite_gaz()
      call print_error(status)
   end if
 
+  if (lstop_after_init) then
+     write(*,*) "Exiting"
+     stop
+  endif
+
   return
 
-
-end subroutine ecriture_densite_gaz
+end subroutine write_disk_struct
 
 !********************************************************************
 

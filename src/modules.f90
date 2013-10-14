@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.18
-  character(8), parameter :: mcfost_release = "2.18.1"
+  character(8), parameter :: mcfost_release = "2.18.2"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -17,7 +17,7 @@ module parametres
 
   ! Système
   integer :: nb_proc
-  logical :: lpara
+  logical :: lpara, lstop_after_init
   integer, parameter :: sl = selected_real_kind(p=6,r=37)
   integer, parameter :: db = selected_real_kind(p=13,r=200)
   integer, parameter :: limite_stack = 5000000

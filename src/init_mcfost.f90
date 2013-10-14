@@ -52,6 +52,7 @@ subroutine initialisation_mcfost()
   ldisk_struct = .false.
   ldust_prop = .false.
   ldust_gas_ratio = .false.
+  lstop_after_init= .false.
   lwall=.false.
   lgap=.false.
   lpah=.false.
@@ -414,6 +415,10 @@ subroutine initialisation_mcfost()
      case("-disk_struct")
         ldisk_struct=.true.
         i_arg = i_arg+1
+     case("+disk_struct")
+        ldisk_struct=.true.
+        i_arg = i_arg+1
+        lstop_after_init= .false.
      case("-output_J")
         loutput_J=.true.
         i_arg = i_arg+1
@@ -462,6 +467,11 @@ subroutine initialisation_mcfost()
      case("-dust_prop")
         i_arg = i_arg+1
         ldust_prop=.true.
+        lstop_after_init= .true.
+     case("+dust_prop")
+        i_arg = i_arg+1
+        ldust_prop=.true.
+        lstop_after_init= .false.
      case("-optical_depth_map")
         i_arg = i_arg+1
         loptical_depth_map=.true.
@@ -752,7 +762,6 @@ subroutine initialisation_mcfost()
 
   if (ldust_prop) then
      write(*,*) "Computation of dust properties as a function of wavelength"
-     basename_data_dir = "data_dust"
      ! Make sure the full wavelength range is used to compute
      ! the dust properties
      limg=.false.
@@ -760,11 +769,16 @@ subroutine initialisation_mcfost()
      lmono0=.false.
      lstrat=.false.
      scattering_method=2
+     basename_data_dir = "data_dust"
+     data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
+     call save_data()
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
+     data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
+     call save_data()
   endif
 
   if (ln_zone) then
@@ -816,7 +830,7 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ((ltemp.or.lsed.or.lsed_complete).and.(.not.(ldust_prop .or. ldisk_struct))) then
+  if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
      if (lforce_1st_scatt) then
         write(*,*) "The [-force_1st_scatt] option is not relevant for SED calculation"
@@ -830,12 +844,10 @@ subroutine initialisation_mcfost()
         write(*,*) 'Exiting'
         stop
      endif
-     if (.not.(ldust_prop .or. ldisk_struct)) then
-        basename_data_dir = "data_th"
-     endif
+     if ((.not.lstop_after_init)) basename_data_dir = "data_th"
   endif
 
-  if ((lTemp).and.(.not.(ldust_prop))) then
+  if ((lTemp).and.(.not.(lstop_after_init))) then
      if (lRE_LTE) then
         write(*,*) "Temperature calculation under LTE approximation"
      else
@@ -843,7 +855,7 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.ldust_prop)) then
+  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lstop_after_init)) then
      write(*,*) "Error : Nothing to calculate!"
      write(*,*) "You can: "
      write(*,*) "- use the [-img wavelength] option to calculate an image"
