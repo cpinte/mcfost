@@ -598,6 +598,7 @@ contains
     ! mcfost
     ! 21/04/11 : skipping the computation of M1, M2, S21 and D21. Adjusting
     ! the angle values to match those used in mueller2/BHMIE.
+    ! 13/10/13 : bug fix : avoiding computing the case 90 degrees twice
     !
     ! **********************************************************************
 
@@ -813,8 +814,10 @@ contains
     BC  = 1.5D0*BCOE
     do j = 1,NUMANG
        S1(J) = AC*PI_tab(J,2) + BC*TAU(J,2)
-       S1(2*numang-J) = AC*PI_tab(J,2) - BC*TAU(J,2)
        S2(J) = BC*PI_tab(J,2) + AC*TAU(J,2)
+    enddo
+    do j = 1,NUMANG-1
+       S1(2*numang-J) = AC*PI_tab(J,2) - BC*TAU(J,2)
        S2(2*numang-J) = BC*PI_tab(J,2) - AC*TAU(J,2)
     enddo
 
@@ -898,13 +901,13 @@ contains
        ! supplements of 0-90 degree scattering
        ! angles submitted by user
        if(mod(N,2) == 0) then
-          do j= 1, NUMANG
+          do j= 1, NUMANG-1
              JJ = 2*numang - j
              S1(JJ) = S1(JJ) - AC*PI_tab(J,3) + BC*TAU(J,3)
              S2(JJ) = S2(JJ) - BC*PI_tab(J,3) + AC*TAU(J,3)
           enddo
        else
-          do j= 1, NUMANG
+          do j= 1, NUMANG-1
              JJ = 2*numang - j
              S1(JJ) = S1(JJ) + AC*PI_tab(J,3) - BC*TAU(J,3)
              S2(JJ) = S2(JJ) + BC*PI_tab(J,3) - AC*TAU(J,3)
