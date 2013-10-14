@@ -286,6 +286,11 @@ subroutine init_indices_optiques()
               deallocate(m,f)
            else ! coating : 2 composants max pour coating
               !write(*,*) "Applying coating for pop.", pop
+              if (n_components /= 2) then
+                 write(*,*) "ERROR : coating can only be computed with 2 components"
+                 write(*,*) "Exiting"
+                 stop
+              endif
               tab_amu1(:,pop) = tab_tmp_amu1(:,1)
               tab_amu2(:,pop) = tab_tmp_amu2(:,1)
               tab_amu1_coating(:,pop) = tab_tmp_amu1(:,2)

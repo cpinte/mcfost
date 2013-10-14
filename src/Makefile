@@ -569,7 +569,7 @@ utils.o :      sha.f90
 ifeq ($(MCFOST_GIT),1)
 sha.f90 : ../.git/objects
 	printf "module sha\n  implicit none\n" > sha.f90
-	git log --pretty=format:"%H %d" | grep HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
+	git log --pretty=format:"%H %d" | grep \(HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
 	printf "end module sha\n" >> sha.f90
 endif
 
