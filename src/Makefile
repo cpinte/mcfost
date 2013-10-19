@@ -25,6 +25,8 @@ ifeq ($(ifort32),yes)
 COMPILO = ifort32
 endif
 
+BINARY = mcfost
+
 # Linux, ifort
 ifeq ($(ARCH),LINUX)
 PLATFORM =  $(shell uname -p)
@@ -101,7 +103,7 @@ OPTS = -O3 -ipo -no-prec-div #-fast (because -fast implies -xP, cannot be overwr
 DEBUG_OPTS =  -check all -traceback  -fpstkchk  -C -g -d2  -fpe0
 #PARALLEL = -openmp
 #MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
-MACH =-xW -axP # for fostino and ifort 10
+MACH = -xW -axP # for fostino and ifort 10
 PREC = #-pc80 -prec_div -mp
 # Option de conservation de la precision
 # -mp : maintain precision fait prendre 1 facteur 2 dans le tps d'execution
@@ -111,8 +113,20 @@ FFLAGS = -c  $(PREC)
 FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
+
+# Modification de quelques variables pour les xeon phi
+ifeq ($(phi),yes)
+LIBS = $(MCFOST_INSTALL)/lib/xeon-phi/
+OPTS = -O3 -no-prec-div
+MACH = -mmic
+FFLAGS_EXE = $(PREC)  -static-intel
+BINARY = mcfost.phi
+endif
+
 LIBS_PGPLOT = -L $(LIBS) -lpgplot -L /usr/X11R6/lib/ -lX11 -static
 LIBS_FITS = -L $(LIBS) -lcfitsio
+
+
 
 # Numerical recipes
 MODS_NR = -I $(LIBS)/nr
@@ -548,7 +562,7 @@ main : mcfost
 # Code séquentiel et parallèle
 #*************************************************************
 mcfost : $(OBJECTS)
-	$(FF) $(FFLAGS_EXE) -o mcfost $(OBJECTS) $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+	$(FF) $(FFLAGS_EXE) -o $(BINARY) $(OBJECTS) $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
