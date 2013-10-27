@@ -16,9 +16,9 @@ module PAH
 contains
 
 
-function specific_heat(T, taille_grain) 
+function specific_heat(T, taille_grain)
   ! C. Pinte
-  ! 30/01/07  
+  ! 30/01/07
 
   implicit none
 
@@ -29,7 +29,7 @@ function specific_heat(T, taille_grain)
   if (is_grain_PAH(taille_grain)) then
      specific_heat = PAH_specific_heat(T, taille_grain)
   else
-     specific_heat = astrosil_specific_heat(T, taille_grain) 
+     specific_heat = astrosil_specific_heat(T, taille_grain)
   endif
 
   return
@@ -39,9 +39,9 @@ end function specific_heat
 !**********************************************************************
 
 
-function astrosil_specific_heat(T, taille_grain) 
+function astrosil_specific_heat(T, taille_grain)
   ! C. Pinte
-  ! 26/01/07 
+  ! 26/01/07
 
   implicit none
 
@@ -53,7 +53,7 @@ function astrosil_specific_heat(T, taille_grain)
 
   Na = get_astrosil_Na(taille_grain)
 
-  ! specific heat [J/K]  
+  ! specific heat [J/K]
   astrosil_specific_heat = (Na-2.)* kb * (2.*sh_helper(T/500., 2) + sh_helper(T/1500., 3))
 end function astrosil_specific_heat
 
@@ -64,7 +64,7 @@ function PAH_specific_heat(T,taille_grain)
   ! input is Temperature [K] and grain radius [cm]
   ! optional output are mode energies hbarw [erg] and modes/energy g
   ! C. Pinte
-  ! 30/01/07  
+  ! 30/01/07
 
   implicit none
 
@@ -111,14 +111,14 @@ function PAH_specific_heat(T,taille_grain)
   n = 2                        ! PAH C-C
 
   ! out-of-plane C-C
-  Nm = NC-2   ; N_CCop = Nm    ! number of modes 
+  Nm = NC-2   ; N_CCop = Nm    ! number of modes
   ThetaD = 863.                ! Debye temperature [K]
 
-  allocate(deltaj(Nm),hbarw_CCop(Nm)) 
+  allocate(deltaj(Nm),hbarw_CCop(Nm))
   deltaj=0.5 ; deltaj(2:3) =1.0 ! PAH C-C (DL01 eqs. 5,6)
   beta = get_beta(NC, Nm)
   ! do i=1, nT
-  !    if (T(i) > ThetaD) then 
+  !    if (T(i) > ThetaD) then
   !       write(*,*) 'temp greater than Debye!'
   !    endif
   ! enddo
@@ -126,13 +126,13 @@ function PAH_specific_heat(T,taille_grain)
   hbarw_CCop = mode_spectrum(ThetaD, Nm, beta, deltaj) ! mode spectrum
 
   allocate(g_CCop(Nm)) ; g_CCop = 1. ! number of oscillators per energy
-  deallocate(deltaj)   
+  deallocate(deltaj)
 
   ! in-plane C-C
-  Nm = 2*NC-2  ; N_CCip = Nm    ! number of modes 
+  Nm = 2*NC-2  ; N_CCip = Nm    ! number of modes
   ThetaD = 2504.                ! Debye temperature [K]
 
-  allocate(deltaj(Nm),hbarw_CCip(Nm)) 
+  allocate(deltaj(Nm),hbarw_CCip(Nm))
   deltaj = 0.5  ; deltaj(2:3) = 1. ! PAH C-C (DL01 eqs. 5,6)
   beta = get_beta(NC, Nm)
   ! do i=1,NT
@@ -142,7 +142,7 @@ function PAH_specific_heat(T,taille_grain)
   ! enddo
   hbarw_CCip = mode_spectrum(ThetaD, Nm, beta, deltaj) ! mode spectrum
   allocate(g_CCip(Nm)) ;  g_CCip = 1.   ! number of oscillators per energy
-  deallocate(deltaj) 
+  deallocate(deltaj)
 
   ! C-H modes (out-of-plane bending, in-plane bending, stretching)
   N_H=3
@@ -156,7 +156,7 @@ function PAH_specific_heat(T,taille_grain)
 
 
   ! combine mode spectra
-  N_tot = N_CCop +  N_CCip + N_H 
+  N_tot = N_CCop +  N_CCip + N_H
 
   if (N_tot > limite_stack) then
      write(*,*) "Error : PAH grain size is too large"
@@ -195,7 +195,7 @@ function PAH_specific_heat(T,taille_grain)
   ! close(unit=1)
 
   ! compute heat capacity
-  do i = 1, nT 
+  do i = 1, nT
      x = hbarw/(kb*T(i))
      PAH_specific_heat(i) = kb*sum(g*exp(-x)*(x/(1. -exp(-x)))**2)
   end do
@@ -250,7 +250,7 @@ end function get_astrosil_Na
 function mode_spectrum(ThetaD,Nm,beta,deltaj)
   ! Draine & Lee eq 4 with n=2
   ! C. Pinte
-  ! 30/01/07  
+  ! 30/01/07
 
   implicit none
 
@@ -278,17 +278,17 @@ end function mode_spectrum
 function get_beta(NC, Nm)
   ! helper for specific heat calc (DL01 eq. 7)
   ! C. Pinte
-  ! 30/01/07  
+  ! 30/01/07
   implicit none
 
   integer, intent(in) :: NC, Nm
   real :: get_beta
 
-  if (NC <= 54) then 
+  if (NC <= 54) then
      get_beta = 0 ! PAH C-C (DL01 eq. 7)
-  else if (NC <= 102) then 
-     get_beta = (NC-52.)/52./(2.*Nm-1) 
-  else 
+  else if (NC <= 102) then
+     get_beta = (NC-52.)/52./(2.*Nm-1)
+  else
      get_beta = ((NC-54.)/52.*(102./NC)**(2./3.)-1.)/(2.*Nm-1)
   end if
 
@@ -310,11 +310,11 @@ function sh_helper(x, n)
   integer, intent(in) :: n
   real, dimension(size(x)) :: sh_helper
 
-  integer, parameter :: nn=100  
+  integer, parameter :: nn=100
   integer :: i, nx, j
   real :: dy
   real, dimension(nn) :: y
-  real(kind=db) :: eyx, yx 
+  real(kind=db) :: eyx, yx
 
   do j=1, nn
      y(j)=(real(j)-0.5)/real(nn);

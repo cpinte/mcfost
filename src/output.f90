@@ -2,7 +2,7 @@ module output
 
   use parametres
   use resultats
-  use disk 
+  use disk
   use grains
   use em_th
   use constantes
@@ -50,12 +50,12 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   !*     utilisation de la symetrie centrale
   if (w1 < 0.0) then
      if (l_sym_centrale) then
-        x1 = -x1 
-        y1 = -y1 
-        z1 = -z1 
-        u1 = -u1 
-        v1 = -v1 
-        w1 = -w1 
+        x1 = -x1
+        y1 = -y1
+        z1 = -z1
+        u1 = -u1
+        v1 = -v1
+        w1 = -w1
         stok(3) = -stok(3)
      else
         return
@@ -78,11 +78,11 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      ! Utilisation de la symetrie Est-Ouest
      ! (le centre du mur est dans la direction u)
      if (v1 < 0.0) then
-        v1 = - v1  
+        v1 = - v1
         y1 = - y1
         stok(3) = -stok(3)
      endif
-     ! Selection angle phi 
+     ! Selection angle phi
      ! (atan2 renvoie dans [-Pi,Pi] mais ici dans [0,Pi] car v1 > 0)
      if (w1==1.0) then
         c_phi=1
@@ -123,9 +123,9 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      !*    (X1,Y1,Z1) POUR RAMENER LES COORDONNEES DANS
      !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
      !*
-     !*    utilisation de la symetrie gauche-droite pour 
+     !*    utilisation de la symetrie gauche-droite pour
      !*    produire une demi-carte seulement, dans les
-     !*    "yprim positifs" 
+     !*    "yprim positifs"
      !*****************************************************
 
      call ROTATION(X1,Y1,Z1,u1,v1,w1,XPRIM,YPRIM,ZPRIM)
@@ -161,7 +161,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      if (l_sym_ima) then
         ! 1/2 photon
         STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-        
+
         if (lsepar_pola) then
            STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(2)
            STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(3)
@@ -265,7 +265,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      else
         ! Pas de symetrie
         STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
-      
+
         if (lsepar_pola) then
            STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEQ(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(2)
            STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEU(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(3)
@@ -307,7 +307,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
         if (l_sym_ima) then
            ! 1/2 photon
            STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-     
+
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
@@ -348,7 +348,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
         if (l_sym_ima) then
            ! 1/2 photon
            STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-     
+
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
@@ -389,7 +389,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
         if (l_sym_ima) then
            ! 1/2 photon
            STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-     
+
            ! 1/2 photon symetrique
           ! ytmp = - ytmp
           ! yprim = ytmp * cos_disk - ztmp * sin_disk
@@ -453,7 +453,7 @@ subroutine write_stokes_fits()
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id
-  
+
   integer :: lambda=1
   integer :: image_type=1
 
@@ -481,7 +481,7 @@ subroutine write_stokes_fits()
       !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
-  
+
       !  Create the new empty FITS file.
      blocksize=1
      call ftinit(unit,trim(filename),blocksize,status)
@@ -495,15 +495,15 @@ subroutine write_stokes_fits()
      naxis=2
      naxes(1)=n_rad
      naxes(2)=nz
-  
+
      ! Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-      
+
       !  Write the array to the FITS file.
      group=1
      fpixel=1
      nelements=naxes(1)*naxes(2)
- 
+
       ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,o_disk,status)
 
@@ -517,7 +517,7 @@ subroutine write_stokes_fits()
      end if
   endif
 
-   
+
 
   filename = trim(data_dir)//"/MC.fits.gz"
 
@@ -580,11 +580,11 @@ subroutine write_stokes_fits()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
- 
+
   ! Write  optional keywords to the header
   !  wavelength
   call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
- 
+
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
@@ -598,21 +598,21 @@ subroutine write_stokes_fits()
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
 
-  
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,stoke_io,status)
 
-  ! Cartes de differentes resolutions 
+  ! Cartes de differentes resolutions
   if (n_cartes > 1) then
      ! create new hdu
      naxis=4
      naxes(1)=igridx2(1)
-     naxes(2)=igridy2(1) 
+     naxes(2)=igridy2(1)
 
      call FTCRHD(unit, status)
 
@@ -632,7 +632,7 @@ subroutine write_stokes_fits()
      tmp = real(sum(stokei1(lambda,:,:,:,:,:),dim=5))
      call ftppre(unit,group,fpixel,nelements,tmp,status)
      deallocate(tmp)
-     
+
   endif
   if (n_cartes > 2) then
      ! create new hdu
@@ -640,7 +640,7 @@ subroutine write_stokes_fits()
      naxis=4
      naxes(1)=igridx2(2)
      naxes(2)=igridy2(2)
-  
+
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -666,7 +666,7 @@ subroutine write_stokes_fits()
      naxis=4
      naxes(1)=igridx2(3)
      naxes(2)=igridy2(3)
-  
+
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -709,7 +709,7 @@ subroutine ecriture_map_ray_tracing()
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id, xcenter, lambda, itype, ibin
-  
+
   character(len = 512) :: filename
   logical :: simple, extend
   real :: pixel_scale_x, pixel_scale_y
@@ -722,7 +722,7 @@ subroutine ecriture_map_ray_tracing()
      write(*,*) 'Allocation error RT image'
      stop
   endif
-  image = 0.0 ; 
+  image = 0.0 ;
 
   lambda=1
   filename = trim(data_dir)//"/RT.fits.gz"
@@ -757,7 +757,7 @@ subroutine ecriture_map_ray_tracing()
   ! Write  optional keywords to the header
   !  wavelength
   call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
- 
+
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
@@ -783,7 +783,7 @@ subroutine ecriture_map_ray_tracing()
      enddo !ibin
   enddo ! itype
 
-  if (l_sym_ima) then 
+  if (l_sym_ima) then
      xcenter = igridx/2 + modulo(igridx,2)
      do i=xcenter+1,igridx
         image(i,:,:,1,1) = image(igridx-i+1,:,:,1,1)
@@ -791,14 +791,14 @@ subroutine ecriture_map_ray_tracing()
         if (lsepar_pola) then
            image(i,:,:,1,2) = image(igridx-i+1,:,:,1,2)
            image(i,:,:,1,3) = - image(igridx-i+1,:,:,1,3)
-           image(i,:,:,1,4) = image(igridx-i+1,:,:,1,4)   
+           image(i,:,:,1,4) = image(igridx-i+1,:,:,1,4)
         endif
-  
+
         if (lsepar_contrib) then
            image(i,:,:,1,n_Stokes+1) = image(igridx-i+1,:,:,1,n_Stokes+1)
            image(i,:,:,1,n_Stokes+2) = image(igridx-i+1,:,:,1,n_Stokes+2)
-           image(i,:,:,1,n_Stokes+3) = image(igridx-i+1,:,:,1,n_Stokes+3)   
-           image(i,:,:,1,n_Stokes+4) = image(igridx-i+1,:,:,1,n_Stokes+4)   
+           image(i,:,:,1,n_Stokes+3) = image(igridx-i+1,:,:,1,n_Stokes+3)
+           image(i,:,:,1,n_Stokes+4) = image(igridx-i+1,:,:,1,n_Stokes+4)
         endif
      enddo
   endif ! l_sym_image
@@ -815,7 +815,7 @@ subroutine ecriture_map_ray_tracing()
   if (status > 0) then
      call print_error(status)
   end if
-  
+
   return
 
 end subroutine ecriture_map_ray_tracing
@@ -829,7 +829,7 @@ subroutine ecriture_sed_ray_tracing()
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id, lambda
-  
+
   character(len = 512) :: filename
   logical :: simple, extend
 
@@ -878,7 +878,7 @@ subroutine ecriture_sed_ray_tracing()
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,sed_rt,status)
 
@@ -888,16 +888,16 @@ subroutine ecriture_sed_ray_tracing()
   naxis=1
   naxes(1)=n_lambda
   nelements=naxes(1)
-  
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  
+
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)  
+  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -916,11 +916,11 @@ end subroutine ecriture_sed_ray_tracing
 subroutine write_origin()
 
   implicit none
-    
+
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id
-  
+
   integer :: lambda=1
   integer :: image_type=1
 
@@ -941,7 +941,7 @@ subroutine write_origin()
   !  Create the new empty FITS file.
   blocksize=1
   call ftinit(unit,trim(filename),blocksize,status)
-  
+
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -955,19 +955,19 @@ subroutine write_origin()
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-  
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,o_disk,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
-  call ftfiou(unit, status)      
-  
+  call ftfiou(unit, status)
+
   return
 
 end subroutine write_origin
@@ -1002,7 +1002,7 @@ end subroutine print_error
 
 !***********************************************************
 
-subroutine calc_opacity_map(lambda)
+subroutine calc_optical_depth_map(lambda)
 
   implicit none
 
@@ -1011,30 +1011,29 @@ subroutine calc_opacity_map(lambda)
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id
-  
+
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
 
-  real, dimension(n_rad,nz,2) :: opacity_map
-
+  real, dimension(n_rad,nz,2) :: optical_depth_map
 
   lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
 
   if (lmilieu) then
      ! Opacite radiale
      do j=1, nz
-        i=1 ; opacity_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
+        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
         do i=2, n_rad
-           opacity_map(i,j,1) = opacity_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
+           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
                 + 0.5 * kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         enddo
      enddo
-     
+
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; opacity_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
+        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
         do j=nz-1,1,-1
-           opacity_map(i,j,2) = opacity_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
+           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
                + 0.5 * kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         enddo
      enddo
@@ -1042,24 +1041,23 @@ subroutine calc_opacity_map(lambda)
   else
      ! Opacite radiale
      do j=1, nz
-        i=1 ; opacity_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         do i=2, n_rad
-           opacity_map(i,j,1) = opacity_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
         enddo
      enddo
-     
+
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; opacity_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         do j=nz-1,1,-1
-           opacity_map(i,j,2) = opacity_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
         enddo
      enddo
   endif
 
-  write(*,*) "Writing opacity_map.fits.gz"
-
-  filename = "opacity_map.fits.gz"
+  write(*,*) "Writing optical_depth_map.fits.gz"
+  filename = "optical_depth_map.fits.gz"
 
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1088,14 +1086,14 @@ subroutine calc_opacity_map(lambda)
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)
-  
+
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,opacity_map,status)
+  call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
 
-  call ftfiou(unit, status)      
+  call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
   if (status > 0) then
@@ -1106,7 +1104,7 @@ subroutine calc_opacity_map(lambda)
   stop
   return
 
-end subroutine calc_opacity_map
+end subroutine calc_optical_depth_map
 
 !***********************************************************
 
@@ -1115,7 +1113,7 @@ subroutine reemission_stats()
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: i,j,group,fpixel,nelements, alloc_status, id
-  
+
   character(len = 512) :: filename
   logical :: simple, extend
 
@@ -1131,7 +1129,7 @@ subroutine reemission_stats()
   !  Create the new empty FITS file.
   blocksize=1
   call ftinit(unit,trim(filename),blocksize,status)
-  
+
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -1145,18 +1143,18 @@ subroutine reemission_stats()
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-  
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,N_reemission,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
-  call ftfiou(unit, status)  
+  call ftfiou(unit, status)
 
   return
 
@@ -1164,30 +1162,40 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine ecriture_densite_gaz()
-! Ecrit la table de densite du gaz en g/cm^3 (il vaut mieux strat=0)
+subroutine write_disk_struct()
+! Ecrit les table de densite du gaz en g/cm^3
+! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
+! + les tailles et masse des grains
 ! C. Pinte
 ! 3/06/06
- 
+
   implicit none
 
   integer :: i, j, k
 
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(3) :: naxes
+  integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
 
   logical :: simple, extend
   character(len=512) :: filename
 
   real, dimension(n_rad,nz,n_az) :: dens
+  real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
   real, dimension(n_rad) :: vol
   real(kind=db), dimension(n_rad,nz,2) :: grid
 
 
+  allocate(dust_dens(n_rad,nz,n_az,n_grains_tot), stat = alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error dust density table for fits file'
+     stop
+  endif
+
+
   ! ********************************************************************************
-  filename = "density.fits.gz"
+  filename = "data_disk/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1206,7 +1214,6 @@ subroutine ecriture_densite_gaz()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=1
 
   if (l3D) then
      naxis=3
@@ -1217,15 +1224,19 @@ subroutine ecriture_densite_gaz()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
-  
-  dens =  densite_gaz * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  nelements=naxes(1)*naxes(2)
+
+  dens =  densite_gaz(:,1:nz,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1236,7 +1247,199 @@ subroutine ecriture_densite_gaz()
   end if
 
   ! ********************************************************************************
-  filename = "volume.fits.gz"
+  filename = "data_disk/dust_particule_density.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-64
+  extend=.true.
+
+  naxis=4
+  naxes(1) = n_rad
+  naxes(2) = nz
+  naxes(3) = n_az
+  naxes(4) = n_grains_tot
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  !  dens =  densite_pouss
+  ! le d signifie real*8
+  dust_dens = densite_pouss(:,1:nz,:,:) * m3_to_cm3
+  call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
+  filename = "data_disk/dust_mass_density.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=3
+  naxes(1) = n_rad
+  naxes(2) = nz
+  naxes(3) = n_az
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  !  dens =  densite_pouss
+  ! le d signifie real*8
+  dust_dens = densite_pouss(:,1:nz,:,:)
+  dens = 0.0
+  do k=1,n_az
+     do j=1,nz
+        do i=1,n_rad
+           dens(i,j,k) = sum(densite_pouss(i,j,k,:) * M_grain(:)) ! M_grain en g
+        enddo !i
+     enddo !j
+  enddo !k
+  call ftppre(unit,group,fpixel,nelements,dens,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
+  filename = "data_disk/grain_sizes.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+  ! ********************************************************************************
+  filename = "data_disk/grain_masses.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"g",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,M_grain,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
+  filename = "data_disk/volume.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1254,10 +1457,13 @@ subroutine ecriture_densite_gaz()
 
   naxis=1
   naxes(1)=n_rad
-  
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"AU^3",' ',status)
 
   !  Write the array to the FITS file.
   group=1
@@ -1265,11 +1471,11 @@ subroutine ecriture_densite_gaz()
   nelements=naxes(1)
 
   ! conversion en simple precision
-  vol = volume !* (AU_to_cm)**3 
+  vol = volume !* (AU_to_cm)**3
 
  ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,vol,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1281,7 +1487,7 @@ subroutine ecriture_densite_gaz()
 
 
   ! ********************************************************************************
-  filename = "grid.fits.gz"
+  filename = "data_disk/grid.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1306,22 +1512,27 @@ subroutine ecriture_densite_gaz()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"AU",' ',status)
+  call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
+  call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)
 
    do i=1, n_rad
-     grid(i,:,1) = sqrt(r_lim(i) * r_lim(i-1)) 
+     grid(i,:,1) = sqrt(r_lim(i) * r_lim(i-1))
      do j=1,nz
         grid(i,j,2) = (real(j)-0.5)*delta_z(i)
         !write(*,*) i, j, grid(i,j,1), grid(i,j,2)
      enddo
   enddo
 
-  ! le e signifie real*4
+  ! le d signifie real*8
   call ftpprd(unit,group,fpixel,nelements,grid,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1331,10 +1542,14 @@ subroutine ecriture_densite_gaz()
      call print_error(status)
   end if
 
+  if (lstop_after_init) then
+     write(*,*) "Exiting"
+     stop
+  endif
+
   return
 
-
-end subroutine ecriture_densite_gaz
+end subroutine write_disk_struct
 
 !********************************************************************
 
@@ -1358,7 +1573,7 @@ subroutine ecriture_J()
   filename = trim(data_dir)//"/J.fits.gz"
 
   ! 1/4pi est inclus dans n_phot_l_tot
-  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi 
+  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
 
   do ri=1, n_rad
      J(:,ri,:) = J(:,ri,:) / volume(ri)
@@ -1376,7 +1591,7 @@ subroutine ecriture_J()
         enddo
      enddo
   enddo
-  
+
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
   call ftgiou (unit,status)
@@ -1395,7 +1610,7 @@ subroutine ecriture_J()
   naxes(1)=n_rad
   naxes(2)=nz
   naxes(3)=n_lambda
-  
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
@@ -1407,7 +1622,7 @@ subroutine ecriture_J()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1444,14 +1659,14 @@ subroutine ecriture_UV_field()
   real(kind=db), dimension(n) :: wl, J_interp
   real(kind=db), dimension(n_lambda) :: lamb
   real(kind=db) :: delta_wl
-  
+
   real, dimension(n_rad,nz) :: Gio
 
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
   ! 1/4pi est inclus dans n_phot_l_tot
-  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi 
+  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
 
   do ri=1, n_rad
      J(:,ri,:) = J(:,ri,:) / volume(ri)
@@ -1462,7 +1677,7 @@ subroutine ecriture_UV_field()
   do lambda=1, n_lambda
      J(lambda,:,:) = J(lambda,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
   enddo
-  
+
   lamb = tab_lambda
 
   wl(:) = span(0.0912,0.24,n)
@@ -1476,13 +1691,13 @@ subroutine ecriture_UV_field()
 
         ! Le Petit et al 2006 page 19-20
         ! integration trapeze
-        G(ri,zj) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  & 
+        G(ri,zj) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
              * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
 
         Gio(ri,zj) = G(ri,zj) ! Teste OK par comparaison avec yorick
      enddo
   enddo
-  
+
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
   call ftgiou (unit,status)
@@ -1500,7 +1715,7 @@ subroutine ecriture_UV_field()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
-  
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
@@ -1512,7 +1727,7 @@ subroutine ecriture_UV_field()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Gio,status)
-  
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1543,7 +1758,7 @@ subroutine ecriture_temperature(iTemperature)
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
-  
+
   logical :: simple, extend
   character(len=512) :: filename
 
@@ -1559,11 +1774,11 @@ subroutine ecriture_temperature(iTemperature)
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
-     
+
      !  Create the new empty FITS file.
      blocksize=1
      call ftinit(unit,trim(filename),blocksize,status)
-     
+
      !  Initialize parameters about the FITS image
      simple=.true.
      ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -1575,7 +1790,7 @@ subroutine ecriture_temperature(iTemperature)
         naxes(1)=n_rad
         naxes(2)=nz
         naxes(3)=n_az
-  
+
         !  Write the required header keywords.
         call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
         !call ftphps(unit,simple,bitpix,naxis,naxes,status)
@@ -1584,14 +1799,14 @@ subroutine ecriture_temperature(iTemperature)
         group=1
         fpixel=1
         nelements=naxes(1)*naxes(2)*naxes(3)
-        
+
         ! le e signifie real*4
         call ftppre(unit,group,fpixel,nelements,temperature(:,1:nz,:),status)
      else
         naxis=2
         naxes(1)=n_rad
         naxes(2)=nz
-  
+
         !  Write the required header keywords.
         call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
         !call ftphps(unit,simple,bitpix,naxis,naxes,status)
@@ -1600,7 +1815,7 @@ subroutine ecriture_temperature(iTemperature)
         group=1
         fpixel=1
         nelements=naxes(1)*naxes(2)
-        
+
         ! le e signifie real*4
         call ftppre(unit,group,fpixel,nelements,temperature(:,1:nz,1),status)
      endif
@@ -1608,7 +1823,7 @@ subroutine ecriture_temperature(iTemperature)
      !  Close the file and free the unit number.
      call ftclos(unit, status)
      call ftfiou(unit, status)
-     
+
      !  Check for any error, and if so print out error messages
      if (status > 0) then
         call print_error(status)
@@ -1649,7 +1864,7 @@ subroutine ecriture_temperature(iTemperature)
      group=1
      fpixel=1
      nelements=naxes(1)*naxes(2)*naxes(3)
-  
+
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
 
@@ -1660,10 +1875,10 @@ subroutine ecriture_temperature(iTemperature)
      !  Check for any error, and if so print out error messages
      if (status > 0) then
         call print_error(status)
-     end if  
+     end if
   endif
 
-  
+
 
   if (lnRE .and. iTemperature==1) then
      if (l3D) then
@@ -1675,15 +1890,15 @@ subroutine ecriture_temperature(iTemperature)
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
-     
+
      !  Create the new empty FITS file.
      blocksize=1
      call ftinit(unit,trim(filename),blocksize,status)
-     
+
      !  Initialize parameters about the FITS image
      simple=.true.
      extend=.true.
-   
+
      ! 1er HDU : Temperature ou Proba Temparature
      bitpix=32
      naxis=3
@@ -1695,12 +1910,12 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
      !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-     
+
      !  Write the array to the FITS file.
      group=1
      fpixel=1
      nelements=naxes(1)*naxes(2)*naxes(3)
-     
+
      ! le j signifie integer
      do i=1, n_rad
         do j=1,nz
@@ -1715,7 +1930,7 @@ subroutine ecriture_temperature(iTemperature)
      enddo
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
 
-     ! 2eme HDU : Proba Temperature 
+     ! 2eme HDU : Proba Temperature
      call FTCRHD(unit, status)
      bitpix=-32
 
@@ -1725,7 +1940,7 @@ subroutine ecriture_temperature(iTemperature)
      naxes(2)=n_rad
      naxes(3)=nz
      naxes(4)=n_grains_nRE
-  
+
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
      !call ftphps(unit,simple,bitpix,naxis,naxes,status)
@@ -1734,7 +1949,7 @@ subroutine ecriture_temperature(iTemperature)
      group=1
      fpixel=1
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  
+
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
 
@@ -1757,7 +1972,7 @@ subroutine ecriture_temperature(iTemperature)
      group=1
      fpixel=1
      nelements=naxes(1)*naxes(2)*naxes(3)
-  
+
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
 
@@ -1768,7 +1983,7 @@ subroutine ecriture_temperature(iTemperature)
      !  Check for any error, and if so print out error messages
      if (status > 0) then
         call print_error(status)
-     end if  
+     end if
   endif
 
   return
@@ -1790,7 +2005,7 @@ subroutine ecriture_Tex(imol)
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
-  
+
   logical :: simple, extend
   character(len=512) :: filename
 
@@ -1801,7 +2016,7 @@ subroutine ecriture_Tex(imol)
   do iTrans=1,nTrans_tot
      iUp = iTransUpper(iTrans)
      iLow = iTransLower(iTrans)
-     cst = - hp * Transfreq(iTrans) / kb 
+     cst = - hp * Transfreq(iTrans) / kb
      do j=1, nz
         do i=1, n_rad
            nUp = tab_nLevel(i,j,iUp)
@@ -1814,15 +2029,15 @@ subroutine ecriture_Tex(imol)
   enddo !iTrans
 
   filename = trim(data_dir2(imol))//"/Tex.fits.gz"
-  
+
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
   call ftgiou (unit,status)
-     
+
   !  Create the new empty FITS file.
   blocksize=1
   call ftinit(unit,trim(filename),blocksize,status)
-     
+
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -1842,14 +2057,14 @@ subroutine ecriture_Tex(imol)
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Tex,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
-     
+
   !  Check for any error, and if so print out error messages
   if (status > 0) then
      call print_error(status)
@@ -1872,7 +2087,7 @@ subroutine taille_moyenne_grains()
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
-  
+
   logical :: simple, extend
   character(len=512) :: filename
 
@@ -1880,7 +2095,7 @@ subroutine taille_moyenne_grains()
   write(*,*) "Writing average_grain_size.fits.gz"
 
   a_moyen(:,:) = 0.
- 
+
   do j=1,nz
      do i=1,n_rad
         somme=0.0
@@ -1892,17 +2107,17 @@ subroutine taille_moyenne_grains()
      enddo
   enddo
   a_moyen = sqrt(a_moyen)
-  
+
   filename = "average_grain_size.fits.gz"
-  
+
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
   call ftgiou (unit,status)
-     
+
   !  Create the new empty FITS file.
   blocksize=1
   call ftinit(unit,trim(filename),blocksize,status)
-     
+
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -1921,14 +2136,14 @@ subroutine taille_moyenne_grains()
   group=1
   fpixel=1
   nelements=naxes(1)*naxes(2)
-  
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,a_moyen,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
-     
+
   !  Check for any error, and if so print out error messages
   if (status > 0) then
      call print_error(status)
@@ -1955,25 +2170,25 @@ subroutine ecriture_sed(ised)
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id
-  
-  logical :: simple, extend
 
+  logical :: simple, extend
 
   !! Ecriture SED
   if (ised ==1) then
      filename = trim(data_dir)//"/sed1.fits.gz"
   else
      filename = trim(data_dir)//"/sed2.fits.gz"
+     if (lProDiMo) write(*,*) "WARNING: sed2.fits.gz will be noisy due to the use of ProDiMo mode"
   endif
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
   call ftgiou (unit,status)
-     
+
   !  Create the new empty FITS file.
   blocksize=1
   call ftinit(unit,trim(filename),blocksize,status)
-     
+
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
@@ -1982,19 +2197,19 @@ subroutine ecriture_sed(ised)
   group=1
   fpixel=1
 
-  
+
   if (ised == 1) then
      naxis=3
      naxes(1)=n_lambda
      naxes(2)=N_thet
      naxes(3)=N_phi
-  
+
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      !  Write the array to the FITS file.
      nelements=naxes(1)*naxes(2)*naxes(3)
-  
+
      do lambda=1,n_lambda
         facteur =  E_photon * tab_lambda(lambda)/tab_delta_lambda(lambda)
         sed1_io(lambda,:,:) = sum(sed(:,lambda,:,:),dim=1) * facteur
@@ -2004,7 +2219,7 @@ subroutine ecriture_sed(ised)
      call ftppre(unit,group,fpixel,nelements,sed1_io,status)
 
      L_bol1 = sum(sed) * E_photon
- 
+
   else
      ! Energie totale emise a une distance emise egale au rayon stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
@@ -2026,7 +2241,7 @@ subroutine ecriture_sed(ised)
 
      !  Write the array to the FITS file.
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  
+
      do lambda=1,n_lambda2
         facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
         sed2_io(lambda,:,:,1) = sum(sed(:,lambda,:,:),dim=1) * facteur
@@ -2059,16 +2274,16 @@ subroutine ecriture_sed(ised)
   naxis=1
   naxes(1)=n_lambda
   nelements=naxes(1)
-  
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  
+
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  
+
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)  
+  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -2089,9 +2304,9 @@ end subroutine ecriture_sed
 !**********************************************************************
 
 subroutine ecriture_pops(imol)
-    
+
   implicit none
-  
+
   integer, intent(in) :: imol
 
   character(len=512) :: filename
@@ -2121,7 +2336,7 @@ subroutine ecriture_pops(imol)
   naxes(1)=n_rad
   naxes(2)=nz
   naxes(3)=nLevels
- 
+
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
@@ -2165,7 +2380,7 @@ subroutine ecriture_spectre(imol)
   real :: pixel_scale_x, pixel_scale_y
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
-  
+
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
@@ -2198,7 +2413,7 @@ subroutine ecriture_spectre(imol)
   naxes(4)=ntrans
   naxes(5)=RT_n_ibin
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-   
+
   ! create new hdu
   !call ftcrhd(unit, status)
 
@@ -2274,7 +2489,7 @@ subroutine ecriture_spectre(imol)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  if (l_sym_ima.and.(RT_line_method==2)) then 
+  if (l_sym_ima.and.(RT_line_method==2)) then
      xcenter = igridx/2 + modulo(igridx,2)
      do i=xcenter+1,igridx
         continu(i,:,:,:) = continu(igridx-i+1,:,:,:)
@@ -2283,7 +2498,7 @@ subroutine ecriture_spectre(imol)
 
   !  Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,continu,status)
-  
+
   !------------------------------------------------------------------------------
   ! Transition numbers
   !------------------------------------------------------------------------------
@@ -2350,7 +2565,7 @@ subroutine ecriture_spectre(imol)
      call print_error(status)
   endif
 
-  
+
   !------------------------------------------------------------------------------
   ! Origine
   !------------------------------------------------------------------------------
@@ -2360,7 +2575,7 @@ subroutine ecriture_spectre(imol)
      do i=1, nb_proc
         O(:,:,:,:) =  O(:,:,:,:) +  origine_mol(:,:,:,:,i)
      enddo
-     
+
 
      filename = trim(data_dir2(imol))//'/origine.fits.gz'
 
@@ -2382,7 +2597,7 @@ subroutine ecriture_spectre(imol)
      naxes(2)=ntrans
      naxes(3)=n_rad
      naxes(4)=nz
- 
+
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
@@ -2396,12 +2611,12 @@ subroutine ecriture_spectre(imol)
      !  Close the file and free the unit number.
      call ftclos(unit, status)
      call ftfiou(unit, status)
-     
+
      !  Check for any error, and if so print out error messages
      if (status > 0) then
         call print_error(status)
      endif
-     
+
   endif ! lorigine
 
   return
@@ -2435,7 +2650,7 @@ subroutine cfitsWrite(filename,tab,dim)
   bitpix=-32
   extend=.true.
 
- 
+
   !  Write the required header keywords.
   naxis=size(dim)
   call ftphpr(unit,simple,bitpix,naxis,dim,0,1,extend,status)

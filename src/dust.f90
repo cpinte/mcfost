@@ -21,7 +21,7 @@ module dust
 subroutine taille_grains()
 ! Distribution en taille des grains
 ! Sortie de prop_grains pour cas multi-lambda
-! C. Pinte 14/01/05  
+! C. Pinte 14/01/05
 
   implicit none
   integer :: k, i, j
@@ -70,7 +70,7 @@ subroutine taille_grains()
         write(*,*) "If yes, press return"
         read(*,*)
      endif
-     
+
      ! Taille des grains (recursif)
      masse_pop = nbre_grains(dp%ind_debut)
      exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
@@ -80,7 +80,7 @@ subroutine taille_grains()
         else
            a= r_grain(k-1) * exp_grains
         endif
-        
+
         r_grain(k) = a ! micron
         S_grain(k) = pi * a**2 ! micron^2
         M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
@@ -103,13 +103,13 @@ subroutine taille_grains()
      do k=dp%ind_debut,dp%ind_fin
         nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
      enddo
-     
+
      ! Fraction de grains de taille k au sein d'une pop
      do  k=dp%ind_debut,dp%ind_fin
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
 
-     ! Total radius is kept constant with coating 
+     ! Total radius is kept constant with coating
      if (dp%lcoating) then
         correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
         do k=dp%ind_debut,dp%ind_fin
@@ -138,7 +138,7 @@ subroutine init_indices_optiques()
 
   real :: frac, fbuffer
   real, dimension(:), allocatable :: f
-  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment
+  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment, n_components
 
   character(len=512) :: filename
 
@@ -149,10 +149,11 @@ subroutine init_indices_optiques()
 
 
   do pop=1, n_pop
-     if (.not.dust_pop(pop)%is_PAH) then 
+     if (.not.dust_pop(pop)%is_PAH) then
 
-        allocate(tab_tmp_amu1(n_lambda, dust_pop(pop)%n_components), &
-             tab_tmp_amu2(n_lambda, dust_pop(pop)%n_components), stat=alloc_status)
+        n_components = dust_pop(pop)%n_components
+        if (dust_pop(pop)%porosity > tiny_real) n_components = n_components + 1
+        allocate(tab_tmp_amu1(n_lambda,n_components), tab_tmp_amu2(n_lambda,n_components), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_tmp_amu1'
            stop
@@ -171,7 +172,7 @@ subroutine init_indices_optiques()
 
            ! On elimine les lignes avec des commentaires
            status = 1
-           n_comment = 0 
+           n_comment = 0
            do while (status /= 0)
               n_comment = n_comment + 1
               read(1,*,iostat=status) fbuffer
@@ -186,7 +187,7 @@ subroutine init_indices_optiques()
               read(1,*,iostat=status)
            enddo
            n_ind = n_ind - 1
-           
+
            ! On enleve les 2 premieres lignes
            n_ind = n_ind - 2
 
@@ -221,7 +222,7 @@ subroutine init_indices_optiques()
            enddo
 
            if (tab_l(2) > tab_l(1)) then
-              l_ordre_decroissant = .false. 
+              l_ordre_decroissant = .false.
            else
               l_ordre_decroissant = .true.
            endif
@@ -235,7 +236,7 @@ subroutine init_indices_optiques()
                  do while((tab_lambda(i) < tab_l(ii)).and.(ii <= n_ind-1))
                     ii=ii+1
                  enddo
-           
+
                  frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
                  tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
                  tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
@@ -245,81 +246,74 @@ subroutine init_indices_optiques()
                  do while((tab_lambda(i) > tab_l(ii)).and.(ii <= n_ind-1))
                     ii=ii+1
                  enddo
-                 
+
                  frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
                  tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
                  tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
               endif ! croissant ou decroissant
-              
+
            enddo ! lambda
-        
+
            deallocate(tab_l,tab_n,tab_k)
 
         enddo ! k , boucle components
 
+        ! Add vacuum as last component
+        if (dust_pop(pop)%porosity > tiny_real) then
+           tab_tmp_amu1(:,n_components) = 1.0_db
+           tab_tmp_amu2(:,n_components) = 0.0_db
+        endif
 
-        if (dust_pop(pop)%n_components == 1) then
+        if (n_components == 1) then
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
            dust_pop(pop)%T_sub = dust_pop(pop)%component_T_sub(1)
-        else  
+        else
            if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
-              allocate(m(dust_pop(pop)%n_components), f(dust_pop(pop)%n_components))
-              do i=1, n_lambda 
+              allocate(m(n_components), f(n_components))
+              do i=1, n_lambda
                  m = cmplx(tab_tmp_amu1(i,:),tab_tmp_amu2(i,:))
-                 f = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components)
-                 
+                 f(1:dust_pop(pop)%n_components) = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components) &
+                      * (1.0_db - dust_pop(pop)%porosity)
+                 if (dust_pop(pop)%porosity > tiny_real)  f(n_components) = dust_pop(pop)%porosity
+
+
                  mavg = Bruggeman_EMT(i, m, f)
-                 
+
                  tab_amu1(i,pop) = real(mavg)
                  tab_amu2(i,pop) = aimag(mavg)
               enddo
               deallocate(m,f)
            else ! coating : 2 composants max pour coating
               !write(*,*) "Applying coating for pop.", pop
+              if (n_components /= 2) then
+                 write(*,*) "ERROR : coating can only be computed with 2 components"
+                 write(*,*) "Exiting"
+                 stop
+              endif
               tab_amu1(:,pop) = tab_tmp_amu1(:,1)
               tab_amu2(:,pop) = tab_tmp_amu2(:,1)
               tab_amu1_coating(:,pop) = tab_tmp_amu1(:,2)
               tab_amu2_coating(:,pop) = tab_tmp_amu2(:,2)
            endif
-        
+
            ! On suppose que le grain est detruit des que le premier composant se vaporise
            write(*,*) "WARNING : T_sub is set to the minimum T_sub of the individual components"
            dust_pop(pop)%T_sub = minval(dust_pop(pop)%component_T_sub(1:dust_pop(pop)%n_components))
         endif ! n_components
 
-        ! Ajout porosite
-        if (dust_pop(pop)%porosity > tiny_real) then 
-           allocate(m(2),f(2))
-           f(2) = dust_pop(pop)%porosity
-           f(1) = 1. - f(2)
-
-           ! On corrige la densite 
-           dust_pop(pop)%rho1g_avg  = dust_pop(pop)%rho1g_avg * f(1)
-
-           ! On corrige les indices optiques
-           do i=1, n_lambda
-              m(1) = cmplx(tab_amu1(i,pop),tab_amu2(i,pop))
-              m(2) = cmplx(1.0,0.0) ! Vide
-
-              mavg = Bruggeman_EMT(i, m,f)
-
-              tab_amu1(i,pop) = real(mavg)
-              tab_amu2(i,pop) = aimag(mavg)
-           enddo ! n_ind
-           deallocate(m,f)
-        endif ! porosity
-
         deallocate(tab_tmp_amu1,tab_tmp_amu2)
-
 
         ! Compute average material density
         dust_pop(pop)%rho1g_avg = 0.0
-        do k=1, dust_pop(pop)%n_components 
+        do k=1, dust_pop(pop)%n_components
            dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg  + &
                 dust_pop(pop)%component_rho1g(k) * dust_pop(pop)%component_volume_fraction(k)
         enddo
-     else ! PAH       
+        dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
+
+        !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
+     else ! PAH
         ! we only set the material density
         dust_pop(pop)%component_rho1g(1) = 2.5
         dust_pop(pop)%rho1g_avg = 2.5
@@ -330,8 +324,8 @@ subroutine init_indices_optiques()
            stop
         endif
 
-     endif ! fin test PAH       
-     
+     endif ! fin test PAH
+
   enddo ! pop
 
   return
@@ -343,11 +337,12 @@ end subroutine init_indices_optiques
 function Bruggeman_EMT(lambda,m,f) result(m_eff)
   ! Effective medium theory following Bruggeman rule
   !  - for 2 components : find 2nd degree polynomial root
-  !  - more than 2 components : iterative solution 
+  !  - more than 2 components : iterative solution
   !
   ! C. Pinte
   ! 28/09/11
   ! 27/10/11 : more than 2 components
+  ! 18/09/13 : changing iteration for a much more stable scheme
 
   implicit none
 
@@ -355,18 +350,14 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   complex, dimension(:), intent(in) :: m ! optical indices of the components
   real,    dimension(:), intent(in) :: f ! volume fractions of the components
   complex ::  m_eff
-  
-  integer, parameter :: n_iter_max = 1000
-  real, parameter :: accuracy = 1.e-6
-  
-  complex, dimension(size(m)) :: eps, A_i ! 3*alpha dans la notoation de WF
-  real, dimension(size(m)):: f_i 
-  
-  integer :: n, i, imatrix, iter
-  integer, dimension(1) :: imatrix_tmp
-  real :: f_mat, verif
 
-  complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, eps_eff0, eps_mat, S
+  integer, parameter :: n_iter_max = 100
+  real, parameter :: accuracy = 1.e-6
+
+  complex, dimension(size(m)) :: eps
+
+  integer :: n, i, iter, k
+  complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, S
 
   ! Number of components
   n = size(m) ;
@@ -379,16 +370,16 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   endif
 
   ! Constantes dielectriques
-  eps = m*m 
-  
+  eps = m*m
+
   if (n==2) then ! equation du degre 2
      b = 2*f(1)*eps(1) - f(1)*eps(2) + 2*f(2)*eps(2) -f(2)*eps(1)
      c = eps(1) * eps(2)
      a = -2.   ! --> 1/2a  = -0.25
-     delta = b*b - 4*a*c 
+     delta = b*b - 4*a*c
      eps_eff1 = (-b - sqrt(delta)) * (-0.25)
-     eps_eff2 = (-b + sqrt(delta)) * (-0.25) 
-  
+     eps_eff2 = (-b + sqrt(delta)) * (-0.25)
+
      ! Selection (et verif) de l'unique racine positive (a priori c'est eps_eff1)
      if (aimag(eps_eff1) > 0) then
         if (aimag(eps_eff2) > 0) then
@@ -409,57 +400,25 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
      endif
 
   else ! n > 2, pas de solution analytique, methode iterative
-     ! TODO : comment etre sur que c'est la bonne racine ???
-     
-     ! Initial guess : Landau, Lifshitz, Looyenga rule
-     eps_eff0 = (sum(f(:) * eps(:)**(1./3)))**3
-     eps_eff = eps_eff0
+     eps_eff = (sum(f(:) * eps(:)**(1./3)))**3 ! Initial guess : Landau, Lifshitz, Looyenga rule
+     ! Marche aussi avec eps_eff = 1.0 mais necessite quelques iterations de plus
 
-     ! Selecting matrix : component with the largest volume fraction
-     !imatrix_tmp = minloc(abs(eps(:) - eps_eff0))
-     imatrix_tmp = maxloc(f)
-     imatrix = imatrix_tmp(1) 
-     if (lambda==2) imatrix = 3
-     f_mat = f(imatrix)
-     eps_mat = eps(imatrix)
+     eps_eff1 = eps_eff ; k=0 ! in case the iteration does not work
+     iteration : do iter=1, n_iter_max
+        k=k+1
+        S = sum( (eps(:)-eps_eff)/(eps(:)+2*eps_eff) * f(:) )
+        eps_eff =  eps_eff * (2*S+1)/(1-S)
 
-     ! extra variable to avoid summing over the matrix component
-     f_i(:) = f(:) ; f_i(imatrix) = 0.0  
-          
-     ! valeurs pour la 1ere iteration
-     A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff) 
-     S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
-     verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
+        if (abs(S) < accuracy) exit iteration
+     enddo iteration
 
-     if (verif > accuracy) then
-        ! Iteration proprement-dite
-        iteration : do iter=1, n_iter_max
-           eps_eff = eps_mat * (f_mat + S) / (f_mat - 2*S)
-           
-           ! valeurs pour verif + iteration suivant
-           A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2*eps_eff) 
-           S = sum(f_i(:) * A_i(:)) ! somme sur les composents sauf matrice
-           
-           verif = abs(f_mat * A_i(imatrix) + S) ! on ajoute la matrice
-           if (verif < accuracy) exit iteration
-           
-           if (iter == n_iter_max) then
-              write(*,*) "****************************************************"
-              write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman not converging"
-              write(*,*) "Using Landau, Lifshitz, Looyenga instead"
-              write(*,*) "****************************************************"
-              eps_eff = eps_eff0
-           endif
-        enddo iteration
-     endif 
-
-     if (aimag(eps_eff) < 0) then
+     if (k==n_iter_max) then
         write(*,*) "****************************************************"
-        write(*,*) "WARNING: wl=",tab_lambda(lambda),"Bruggeman converging"
-        write(*,*) "to unphysical solution"
+        write(*,*) "WARNING: lambda=",lambda, "wl=",tab_lambda(lambda)
+        write(*,*) "Bruggeman not converging"
         write(*,*) "Using Landau, Lifshitz, Looyenga instead"
         write(*,*) "****************************************************"
-        eps_eff = eps_eff0
+        eps_eff = eps_eff1
      endif
 
   endif ! n > 2
@@ -467,10 +426,10 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
   ! Indices optiques
   m_eff = sqrt(eps_eff)
 
-  ! Verification finale ---> OK 
-  !A_i(:) = (eps(:) - eps_eff) / (eps(:) + 2* eps_eff) 
-  !write(*,*) "Verif Bruggeman", lambda, iter, abs(sum( f(:) * A_i(:)))
-  
+  ! Verification finale ---> OK
+  !S = sum( (eps(:)-eps_eff)/(eps(:)+2*eps_eff) * f(:) )
+  !write(*,*) "Verif Bruggeman", lambda, iter, m_eff, abs(S)
+
   return
 
 end function Bruggeman_EMT
@@ -514,10 +473,10 @@ subroutine prop_grains(lambda, p_lambda)
            write(*,*) 'Allocation error PAH_Q_ext'
            stop
         endif
-        
+
         do i=1, n_pop
            dp = dust_pop(i)
-           if (dp%is_PAH) then 
+           if (dp%is_PAH) then
               opt_file = trim(dust_dir)//"/"//trim(dp%indices(1))
               ! load optical data from file
               call draine_load(opt_file, PAH_n_lambda, PAH_n_rad, 10, 1, &
@@ -529,7 +488,7 @@ subroutine prop_grains(lambda, p_lambda)
               log_PAH_rad = log(tmp_PAH_rad)
            endif
         enddo !i
-        
+
         ! abs car le fichier de lambda pour les PAHs est a l'envers
         PAH_delta_lambda(1) = abs(PAH_lambda(2) - PAH_lambda(1))
         if (n_lambda > 1) then
@@ -550,11 +509,11 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp shared(r_grain,q_ext,q_sca,q_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot,is_pop_PAH,is_grain_PAH) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
-  !$omp shared(dust_pop) 
-  !$omp do schedule(dynamic,10)
+  !$omp shared(dust_pop)
+  !$omp do schedule(dynamic,1)
   ! on fait la boucle a l'envers pour optimiser la parallelisation
   ! et savoir des le debut si l'alloc. mem. ds bhmie passe ou pas
-  do  k=1,n_grains_tot
+  do  k=n_grains_tot,1,-1
      pop = grain(k)%pop
      a = r_grain(k)
      if (.not.dust_pop(pop)%is_PAH) then ! theorie de mie ou gmm
@@ -564,13 +523,20 @@ subroutine prop_grains(lambda, p_lambda)
         if (laggregate) then
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
-           if (.not.(dust_pop(pop)%lcoating)) then
+           if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
               call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
+              if (dust_pop(pop)%lcoating) then
+                 amu1_coat=tab_amu1_coating(lambda,pop)
+                 amu2_coat=tab_amu2_coating(lambda,pop)
+                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
+              endif
+           else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
+              call mueller_DHS(p_lambda,k,wavel,amu1,amu2,qext,qsca,gsca)
            else
-              amu1_coat=tab_amu1_coating(lambda,pop)
-              amu2_coat=tab_amu2_coating(lambda,pop)
-              call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
-           endif ! lcoating
+              write(*,*) "Unknow dust type : ", dust_pop(pop)%type
+              write(*,*) "Exiting"
+              stop
+           endif
 !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
      else ! grain de PAH
@@ -579,15 +545,15 @@ subroutine prop_grains(lambda, p_lambda)
      endif
      tab_albedo(lambda,k)=qsca/qext
      tab_g(lambda,k) = gsca
-     ! tau est sans dimension : [kappa * lvol = density * a² * lvol] 
+     ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
      ! a² microns² -> 1e-8 cm²             \
-     ! density en cm-3                      > reste facteur 149595.0 
-     ! longueur de vol en AU = 1.5e13 cm   / 
+     ! density en cm-3                      > reste facteur 149595.0
+     ! longueur de vol en AU = 1.5e13 cm   /
      fact =  pi * a * a * 149595.0
      !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-     q_ext(lambda,k) = qext * fact
+     q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
      q_sca(lambda,k) = qsca * fact
-     q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)     
+     q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
   enddo !k
   !$omp enddo
   !$omp end parallel
@@ -602,8 +568,8 @@ subroutine opacite2(lambda)
 ! Calcule la table d'opacite et probsizecumul
 ! Inclus stratification empirique
 ! Utilise les resultats des routine densite et prop_grains
-! Doit etre utilise juste apres prop_grain : lambda ne doit pas changer entre 2 
-! (dans le cas multi-longueurs d'onde) 
+! Doit etre utilise juste apres prop_grain : lambda ne doit pas changer entre 2
+! (dans le cas multi-longueurs d'onde)
 ! update : 12/09/06
 
   implicit none
@@ -615,18 +581,23 @@ subroutine opacite2(lambda)
   integer :: i,j, pk, k, ii, jj, kk, l, k_min, thetaj
   real(kind=db) ::  density, proba, q_sca_tot, q_ext_tot,norme
   logical :: lcompute_obs
-  
+
   ! Pour spline
-  real, dimension(1:n_prob) :: xa,ya,y2
-  real :: delta_prob1, delta_probn, yp1, ypn
+!  real, dimension(1:n_prob) :: xa,ya,y2
+!  real :: delta_prob1, delta_probn, yp1, ypn
+!  real :: yp_p1, yp_m1, ypp
 
-  real :: yp_p1, yp_m1, ypp, somme, gsca
 
-  real :: z, rcyl
+
+  real :: z, rcyl, somme, gsca
 
   logical :: ldens0
 
   real(kind=db) :: kappa_abs_RE, kappa_abs_tot, angle
+
+  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
+
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
@@ -638,7 +609,7 @@ subroutine opacite2(lambda)
         densite_pouss(1,1,1,:) = nbre_grains(:)
      endif
   endif
-        
+
   if (lmono0) then
      lcompute_obs = .true.
   else
@@ -650,14 +621,14 @@ subroutine opacite2(lambda)
   endif
 
 !***************
-! Calcul proba cumulee en dessous d'une taille de grains 
+! Calcul proba cumulee en dessous d'une taille de grains
 ! et opacite pour chaque position
 !
 !* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
 !* certaine taille de grain. Ce tableau est utilise pour le tirage
 !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
 !* en compte le nombre de grains en meme temps que leur probabilite
-!* individuelle de diffuser (donnee par qsca*pi*a**2). 
+!* individuelle de diffuser (donnee par qsca*pi*a**2).
 
 
   if (scattering_method == 2) then
@@ -683,7 +654,7 @@ subroutine opacite2(lambda)
               kappa_abs_tot = kappa_abs_tot + q_abs(lambda,k) * density
            enddo !k
 
-           if (lRE_LTE) then 
+           if (lRE_LTE) then
               kappa_abs_eg(lambda,i,j,pk) = 0.0
               do k=grain_RE_LTE_start,grain_RE_LTE_end
                  density=densite_pouss(i,j,pk,k)
@@ -692,7 +663,7 @@ subroutine opacite2(lambda)
               enddo
             endif
 
-           if (lRE_nLTE) then 
+           if (lRE_nLTE) then
               do k=grain_RE_nLTE_start,grain_RE_nLTE_end
                  density=densite_pouss(i,j,pk,k)
                  kappa_abs_RE = kappa_abs_RE + q_abs(lambda,k) * density
@@ -706,27 +677,27 @@ subroutine opacite2(lambda)
                  kappa_sca(lambda,i,j,pk) =  kappa_sca(lambda,i,j,pk) + q_sca(lambda,k) * density
               enddo
            endif
-       
+
            if (kappa_abs_tot > tiny_db) proba_abs_RE(lambda,i,j,pk) = kappa_abs_RE/kappa_abs_tot
         enddo !pk
      enddo bz !j
   enddo !i
 
   proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
-  
+
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
      if (.not.lmono) then
         do i=1, n_rad
            do j=1, nz
-              prob_kappa_abs_1grain(lambda,i,j,0)=0.0  
+              prob_kappa_abs_1grain(lambda,i,j,0)=0.0
               do  k=1, n_grains_RE_nLTE
                  density=densite_pouss(i,j,1,k)
                  prob_kappa_abs_1grain(lambda,i,j,k)=prob_kappa_abs_1grain(lambda,i,j,k-1) + &
                       q_abs(lambda,k) * density
               enddo !k
               prob_kappa_abs_1grain(lambda,i,j,:) =  prob_kappa_abs_1grain(lambda,i,j,:)/&
-                   prob_kappa_abs_1grain(lambda,i,j,n_grains_RE_nLTE) 
+                   prob_kappa_abs_1grain(lambda,i,j,n_grains_RE_nLTE)
            enddo !j
         enddo !i
      endif !.not.lmono
@@ -738,7 +709,7 @@ subroutine opacite2(lambda)
         write(*,*) "Error : lkappa_abs_grain only monochrmatic"
         stop
      endif
-     
+
      allocate(kappa_abs_tmp(n_rad,nz,n_grains_tot))
 
      kappa_abs_tmp =0._db
@@ -775,15 +746,15 @@ subroutine opacite2(lambda)
   !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(q_ext,q_sca,densite_pouss,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
-  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola)
-  !$omp do schedule(dynamic,1) 
+  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop)
+  !$omp do schedule(dynamic,1)
   do i=1, p_n_rad
      bz2 : do j=pj_start,p_nz
         if (j==0) cycle bz2
         do pk=1, p_n_az
            q_sca_tot=0.0
            q_ext_tot=0.0
-     
+
            if (scattering_method == 2) then
               if (aniso_method==1) then
                  tab_s11_pos(lambda,i,j,pk,:) = 0.
@@ -796,7 +767,7 @@ subroutine opacite2(lambda)
            else
               probsizecumul(lambda,i,j,pk,0)=0.0
            endif
-           
+
            somme=0.0
            do  k=1,n_grains_tot
               density=densite_pouss(i,j,pk,k)
@@ -804,7 +775,7 @@ subroutine opacite2(lambda)
               q_ext_tot = q_ext_tot + q_ext(lambda,k)*density
               tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk) + q_sca(lambda,k)*density * tab_g(lambda,k)
               !somme = somme + q_sca(lambda,k)*density
-         
+
               if (scattering_method == 2) then
                  if (aniso_method==1) then
                     ! Moyennage matrice de mueller (long) (dernier indice : angle)
@@ -815,7 +786,7 @@ subroutine opacite2(lambda)
                        tab_s33_pos(lambda,i,j,pk,:) = tab_s33(1,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
                        tab_s34_pos(lambda,i,j,pk,:) = tab_s34(1,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
                     endif
-                 endif !aniso_method 
+                 endif !aniso_method
               else
                  ! Au choix suivant que l'on considère un albedo par cellule ou par grain
                  ! albedo par cellule :
@@ -824,13 +795,13 @@ subroutine opacite2(lambda)
                  !              probsizecumul(lambda,i,j,k) = probsizecumul(lambda,i,j,k-1) + q_ext(lambda,k)*density
               endif !scattering_method
            enddo !k
-           
 
-           if (q_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = q_sca_tot/q_ext_tot 
+
+           if (q_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = q_sca_tot/q_ext_tot
            if (q_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/q_sca_tot
-              
 
-           
+
+
            if (lcompute_obs.and.lscatt_ray_tracing) then
               if (scattering_method == 1) then
                  write(*,*) "ERROR: ray-tracing is incompatible with scattering method 1"
@@ -844,14 +815,14 @@ subroutine opacite2(lambda)
                     angle = real(thetaj)/real(nang_scatt)*pi
                     norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
                  enddo
-              
+
                  if (abs(norme) > 0.0_db) then
                     norme = 1.0_db / (norme * deux_pi)
-                    
+
                     tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
-                    if (lsepar_pola) then 
-                       ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard 
-                       ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer 
+                    if (lsepar_pola) then
+                       ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
+                       ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
                        tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
@@ -866,13 +837,16 @@ subroutine opacite2(lambda)
                        tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
                     endif
                  endif ! norme
-                 
+
                  if (lsepar_pola) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / tab_s11_ray_tracing(lambda,i,j,:)
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
                  endif
-              else ! aniso_method =2 --> HG                 
+              else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
 
                  norme = 0.0
@@ -884,9 +858,9 @@ subroutine opacite2(lambda)
                  enddo
                  tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)
               endif
-              
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)               
-              
+
+              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
+
             !  ! Verification normalization
             !  norme = 0.0
             !  do thetaj=0,nang_scatt
@@ -915,7 +889,9 @@ subroutine opacite2(lambda)
                     do l=0,180
                        if (tab_s11_pos(lambda,i,j,pk,l) > tiny_real) then ! NEW TEST STRAT LAURE
                           norme=1.0/tab_s11_pos(lambda,i,j,pk,l)
-                          tab_s11_pos(lambda,i,j,pk,l)=tab_s11_pos(lambda,i,j,pk,l)*norme
+                          if (.not.ldust_prop) then
+                             tab_s11_pos(lambda,i,j,pk,l)= 1.0 !tab_s11_pos(lambda,i,j,pk,l)*norme
+                          endif
                           if (lsepar_pola) then
                              tab_s12_pos(lambda,i,j,pk,l)=tab_s12_pos(lambda,i,j,pk,l)*norme
                              tab_s33_pos(lambda,i,j,pk,l)=tab_s33_pos(lambda,i,j,pk,l)*norme
@@ -924,14 +900,14 @@ subroutine opacite2(lambda)
                        endif
                     enddo
                  else !aniso_method
-                    tab_s11_pos(lambda,i,j,pk,:)=1.0
+                    tab_s11_pos(lambda,i,j,pk,:) = 1.0
                     if (lsepar_pola) then
                        tab_s12_pos(lambda,i,j,pk,:)=0.0
                        tab_s33_pos(lambda,i,j,pk,:)=0.0
                        tab_s34_pos(lambda,i,j,pk,:)=0.0
                     endif
                  endif !aniso_method
-                 
+
               else !scattering_method
                  if  (probsizecumul(lambda,i,j,pk,n_grains_tot) > tiny_real) then
                     do k=1, n_grains_tot
@@ -1012,7 +988,7 @@ subroutine opacite2(lambda)
                  ech_prob(lambda,i,j,pk,:) = 1
                  valeur_prob(lambda,i,j,pk,:) = 1.0
               endif ! scattering_method
-              
+
            endif !densite_pouss = 0.0
         enddo !pk
      enddo bz2 !j
@@ -1034,7 +1010,7 @@ subroutine opacite2(lambda)
 
   ! On remet la densite à zéro si besoin
   if (ldens0) densite_pouss(1,1,1,:) = 0.0_db
-        
+
 !  write(*,*) "lambda", tab_lambda(lambda), tab_g_pos(lambda,1,1,1)
 !  write(*,*) tab_s11_ray_tracing(lambda,1,1,:)
 
@@ -1054,7 +1030,7 @@ subroutine opacite2(lambda)
 !!$
 !!$        if (delta_prob1 > 0.0) then
 !!$           yp1=1.0/delta_prob1 ! 1.0 = 2-1
-!!$!           yp1=(ya(2)-ya(1))/(xa(2)-xa(1))           
+!!$!           yp1=(ya(2)-ya(1))/(xa(2)-xa(1))
 !!$        else
 !!$           yp1=1.e30
 !!$        endif
@@ -1106,34 +1082,45 @@ subroutine opacite2(lambda)
 !  write(*,*) sum(densite_pouss),   q_abs(lambda,1), r_grain(1)
 !  stop
 
-  if ((ldust_prop).and.(lambda == n_lambda)) then 
+  if ((ldust_prop).and.(lambda == n_lambda)) then
+     write(*,*) "Writing dust prop."
+
      ! Only do it after the last pass through the wavelength table
      ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
      allocate(kappa_lambda(n_lambda))
      allocate(albedo_lambda(n_lambda))
      allocate(g_lambda(n_lambda))
-     allocate(pol_lambda_theta(n_lambda,nang_scatt))
+     allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
 
-     kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3)))
+     kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3))) ! cm^2/g
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
-         
+
      call cfitsWrite("data_dust/lambda.fits.gz",tab_lambda,shape(tab_lambda))
      call cfitsWrite("data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-     
+
+     S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
+     call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+
      if (lsepar_pola) then
-        do i=1,n_lambda
-           pol_lambda_theta(i,:)=-tab_s12_pos(i,1,1,1,:)/tab_s11_pos(i,1,1,1,:)
-        enddo
-        call cfitsWrite("data_dust/polar.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:)/tab_s11_pos(:,1,1,1,:)
+        call cfitsWrite("data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 
      deallocate(kappa_lambda,albedo_lambda,g_lambda,pol_lambda_theta)
-     write(*,*) "Writing dust prop."
-     write(*,*) "Exiting"
-     stop
+
+     if (lstop_after_init) then
+        write(*,*) "Exiting"
+        stop
+     else
+        ! Re-Normalisation S11
+        ! la normalisation n'a pas eu lieu dans le cas ldust_prop pour sauver S11 dans le fichier fits
+        ! on l'a fait donc maintenant pour comtinuer les calculs
+        if ((scattering_method==2).and.(aniso_method==1)) tab_s11_pos = 1.0
+     endif
+
   endif !ldust_prop
 
   return

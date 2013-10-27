@@ -35,7 +35,7 @@ subroutine alloc_dynamique()
   !allocate(nnfot2(nb_proc))
   nnfot2=0.0_db
 
-  
+
 
   !$omp parallel threadprivate(alloc_status) private(n_phot_sed2)
   allocate(n_phot_sed2(n_lambda,N_thet,N_phi), stat=alloc_status)
@@ -43,7 +43,7 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error n_phot_sed2'
      stop
   endif
-  n_phot_sed2 = 0.0     
+  n_phot_sed2 = 0.0
 
   write(*,*) "A", shape(n_phot_sed2)
   !$omp end parallel
@@ -74,7 +74,7 @@ subroutine alloc_dynamique()
      stop
   endif
   n_cell_traversees = 0
-  
+
   allocate(tab_cell_r(nb_proc,n_cell_max), tab_cell_z(nb_proc,n_cell_max),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_cell_r'
@@ -131,14 +131,14 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error r_lim'
      stop
   endif
-  r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0 
+  r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
 
   allocate(z_lim(n_rad,nz+2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error z_lim'
      stop
   endif
-  z_lim = 0.0     
+  z_lim = 0.0
 
   allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
   if (alloc_status > 0) then
@@ -178,7 +178,7 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error densite_pouss'
      stop
   endif
-  densite_pouss = 0.0     
+  densite_pouss = 0.0
 
   if (l3D) then
      allocate(l_dark_zone(0:n_rad+1,-nz-1:nz+1,n_az), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
@@ -192,7 +192,7 @@ subroutine alloc_dynamique()
      stop
   endif
   l_is_dark_zone = .false.
-  l_dark_zone = .false.     
+  l_dark_zone = .false.
   ri_in_dark_zone=0
   ri_out_dark_zone=0
   zj_sup_dark_zone=0
@@ -207,7 +207,7 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error r_in_opacite'
      stop
   endif
-  r_in_opacite=0.0 ; r_in_opacite2=0.0     
+  r_in_opacite=0.0 ; r_in_opacite2=0.0
 
 
   ! **************************************************
@@ -237,7 +237,7 @@ subroutine alloc_dynamique()
      stop
   endif
   q_ext = 0 ; q_sca = 0 ; q_abs = 0 ; q_geo =0
-  
+
 
   allocate(tab_g(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
@@ -246,7 +246,7 @@ subroutine alloc_dynamique()
   endif
   tab_g = 0
 
-  
+
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
   ! **************************************************
@@ -305,7 +305,7 @@ subroutine alloc_dynamique()
      allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
           kappa_abs_eg(n_lambda,n_rad,nz+1,1), proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
-  if (alloc_status > 0) then 
+  if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
@@ -389,7 +389,7 @@ subroutine alloc_dynamique()
      p_n_lambda = 1
   else ! prop par grains
      p_n_lambda = n_lambda
-     
+
      if (l3D) then
         allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
      else
@@ -487,7 +487,7 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error l_emission_pah'
      stop
   endif
-  l_emission_pah = .false.     
+  l_emission_pah = .false.
 
 
   if (l3D) then
@@ -518,8 +518,8 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error disk_origin'
         stop
      endif
-     disk_origin = 0.0     
-     star_origin = 0.0     
+     disk_origin = 0.0
+     star_origin = 0.0
   endif
 
 
@@ -554,7 +554,7 @@ subroutine alloc_dynamique()
            write(*,*) 'Allocation error tab_Temp'
            stop
         endif
-        tab_Temp = 0.0     
+        tab_Temp = 0.0
      endif
 
      allocate(Proba_Temperature(n_T,n_rad,nz,grain_nRE_start:grain_nRE_end), &
@@ -584,7 +584,7 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error tab_Temp'
         stop
      endif
-     tab_Temp = 0.0     
+     tab_Temp = 0.0
 
      if (l3D) then
         allocate(log_frac_E_em(n_rad,-nz:nz,n_az,n_T), stat=alloc_status)
@@ -629,7 +629,7 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error E0'
         stop
      endif
-     E0 = 0.0 
+     E0 = 0.0
      J0 = 0.0
 
      if (l3D) then
@@ -709,7 +709,7 @@ subroutine alloc_dynamique()
         !   stop
         !endif
         !log_frac_E_em_1grain=0.0
-        
+
         allocate(Temperature_1grain_nRE_old(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Proba_Temperature'
@@ -726,7 +726,7 @@ subroutine alloc_dynamique()
         endif
         Tpeak_old=0
         maxP_old=0.
-        
+
         if (lRE_nlTE) then
            allocate(Temperature_1grain_old(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
            if (alloc_status > 0) then
@@ -749,7 +749,7 @@ subroutine alloc_dynamique()
   endif
 
 
- 
+
  ! if (lProDiMo) then
  !    allocate(J_prodimo(n_lambda,n_rad,nz),stat=alloc_status)
  !    if (alloc_status > 0) then
@@ -768,63 +768,63 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error sed'
         stop
      endif
-     sed = 0.0     
+     sed = 0.0
 
      allocate(sed_q(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_q'
         stop
      endif
-     sed_q = 0.0     
-     
+     sed_q = 0.0
+
      allocate(sed_u(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_u'
         stop
      endif
-     sed_u = 0.0     
+     sed_u = 0.0
 
      allocate(sed_v(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_v'
         stop
      endif
-     sed_v = 0.0     
-     
+     sed_v = 0.0
+
      allocate(sed_star(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_star'
         stop
      endif
-     sed_star = 0.0     
-     
+     sed_star = 0.0
+
      allocate(sed_star_scat(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_star_scat'
         stop
      endif
-     sed_star_scat = 0.0     
+     sed_star_scat = 0.0
 
      allocate(sed_disk(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_disk'
         stop
      endif
-     sed_disk = 0.0     
+     sed_disk = 0.0
 
      allocate(sed_disk_scat(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_disk_scat'
         stop
      endif
-     sed_disk_scat = 0.0     
+     sed_disk_scat = 0.0
 
      allocate(n_phot_sed(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error n_phot_sed'
         stop
      endif
-     n_phot_sed = 0.0     
+     n_phot_sed = 0.0
 
      allocate(sed1_io(n_lambda,N_thet,N_phi),sed2_io(n_lambda,N_thet,N_phi,9),wave2_io(n_lambda,2), stat=alloc_status)
      if (alloc_status > 0) then
@@ -877,7 +877,7 @@ subroutine alloc_dynamique()
         endif
         STOKEV = 0.0
      endif
-     
+
      if (lsepar_contrib) then
         allocate(STOKEI_star(n_lambda,IGRIDX,IGRIDY,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
@@ -980,17 +980,19 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error norme_phiProf_m1'
         stop
      endif
-     norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0    
+     norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
   endif ! lemission_mol
 
-  if (lsetup_gas) then
-     allocate(densite_gaz(n_rad,nz,1), masse_gaz(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error densite_gaz'
-        stop
-     endif
-     densite_gaz = 0.0 ; masse_gaz = 0.0
+  if (l3D) then
+     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
+  else
+     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
   endif
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error densite_gaz'
+     stop
+  endif
+  densite_gaz = 0.0 ; masse_gaz = 0.0
 
   return
 
@@ -999,7 +1001,7 @@ end subroutine alloc_dynamique
 !**********************************************************************
 
 subroutine dealloc_em_th()
-  
+
   !deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
   deallocate(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
 
@@ -1049,14 +1051,14 @@ subroutine dealloc_em_th()
      if (lnRE) then
         deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE)
         deallocate(Temperature_1grain_nRE_old)
-        deallocate(Emissivite_nRE_old)        
-        deallocate(Tpeak_old)        
+        deallocate(Emissivite_nRE_old)
+        deallocate(Tpeak_old)
         if (lRE_nlTE) deallocate(Temperature_1grain_old)
      endif
   endif ! lTemp
 
   if (lTemp.or.lsed) then
-     deallocate(sed,sed_q,sed_u,sed_v)     
+     deallocate(sed,sed_q,sed_u,sed_v)
      deallocate(sed_star,sed_star_scat,sed_disk,sed_disk_scat,n_phot_sed)
      deallocate(sed1_io,sed2_io,wave2_io)
   endif ! ltemp.or.lSED
@@ -1094,7 +1096,7 @@ subroutine realloc_dust_mol()
      stop
   endif
   q_ext = 0 ; q_sca = 0 ; q_abs = 0 ; tab_g = 0
-  
+
 
   allocate(prob_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1145,8 +1147,8 @@ subroutine realloc_dust_mol()
 
   ! Tableaux relatifs aux prop optiques des cellules
   if (l3D) then
-     allocate(kappa(n_lambda,n_rad,-nz-1:nz+1,n_az),kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), & 
-          kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), & 
+     allocate(kappa(n_lambda,n_rad,-nz-1:nz+1,n_az),kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), &
+          kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           emissivite_dust(n_lambda,n_rad,-nz-1:nz+1,n_az),proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
@@ -1160,7 +1162,7 @@ subroutine realloc_dust_mol()
      stop
   endif
   kappa = 0.0 ; kappa_abs_eg = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
-  
+
   if (l3D) then
      allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
           stat=alloc_status)
@@ -1184,7 +1186,7 @@ subroutine realloc_dust_mol()
      stop
   endif
   ech_prob = 0
-  
+
   if (l3D) then
      allocate(valeur_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
   else
@@ -1245,7 +1247,7 @@ subroutine realloc_step2()
         write(*,*) 'Allocation error xJ_abs in realloc_step2'
         stop
      endif
-     xJ_abs = 0.0 
+     xJ_abs = 0.0
   endif
 
   ! Liberation memoire step1 et reallocation step 2
@@ -1265,7 +1267,7 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error n_phot_sed2'
      stop
   endif
-  n_phot_sed2 = 0.0     
+  n_phot_sed2 = 0.0
 
   deallocate(sed)
   allocate(sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1273,8 +1275,8 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed'
      stop
   endif
-  sed = 0.0     
-  
+  sed = 0.0
+
 
 
   deallocate(sed_q)
@@ -1283,15 +1285,15 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed_q'
      stop
   endif
-  sed_q = 0.0     
-  
+  sed_q = 0.0
+
   deallocate(sed_u)
   allocate(sed_u(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_u'
      stop
   endif
-  sed_u = 0.0     
+  sed_u = 0.0
 
   deallocate(sed_v)
   allocate(sed_v(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1299,15 +1301,15 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed_v'
      stop
   endif
-  sed_v = 0.0     
-  
+  sed_v = 0.0
+
   deallocate(sed_star)
   allocate(sed_star(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_star'
      stop
   endif
-  sed_star = 0.0     
+  sed_star = 0.0
 
   deallocate(sed_star_scat)
   allocate(sed_star_scat(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1315,7 +1317,7 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed_star_scat'
      stop
   endif
-  sed_star_scat = 0.0     
+  sed_star_scat = 0.0
 
   deallocate(sed_disk)
   allocate(sed_disk(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1323,7 +1325,7 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed_disk'
      stop
   endif
-  sed_disk = 0.0     
+  sed_disk = 0.0
 
   deallocate(sed_disk_scat)
   allocate(sed_disk_scat(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1331,7 +1333,7 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error sed_disk_scat'
      stop
   endif
-  sed_disk_scat = 0.0     
+  sed_disk_scat = 0.0
 
   deallocate(n_phot_sed)
   allocate(n_phot_sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
@@ -1339,8 +1341,8 @@ subroutine realloc_step2()
      write(*,*) 'Allocation error n_phot_sed'
      stop
   endif
-  n_phot_sed = 0.0     
-     
+  n_phot_sed = 0.0
+
   deallocate(sed2_io, wave2_io)
   allocate(sed2_io(n_lambda2,N_thet,N_phi,9),wave2_io(n_lambda2,2), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1377,7 +1379,7 @@ subroutine realloc_step2()
      stop
   endif
   prob_E_star = 0.0
-  
+
   deallocate(spectre_etoiles_cumul, spectre_etoiles, spectre_emission_cumul)
   allocate(spectre_etoiles_cumul(0:n_lambda2),spectre_etoiles(n_lambda2),spectre_emission_cumul(0:n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1420,7 +1422,7 @@ subroutine realloc_step2()
      stop
   endif
   q_ext = 0
-  
+
   deallocate(q_sca)
   allocate(q_sca(n_lambda2,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1493,7 +1495,7 @@ subroutine realloc_step2()
      stop
   endif
   tab_s33 = 0
-  
+
   deallocate(tab_s34)
   allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1624,12 +1626,12 @@ subroutine realloc_step2()
   if (l3D) then
      allocate(amax_reel(n_lambda2,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda2,n_rad,-nz-1:nz+1,n_az), &
           kappa_abs_eg(n_lambda2,n_rad,-nz-1:nz+1,n_az), proba_abs_RE(n_lambda2,n_rad,-nz-1:nz+1,n_az), &
-          stat=alloc_status) 
+          stat=alloc_status)
  else
      allocate(amax_reel(n_lambda2,n_rad,nz+1,1), kappa(n_lambda2,n_rad,nz+1,1), &
           kappa_abs_eg(n_lambda2,n_rad,nz+1,1), proba_abs_RE(n_lambda2,n_rad,nz+1,1), stat=alloc_status)
   endif
-  if (alloc_status > 0) then 
+  if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
@@ -1642,10 +1644,10 @@ subroutine realloc_step2()
         write(*,*) 'Allocation error disk_origin'
         stop
      endif
-     disk_origin = 0.0     
-     star_origin = 0.0     
+     disk_origin = 0.0
+     star_origin = 0.0
   endif
-  
+
   return
 
 end subroutine realloc_step2
@@ -1685,7 +1687,7 @@ subroutine alloc_emission_mol(imol)
      stop
   endif
   tab_v=0.0
-     
+
   allocate(tab_deltaV(-n_speed:n_speed,n_rad,nz), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_deltaV'
@@ -1699,7 +1701,7 @@ subroutine alloc_emission_mol(imol)
       stop
    endif
    tab_Cmb_mol = 0.0
-  
+
    allocate(Jmol(nTrans_tot,nb_proc), stat=alloc_status)
    if (alloc_status > 0) then
       write(*,*) 'Allocation error Jmol'
@@ -1715,14 +1717,14 @@ subroutine alloc_emission_mol(imol)
      endif
      kappa_mol_o_freq2=0.0
      emissivite_mol_o_freq2=0.0
-     
+
      allocate(tab_nLevel2(n_rad,nz,nLevels), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_nLevel2'
         stop
      endif
      tab_nLevel2 = 0.0
-  
+
      allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Jmol2'
@@ -1734,15 +1736,15 @@ subroutine alloc_emission_mol(imol)
   ! Methode d'echantillonnage
   if (igridx > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
-     
-     write(*,*) "WARNING : memory size if lots of pixels" 
+
+     write(*,*) "WARNING : memory size if lots of pixels"
      allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
           continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
      allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
           continu(1,1,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
-  endif  
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre'
      stop
@@ -1783,207 +1785,12 @@ subroutine dealloc_emission_mol()
 
 end subroutine dealloc_emission_mol
 
-
 !**********************************************************************
-
-
-subroutine save_checkpoint_init()
-
-  character(len=512) :: filename
-  
-
-  filename=trim(data_dir)//"/checkpoint_init.dat"
-
-  open(1,file=filename,status='new',form='unformatted')
-  
-  write(1) tab_lambda, tab_delta_lambda, tab_amu1, tab_amu2, tab_lambda2, tab_delta_lambda2,  tab_albedo_pos, &
-       prob_E_star, E_stars, L_etoile, rmin, zmax, volume, r_lim, r_lim_2, r_lim_3, z_lim, delta0, r_grain,  masse, &
-       kappa, kappa_abs_eg,  probsizecumul, ech_prob, valeur_prob, l_dark_zone,  E_photon, spectre_etoiles_cumul, tab_Temp, E0, &
-       delta0, prob_E_cell, frac_E_stars, E_totale, cos_max2, etape_i, etape_f, &
-       lscattering_method1, lmethod_aniso1, nbre_photons_tot, n_lambda2
-
-  if (scattering_method==2) then
-     write(1) tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos
-  else
-    write(1)  probsizecumul, ech_prob, valeur_prob, tab_s11, tab_s12, tab_s33, tab_s34, prob_s11
-  endif
-
-  
-  if (lRE_LTE) write(1) log_frac_E_em ,  prob_delta_T
-  if (lRE_nLTE) write(1) prob_kappa_abs_1grain, log_frac_E_em_1grain, prob_delta_T_1grain
-
-  close(1)
-  return
-  
-
-end subroutine save_checkpoint_init
-
-!*************************************************
-
-subroutine save_checkpoint()
-
-#include "sprng_f.h"
-
-  character :: buffer(MAX_PACKED_LENGTH)
-  integer :: size, sys_status
-
-  character(len=512) :: filename, cmd
-
-  checkpoint = checkpoint + 1
-  filename=trim(data_dir)//"/checkpoint_"//achar(mod((checkpoint),2)+iachar('0'))//".dat"
-
-  open(1,file=filename,status='new',form='unformatted')
-
-  size=pack_sprng(stream,buffer)
-  write(1) size
-  write(1) buffer
-
-  write(1)  nnfot1, nnfot2, n_phot_envoyes, n_phot_envoyes_loc, xKJ_abs, xE_abs, nbre_reemission, xE_abs_1grain,&
-       xJ_abs, xT_ech, xT_ech_1grain, indice_etape, letape_th
-
-  if (lmono0) then
-     write(1) STOKEI, STOKEQ, STOKEU, STOKEV
-     if (lsepar_contrib) then 
-        write(1) STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
-     endif
-  else
-     write(1) sed, n_phot_sed, sed_u, sed_q, sed_v, sed_star, sed_star_scat, sed_disk, sed_disk_scat, n_phot_sed2
-  endif
-
-  if (lRE_LTE) write(1) xKJ_abs, xE_abs, nbre_reemission
-  if (lRE_nLTE) write(1) xJ_abs, xE_abs_1grain
-
-  close(1)
-
-  if (checkpoint > 1) then
-     cmd = "rm -rf data_"//trim(band)//"/checkpoint_"//achar(mod((checkpoint-1),2)+iachar('0'))//".dat"
-     call appel_syst(cmd, sys_status)
-  endif
-  return
-
-
-end subroutine save_checkpoint
-
-!*************************************************
-
-subroutine restore_checkpoint()
-
-  character(len=MAX_PACKED_LENGTH) :: buffer
-  integer :: sys_status, size
-  integer, dimension(8) :: ios
-  integer :: err_init, err_run
-
-  character(len=512) :: filename, cmd, checkpoint_name
-  character(len=1) ::  ind_checkpoint
-
-  ios=0 
-
-  ! Restauration iniatialisation
-  filename=trim(data_dir)//"/checkpoint_init.dat"
-
-  open(1,file=filename,status='old',form='unformatted')
-
-  read(1,iostat=ios(1)) tab_lambda, tab_delta_lambda, tab_amu1, tab_amu2, tab_lambda2, tab_delta_lambda2,  tab_albedo_pos, &
-       prob_E_star, E_stars, L_etoile, rmin, zmax, volume, r_lim, r_lim_2, z_lim, delta0, r_grain,  masse, &
-       kappa, kappa_abs_eg,  probsizecumul, ech_prob, valeur_prob, l_dark_zone,  E_photon, spectre_etoiles_cumul, tab_Temp, E0, &
-       delta0, prob_E_cell, frac_E_stars, E_totale, cos_max2, etape_i, etape_f, &
-       lscattering_method1, lmethod_aniso1, nbre_photons_tot, n_lambda2
-
-  if (scattering_method==2) then
-     read(1,iostat=ios(2)) tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos
-  else
-    read(1,iostat=ios(2))  probsizecumul, ech_prob, valeur_prob, tab_s11, tab_s12, tab_s33, tab_s34, prob_s11
-  endif
-
-  if (lRE_LTE) read(1,iostat=ios(3)) log_frac_E_em ,  prob_delta_T
-  if (lRE_nLTE) read(1,iostat=ios(3)) prob_kappa_abs_1grain, log_frac_E_em_1grain, prob_delta_T_1grain
-
-  close(1)
-
-  err_init=ios(1)+ios(2)+ios(3)
-  if (err_init /=0) then
-     write(*,*) "Error : "//trim(filename)
-     checkpoint_level = 0
-     return
-  else
-     checkpoint_level = 1
-  endif
-
-  ! Autre checkpoint à restaurer ?
-  cmd = "basename `ls "//trim(data_dir)//"/checkpoint* ` > checkpoint.txt"
-  call appel_syst(cmd, sys_status)
-
-  open(unit=10, file="checkpoint.txt",status="old")
-  read(10,*) checkpoint_name
-  ind_checkpoint = checkpoint_name(12:15)
-  close(unit=10,status="delete")
-
-  if (ind_checkpoint=="i") then
-     return
-  endif
-
-  ! Restauration dernier point de sauvegarde
-  read(ind_checkpoint,*) checkpoint
-  filename=trim(data_dir)//"/"//trim(checkpoint_name)
-
-  open(1,file=filename,status='old',form='unformatted')
-
-  read(1) size
-  read(1,iostat=ios(8)) buffer
-
-  stream = unpack_sprng(buffer)
-
-  read(1,iostat=ios(4))  nnfot1, nnfot2, n_phot_envoyes, n_phot_envoyes_loc, xKJ_abs, xE_abs, nbre_reemission, xE_abs_1grain, &
-       xJ_abs, xT_ech, xT_ech_1grain, indice_etape
-
-  if (lmono0) then
-     read(1,iostat=ios(5)) STOKEI, STOKEQ, STOKEU, STOKEV
-     if (lsepar_contrib) then 
-        read(1,iostat=ios(6)) STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
-     endif
-  else
-     read(1,iostat=ios(5)) sed, n_phot_sed, sed_u, sed_q, sed_v, sed_star, sed_star_scat, sed_disk, sed_disk_scat, n_phot_sed2
-  endif
-
-
-  if (lRE_LTE) read(1,iostat=ios(7)) xKJ_abs, xE_abs, nbre_reemission
-  if (lRE_nLTE) read(1,iostat=ios(7)) xJ_abs, xE_abs_1grain
-
-  close(1)
-
-
-  err_run=ios(4)+ios(5)+ios(6)+ios(7)+ios(8)
-  if (err_init /=0) then
-     write(*,*) "Error : "//trim(checkpoint_name)
-  else
-     checkpoint_level = 2
-  endif
-
-  return
-
-end subroutine restore_checkpoint
-
-!*************************************************
-
-subroutine clean_checkpoint()
-
-  character(len=512) :: cmd
-  integer :: syst_status
-  
-  cmd = "rm -rf "//trim(data_dir)//"/checkpoint*"
-  call appel_syst(cmd, syst_status)
-
-  return
-
-end subroutine clean_checkpoint
-
-
-!*************************************************
 
 subroutine sig_handler(sig)
 
   integer, intent(in) ::  sig
- 
+
   select case(sig)
   case(2)
      write (*,*) 'mcfost : SIGINT Caught'

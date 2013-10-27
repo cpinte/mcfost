@@ -2,24 +2,24 @@ program BIGCRUNCH
   !***********************************************************
   ! Code de transfert radiatif Monte-Carlo : MCFOST
   !***********************************************************
-  ! Transfert dans la poussiere : lumiere diffusee et emission 
+  ! Transfert dans la poussiere : lumiere diffusee et emission
   ! thermique et dans le gaz : raies moleculaires
   ! Code parallèle OpenMP
   !
-  ! F. Menard, G. Duchene et C. Pinte 
+  ! F. Menard, G. Duchene et C. Pinte
   ! Grenoble, Exeter
   !
   !
   ! Quelques remarques :
   ! - Vive le 64bits !!
-  ! - il faut augmenter la stack size sur les architectures x86 
-  ! et AIX pour les lib numerical recipes. Passage en 
+  ! - il faut augmenter la stack size sur les architectures x86
+  ! et AIX pour les lib numerical recipes. Passage en
   ! allocation dynamique dans MCFOST en cas de pb
   ! - pas de pointeur en OpenMP sur Sun x86_64
   ! - ifort n'aime pas le retypage a la volee des tableaux
   !
   !***********************************************************
-  use parametres  
+  use parametres
   use init_mcfost
   use dust_transfer
   use mol_transfer
@@ -45,13 +45,11 @@ program BIGCRUNCH
   if (ldust_transfer) then
      call transfert_poussiere()
   endif
-     
+
   ! Emission moleculaire ...
   if (lemission_mol) then
      call mol_line_transfer()
   endif
-
-  if (lcheckpoint) call clean_checkpoint()
 
   ! Temps d'execution
   call system_clock(time_end)
@@ -62,7 +60,7 @@ program BIGCRUNCH
   endif
   write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
   call cpu_time(cpu_time_end)
-  time = int(cpu_time_end - cpu_time_begin)      
+  time = int(cpu_time_end - cpu_time_begin)
   write (*,'(" CPU time used          ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
 
 
