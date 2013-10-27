@@ -1213,7 +1213,6 @@ subroutine write_disk_struct()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=1
 
   if (l3D) then
      naxis=3
@@ -1230,9 +1229,10 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)
 
-  dens =  densite_gaz * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  dens =  densite_gaz(:,1:nz,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
