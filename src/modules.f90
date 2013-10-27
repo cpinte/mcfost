@@ -29,7 +29,6 @@ module parametres
   integer :: nbre_photons_loop, nbre_photons_eq_th, nbre_photons_lambda, nbre_photons_image, nbre_photons_spectre
   real :: nbre_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
   integer :: nnfot1
-  real(kind=db), target :: nnfot2
   real(kind=db) :: E_paquet
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
@@ -563,7 +562,6 @@ module resultats
   real, dimension(:,:,:), allocatable :: sed1_io
   real, dimension(:,:,:,:), allocatable :: sed2_io
   real, dimension(:,:), allocatable :: wave2_io
-  real(kind=db), dimension(:,:,:), allocatable, target :: n_phot_sed2
   real(kind=db), dimension(:), allocatable :: n_phot_envoyes, n_phot_envoyes_loc
 
   ! Line transfer

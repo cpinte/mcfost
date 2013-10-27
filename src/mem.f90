@@ -32,32 +32,6 @@ subroutine alloc_dynamique()
   gauss_random_saved = 0.0_db
   lgauss_random_saved = .false.
 
-  !allocate(nnfot2(nb_proc))
-  nnfot2=0.0_db
-
-
-
-  !$omp parallel threadprivate(alloc_status) private(n_phot_sed2)
-  allocate(n_phot_sed2(n_lambda,N_thet,N_phi), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error n_phot_sed2'
-     stop
-  endif
-  n_phot_sed2 = 0.0
-
-  write(*,*) "A", shape(n_phot_sed2)
-  !$omp end parallel
-
-  write(*,*) " "
-  write(*,*) "B", shape(n_phot_sed2)
-  write(*,*) " "
-
-  !$omp parallel firstprivate(n_phot_sed2)
-  write(*,*) "C", shape(n_phot_sed2)
-  !$omp end parallel
-
-  stop
-
   allocate(n_phot_envoyes(n_lambda), n_phot_envoyes_loc(n_lambda),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
@@ -1002,8 +976,7 @@ end subroutine alloc_dynamique
 
 subroutine dealloc_em_th()
 
-  !deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
-  deallocate(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
+  deallocate(n_phot_envoyes,n_phot_envoyes_loc)
 
   deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
 
@@ -1260,14 +1233,6 @@ subroutine realloc_step2()
   endif
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda=0.0
   tab_amu1=0.0 ; tab_amu2=0.0
-
-  deallocate(n_phot_sed2)
-  allocate(n_phot_sed2(n_lambda2,N_thet,N_phi), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error n_phot_sed2'
-     stop
-  endif
-  n_phot_sed2 = 0.0
 
   deallocate(sed)
   allocate(sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
