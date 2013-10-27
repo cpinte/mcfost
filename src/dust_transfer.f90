@@ -61,7 +61,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand
-  integer :: i, ri, zj, phik
+  integer :: i, ri, zj, phik, capt
   logical :: flag_star, flag_scatt
 
 
@@ -70,8 +70,10 @@ subroutine transfert_poussiere()
   ! Paramètres parallelisation
   integer :: id=1
 
+  real(kind=db), target :: nnfot2, n_phot_sed2
   real(kind=db), pointer :: p_nnfot2
 
+  nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
 
@@ -123,10 +125,6 @@ subroutine transfert_poussiere()
 
   ! Allocation dynamique
   call alloc_dynamique()
-
-  !$omp parallel
-  allocate(p_nnfot2)
-  !$omp end parallel
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -451,7 +449,7 @@ subroutine transfert_poussiere()
      !$omp default(none) &
      !$omp firstprivate(lambda) &
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,rand) &
-     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt) &
+     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(nbre_phot2,lforce_1st_scatt) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
@@ -463,7 +461,7 @@ subroutine transfert_poussiere()
         if (lmono0) then
            p_nnfot2 => nnfot2
         else
-           p_nnfot2 => n_phot_sed2(lambda,capt_sup,1)
+           p_nnfot2 => n_phot_sed2
 
            if (lProDiMo)  then
               p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
@@ -510,7 +508,11 @@ subroutine transfert_poussiere()
            endif
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
-           if (lpacket_alive) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
+           if (lpacket_alive) then
+              call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
+           endif
+
 
         enddo photon !nnfot2
      enddo !nnfot1
@@ -1045,7 +1047,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
 
   logical :: flag_sortie, flag_direct_star
 
-  integer :: p_ri, p_zj, p_phik, ri_save, zj_save, phik_save, taille_grain, itheta
+  integer :: p_ri, p_zj, p_phik, ri_save, zj_save, phik_save, taille_grain, itheta, capt
   real :: tau_max, rand, rand2, tau, dvol
   real(kind=db) :: frac_transmise, frac_diff, x_save, y_save, z_save, lmin, lmax, frac
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
@@ -1075,7 +1077,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
      ! fraction transmise
      frac_transmise = exp(-tau_max)
      Stokes(:) = frac_transmise * Stokes_old(:)
-     if (Stokes(1) > 1.0e-30) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
+     if (Stokes(1) > 1.0e-30) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
 
      ! tau_max=0.0 --> pas de diff
      if (tau_max >  tiny_real) then
