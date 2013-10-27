@@ -415,6 +415,7 @@ subroutine initialisation_mcfost()
      case("-disk_struct")
         ldisk_struct=.true.
         i_arg = i_arg+1
+        lstop_after_init= .true.
      case("+disk_struct")
         ldisk_struct=.true.
         i_arg = i_arg+1

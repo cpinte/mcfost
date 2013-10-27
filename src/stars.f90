@@ -71,7 +71,6 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v
   x = srw02 * cos(argmt)
   y = srw02 * sin(argmt)
 
-
   ! Choix direction de vol : sphere uniforme
   cospsi = sqrt(aleat3) ! !TODO : c'est bizarre ca. aleat3 marche avec le benchmark : mais pas la meme chose pour la surface stellaire dans RT. sqrt(aleat3) ~ OK avec TORUS en mode MC
   phi = 2.0_db*pi*aleat4
