@@ -69,6 +69,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   if (CAPT == (N_thet+1)) then
      CAPT = N_thet
   endif
+!  return
 
   if (lonly_capt_interet) then
      if ((capt > capt_sup).or.(capt < capt_inf)) return
@@ -420,22 +421,22 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
 
 !!!!!!!!!!!!!!
   else ! Creation sed
-     sed(id,lambda,capt,c_phi) = sed(id,lambda,capt,c_phi) + stok(1)
-     sed_q(id,lambda,capt,c_phi) = sed_q(id,lambda,capt,c_phi) + stok(2)
-     sed_u(id,lambda,capt,c_phi) = sed_u(id,lambda,capt,c_phi) + stok(3)
-     sed_v(id,lambda,capt,c_phi) = sed_v(id,lambda,capt,c_phi) + stok(4)
-     n_phot_sed(id,lambda,capt,c_phi) = n_phot_sed(id,lambda,capt,c_phi) + 1.0_db
+     sed(lambda,capt,c_phi,id) = sed(lambda,capt,c_phi,id) + stok(1)
+     sed_q(lambda,capt,c_phi,id) = sed_q(lambda,capt,c_phi,id) + stok(2)
+     sed_u(lambda,capt,c_phi,id) = sed_u(lambda,capt,c_phi,id) + stok(3)
+     sed_v(lambda,capt,c_phi,id) = sed_v(lambda,capt,c_phi,id) + stok(4)
+     n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_db
      if (flag_star) then ! photon étoile
         if (flag_scatt) then
-           sed_star_scat(id,lambda,capt,c_phi) = sed_star_scat(id,lambda,capt,c_phi) + stok(1)
+           sed_star_scat(lambda,capt,c_phi,id) = sed_star_scat(lambda,capt,c_phi,id) + stok(1)
         else
-           sed_star(id,lambda,capt,c_phi) = sed_star(id,lambda,capt,c_phi) + stok(1)
+           sed_star(lambda,capt,c_phi,id) = sed_star(lambda,capt,c_phi,id) + stok(1)
         endif
      else ! photon thermique
         if (flag_scatt) then
-           sed_disk_scat(id,lambda,capt,c_phi) = sed_disk_scat(id,lambda,capt,c_phi) + stok(1)
+           sed_disk_scat(lambda,capt,c_phi,id) = sed_disk_scat(lambda,capt,c_phi,id) + stok(1)
         else
-           sed_disk(id,lambda,capt,c_phi) = sed_disk(id,lambda,capt,c_phi) + stok(1)
+           sed_disk(lambda,capt,c_phi,id) = sed_disk(lambda,capt,c_phi,id) + stok(1)
         endif
      endif ! type de photon
   endif
@@ -2212,7 +2213,7 @@ subroutine ecriture_sed(ised)
 
      do lambda=1,n_lambda
         facteur =  E_photon * tab_lambda(lambda)/tab_delta_lambda(lambda)
-        sed1_io(lambda,:,:) = sum(sed(:,lambda,:,:),dim=1) * facteur
+        sed1_io(lambda,:,:) = sum(sed(lambda,:,:,:),dim=3) * facteur
      enddo
 
      ! le e signifie real*4
@@ -2244,22 +2245,22 @@ subroutine ecriture_sed(ised)
 
      do lambda=1,n_lambda2
         facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
-        sed2_io(lambda,:,:,1) = sum(sed(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,2) = sum(sed_q(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,3) = sum(sed_u(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,4) = sum(sed_v(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,5) = sum(sed_star(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,6) = sum(sed_star_scat(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,7) = sum(sed_disk(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,8) = sum(sed_disk_scat(:,lambda,:,:),dim=1) * facteur
-        sed2_io(lambda,:,:,9) = sum(n_phot_sed(:,lambda,:,:),dim=1)
+        sed2_io(lambda,:,:,1) = sum(sed(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,2) = sum(sed_q(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,3) = sum(sed_u(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,4) = sum(sed_v(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,5) = sum(sed_star(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,6) = sum(sed_star_scat(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,7) = sum(sed_disk(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,8) = sum(sed_disk_scat(lambda,:,:,:),dim=3) * facteur
+        sed2_io(lambda,:,:,9) = sum(n_phot_sed(lambda,:,:,:),dim=3)
      enddo
 
      call ftppre(unit,group,fpixel,nelements,sed2_io,status)
 
      L_bol2 = 0.0
      do lambda=1,n_lambda
-        L_bol2 = L_bol2 + sum(sed(:,lambda,:,:))*tab_delta_lambda(lambda)*1.0e-6*E_totale(lambda)
+        L_bol2 = L_bol2 + sum(sed(lambda,:,:,:))*tab_delta_lambda(lambda)*1.0e-6*E_totale(lambda)
      enddo
 
      if ((lsed_complete).and.(ltemp)) then

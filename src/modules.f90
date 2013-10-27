@@ -562,7 +562,7 @@ module resultats
   real, dimension(:,:,:), allocatable :: sed1_io
   real, dimension(:,:,:,:), allocatable :: sed2_io
   real, dimension(:,:), allocatable :: wave2_io
-  real(kind=db), dimension(:), allocatable :: n_phot_envoyes, n_phot_envoyes_loc
+  real(kind=db), dimension(:), allocatable :: n_phot_envoyes
 
   ! Line transfer
   real, dimension(:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,x,y

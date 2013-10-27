@@ -72,6 +72,7 @@ subroutine transfert_poussiere()
 
   real(kind=db), target :: nnfot2, n_phot_sed2
   real(kind=db), pointer :: p_nnfot2
+  real(kind=db) :: n_phot_envoyes_in_loop
 
   nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
   ! Energie des paquets mise a 1
@@ -449,11 +450,11 @@ subroutine transfert_poussiere()
      !$omp default(none) &
      !$omp firstprivate(lambda) &
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,rand) &
-     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt) &
+     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt,n_phot_envoyes_in_loop) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(nbre_phot2,lforce_1st_scatt) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
-     !$omp reduction(+:E_abs_nRE,n_phot_envoyes,n_phot_envoyes_loc)
+     !$omp reduction(+:E_abs_nRE,n_phot_envoyes)
      if (letape_th) then
         p_nnfot2 => nnfot2
         E_abs_nRE = 0.0
@@ -478,17 +479,17 @@ subroutine transfert_poussiere()
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
-        p_nnfot2 = 0
-        n_phot_envoyes_loc(lambda) = 0.0
-        photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_loc(lambda) < n_phot_lim))
+        p_nnfot2 = 0.0_db
+        n_phot_envoyes_in_loop = 0.0_db
+        photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_in_loop < n_phot_lim))
 
         !   if (.not. letape_th) then
-        !      write(*,*) id, p_nnfot2, nbre_phot2, n_phot_envoyes_loc(lambda),  n_phot_lim
+        !      write(*,*) id, p_nnfot2, nbre_phot2, n_phot_envoyes_in_loop,  n_phot_lim
         !   endif
 
            nnfot2=nnfot2+1.0_db
            n_phot_envoyes(lambda) = n_phot_envoyes(lambda) + 1.0_db
-           n_phot_envoyes_loc(lambda) = n_phot_envoyes_loc(lambda) + 1.0_db
+           n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_db
 
            ! Choix longueur d'onde
            if (.not.lmono) then
