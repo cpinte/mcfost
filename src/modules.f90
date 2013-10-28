@@ -17,6 +17,7 @@ module parametres
 
   ! Système
   integer :: nb_proc
+  integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
   logical :: lpara, lstop_after_init
   integer, parameter :: sl = selected_real_kind(p=6,r=37)
   integer, parameter :: db = selected_real_kind(p=13,r=200)
@@ -562,7 +563,7 @@ module resultats
   real, dimension(:,:,:), allocatable :: sed1_io
   real, dimension(:,:,:,:), allocatable :: sed2_io
   real, dimension(:,:), allocatable :: wave2_io
-  real(kind=db), dimension(:), allocatable :: n_phot_envoyes
+  real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes
 
   ! Line transfer
   real, dimension(:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,x,y

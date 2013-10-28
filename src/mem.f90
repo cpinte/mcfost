@@ -32,7 +32,7 @@ subroutine alloc_dynamique()
   gauss_random_saved = 0.0_db
   lgauss_random_saved = .false.
 
-  allocate(n_phot_envoyes(n_lambda),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
@@ -1318,7 +1318,7 @@ subroutine realloc_step2()
   wave2_io=0.0
 
   deallocate(n_phot_envoyes)
-  allocate(n_phot_envoyes(n_lambda2),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda2,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop

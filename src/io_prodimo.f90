@@ -321,8 +321,7 @@ contains
     !    enddo
 
     ! Step2
-    !n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-    n_photons_envoyes = n_phot_envoyes(lambda)
+    n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
          * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
