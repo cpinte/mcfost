@@ -452,9 +452,9 @@ subroutine transfert_poussiere()
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_sed2,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt,n_phot_envoyes_in_loop) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-     !$omp shared(nbre_phot2,lforce_1st_scatt) &
+     !$omp shared(nbre_phot2,lforce_1st_scatt,n_phot_envoyes) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
-     !$omp reduction(+:E_abs_nRE,n_phot_envoyes)
+     !$omp reduction(+:E_abs_nRE)
      if (letape_th) then
         p_nnfot2 => nnfot2
         E_abs_nRE = 0.0
@@ -488,7 +488,7 @@ subroutine transfert_poussiere()
         !   endif
 
            nnfot2=nnfot2+1.0_db
-           n_phot_envoyes(lambda) = n_phot_envoyes(lambda) + 1.0_db
+           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
            n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_db
 
            ! Choix longueur d'onde

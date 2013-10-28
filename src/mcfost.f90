@@ -7,7 +7,7 @@ program BIGCRUNCH
   ! Code parallèle OpenMP
   !
   ! F. Menard, G. Duchene et C. Pinte
-  ! Grenoble, Exeter
+  ! Grenoble, Exeter, Grenoble, Santiago
   !
   !
   ! Quelques remarques :
