@@ -52,42 +52,42 @@ end function spanl
 
 !************************************************************
 
-function gauss_random(id)
-  ! Retourne un nombre aleatoire distribue suivant une gaussienne
-  ! avec moyenne nulle et variance 1
-  ! Adapte de numerical recipes pour fonctionner en parallel avec sprng
-  ! C. Pinte
-  ! 19/10/07
-
-  implicit none
-
-#include "sprng_f.h"
-
-  integer, intent(in) :: id
-  real(kind=db) :: gauss_random
-  real(kind=db) :: rsq,rand1,rand2
-
-  if (lgauss_random_saved(id)) then
-     gauss_random=gauss_random_saved(id)
-     lgauss_random_saved(id)=.false.
-  else
-     loop : do
-        rand1 = sprng(stream(id))
-        rand2 = sprng(stream(id))
-        rand1 = 2.0_db * rand1 - 1.0_db
-        rand2 = 2.0_db * rand2 - 1.0_db
-        rsq=rand1**2+rand2**2
-        if (rsq > 0.0_db .and. rsq < 1.0_db) exit loop
-     enddo loop
-     rsq=sqrt(-2.0_db*log(rsq)/rsq)
-     gauss_random = rand1 * rsq
-     gauss_random_saved(id)= rand2 * rsq
-     lgauss_random_saved(id)=.true.
-  endif
-
-  return
-
-end function gauss_random
+!-- function gauss_random(id)
+!--   ! Retourne un nombre aleatoire distribue suivant une gaussienne
+!--   ! avec moyenne nulle et variance 1
+!--   ! Adapte de numerical recipes pour fonctionner en parallel avec sprng
+!--   ! C. Pinte
+!--   ! 19/10/07
+!--
+!--   implicit none
+!--
+!-- #include "sprng_f.h"
+!--
+!--   integer, intent(in) :: id
+!--   real(kind=db) :: gauss_random
+!--   real(kind=db) :: rsq,rand1,rand2
+!--
+!--   if (lgauss_random_saved(id)) then
+!--      gauss_random=gauss_random_saved(id)
+!--      lgauss_random_saved(id)=.false.
+!--   else
+!--      loop : do
+!--         rand1 = sprng(stream(id))
+!--         rand2 = sprng(stream(id))
+!--         rand1 = 2.0_db * rand1 - 1.0_db
+!--         rand2 = 2.0_db * rand2 - 1.0_db
+!--         rsq=rand1**2+rand2**2
+!--         if (rsq > 0.0_db .and. rsq < 1.0_db) exit loop
+!--      enddo loop
+!--      rsq=sqrt(-2.0_db*log(rsq)/rsq)
+!--      gauss_random = rand1 * rsq
+!--      gauss_random_saved(id)= rand2 * rsq
+!--      lgauss_random_saved(id)=.true.
+!--   endif
+!--
+!--   return
+!--
+!-- end function gauss_random
 
 !**********************************************************
 
@@ -493,7 +493,7 @@ subroutine mcfost_update(lforce_update)
   logical, intent(in) :: lforce_update
   logical :: lupdate
 
-  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system
+  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -579,7 +579,7 @@ subroutine mcfost_update(lforce_update)
         stop
      endif
 
-     write(*,*) "Your system ", trim(system)
+     write(*,*) "Your system is ", trim(system)
 
 
      ! Download
@@ -629,14 +629,35 @@ subroutine mcfost_update(lforce_update)
         write(*,*) "Done"
      endif
 
+     ! check where is the current binary
+     call get_command_argument(0,current_binary)
+     if (current_binary(1:1)/=".") then
+
+        write(*,'(a28, $)') "Locating current binary ..."
+        cmd = "rm -rf which_mcfost_binary.txt && which "//trim(current_binary)// &
+             " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
+        call appel_syst(cmd, syst_status)
+
+        ios=0
+        open(unit=1, file="which_mcfost_binary.txt", status='old',iostat=ios)
+        read(1,*,iostat=ios) current_binary
+        close(unit=1,iostat=ios)
+
+        if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
+           write(*,*) ""
+           write(*,*) "ERROR: Cannot locate current MCFOST binary,"
+           write(*,*) "the new binary will downloaded in the current directory."
+        else
+           write(*,*) "Done"
+        endif
+     endif
+
      ! make binary executable
-     !cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update ; mv mcfost_update mcfost"
+     cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
-     !write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)
   endif ! lupdate
 
   return
