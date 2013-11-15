@@ -529,6 +529,13 @@ subroutine define_dust_density()
 
         lwarning = .true.
         if (lmigration) then
+           ! distribution en taille de grains avant la migration
+           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              do i=1,n_rad
+                 N_tot(l) = N_tot(l) + sum(densite_pouss(i,:,:,l) * volume(i))
+              enddo
+           enddo
+
            do i=1, n_rad
               rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
               !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
@@ -549,19 +556,23 @@ subroutine define_dust_density()
                  lwarning = .false.
               endif
 
-              !write(*,*) "s_opt", i, rcyl, s_opt
-
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 S = sum(densite_pouss(i,:,:,l))
-                 N_tot(l) = N_tot(l) + S
                  if (r_grain(l) > s_opt) then ! grains plus gros que taille optimale de migration
-                    !write(*,*) "migration", i, rcyl, l, r_grain(l)
                     densite_pouss(i,:,:,l) = 0.0
-                 else
-                    N_tot2(l) = N_tot2(l) + S
                  endif
               enddo ! l
            enddo !i
+
+           ! distribution en taille de grains apres la migration
+           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              do i=1,n_rad
+                 N_tot2(l) = N_tot2(l) + sum(densite_pouss(i,:,:,l) * volume(i))
+              enddo
+              !write(*,*) "N(a)", l, N_tot(l)/N_tot2(l)
+           enddo
+
+
+
 
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
@@ -569,6 +580,7 @@ subroutine define_dust_density()
                  densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l) * N_tot(l)/N_tot2(l)
               endif
            enddo ! l
+
         endif ! migration
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
