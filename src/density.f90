@@ -538,11 +538,13 @@ subroutine define_dust_density()
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
+              write(*,*) "r=", rcyl, "a_migration =", s_opt
+
               if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
                  write(*,*)
                  write(*,*) "WARNING: a_migration = ", s_opt
                  write(*,*) "is smaller than amin for dust pop #", pop
-                 write(*,*) "MCFOST will exit with an error is there are no smaller grains"
+                 write(*,*) "MCFOST will exit with an error as there are no smaller grains"
                  if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
                  lwarning = .false.
               endif
@@ -2479,153 +2481,13 @@ end subroutine init_opacity_wall
 
 !********************************************************************
 
-subroutine densite_gap_laure()
-  ! Remplace par densite_gap_laure2
-
-  implicit none
-
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
-  integer :: nullval
-  integer, dimension(4) :: naxes
-  logical :: anynull
-
-  integer, parameter :: nbre_a = 4
-
-  real, dimension(4) :: a_sph
-  integer :: k, l, i
-  real(kind=db) :: somme, mass
-
-  real, dimension(n_rad,nz,nbre_a) :: sph_dens
-
-
-  sph_dens = 1.
-
-  ! Lecture donnees
-  status=0
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  call ftgiou(unit,status)
-
-  write(*,*) "Reading density file : "//trim(density_file)
-
-  readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier temperature n'existe pas
-     write(*,*) "ERROR : density file needed"
-     stop
-  endif
-
-  group=1
-  firstpix=1
-  nullval=-999
-
-  !  determine the size of density file
-  call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
-  if (nfound /= 3) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
-     stop
-  endif
-
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-     write(*,*) "Error : "//trim(density_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
-     write(*,*) naxes(1), n_rad
-     write(*,*) naxes(2), nz
-     stop
-  endif
-
-  npixels=naxes(1)*naxes(2)*naxes(3)
-
-  nbuffer=npixels
-  ! read_image
-  call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
-
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
-
-  ! Interpolation en tailles
-  a_sph(1) = 10. ! densite des grains <= 10 microns == celle du gas
-  a_sph(2) = 100.
-  a_sph(3) = 1000.
-  a_sph(4) = 10000.
-
-
-  if (lstrat) then
-     write(*,*) "Differential gap"
-     l=1
-     do k=1,n_grains_tot
-        if (r_grain(k) < a_sph(1)) then  ! Petits grains
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,1)
-        else if (r_grain(k) > a_sph(nbre_a)) then ! Gros grains
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,nbre_a)
-        else  ! Autres grains : interpolation
-           if (r_grain(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
-                ( sph_dens(:,:,l+1) -  sph_dens(:,:,l) )
-        endif
-     enddo
-  else ! Tous les grains suivent le gas
-     write(*,*) "Constant Gap"
-     do k=1,n_grains_tot
-        densite_pouss(:,1:nz,1,k) = sph_dens(:,:,1)
-     enddo
-  endif  !lstrat
-
-  ! Normalisation : on a 1 grain de chaque taille dans le disque
-  do k=1,n_grains_tot
-     somme=0.0
-     do i=1,n_rad
-        do j=1,nz
-           if (densite_pouss(i,j,1,k) < 0.0) densite_pouss(i,j,1,k) = 1.0e-20
-           somme=somme+densite_pouss(i,j,1,k)*volume(i)
-        enddo
-     enddo
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)
-  enddo
-
-  ! Normalisation : on a 1 grain en tout dans le disque
-  do k=1,n_grains_tot
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
-  enddo
-
-  ! Normalisation : Calcul masse totale
-  mass = 0.0
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
-        enddo
-     enddo
-  enddo
-  mass =  mass/Msun_to_g
-  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
-
-  write(*,*) "Done"
-
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * volume(i)
-        enddo !k
-     enddo !j
-  enddo ! i
-
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
-
-  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-
-  return
-
-end subroutine densite_gap_laure
-
-!**********************************************************
-
-subroutine densite_gap_laure2()
+subroutine densite_file()
   ! Nouvelle routine pour lire les grilles de densite
-  ! calculees par Yorick directement a partir des donnees SPH
+  ! calculees par Yorick directement a partir des donnees SPH (ou autre)
   ! Les donnees sont directement lissees sur la grille de MCFOST
   ! C. Pinte
   ! 12/0/09
+  ! Mise a jour 9/11/13
 
   implicit none
 
@@ -2638,13 +2500,11 @@ subroutine densite_gap_laure2()
   integer :: k, l, i, n_a
   real(kind=db) :: somme, mass
   real :: tmp
-  character :: s
+  character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph ! n_a
 
-
-  sph_dens = 1.
 
   ! Lecture donnees
   status=0
@@ -2693,17 +2553,17 @@ subroutine densite_gap_laure2()
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
 
   ! Au cas ou
-  sph_dens = sph_dens + 1e-20
+  sph_dens = max(sph_dens,tiny_db)
 
   ! Lecture des tailles de grains (en microns)
-  if (n_a > 9) then
-     write(*,*) "ERROR : max 9 grain sizes at the moment"
+  if (n_a > 99999) then
+     write(*,*) "ERROR : max 99999 grain sizes at the moment"
      write(*,*) "code must be updated if you need more"
      write(*,*) "Exiting."
      stop
   endif
   do i=1,n_a
-     write(s,'(i1)') i ; call ftgkye(unit,'grain_size_'//s,tmp,comment,stat)
+     write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
      a_sph(i) = tmp ! cannot read directly into an array element
      write(*,*) i, a_sph(i), "microns"
   enddo
@@ -2757,7 +2617,7 @@ subroutine densite_gap_laure2()
         do j=-nz,nz
            if (j==0) cycle
            do k=1,n_az
-              if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = 1.0e-20
+              if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = tiny_db
               somme=somme+densite_pouss(i,j,k,l)*volume(i)
            enddo !k
         enddo !j
@@ -2822,7 +2682,7 @@ subroutine densite_gap_laure2()
 
   return
 
-end subroutine densite_gap_laure2
+end subroutine densite_file
 
 !**********************************************************
 
@@ -3165,7 +3025,7 @@ subroutine densite_Seb_Charnoz2()
   call ftfiou(unit, status)
 
   ! Au cas ou
-  dens = dens + 1e-30
+  dens = dens + tiny_real
 
   somme = 0
   somme2 = 0
