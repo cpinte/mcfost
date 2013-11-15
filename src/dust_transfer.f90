@@ -156,8 +156,8 @@ subroutine transfert_poussiere()
   if (lProDiMo) call setup_ProDiMo()
 
   !call densite_data_hd32297(para) ! grille redefinie dans routine
-  if (lgap_laure) then
-     call densite_gap_laure2()
+  if (ldensity_file) then
+     call densite_file()
   elseif (lgap) then
      call densite_data_gap
   else if (lstrat_SPH) then

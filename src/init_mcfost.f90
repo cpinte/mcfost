@@ -98,7 +98,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing1=.false.
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
-  lgap_laure=.false.
+  ldensity_file=.false.
   ldebris=.false.
   lkappa_abs_grain=.false.
   lweight_emission=.false.
@@ -580,11 +580,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lmc=.true.
         loutput_mc=.true.
-     case("-gap_laure")
+     case("-density_file")
         i_arg = i_arg + 1
-        lgap_laure=.true.
-        !llinear_grid=.true.  ! Ce n'est plus la gap pour densite_gap_laure2 !!!
-        !write(*,*) "Using linear grid to read Laure's gap data"
+        ldensity_file=.true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
@@ -1058,7 +1056,7 @@ subroutine display_help()
   write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
-  write(*,*) "        : -gap_laure <density_file>"
+  write(*,*) "        : -density_file <density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"
