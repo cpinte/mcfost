@@ -1104,6 +1104,34 @@ end function is_file
 
 !************************************************************
 
+function in_dir(filename,dir_list, status)
+
+  character(len=*), intent(in) :: filename
+  character(len=*), dimension(:), intent(in) :: dir_list
+  character(len=128) :: in_dir
+
+  integer, intent(out), optional  :: status
+
+  logical :: is_file
+  integer :: i
+
+  in_dir = "None"
+  if (present(status)) status = 1
+  do i=1,size(dir_list)
+     inquire(file=trim(dir_list(i))//"/"//trim(filename),exist=is_file)
+     if (is_file) then
+        in_dir = dir_list(i)
+        if (present(status)) status = 0
+        return
+     endif
+  enddo !i
+
+  return
+
+end function in_dir
+
+!************************************************************
+
 subroutine appel_syst(cmd, status)
 
 #if defined (__INTEL_COMPILER)
@@ -1115,7 +1143,7 @@ subroutine appel_syst(cmd, status)
   character(len=*), intent(in) :: cmd
   integer, intent(out), optional :: status
 
-  status = system(cmd) ! limux
+  status = system(cmd) ! linux
   !call system(cmd, status) ! aix
 
   return

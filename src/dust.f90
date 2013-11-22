@@ -140,7 +140,7 @@ subroutine init_indices_optiques()
   real, dimension(:), allocatable :: f
   integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment, n_components
 
-  character(len=512) :: filename
+  character(len=512) :: filename, dir
 
   real, dimension(:), allocatable :: tab_l, tab_n, tab_k
   real, dimension(:,:), allocatable :: tab_tmp_amu1, tab_tmp_amu2
@@ -162,7 +162,18 @@ subroutine init_indices_optiques()
 
         ! Lecture fichier indices
         do k=1, dust_pop(pop)%n_components
-           filename = trim(dust_dir)//trim(dust_pop(pop)%indices(k))
+           filename = trim(dust_pop(pop)%indices(k))
+
+           dir = in_dir(filename, dust_dir,  status=ios)
+           if (ios /=0) then
+              write(*,*) "ERROR: dust file cannot be found:",trim(filename)
+              write(*,*) "Exiting"
+              stop
+           else
+              filename = trim(dir)//trim(filename) ;
+              write(*,*) "Reading "//trim(filename) ;
+           endif
+
            open(unit=1,file=filename, status='old', iostat=ios)
            if (ios /=0) then
               write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
@@ -447,16 +458,15 @@ subroutine prop_grains(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
   real :: a, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
-  integer :: k, alloc_status, i, pop, l
+  integer :: k, alloc_status, i, pop, l, ios
 
   type(dust_pop_type) :: dp
 
   ! PAH
   real, dimension(PAH_n_lambda,PAH_n_rad) :: tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g
-  character(len=512) :: opt_file
+  character(len=512) :: filename, dir
   real, dimension(PAH_n_lambda) :: tmp_PAH_lambda
   real, dimension(PAH_n_rad) :: tmp_PAH_rad
-
 
   qext=0.0
   qsca=0.0
@@ -477,9 +487,20 @@ subroutine prop_grains(lambda, p_lambda)
         do i=1, n_pop
            dp = dust_pop(i)
            if (dp%is_PAH) then
-              opt_file = trim(dust_dir)//"/"//trim(dp%indices(1))
+              filename = trim(dp%indices(1))
+
+              dir = in_dir(filename, dust_dir,  status=ios)
+              if (ios /=0) then
+                 write(*,*) "ERROR: dust file cannot be found:",trim(filename)
+                 write(*,*) "Exiting"
+                 stop
+              else
+                 filename = trim(dir)//trim(filename) ;
+                 write(*,*) "Reading "//trim(filename) ;
+              endif
+
               ! load optical data from file
-              call draine_load(opt_file, PAH_n_lambda, PAH_n_rad, 10, 1, &
+              call draine_load(filename, PAH_n_lambda, PAH_n_rad, 10, 1, &
                    tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
               PAH_Q_ext(:,:,i) = tmp_Q_ext
               PAH_Q_sca(:,:,i) = tmp_Q_sca

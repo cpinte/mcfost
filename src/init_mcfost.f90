@@ -24,7 +24,7 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
+  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   real :: wvl, opt_zoom, utils_version
 
   character(len=512) :: cmd, s, str_seed
@@ -143,12 +143,26 @@ subroutine initialisation_mcfost()
      write(*,*) "Exiting."
      stop
   endif
+  call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
 
-  dust_dir = trim(mcfost_utils)//"/Dust/"
-  mol_dir = trim(mcfost_utils)//"/Molecules/"
-  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
-  lambda_dir = trim(mcfost_utils)//"/Lambda/"
+  ! Directories to search (ordered)
+  if (my_mcfost_utils == "") then
+     write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
+     allocate(search_dir(2)) ; n_dir = 2
+     search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
+  else
+     allocate(search_dir(3)) ; n_dir = 3
+     search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
+  endif
 
+  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
+  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
+  do i=2,n_dir
+     dust_dir(i)   = trim(search_dir(i))//"/Dust/"
+     mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
+     star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
+     lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
+  enddo
 
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
