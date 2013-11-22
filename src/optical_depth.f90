@@ -870,7 +870,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, phi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
@@ -1071,7 +1071,17 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
            if (zj1>nz) zj1=nz+1
            if (z1 < 0.0) zj1=-zj1
         endif
+
         phik1=phik0
+        ! We need to find the azimuth when we enter the disc
+        ! It can be different from the initial azimuth if the star is not centered
+        ! so we need to compute it here
+        if (ri0==0) then
+           phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
+           phik1=floor(phi/(2*pi)*real(N_az))+1
+           if (phik1==n_az+1) phik1=n_az
+        endif
+
      else if (t < t_phi) then ! z
         l=t
         delta_vol=t
@@ -4868,4 +4878,3 @@ end subroutine define_proba_weight_emission
 
 
 end module optical_depth
-

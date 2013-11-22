@@ -571,9 +571,6 @@ subroutine define_dust_density()
               !write(*,*) "N(a)", l, N_tot(l)/N_tot2(l)
            enddo
 
-
-
-
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
               if (N_tot2(l) > tiny_db) then

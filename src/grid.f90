@@ -1094,7 +1094,6 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
   if (zj_out > nz) zj_out = nz
   if (zin < 0.0)  zj_out = -zj_out
 
-
   if (zin /= 0.0) then
      phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
      phik_out=floor(phi/(2*pi)*real(N_az))+1
