@@ -96,7 +96,6 @@ module parametres
   real, dimension(:), allocatable :: size_pix2
   real, parameter :: cutoff = 7.0
 
-
   ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
@@ -121,10 +120,10 @@ module parametres
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
   logical :: lspot, lforce_1st_scatt
 
-  character(len=512) :: mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
-  character(len=512) :: dust_dir, mol_dir, star_dir, lambda_dir, lambda_filename
-  character(len=512) :: para, band, model_pah, pah_grain, cmd_opt
+  character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
+  character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
   character(len=512), dimension(100) :: data_dir2, basename_data_dir2
+  character(len=512), dimension(:), allocatable :: search_dir, dust_dir, mol_dir, star_dir, lambda_dir
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol

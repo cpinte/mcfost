@@ -6,6 +6,7 @@ module input
   use em_th
   use grains
   use disk
+  use utils, only : in_dir
 
   implicit none
 
@@ -79,11 +80,25 @@ subroutine read_molecules_names(imol)
   integer, intent(in) :: imol
 
   character(len=80) :: junk
+  character(len=512) :: filename, dir
+  integer :: ios
 
-  open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
+  filename = trim(mol(imol)%filename)
+  dir = in_dir(filename, mol_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     filename = trim(dir)//trim(filename) ;
+     write(*,*) "Reading "//trim(filename) ;
+  endif
+
+  open(unit=1, file=filename, status="old")
 
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
+  close(unit=1)
 
   return
 
@@ -101,14 +116,26 @@ subroutine readmolecule(imol)
 
   integer, intent(in) :: imol
 
+  character(len=515) :: filename, dir
   character(len=80) :: junk
-  integer :: i, j, iLow, iUp, iPart
+  integer :: i, j, iLow, iUp, iPart, ios
   real :: a, freq, eu
   real, dimension(20) :: collrates_tmp, colltemps_tmp
 
   character(len=10) :: buffer
 
-  open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
+  filename = trim(mol(imol)%filename)
+  dir = in_dir(filename, mol_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     filename = trim(dir)//trim(filename) ;
+     write(*,*) "Reading "//trim(filename) ;
+  endif
+
+  open(unit=1, file=filename, status="old")
 
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
@@ -471,12 +498,25 @@ subroutine lect_lambda()
 
   implicit none
 
-  integer :: alloc_status, lambda, status, n_comment, i
+  integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
 
   real, parameter :: wl_factor = 1.025
 
-  lambda_filename = trim(lambda_dir)//trim(tab_wavelength)
+  character(len=512) :: dir
+
+  lambda_filename = trim(tab_wavelength)
+
+  dir = in_dir(lambda_filename, lambda_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: lambda file cannot be found:",trim(lambda_filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     lambda_filename = trim(dir)//trim(lambda_filename) ;
+     write(*,*) "Reading "//trim(lambda_filename) ;
+  endif
+
   open(unit=1,file=lambda_filename,status="old",iostat=status)
   if (status /= 0) then
      write(*,*) "WARNING: '"//trim(lambda_filename)//"' does not exit."
