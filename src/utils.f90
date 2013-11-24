@@ -656,9 +656,14 @@ subroutine mcfost_update(lforce_update)
      write(*,'(a20, $)') "Updating binary ..."
      cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
+
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
   endif ! lupdate
+
+  ! Write date of the last time an update was search for
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  call appel_syst(cmd, syst_status)
 
   return
 

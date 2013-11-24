@@ -25,6 +25,7 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: current_date, update_date, mcfost_auto_update
   real :: wvl, opt_zoom, utils_version
 
   character(len=512) :: cmd, s, str_seed
@@ -144,6 +145,29 @@ subroutine initialisation_mcfost()
      stop
   endif
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
+
+
+  ! Do we need to search for an update ?
+  mcfost_auto_update = 7
+  call get_environment_variable('MCFOST_AUTO_UPDATE',s)
+  if (s/="") read(s,*) mcfost_auto_update
+
+  if (mcfost_auto_update > 0) then
+     cmd = 'date +%s > date.tmp' ;   call appel_syst(cmd, syst_status)
+     open(unit=1,file="date.tmp",status="old")
+     read(1,*) current_date
+     close(unit=1,status="delete")
+
+     open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
+     read(1,*) update_date
+     close(unit=1)
+
+     if ( (current_date-update_date) > mcfost_auto_update*86400) then
+        write(*,*) "Your version of mcfost is more than 30 days old"
+        write(*,*) "checking for update ..."
+        call mcfost_update(.false.)
+     endif
+  endif
 
   ! Directories to search (ordered)
   if (my_mcfost_utils == "") then
