@@ -32,6 +32,10 @@ subroutine initialisation_mcfost()
 
   logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
 
+
+  write(*,*) "You are running MCFOST "//trim(mcfost_release)
+  write(*,*) "Git SHA = ", sha_id
+
   lmc = .false.
 
   call get_environment_variable('HOME',home)
@@ -982,7 +986,6 @@ subroutine initialisation_mcfost()
      write(*,*) " "
   else
      write (*,'(" Sequential code")')
-     write(*,*) " "
   endif
 
   if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
