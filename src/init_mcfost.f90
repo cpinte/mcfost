@@ -29,8 +29,10 @@ subroutine initialisation_mcfost()
   real :: wvl, opt_zoom, utils_version
 
   character(len=512) :: cmd, s, str_seed
+  character(len=4) :: n_chiffres
+  character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
 
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
@@ -150,6 +152,8 @@ subroutine initialisation_mcfost()
   endif
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
 
+  ! Ligne de commande
+  call get_command(cmd_opt)
 
   ! Do we need to search for an update ?
   mcfost_auto_update = 7
@@ -162,14 +166,30 @@ subroutine initialisation_mcfost()
      read(1,*) current_date
      close(unit=1,status="delete")
 
-     open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
-     read(1,*) update_date
-     close(unit=1)
+     if (is_file(trim(mcfost_utils)//"/.last_update")) then
+        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
+        read(1,*) update_date
+        close(unit=1)
+     else
+        update_date = 0 ! if the file .last_update does not exist, I assume mcfost is old
+     endif
 
      if ( (current_date-update_date) > mcfost_auto_update*86400) then
-        write(*,*) "Your version of mcfost is more than 30 days old"
+        write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
+        fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
+        write(*,fmt=fmt1) mcfost_auto_update
         write(*,*) "checking for update ..."
-        call mcfost_update(.false.)
+        lupdate = mcfost_update(.false.)
+        if (lupdate) then ! On redemarre mcfost avec la meme ligne de commande
+           write(*,*) "Restarting MCFOST ..."
+           write(*,*) ""
+           call appel_syst(cmd_opt,syst_status)
+           if (syst_status /=0) then
+              write(*,*) "ERROR : MCFOST did not manage to restart itself"
+              write(*,*) "Exiting"
+           endif
+           stop
+        endif ! lupdate
      endif
   endif
 
@@ -205,9 +225,7 @@ subroutine initialisation_mcfost()
      else if (para(2:2)=="h") then ! mcfost history
         call mcfost_history()
      else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
-        call get_utils()
-        call mcfost_get_ref_para()
-        call mcfost_get_manual()
+        call mcfost_setup()
      else if (para(2:9)=="get_para") then ! download current reference file
         call mcfost_get_ref_para()
      else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
@@ -217,9 +235,9 @@ subroutine initialisation_mcfost()
      else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
      else if (para(2:2)=="u") then ! update binary
-        call mcfost_update(.false.)
+        lupdate = mcfost_update(.false.)
      else if (para(2:3)=="fu") then ! force update binary
-        call mcfost_update(.true.)
+        lupdate =  mcfost_update(.true.)
      else
         call display_help()
      endif
@@ -264,8 +282,6 @@ subroutine initialisation_mcfost()
   endif
 
   i_arg=2
-
-  call get_command(cmd_opt)
 
   ! Options ligne de commande
   do while (i_arg <= nbr_arg)

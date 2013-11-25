@@ -488,20 +488,38 @@ end function get_NH
 
 !***********************************************************
 
-subroutine mcfost_update(lforce_update)
+subroutine mcfost_setup()
+
+  character(len=512) :: cmd
+  integer ::  syst_status
+
+  call get_utils()
+  call mcfost_get_ref_para()
+  call mcfost_get_manual()
+  ! Write date of the last time an update was search for
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  call appel_syst(cmd, syst_status)
+
+  write(*,*) "MCFOST set-up was sucessful"
+  return
+
+end subroutine mcfost_setup
+
+!***********************************************************
+
+function mcfost_update(lforce_update)
 
   logical, intent(in) :: lforce_update
-  logical :: lupdate
+  logical :: lupdate, mcfost_update
 
   character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
 
-  write(*,*) "Version ", mcfost_release
-
   ! Last version
   write(*,*) "Checking last version ..."
+  syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)
@@ -656,7 +674,12 @@ subroutine mcfost_update(lforce_update)
      write(*,'(a20, $)') "Updating binary ..."
      cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
-
+     if (syst_status /= 0) then
+        write(*,*) "ERROR : the update failed for some reason"
+        write(*,*) "You may want to have a look at the file mcfost_update"
+        write(*,*) "Exiting"
+        stop
+     endif
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
   endif ! lupdate
@@ -665,9 +688,11 @@ subroutine mcfost_update(lforce_update)
   cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
+  mcfost_update = lupdate
+
   return
 
-end subroutine mcfost_update
+end function mcfost_update
 
 !***********************************************************
 

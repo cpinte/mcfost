@@ -26,9 +26,6 @@ contains
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
-    write(*,*) "You are running MCFOST "//trim(mcfost_release)
-    write(*,*) "Git SHA = ", sha_id
-
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old', iostat=ios)
     if (ios/=0) then
