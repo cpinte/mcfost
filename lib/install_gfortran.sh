@@ -17,7 +17,7 @@ rm -rf sprng2.0
 
 
 # cfitsio
-# g77 ou f77 needed by configure to set up the fotran wrapper in Makefile 
+# g77 ou f77 needed by configure to set up the fotran wrapper in Makefile
 #wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
@@ -42,4 +42,4 @@ cd ..
 
 cp -r include $MCFOST_INSTALL
 mkdir $MCFOST_INSTALL/lib
-cp -r lib $MCFOST_INSTALL/lib/gfortran
+cp -r lib $MCFOST_INSTALL/lib/gfortran32
