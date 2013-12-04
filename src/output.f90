@@ -1009,48 +1009,56 @@ subroutine calc_optical_depth_map(lambda)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: i,j,k, group,fpixel,nelements, alloc_status, id
 
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
 
-  real, dimension(n_rad,nz,2) :: optical_depth_map
+  real, dimension(n_rad,nz,n_az,2) :: optical_depth_map
 
   lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
 
   if (lmilieu) then
      ! Opacite radiale
-     do j=1, nz
-        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
-        do i=2, n_rad
-           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
-                + 0.5 * kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+     do k=1, n_az
+        do j=1, nz
+           i=1 ; optical_depth_map(i,j,k,1) = kappa(lambda,i,j,k)* 0.5 * (r_lim(i)-r_lim(i-1))
+           do i=2, n_rad
+              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + 0.5 * kappa(lambda,i-1,j,k)*(r_lim(i-1)-r_lim(i-2)) &
+                   + 0.5 * kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           enddo
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
-        do j=nz-1,1,-1
-           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
-               + 0.5 * kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        do k=1, n_az
+           j=nz ; optical_depth_map(i,j,k,2) = kappa(lambda,i,j,k)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
+           do j=nz-1,1,-1
+              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + 0.5 * kappa(lambda,i,j+1,k)*(z_lim(i,j+2)-z_lim(i,j+1)) &
+                   + 0.5 * kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           enddo
         enddo
      enddo
 
   else
      ! Opacite radiale
-     do j=1, nz
-        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
-        do i=2, n_rad
-           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+     do k=1, n_az
+        do j=1, nz
+           i=1 ; optical_depth_map(i,j,k,1) = kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           do i=2, n_rad
+              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) +kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           enddo
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
-        do j=nz-1,1,-1
-           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        do k=1, n_az
+           j=nz ; optical_depth_map(i,j,k,2) = kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           do j=nz-1,1,-1
+              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           enddo
         enddo
      enddo
   endif
@@ -1070,10 +1078,11 @@ subroutine calc_optical_depth_map(lambda)
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
-  naxis=3
+  naxis=4
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=2
+  naxes(3)=n_az
+  naxes(4)=2
 
   extend=.true.
 
@@ -1084,7 +1093,7 @@ subroutine calc_optical_depth_map(lambda)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
