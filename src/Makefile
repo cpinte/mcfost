@@ -227,7 +227,7 @@ release : main
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
 	cp -r Doc web/
-	scp -r web/* horus:/user/publicdir/pintec/mcfost
+	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
 
@@ -243,7 +243,7 @@ release_mac : main
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
-	scp -r web/* horus:/user/publicdir/pintec/mcfost
+	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
 release_utils :
@@ -254,7 +254,7 @@ release_utils :
 
 
 fosti :
-	rsync -Pu *.f90 Makefile fosti:mcfost/src
+	rsync -Pur *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri/"
 
 #*************************************************************

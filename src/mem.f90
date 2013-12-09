@@ -1192,7 +1192,7 @@ subroutine clean_mem_dust_mol()
 
   integer :: alloc_status
 
-  ! Ne reste que kappa et emissivite_dust
+  ! Ne reste que kappa, kappa_sca et emissivite_dust
   deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, tab_amu1, tab_amu2)
   deallocate(tab_albedo)
   deallocate(q_ext, q_sca, q_abs, tab_g)
