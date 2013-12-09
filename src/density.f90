@@ -324,6 +324,7 @@ subroutine define_dust_density()
      ! Correction stratification
      if (lstrat.and.(settling_type == 1)) then
         ! loi de puissance
+        a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
         else
@@ -388,7 +389,6 @@ subroutine define_dust_density()
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                     ! Settling a la Dubrulle
                     if (lstrat.and.(settling_type == 2)) then
-
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
                        OmegaTau = omega_tau(rho0,H,l)

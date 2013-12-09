@@ -821,11 +821,16 @@ subroutine initialisation_mcfost()
      write(*,*) "Computation of dust properties as a function of wavelength"
      ! Make sure the full wavelength range is used to compute
      ! the dust properties
-     limg=.false.
-     lmono=.false.
-     lmono0=.false.
-     lstrat=.false.
-     scattering_method=2
+     if (lstop_after_init) then
+        ! on change les parametres par default pour gagner du temps
+        ! et pour avoir des quantites integrees !!!
+        ! BUG ici : +dust_prop renvoie les prop de la 1ere cellule
+        limg=.false.
+        lmono=.false.
+        lmono0=.false.
+        lstrat=.false.
+        scattering_method=2
+     endif
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
      call save_data()
