@@ -753,7 +753,7 @@ subroutine mcfost_get_manual()
   integer ::  syst_status
 
   doc_dir = "Doc/"
-  doc_file = "MCFOSTUnofficialPseudo-Manual.pdf"
+  doc_file = "MCFOSTManual.pdf"
 
   write(*,*) "Getting MCFOST manual: ", trim(doc_file)
   cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
