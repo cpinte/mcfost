@@ -109,7 +109,7 @@ subroutine define_gas_density()
 
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-              else ! tappered-edge : dz%surf correspond a -gamma
+              else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -167,6 +167,27 @@ subroutine define_gas_density()
               densite_gaz_tmp(i,j,1) = density
            enddo !j
         enddo ! i
+
+     else if (dz%geometry == 4) then
+        k=1
+        do i=1, n_rad
+           do j=1,nz
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+              if (rcyl > dz%rmax) then
+                 density = 0.0
+              else if (rcyl < dz%rmin) then
+                 density = 0.0
+              else
+                 density = cst_gaz(izone) * &
+                      ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                      exp( - (abs(z)/h)**dz%vert_exponent)
+              endif
+              densite_gaz_tmp(i,j,1) = density
+           enddo !j
+        enddo !i
 
      endif ! dz%geometry
 
@@ -294,7 +315,7 @@ subroutine define_dust_density()
         stop
      endif
 
-     if (dz%geometry == 4) lwall = .true.
+     if (dz%geometry == 5) lwall = .true.
 
      if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
@@ -371,7 +392,7 @@ subroutine define_dust_density()
 
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-              else ! tappered-edge : dz%surf correspond a -gamma
+              else if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -603,6 +624,36 @@ subroutine define_dust_density()
            enddo !j
         enddo ! i
 
+     else if (dz%geometry == 4) then ! disque de debris
+        k=1  ! 2D seulement pour le moment
+        do i=1, n_rad
+           do j=1,nz
+              ! On calcule la densite au milieu de la cellule
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+
+              h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
+
+              !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
+              !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
+
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else
+                    density = nbre_grains(l) * cst_pous(pop) * &
+                         ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                         exp( - (abs(z)/h)**dz%vert_exponent)
+                 endif
+                 densite_pouss(i,j,k,l) = density
+              enddo ! l
+
+
+           enddo
+        enddo
+
      endif ! dz%geometry
 
   enddo ! pop
@@ -647,7 +698,7 @@ subroutine define_dust_density()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-     if (dz%geometry /= 4) then ! pas de wall ici
+     if (dz%geometry /= 5) then ! pas de wall ici
         dp => dust_pop(pop)
         mass = 0.0
 
