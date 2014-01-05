@@ -299,6 +299,7 @@ subroutine init_indices_optiques()
               !write(*,*) "Applying coating for pop.", pop
               if (n_components /= 2) then
                  write(*,*) "ERROR : coating can only be computed with 2 components"
+                 write(*,*) "there is", n_components, "components in pop #", pop
                  write(*,*) "Exiting"
                  stop
               endif
