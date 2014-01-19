@@ -1222,10 +1222,12 @@ subroutine write_disk_struct()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
+  nelements=naxes(1)*naxes(2)
 
   if (l3D) then
      naxis=3
      naxes(3)=n_az
+     nelements=naxes(1)*naxes(2)*naxes(3)
   endif
 
   !  Write the required header keywords.
@@ -1238,7 +1240,6 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
 
   dens =  densite_gaz(:,1:nz,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
@@ -2007,7 +2008,7 @@ subroutine ecriture_Tex(imol)
 
   integer, intent(in) :: imol
 
-  integer :: i, j, iTrans, iUp, iLow
+  integer :: i, j, iTrans, iUp, iLow, k
   real(kind=db) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2021,14 +2022,17 @@ subroutine ecriture_Tex(imol)
 
   Tex = 0.0
 
+  k=1 ! Cette version n'est pas en 3D
+
   do iTrans=1,nTrans_tot
      iUp = iTransUpper(iTrans)
      iLow = iTransLower(iTrans)
      cst = - hp * Transfreq(iTrans) / kb
+
      do j=1, nz
         do i=1, n_rad
-           nUp = tab_nLevel(i,j,iUp)
-           nLow =  tab_nLevel(i,j,iLow)
+           nUp = tab_nLevel(i,j,k,iUp)
+           nLow =  tab_nLevel(i,j,k,iLow)
            if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
               Tex(i,j,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
            endif
@@ -2321,7 +2325,7 @@ subroutine ecriture_pops(imol)
   integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans
   logical :: simple, extend
 
-  real, dimension(n_rad,nz,nLevels) :: tab_nLevel_io
+  real, dimension(n_rad,nz,1,nLevels) :: tab_nLevel_io ! pas en 3D
 
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 

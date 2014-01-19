@@ -207,7 +207,7 @@ subroutine define_gas_density()
      enddo !i
      mass =  mass * AU3_to_m3 * g_to_Msun
 
-        ! Normalisation
+     ! Normalisation
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
         !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
@@ -2558,12 +2558,14 @@ subroutine densite_file()
   character(len=80) :: comment
 
   integer :: k, l, i, n_a
-  real(kind=db) :: somme, mass
+  real(kind=db) :: somme, mass, facteur
   real :: tmp
   character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph ! n_a
+
+  type(disk_zone_type) :: dz
 
 
   ! Lecture donnees
@@ -2623,14 +2625,17 @@ subroutine densite_file()
      stop
   endif
   do i=1,n_a
+     stat = 0
+     tmp = 0.0
      write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
+!     write(*,*) tmp, stat
+     write(*,*) 'grain_size_'//trim(ADJUSTL(s)), tmp, "microns"
      a_sph(i) = tmp ! cannot read directly into an array element
-     write(*,*) i, a_sph(i), "microns"
   enddo
 
   ! On verifie que les grains sont tries
   do i=1, n_a-1
-     if (a_sph(i) > a_sph(i+1)) then
+     if (a_sph(i) >= a_sph(i+1)) then
         write(*,*) "ERROR : grains must be ordered from small to large"
         write(*,*) "Exiting"
         stop
@@ -2641,8 +2646,65 @@ subroutine densite_file()
   call ftfiou(unit, status)
 
 
+
+  ! Densite du gaz : gaz = plus petites particules
+  dz = disk_zone(1)
+  !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
+  do k=1, n_az
+     do j=1,nz
+        do i=1, n_rad
+           densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+        enddo
+     enddo
+  enddo
+
+  ! Symetrie verticale en z
+  do j=1,nz
+     densite_gaz(:,-j,:) = densite_gaz(:,j,:)
+  enddo
+
+  ! Calcul de la masse de gaz de la zone
+  mass = 0.
+  do i=1,n_rad
+     bz_gas_mass : do j=-nz,nz
+        if (j==0) cycle bz_gas_mass
+        do k=1,n_az
+           mass = mass + densite_gaz(i,j,k) *  masse_mol_gaz * volume(i)
+        enddo  !k
+     enddo bz_gas_mass
+  enddo !i
+  mass =  mass * AU3_to_m3 * g_to_Msun
+
+  ! Normalisation
+  if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+     facteur = dz%diskmass * dz%gas_to_dust / mass
+     ! Somme sur les zones pour densite finale
+     do i=1,n_rad
+        bz_gas_mass2 : do j=-nz,nz
+           if (j==0) cycle bz_gas_mass2
+           do k=1, n_az
+              densite_gaz(i,j,k) = densite_gaz(i,j,k) * facteur
+           enddo !k
+        enddo bz_gas_mass2
+     enddo ! i
+  endif
+
+
+  ! Tableau de masse de gaz
+  do i=1,n_rad
+     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
+     bz_gas_mass3 : do j=j_start,nz
+        if (j==0) cycle bz_gas_mass3
+        do k=1, n_az
+           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+        enddo !k
+     enddo bz_gas_mass3
+  enddo ! i
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+
+
   if (lstrat) then
-     write(*,*) "Differential gap"
+     write(*,*) "Dust Differential gap"
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
@@ -2720,8 +2782,6 @@ subroutine densite_file()
   enddo !i
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
-
-  write(*,*) "Done"
 
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))

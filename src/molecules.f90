@@ -188,7 +188,7 @@ subroutine init_benchmark_vanzadelhoff2()
      Temperature(ri,:,:) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
      Tcin(ri,:,:) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
      vfield(ri,:) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
-     v_turb(ri,:) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
+     v_turb(ri,:,:) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
 
   enddo
 
@@ -343,10 +343,10 @@ subroutine init_benchmark_water3()
 
      if (rayon < 5.95) then
         vfield(ri,:) = 0.0
-        v_turb(ri,:) = 3.
+        v_turb(ri,:,:) = 3.
      else
         vfield(ri,:) =  exp( log_tmp_v(l-1) + frac * (log_tmp_v(l) - log_tmp_v(l-1)) )
-        v_turb(ri,:) = 1.
+        v_turb(ri,:,:) = 1.
      endif
   enddo
 
@@ -414,8 +414,8 @@ subroutine init_molecular_disk(imol)
      call read_abundance(imol)
   endif
 
-  lcompute_molRT(:,:) = (tab_abundance(:,:) > tiny_real) .and. (densite_gaz(:,:,1) > tiny_real) &
-       .and. (Tcin(:,:,1) > 1.)
+  lcompute_molRT(:,:,:) = (tab_abundance(:,:,:) > tiny_real) .and. &
+       (densite_gaz(:,:,:) > tiny_real) .and. (Tcin(:,:,:) > 1.)
 
 !  do i=1,n_rad
 !     do j=1, nz
@@ -440,36 +440,39 @@ subroutine init_Doppler_profiles(imol)
   integer, intent(in) :: imol
 
   real(kind=db) :: sigma2, sigma2_m1, v, flux, vmax
-  integer :: i, j, iv, n_speed
+  integer :: i, j, k, iv, n_speed
 
   n_speed = mol(imol)%n_speed
 
-  do i=1, n_rad
-     do j=1, nz
-        ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
-        ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
-        ! Consistent avec benchmark
-        sigma2 =  2.0_db * (kb*Tcin(i,j,1) / (masse_mol* g_to_kg)) + v_turb(i,j)**2
-        v_line(i,j) = sqrt(sigma2)
+  do k=1, n_az
+     bz : do j=j_start, nz
+        if (j==0) cycle bz
+        do i=1, n_rad
+           ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
+           ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
+           ! Consistent avec benchmark
+           sigma2 =  2.0_db * (kb*Tcin(i,j,k) / (masse_mol* g_to_kg)) + v_turb(i,j,k)**2
+           v_line(i,j,k) = sqrt(sigma2)
 
-        !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
-        sigma2_m1 = 1.0_db / sigma2
-        sigma2_phiProf_m1(i,j) = sigma2_m1
-        ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
-        ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-        norme_phiProf_m1(i,j) = c_light / sqrt(pi * sigma2)
+           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
+           sigma2_m1 = 1.0_db / sigma2
+           sigma2_phiProf_m1(i,j,k) = sigma2_m1
+           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
+           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
+           norme_phiProf_m1(i,j,k) = c_light / sqrt(pi * sigma2)
 
-        ! Echantillonage du profil de vitesse dans la cellule
-        ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
-        ! sa valeur au centre : exp(-2.15^2) = 0.01
-        vmax = sqrt(sigma2)
-        tab_dnu_o_freq(i,j) = largeur_profile * vmax / (real(n_speed) )
-        do iv=-n_speed, n_speed
-           tab_deltaV(iv,i,j) = largeur_profile * real(iv,kind=db)/real(n_speed,kind=db) * vmax
-        enddo ! iv
-        deltaVmax(i,j) = largeur_profile * vmax !* 2.0_db  ! facteur 2 pour tirage aleatoire
-     enddo !i
-  enddo !j
+           ! Echantillonage du profil de vitesse dans la cellule
+           ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
+           ! sa valeur au centre : exp(-2.15^2) = 0.01
+           vmax = sqrt(sigma2)
+           tab_dnu_o_freq(i,j,k) = largeur_profile * vmax / (real(n_speed))
+           do iv=-n_speed, n_speed
+              tab_deltaV(iv,i,j,k) = largeur_profile * real(iv,kind=db)/real(n_speed,kind=db) * vmax
+           enddo ! iv
+           deltaVmax(i,j,k) = largeur_profile * vmax !* 2.0_db  ! facteur 2 pour tirage aleatoire
+        enddo !i
+     enddo bz !j
+  enddo ! k
 
   return
 
@@ -477,7 +480,7 @@ end subroutine init_Doppler_profiles
 
 !***********************************************************
 
-function phiProf(ri,zj,ispeed,tab_speed)
+function phiProf(ri,zj,phik,ispeed,tab_speed)
   ! renvoie le profil de raie local a une cellule (ri, zj)
   ! sur le tableau de vitesse tab_speed
   ! Il faut diviser par la frequence de la transition pour que la normalisation soit OK !!!
@@ -487,15 +490,15 @@ function phiProf(ri,zj,ispeed,tab_speed)
   implicit none
 
   integer, dimension(2), intent(in) :: ispeed
-  integer, intent(in) :: ri, zj
+  integer, intent(in) :: ri, zj, phik
   real(kind=db), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: phiProf
 
   real(kind=db) :: norme_m1, sigma2_m1
 
-  norme_m1 = norme_phiProf_m1(ri,zj) ! ATTENTION : il manque la frequence ici !!!!
-  sigma2_m1 = sigma2_phiProf_m1(ri,zj)
+  norme_m1 = norme_phiProf_m1(ri,zj,phik) ! ATTENTION : il manque la frequence ici !!!!
+  sigma2_m1 = sigma2_phiProf_m1(ri,zj,phik)
 
   phiProf(:) =  norme_m1 * exp(- sigma2_m1 * tab_speed(:)**2)
 
@@ -622,8 +625,8 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
 
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
-     nu = tab_nLevel(ri,zj,iTransUpper(iiTrans))
-     nl = tab_nLevel(ri,zj,iTransLower(iiTrans))
+     nu = tab_nLevel(ri,zj,phik,iTransUpper(iiTrans))
+     nl = tab_nLevel(ri,zj,phik,iTransLower(iiTrans))
 
      ! Opacite et emissivite raie
      kap = (nl*fBlu(iiTrans) - nu*fBul(iiTrans))
@@ -632,14 +635,14 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
      if (kap < 0.) then
         lmaser = .true.
         ! inversion value (inversion population is > 1 )
-        maser_map(ri,zj,iTrans) = (nu * poids_stat_g(iTransLower(iiTrans))) / &
+        maser_map(ri,zj,phik,iTrans) = (nu * poids_stat_g(iTransLower(iiTrans))) / &
              (poids_stat_g(iTransUpper(iiTrans)) * nl)
         kap = 0.
      endif
 
      ! longueur de vol en AU, a multiplier par le profil de raie
-     kappa_mol_o_freq(ri,zj,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
-     emissivite_mol_o_freq(ri,zj,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
+     kappa_mol_o_freq(ri,zj,phik,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
+     emissivite_mol_o_freq(ri,zj,phik,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
   enddo
 
 !  if ( (lmaser) .and. (ri==n_rad) .and. (zj==nz) ) then
@@ -657,16 +660,16 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
   if (ldouble_RT) then
      do iTrans=1,nTrans
         iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
-        nu = tab_nLevel2(ri,zj,iTransUpper(iiTrans))
-        nl = tab_nLevel2(ri,zj,iTransLower(iiTrans))
+        nu = tab_nLevel2(ri,zj,phik,iTransUpper(iiTrans))
+        nl = tab_nLevel2(ri,zj,phik,iTransLower(iiTrans))
 
         ! Opacite et emissivite raie
         kap = (nl*fBlu(iiTrans) - nu*fBul(iiTrans))
         eps =  nu*fAul(iiTrans)
 
         ! longueur de vol en AU, a multiplier par la profil de raie
-        kappa_mol_o_freq2(ri,zj,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
-        emissivite_mol_o_freq2(ri,zj,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
+        kappa_mol_o_freq2(ri,zj,phik,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
+        emissivite_mol_o_freq2(ri,zj,phik,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
      enddo
   endif ! ldouble_RT
 
@@ -688,7 +691,7 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, iiTrans, ri, zj, p_lambda
+  integer :: iTrans, iiTrans, ri, zj, phik, p_lambda
   real(kind=db) :: f, Jnu
   real :: T, wl, kap
 
@@ -770,14 +773,17 @@ subroutine init_dust_mol(imol)
         ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
         ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
         do ri=1,n_rad
-           do zj=1,nz
-              ! Interpolation champ de radiation en longeur d'onde
-              Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+           bz : do zj=j_start,nz
+              if (zj==0) cycle bz
+              do phik=1, n_az
+                 ! Interpolation champ de radiation en longeur d'onde
+                 ! Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))  ! todo : tmp pas de scatt pour le moment
 
-              T = Temperature(ri,zj,1)
-              ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-              emissivite_dust(iTrans,ri,zj,1) = kappa_abs_eg(iTrans,ri,zj,1) * Bnu(f,T) + kappa_sca(iTrans,ri,zj,1) * Jnu
-           enddo ! zj
+                 T = Temperature(ri,zj,phik)
+                 ! On ne fait que du scattering isotropique dans les raies pour le moment ...
+                 emissivite_dust(iTrans,ri,zj,phik) = kappa_abs_eg(iTrans,ri,zj,phik) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+              enddo ! phik
+           enddo bz ! zj
         enddo ! ri
      enddo ! itrans
 
@@ -805,27 +811,29 @@ subroutine equilibre_LTE_mol()
 
   implicit none
 
-  integer :: i,j, l
+  integer :: i,j, k, l
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(i,j,l) &
-  !$omp shared(n_rad,nz,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance)
+  !$omp private(i,j,k,l) &
+  !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance)
   !$omp do
   do i=1, n_rad
      do j=1, nz
-        tab_nLevel(i,j,1) = 1.0
-        do l=2, nLevels
-           ! Utilisation de la temperature de la poussiere comme temperature LTE
-           tab_nLevel(i,j,l) = tab_nLevel(i,j,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
-                exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
-        enddo
-        ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
-        ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Temperature(i,j,1)))
-        ! read(*,*)
+        do k=1, n_az
+           tab_nLevel(i,j,k,1) = 1.0
+           do l=2, nLevels
+              ! Utilisation de la temperature de la poussiere comme temperature LTE
+              tab_nLevel(i,j,k,l) = tab_nLevel(i,j,k,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
+                   exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
+           enddo
+           ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
+           ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Temperature(i,j,1)))
+           ! read(*,*)
 
-        ! Normalisation
-        tab_nLevel(i,j,:) = densite_gaz(i,j,1) * tab_abundance(i,j) * tab_nLevel(i,j,:)  / sum(tab_nLevel(i,j,:))
+           ! Normalisation
+           tab_nLevel(i,j,k,:) = densite_gaz(i,j,k) * tab_abundance(i,j,k) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
+        enddo !k
      enddo !j
   enddo!i
   !$omp end do
@@ -950,9 +958,9 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
      call GaussSlv(A, B, nLevels)
 
      if (eq==1) then
-        tab_nLevel(ri,zj,:) = densite_gaz(ri,zj,1) * tab_abundance(ri,zj) * B(:)
+        tab_nLevel(ri,zj,phik,:) = densite_gaz(ri,zj,phik) * tab_abundance(ri,zj,phik) * B(:)
      else
-        tab_nLevel2(ri,zj,:) = densite_gaz(ri,zj,1) * tab_abundance(ri,zj) * B(:)
+        tab_nLevel2(ri,zj,phik,:) = densite_gaz(ri,zj,phik) * tab_abundance(ri,zj,phik) * B(:)
      endif
 
   enddo !n_eq
@@ -1008,7 +1016,7 @@ subroutine equilibre_othin_mol_pop2()
 
   integer :: ri, zj, phik, id
 
-  real(kind=db) :: tab_nLevel_tmp(n_rad,nz,nLevels)
+  real(kind=db) :: tab_nLevel_tmp(n_rad,nz,1,nLevels)  ! pas 3D
   logical :: ldouble_RT_tmp
 
   Jmol(:,:) = 0.0_db
@@ -1016,17 +1024,17 @@ subroutine equilibre_othin_mol_pop2()
   id =1 ! TODO : parallelisation
 
   ! Par securite : sauvegarde population 1
-  tab_nLevel_tmp(:,:,:) =  tab_nLevel(:,:,:)
+  tab_nLevel_tmp(:,:,:,:) =  tab_nLevel(:,:,:,:)
   ldouble_RT_tmp = ldouble_RT
   ldouble_RT = .false.
 
   call equilibre_othin_mol()
 
   ! Initialisation de la population 2
-  tab_nLevel2(:,:,:) = tab_nLevel(:,:,:)
+  tab_nLevel2(:,:,:,:) = tab_nLevel(:,:,:,:)
 
   ! Restauration population 1
-  tab_nLevel(:,:,:) =  tab_nLevel_tmp(:,:,:)
+  tab_nLevel(:,:,:,:) =  tab_nLevel_tmp(:,:,:,:)
   ldouble_RT = ldouble_RT_tmp
 
   return
@@ -1056,10 +1064,10 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
      J = 0.0_db
      do iray=1, n_rayons
         P(:) =  Doppler_P_x_freq(:,iray,id)
-        opacite(:) = kappa_mol_o_freq(ri,zj,iTrans) * P(:) + kappa(iTrans,ri,zj,1)
+        opacite(:) = kappa_mol_o_freq(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
         etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
-        Snu(:) = ( emissivite_mol_o_freq(ri,zj,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,1) ) / (opacite(:) + 1.0e-30_db)
+        Snu(:) = ( emissivite_mol_o_freq(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
 
         J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:))
         somme = somme + sum(P(:))
@@ -1077,10 +1085,10 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
      do iray=1, n_rayons
         do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
            P(:) =  Doppler_P_x_freq(:,iray,id)
-           opacite(:) = kappa_mol_o_freq2(ri,zj,iTrans) * P(:) + kappa(iTrans,ri,zj,1)
+           opacite(:) = kappa_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
            etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
-           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,1) ) / (opacite(:) + 1.0e-30_db)
+           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
            J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:)) / sum(P(:))
 
            Jmol2(iTrans,id) = Jmol2(iTrans,id) + J
@@ -1201,13 +1209,15 @@ subroutine freeze_out()
 
   implicit none
 
-  integer :: i, j
+  integer :: i, j, k
 
   write (*,*) "Freezing out of molecules"
 
-  do j=1, nz
-     do i=1, n_rad
-        if (Temperature(i,j,1) < T_freeze_out)  tab_abundance(i,j) = 0.
+  do k=1, n_az
+     do j=1, nz
+        do i=1, n_rad
+           if (Temperature(i,j,k) < T_freeze_out)  tab_abundance(i,j,k) = 0.
+        enddo
      enddo
   enddo
 

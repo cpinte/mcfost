@@ -820,14 +820,13 @@ module molecular_emission
 
   real :: nH2, masse_mol
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
-  real(kind=db), dimension(:,:,:), allocatable :: frac_E_Trans ! n_rad, n_z, nTrans
-  real(kind=db), dimension(:,:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_rad, nz, nTrans
-  real(kind=db), dimension(:,:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_rad, nz, nTrans
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_rad, nz, n_az, nTrans
+  real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_rad, nz, n_az, nTrans
   real, dimension(:,:), allocatable :: vfield ! n_rad, nz
 !  real, dimension(:,:,:), allocatable :: vx, vy
-  real, dimension(:,:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_rad, nz, nLevels
+  real, dimension(:,:,:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_rad, nz, n_az, nLevels
 
-  real, dimension(:,:), allocatable :: v_turb, v_line ! n_rad, nz
+  real, dimension(:,:,:), allocatable :: v_turb, v_line ! n_rad, nz, n_az
 
   real ::  vitesse_turb, dv, dnu
   integer, parameter :: n_largeur_Doppler = 15
@@ -846,13 +845,13 @@ module molecular_emission
 
   logical :: linfall, lkeplerian
 
-  real(kind=db), dimension(:,:), allocatable :: deltaVmax ! n_rad, nz
-  real(kind=db), dimension(:,:,:), allocatable :: tab_deltaV ! n_speed, n_rad, nz
-  real(kind=db), dimension(:,:), allocatable :: tab_dnu_o_freq ! n_rad, nz
-  real(kind=db), dimension(:,:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_rad, nz
+  real(kind=db), dimension(:,:,:), allocatable :: deltaVmax ! n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:,:), allocatable :: tab_deltaV ! n_speed, n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:), allocatable :: tab_dnu_o_freq ! n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_rad, nz, n_az
 
-  real, dimension(:,:), allocatable :: tab_abundance
-  logical, dimension(:,:), allocatable :: lcompute_molRT
+  real, dimension(:,:,:), allocatable :: tab_abundance
+  logical, dimension(:,:,:), allocatable :: lcompute_molRT
 
   logical ::  lfreeze_out
   real :: T_freeze_out
@@ -874,7 +873,7 @@ module molecular_emission
 
   real(kind=db), dimension(:), allocatable :: tab_speed_rt
 
-  real, dimension(:,:,:), allocatable :: maser_map
+  real, dimension(:,:,:,:), allocatable :: maser_map
 
 
 end module molecular_emission
