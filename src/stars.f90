@@ -560,6 +560,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
+  integer :: phik
   real :: aleat1, aleat2, aleat3, aleat4
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi, l, w2
 
@@ -596,7 +597,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   y = y * l
   z = z * l
 
-  call move_to_grid(x,y,z,u,v,w,ri,zj,lintersect)
+  call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
 
 
   return
