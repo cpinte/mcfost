@@ -442,7 +442,7 @@ subroutine init_Doppler_profiles(imol)
   real(kind=db) :: sigma2, sigma2_m1, v, flux, vmax
   integer :: i, j, k, iv, n_speed
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt
 
   do k=1, n_az
      bz : do j=j_start, nz
@@ -590,12 +590,15 @@ subroutine opacite_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i,j
+  integer :: i,j, k
 
   do i=1,n_rad
-     do j=1,nz
-        call opacite_mol_loc(i,j,1,imol)
-     enddo ! j
+     bz : do j=j_start,nz
+        if (j==0) cycle bz
+        do k=1, n_az
+           call opacite_mol_loc(i,j,k,imol)
+        enddo ! k
+     enddo bz ! j
   enddo ! i
 
   return
@@ -753,6 +756,7 @@ subroutine init_dust_mol(imol)
         lmono = .true. ! equivalent au mode sed2
 
         ! On recalcule les proprietes optiques
+        write(*,*) "Computing dust properties for", nTrans, "wavelength"
         do iTrans=1,nTrans
            call prop_grains(iTrans, p_lambda)
            call opacite2(iTrans)
@@ -1067,7 +1071,8 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
         opacite(:) = kappa_mol_o_freq(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
         etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
-        Snu(:) = ( emissivite_mol_o_freq(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
+        Snu(:) = ( emissivite_mol_o_freq(ri,zj,phik,iTrans) * P(:) + &
+             emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
 
         J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:))
         somme = somme + sum(P(:))
@@ -1088,8 +1093,10 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
            opacite(:) = kappa_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
            etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
-           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
-           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:)) / sum(P(:))
+           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) &
+                / (opacite(:) + 1.0e-30_db)
+           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) &
+                * P(:)) / sum(P(:))
 
            Jmol2(iTrans,id) = Jmol2(iTrans,id) + J
         enddo ! iTrans
@@ -1118,7 +1125,7 @@ function v_proj(ri,zj,x,y,z,u,v,w) !
 
   real(kind=db) :: vitesse, vx, vy, vz, norme, r
 
-  vitesse = vfield(ri,zj)
+  vitesse = vfield(ri,abs(zj))
 
   if (linfall) then
      r = sqrt(x*x+y*y+z*z)

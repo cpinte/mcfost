@@ -56,6 +56,7 @@ subroutine define_gas_density()
   densite_gaz_tmp = 0.0
   densite_gaz = 0.0 ;
 
+
   do izone=1, n_zones
      dz = disk_zone(izone)
      if (dz%geometry <= 2) then ! Disque
@@ -110,6 +111,11 @@ subroutine define_gas_density()
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
               else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
+                 if (dz%rc < tiny_db) then
+                    write(*,*) "ERROR : tappered-edge structure with Rc = 0."
+                    write(*,*) "Exiting"
+                    stop
+                 endif
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -2799,6 +2805,12 @@ subroutine densite_file()
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
+
+
+  write(*,*) "MODIFYING 3D DENSITY !!!"
+  k = 36
+  densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
 
   return
 

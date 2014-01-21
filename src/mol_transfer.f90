@@ -187,7 +187,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   id = 1
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
 
   if (n_level_comp < 2) then
@@ -597,8 +597,8 @@ subroutine emission_line_map(imol,ibin)
   ! le plan image sans rotation est par defaut (y,z)
   ! on fait ensuite une rotation pour deplacer (1,0,0) vers (-u,-v,-w) ie vers l'obervateur
 
-  ! vecteur de base 1
   if (abs(w) < 0.999999999_db) then
+     ! vecteur de base 1
      x1=0.0_db ; y1=cos_disk ; z1=sin_disk
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(1,1) = x2 ; Iaxis(1,2) = y2 ; Iaxis(1,3) =z2
@@ -608,8 +608,8 @@ subroutine emission_line_map(imol,ibin)
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(2,1) = x2 ; Iaxis(2,2) = y2 ; Iaxis(2,3) =z2
   else
-     Iaxis(1,1) = 1.0_db ; Iaxis(1,2) = 0.0_db ; Iaxis(1,3) = 0.0_db
-     Iaxis(2,1) = 0.0_db ; Iaxis(2,2) = -1.0_db ; Iaxis(2,3) = 0.0_db
+     Iaxis(1,1) = 0.0_db ; Iaxis(1,2) = -1.0_db ; Iaxis(1,3) = 0.0_db
+     Iaxis(2,1) = -1.0_db ; Iaxis(2,2) = 0.0_db ; Iaxis(2,3) = 0.0_db
   endif
 
   ! position initiale hors modele (du cote de l'observateur)

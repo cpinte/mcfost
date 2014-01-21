@@ -1220,8 +1220,8 @@ subroutine clean_mem_dust_mol()
 
   integer :: alloc_status
 
-  ! Ne reste que kappa, kappa_sca et emissivite_dust
-  deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, tab_amu1, tab_amu2)
+  ! Ne reste que tab_lambda, kappa, kappa_sca et emissivite_dust
+  deallocate(tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, tab_amu1, tab_amu2)
   deallocate(tab_albedo)
   deallocate(q_ext, q_sca, q_abs, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
@@ -1673,12 +1673,13 @@ subroutine alloc_emission_mol(imol)
   integer :: alloc_status, n_speed, n_speed_rt, nTrans_raytracing
 
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt ! I use the same now
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
   if (l3D) then
-     allocate(kappa_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), stat=alloc_status)
+     allocate(kappa_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), &
+          stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error kappa_mol_o_freq'
         stop
@@ -1760,7 +1761,8 @@ subroutine alloc_emission_mol(imol)
 
   if (ldouble_RT) then
      if (l3D) then
-        allocate(kappa_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot), stat=alloc_status)
+        allocate(kappa_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot),&
+             stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kappa_mol2'
            stop
