@@ -1090,7 +1090,11 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
      ri_out=ri+1
   endif
 
-  zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+  if (ri_out > 0) then
+     zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+  else
+     zj_out = 0
+  endif
   if (zj_out > nz) zj_out = nz
   if (zin < 0.0)  zj_out = -zj_out
 

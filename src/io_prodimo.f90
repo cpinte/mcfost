@@ -1136,7 +1136,7 @@ contains
        mol(imol)%lline = .true.
        read(1,*) mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-       mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
+       !mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
 
 
        mol(imol)%abundance = 1e-6

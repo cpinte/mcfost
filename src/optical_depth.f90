@@ -2628,39 +2628,50 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
               ! on monte
               if (zj0==nz+1) then
                  delta_zj=0
-                 if (z0 > 0.0_db) then
-                    zlim=1.0e10
-                 else
-                    zlim=-1.0e10
-                 endif
+                 zlim=1.0e10
+              else if (zj0==-(nz+1)) then
+                 delta_zj=0
+                 zlim=-1.0e10
               else
                  if (z0 > 0.0) then
                     zlim=z_lim(ri0,zj0+1)*correct_plus
+                    delta_zj=1
                  else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                    delta_zj=-1
                  endif
-                 delta_zj=1
               endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
+           else ! on se rappoche du midplane
+              if (l3D) then
+                 if (z0 > 0.0) then
+                    zlim=z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=-1
+                    if (zj0==1) delta_zj=-2 ! pas d'indice 0
                  else
-                    zlim=z_lim(ri0,2)*correct_moins
+                    zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=1
+                    if (zj0==-1) delta_zj=2 ! pas d'indice 0
                  endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
-                 else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
-                 endif
-                 delta_zj=-1
-              endif !(zj0==1)
+              else ! 2D
+                 if (zj0==1) then
+                    ! on traverse le plan eq donc on va remonter
+                    ! et z va changer de signe
+                    delta_zj=1
+                    if (z0 > 0.0_db) then
+                       zlim=-z_lim(ri0,2)*correct_moins
+                    else
+                       zlim=z_lim(ri0,2)*correct_moins
+                    endif
+                 else !(zj0==1)
+                    ! on ne traverse pas z=0.
+                    if (z0 > 0.0_db) then
+                       zlim=z_lim(ri0,zj0)*correct_moins
+                    else
+                       zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                    endif
+                    delta_zj=-1
+                 endif !(zj0==1)
+              endif
            endif ! monte ou descend
            t=(zlim-z0)*inv_w
            ! correct pb precision

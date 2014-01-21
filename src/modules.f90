@@ -179,7 +179,8 @@ module disk
   integer :: n_zones, n_regions
 
   type disk_zone_type
-     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
+     real(kind=db) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
      integer :: region
   end type disk_zone_type
@@ -861,7 +862,7 @@ module molecular_emission
   integer :: RT_line_method, n_molecules
 
   type molecule
-     integer :: n_speed, n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
+     integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
      real :: vmax_center_rt, extra_deltaV_rt, abundance
      logical :: lcst_abundance, lline
      character(len=512) :: abundance_file, filename
