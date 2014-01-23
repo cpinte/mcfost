@@ -531,10 +531,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         ldust_prop=.true.
         lstop_after_init= .false.
-     case("-optical_depth_map")
-        i_arg = i_arg+1
-        loptical_depth_map=.true.
-     case("-od") ! short option name
+     case("-optical_depth_map","-od")
         i_arg = i_arg+1
         loptical_depth_map=.true.
      case("-reemission_stats")
@@ -601,16 +598,16 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) r_subdivide
-     case("-freeze_out")
+     case("-freeze_out","-freeze-out")
         i_arg = i_arg + 1
         lfreeze_out=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) T_freeze_out
-     case("-isotropic")
+     case("-isotropic","-iso")
         i_arg = i_arg + 1
         lisotropic=.true.
-     case("-no_scattering")
+     case("-no_scattering","-no_scatt")
         i_arg = i_arg + 1
         lno_scattering=.true.
      case("-qsca=qabs")
@@ -638,7 +635,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lmc=.true.
         loutput_mc=.true.
-     case("-density_file")
+     case("-density_file","-df")
         i_arg = i_arg + 1
         ldensity_file=.true.
         call get_command_argument(i_arg,s)
@@ -713,7 +710,7 @@ subroutine initialisation_mcfost()
      case("-only_scatt")
         i_arg = i_arg+1
         lonly_scatt = .true.
-     case("-HG")
+     case("-HG","-hg")
         i_arg = i_arg+1
         lHG=.true.
      case("-p2m")
