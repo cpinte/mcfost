@@ -2608,6 +2608,7 @@ subroutine densite_file()
   nbuffer=npixels
 
   allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a))
+  sph_dens = 0.0 ; a_sph = 0.0
 
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
@@ -2622,6 +2623,7 @@ subroutine densite_file()
      write(*,*) "Exiting."
      stop
   endif
+
   do i=1,n_a
      write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
      a_sph(i) = tmp ! cannot read directly into an array element
