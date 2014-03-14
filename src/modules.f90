@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.2"
+  character(8), parameter :: mcfost_release = "2.19.3"
   real, parameter :: required_utils_version = 2.14
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -179,7 +179,8 @@ module disk
   integer :: n_zones, n_regions
 
   type disk_zone_type
-     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, moins_gamma_exp, sclht, diskmass
+     real(kind=db) :: gas_to_dust, vert_exponent
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
      integer :: region
   end type disk_zone_type
