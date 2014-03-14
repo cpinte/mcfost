@@ -596,7 +596,27 @@ subroutine write_stokes_fits()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
 
+  call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+  if (lsepar_pola) then
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+  endif
+  if (lsepar_contrib) then
+     if (lsepar_pola) then
+        call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     else
+        call ftpkys(unit,'FLUX_2',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_3',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_4',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_5',"scattered thermal emssion",' ',status)
+     endif
+  endif
 
   !  Write the array to the FITS file.
   group=1
@@ -769,6 +789,27 @@ subroutine ecriture_map_ray_tracing()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+
+  call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+  if (lsepar_pola) then
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+  endif
+  if (lsepar_contrib) then
+     if (lsepar_pola) then
+        call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     else
+        call ftpkys(unit,'FLUX_2',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_3',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_4',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_5',"scattered thermal emssion",' ',status)
+     endif
+  endif
 
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
@@ -2263,6 +2304,16 @@ subroutine ecriture_sed(ised)
 
      call ftppre(unit,group,fpixel,nelements,sed2_io,status)
 
+     call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+     call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+     call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+     call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+     call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     call ftpkys(unit,'FLUX_9',"number of packets",' ',status)
+
      L_bol2 = 0.0
      do lambda=1,n_lambda
         L_bol2 = L_bol2 + sum(sed(:,lambda,:,:))*tab_delta_lambda(lambda)*1.0e-6*E_totale(lambda)
@@ -2273,6 +2324,8 @@ subroutine ecriture_sed(ised)
      endif
 
   endif ! ised
+
+  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)

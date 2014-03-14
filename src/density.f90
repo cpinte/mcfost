@@ -2672,7 +2672,7 @@ subroutine densite_file()
 
 
   ! On lit au besoin la distribution en taille (dn(a) / da)
-  if (read_n_a) then
+  if (read_n_a==1) then
      write(*,*) "Reading grain size distribution from fits file"
 
      !---------------------------------------------------------
