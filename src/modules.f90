@@ -890,6 +890,9 @@ module ray_tracing
   save
 
   logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
+  ! ray-tracing 1 : sauve le champ de radiation diffuse
+  ! ray-tracing 2 : sauve l'intensite specifique
+
 
   ! inclinaisons
   real :: RT_imin, RT_imax
