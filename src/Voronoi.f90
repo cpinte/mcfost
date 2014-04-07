@@ -1,5 +1,8 @@
 module Voronoi_grid
 
+  use parametres
+  use utils, only : bubble_sort
+
   implicit none
 
   integer, parameter :: max_wall_neighbours = 100000
@@ -21,23 +24,27 @@ module Voronoi_grid
   type(Voronoi_wall), dimension(:), allocatable :: wall
   integer, dimension(:), allocatable :: neighbours_list
 
-  integer :: n_wall
+  integer :: n_walls
 
   contains
 
-  subroutine read_Voronoi(n, n_walls)
+  subroutine read_Voronoi(n)
 
-    integer, intent(in) :: n, n_walls
+    integer, intent(in) :: n
 
     integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, ifirst
 
-    allocate(Voronoi(n), wall(n_walls))
 
-    ! initialise walls
-    do j=1, n_walls
-       wall(j)%type = "plane"
-       wall(j)%n_neighbours = 0
-    enddo
+    n_walls = 6
+    write(*,*) "Reading ", n_walls, "walls"
+
+
+    call init_Voronoi_walls()
+
+    allocate(Voronoi(n))
+
+    write(*,*) "Reading Voronoi :", n, "cells"
+
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
@@ -53,10 +60,13 @@ module Voronoi_grid
        n_neighbours_tot = n_neighbours_tot + n_neighbours
     enddo
 
-    write(*,*)  n_neighbours_tot, "voisins en tout"
-    write(*,*)  sum(Voronoi%V)
     rewind(1)
+    write(*,*) "neighbours list size =", n_neighbours_tot
+    write(*,*)  "Voronoi volume =", sum(Voronoi%V)
+    write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
+
+
 
     do i=1, n
        read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
@@ -71,18 +81,6 @@ module Voronoi_grid
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
              endif
              wall(j)%neighbour_list(wall(j)%n_neighbours) = i
-
-             ! test pour localiser les murs par defaut
-             !if (j==6) then
-             !   write(*,*) Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z
-             !endif
-
-             ! j=1 ---> x = xmin ; n = (-1,0,0) : normal towards outside
-             ! j=2 ---> x = xmax
-             ! j=3 ---> y = ymin
-             ! j=4 ---> y = ymax
-             ! j=5 ---> z = zmin
-             ! j=6 ---> z = zmax
           endif ! wall
        enddo ! k
     enddo ! i
@@ -161,6 +159,48 @@ module Voronoi_grid
 
   !----------------------------------------
 
+  subroutine init_Voronoi_walls()
+
+    integer :: iwall
+
+    real, parameter :: xmin = 0 , xmax = 1, ymin = 0, ymax = 1, zmin = 0, zmax = 1
+
+    allocate(wall(n_walls))
+
+    ! initialise plane walls
+    do iwall=1, n_walls
+       wall(iwall)%type = "plane"
+       wall(iwall)%n_neighbours = 0
+    enddo
+
+    ! test pour localiser les murs par defaut
+    !if (j==6) then
+    !   write(*,*) Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z
+    !endif
+
+    ! j=1 ---> x = xmin ; n = (-1,0,0) : normal towards outside
+    ! j=2 ---> x = xmax
+    ! j=3 ---> y = ymin
+    ! j=4 ---> y = ymax
+    ! j=5 ---> z = zmin
+    ! j=6 ---> z = zmax
+
+    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = -xmin
+    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 =  xmax
+    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = -ymin
+    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 =  ymax
+    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = -zmin
+    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 =  zmax
+
+
+    return
+
+
+  end subroutine init_Voronoi_walls
+
+  !----------------------------------------
+
+
   real function distance_to_wall(x,y,z, u,v,w, iwall)
     ! Mur plan pour le moment : meme algorithme que cross Voronoi cell
     ! renvoie une valeur :
@@ -199,9 +239,9 @@ module Voronoi_grid
     real, intent(out) :: s
     integer, intent(out) :: icell
 
-    logical, dimension(n_wall) :: intersect
-    real, dimension(n_wall) :: s_walls
-    integer, dimension(n_wall) :: order
+    logical, dimension(n_walls) :: intersect
+    real, dimension(n_walls) :: s_walls
+    integer, dimension(n_walls) :: order
 
     real :: l
     integer :: iwall
@@ -210,7 +250,7 @@ module Voronoi_grid
     ! and test boundaries of the plane
     s_walls(:) = huge(1.0)
     intersect(:) = .false.
-    do iwall=1, n_wall
+    do iwall=1, n_walls
        l = -distance_to_wall(x,y,z, u,v,w, iwall) ! signe - car on rentre dans le volume
        if (l >= 0) then
           intersect(iwall) = .true.
@@ -218,7 +258,7 @@ module Voronoi_grid
        endif
     enddo
 
-    order = bubble_sort(s_walls)
+    order = bubble_sort(real(s_walls,kind=db))
 
     ! Move to the plane
 
@@ -261,6 +301,6 @@ program Voronoi
 
   implicit none
 
-  call read_Voronoi(999997, 6)
+  call read_Voronoi(999997)
 
 end program Voronoi
