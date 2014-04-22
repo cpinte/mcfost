@@ -34,6 +34,9 @@ module Voronoi_grid
 
     integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, ifirst
 
+    ! For testing purposes
+    real :: x, y, z, u, v, w, s, norme
+    integer :: icell
 
     n_walls = 6
     write(*,*) "Reading ", n_walls, "walls"
@@ -96,6 +99,16 @@ module Voronoi_grid
        !endif
     enddo
 
+
+    ! TEST
+    x = -2.0 ; y = -2.0 ; z = -2.0 ;
+    u = 1.2 ; v = 1.0 ; w = 1.1 ;
+    norme = sqrt(u*u + v*v + w*w)
+    u = u / norme ; v = v / norme ;  w = w / norme ;
+
+    call move_to_Voronoi_grid(x,y,z, u,v,w, s,icell)
+
+    ! OK
 
     return
 
@@ -163,7 +176,9 @@ module Voronoi_grid
 
     integer :: iwall
 
-    real, parameter :: xmin = 0 , xmax = 1, ymin = 0, ymax = 1, zmin = 0, zmax = 1
+    real, parameter :: xmin = 0, xmax = 1
+    real, parameter :: ymin = 0, ymax = 1
+    real, parameter :: zmin = 0, zmax = 1
 
     allocate(wall(n_walls))
 
@@ -185,12 +200,12 @@ module Voronoi_grid
     ! j=5 ---> z = zmin
     ! j=6 ---> z = zmax
 
-    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = -xmin
-    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 =  xmax
-    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = -ymin
-    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 =  ymax
-    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = -zmin
-    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 =  zmax
+    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = xmin
+    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = xmax
+    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = ymin
+    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = ymax
+    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = zmin
+    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = zmax
 
 
     return
@@ -223,8 +238,17 @@ module Voronoi_grid
 
     den = dot_product(n, k)
 
+    write(*,*) "------------------------"
+    write(*,*) "wall", iwall
+    write(*,*) "P", p
+    write(*,*) "n", n
+    write(*,*) "den", den
+
+
     if (abs(den) > 0) then
        distance_to_wall = dot_product(n, p-r) / den
+    else
+       distance_to_wall = huge(1.0)
     endif
 
     return
@@ -251,7 +275,14 @@ module Voronoi_grid
     s_walls(:) = huge(1.0)
     intersect(:) = .false.
     do iwall=1, n_walls
-       l = -distance_to_wall(x,y,z, u,v,w, iwall) ! signe - car on rentre dans le volume
+       write(*,*) "X0", x, y, z
+
+       l = distance_to_wall(x,y,z, u,v,w, iwall) ! signe - car on rentre dans le volume
+       write(*,*) "X1", x, y, z
+
+       write(*,*) "distance", l
+       write(*,*) "inter", x + l*u, y+l*v, z+l*w
+
        if (l >= 0) then
           intersect(iwall) = .true.
           s_walls(iwall) = l
@@ -261,6 +292,13 @@ module Voronoi_grid
     order = bubble_sort(real(s_walls,kind=db))
 
     ! Move to the plane
+    do i = 1, n_walls
+       iwall = order(i)
+
+
+
+    enddo
+
 
     ! Find out the closest cell
 
