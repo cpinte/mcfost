@@ -1645,7 +1645,7 @@ subroutine alloc_emission_mol(imol)
   integer :: alloc_status, n_speed, n_speed_rt, nTrans_raytracing
 
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
@@ -1752,7 +1752,7 @@ end subroutine alloc_emission_mol
 
 subroutine dealloc_emission_mol()
 
-  deallocate(kappa,emissivite_dust)
+  deallocate(kappa,kappa_sca,emissivite_dust) ! reste non dealloue par clean_dust_mol
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &

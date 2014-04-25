@@ -442,7 +442,7 @@ subroutine init_Doppler_profiles(imol)
   real(kind=db) :: sigma2, sigma2_m1, v, flux, vmax
   integer :: i, j, iv, n_speed
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt ! it was n_speed before : TODO : clean the code
 
   do i=1, n_rad
      do j=1, nz
@@ -772,7 +772,11 @@ subroutine init_dust_mol(imol)
         do ri=1,n_rad
            do zj=1,nz
               ! Interpolation champ de radiation en longeur d'onde
-              Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+              if (lProDiMo2mcfost) then
+                 Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+              else
+                 Jnu = 0.0 ! todo : pour prendre en compte scattering
+              endif
 
               T = Temperature(ri,zj,1)
               ! On ne fait que du scattering isotropique dans les raies pour le moment ...
