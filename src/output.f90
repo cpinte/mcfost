@@ -2058,8 +2058,14 @@ subroutine ecriture_Tex(imol)
   logical :: simple, extend
   character(len=512) :: filename
 
-  real, dimension(n_rad,nz,nTrans_tot) :: Tex
+  !real, dimension(n_rad,nz,nTrans_tot) :: Tex
+  real, dimension(:,:,:), allocatable :: Tex
 
+  allocate(Tex(n_rad,nz,nTrans_tot), stat = alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error Tex in ecriture_Tex'
+     stop
+  endif
   Tex = 0.0
 
   do iTrans=1,nTrans_tot
@@ -2118,6 +2124,8 @@ subroutine ecriture_Tex(imol)
   if (status > 0) then
      call print_error(status)
   end if
+
+  deallocate(Tex)
 
   return
 
