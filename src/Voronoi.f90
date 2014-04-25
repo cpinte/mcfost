@@ -267,8 +267,9 @@ module Voronoi_grid
     real, dimension(n_walls) :: s_walls
     integer, dimension(n_walls) :: order
 
-    real :: l
-    integer :: iwall
+    real :: l, x_test, y_test, z_test
+    integer :: i, iwall
+
 
     ! Find out which plane we are crossing first
     ! and test boundaries of the plane
@@ -286,21 +287,52 @@ module Voronoi_grid
        if (l >= 0) then
           intersect(iwall) = .true.
           s_walls(iwall) = l
+       else
+          s_walls(iwall) = huge(1.0)
        endif
     enddo
 
+    write(*,*) ""
+    write(*,*) "************************************"
+    write(*,*) "TESTE OK jusqu'ici"
+    write(*,*) "************************************"
+    write(*,*) ""
+
     order = bubble_sort(real(s_walls,kind=db))
 
-    ! Move to the plane
-    do i = 1, n_walls
+    write(*,*) order
+
+    ! Move to the closest plane & check the packet is in the model
+    check_wall : do i = 1, n_walls
+       write(*,*) "I", i
        iwall = order(i)
+       l = s_walls(iwall) * (1.0_db + 1e-6_db)
 
+       x_test = x + l*u
+       y_test = y + l*v
+       z_test = z + l*w
 
+       write(*,*) "TEST wall", iwall, x_test, y_test, z_test
+       write(*,*) is_in_model(x_test,y_test,z_test)
+       write(*,*) " "
 
-    enddo
+       if (is_in_model(x_test,y_test,z_test)) then
+          s = l ! distance to the closest wall
+          exit check_wall
+       endif
 
+       if (i==n_walls) then
+          ! The packet does not reach the model
+          icell = 0
+          s = 0.0
+          return
+       endif
+    enddo check_wall
 
     ! Find out the closest cell
+    icell = find_Voronoi_cell(iwall, x_test, y_test, z_test)
+
+    write(*,*) "icell", icell
 
     ! Move to the cell (if wall is approximate)
 
@@ -327,6 +359,58 @@ module Voronoi_grid
 !    return
 !
 !  end subroutine length_Voronoi
+
+!----------------------------------------
+
+logical function is_in_model(x,y,z)
+
+  real, intent(in) :: x,y,z
+
+  is_in_model = .false.
+  if ((x > wall(1)%x4).and.(x < wall(2)%x4)) then
+     write(*,*) "ok x"
+     if ((y > wall(3)%x4).and.(y < wall(4)%x4)) then
+        write(*,*) "ok y"
+        if ((z > wall(5)%x4).and.(z < wall(6)%x4)) then
+           write(*,*) "ok z"
+           is_in_model = .true.
+        endif
+     endif
+  endif
+
+  return
+
+end function is_in_model
+
+
+!----------------------------------------
+
+integer function find_Voronoi_cell(iwall, x,y,z)
+  ! Methode debile : boucle sur toutes les cellules pour test
+
+  integer, intent(in) :: iwall
+  real, intent(in) :: x, y, z
+
+  real :: dist2, dist2_min, i
+  integer :: icell, icell_min
+
+  dist2_min = huge(1.0)
+  do i=1, wall(iwall)%n_neighbours
+     icell = wall(iwall)%neighbour_list(i)
+     dist2 = (Voronoi(icell)%x - x)**2 + (Voronoi(icell)%y - y)**2 + (Voronoi(icell)%z - z)**2
+
+     if (dist2 < dist2_min) then
+        icell_min = icell
+        dist2_min = dist2
+     endif
+  enddo
+
+  write(*,*) "dist2_min", dist2_min
+
+  find_Voronoi_cell = icell_min
+  return
+
+end function find_Voronoi_cell
 
 
 end module Voronoi_grid
