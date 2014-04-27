@@ -34,9 +34,19 @@ module Voronoi_grid
 
     integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, ifirst
 
+    !integer, dimension(:), allocatable :: id_list
+
     ! For testing purposes
     real :: x, y, z, u, v, w, s, norme
     integer :: icell
+
+    integer :: id, lambda
+    real :: tau, lvol
+
+    real(kind=db), dimension(4) :: Stokes
+    logical :: flag_star, flag_direct_star, flag_sortie
+
+    ! Fin testing
 
     n_walls = 6
     write(*,*) "Reading ", n_walls, "walls"
@@ -44,7 +54,9 @@ module Voronoi_grid
 
     call init_Voronoi_walls()
 
-    allocate(Voronoi(n))
+    allocate(Voronoi(n)) !, id_list(n))
+
+
 
     write(*,*) "Reading Voronoi :", n, "cells"
 
@@ -53,6 +65,8 @@ module Voronoi_grid
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
     do i=1, n
        read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours
+       Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points
+
        if (i>1) then
           Voronoi(i)%first_neighbour = Voronoi(i-1)%last_neighbour + 1
           Voronoi(i)%last_neighbour  = Voronoi(i-1)%last_neighbour + n_neighbours
@@ -72,7 +86,17 @@ module Voronoi_grid
 
 
     do i=1, n
+       ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
        read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+
+       if (Voronoi(i)%id == 975808) then
+          write(*,*) "TEST", Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+       endif
+
+       if (Voronoi(i)%id == 551468) then
+          write(*,*) "TEST", Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+       endif
+
 
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
@@ -102,13 +126,33 @@ module Voronoi_grid
 
     ! TEST
     x = -2.0 ; y = -2.0 ; z = -2.0 ;
-    u = 1.2 ; v = 1.0 ; w = 1.1 ;
+    !u = 1.2 ; v = 1.0 ; w = 1.1 ;
+    u = 1.0 ; v = 1.0 ; w = 1.0 ;
     norme = sqrt(u*u + v*v + w*w)
     u = u / norme ; v = v / norme ;  w = w / norme ;
 
-    call move_to_Voronoi_grid(x,y,z, u,v,w, s,icell)
+    call move_to_Voronoi_grid(x,y,z, u,v,w, s, icell)
+    x = x + s*u ; y = y + s*v ; z = z+s*w ! a mettre dans move ??
 
     ! OK
+
+
+    ! TEST
+    write(*,*) "testing length_Voronoi"
+    id = 1 ; lambda = 1 !TODO
+    Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
+
+    flag_star = .true.
+    flag_direct_star = .true.
+
+    tau = 100 ;
+
+    call length_Voronoi(id,lambda,Stokes, icell,x,y,z, u,v,w, flag_star,flag_direct_star, tau, lvol,flag_sortie)
+
+    write(*,*) "lvol", lvol, flag_sortie
+    write(*,*) "icell", icell
+    write(*,*) x, y, z
+
 
     return
 
@@ -130,13 +174,30 @@ module Voronoi_grid
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k
 
+
+    write(*,*) ""
+    write(*,*) ""
+    write(*,*) ""
+    write(*,*) "********************************"
+
     r(1) = x ; r(2) = y ; r(3) = z
     k(1) = u ; k(2) = v ; k(3) = w
 
     s = 1e30 !huge_real
     next_cell = 0
-    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%first_neighbour
+    write(*,*) "CVin  PB ???", icell, Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+
+    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
        in = neighbours_list(i) ! id du voisin
+
+       write(*,*) "CV", i, in
+
+       if (in > 0) then
+          write(*,*) r(1), Voronoi(icell)%x, Voronoi(in)%x
+          write(*,*) r(2), Voronoi(icell)%y, Voronoi(in)%y
+          write(*,*) r(3), Voronoi(icell)%z, Voronoi(in)%z
+       endif
+
 
        if (in==previous_cell) cycle nb_loop
 
@@ -146,9 +207,10 @@ module Voronoi_grid
           n(2) = Voronoi(in)%y - Voronoi(icell)%y
           n(3) = Voronoi(in)%z - Voronoi(icell)%z
 
+
           ! test direction
           den = dot_product(n, k)
-          if (den <= 0) cycle nb_loop
+          if (den <= 0) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
           p(1) = 0.5 * (Voronoi(in)%x + Voronoi(icell)%x)
@@ -158,13 +220,23 @@ module Voronoi_grid
           s_tmp = dot_product(n, p-r) / den
        else ! i < 0 ; le voisin est un wall
           s_tmp = distance_to_wall(x,y,z, u,v,w, -in) ;
+
+          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardabt le wall d'entree
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+
        endif
 
        if (s_tmp < s) then
           s = s_tmp
           next_cell = in
        endif
+
+       write(*,*) "s_tmp", s_tmp, s
+
     enddo nb_loop ! i
+
+    write(*,*) "s_finale", s, next_cell
+    read(*,*)
 
     return
 
@@ -218,9 +290,6 @@ module Voronoi_grid
 
   real function distance_to_wall(x,y,z, u,v,w, iwall)
     ! Mur plan pour le moment : meme algorithme que cross Voronoi cell
-    ! renvoie une valeur :
-    ! - negative si on rentre dans le modele (car la normale du mur est vers l'exterieur)
-    ! - positive is on sort du modele
 
     real, intent(in) :: x,y,z, u,v,w
     integer, intent(in) :: iwall
@@ -236,14 +305,14 @@ module Voronoi_grid
     n(1) = wall(iwall)%x1 ; n(2) = wall(iwall)%x2 ;  n(3) = wall(iwall)%x3 ;
     p = wall(iwall)%x4 * n  ! todo : verifier le signe
 
-    den = dot_product(n, k)
+    den = dot_product(n, k) ! le signe depend du sens de propagation par rapport a la normale
 
     write(*,*) "------------------------"
     write(*,*) "wall", iwall
     write(*,*) "P", p
     write(*,*) "n", n
     write(*,*) "den", den
-
+    write(*,*) "------------------------"
 
     if (abs(den) > 0) then
        distance_to_wall = dot_product(n, p-r) / den
@@ -334,6 +403,9 @@ module Voronoi_grid
 
     write(*,*) "icell", icell
 
+    write(*,*) x_test, y_test, z_test
+    write(*,*) Voronoi(icell)%x, Voronoi(icell)%y, Voronoi(icell)%z
+
     ! Move to the cell (if wall is approximate)
 
     return
@@ -342,23 +414,91 @@ module Voronoi_grid
 
   !----------------------------------------
 
-!  subroutine length_Voronoi(id,lambda,Stokes,id,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-!    !Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-!    ! C. Pinte
-!
-!    integer, intent(in) :: id,lambda
-!    integer, intent(inout) :: id
-!    real(kind=db), dimension(4), intent(in) :: Stokes
-!    logical, intent(in) :: flag_star, flag_direct_star
-!    real(kind=db), intent(inout) :: u,v,w
-!    real, intent(in) :: extrin
-!    real(kind=db), intent(inout) :: xio,yio,zio
-!    real, intent(out) :: ltot
-!    logical, intent(out) :: flag_sortie
-!
-!    return
-!
-!  end subroutine length_Voronoi
+  subroutine length_Voronoi(id,lambda,Stokes,cell_io,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+    !Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
+    ! C. Pinte
+
+    integer, intent(in) :: id,lambda
+    integer, intent(inout) :: cell_io
+    real(kind=db), dimension(4), intent(in) :: Stokes
+    logical, intent(in) :: flag_star, flag_direct_star
+    real, intent(inout) :: u,v,w
+    real, intent(in) :: extrin
+    real, intent(inout) :: xio,yio,zio
+    real, intent(out) :: ltot
+    logical, intent(out) :: flag_sortie
+
+
+    logical :: lstop
+
+    real(kind=db) :: extr, tau, opacite !, correct_moins, correct_plus
+    integer :: previous_cell, cell, next_cell
+
+    real :: x, y, z, l
+
+    !correct_moins = 1.0_db - prec_grille
+    !correct_plus = 1.0_db + prec_grille
+
+    extr = extrin
+
+    previous_cell = 0
+    cell = cell_io
+
+    lstop = .false.
+
+    x = xio ; y = yio ; z=zio
+    ltot = 0.0
+
+    ! Boucle infinie sur les cellules
+    do
+
+       write(*,*) "length_V 1", cell
+       call cross_Voronoi_cell(cell, previous_cell, x,y,z, u,v,w, next_cell, l)
+       opacite=1.0 !kappa(lambda,cell,1,1) ! TODO !!!
+
+       write(*,*) "length_V 2", next_cell, l
+
+       ! Calcul longeur de vol et profondeur optique dans la cellule
+       tau=l*opacite ! opacite constante dans la cellule
+
+       write(*,*) tau, extr
+
+       ! Comparaison integrale avec tau
+       ! et ajustement longueur de vol evntuellement
+       if(tau > extr) then ! On a fini d'integrer
+          lstop = .true.
+          l = l * (extr/tau) ! on rescale l pour que tau=extr
+          ltot=ltot+l
+       else ! Il reste extr - tau a integrer dans la cellule suivante
+          extr=extr-tau
+          ltot=ltot+l
+       endif
+
+       ! Update position
+       x=x+l*u ; y=y+l*v ; z=z+l*w
+
+       ! Test si on on sort de la routine ou pas
+       if (lstop) then ! On a fini d'integrer
+          write(*,*) "length_V out: photon interacts"
+          flag_sortie = .false.
+          cell_io = cell
+          xio=x ; yio=y ;zio=z
+          return
+       else ! On passe a la cellule suivante
+          previous_cell = cell
+          cell = next_cell
+
+          if (cell < 0) then ! on sort du volume
+             write(*,*) "length_V out: photon exits"
+             flag_sortie = .true.
+             return
+          endif
+       endif
+    enddo ! Boucle sur cellules
+
+    return
+
+  end subroutine length_Voronoi
 
 !----------------------------------------
 
@@ -405,7 +545,7 @@ integer function find_Voronoi_cell(iwall, x,y,z)
      endif
   enddo
 
-  write(*,*) "dist2_min", dist2_min
+  write(*,*) "dist_min", sqrt(dist2_min)
 
   find_Voronoi_cell = icell_min
   return
@@ -423,6 +563,6 @@ program Voronoi
 
   implicit none
 
-  call read_Voronoi(999997)
+  call read_Voronoi(1000)
 
 end program Voronoi
