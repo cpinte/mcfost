@@ -600,6 +600,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -641,7 +642,6 @@ contains
           mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
           mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
        enddo
-
 
     endif ! lfits
 
@@ -1142,6 +1142,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -1683,6 +1684,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -2227,6 +2229,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -2759,6 +2762,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -3298,6 +3302,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -3829,6 +3834,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -4345,6 +4351,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -4860,6 +4867,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -5374,6 +5382,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -5749,6 +5758,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6108,6 +6118,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6475,6 +6486,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6844,6 +6856,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7211,6 +7224,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7549,6 +7563,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7878,6 +7893,7 @@ end subroutine read_para215
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true.
+                T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
