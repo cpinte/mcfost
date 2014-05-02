@@ -1105,7 +1105,7 @@ subroutine opacite2(lambda)
 !  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
-     write(*,*) "Writing dust prop."
+     write(*,*) "Writing dust propreties"
 
      ! Only do it after the last pass through the wavelength table
      ! in order to populate the tab_s11_pos and tab_s12_pos tables first!

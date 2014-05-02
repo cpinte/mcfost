@@ -2535,7 +2535,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,spectre,status)
 
   !------------------------------------------------------------------------------
-  ! Continuum map
+  ! HDU 2 : Continuum map
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis=4
@@ -2567,7 +2567,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,continu,status)
 
   !------------------------------------------------------------------------------
-  ! Transition numbers
+  ! HDU 3 : Transition numbers
   !------------------------------------------------------------------------------
   bitpix=32
   naxis = 1
@@ -2584,7 +2584,7 @@ subroutine ecriture_spectre(imol)
   call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
 
   !------------------------------------------------------------------------------
-  ! Transition frequencies
+  ! HDU 4 : Transition frequencies
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1
@@ -2606,7 +2606,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,freq,status)
 
   !------------------------------------------------------------------------------
-  ! Velocities
+  ! HDU 5 : Velocities
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1

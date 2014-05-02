@@ -827,7 +827,7 @@ subroutine Temp_nRE(lconverged)
      id =1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
-     do i=1, n_rad
+     do i=n_rad, 1, -1
         !$ id = omp_get_thread_num() + 1
         do j=1,nz
 
@@ -916,10 +916,10 @@ subroutine Temp_nRE(lconverged)
                  ! Impossible de definir proba de temperature
                  t_cool = 1.0
                  t_abs = 0.0
-                 write(*,*) "ERROR : temperature of non equilibrium grains"
-                 write(*,*) "is larger than maximum temperature set in the"
-                 write(*,*) "parameter file. Exiting !"
+                 write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
                  write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
+                 write(*,*) "Exiting"
+                 stop
               endif
 
               !           t_cool=1.0 ; t_abs = 0.0
