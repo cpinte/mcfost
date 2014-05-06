@@ -65,12 +65,13 @@ subroutine transfert_poussiere()
   logical :: flag_star, flag_scatt
 
 
-  logical :: laffichage, flag_em_nRE
+  logical :: laffichage, flag_em_nRE, lcompute_dust_prop
 
   ! Paramètres parallelisation
   integer :: id=1
 
   real(kind=db), dimension(:), pointer :: p_nnfot2
+
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
@@ -92,7 +93,7 @@ subroutine transfert_poussiere()
      p_lambda => lambda
  else
      lambda0=1
-     p_lambda => lambda0
+     p_lambda => lambda ! was lambda0 : changed to save dust properties
   endif
 
 
@@ -202,12 +203,10 @@ subroutine transfert_poussiere()
      endif
      call repartition_energie_etoiles()
      call prop_grains(1,1)
-
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
-
      call opacite2(1)
      call integ_tau(1) !TODO
 
@@ -267,11 +266,18 @@ subroutine transfert_poussiere()
               call init_directions_ray_tracing()
            endif
 
-           write(*,'(a30, $)') "Computing dust properties ..."
+           ! Try to restore dust calculation from previous run
+           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+           if (lcompute_dust_prop) then
+              write(*,'(a30, $)') "Computing dust properties ..."
+           else
+              write(*,'(a46, $)') "Reading dust properties from previous run ..."
+           endif
            do lambda=1,n_lambda
-              call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data
+              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
+              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
            enddo !n
+           if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
 
            if (ldust_sublimation)  then
@@ -409,11 +415,20 @@ subroutine transfert_poussiere()
               call init_directions_ray_tracing()
            endif
 
-           ! Recalcul des propriétés opt
+           ! Recalcul des propriétés optiques
+           ! Try to restore dust calculation from previous run
+           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+           if (lcompute_dust_prop) then
+              write(*,'(a30, $)') "Computing dust properties ..."
+           else
+              write(*,'(a46, $)') "Reading dust properties from previous run ..."
+           endif
            do lambda=1,n_lambda2
-              call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data
-           enddo
+              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
+              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+           enddo !n
+           if (lcompute_dust_prop) call save_dust_prop(letape_th)
+           write(*,*) "Done"
         endif
         lambda = ind_etape - first_etape_obs + 1
 

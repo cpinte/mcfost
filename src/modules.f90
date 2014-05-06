@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.5"
+  character(8), parameter :: mcfost_release = "2.19.6"
   real, parameter :: required_utils_version = 2.19
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -375,7 +375,6 @@ module grains
 
      logical :: is_PAH, lcoating
      integer :: ind_debut, ind_fin
-     integer :: pop_geo
   end type dust_pop_type
 
   type(dust_pop_type), dimension(:), allocatable, target :: dust_pop
@@ -408,19 +407,16 @@ module grains
   real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2
 
   ! Parametres de diffusion des grains
-  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34 !n_lambda,n_grains,180
+  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
   real, dimension(:,:), allocatable :: tab_g, tab_albedo, q_ext, q_sca, q_abs!n_lambda,n_grains
-  real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
-  real, dimension(:,:,:), allocatable :: prob_s11 !n_lambda,n_grains,0:180
+  !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
   ! aggregats
   real, dimension(:,:,:,:,:), allocatable :: tab_mueller !n_lambda,n_grains,4,4,180
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:,:,:), allocatable :: tab_albedo_pos, tab_g_pos !n_lambda,n_rad,nz+1, (n_az)
-  real, dimension(:,:,:,:,:), allocatable :: tab_s11_pos, tab_s12_pos!n_lambda,n_rad,nz+1,(n_az), 180
-  real, dimension(:,:,:,:,:), allocatable ::  tab_s33_pos, tab_s34_pos !n_lambda,n_rad,nz+1,(n_az), 180
-  real, dimension(:,:,:,:,:), allocatable :: prob_s11_pos !n_lambda,n_rad,nz+1,(n_az),0:180
+  real, dimension(:,:,:,:,:), allocatable :: tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos !n_lambda,n_rad,nz+1,(n_az), 180
 
   character(len=512) :: aggregate_file, mueller_aggregate_file
   real :: R_sph_same_M
