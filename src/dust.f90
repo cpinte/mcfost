@@ -546,24 +546,24 @@ subroutine prop_grains(lambda, p_lambda)
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
-              call mueller2(p_lambda,k,alfa,amu1,amu2,qext,qsca,gsca)
+              call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
-                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
+                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
-              call mueller_DHS(p_lambda,k,wavel,amu1,amu2,qext,qsca,gsca)
+              call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
               write(*,*) "Exiting"
               stop
            endif
-!           write(*,*) wavel, qext,qsca,gsca
+           !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
      else ! grain de PAH
         is_grain_PAH(k) = .true.
-        call mueller_PAH(lambda,p_lambda,k,qext,qsca,gsca)
+        call mueller_PAH(lambda,p_lambda,k,qext, qsca,gsca)
      endif
      tab_albedo(lambda,k)=qsca/qext
      tab_g(lambda,k) = gsca
@@ -585,6 +585,104 @@ subroutine prop_grains(lambda, p_lambda)
 end subroutine prop_grains
 
 !******************************************************************************
+
+subroutine save_dust_prop(letape_th)
+
+  logical, intent(in) :: letape_th
+
+  type(dust_pop_type), dimension(n_pop) :: dust_pop_save
+  character(len=512) :: filename, tab_wavelength_save
+  integer :: n_lambda_save
+  real :: lambda_min_save, lambda_max_save
+
+  dust_pop_save = dust_pop
+  n_lambda_save = n_lambda
+  lambda_min_save = lambda_min
+  lambda_max_save = lambda_max
+  tab_wavelength_save = tab_wavelength
+
+  if (letape_th) then
+     filename=".dust_prop1.tmp" ;
+  else
+     filename=".dust_prop2.tmp" ;
+  endif
+
+  open(1,file=filename,status='replace',form='unformatted')
+  write(1) dust_pop_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  close(unit=1)
+
+  return
+
+end subroutine save_dust_prop
+
+!******************************************************************************
+
+subroutine read_saved_dust_prop(letape_th, lcompute)
+
+  logical, intent(in) :: letape_th
+  logical, intent(out) :: lcompute
+
+  type(dust_pop_type), dimension(n_pop) :: dust_pop_save
+  character(len=512) :: filename, tab_wavelength_save
+  integer :: n_lambda_save
+  real :: lambda_min_save, lambda_max_save
+
+  integer :: i, pop, ios
+  logical :: ok
+
+  lcompute = .true.
+
+  if (letape_th) then
+     filename=".dust_prop1.tmp" ;
+  else
+     filename=".dust_prop2.tmp" ;
+  endif
+
+  ! check if there is a dust population file
+  ios = 0
+  open(1,file=filename,status='old',form='unformatted',iostat=ios)
+  if (ios /= 0)  then
+     close(unit=1)
+     return
+  endif
+
+  ! read the saved dust properties
+  read(1,iostat=ios)  dust_pop_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  close(unit=1)
+  if (ios /= 0)  return
+
+  ! check if the dust population has changed
+  ok = (n_lambda == n_lambda_save) .and. (real_equality(lambda_min,lambda_min_save)) .and. &
+       (real_equality(lambda_max,lambda_max_save)) .and. (tab_wavelength == tab_wavelength_save)
+  if (.not.ok) return
+
+  do pop=1, n_pop
+     ok = ok .and. (dust_pop(pop)%type  == dust_pop_save(pop)%type)
+     ok = ok .and. (dust_pop(pop)%n_grains  == dust_pop_save(pop)%n_grains)
+     ok = ok .and. (dust_pop(pop)%methode_chauffage  == dust_pop_save(pop)%methode_chauffage)
+     ok = ok .and. (dust_pop(pop)%mixing_rule  == dust_pop_save(pop)%mixing_rule)
+     ok = ok .and. (dust_pop(pop)%n_components  == dust_pop_save(pop)%n_components)
+     do i=1, dust_pop(pop)%n_components
+        ok = ok .and. (dust_pop(pop)%indices(i)  == dust_pop_save(pop)%indices(i))
+     enddo ! i
+     ok = ok .and. (real_equality(dust_pop(pop)%amin,dust_pop_save(pop)%amin))
+     ok = ok .and. (real_equality(dust_pop(pop)%amax,dust_pop_save(pop)%amax))
+     ok = ok .and. (real_equality(dust_pop(pop)%aexp,dust_pop_save(pop)%aexp))
+     ok = ok .and. (real_equality(dust_pop(pop)%frac_mass,dust_pop_save(pop)%frac_mass))
+     ok = ok .and. (real_equality(dust_pop(pop)%porosity,dust_pop_save(pop)%porosity))
+     ok = ok .and. (real_equality(dust_pop(pop)%dhs_maxf,dust_pop_save(pop)%dhs_maxf))
+     if (.not.ok) return
+  enddo ! pop
+
+  lcompute = .false.
+  return
+
+end subroutine read_saved_dust_prop
+
+!******************************************************************************
+
 
 subroutine opacite2(lambda)
 ! Calcule la table d'opacite et probsizecumul

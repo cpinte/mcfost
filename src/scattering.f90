@@ -771,7 +771,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
      read(12,*)
      read(12,*)  !'Scattering matrix (4X4 for each scattering angle):'
      read(12,*) string
-    do i=1,nang2
+     do i=1,nang2
         read(12,'(f7.1,4e16.7)') dang(i),mue(1,1,i),mue(1,2,i),mue(1,3,i),mue(1,4,i)
         read(12,'(7x,4e16.7)')   mue(2,1,i),mue(2,2,i),mue(2,3,i),mue(2,4,i)
         read(12,'(7x,4e16.7)')   mue(3,1,i),mue(3,2,i),mue(3,3,i),mue(3,4,i)
