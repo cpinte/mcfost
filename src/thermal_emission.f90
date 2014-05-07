@@ -958,7 +958,7 @@ subroutine Temp_nRE(lconverged)
                  do T=2, n_T
                     if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
                     if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
-                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / Akj(T-1, T,id)
+                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(Akj(T-1, T,id),tiny_db)
                  enddo
 
                  !! Normalisation
