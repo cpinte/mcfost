@@ -315,7 +315,7 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
-     p_n_lambda = n_lambda ! was lambda0 : changed to save dust properties
+     p_n_lambda = n_lambda ! was 1 : changed to save dust properties
 
      if (l3D) then
         allocate(tab_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
