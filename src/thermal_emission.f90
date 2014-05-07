@@ -1339,15 +1339,9 @@ subroutine repartition_energie(lambda)
               else
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
-                    if (i==1) then
-                       Ener = 4.0*kappa_abs_eg(lambda,i,j,pk)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
-                       frac = (r_in_opacite(j,pk)-rmin)/(r_lim(1)-rmin)
-                       E_cell(l) =  Ener * frac
-                    else if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
+                    if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
                        E_cell(l) =  4.0*kappa_abs_eg(lambda,i,j,pk)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
-
-
                  endif !cst_wl
               endif ! Temp==0.0
 
