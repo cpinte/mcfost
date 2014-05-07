@@ -181,7 +181,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         c=(r_2-r_lim_2(0))*inv_a
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
@@ -559,7 +559,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         c=(r0_2-r_lim_2(0)*correct_plus)
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
