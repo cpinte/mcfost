@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.6"
+  character(8), parameter :: mcfost_release = "2.19.7"
   real, parameter :: required_utils_version = 2.19
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -188,6 +188,7 @@ module disk
   type disk_region_type
      integer :: n_zones
      real(kind=db) :: Rmin, Rmax
+     integer :: iRmin, iRmax
      integer, dimension(:), allocatable :: zones
   end type disk_region_type
 
