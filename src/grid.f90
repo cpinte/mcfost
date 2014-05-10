@@ -236,6 +236,8 @@ subroutine define_grid4()
         if (lprint) write(*,*) "istart", istart, n_rad_in_region, n_rad_in
         if (lprint) write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
 
+        regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
+
 
         if (ir == n_regions) then
            n_rad_region = n_rad - n_cells ! On prend toutes les celles restantes
