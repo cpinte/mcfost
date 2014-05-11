@@ -2624,23 +2624,40 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         if (dotprod == 0.0_db) then
            t=1.0e10
         else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 zlim=1.0e10
-              else if (zj0==-(nz+1)) then
-                 delta_zj=0
-                 zlim=-1.0e10
-              else
-                 if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
-                    delta_zj=1
+           if (dotprod > 0.0_db) then ! on se rapproche de la surface
+              if (l3D) then
+                 if (zj0==nz+1) then
+                    delta_zj=0
+                    zlim=1.0e10
+                 else if (zj0==-(nz+1)) then
+                    delta_zj=0
+                    zlim=-1.0e10
                  else
-                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
-                    delta_zj=-1
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                       delta_zj=1
+                    else
+                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                       delta_zj=-1
+                    endif
                  endif
-              endif
+              else ! 2D
+                 if (zj0==nz+1) then
+                    delta_zj=0
+                    if (z0 > 0.0_db) then
+                       zlim=1.0e10
+                    else
+                       zlim=-1.0e10
+                    endif
+                 else
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                    else
+                       zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    endif
+                    delta_zj=1
+                 endif
+              endif ! l3D
            else ! on se rappoche du midplane
               if (l3D) then
                  if (z0 > 0.0) then
