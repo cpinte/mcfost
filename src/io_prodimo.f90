@@ -939,8 +939,8 @@ contains
     character(len=128) :: line
     character(len=10) :: fmt
 
-    integer :: status, i, iProDiMo, syst_status
-    logical :: unchanged, other_PAH
+    integer :: status, i, iProDiMo, syst_status, ipop
+    logical :: unchanged
 
 
     character :: s
@@ -1015,6 +1015,18 @@ contains
           unchanged = .false.
        endif
 
+       if (INDEX(line,"! PAH_in_RT") > 0) then
+          lPAH = .false.
+          do ipop=1, n_pop
+             if (dust_pop(ipop)%is_PAH) then
+                lPAH = .true.
+             endif
+          enddo
+          write(2,*) lPAH, " ! PAH_in_RT : set by MCFOST"
+          unchanged = .false.
+       endif
+
+
        if (INDEX(line,"! v_turb") > 0) then
           write(2,*) real(vitesse_turb * m_to_km), " ! v_turb [km/s] : set by MCFOST"
           unchanged = .false.
@@ -1024,6 +1036,8 @@ contains
           write(2,*) RT_imin, " ! incl : set by MCFOST (1st MCFOST inclination)" ! tab_RT_incl n'est pas necessairement alloue
           unchanged = .false.
        endif
+
+
 
        if (unchanged) then
           if (len(trim(line)) > 0) then

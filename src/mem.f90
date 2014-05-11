@@ -216,12 +216,12 @@ subroutine alloc_dynamique()
   tab_albedo = 0
 
   allocate(q_ext(n_lambda,n_grains_tot), q_sca(n_lambda,n_grains_tot), &
-       q_abs(n_lambda,n_grains_tot), q_geo(n_grains_tot), stat=alloc_status)
+       q_abs(n_lambda,n_grains_tot), stat=alloc_status) !  q_geo(n_grains_tot)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error q_ext'
      stop
   endif
-  q_ext = 0 ; q_sca = 0 ; q_abs = 0 ; q_geo =0
+  q_ext = 0 ; q_sca = 0 ; q_abs = 0 !; q_geo =0
 
 
   allocate(tab_g(n_lambda,n_grains_tot), stat=alloc_status)
@@ -315,6 +315,8 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
+     p_n_lambda = n_lambda ! was 1 : changed to save dust properties
+
      if (l3D) then
         allocate(tab_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
      else
@@ -371,7 +373,6 @@ subroutine alloc_dynamique()
         stop
      endif
      prob_s11_pos = 0
-     p_n_lambda = 1
   else ! prop par grains
      p_n_lambda = n_lambda
 
@@ -1021,7 +1022,7 @@ subroutine dealloc_em_th()
   !deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
   !deallocate(tab_x0,tab_y0,tab_z0)
 
-  deallocate(tab_albedo,q_ext,q_sca,q_abs,q_geo,tab_g)
+  deallocate(tab_albedo,q_ext,q_sca,q_abs,tab_g) ! q_geo
 
   !deallocate(E_stars,E_disk,frac_E_stars,E_totale)
 
@@ -1828,7 +1829,7 @@ end subroutine alloc_emission_mol
 
 subroutine dealloc_emission_mol()
 
-  deallocate(kappa,emissivite_dust)
+  deallocate(kappa,kappa_sca,emissivite_dust) ! reste non dealloue par clean_dust_mol
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &

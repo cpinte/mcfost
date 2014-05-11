@@ -1253,4 +1253,25 @@ subroutine GauLeg(x1,x2,x,w,n)
 
 end subroutine gauleg
 
+!************************************************************
+
+logical function real_equality(x,y)
+
+  real, intent(in) :: x, y
+
+  real_equality = .false.
+  if (abs(x) < tiny_real) then
+     if (abs(y) < tiny_real) then
+        real_equality = .true.
+     endif
+  else
+     real_equality = abs(x-y) < 1e-5 * abs(x)
+  endif
+
+  return
+
+end function real_equality
+
+!************************************************************
+
 end module utils

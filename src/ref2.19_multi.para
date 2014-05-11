@@ -32,7 +32,7 @@
   T	                  axial symmetry (important only if N_phi > 1)
 
 #Disk physics
-  3     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  1     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
   F                       dust radial migration
   F		  	  sublimate dust
   F                       hydostatic equilibrium

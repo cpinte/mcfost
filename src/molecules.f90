@@ -781,7 +781,11 @@ subroutine init_dust_mol(imol)
               if (zj==0) cycle bz
               do phik=1, n_az
                  ! Interpolation champ de radiation en longeur d'onde
-                 ! Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))  ! todo : tmp pas de scatt pour le moment
+                 if (lProDiMo2mcfost) then
+                    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+                 else
+                    Jnu = 0.0 ! todo : pour prendre en compte scattering
+                 endif
 
                  T = Temperature(ri,zj,phik)
                  ! On ne fait que du scattering isotropique dans les raies pour le moment ...

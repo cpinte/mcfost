@@ -79,7 +79,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
+  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm, factor
   integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, iscatt, dir, p_ri0, p_zj0
   integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in
 
@@ -181,7 +181,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         c=(r_2-r_lim_2(0))*inv_a
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
@@ -208,9 +208,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
            delta_rad=1
         endif !dotprod
         rac=sqrt(delta)
-        s=-b-rac
+        s=(-b-rac) * correct_plus
         if (s < 0.0_db) then
-           s=-b+rac
+           s=(-b+rac) * correct_plus
         else if (s==0.0_db) then
            s=prec_grille
         endif
@@ -408,19 +408,20 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         ! Patch pour eviter BUG sur position radiale
         ! a cause de limite de precision
 !        if ((ri/=ri0).or.(zj/=zj0).or.(zj > nz)) then
-!           factor = rmin/ sqrt(xio*xio+yio*yio+zio*zio) * correct_plus
-!           xio = xio * factor
-!           yio = yio * factor
-!           zio = zio * factor
-!
-!           ! On verifie que c'est OK maintenant
-!           call indice_cellule_sph(xio,yio,zio,ri,thetaj)
-!           if (ri==0) then
-!              write(*,*) "BUG integ_deg2_SPH"
-!              write(*,*) "Exiting"
-!              stop
-!           endif
-!        endif
+        if (ri==0) then
+           factor = rmin/ sqrt(xio*xio+yio*yio) * correct_plus
+           xio = xio * factor
+           yio = yio * factor
+           zio = zio * factor
+
+           ! On verifie que c'est OK maintenant
+           call indice_cellule(xio,yio,zio,ri,zj)
+           if (ri==0) then
+              write(*,*) "BUG integ_deg2_cyl"
+              write(*,*) "Exiting"
+              stop
+           endif
+        endif
 
         if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
            ! On resort le paquet
@@ -559,7 +560,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         c=(r0_2-r_lim_2(0)*correct_plus)
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
@@ -4776,10 +4777,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   if (n_zones > 1) then
      do i=1, n_rad
         if (sum(densite_pouss(i,1,1,:)) < tiny_real) then
-
+           l_dark_zone(i,:,1) = .false.
         endif
      enddo
   endif
+
+  do i=1, n_regions
+     l_dark_zone(regions(i)%iRmin,:,1) = .false.
+     l_dark_zone(regions(i)%iRmax,:,1) = .false.
+  enddo
 
 !  write(*,*) l_dark_zone(:,nz,1)
 !  write(*,*) "**"
