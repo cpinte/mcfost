@@ -2685,7 +2685,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
                     if (z0 > 0.0_db) then
                        zlim=z_lim(ri0,zj0)*correct_moins
                     else
-                       zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                       zlim=-z_lim(ri0,zj0)*correct_moins
                     endif
                     delta_zj=-1
                  endif !(zj0==1)
@@ -2829,7 +2829,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
 
            ! Epaisseur optique
            dtau(:) =  l * opacite(:)
-           dtau_c = l * kappa(iiTrans,ri0,zj0,1)
+           dtau_c = l * kappa(iiTrans,ri0,zj0,phik0)
 
            ! Fonction source
            Snu(:) = ( emissivite_mol_o_freq(ri0,zj0,phik0,iiTrans) * P(:) &
@@ -3467,7 +3467,11 @@ subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
 
   ! Determination de l'indice de la premiere cellule traversee
   ! pour initialiser la propagation
-  call indice_cellule_3D(x,y,z,ri,zj,phik)
+  if (l3D) then
+     call indice_cellule_3D(x,y,z,ri,zj,phik)
+  else
+     call indice_cellule(x,y,z,ri,zj) ; phik=1
+  endif
 
   return
 
