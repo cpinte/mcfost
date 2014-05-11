@@ -2555,6 +2555,9 @@ subroutine densite_file()
   ! 12/0/09
   ! Mise a jour 9/11/13
 
+  use grains
+  use utils
+
   implicit none
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
@@ -2563,13 +2566,13 @@ subroutine densite_file()
   logical :: anynull
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a
+  integer :: k, l, i, n_a, read_n_a
   real(kind=db) :: somme, mass, facteur
-  real :: tmp
+  real :: a, tmp
   character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
-  real, dimension(:), allocatable :: a_sph ! n_a
+  real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
 
   type(disk_zone_type) :: dz
 
@@ -2615,7 +2618,8 @@ subroutine densite_file()
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
   nbuffer=npixels
 
-  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a))
+  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
@@ -2624,20 +2628,45 @@ subroutine densite_file()
   sph_dens = max(sph_dens,tiny_db)
 
   ! Lecture des tailles de grains (en microns)
-  if (n_a > 99999) then
-     write(*,*) "ERROR : max 99999 grain sizes at the moment"
-     write(*,*) "code must be updated if you need more"
-     write(*,*) "Exiting."
+!  if (n_a > 99999) then
+!     write(*,*) "ERROR : max 99999 grain sizes at the moment"
+!     write(*,*) "code must be updated if you need more"
+!     write(*,*) "Exiting."
+!     stop
+!  endif
+!
+!  do i=1,n_a
+!     write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
+!     a_sph(i) = tmp ! cannot read directly into an array element
+!     write(*,*) i, a_sph(i), "microns"
+!  enddo
+
+
+  read_n_a = 0
+  call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
+
+  !---------------------------------------------------------
+  ! HDU 2 : grain sizes
+  !---------------------------------------------------------
+  !  move to next hdu
+  call ftmrhd(unit,1,hdutype,status)
+
+  ! Check dimensions
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if (nfound /= 1) then
+     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'of HDU 2 file. Exiting.'
      stop
   endif
-  do i=1,n_a
-     stat = 0
-     tmp = 0.0
-     write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
-!     write(*,*) tmp, stat
-     write(*,*) 'grain_size_'//trim(ADJUSTL(s)), tmp, "microns"
-     a_sph(i) = tmp ! cannot read directly into an array element
-  enddo
+  if ((naxes(1) /= n_a)) then
+     write(*,*) "Error : HDU 2 does not have the"
+     write(*,*) "right dimensions. Exiting."
+     stop
+  endif
+  npixels=naxes(1)
+
+  ! read_image
+  call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
 
   ! On verifie que les grains sont tries
   do i=1, n_a-1
@@ -2647,6 +2676,66 @@ subroutine densite_file()
         stop
      endif
   enddo
+
+
+  ! On lit au besoin la distribution en taille (dn(a) / da)
+  if (read_n_a==1) then
+     write(*,*) "Reading grain size distribution from fits file"
+
+     !---------------------------------------------------------
+     ! HDU 3 : nombre de grains
+     !---------------------------------------------------------
+     !  move to next hdu
+     call ftmrhd(unit,1,hdutype,status)
+
+     nfound = 0 ; naxes = 0 ;
+     ! Check dimensions
+     call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+     if (nfound /= 1) then
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of HDU 2 file. Exiting.'
+        stop
+     endif
+     if ((naxes(1) /= n_a)) then
+        write(*,*) "Error : HDU 2 does not have the"
+        write(*,*) "right dimensions. Exiting."
+        stop
+     endif
+     npixels=naxes(1)
+
+     ! read_image
+     call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
+
+     tmp = sum(n_a_sph)
+     do i=1,n_a
+        write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
+     enddo
+
+
+     if (n_pop > 1) then
+        write(*,*) "ERROR : density fits interface only works for 1 dust pop"
+        stop
+     endif
+
+     allocate(log_a_sph(n_a), log_n_a_sph(n_a))
+     log_a_sph = log(a_sph) ; log_n_a_sph = log(n_a_sph)
+
+     ! Multiplication par a car da = a.dln(a)
+     do k=1, n_grains_tot
+        write(*,*) k
+        a = r_grain(k)
+        ! todo : peut etre optimise sans interp
+        nbre_grains(k) = exp( interp(log_n_a_sph, log_a_sph, log(a)) )  * a
+     enddo !k
+
+     ! Normalisation de tous les grains au sein d'une pop
+     nbre_grains = nbre_grains / sum(nbre_grains)
+  else
+     write(*,*) "Using grain size distribution from parameter file"
+     do i=1,n_a
+        write(*,*) i, a_sph(i), "microns"
+     enddo
+  endif
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -2710,7 +2799,7 @@ subroutine densite_file()
 
 
   if (lstrat) then
-     write(*,*) "Dust Differential gap"
+     write(*,*) "Differential spatial distribution"
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
@@ -2727,7 +2816,7 @@ subroutine densite_file()
         endif
      enddo
   else ! Tous les grains suivent le gas
-     write(*,*) "Constant Gap"
+     write(*,*) "Constant spatial distribution"
      do k=1,n_grains_tot
         densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
      enddo
@@ -2752,6 +2841,12 @@ subroutine densite_file()
      enddo !i
      densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)
   enddo !l
+
+
+  ! TODO : changer la distribution des grains
+
+
+
 
   ! Normalisation : on a 1 grain en tout dans le disque
   do l=1,n_grains_tot

@@ -115,12 +115,13 @@ subroutine readmolecule(imol)
   implicit none
 
   integer, intent(in) :: imol
+  integer, parameter :: nCollTemp_max = 50
 
   character(len=515) :: filename, dir
   character(len=80) :: junk
   integer :: i, j, iLow, iUp, iPart, ios
   real :: a, freq, eu
-  real, dimension(20) :: collrates_tmp, colltemps_tmp
+  real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
 
   character(len=10) :: buffer
 
@@ -178,7 +179,6 @@ subroutine readmolecule(imol)
      Bul(i) = a * (c_light**2)/(2.d0*hp*(transfreq(i))**3)
      ! Transformation Bul -> Blu
      Blu(i) = Bul(i) * poids_stat_g(iUp)/poids_stat_g(iLow)
-
   enddo
 
   fAul(:) = Aul(:) * hp * transfreq(:)/(4*pi)
@@ -190,10 +190,8 @@ subroutine readmolecule(imol)
 
   allocate(nCollTrans(1:nCollPart))
   allocate(nCollTemps(1:nCollPart))
-  allocate(collTemps(1:nCollPart, 1:20))
+  allocate(collTemps(1:nCollPart, 1:nCollTemp_max))
   allocate(collBetween(1:nCollPart))
-
-
 
   do iPart = 1, nCollPart
 
@@ -213,7 +211,7 @@ subroutine readmolecule(imol)
 
      if (iPart == 1) then
         allocate(collRates(1:nCollPart, 1:nCollTrans(iPart) + 50, 1:nCollTemps(ipart) + 50)) ! TODO : passage par des pointeurs, c'est crade
-        allocate(iCollUpper(1:nCollPart, 1:nCollTrans(iPart) +50))
+        allocate(iCollUpper(1:nCollPart, 1:nCollTrans(iPart) + 50))
         allocate(iCollLower(1:nCollPart, 1:nCollTrans(iPart) + 50))
         collRates = 0.d0
      endif
