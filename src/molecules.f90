@@ -701,6 +701,10 @@ subroutine init_dust_mol(imol)
   real(kind=db) :: cst_wl, coeff_exp, cst_E
 
   real, parameter :: gas_dust = 100
+  real, parameter :: delta_lambda = 0.025
+
+  WRITE(*,*) "hard-coded gas_dust =", gas_dust
+
 
   cst_E=2.0*hp*c_light**2
 
@@ -715,6 +719,9 @@ subroutine init_dust_mol(imol)
      ! Tableau de longeur d'onde
      do iTrans=1,nTrans
         tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
+        tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
+        tab_lambda_sup(iTrans)= tab_lambda(iTrans)/delta_lambda
+        tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
      enddo
 
      if (lbenchmark_water3) then ! opacite en loi de puissance

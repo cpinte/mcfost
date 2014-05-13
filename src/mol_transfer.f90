@@ -20,6 +20,7 @@ module mol_transfer
   use ProDiMo, only: read_ProDiMo2mcfost
   use dust_ray_tracing, only: init_directions_ray_tracing
   use dust_transfer, only : flux_etoile_ray_tracing
+  use stars
 
   implicit none
 
@@ -87,6 +88,9 @@ subroutine mol_line_transfer()
 
      ! Absorption et emissivite poussiere
      call init_dust_mol(imol)
+
+     ! recalcul des flux stellaires aux nouvelles longeurs d'onde
+     call repartition_energie_etoiles()
 
      call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
 
@@ -724,7 +728,7 @@ subroutine emission_line_map(imol,ibin)
   cx = igridx/2+1
   cy = igridy/2+1
 
-  do lambda = 1,  mol(imol)%nTrans_raytracing
+  do lambda = 1, mol(imol)%nTrans_raytracing
      Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
 
      spectre(cx,cy,:,lambda,ibin) = spectre(cx,cy,:,lambda,ibin) + Flux_etoile

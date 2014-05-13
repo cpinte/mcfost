@@ -1211,6 +1211,14 @@ subroutine realloc_dust_mol()
   endif
   valeur_prob = 0
 
+  allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error spectre_etoile'
+     stop
+  endif
+  spectre_etoiles_cumul = 0.0
+  spectre_etoiles = 0.0
+
   return
 
 end subroutine realloc_dust_mol
@@ -1221,8 +1229,9 @@ subroutine clean_mem_dust_mol()
 
   integer :: alloc_status
 
-  ! Ne reste que tab_lambda, kappa, kappa_sca et emissivite_dust
-  deallocate(tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, tab_amu1, tab_amu2)
+  ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, kappa_sca, emissivite_dust
+  ! et spectre_etoiles, spectre_etoiles_cumul
+  deallocate(tab_amu1, tab_amu2)
   deallocate(tab_albedo)
   deallocate(q_ext, q_sca, q_abs, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)

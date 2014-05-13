@@ -2008,7 +2008,6 @@ subroutine ecriture_temperature(iTemperature)
      call FTCRHD(unit, status)
      bitpix=-32
 
-
      naxis=3
      naxes(1)=n_rad
      naxes(2)=nz
