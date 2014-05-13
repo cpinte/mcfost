@@ -4071,7 +4071,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
                  if (z0 > 0.0) then
                     zlim=z_lim(ri0,zj0+1)*correct_plus
                  else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
                  endif
                  delta_zj=1
               endif
@@ -4091,7 +4091,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
                  if (z0 > 0.0_db) then
                     zlim=z_lim(ri0,zj0)*correct_moins
                  else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
+                    zlim=-z_lim(ri0,abs(zj0))*correct_moins
                  endif
                  delta_zj=-1
               endif !(zj0==1)
@@ -4178,7 +4178,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(lambda,ri0,zj0,1)
+        dtau =  l * kappa(lambda,ri0,zj0,phik0)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
