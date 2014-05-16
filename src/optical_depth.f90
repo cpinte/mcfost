@@ -378,6 +378,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
                  else
                     theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
                  endif
+                 if (theta_I > n_theta_I) theta_I = n_theta_I
 
                  xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
 
