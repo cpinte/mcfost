@@ -56,6 +56,7 @@ subroutine define_gas_density()
   densite_gaz_tmp = 0.0
   densite_gaz = 0.0 ;
 
+
   do izone=1, n_zones
      dz = disk_zone(izone)
      if (dz%geometry <= 2) then ! Disque
@@ -110,6 +111,11 @@ subroutine define_gas_density()
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
               else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
+                 if (dz%rc < tiny_db) then
+                    write(*,*) "ERROR : tappered-edge structure with Rc = 0."
+                    write(*,*) "Exiting"
+                    stop
+                 endif
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -207,7 +213,7 @@ subroutine define_gas_density()
      enddo !i
      mass =  mass * AU3_to_m3 * g_to_Msun
 
-        ! Normalisation
+     ! Normalisation
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
         !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
@@ -2561,12 +2567,14 @@ subroutine densite_file()
   character(len=80) :: comment
 
   integer :: k, l, i, n_a, read_n_a
-  real(kind=db) :: somme, mass
+  real(kind=db) :: somme, mass, facteur
   real :: a, tmp
   character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
+
+  type(disk_zone_type) :: dz
 
 
   ! Lecture donnees
@@ -2660,10 +2668,9 @@ subroutine densite_file()
   ! read_image
   call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
 
-
   ! On verifie que les grains sont tries
   do i=1, n_a-1
-     if (a_sph(i) > a_sph(i+1)) then
+     if (a_sph(i) >= a_sph(i+1)) then
         write(*,*) "ERROR : grains must be ordered from small to large"
         write(*,*) "Exiting"
         stop
@@ -2732,6 +2739,63 @@ subroutine densite_file()
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
+
+
+
+  ! Densite du gaz : gaz = plus petites particules
+  dz = disk_zone(1)
+  !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
+  do k=1, n_az
+     do j=1,nz
+        do i=1, n_rad
+           densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+        enddo
+     enddo
+  enddo
+
+  ! Symetrie verticale en z
+  do j=1,nz
+     densite_gaz(:,-j,:) = densite_gaz(:,j,:)
+  enddo
+
+  ! Calcul de la masse de gaz de la zone
+  mass = 0.
+  do i=1,n_rad
+     bz_gas_mass : do j=-nz,nz
+        if (j==0) cycle bz_gas_mass
+        do k=1,n_az
+           mass = mass + densite_gaz(i,j,k) *  masse_mol_gaz * volume(i)
+        enddo  !k
+     enddo bz_gas_mass
+  enddo !i
+  mass =  mass * AU3_to_m3 * g_to_Msun
+
+  ! Normalisation
+  if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+     facteur = dz%diskmass * dz%gas_to_dust / mass
+     ! Somme sur les zones pour densite finale
+     do i=1,n_rad
+        bz_gas_mass2 : do j=-nz,nz
+           if (j==0) cycle bz_gas_mass2
+           do k=1, n_az
+              densite_gaz(i,j,k) = densite_gaz(i,j,k) * facteur
+           enddo !k
+        enddo bz_gas_mass2
+     enddo ! i
+  endif
+
+
+  ! Tableau de masse de gaz
+  do i=1,n_rad
+     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
+     bz_gas_mass3 : do j=j_start,nz
+        if (j==0) cycle bz_gas_mass3
+        do k=1, n_az
+           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+        enddo !k
+     enddo bz_gas_mass3
+  enddo ! i
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
 
   if (lstrat) then
@@ -2820,8 +2884,6 @@ subroutine densite_file()
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  write(*,*) "Done"
-
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
      do j=-nz,nz
@@ -2838,6 +2900,12 @@ subroutine densite_file()
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
+
+
+  write(*,*) "MODIFYING 3D DENSITY !!!"
+  k = 36
+  densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
 
   return
 

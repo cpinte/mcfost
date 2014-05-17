@@ -718,7 +718,6 @@ subroutine opacite2(lambda)
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
 
-
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
