@@ -19,6 +19,8 @@ module mol_transfer
   use optical_depth
   use ProDiMo, only: read_ProDiMo2mcfost
   use dust_ray_tracing, only: init_directions_ray_tracing
+  use dust_transfer, only : flux_etoile_ray_tracing
+  use stars
 
   implicit none
 
@@ -87,6 +89,9 @@ subroutine mol_line_transfer()
      ! Absorption et emissivite poussiere
      call init_dust_mol(imol)
 
+     ! recalcul des flux stellaires aux nouvelles longeurs d'onde
+     call repartition_energie_etoiles()
+
      call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
 
      ! Population des niveaux initiale
@@ -146,6 +151,9 @@ subroutine NLTE_mol_line_transfer(imol)
   ! TODO : pourquoi ca merde a haute profondeur optique dans le benchmark 1 de van Zadelhoff ??? :-(
   ! TODO : je capte pas le benchmark water3 ?????
 
+
+  ! WARNING : cette routine n'est pas vraiment 3D
+
   implicit none
 
 #include "sprng_f.h"
@@ -183,7 +191,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   id = 1
 
-  n_speed = mol(imol)%n_speed
+  n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
 
   if (n_level_comp < 2) then
@@ -327,7 +335,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp default(none) &
         !$omp private(id,ri,zj,phik,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv) &
-        !$omp shared(imol,stream,n_rad,nz,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
+        !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape)
         !$omp do schedule(static,1)
@@ -337,12 +345,11 @@ subroutine NLTE_mol_line_transfer(imol)
 
               ! Echantillonage uniforme du profil de raie
               if (lfixed_rays) then
-                 tab_speed(:,id) = tab_deltaV(:,ri,zj)
+                 tab_speed(:,id) = tab_deltaV(:,ri,zj,phik)
               endif
 
-              if (lcompute_molRT(ri,zj)) then
-
-                 do phik=1, 1!n_az
+              do phik=1, n_az
+                 if (lcompute_molRT(ri,zj,phik)) then
 
                     ! Propagation des rayons
                     do iray=iray_start, iray_start-1+n_rayons
@@ -396,7 +403,7 @@ subroutine NLTE_mol_line_transfer(imol)
                        if (lnotfixed_Rays) then
                           do iv=ispeed(1),ispeed(2)
                              !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
-                             rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(ri,zj)
+                             rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(ri,zj,phik)
                           enddo
                        endif
 
@@ -409,7 +416,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
                     ! Resolution de l'equilibre statistique
                     n_iter_loc = 0
-                    pop(:,id) = tab_nLevel(ri,zj,:)
+                    pop(:,id) = tab_nLevel(ri,zj,phik,:)
                     lconverged_loc = .false.
                     ! Boucle pour converger le champ local et les populations
                     ! avec champ externe fixe
@@ -423,7 +430,7 @@ subroutine NLTE_mol_line_transfer(imol)
                        call J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)  ! inclus les boucles sur Transition
 
                        call equilibre_rad_mol_loc(id,ri,zj,phik)
-                       pop(:,id) = tab_nLevel(ri,zj,:)
+                       pop(:,id) = tab_nLevel(ri,zj,phik,:)
 
                        ! Critere de convergence locale
                        diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
@@ -439,22 +446,22 @@ subroutine NLTE_mol_line_transfer(imol)
                     enddo ! while : convergence champ local
                     if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
 
-                 enddo ! phik
+                 endif ! lcompute_molRT
 
-              endif ! lcompute_molRT
-
+              enddo ! phik
            enddo !zj
         enddo !ri
         !$omp end do
         !$omp end parallel
 
+        phik = 1 ! pas 3D
         ! Critere de convergence totale
         maxdiff = 0.0
         do ri=1,n_rad
            do zj=1,nz
-              if (lcompute_molRT(ri,zj)) then
-                 diff = maxval( abs( tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp) ) / &
-                      tab_nLevel_old(ri,zj,1:n_level_comp) + 1e-300_db)
+              if (lcompute_molRT(ri,zj,phik)) then
+                 diff = maxval( abs( tab_nLevel(ri,zj,phik,1:n_level_comp) - tab_nLevel_old(ri,zj,phik,1:n_level_comp) ) / &
+                      tab_nLevel_old(ri,zj,phik,1:n_level_comp) + 1e-300_db)
 
              !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
               !        tab_nLevel_old(ri,zj,1:n_level_comp)
@@ -491,7 +498,7 @@ subroutine NLTE_mol_line_transfer(imol)
            endif
         endif
 
-        write(*,*) "STAT", minval(tab_nLevel(:,:,1:n_level_comp)), maxval(tab_nLevel(:,:,1:n_level_comp))
+        write(*,*) "STAT", minval(tab_nLevel(:,:,:,1:n_level_comp)), maxval(tab_nLevel(:,:,:,1:n_level_comp))
         call integ_tau_mol(imol)
 
      enddo ! while : convergence totale
@@ -529,7 +536,7 @@ subroutine emission_line_map(imol,ibin)
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
-  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt
+  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, cx, cy, lambda
   real :: vmax_center_rt, extra_deltaV_rt
 
   ! Direction de visee pour le ray-tracing
@@ -594,8 +601,8 @@ subroutine emission_line_map(imol,ibin)
   ! le plan image sans rotation est par defaut (y,z)
   ! on fait ensuite une rotation pour deplacer (1,0,0) vers (-u,-v,-w) ie vers l'obervateur
 
-  ! vecteur de base 1
   if (abs(w) < 0.999999999_db) then
+     ! vecteur de base 1
      x1=0.0_db ; y1=cos_disk ; z1=sin_disk
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(1,1) = x2 ; Iaxis(1,2) = y2 ; Iaxis(1,3) =z2
@@ -605,8 +612,8 @@ subroutine emission_line_map(imol,ibin)
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(2,1) = x2 ; Iaxis(2,2) = y2 ; Iaxis(2,3) =z2
   else
-     Iaxis(1,1) = 1.0_db ; Iaxis(1,2) = 0.0_db ; Iaxis(1,3) = 0.0_db
-     Iaxis(2,1) = 0.0_db ; Iaxis(2,2) = -1.0_db ; Iaxis(2,3) = 0.0_db
+     Iaxis(1,1) = 0.0_db ; Iaxis(1,2) = -1.0_db ; Iaxis(1,3) = 0.0_db
+     Iaxis(2,1) = -1.0_db ; Iaxis(2,2) = 0.0_db ; Iaxis(2,3) = 0.0_db
   endif
 
   ! position initiale hors modele (du cote de l'observateur)
@@ -714,7 +721,19 @@ subroutine emission_line_map(imol,ibin)
 
   endif
 
-  ! TODO ajout etoile
+  ! --------------------------
+  ! Ajout flux etoile
+  ! --------------------------
+  ! Pixel central      ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
+  cx = igridx/2+1
+  cy = igridy/2+1
+
+  do lambda = 1, mol(imol)%nTrans_raytracing
+     Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
+
+     spectre(cx,cy,:,lambda,ibin) = spectre(cx,cy,:,lambda,ibin) + Flux_etoile
+     continu(cx,cy,lambda,ibin) = continu(cx,cy,lambda,ibin) + Flux_etoile
+  enddo
 
   return
 
@@ -797,7 +816,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,lintersect)
+           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)
 
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)

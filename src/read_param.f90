@@ -7589,7 +7589,7 @@ end subroutine read_para215
 
     n_molecules = 1
     allocate(mol(1))
-    read(1,*) lmol_LTE, ljunk, ljunk, mol(1)%n_speed
+    read(1,*) lmol_LTE, ljunk, ljunk, mol(1)%n_speed_rt
     read(1,*) mol(1)%filename
     read(1,*) gas_dust, mol(1)%abundance
 
