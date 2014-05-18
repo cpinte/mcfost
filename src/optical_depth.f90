@@ -79,7 +79,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
+  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm, factor
   integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, iscatt, dir, p_ri0, p_zj0
   integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in
 
@@ -181,7 +181,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         c=(r_2-r_lim_2(0))*inv_a
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
@@ -208,9 +208,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
            delta_rad=1
         endif !dotprod
         rac=sqrt(delta)
-        s=-b-rac
+        s=(-b-rac) * correct_plus
         if (s < 0.0_db) then
-           s=-b+rac
+           s=(-b+rac) * correct_plus
         else if (s==0.0_db) then
            s=prec_grille
         endif
@@ -378,6 +378,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
                  else
                     theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
                  endif
+                 if (theta_I > n_theta_I) theta_I = n_theta_I
 
                  xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
 
@@ -408,19 +409,20 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         ! Patch pour eviter BUG sur position radiale
         ! a cause de limite de precision
 !        if ((ri/=ri0).or.(zj/=zj0).or.(zj > nz)) then
-!           factor = rmin/ sqrt(xio*xio+yio*yio+zio*zio) * correct_plus
-!           xio = xio * factor
-!           yio = yio * factor
-!           zio = zio * factor
-!
-!           ! On verifie que c'est OK maintenant
-!           call indice_cellule_sph(xio,yio,zio,ri,thetaj)
-!           if (ri==0) then
-!              write(*,*) "BUG integ_deg2_SPH"
-!              write(*,*) "Exiting"
-!              stop
-!           endif
-!        endif
+        if (ri==0) then
+           factor = rmin/ sqrt(xio*xio+yio*yio) * correct_plus
+           xio = xio * factor
+           yio = yio * factor
+           zio = zio * factor
+
+           ! On verifie que c'est OK maintenant
+           call indice_cellule(xio,yio,zio,ri,zj)
+           if (ri==0) then
+              write(*,*) "BUG integ_deg2_cyl"
+              write(*,*) "Exiting"
+              stop
+           endif
+        endif
 
         if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
            ! On resort le paquet
@@ -559,7 +561,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         c=(r0_2-r_lim_2(0)*correct_plus)
         delta=b*b-c
         rac=sqrt(delta)
-        s=-b+rac
+        s = (-b+rac) * correct_plus
         t=huge_real
         delta_rad=1
      else
@@ -870,7 +872,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, phi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
@@ -1071,7 +1073,17 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
            if (zj1>nz) zj1=nz+1
            if (z1 < 0.0) zj1=-zj1
         endif
+
         phik1=phik0
+        ! We need to find the azimuth when we enter the disc
+        ! It can be different from the initial azimuth if the star is not centered
+        ! so we need to compute it here
+        if (ri0==0) then
+           phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
+           phik1=floor(phi/(2*pi)*real(N_az))+1
+           if (phik1==n_az+1) phik1=n_az
+        endif
+
      else if (t < t_phi) then ! z
         l=t
         delta_vol=t
@@ -2614,43 +2626,71 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         if (dotprod == 0.0_db) then
            t=1.0e10
         else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 if (z0 > 0.0_db) then
+           if (dotprod > 0.0_db) then ! on se rapproche de la surface
+              if (l3D) then
+                 if (zj0==nz+1) then
+                    delta_zj=0
                     zlim=1.0e10
-                 else
+                 else if (zj0==-(nz+1)) then
+                    delta_zj=0
                     zlim=-1.0e10
+                 else
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                       delta_zj=1
+                    else
+                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                       delta_zj=-1
+                    endif
                  endif
-              else
+              else ! 2D
+                 if (zj0==nz+1) then
+                    delta_zj=0
+                    if (z0 > 0.0_db) then
+                       zlim=1.0e10
+                    else
+                       zlim=-1.0e10
+                    endif
+                 else
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                    else
+                       zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    endif
+                    delta_zj=1
+                 endif
+              endif ! l3D
+           else ! on se rappoche du midplane
+              if (l3D) then
                  if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
+                    zlim=z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=-1
+                    if (zj0==1) delta_zj=-2 ! pas d'indice 0
                  else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=1
+                    if (zj0==-1) delta_zj=2 ! pas d'indice 0
                  endif
-                 delta_zj=1
+              else ! 2D
+                 if (zj0==1) then
+                    ! on traverse le plan eq donc on va remonter
+                    ! et z va changer de signe
+                    delta_zj=1
+                    if (z0 > 0.0_db) then
+                       zlim=-z_lim(ri0,2)*correct_moins
+                    else
+                       zlim=z_lim(ri0,2)*correct_moins
+                    endif
+                 else !(zj0==1)
+                    ! on ne traverse pas z=0.
+                    if (z0 > 0.0_db) then
+                       zlim=z_lim(ri0,zj0)*correct_moins
+                    else
+                       zlim=-z_lim(ri0,zj0)*correct_moins
+                    endif
+                    delta_zj=-1
+                 endif !(zj0==1)
               endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
-                 else
-                    zlim=z_lim(ri0,2)*correct_moins
-                 endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
-                 else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
-                 endif
-                 delta_zj=-1
-              endif !(zj0==1)
            endif ! monte ou descend
            t=(zlim-z0)*inv_w
            ! correct pb precision
@@ -2659,10 +2699,14 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
 
         ! 3) position interface azimuthale
         dotprod =  x0*v - y0*u
+
+
         if (abs(dotprod) < 1.0e-10) then
            ! on ne franchit pas d'interface azimuthale
            t_phi = 1.0e30
         else
+
+
            ! Quelle cellule on va franchir
            if (dotprod > 0.0) then
               tan_angle_lim = tan_phi_lim(phik0)
@@ -2703,7 +2747,9 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         else
            zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
            if (zj1>nz) zj1=nz+1
-!           if (z1 < 0.0) zj1=-zj1
+           if (l3D) then
+              if (z1 < 0.0) zj1=-zj1
+           endif
         endif
         phik1=phik0
      else if (t < t_phi) then ! z
@@ -2726,7 +2772,9 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         ri1=ri0
         zj1= floor(abs(z1)/zmax(ri1)*nz) + 1
         if (zj1>nz) zj1=nz+1
-   !     if (z1 < 0.0) zj1=-zj1
+        if (l3D) then
+           if (z1 < 0.0) zj1=-zj1
+        endif
         phik1=phik0+delta_phi
         if (phik1 == 0) phik1=N_az
         if (phik1 == N_az+1) phik1=1
@@ -2741,7 +2789,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
 
         ! Nbre de points d'integration en fct du differentiel de vitesse
         ! compare a la largeur de raie de la cellule de depart
-        n_vpoints  = min(max(2,nint(dv/v_line(ri0,zj0)*20.)),n_vpoints_max)
+        n_vpoints  = min(max(2,nint(dv/v_line(ri0,zj0,phik0)*20.)),n_vpoints_max)
 
         ! Vitesse projete le long du trajet dans la cellule
         do ivpoint=2, n_vpoints-1
@@ -2766,7 +2814,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         P(:) = 0.0_db
         do ivpoint=1,n_vpoints
            tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
-           P(:) = P(:) + phiProf(ri0,zj0,ispeed,tspeed)
+           P(:) = P(:) + phiProf(ri0,zj0,phik0,ispeed,tspeed)
         enddo
         P(:) = P(:)/n_vpoints
 
@@ -2778,21 +2826,16 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         do iTrans=1,nTrans
            iiTrans = indice_Trans(iTrans)
 
-           ! TMP
-           !kappa_mol_o_freq(ri0,zj0,iiTrans)  = 0.0
-           !emissivite_mol_o_freq(ri0,zj0,iiTrans)  = 0.0
-           ! Fin TMP
-
-           opacite(:) = kappa_mol_o_freq(ri0,zj0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,1)
+           opacite(:) = kappa_mol_o_freq(ri0,zj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,phik0)
 
            ! Epaisseur optique
            dtau(:) =  l * opacite(:)
-           dtau_c = l * kappa(iiTrans,ri0,zj0,1)
+           dtau_c = l * kappa(iiTrans,ri0,zj0,phik0)
 
            ! Fonction source
-           Snu(:) = ( emissivite_mol_o_freq(ri0,zj0,iiTrans) * P(:) &
-                + emissivite_dust(iiTrans,ri0,zj0,1) ) / (opacite(:) + 1.0e-300_db)
-           Snu_c = emissivite_dust(iiTrans,ri0,zj0,1) / (kappa(iiTrans,ri0,zj0,1) + 1.0e-300_db)
+           Snu(:) = ( emissivite_mol_o_freq(ri0,zj0,phik0,iiTrans) * P(:) &
+                + emissivite_dust(iiTrans,ri0,zj0,phik0) ) / (opacite(:) + 1.0e-300_db)
+           Snu_c = emissivite_dust(iiTrans,ri0,zj0,phik0) / (kappa(iiTrans,ri0,zj0,phik0) + 1.0e-300_db)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
@@ -2826,13 +2869,13 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         if (ldouble_RT) then
            do iTrans=1,nTrans
               iiTrans = indice_Trans(iTrans)
-              opacite(:) = kappa_mol_o_freq2(ri0,zj0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,1)
+              opacite(:) = kappa_mol_o_freq2(ri0,zj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,phik0)
               dtau(:) =  l * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
-              Snu(:) = ( emissivite_mol_o_freq2(ri0,zj0,iiTrans) * P(:) + &
-                   emissivite_dust(iiTrans,ri0,zj0,1) ) / (opacite(:) + 1.0e-30_db)
+              Snu(:) = ( emissivite_mol_o_freq2(ri0,zj0,phik0,iiTrans) * P(:) + &
+                   emissivite_dust(iiTrans,ri0,zj0,phik0) ) / (opacite(:) + 1.0e-30_db)
               I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
                    exp(-tau2(:,iTrans)) * (1.0_db - exp(-dtau2(:))) * Snu(:)
 
@@ -3163,7 +3206,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
 
         ! Nbre de points d'integration en fct du differentiel de vitesse
         ! compare a la largeur de raie de la cellule de depart
-        n_vpoints  = min(max(2,nint(dv/v_line(ri0,thetaj0)*20.)),n_vpoints_max)
+        n_vpoints  = min(max(2,nint(dv/v_line(ri0,thetaj0,phik0)*20.)),n_vpoints_max)
      !   n_vpoints = 2
 
 !        write(*,*) ri0, real(dv), real(v0), real(v1), real(v_line(ri0,thetaj0)), nint(dv/v_line(ri0,thetaj0)*20.)
@@ -3200,7 +3243,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
         P(:) = 0.0_db
         do ivpoint=1,n_vpoints
            tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
-           P(:) = P(:) + phiProf(ri0,thetaj0,ispeed,tspeed)
+           P(:) = P(:) + phiProf(ri0,thetaj0,phik0,ispeed,tspeed)
         enddo
         P(:) = P(:)/n_vpoints
 
@@ -3211,13 +3254,13 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
 
         do iTrans=1,nTrans
            iiTrans = indice_Trans(iTrans)
-           opacite(:) = kappa_mol_o_freq(ri0,thetaj0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,1)
+           opacite(:) = kappa_mol_o_freq(ri0,thetaj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,phik0)
            dtau(:) =  l * opacite(:)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
-           Snu(:) = ( emissivite_mol_o_freq(ri0,thetaj0,iiTrans) * P(:) + &
-                emissivite_dust(iiTrans,ri0,thetaj0,1) ) / (opacite(:) + 1.0e-30_db)
+           Snu(:) = ( emissivite_mol_o_freq(ri0,thetaj0,phik0,iiTrans) * P(:) + &
+                emissivite_dust(iiTrans,ri0,thetaj0,phik0) ) / (opacite(:) + 1.0e-30_db)
            I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
 
            ! surface superieure ou inf
@@ -3232,12 +3275,12 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
         if (ldouble_RT) then
            do iTrans=1,nTrans
               iiTrans = indice_Trans(iTrans)
-              opacite(:) = kappa_mol_o_freq2(ri0,thetaj0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,1)
+              opacite(:) = kappa_mol_o_freq2(ri0,thetaj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,phik0)
               dtau(:) =  l * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
-              Snu(:) = ( emissivite_mol_o_freq2(ri0,thetaj0,iiTrans) * P(:) + &
+              Snu(:) = ( emissivite_mol_o_freq2(ri0,thetaj0,phik0,iiTrans) * P(:) + &
                    emissivite_dust(iiTrans,ri0,thetaj0,1) ) / (opacite(:) + 1.0e-30_db)
               I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + exp(-tau2(:,iTrans)) * (1.0_db - exp(-dtau2(:))) * Snu(:)
 
@@ -3277,7 +3320,7 @@ end subroutine integ_ray_mol_sph
 
 !***********************************************************
 
-subroutine move_to_grid(x,y,z,u,v,w,ri,zj,lintersect)
+subroutine move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
   ! Calcule la position au bord de la grille dans
   ! la direction donnee
   ! C. Pinte
@@ -3287,13 +3330,14 @@ subroutine move_to_grid(x,y,z,u,v,w,ri,zj,lintersect)
 
   real(kind=db), intent(inout) :: x,y,z
   real(kind=db), intent(in) :: u,v,w
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: ri, zj, phik
   logical, intent(out) :: lintersect
 
   if (lcylindrical) then
-     call move_to_grid_cyl(x,y,z,u,v,w,ri,zj,lintersect)
+     call move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
   else
      call move_to_grid_sph(x,y,z,u,v,w,ri,zj,lintersect)
+     phik=1 ! pas 3D
   endif
 
   return
@@ -3302,7 +3346,7 @@ end subroutine move_to_grid
 
 !***********************************************************
 
-subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,lintersect)
+subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
   ! Calcule la position au bord de la grille dans
   ! la direction donnee pour grille cylindrique
   ! C. Pinte
@@ -3312,7 +3356,7 @@ subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,lintersect)
 
   real(kind=db), intent(inout) :: x,y,z
   real(kind=db), intent(in) :: u,v,w
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: ri, zj, phik
   logical, intent(out) :: lintersect
 
   real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t, t1, t2
@@ -3424,7 +3468,11 @@ subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,lintersect)
 
   ! Determination de l'indice de la premiere cellule traversee
   ! pour initialiser la propagation
-  call indice_cellule(x,y,z,ri,zj)
+  if (l3D) then
+     call indice_cellule_3D(x,y,z,ri,zj,phik)
+  else
+     call indice_cellule(x,y,z,ri,zj) ; phik=1
+  endif
 
   return
 
@@ -3533,8 +3581,8 @@ subroutine integ_tau_mol(imol)
   norme=0.0
   norme1=0.0
   do i=1, n_rad
-     P(:) = phiProf(i,1,ispeed,tab_speed)
-     norme=norme+kappa_mol_o_freq(i,1,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
+     P(:) = phiProf(i,1,1,ispeed,tab_speed)
+     norme=norme+kappa_mol_o_freq(i,1,1,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
      norme1=norme1 + kappa(1,i,1,1) * (r_lim(i)-r_lim(i-1))
   enddo
   write(*,*) "tau_mol = ", norme
@@ -3544,8 +3592,8 @@ subroutine integ_tau_mol(imol)
      if (r_grid(i,1) > 100.0) then
         norme=0.0
         loop_z : do j=nz, 1, -1
-           P(:) = phiProf(i,j,ispeed,tab_speed)
-           norme=norme+kappa_mol_o_freq(i,j,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+           P(:) = phiProf(i,j,1,ispeed,tab_speed)
+           norme=norme+kappa_mol_o_freq(i,j,1,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
            if (norme > 1.0) then
               write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(i,j), "AU"
               exit loop_z
@@ -4024,7 +4072,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
                  if (z0 > 0.0) then
                     zlim=z_lim(ri0,zj0+1)*correct_plus
                  else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
+                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
                  endif
                  delta_zj=1
               endif
@@ -4044,7 +4092,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
                  if (z0 > 0.0_db) then
                     zlim=z_lim(ri0,zj0)*correct_moins
                  else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
+                    zlim=-z_lim(ri0,abs(zj0))*correct_moins
                  endif
                  delta_zj=-1
               endif !(zj0==1)
@@ -4131,7 +4179,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(lambda,ri0,zj0,1)
+        dtau =  l * kappa(lambda,ri0,zj0,phik0)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
@@ -4734,10 +4782,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   if (n_zones > 1) then
      do i=1, n_rad
         if (sum(densite_pouss(i,1,1,:)) < tiny_real) then
-
+           l_dark_zone(i,:,1) = .false.
         endif
      enddo
   endif
+
+  do i=1, n_regions
+     l_dark_zone(regions(i)%iRmin,:,1) = .false.
+     l_dark_zone(regions(i)%iRmax,:,1) = .false.
+  enddo
 
 !  write(*,*) l_dark_zone(:,nz,1)
 !  write(*,*) "**"
@@ -4868,4 +4921,3 @@ end subroutine define_proba_weight_emission
 
 
 end module optical_depth
-

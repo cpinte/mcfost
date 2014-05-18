@@ -236,6 +236,8 @@ subroutine define_grid4()
         if (lprint) write(*,*) "istart", istart, n_rad_in_region, n_rad_in
         if (lprint) write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
 
+        regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
+
 
         if (ir == n_regions) then
            n_rad_region = n_rad - n_cells ! On prend toutes les celles restantes
@@ -1090,10 +1092,13 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
      ri_out=ri+1
   endif
 
-  zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+  if (ri_out > 0) then
+     zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+  else
+     zj_out = 0
+  endif
   if (zj_out > nz) zj_out = nz
   if (zin < 0.0)  zj_out = -zj_out
-
 
   if (zin /= 0.0) then
      phi=modulo(atan2(yin,xin),2*real(pi,kind=db))

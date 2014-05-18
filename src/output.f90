@@ -597,7 +597,27 @@ subroutine write_stokes_fits()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
 
+  call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+  if (lsepar_pola) then
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+  endif
+  if (lsepar_contrib) then
+     if (lsepar_pola) then
+        call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     else
+        call ftpkys(unit,'FLUX_2',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_3',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_4',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_5',"scattered thermal emssion",' ',status)
+     endif
+  endif
 
   !  Write the array to the FITS file.
   group=1
@@ -770,6 +790,27 @@ subroutine ecriture_map_ray_tracing()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+
+  call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+  if (lsepar_pola) then
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+  endif
+  if (lsepar_contrib) then
+     if (lsepar_pola) then
+        call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     else
+        call ftpkys(unit,'FLUX_2',"direct star light",' ',status)
+        call ftpkys(unit,'FLUX_3',"scattered star light",' ',status)
+        call ftpkys(unit,'FLUX_4',"direct thermal emission",' ',status)
+        call ftpkys(unit,'FLUX_5',"scattered thermal emssion",' ',status)
+     endif
+  endif
 
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
@@ -1010,48 +1051,56 @@ subroutine calc_optical_depth_map(lambda)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: i,j,k, group,fpixel,nelements, alloc_status, id
 
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
 
-  real, dimension(n_rad,nz,2) :: optical_depth_map
+  real, dimension(n_rad,nz,n_az,2) :: optical_depth_map
 
   lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
 
   if (lmilieu) then
      ! Opacite radiale
-     do j=1, nz
-        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)* 0.5 * (r_lim(i)-r_lim(i-1))
-        do i=2, n_rad
-           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) + 0.5 * kappa(lambda,i-1,j,1)*(r_lim(i-1)-r_lim(i-2)) &
-                + 0.5 * kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+     do k=1, n_az
+        do j=1, nz
+           i=1 ; optical_depth_map(i,j,k,1) = kappa(lambda,i,j,k)* 0.5 * (r_lim(i)-r_lim(i-1))
+           do i=2, n_rad
+              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + 0.5 * kappa(lambda,i-1,j,k)*(r_lim(i-1)-r_lim(i-2)) &
+                   + 0.5 * kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           enddo
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
-        do j=nz-1,1,-1
-           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + 0.5 * kappa(lambda,i,j+1,1)*(z_lim(i,j+2)-z_lim(i,j+1)) &
-               + 0.5 * kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        do k=1, n_az
+           j=nz ; optical_depth_map(i,j,k,2) = kappa(lambda,i,j,k)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
+           do j=nz-1,1,-1
+              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + 0.5 * kappa(lambda,i,j+1,k)*(z_lim(i,j+2)-z_lim(i,j+1)) &
+                   + 0.5 * kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           enddo
         enddo
      enddo
 
   else
      ! Opacite radiale
-     do j=1, nz
-        i=1 ; optical_depth_map(i,j,1) = kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
-        do i=2, n_rad
-           optical_depth_map(i,j,1) = optical_depth_map(i-1,j,1) +kappa(lambda,i,j,1)*(r_lim(i)-r_lim(i-1))
+     do k=1, n_az
+        do j=1, nz
+           i=1 ; optical_depth_map(i,j,k,1) = kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           do i=2, n_rad
+              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) +kappa(lambda,i,j,k)*(r_lim(i)-r_lim(i-1))
+           enddo
         enddo
      enddo
 
      ! Opacite verticale
      do i=1, n_rad
-        j=nz ; optical_depth_map(i,j,2) = kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
-        do j=nz-1,1,-1
-           optical_depth_map(i,j,2) = optical_depth_map(i,j+1,2) + kappa(lambda,i,j,1)*(z_lim(i,j+1)-z_lim(i,j))
+        do k=1, n_az
+           j=nz ; optical_depth_map(i,j,k,2) = kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           do j=nz-1,1,-1
+              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + kappa(lambda,i,j,k)*(z_lim(i,j+1)-z_lim(i,j))
+           enddo
         enddo
      enddo
   endif
@@ -1071,10 +1120,11 @@ subroutine calc_optical_depth_map(lambda)
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
-  naxis=3
+  naxis=4
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=2
+  naxes(3)=n_az
+  naxes(4)=2
 
   extend=.true.
 
@@ -1085,7 +1135,7 @@ subroutine calc_optical_depth_map(lambda)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
@@ -1214,10 +1264,12 @@ subroutine write_disk_struct()
   naxis=2
   naxes(1)=n_rad
   naxes(2)=nz
+  nelements=naxes(1)*naxes(2)
 
   if (l3D) then
      naxis=3
      naxes(3)=n_az
+     nelements=naxes(1)*naxes(2)*naxes(3)
   endif
 
   !  Write the required header keywords.
@@ -1230,7 +1282,6 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
 
   dens =  densite_gaz(:,1:nz,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
@@ -1958,7 +2009,6 @@ subroutine ecriture_temperature(iTemperature)
      call FTCRHD(unit, status)
      bitpix=-32
 
-
      naxis=3
      naxes(1)=n_rad
      naxes(2)=nz
@@ -1999,7 +2049,7 @@ subroutine ecriture_Tex(imol)
 
   integer, intent(in) :: imol
 
-  integer :: i, j, iTrans, iUp, iLow
+  integer :: i, j, iTrans, iUp, iLow, k
   real(kind=db) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2009,18 +2059,27 @@ subroutine ecriture_Tex(imol)
   logical :: simple, extend
   character(len=512) :: filename
 
-  real, dimension(n_rad,nz,nTrans_tot) :: Tex
+  !real, dimension(n_rad,nz,nTrans_tot) :: Tex
+  real, dimension(:,:,:), allocatable :: Tex
 
+  allocate(Tex(n_rad,nz,nTrans_tot), stat = alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error Tex in ecriture_Tex'
+     stop
+  endif
   Tex = 0.0
+
+  k=1 ! Cette version n'est pas en 3D
 
   do iTrans=1,nTrans_tot
      iUp = iTransUpper(iTrans)
      iLow = iTransLower(iTrans)
      cst = - hp * Transfreq(iTrans) / kb
+
      do j=1, nz
         do i=1, n_rad
-           nUp = tab_nLevel(i,j,iUp)
-           nLow =  tab_nLevel(i,j,iLow)
+           nUp = tab_nLevel(i,j,k,iUp)
+           nLow =  tab_nLevel(i,j,k,iLow)
            if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
               Tex(i,j,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
            endif
@@ -2069,6 +2128,8 @@ subroutine ecriture_Tex(imol)
   if (status > 0) then
      call print_error(status)
   end if
+
+  deallocate(Tex)
 
   return
 
@@ -2256,6 +2317,16 @@ subroutine ecriture_sed(ised)
 
      call ftppre(unit,group,fpixel,nelements,sed2_io,status)
 
+     call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
+     call ftpkys(unit,'FLUX_2',"Q",' ',status)
+     call ftpkys(unit,'FLUX_3',"U",' ',status)
+     call ftpkys(unit,'FLUX_4',"V",' ',status)
+     call ftpkys(unit,'FLUX_5',"direct star light",' ',status)
+     call ftpkys(unit,'FLUX_6',"scattered star light",' ',status)
+     call ftpkys(unit,'FLUX_7',"direct thermal emission",' ',status)
+     call ftpkys(unit,'FLUX_8',"scattered thermal emssion",' ',status)
+     call ftpkys(unit,'FLUX_9',"number of packets",' ',status)
+
      L_bol2 = 0.0
      do lambda=1,n_lambda
         L_bol2 = L_bol2 + sum(sed(lambda,:,:,:))*tab_delta_lambda(lambda)*1.0e-6*E_totale(lambda)
@@ -2266,6 +2337,8 @@ subroutine ecriture_sed(ised)
      endif
 
   endif ! ised
+
+  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -2314,7 +2387,7 @@ subroutine ecriture_pops(imol)
   integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans
   logical :: simple, extend
 
-  real, dimension(n_rad,nz,nLevels) :: tab_nLevel_io
+  real, dimension(n_rad,nz,1,nLevels) :: tab_nLevel_io ! pas en 3D
 
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 
@@ -2467,7 +2540,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,spectre,status)
 
   !------------------------------------------------------------------------------
-  ! Continuum map
+  ! HDU 2 : Continuum map
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis=4
@@ -2499,7 +2572,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,continu,status)
 
   !------------------------------------------------------------------------------
-  ! Transition numbers
+  ! HDU 3 : Transition numbers
   !------------------------------------------------------------------------------
   bitpix=32
   naxis = 1
@@ -2516,7 +2589,7 @@ subroutine ecriture_spectre(imol)
   call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
 
   !------------------------------------------------------------------------------
-  ! Transition frequencies
+  ! HDU 4 : Transition frequencies
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1
@@ -2538,7 +2611,7 @@ subroutine ecriture_spectre(imol)
   call ftppre(unit,group,fpixel,nelements,freq,status)
 
   !------------------------------------------------------------------------------
-  ! Velocities
+  ! HDU 5 : Velocities
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1

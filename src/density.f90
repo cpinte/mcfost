@@ -56,6 +56,7 @@ subroutine define_gas_density()
   densite_gaz_tmp = 0.0
   densite_gaz = 0.0 ;
 
+
   do izone=1, n_zones
      dz = disk_zone(izone)
      if (dz%geometry <= 2) then ! Disque
@@ -109,7 +110,12 @@ subroutine define_gas_density()
 
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-              else ! tappered-edge : dz%surf correspond a -gamma
+              else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
+                 if (dz%rc < tiny_db) then
+                    write(*,*) "ERROR : tappered-edge structure with Rc = 0."
+                    write(*,*) "Exiting"
+                    stop
+                 endif
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -168,6 +174,27 @@ subroutine define_gas_density()
            enddo !j
         enddo ! i
 
+     else if (dz%geometry == 4) then
+        k=1
+        do i=1, n_rad
+           do j=1,nz
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+
+              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+              if (rcyl > dz%rmax) then
+                 density = 0.0
+              else if (rcyl < dz%rmin) then
+                 density = 0.0
+              else
+                 density = cst_gaz(izone) * &
+                      ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                      exp( - (abs(z)/h)**dz%vert_exponent)
+              endif
+              densite_gaz_tmp(i,j,1) = density
+           enddo !j
+        enddo !i
+
      endif ! dz%geometry
 
      !----------------------------------------
@@ -186,7 +213,7 @@ subroutine define_gas_density()
      enddo !i
      mass =  mass * AU3_to_m3 * g_to_Msun
 
-        ! Normalisation
+     ! Normalisation
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
         !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
@@ -294,7 +321,7 @@ subroutine define_dust_density()
         stop
      endif
 
-     if (dz%geometry == 4) lwall = .true.
+     if (dz%geometry == 5) lwall = .true.
 
      if (dz%geometry <= 2) then ! Disque
         if (abs(dz%surf+2.0) > 1.0e-5) then
@@ -324,6 +351,7 @@ subroutine define_dust_density()
      ! Correction stratification
      if (lstrat.and.(settling_type == 1)) then
         ! loi de puissance
+        a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
         else
@@ -370,7 +398,7 @@ subroutine define_dust_density()
 
               if (dz%geometry == 1) then ! power-law
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-              else ! tappered-edge : dz%surf correspond a -gamma
+              else if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
                  fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
               endif
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -388,7 +416,6 @@ subroutine define_dust_density()
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                     ! Settling a la Dubrulle
                     if (lstrat.and.(settling_type == 2)) then
-
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
                        OmegaTau = omega_tau(rho0,H,l)
@@ -529,6 +556,13 @@ subroutine define_dust_density()
 
         lwarning = .true.
         if (lmigration) then
+           ! distribution en taille de grains avant la migration
+           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              do i=1,n_rad
+                 N_tot(l) = N_tot(l) + sum(densite_pouss(i,:,:,l) * volume(i))
+              enddo
+           enddo
+
            do i=1, n_rad
               rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
               !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
@@ -538,28 +572,31 @@ subroutine define_dust_density()
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
+              write(*,*) "r=", rcyl, "a_migration =", s_opt
+
               if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
                  write(*,*)
                  write(*,*) "WARNING: a_migration = ", s_opt
                  write(*,*) "is smaller than amin for dust pop #", pop
-                 write(*,*) "MCFOST will exit with an error is there are no smaller grains"
+                 write(*,*) "MCFOST will exit with an error as there are no smaller grains"
                  if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
                  lwarning = .false.
               endif
 
-              !write(*,*) "s_opt", i, rcyl, s_opt
-
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 S = sum(densite_pouss(i,:,:,l))
-                 N_tot(l) = N_tot(l) + S
                  if (r_grain(l) > s_opt) then ! grains plus gros que taille optimale de migration
-                    !write(*,*) "migration", i, rcyl, l, r_grain(l)
                     densite_pouss(i,:,:,l) = 0.0
-                 else
-                    N_tot2(l) = N_tot2(l) + S
                  endif
               enddo ! l
            enddo !i
+
+           ! distribution en taille de grains apres la migration
+           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              do i=1,n_rad
+                 N_tot2(l) = N_tot2(l) + sum(densite_pouss(i,:,:,l) * volume(i))
+              enddo
+              !write(*,*) "N(a)", l, N_tot(l)/N_tot2(l)
+           enddo
 
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
@@ -567,6 +604,7 @@ subroutine define_dust_density()
                  densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l) * N_tot(l)/N_tot2(l)
               endif
            enddo ! l
+
         endif ! migration
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
@@ -591,6 +629,36 @@ subroutine define_dust_density()
               enddo !l
            enddo !j
         enddo ! i
+
+     else if (dz%geometry == 4) then ! disque de debris
+        k=1  ! 2D seulement pour le moment
+        do i=1, n_rad
+           do j=1,nz
+              ! On calcule la densite au milieu de la cellule
+              rcyl = r_grid(i,j)
+              z = z_grid(i,j)
+
+              h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
+
+              !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
+              !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
+
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else
+                    density = nbre_grains(l) * cst_pous(pop) * &
+                         ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                         exp( - (abs(z)/h)**dz%vert_exponent)
+                 endif
+                 densite_pouss(i,j,k,l) = density
+              enddo ! l
+
+
+           enddo
+        enddo
 
      endif ! dz%geometry
 
@@ -636,7 +704,7 @@ subroutine define_dust_density()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-     if (dz%geometry /= 4) then ! pas de wall ici
+     if (dz%geometry /= 5) then ! pas de wall ici
         dp => dust_pop(pop)
         mass = 0.0
 
@@ -2479,153 +2547,16 @@ end subroutine init_opacity_wall
 
 !********************************************************************
 
-subroutine densite_gap_laure()
-  ! Remplace par densite_gap_laure2
-
-  implicit none
-
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
-  integer :: nullval
-  integer, dimension(4) :: naxes
-  logical :: anynull
-
-  integer, parameter :: nbre_a = 4
-
-  real, dimension(4) :: a_sph
-  integer :: k, l, i
-  real(kind=db) :: somme, mass
-
-  real, dimension(n_rad,nz,nbre_a) :: sph_dens
-
-
-  sph_dens = 1.
-
-  ! Lecture donnees
-  status=0
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  call ftgiou(unit,status)
-
-  write(*,*) "Reading density file : "//trim(density_file)
-
-  readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier temperature n'existe pas
-     write(*,*) "ERROR : density file needed"
-     stop
-  endif
-
-  group=1
-  firstpix=1
-  nullval=-999
-
-  !  determine the size of density file
-  call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
-  if (nfound /= 3) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
-     stop
-  endif
-
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-     write(*,*) "Error : "//trim(density_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
-     write(*,*) naxes(1), n_rad
-     write(*,*) naxes(2), nz
-     stop
-  endif
-
-  npixels=naxes(1)*naxes(2)*naxes(3)
-
-  nbuffer=npixels
-  ! read_image
-  call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
-
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
-
-  ! Interpolation en tailles
-  a_sph(1) = 10. ! densite des grains <= 10 microns == celle du gas
-  a_sph(2) = 100.
-  a_sph(3) = 1000.
-  a_sph(4) = 10000.
-
-
-  if (lstrat) then
-     write(*,*) "Differential gap"
-     l=1
-     do k=1,n_grains_tot
-        if (r_grain(k) < a_sph(1)) then  ! Petits grains
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,1)
-        else if (r_grain(k) > a_sph(nbre_a)) then ! Gros grains
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,nbre_a)
-        else  ! Autres grains : interpolation
-           if (r_grain(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,1,k) = sph_dens(:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
-                ( sph_dens(:,:,l+1) -  sph_dens(:,:,l) )
-        endif
-     enddo
-  else ! Tous les grains suivent le gas
-     write(*,*) "Constant Gap"
-     do k=1,n_grains_tot
-        densite_pouss(:,1:nz,1,k) = sph_dens(:,:,1)
-     enddo
-  endif  !lstrat
-
-  ! Normalisation : on a 1 grain de chaque taille dans le disque
-  do k=1,n_grains_tot
-     somme=0.0
-     do i=1,n_rad
-        do j=1,nz
-           if (densite_pouss(i,j,1,k) < 0.0) densite_pouss(i,j,1,k) = 1.0e-20
-           somme=somme+densite_pouss(i,j,1,k)*volume(i)
-        enddo
-     enddo
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)
-  enddo
-
-  ! Normalisation : on a 1 grain en tout dans le disque
-  do k=1,n_grains_tot
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
-  enddo
-
-  ! Normalisation : Calcul masse totale
-  mass = 0.0
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
-        enddo
-     enddo
-  enddo
-  mass =  mass/Msun_to_g
-  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
-
-  write(*,*) "Done"
-
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,k) * M_grain(k) * volume(i)
-        enddo !k
-     enddo !j
-  enddo ! i
-
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
-
-  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-
-  return
-
-end subroutine densite_gap_laure
-
-!**********************************************************
-
-subroutine densite_gap_laure2()
+subroutine densite_file()
   ! Nouvelle routine pour lire les grilles de densite
-  ! calculees par Yorick directement a partir des donnees SPH
+  ! calculees par Yorick directement a partir des donnees SPH (ou autre)
   ! Les donnees sont directement lissees sur la grille de MCFOST
   ! C. Pinte
   ! 12/0/09
+  ! Mise a jour 9/11/13
+
+  use grains
+  use utils
 
   implicit none
 
@@ -2635,16 +2566,16 @@ subroutine densite_gap_laure2()
   logical :: anynull
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a
-  real(kind=db) :: somme, mass
-  real :: tmp
-  character :: s
+  integer :: k, l, i, n_a, read_n_a
+  real(kind=db) :: somme, mass, facteur
+  real :: a, tmp
+  character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
-  real, dimension(:), allocatable :: a_sph ! n_a
+  real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
 
+  type(disk_zone_type) :: dz
 
-  sph_dens = 1.
 
   ! Lecture donnees
   status=0
@@ -2687,42 +2618,188 @@ subroutine densite_gap_laure2()
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
   nbuffer=npixels
 
-  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a))
+  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
 
   ! Au cas ou
-  sph_dens = sph_dens + 1e-20
+  sph_dens = max(sph_dens,tiny_db)
 
   ! Lecture des tailles de grains (en microns)
-  if (n_a > 9) then
-     write(*,*) "ERROR : max 9 grain sizes at the moment"
-     write(*,*) "code must be updated if you need more"
-     write(*,*) "Exiting."
+!  if (n_a > 99999) then
+!     write(*,*) "ERROR : max 99999 grain sizes at the moment"
+!     write(*,*) "code must be updated if you need more"
+!     write(*,*) "Exiting."
+!     stop
+!  endif
+!
+!  do i=1,n_a
+!     write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
+!     a_sph(i) = tmp ! cannot read directly into an array element
+!     write(*,*) i, a_sph(i), "microns"
+!  enddo
+
+
+  read_n_a = 0
+  call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
+
+  !---------------------------------------------------------
+  ! HDU 2 : grain sizes
+  !---------------------------------------------------------
+  !  move to next hdu
+  call ftmrhd(unit,1,hdutype,status)
+
+  ! Check dimensions
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if (nfound /= 1) then
+     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'of HDU 2 file. Exiting.'
      stop
   endif
-  do i=1,n_a
-     write(s,'(i1)') i ; call ftgkye(unit,'grain_size_'//s,tmp,comment,stat)
-     a_sph(i) = tmp ! cannot read directly into an array element
-     write(*,*) i, a_sph(i), "microns"
-  enddo
+  if ((naxes(1) /= n_a)) then
+     write(*,*) "Error : HDU 2 does not have the"
+     write(*,*) "right dimensions. Exiting."
+     stop
+  endif
+  npixels=naxes(1)
+
+  ! read_image
+  call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
 
   ! On verifie que les grains sont tries
   do i=1, n_a-1
-     if (a_sph(i) > a_sph(i+1)) then
+     if (a_sph(i) >= a_sph(i+1)) then
         write(*,*) "ERROR : grains must be ordered from small to large"
         write(*,*) "Exiting"
         stop
      endif
   enddo
 
+
+  ! On lit au besoin la distribution en taille (dn(a) / da)
+  if (read_n_a==1) then
+     write(*,*) "Reading grain size distribution from fits file"
+
+     !---------------------------------------------------------
+     ! HDU 3 : nombre de grains
+     !---------------------------------------------------------
+     !  move to next hdu
+     call ftmrhd(unit,1,hdutype,status)
+
+     nfound = 0 ; naxes = 0 ;
+     ! Check dimensions
+     call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+     if (nfound /= 1) then
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of HDU 2 file. Exiting.'
+        stop
+     endif
+     if ((naxes(1) /= n_a)) then
+        write(*,*) "Error : HDU 2 does not have the"
+        write(*,*) "right dimensions. Exiting."
+        stop
+     endif
+     npixels=naxes(1)
+
+     ! read_image
+     call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
+
+     tmp = sum(n_a_sph)
+     do i=1,n_a
+        write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
+     enddo
+
+
+     if (n_pop > 1) then
+        write(*,*) "ERROR : density fits interface only works for 1 dust pop"
+        stop
+     endif
+
+     allocate(log_a_sph(n_a), log_n_a_sph(n_a))
+     log_a_sph = log(a_sph) ; log_n_a_sph = log(n_a_sph)
+
+     ! Multiplication par a car da = a.dln(a)
+     do k=1, n_grains_tot
+        write(*,*) k
+        a = r_grain(k)
+        ! todo : peut etre optimise sans interp
+        nbre_grains(k) = exp( interp(log_n_a_sph, log_a_sph, log(a)) )  * a
+     enddo !k
+
+     ! Normalisation de tous les grains au sein d'une pop
+     nbre_grains = nbre_grains / sum(nbre_grains)
+  else
+     write(*,*) "Using grain size distribution from parameter file"
+     do i=1,n_a
+        write(*,*) i, a_sph(i), "microns"
+     enddo
+  endif
+
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
 
+
+  ! Densite du gaz : gaz = plus petites particules
+  dz = disk_zone(1)
+  !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
+  do k=1, n_az
+     do j=1,nz
+        do i=1, n_rad
+           densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+        enddo
+     enddo
+  enddo
+
+  ! Symetrie verticale en z
+  do j=1,nz
+     densite_gaz(:,-j,:) = densite_gaz(:,j,:)
+  enddo
+
+  ! Calcul de la masse de gaz de la zone
+  mass = 0.
+  do i=1,n_rad
+     bz_gas_mass : do j=-nz,nz
+        if (j==0) cycle bz_gas_mass
+        do k=1,n_az
+           mass = mass + densite_gaz(i,j,k) *  masse_mol_gaz * volume(i)
+        enddo  !k
+     enddo bz_gas_mass
+  enddo !i
+  mass =  mass * AU3_to_m3 * g_to_Msun
+
+  ! Normalisation
+  if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+     facteur = dz%diskmass * dz%gas_to_dust / mass
+     ! Somme sur les zones pour densite finale
+     do i=1,n_rad
+        bz_gas_mass2 : do j=-nz,nz
+           if (j==0) cycle bz_gas_mass2
+           do k=1, n_az
+              densite_gaz(i,j,k) = densite_gaz(i,j,k) * facteur
+           enddo !k
+        enddo bz_gas_mass2
+     enddo ! i
+  endif
+
+
+  ! Tableau de masse de gaz
+  do i=1,n_rad
+     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
+     bz_gas_mass3 : do j=j_start,nz
+        if (j==0) cycle bz_gas_mass3
+        do k=1, n_az
+           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+        enddo !k
+     enddo bz_gas_mass3
+  enddo ! i
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+
+
   if (lstrat) then
-     write(*,*) "Differential gap"
+     write(*,*) "Differential spatial distribution"
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
@@ -2739,7 +2816,7 @@ subroutine densite_gap_laure2()
         endif
      enddo
   else ! Tous les grains suivent le gas
-     write(*,*) "Constant Gap"
+     write(*,*) "Constant spatial distribution"
      do k=1,n_grains_tot
         densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
      enddo
@@ -2757,13 +2834,19 @@ subroutine densite_gap_laure2()
         do j=-nz,nz
            if (j==0) cycle
            do k=1,n_az
-              if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = 1.0e-20
+              if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = tiny_db
               somme=somme+densite_pouss(i,j,k,l)*volume(i)
            enddo !k
         enddo !j
      enddo !i
      densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)
   enddo !l
+
+
+  ! TODO : changer la distribution des grains
+
+
+
 
   ! Normalisation : on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
@@ -2801,8 +2884,6 @@ subroutine densite_gap_laure2()
   mass =  mass/Msun_to_g
   densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
-  write(*,*) "Done"
-
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
      do j=-nz,nz
@@ -2820,9 +2901,15 @@ subroutine densite_gap_laure2()
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
 
+
+  write(*,*) "MODIFYING 3D DENSITY !!!"
+  k = 36
+  densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
+
   return
 
-end subroutine densite_gap_laure2
+end subroutine densite_file
 
 !**********************************************************
 
@@ -3165,7 +3252,7 @@ subroutine densite_Seb_Charnoz2()
   call ftfiou(unit, status)
 
   ! Au cas ou
-  dens = dens + 1e-30
+  dens = dens + tiny_real
 
   somme = 0
   somme2 = 0

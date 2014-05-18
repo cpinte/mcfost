@@ -6,6 +6,7 @@ module input
   use em_th
   use grains
   use disk
+  use utils, only : in_dir
 
   implicit none
 
@@ -79,11 +80,25 @@ subroutine read_molecules_names(imol)
   integer, intent(in) :: imol
 
   character(len=80) :: junk
+  character(len=512) :: filename, dir
+  integer :: ios
 
-  open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
+  filename = trim(mol(imol)%filename)
+  dir = in_dir(filename, mol_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     filename = trim(dir)//trim(filename) ;
+     write(*,*) "Reading "//trim(filename) ;
+  endif
+
+  open(unit=1, file=filename, status="old")
 
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
+  close(unit=1)
 
   return
 
@@ -100,15 +115,28 @@ subroutine readmolecule(imol)
   implicit none
 
   integer, intent(in) :: imol
+  integer, parameter :: nCollTemp_max = 50
 
+  character(len=515) :: filename, dir
   character(len=80) :: junk
-  integer :: i, j, iLow, iUp, iPart
+  integer :: i, j, iLow, iUp, iPart, ios
   real :: a, freq, eu
-  real, dimension(20) :: collrates_tmp, colltemps_tmp
+  real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
 
   character(len=10) :: buffer
 
-  open(unit=1, file=trim(mol_dir)//trim(mol(imol)%filename), status="old")
+  filename = trim(mol(imol)%filename)
+  dir = in_dir(filename, mol_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     filename = trim(dir)//trim(filename) ;
+     write(*,*) "Reading "//trim(filename) ;
+  endif
+
+  open(unit=1, file=filename, status="old")
 
   read(1,*) junk
   read(1,'(a)') mol(imol)%name
@@ -151,7 +179,6 @@ subroutine readmolecule(imol)
      Bul(i) = a * (c_light**2)/(2.d0*hp*(transfreq(i))**3)
      ! Transformation Bul -> Blu
      Blu(i) = Bul(i) * poids_stat_g(iUp)/poids_stat_g(iLow)
-
   enddo
 
   fAul(:) = Aul(:) * hp * transfreq(:)/(4*pi)
@@ -163,10 +190,8 @@ subroutine readmolecule(imol)
 
   allocate(nCollTrans(1:nCollPart))
   allocate(nCollTemps(1:nCollPart))
-  allocate(collTemps(1:nCollPart, 1:20))
+  allocate(collTemps(1:nCollPart, 1:nCollTemp_max))
   allocate(collBetween(1:nCollPart))
-
-
 
   do iPart = 1, nCollPart
 
@@ -186,7 +211,7 @@ subroutine readmolecule(imol)
 
      if (iPart == 1) then
         allocate(collRates(1:nCollPart, 1:nCollTrans(iPart) + 50, 1:nCollTemps(ipart) + 50)) ! TODO : passage par des pointeurs, c'est crade
-        allocate(iCollUpper(1:nCollPart, 1:nCollTrans(iPart) +50))
+        allocate(iCollUpper(1:nCollPart, 1:nCollTrans(iPart) + 50))
         allocate(iCollLower(1:nCollPart, 1:nCollTrans(iPart) + 50))
         collRates = 0.d0
      endif
@@ -471,12 +496,25 @@ subroutine lect_lambda()
 
   implicit none
 
-  integer :: alloc_status, lambda, status, n_comment, i
+  integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
 
   real, parameter :: wl_factor = 1.025
 
-  lambda_filename = trim(lambda_dir)//trim(tab_wavelength)
+  character(len=512) :: dir
+
+  lambda_filename = trim(tab_wavelength)
+
+  dir = in_dir(lambda_filename, lambda_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: lambda file cannot be found:",trim(lambda_filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     lambda_filename = trim(dir)//trim(lambda_filename) ;
+     write(*,*) "Reading "//trim(lambda_filename) ;
+  endif
+
   open(unit=1,file=lambda_filename,status="old",iostat=status)
   if (status /= 0) then
      write(*,*) "WARNING: '"//trim(lambda_filename)//"' does not exit."

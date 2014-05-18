@@ -24,12 +24,19 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer
+  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: current_date, update_date, mcfost_auto_update
   real :: wvl, opt_zoom, utils_version
 
   character(len=512) :: cmd, s, str_seed
+  character(len=4) :: n_chiffres
+  character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
+
+
+  write(*,*) "You are running MCFOST "//trim(mcfost_release)
+  write(*,*) "Git SHA = ", sha_id
 
   lmc = .false.
 
@@ -98,7 +105,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing1=.false.
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
-  lgap_laure=.false.
+  ldensity_file=.false.
   ldebris=.false.
   lkappa_abs_grain=.false.
   lweight_emission=.false.
@@ -143,12 +150,67 @@ subroutine initialisation_mcfost()
      write(*,*) "Exiting."
      stop
   endif
+  call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
 
-  dust_dir = trim(mcfost_utils)//"/Dust/"
-  mol_dir = trim(mcfost_utils)//"/Molecules/"
-  star_dir = trim(mcfost_utils)//"/Stellar_Spectra/"
-  lambda_dir = trim(mcfost_utils)//"/Lambda/"
+  ! Ligne de commande
+  call get_command(cmd_opt)
 
+  ! Do we need to search for an update ?
+  mcfost_auto_update = 7
+  call get_environment_variable('MCFOST_AUTO_UPDATE',s)
+  if (s/="") read(s,*) mcfost_auto_update
+
+  if (mcfost_auto_update > 0) then
+     cmd = 'date +%s > date.tmp' ;   call appel_syst(cmd, syst_status)
+     open(unit=1,file="date.tmp",status="old")
+     read(1,*) current_date
+     close(unit=1,status="delete")
+
+     if (is_file(trim(mcfost_utils)//"/.last_update")) then
+        open(unit=1,file=trim(mcfost_utils)//"/.last_update",status="old")
+        read(1,*) update_date
+        close(unit=1)
+     else
+        update_date = 0 ! if the file .last_update does not exist, I assume mcfost is old
+     endif
+
+     if ( (current_date-update_date) > mcfost_auto_update*86400) then
+        write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
+        fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
+        write(*,fmt=fmt1) mcfost_auto_update
+        write(*,*) "checking for update ..."
+        lupdate = mcfost_update(.false.)
+        if (lupdate) then ! On redemarre mcfost avec la meme ligne de commande
+           write(*,*) "Restarting MCFOST ..."
+           write(*,*) ""
+           call appel_syst(cmd_opt,syst_status)
+           if (syst_status /=0) then
+              write(*,*) "ERROR : MCFOST did not manage to restart itself"
+              write(*,*) "Exiting"
+           endif
+           stop
+        endif ! lupdate
+     endif
+  endif
+
+  ! Directories to search (ordered)
+  if (my_mcfost_utils == "") then
+     write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
+     allocate(search_dir(2)) ; n_dir = 2
+     search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
+  else
+     allocate(search_dir(3)) ; n_dir = 3
+     search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
+  endif
+
+  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
+  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
+  do i=2,n_dir
+     dust_dir(i)   = trim(search_dir(i))//"/Dust/"
+     mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
+     star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
+     lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
+  enddo
 
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
@@ -163,9 +225,7 @@ subroutine initialisation_mcfost()
      else if (para(2:2)=="h") then ! mcfost history
         call mcfost_history()
      else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
-        call get_utils()
-        call mcfost_get_ref_para()
-        call mcfost_get_manual()
+        call mcfost_setup()
      else if (para(2:9)=="get_para") then ! download current reference file
         call mcfost_get_ref_para()
      else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
@@ -175,9 +235,9 @@ subroutine initialisation_mcfost()
      else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
      else if (para(2:2)=="u") then ! update binary
-        call mcfost_update(.false.)
+        lupdate = mcfost_update(.false.)
      else if (para(2:3)=="fu") then ! force update binary
-        call mcfost_update(.true.)
+        lupdate =  mcfost_update(.true.)
      else
         call display_help()
      endif
@@ -222,8 +282,6 @@ subroutine initialisation_mcfost()
   endif
 
   i_arg=2
-
-  call get_command(cmd_opt)
 
   ! Options ligne de commande
   do while (i_arg <= nbr_arg)
@@ -473,10 +531,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         ldust_prop=.true.
         lstop_after_init= .false.
-     case("-optical_depth_map")
-        i_arg = i_arg+1
-        loptical_depth_map=.true.
-     case("-od") ! short option name
+     case("-optical_depth_map","-od")
         i_arg = i_arg+1
         loptical_depth_map=.true.
      case("-reemission_stats")
@@ -543,16 +598,16 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) r_subdivide
-     case("-freeze_out")
+     case("-freeze_out","-freeze-out")
         i_arg = i_arg + 1
         lfreeze_out=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) T_freeze_out
-     case("-isotropic")
+     case("-isotropic","-iso")
         i_arg = i_arg + 1
         lisotropic=.true.
-     case("-no_scattering")
+     case("-no_scattering","-no_scatt")
         i_arg = i_arg + 1
         lno_scattering=.true.
      case("-qsca=qabs")
@@ -580,11 +635,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lmc=.true.
         loutput_mc=.true.
-     case("-gap_laure")
+     case("-density_file","-df")
         i_arg = i_arg + 1
-        lgap_laure=.true.
-        !llinear_grid=.true.  ! Ce n'est plus la gap pour densite_gap_laure2 !!!
-        !write(*,*) "Using linear grid to read Laure's gap data"
+        ldensity_file=.true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
@@ -657,7 +710,7 @@ subroutine initialisation_mcfost()
      case("-only_scatt")
         i_arg = i_arg+1
         lonly_scatt = .true.
-     case("-HG")
+     case("-HG","-hg")
         i_arg = i_arg+1
         lHG=.true.
      case("-p2m")
@@ -742,8 +795,9 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  if (lsed.and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
+  if ((.not.limg).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
      write(*,*) "WARNING: polarization is turned off in ray-traced SEDs"
+     write(*,*) "         it can be turned back on with -rt2"
      lsepar_pola = .false.
   endif
 
@@ -765,11 +819,16 @@ subroutine initialisation_mcfost()
      write(*,*) "Computation of dust properties as a function of wavelength"
      ! Make sure the full wavelength range is used to compute
      ! the dust properties
-     limg=.false.
-     lmono=.false.
-     lmono0=.false.
-     lstrat=.false.
-     scattering_method=2
+     if (lstop_after_init) then
+        ! on change les parametres par default pour gagner du temps
+        ! et pour avoir des quantites integrees !!!
+        ! BUG ici : +dust_prop renvoie les prop de la 1ere cellule
+        limg=.false.
+        lmono=.false.
+        lmono0=.false.
+        lstrat=.false.
+        scattering_method=2
+     endif
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
      call save_data()
@@ -946,7 +1005,6 @@ subroutine initialisation_mcfost()
      write(*,*) " "
   else
      write (*,'(" Sequential code")')
-     write(*,*) " "
   endif
 
   if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
@@ -1058,7 +1116,7 @@ subroutine display_help()
   write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
-  write(*,*) "        : -gap_laure <density_file>"
+  write(*,*) "        : -density_file <density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"
