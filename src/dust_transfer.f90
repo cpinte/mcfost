@@ -613,7 +613,7 @@ subroutine transfert_poussiere()
         endif
         if (lnRE) then
            call Temp_nRE(flag_em_nRE)
-           if (n_iter > 10) then
+           if (n_iter > 50) then
               flag_em_nRE = .true.
               write(*,*) "WARNING: Reaching the maximum number of iterations"
               write(*,*) "radiation field may not be converged"
