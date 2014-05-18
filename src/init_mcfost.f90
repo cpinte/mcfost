@@ -131,9 +131,9 @@ subroutine initialisation_mcfost()
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
   lremove = .false.
-
   lonly_scatt = .false.
   lHG = .false.
+  lforce_PAH_equilibrium=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -764,6 +764,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) correct_Tgas
+     case("-force_PAH_equilibrium")
+        lforce_PAH_equilibrium=.true.
+        i_arg = i_arg+1
      case default
         call display_help()
      end select
@@ -1097,6 +1100,7 @@ subroutine display_help()
   write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
+  write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"

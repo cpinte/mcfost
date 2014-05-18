@@ -738,6 +738,7 @@ subroutine Temp_nRE(lconverged)
   real(kind=db) :: somme1, somme2, wl, delta_wl, Temp, cst_wl ! pour test
 
   write(*,*) "Calculating temperature probabilities of non equilibrium grains ..."
+  if (lforce_PAH_equilibrium) write(*,*) "Forcing equilibrium " ;
 
   allocate(Akj(n_T,n_T,nb_proc), B(n_T,n_T,nb_proc), X(n_T,nb_proc), nu(n_T,n_T), log_nu(n_T, n_T), stat=alloc_status)
   if (alloc_status > 0) then
@@ -787,7 +788,6 @@ subroutine Temp_nRE(lconverged)
      !   enddo
      !enddo
 
-
      !! cooling terms :  select one-off upper diagonal, on peut les calculer a l'avance
      Akj=0.
      do T=2,n_T
@@ -818,7 +818,7 @@ subroutine Temp_nRE(lconverged)
      !$omp private(i,j,KJ_absorbe, lambda, T, T2) &
      !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,Tlim,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
-     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe) &
+     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium) &
      !$omp shared(n_rad, nz, q_abs_x_cst, xJ_abs, J0, n_phot_L_tot, volume, n_T) &
      !$omp shared(log_tab_nu, tab_nu, log_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,nu,Proba_temperature, Akj,B,X,nu_bin,tab_Temp,T_min,T_max) &
@@ -914,16 +914,16 @@ subroutine Temp_nRE(lconverged)
 
               if (Temperature_1grain_nRE(i,j,l) > T_max) then
                  ! Impossible de definir proba de temperature
-                 t_cool = 1.0
-                 t_abs = 0.0
+                 t_cool = 1.0 ; t_abs = 0.0
                  write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
                  write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
                  write(*,*) "Exiting"
                  stop
               endif
 
-              !           t_cool=1.0 ; t_abs = 0.0
-
+              if (lforce_PAH_equilibrium) then
+                 t_cool=1.0 ; t_abs = 0.0
+              endif
               if (t_cool < t_abs) then !  calcul proba temperature
                  l_RE(i,j,l) = .false.
                  log_KJ_absorbe(:,id) = log(KJ_absorbe_nRE(:,id)+tiny_db)
@@ -1043,7 +1043,6 @@ subroutine Temp_nRE(lconverged)
   enddo !i
 
 
-
   !! TEST
 !!$  l=grain_nRE_start ! TEST pour 1 taille de grains
 !!$  do i=1, n_rad
@@ -1094,17 +1093,10 @@ subroutine emission_nRE()
 
   implicit none
 
-!  integer, intent(in) ::  iter
-!  logical, intent(out) :: status
   integer :: i, j, k, T, l, lambda, n_max, alloc_status
-  real :: Temp, cst_wl, cst_wl_max, wl, delta_wl
+  real :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn
   real(kind=db) :: E_emise, frac_E_abs_nRE, Delta_E
   real(kind=db), dimension(:), allocatable :: E_cell, E_cell_old
-
-  ! TMP
-  real, parameter :: precision = 1.0e-3
-  logical :: status
-
 
   ! proba emission en fct lambda puis pour chaque lambda proba en fct position
   ! proba differentielle en fonction proba emission precedente
@@ -1113,11 +1105,18 @@ subroutine emission_nRE()
   frac_E_abs_nRE =  E_abs_nRE / nbre_photons_tot
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
   write(*,*) "Re-emitting this amount of energy"
-  status = .false.
 
   ! Quantite energie a reemettre
-  ! energie des paquets en supposant que ce soit le meme nombre que pour la premiere etape
-  E_paquet = frac_E_abs_nRE
+
+  ! energie des paquets en supposant que ce soit le meme nombre de paquets que pour la premiere etape
+  !E_paquet = frac_E_abs_nRE
+
+  ! Nouvelle methode : E_paquet reste constante et on modifie le nombre de paquets
+  ! + Modification E_paquet pour compenser erreur arrondi du au passage a un entier
+  fn = (nbre_photons_tot * frac_E_abs_nRE) / nbre_photons_loop ! nbre de photons "reel"
+  nbre_photons_eq_th = int( max( fn, 1.0) ) ! nbre de phtons entier
+  ! fn * 1.0 = nbre_photons_eq_th * E_paquet
+  E_paquet = fn /  nbre_photons_eq_th
 
   ! Pour iteration suivante
   E_abs_nRE = 0.0

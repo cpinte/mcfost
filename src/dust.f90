@@ -683,7 +683,6 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-
 subroutine opacite2(lambda)
 ! Calcule la table d'opacite et probsizecumul
 ! Inclus stratification empirique

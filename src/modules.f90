@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.7"
+  character(8), parameter :: mcfost_release = "2.19.8"
   real, parameter :: required_utils_version = 2.19
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -118,7 +118,7 @@ module parametres
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
