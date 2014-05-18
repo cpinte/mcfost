@@ -65,7 +65,7 @@ subroutine transfert_poussiere()
   logical :: flag_star, flag_scatt
 
 
-  logical :: laffichage, flag_em_nRE
+  logical :: laffichage, flag_em_nRE, lcompute_dust_prop
 
   ! Paramètres parallelisation
   integer :: id=1
@@ -75,6 +75,7 @@ subroutine transfert_poussiere()
   real(kind=db) :: n_phot_envoyes_in_loop
 
   nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
+
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
 
@@ -95,7 +96,7 @@ subroutine transfert_poussiere()
      p_lambda => lambda
  else
      lambda0=1
-     p_lambda => lambda0
+     p_lambda => lambda ! was lambda0 : changed to save dust properties
   endif
 
 
@@ -158,8 +159,8 @@ subroutine transfert_poussiere()
   if (lProDiMo) call setup_ProDiMo()
 
   !call densite_data_hd32297(para) ! grille redefinie dans routine
-  if (lgap_laure) then
-     call densite_gap_laure2()
+  if (ldensity_file) then
+     call densite_file()
   elseif (lgap) then
      call densite_data_gap
   else if (lstrat_SPH) then
@@ -204,12 +205,10 @@ subroutine transfert_poussiere()
      endif
      call repartition_energie_etoiles()
      call prop_grains(1,1)
-
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
-
      call opacite2(1)
      call integ_tau(1) !TODO
 
@@ -269,11 +268,18 @@ subroutine transfert_poussiere()
               call init_directions_ray_tracing()
            endif
 
-           write(*,'(a30, $)') "Computing dust properties ..."
+           ! Try to restore dust calculation from previous run
+           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+           if (lcompute_dust_prop) then
+              write(*,'(a30, $)') "Computing dust properties ..."
+           else
+              write(*,'(a46, $)') "Reading dust properties from previous run ..."
+           endif
            do lambda=1,n_lambda
-              call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data
+              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
+              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
            enddo !n
+           if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
 
            if (ldust_sublimation)  then
@@ -411,11 +417,20 @@ subroutine transfert_poussiere()
               call init_directions_ray_tracing()
            endif
 
-           ! Recalcul des propriétés opt
+           ! Recalcul des propriétés optiques
+           ! Try to restore dust calculation from previous run
+           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+           if (lcompute_dust_prop) then
+              write(*,'(a30, $)') "Computing dust properties ..."
+           else
+              write(*,'(a46, $)') "Reading dust properties from previous run ..."
+           endif
            do lambda=1,n_lambda2
-              call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data
-           enddo
+              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
+              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+           enddo !n
+           if (lcompute_dust_prop) call save_dust_prop(letape_th)
+           write(*,*) "Done"
         endif
         lambda = ind_etape - first_etape_obs + 1
 
@@ -1294,22 +1309,15 @@ subroutine dust_map(lambda,ibin)
 
   integer, intent(in) :: lambda, ibin
   real(kind=db) :: u,v,w
-
-  real(kind=db) :: x0,y0,z0,l, norme
   real(kind=db), dimension(2,3) :: Iaxis
   real(kind=db), dimension(3) :: center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
-  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, lmin, lmax
-  real :: rand, rand2
-  real(kind=db) :: x, y, z, argmt, srw02, cos_thet
 
-  real :: tau
+  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, l, x0, y0, z0
   integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, nethod, ech_method, cx, cy, k
 
-  real(kind=db), dimension(4) :: Stokes
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
-  integer, parameter :: n_ray_star = 1000
   real(kind=db), dimension(n_rad_RT) :: tab_r
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
 
@@ -1478,51 +1486,8 @@ subroutine dust_map(lambda,ibin)
 
   endif ! method
 
-  ! Ajout etoile
-  id = 1 ; i=0 ; j=1 ;
-
-  ! Etoile ponctuelle
-!  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
-!  Stokes = 0.0_db
-!  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-!  Flux_etoile =  exp(-tau)
-!  write(*,*)  "F0", Flux_etoile
-
-  ! Etoile non ponctuelle
-  Flux_etoile = 0.0_db
-  norme = 0.0_db
-  do k=1,n_ray_star
-     ! Position aleatoire sur la disque stellaire
-     rand  = sprng(stream(id))
-     rand2 = sprng(stream(id))
-
-     ! Position de depart aleatoire sur une sphere de rayon 1
-     z = 2.0_db * rand - 1.0_db
-     srw02 = sqrt(1.0-z*z)
-     argmt = pi*(2.0_db*rand2-1.0_db)
-     x = srw02 * cos(argmt)
-     y = srw02 * sin(argmt)
-
-     cos_thet = abs(x*u + y*v + z*w) ;
-     !cos_thet = 1.0_db ;
-
-     ! Position de depart aleatoire sur une sphere de rayon r_etoile
-     x0 = etoile(1)%x + x * etoile(1)%r
-     y0 = etoile(1)%y + y * etoile(1)%r
-     z0 = etoile(1)%z + z * etoile(1)%r
-
-
-     Stokes = 0.0_db
-     call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-     Flux_etoile = Flux_etoile + exp(-tau) * cos_thet
-     norme = norme + cos_thet
-  enddo
-  Flux_etoile = Flux_etoile / norme
-
-!  write(*,*) Flux_etoile
-
-  Flux_etoile = Flux_etoile * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
-       / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
+  ! Flux etoile
+  Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
 
   ! Pixel central
   if (ech_method==1) then
@@ -1545,6 +1510,68 @@ subroutine dust_map(lambda,ibin)
   return
 
 end subroutine dust_map
+
+!***********************************************************
+
+function flux_etoile_ray_tracing(lambda,u,v,w) result(Flux)
+
+  integer, intent(in) :: lambda
+  real(kind=db), intent(in) :: u,v,w
+
+  integer, parameter :: n_ray_star = 1000
+
+  real(kind=db), dimension(4) :: Stokes
+  real(kind=db) :: Flux, x0,y0,z0, lmin, lmax,l, norme, x, y, z, argmt, srw02, cos_thet
+  real :: rand, rand2, tau
+  integer :: id, i, j, k
+
+
+    ! Ajout etoile
+  id = 1 ; i=0 ; j=1 ;
+
+  ! Etoile ponctuelle
+!  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
+!  Stokes = 0.0_db
+!  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+!  Flux_etoile =  exp(-tau)
+!  write(*,*)  "F0", Flux_etoile
+
+  ! Etoile non ponctuelle
+  Flux = 0.0_db
+  norme = 0.0_db
+  do k=1,n_ray_star
+     ! Position aleatoire sur la disque stellaire
+     rand  = sprng(stream(id))
+     rand2 = sprng(stream(id))
+
+     ! Position de depart aleatoire sur une sphere de rayon 1
+     z = 2.0_db * rand - 1.0_db
+     srw02 = sqrt(1.0-z*z)
+     argmt = pi*(2.0_db*rand2-1.0_db)
+     x = srw02 * cos(argmt)
+     y = srw02 * sin(argmt)
+
+     cos_thet = abs(x*u + y*v + z*w) ;
+     !cos_thet = 1.0_db ;
+
+     ! Position de depart aleatoire sur une sphere de rayon r_etoile
+     x0 = etoile(1)%x + x * etoile(1)%r
+     y0 = etoile(1)%y + y * etoile(1)%r
+     z0 = etoile(1)%z + z * etoile(1)%r
+
+     Stokes = 0.0_db
+     call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+     Flux = Flux + exp(-tau) * cos_thet
+     norme = norme + cos_thet
+  enddo
+  Flux = Flux / norme
+
+  Flux = Flux * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
+       / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
+
+  return
+
+end function flux_etoile_ray_tracing
 
 !***********************************************************
 
@@ -1606,7 +1633,7 @@ subroutine intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,ipix,jpix,p
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,lintersect)  !BUG
+           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)  !BUG
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel
              ! write(*,*) i,j,  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)

@@ -1463,6 +1463,10 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
         frac_z = (z_grid(ri,zj2) - abs(z)) / (z_grid(ri,zj2) - z_grid(ri,zj1))
      endif
 
+     ! Ok si je decommente les 2
+     ri1 = ri    ! OK si je decommente seulement r ---> le pb est l'interpolation en r
+     !zj1 = zj    ! Pb si je decommente seulement z
+
 
      ! Patch : dans les cas ou frac_z est > 1 ou < 0  !!!!!
      ! ca veut surement dire que l'on est pas dans la bonne cellule
@@ -1553,6 +1557,8 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
               + eps_dust2_star(1,iscatt1,dir,ri2,zj2) * un_m_frac
      endif
 
+     frac_r = 1.0
+     !frac_z = 1.0
      ! Fct source interpolee
      dust_source_fct(:) = &
           frac_r * frac_z * SF1(:) + &
@@ -1569,6 +1575,3 @@ end function dust_source_fct
 !***********************************************************
 
 end module dust_ray_tracing
-
-
-

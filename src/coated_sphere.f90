@@ -231,8 +231,24 @@ contains
        cext = cext + factor * qext_HS
        csca = csca + factor * qsca_HS
        gsca = gsca + factor * qsca_HS * gsca_HS
-       s1 = s1 + factor * s1_HS
-       s2 = s2 + factor * s2_HS
+
+       norme = 0.0 ;
+       somme_sin = 0.0 ;
+       somme1 = 0.0
+       do j=0,nang_scatt
+          norme = norme + 0.5 * (cabs(s1_HS(j+1))**2  + cabs(s2_HS(j+1))**2 ) * &
+               sin(real(j)/real(nang_scatt)*pi)
+          somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
+
+          !somme1 = somme1 + 0.5 * (cabs(s1_HS(j+1))**2  + cabs(s2_HS(j+1))**2 ) * &
+          !     sin(real(j)/real(nang_scatt)*pi) * cos(real(j)/real(nang_scatt)*pi)
+
+       enddo
+!       somme1 = somme1 / norme
+       norme = norme / somme_sin
+
+       s1 = s1 + factor * s1_HS/norme * qsca_HS
+       s2 = s2 + factor * s2_HS/norme * qsca_HS
     enddo
     if (csca > 0.) gsca = gsca/csca
 

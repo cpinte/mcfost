@@ -170,7 +170,7 @@ subroutine repartition_energie_etoiles()
 
   implicit none
 
-  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l
+  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l, ios
   real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0
   real(kind=db) :: somme_spectre, somme_bb
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo
@@ -180,7 +180,7 @@ subroutine repartition_energie_etoiles()
   real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   real(kind=db), dimension(n_lambda) :: log_lambda, spectre_etoiles0
 
-  character(len=512) :: filename
+  character(len=512) :: filename, dir
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, naxes1_ref
   real :: nullval
@@ -263,7 +263,16 @@ subroutine repartition_energie_etoiles()
         !              lambda : micron
         !     ---> lambda x F_lambda : W.m-2
 
-        filename=trim(star_dir)//trim(etoile(i)%spectre)
+        filename=trim(etoile(i)%spectre)
+        dir = in_dir(filename, star_dir,  status=ios)
+        if (ios /=0) then
+           write(*,*) "ERROR: star file cannot be found:",trim(filename)
+           write(*,*) "Exiting"
+           stop
+        else
+           filename = trim(dir)//trim(filename) ;
+           write(*,*) "Reading "//trim(filename) ;
+        endif
 
         status=0
         !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -551,6 +560,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
+  integer :: phik
   real :: aleat1, aleat2, aleat3, aleat4
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi, l, w2
 
@@ -587,7 +597,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   y = y * l
   z = z * l
 
-  call move_to_grid(x,y,z,u,v,w,ri,zj,lintersect)
+  call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
 
 
   return

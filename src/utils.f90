@@ -52,42 +52,42 @@ end function spanl
 
 !************************************************************
 
-function gauss_random(id)
-  ! Retourne un nombre aleatoire distribue suivant une gaussienne
-  ! avec moyenne nulle et variance 1
-  ! Adapte de numerical recipes pour fonctionner en parallel avec sprng
-  ! C. Pinte
-  ! 19/10/07
-
-  implicit none
-
-#include "sprng_f.h"
-
-  integer, intent(in) :: id
-  real(kind=db) :: gauss_random
-  real(kind=db) :: rsq,rand1,rand2
-
-  if (lgauss_random_saved(id)) then
-     gauss_random=gauss_random_saved(id)
-     lgauss_random_saved(id)=.false.
-  else
-     loop : do
-        rand1 = sprng(stream(id))
-        rand2 = sprng(stream(id))
-        rand1 = 2.0_db * rand1 - 1.0_db
-        rand2 = 2.0_db * rand2 - 1.0_db
-        rsq=rand1**2+rand2**2
-        if (rsq > 0.0_db .and. rsq < 1.0_db) exit loop
-     enddo loop
-     rsq=sqrt(-2.0_db*log(rsq)/rsq)
-     gauss_random = rand1 * rsq
-     gauss_random_saved(id)= rand2 * rsq
-     lgauss_random_saved(id)=.true.
-  endif
-
-  return
-
-end function gauss_random
+!-- function gauss_random(id)
+!--   ! Retourne un nombre aleatoire distribue suivant une gaussienne
+!--   ! avec moyenne nulle et variance 1
+!--   ! Adapte de numerical recipes pour fonctionner en parallel avec sprng
+!--   ! C. Pinte
+!--   ! 19/10/07
+!--
+!--   implicit none
+!--
+!-- #include "sprng_f.h"
+!--
+!--   integer, intent(in) :: id
+!--   real(kind=db) :: gauss_random
+!--   real(kind=db) :: rsq,rand1,rand2
+!--
+!--   if (lgauss_random_saved(id)) then
+!--      gauss_random=gauss_random_saved(id)
+!--      lgauss_random_saved(id)=.false.
+!--   else
+!--      loop : do
+!--         rand1 = sprng(stream(id))
+!--         rand2 = sprng(stream(id))
+!--         rand1 = 2.0_db * rand1 - 1.0_db
+!--         rand2 = 2.0_db * rand2 - 1.0_db
+!--         rsq=rand1**2+rand2**2
+!--         if (rsq > 0.0_db .and. rsq < 1.0_db) exit loop
+!--      enddo loop
+!--      rsq=sqrt(-2.0_db*log(rsq)/rsq)
+!--      gauss_random = rand1 * rsq
+!--      gauss_random_saved(id)= rand2 * rsq
+!--      lgauss_random_saved(id)=.true.
+!--   endif
+!--
+!--   return
+!--
+!-- end function gauss_random
 
 !**********************************************************
 
@@ -488,20 +488,38 @@ end function get_NH
 
 !***********************************************************
 
-subroutine mcfost_update(lforce_update)
+subroutine mcfost_setup()
+
+  character(len=512) :: cmd
+  integer ::  syst_status
+
+  call get_utils()
+  call mcfost_get_ref_para()
+  call mcfost_get_manual()
+  ! Write date of the last time an update was search for
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  call appel_syst(cmd, syst_status)
+
+  write(*,*) "MCFOST set-up was sucessful"
+  return
+
+end subroutine mcfost_setup
+
+!***********************************************************
+
+function mcfost_update(lforce_update)
 
   logical, intent(in) :: lforce_update
-  logical :: lupdate
+  logical :: lupdate, mcfost_update
 
-  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system
+  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
 
-  write(*,*) "Version ", mcfost_release
-
   ! Last version
   write(*,*) "Checking last version ..."
+  syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)
@@ -579,7 +597,7 @@ subroutine mcfost_update(lforce_update)
         stop
      endif
 
-     write(*,*) "Your system ", trim(system)
+     write(*,*) "Your system is ", trim(system)
 
 
      ! Download
@@ -629,19 +647,52 @@ subroutine mcfost_update(lforce_update)
         write(*,*) "Done"
      endif
 
+     ! check where is the current binary
+     call get_command_argument(0,current_binary)
+     if (current_binary(1:1)/=".") then
+
+        write(*,'(a28, $)') "Locating current binary ..."
+        cmd = "rm -rf which_mcfost_binary.txt && which "//trim(current_binary)// &
+             " | awk '{print "//' "\"" $NF "\""'//"}' > which_mcfost_binary.txt"
+        call appel_syst(cmd, syst_status)
+
+        ios=0
+        open(unit=1, file="which_mcfost_binary.txt", status='old',iostat=ios)
+        read(1,*,iostat=ios) current_binary
+        close(unit=1,iostat=ios)
+
+        if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
+           write(*,*) ""
+           write(*,*) "ERROR: Cannot locate current MCFOST binary,"
+           write(*,*) "the new binary will downloaded in the current directory."
+        else
+           write(*,*) "Done"
+        endif
+     endif
+
      ! make binary executable
-     !cmd = "chmod a+x mcfost_update ; mv mcfost mcfost_"//trim(mcfost_release)//" ; mv mcfost_update mcfost"
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update ; mv mcfost_update mcfost"
+     cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
+     if (syst_status /= 0) then
+        write(*,*) "ERROR : the update failed for some reason"
+        write(*,*) "You may want to have a look at the file mcfost_update"
+        write(*,*) "Exiting"
+        stop
+     endif
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
-     !write(*,*) "The previous version has been saved as mcfost_"//trim(mcfost_release)
   endif ! lupdate
+
+  ! Write date of the last time an update was search for
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  call appel_syst(cmd, syst_status)
+
+  mcfost_update = lupdate
 
   return
 
-end subroutine mcfost_update
+end function mcfost_update
 
 !***********************************************************
 
@@ -702,7 +753,7 @@ subroutine mcfost_get_manual()
   integer ::  syst_status
 
   doc_dir = "Doc/"
-  doc_file = "MCFOSTUnofficialPseudo-Manual.pdf"
+  doc_file = "MCFOSTManual.pdf"
 
   write(*,*) "Getting MCFOST manual: ", trim(doc_file)
   cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
@@ -726,9 +777,9 @@ subroutine mcfost_v()
   integer ::  syst_status, line_number, ios
   character(len=128) :: sline_number
 
-  write(*,*) "This is MCFOST version: ", mcfost_release
-  write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
-  write(*,*) "Git SHA  = ", sha_id
+!  write(*,*) "This is MCFOST version: ", mcfost_release
+!  write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
+!  write(*,*) "Git SHA  = ", sha_id
   !write(*,*) 1.0/0.0 , __LINE__, __FILE__
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
@@ -1083,6 +1134,34 @@ end function is_file
 
 !************************************************************
 
+function in_dir(filename,dir_list, status)
+
+  character(len=*), intent(in) :: filename
+  character(len=*), dimension(:), intent(in) :: dir_list
+  character(len=128) :: in_dir
+
+  integer, intent(out), optional  :: status
+
+  logical :: is_file
+  integer :: i
+
+  in_dir = "None"
+  if (present(status)) status = 1
+  do i=1,size(dir_list)
+     inquire(file=trim(dir_list(i))//"/"//trim(filename),exist=is_file)
+     if (is_file) then
+        in_dir = dir_list(i)
+        if (present(status)) status = 0
+        return
+     endif
+  enddo !i
+
+  return
+
+end function in_dir
+
+!************************************************************
+
 subroutine appel_syst(cmd, status)
 
 #if defined (__INTEL_COMPILER)
@@ -1094,7 +1173,7 @@ subroutine appel_syst(cmd, status)
   character(len=*), intent(in) :: cmd
   integer, intent(out), optional :: status
 
-  status = system(cmd) ! limux
+  status = system(cmd) ! linux
   !call system(cmd, status) ! aix
 
   return
@@ -1173,5 +1252,26 @@ subroutine GauLeg(x1,x2,x,w,n)
   return
 
 end subroutine gauleg
+
+!************************************************************
+
+logical function real_equality(x,y)
+
+  real, intent(in) :: x, y
+
+  real_equality = .false.
+  if (abs(x) < tiny_real) then
+     if (abs(y) < tiny_real) then
+        real_equality = .true.
+     endif
+  else
+     real_equality = abs(x-y) < 1e-5 * abs(x)
+  endif
+
+  return
+
+end function real_equality
+
+!************************************************************
 
 end module utils

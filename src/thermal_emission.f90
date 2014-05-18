@@ -827,7 +827,7 @@ subroutine Temp_nRE(lconverged)
      id =1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
-     do i=1, n_rad
+     do i=n_rad, 1, -1
         !$ id = omp_get_thread_num() + 1
         do j=1,nz
 
@@ -916,10 +916,10 @@ subroutine Temp_nRE(lconverged)
                  ! Impossible de definir proba de temperature
                  t_cool = 1.0
                  t_abs = 0.0
-                 write(*,*) "ERROR : temperature of non equilibrium grains"
-                 write(*,*) "is larger than maximum temperature set in the"
-                 write(*,*) "parameter file. Exiting !"
+                 write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
                  write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
+                 write(*,*) "Exiting"
+                 stop
               endif
 
               !           t_cool=1.0 ; t_abs = 0.0
@@ -958,7 +958,7 @@ subroutine Temp_nRE(lconverged)
                  do T=2, n_T
                     if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
                     if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
-                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / Akj(T-1, T,id)
+                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(Akj(T-1, T,id),tiny_db)
                  enddo
 
                  !! Normalisation
@@ -1339,15 +1339,9 @@ subroutine repartition_energie(lambda)
               else
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
-                    if (i==1) then
-                       Ener = 4.0*kappa_abs_eg(lambda,i,j,pk)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
-                       frac = (r_in_opacite(j,pk)-rmin)/(r_lim(1)-rmin)
-                       E_cell(l) =  Ener * frac
-                    else if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
+                    if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
                        E_cell(l) =  4.0*kappa_abs_eg(lambda,i,j,pk)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
-
-
                  endif !cst_wl
               endif ! Temp==0.0
 

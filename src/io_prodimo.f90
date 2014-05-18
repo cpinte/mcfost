@@ -939,8 +939,8 @@ contains
     character(len=128) :: line
     character(len=10) :: fmt
 
-    integer :: status, i, iProDiMo, syst_status
-    logical :: unchanged, other_PAH
+    integer :: status, i, iProDiMo, syst_status, ipop
+    logical :: unchanged
 
 
     character :: s
@@ -1015,6 +1015,18 @@ contains
           unchanged = .false.
        endif
 
+       if (INDEX(line,"! PAH_in_RT") > 0) then
+          lPAH = .false.
+          do ipop=1, n_pop
+             if (dust_pop(ipop)%is_PAH) then
+                lPAH = .true.
+             endif
+          enddo
+          write(2,*) lPAH, " ! PAH_in_RT : set by MCFOST"
+          unchanged = .false.
+       endif
+
+
        if (INDEX(line,"! v_turb") > 0) then
           write(2,*) real(vitesse_turb * m_to_km), " ! v_turb [km/s] : set by MCFOST"
           unchanged = .false.
@@ -1024,6 +1036,8 @@ contains
           write(2,*) RT_imin, " ! incl : set by MCFOST (1st MCFOST inclination)" ! tab_RT_incl n'est pas necessairement alloue
           unchanged = .false.
        endif
+
+
 
        if (unchanged) then
           if (len(trim(line)) > 0) then
@@ -1136,7 +1150,7 @@ contains
        mol(imol)%lline = .true.
        read(1,*) mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-       mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
+       !mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
 
 
        mol(imol)%abundance = 1e-6
@@ -1758,33 +1772,33 @@ contains
 
     ! Niveaux et populations
     write(*,*) "Setting ProDiMo abundances, population levels and Tgas"
-    tab_abundance(:,:) = 0.0
-    tab_nLevel(:,:,:) = 0.0
+    tab_abundance(:,:,:) = 0.0
+    tab_nLevel(:,:,:,:) = 0.0
     do i=1, n_rad
        do j=1, nz
           if (lCII) then
-             tab_nLevel(i,j,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
-             tab_abundance(i,j) = nCII(i,j)
+             tab_nLevel(i,j,1,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
+             tab_abundance(i,j,1) = nCII(i,j)
           endif
           if (lOI) then
-             tab_nLevel(i,j,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
-             tab_abundance(i,j) = nOI(i,j)
+             tab_nLevel(i,j,1,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
+             tab_abundance(i,j,1) = nOI(i,j)
           endif
           if (lCO) then
-             tab_nLevel(i,j,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
-             tab_abundance(i,j) = nCO(i,j)
+             tab_nLevel(i,j,1,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
+             tab_abundance(i,j,1) = nCO(i,j)
           endif
           if (loH2O) then
-             tab_nLevel(i,j,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
-             tab_abundance(i,j) = noH2O(i,j)
+             tab_nLevel(i,j,1,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
+             tab_abundance(i,j,1) = noH2O(i,j)
           endif
           if (lpH2O) then
-             tab_nLevel(i,j,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
-             tab_abundance(i,j) = npH2O(i,j)
+             tab_nLevel(i,j,1,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
+             tab_abundance(i,j,1) = npH2O(i,j)
           endif
        enddo
     enddo
-    tab_abundance = tab_abundance / densite_gaz(:,:,1) ! conversion nbre en abondance
+    tab_abundance(:,:,:) = tab_abundance(:,:,:) / densite_gaz(:,:,:) ! conversion nbre en abondance
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
 
     Tcin(:,:,1) = Tgas
@@ -1853,7 +1867,7 @@ contains
           if (lCO) sigma2 =  dvCO(i,j)**2
           if (loH2O) sigma2 =  dvoH2O(i,j)**2
           if (lpH2O) sigma2 =  dvpH2O(i,j)**2
-          v_line(i,j) = sqrt(sigma2)
+          v_line(i,j,1) = sqrt(sigma2)
 
           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
           if (sigma2 <=0.) then
@@ -1862,10 +1876,10 @@ contains
           endif
 
           sigma2_m1 = 1.0_db / sigma2
-          sigma2_phiProf_m1(i,j) = sigma2_m1
+          sigma2_phiProf_m1(i,j,1) = sigma2_m1
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-          norme_phiProf_m1(i,j) = c_light / sqrt(pi * sigma2)
+          norme_phiProf_m1(i,j,1) = c_light / sqrt(pi * sigma2)
 
 !----          ! Echantillonage du profil de vitesse dans la cellule
 !----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de

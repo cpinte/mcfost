@@ -6,9 +6,9 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.18
-  character(8), parameter :: mcfost_release = "2.18.2"
-  real, parameter :: required_utils_version = 2.14
+  real, parameter :: mcfost_version = 2.19
+  character(8), parameter :: mcfost_release = "2.19.7"
+  real, parameter :: required_utils_version = 2.19
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
@@ -96,7 +96,6 @@ module parametres
   real, dimension(:), allocatable :: size_pix2
   real, parameter :: cutoff = 7.0
 
-
   ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
@@ -116,15 +115,15 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lgap_laure
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
   logical :: lspot, lforce_1st_scatt
 
-  character(len=512) :: mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
-  character(len=512) :: dust_dir, mol_dir, star_dir, lambda_dir, lambda_filename
-  character(len=512) :: para, band, model_pah, pah_grain, cmd_opt
+  character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
+  character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
   character(len=512), dimension(100) :: data_dir2, basename_data_dir2
+  character(len=512), dimension(:), allocatable :: search_dir, dust_dir, mol_dir, star_dir, lambda_dir
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -180,7 +179,8 @@ module disk
   integer :: n_zones, n_regions
 
   type disk_zone_type
-     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf, moins_gamma_exp, sclht, diskmass, gas_to_dust
+     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
+     real(kind=db) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
      integer :: region
   end type disk_zone_type
@@ -188,6 +188,7 @@ module disk
   type disk_region_type
      integer :: n_zones
      real(kind=db) :: Rmin, Rmax
+     integer :: iRmin, iRmax
      integer, dimension(:), allocatable :: zones
   end type disk_region_type
 
@@ -375,7 +376,6 @@ module grains
 
      logical :: is_PAH, lcoating
      integer :: ind_debut, ind_fin
-     integer :: pop_geo
   end type dust_pop_type
 
   type(dust_pop_type), dimension(:), allocatable, target :: dust_pop
@@ -408,19 +408,16 @@ module grains
   real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2
 
   ! Parametres de diffusion des grains
-  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34 !n_lambda,n_grains,180
+  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
   real, dimension(:,:), allocatable :: tab_g, tab_albedo, q_ext, q_sca, q_abs!n_lambda,n_grains
-  real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
-  real, dimension(:,:,:), allocatable :: prob_s11 !n_lambda,n_grains,0:180
+  !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
   ! aggregats
   real, dimension(:,:,:,:,:), allocatable :: tab_mueller !n_lambda,n_grains,4,4,180
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:,:,:), allocatable :: tab_albedo_pos, tab_g_pos !n_lambda,n_rad,nz+1, (n_az)
-  real, dimension(:,:,:,:,:), allocatable :: tab_s11_pos, tab_s12_pos!n_lambda,n_rad,nz+1,(n_az), 180
-  real, dimension(:,:,:,:,:), allocatable ::  tab_s33_pos, tab_s34_pos !n_lambda,n_rad,nz+1,(n_az), 180
-  real, dimension(:,:,:,:,:), allocatable :: prob_s11_pos !n_lambda,n_rad,nz+1,(n_az),0:180
+  real, dimension(:,:,:,:,:), allocatable :: tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos !n_lambda,n_rad,nz+1,(n_az), 180
 
   character(len=512) :: aggregate_file, mueller_aggregate_file
   real :: R_sph_same_M
@@ -820,14 +817,13 @@ module molecular_emission
 
   real :: nH2, masse_mol
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
-  real(kind=db), dimension(:,:,:), allocatable :: frac_E_Trans ! n_rad, n_z, nTrans
-  real(kind=db), dimension(:,:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_rad, nz, nTrans
-  real(kind=db), dimension(:,:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_rad, nz, nTrans
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_rad, nz, n_az, nTrans
+  real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_rad, nz, n_az, nTrans
   real, dimension(:,:), allocatable :: vfield ! n_rad, nz
 !  real, dimension(:,:,:), allocatable :: vx, vy
-  real, dimension(:,:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_rad, nz, nLevels
+  real, dimension(:,:,:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_rad, nz, n_az, nLevels
 
-  real, dimension(:,:), allocatable :: v_turb, v_line ! n_rad, nz
+  real, dimension(:,:,:), allocatable :: v_turb, v_line ! n_rad, nz, n_az
 
   real ::  vitesse_turb, dv, dnu
   integer, parameter :: n_largeur_Doppler = 15
@@ -846,13 +842,13 @@ module molecular_emission
 
   logical :: linfall, lkeplerian
 
-  real(kind=db), dimension(:,:), allocatable :: deltaVmax ! n_rad, nz
-  real(kind=db), dimension(:,:,:), allocatable :: tab_deltaV ! n_speed, n_rad, nz
-  real(kind=db), dimension(:,:), allocatable :: tab_dnu_o_freq ! n_rad, nz
-  real(kind=db), dimension(:,:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_rad, nz
+  real(kind=db), dimension(:,:,:), allocatable :: deltaVmax ! n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:,:), allocatable :: tab_deltaV ! n_speed, n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:), allocatable :: tab_dnu_o_freq ! n_rad, nz, n_az
+  real(kind=db), dimension(:,:,:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_rad, nz, n_az
 
-  real, dimension(:,:), allocatable :: tab_abundance
-  logical, dimension(:,:), allocatable :: lcompute_molRT
+  real, dimension(:,:,:), allocatable :: tab_abundance
+  logical, dimension(:,:,:), allocatable :: lcompute_molRT
 
   logical ::  lfreeze_out
   real :: T_freeze_out
@@ -862,7 +858,7 @@ module molecular_emission
   integer :: RT_line_method, n_molecules
 
   type molecule
-     integer :: n_speed, n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
+     integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
      real :: vmax_center_rt, extra_deltaV_rt, abundance
      logical :: lcst_abundance, lline
      character(len=512) :: abundance_file, filename
@@ -874,7 +870,7 @@ module molecular_emission
 
   real(kind=db), dimension(:), allocatable :: tab_speed_rt
 
-  real, dimension(:,:,:), allocatable :: maser_map
+  real, dimension(:,:,:,:), allocatable :: maser_map
 
 
 end module molecular_emission
