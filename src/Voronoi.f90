@@ -1,7 +1,9 @@
 module Voronoi_grid
 
+  use constantes
   use parametres
   use utils, only : bubble_sort
+  use naleat, only : seed, stream, gtype
 
   implicit none
 
@@ -47,6 +49,8 @@ module Voronoi_grid
     logical :: flag_star, flag_direct_star, flag_sortie
 
     ! Fin testing
+
+    id = 1
 
     n_walls = 6
     write(*,*) "Reading ", n_walls, "walls"
@@ -149,10 +153,52 @@ module Voronoi_grid
        write(*,*) "Do not reach model"
     endif
 
+    ! OK jusqu'ici
+
+    call test_emission()
 
     return
 
   end subroutine read_Voronoi
+
+!----------------------------------------
+
+  subroutine test_emission()
+
+#include "sprng_f.h"
+
+    integer, parameter :: n_sample = 10000000
+
+    real(kind=db) :: rand, rand2, rand3
+    real :: x, y, z
+    integer :: icell, np_proc, i, id, k
+
+
+    nb_proc = 1 ; id = 1
+    allocate(stream(nb_proc))
+
+    stream = 0.0
+    do i=1, nb_proc
+       !write(*,*) gtype, i-1,nb_proc,seed,SPRNG_DEFAULT
+       !init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+       stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+    enddo
+
+
+    ! Testing pos
+    icell = 1
+    write(*,*) "testing emission position", Voronoi(icell)%x, Voronoi(icell)%y, Voronoi(icell)%z
+
+    do k=1, n_sample
+       rand  = sprng(stream(id))
+       rand2 = sprng(stream(id))
+       rand3 = sprng(stream(id))
+
+       call pos_em_cellule_Voronoi(icell,rand,rand2,rand3, x,y,z)
+       write(*,*) x,y,z
+    enddo
+
+  end subroutine test_emission
 
   !----------------------------------------
 
@@ -481,6 +527,42 @@ integer function find_Voronoi_cell(iwall, x,y,z)
 
 end function find_Voronoi_cell
 
+!----------------------------------------
+
+subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3,x,y,z)
+! Choisit la position d'emission uniformement dans la cellule
+! C. Pinte
+! 20/05/14
+
+  implicit none
+
+  integer, intent(in) :: icell
+  real(kind=db), intent(in) :: aleat1, aleat2, aleat3
+  real, intent(out) :: x,y,z
+
+  real(kind=db) :: u, v, w, srw2, argmt
+  integer :: previous_cell, next_cell
+  real :: l
+
+  ! Direction aleatoire
+  w = 2.0_db * aleat1 - 1.0_db
+  srw2 = sqrt(1.0_db-w*w)
+  argmt = pi*(2.0_db*aleat2-1.0_db)
+  u = srw2 * cos(argmt)
+  v = srw2 * sin(argmt)
+
+  ! Distance jusqu'au bord de la cellule
+  previous_cell = 0
+  x = Voronoi(icell)%x ; y = Voronoi(icell)%y ; z = Voronoi(icell)%z
+  call cross_Voronoi_cell(icell, previous_cell, x,y,z, real(u),real(v),real(w), next_cell, l)
+
+  ! Repartition uniforme selon cette direction
+  l = l * aleat3**(1./3)
+  x=x+l*u ; y=y+l*v ; z=z+l*w
+
+  return
+
+end subroutine pos_em_cellule_Voronoi
 
 end module Voronoi_grid
 
