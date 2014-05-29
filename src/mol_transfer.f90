@@ -343,12 +343,12 @@ subroutine NLTE_mol_line_transfer(imol)
            !$ id = omp_get_thread_num() + 1
            do zj=1, nz
 
-              ! Echantillonage uniforme du profil de raie
-              if (lfixed_rays) then
-                 tab_speed(:,id) = tab_deltaV(:,ri,zj,phik)
-              endif
-
               do phik=1, n_az
+                 ! Echantillonage uniforme du profil de raie
+                 if (lfixed_rays) then
+                    tab_speed(:,id) = tab_deltaV(:,ri,zj,phik)
+                 endif
+
                  if (lcompute_molRT(ri,zj,phik)) then
 
                     ! Propagation des rayons

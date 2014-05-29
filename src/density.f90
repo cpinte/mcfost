@@ -2902,10 +2902,10 @@ subroutine densite_file()
   deallocate(sph_dens,a_sph)
 
 
-  write(*,*) "MODIFYING 3D DENSITY !!!"
-  k = 36
-  densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
-  densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
+  !write(*,*) "MODIFYING 3D DENSITY !!!"
+  !k = 36
+  !densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  !densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
 
   return
 
