@@ -507,12 +507,13 @@ end subroutine mcfost_setup
 
 !***********************************************************
 
-function mcfost_update(lforce_update)
+function mcfost_update(lforce_update, lmanual, n_days)
 
-  logical, intent(in) :: lforce_update
+  logical, intent(in) :: lforce_update, lmanual
+  integer, intent(in), optional :: n_days
   logical :: lupdate, mcfost_update
 
-  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary
+  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary, s
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -524,10 +525,19 @@ function mcfost_update(lforce_update)
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
-     write(*,*) "ERROR: Cannot get MCFOST last version number."
-     write(*,*) "Current version file not found."
-     write(*,*) "Exiting"
-     stop
+     write(*,*) "ERROR: Cannot connect to MCFOST server."
+     if (lmanual) then
+        write(*,*) "Exiting."
+        stop
+     else ! if it is an auto-update, we don't exit
+        mcfost_update = .false.
+        ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
+        write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
+        write(s,*) (n_days-1) * 3600 * 24
+        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "//trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+        call appel_syst(cmd, syst_status)
+        return
+     endif
   endif
 
   open(unit=1, file="version.txt", status='old',iostat=ios)
@@ -536,7 +546,7 @@ function mcfost_update(lforce_update)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
-     write(*,*) "Exiting"
+     write(*,*) "Exiting."
      stop
   endif
 

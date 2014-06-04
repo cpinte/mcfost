@@ -178,8 +178,8 @@ subroutine initialisation_mcfost()
         write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
         fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
         write(*,fmt=fmt1) mcfost_auto_update
-        write(*,*) "checking for update ..."
-        lupdate = mcfost_update(.false.)
+        write(*,*) "Checking for update ..."
+        lupdate = mcfost_update(.false.,.false., mcfost_auto_update)
         if (lupdate) then ! On redemarre mcfost avec la meme ligne de commande
            write(*,*) "Restarting MCFOST ..."
            write(*,*) ""
@@ -195,7 +195,7 @@ subroutine initialisation_mcfost()
 
   ! Directories to search (ordered)
   if (my_mcfost_utils == "") then
-     write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
+     !write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
      allocate(search_dir(2)) ; n_dir = 2
      search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
   else
@@ -235,9 +235,9 @@ subroutine initialisation_mcfost()
      else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
      else if (para(2:2)=="u") then ! update binary
-        lupdate = mcfost_update(.false.)
+        lupdate = mcfost_update(.false.,.true.)
      else if (para(2:3)=="fu") then ! force update binary
-        lupdate =  mcfost_update(.true.)
+        lupdate =  mcfost_update(.true.,.true.)
      else
         call display_help()
      endif
