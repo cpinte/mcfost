@@ -225,7 +225,7 @@ release : main
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
