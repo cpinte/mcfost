@@ -1104,7 +1104,7 @@ subroutine calc_optical_depth_map(lambda)
      enddo
   endif
 
-  write(*,*) "Writing optical_depth_map.fits.gz"
+  write(*,*) "Writing optical_depth_map.fits.gz for wl=", tab_lambda(lambda), "microns"
   filename = "optical_depth_map.fits.gz"
 
   status=0
