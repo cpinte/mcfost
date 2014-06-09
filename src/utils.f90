@@ -570,7 +570,6 @@ function mcfost_update(lforce_update, lmanual, n_days)
      call get_environment_variable('MACHTYPE',machtype)
      system = trim(ostype)//" "//trim(machtype)
 
-
      ! get the correct url corresponding to the system
      if (ostype(1:5)=="linux") then
         if (machtype(1:4)=="i386") then
@@ -609,7 +608,6 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      write(*,*) "Your system is ", trim(system)
 
-
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
      !cmd = "wget -q "//trim(url)//" -O mcfost_update"
@@ -626,7 +624,6 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,*) "Exiting"
         stop
      endif
-
 
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
