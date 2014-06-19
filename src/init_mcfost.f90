@@ -230,6 +230,8 @@ subroutine initialisation_mcfost()
         call mcfost_get_ref_para()
      else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
         call mcfost_get_manual()
+     else if (para(2:14)=="get_yorick") then ! force update utils
+        call get_yorick()
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then ! force update utils
@@ -1062,6 +1064,7 @@ subroutine display_help()
   write(*,*) "       -v : displays version number, and available updates"
   write(*,*) "       -get_para or get_doc : downloads the current version of the parameter file"
   write(*,*) "       -get_manual : downloads the current version of manual"
+  write(*,*) "       -get_yorick : downloads the current version of yorick scripts"
   write(*,*) "       -u : updates MCFOST to most recent version"
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
   write(*,*) "       -h : displays full MCFOST history since v2.12.9"
