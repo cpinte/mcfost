@@ -228,6 +228,8 @@ release : main
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
+	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
@@ -245,6 +247,8 @@ release_mac : main
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
+	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
