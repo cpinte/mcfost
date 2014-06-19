@@ -513,7 +513,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   integer, intent(in), optional :: n_days
   logical :: lupdate, mcfost_update
 
-  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary, s
+  character(len=512) :: cmd, url, url_sha1, last_version, current_binary, s
+  character(len=32) :: system
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -565,43 +566,28 @@ function mcfost_update(lforce_update, lmanual, n_days)
   write(*,*) " "
 
   if (lupdate) then
-     ! get system info
-     call get_environment_variable('OSTYPE',ostype)
-     call get_environment_variable('MACHTYPE',machtype)
-     system = trim(ostype)//" "//trim(machtype)
+     ! get system info with uname : Darwin or Linux
+     cmd = "uname > arch.txt" ;  call appel_syst(cmd, syst_status)
+     open(unit=1, file="arch.txt", status='old',iostat=ios)
+     read(1,*,iostat=ios) system
+     close(unit=1,status="delete",iostat=ios)
+     if (ios/=0) then
+        write(*,*) "Unknown operating system : error 1"
+        write(*,*) "Cannot download new binary"
+        write(*,*) "Exiting."
+        stop
+     endif
 
      ! get the correct url corresponding to the system
-     if (ostype(1:5)=="linux") then
-        if (machtype(1:4)=="i386") then
-           url = trim(webpage)//"linux_32bits/mcfost"
-           url_sha1 = trim(webpage)//"linux_32bits/mcfost.sha1"
-        else if (machtype(1:6)=="x86_64") then
-           url = trim(webpage)//"linux_64bits/mcfost"
-           url_sha1 = trim(webpage)//"linux_64bits/mcfost.sha1"
-        else
-           write(*,*) "Linux system but unknown architecture"
-           write(*,*) "Cannot download new binary"
-           write(*,*) "Exiting."
-           stop
-        endif
-         system = trim(ostype)//" "//trim(machtype)
-     else if (ostype(1:6)=="darwin") then
-        system = "MacOS X x86_64"
-        url = trim(webpage)//"macos_intel_64bits/mcfost"
-        url_sha1 = trim(webpage)//"macos_intel_64bits/mcfost.sha1"
+     if (system(1:5)=="Linux") then
+        url = trim(webpage)//"linux/mcfost"
+        url_sha1 = trim(webpage)//"linux/mcfost.sha1"
+     else if (system(1:6)=="Darwin") then
+        url = trim(webpage)//"macos/mcfost"
+        url_sha1 = trim(webpage)//"macos/mcfost.sha1"
      else
-        write(*,*) "Unknown operating system"
+        write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
-        write(*,*) " "
-        write(*,*) "Detected configuration:"
-        write(*,*) "OSTYPE: ", trim(ostype)
-        write(*,*) "MACHTYPE: ", trim(machtype)
-        write(*,*) " "
-        write(*,*) "You can try to update the environement variables OSTYPE & MACHTYPE"
-        write(*,*) "Known values:"
-        write(*,*) " - OSTYPE: linux or darwin"
-        write(*,*) " - MACHTYPE: i386 or x86_64"
-
         write(*,*) "Exiting."
         stop
      endif
@@ -610,11 +596,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     !cmd = "wget -q "//trim(url)//" -O mcfost_update"
-     cmd = "curl "//trim(url)//" -o mcfost_update -s"
-     call appel_syst(cmd, syst_status)
-     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s"
-     call appel_syst(cmd, syst_status)
+     cmd = "curl "//trim(url)//" -o mcfost_update -s"    ; call appel_syst(cmd, syst_status)
+     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s" ; call appel_syst(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
@@ -627,9 +610,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
-     if (ostype(1:5)=="linux") then
+     if (system(1:5)=="Linux") then
         cmd = "sha1sum  mcfost_update > mcfost_update.sha1"
-     else if (ostype(1:6)=="darwin") then
+     else if (system(1:6)=="Darwin") then
         cmd = "openssl sha1 mcfost_update | awk '{print $2}' > mcfost_update.sha1"
      endif
      call appel_syst(cmd, syst_status)
@@ -643,11 +626,13 @@ function mcfost_update(lforce_update, lmanual, n_days)
      close(unit=1,status="delete",iostat=ios)
 
      if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then
-        cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
+        !cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
         write(*,*) " "
         write(*,*) "ERROR: binary sha1 is incorrect. MCFOST has not been updated."
-        write(*,*) mcfost_sha1
+        write(*,*) "The downloaded file has sha1: "
         write(*,*) mcfost_update_sha1
+        write(*,*) "It should be:"
+        write(*,*) mcfost_sha1
         write(*,*) "Exiting"
         stop
      else
