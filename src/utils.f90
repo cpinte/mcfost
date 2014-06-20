@@ -715,15 +715,18 @@ subroutine mcfost_get_ref_para()
   character(len=512) :: cmd
   character(len=12) :: ref_file
   character(len=18) :: ref_file_multi
+  character(len=15) :: ref_file_3D
   integer ::  syst_status
 
   ref_file = "ref"//mcfost_release(1:4)//".para"
   ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
 
-  write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi
+  write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
   cmd = "curl "//trim(webpage)//ref_file//" -O -s"
   call appel_syst(cmd, syst_status)
   cmd = "curl "//trim(webpage)//ref_file_multi//" -O -s"
+  call appel_syst(cmd, syst_status)
+  cmd = "curl "//trim(webpage)//ref_file_3D//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST reference file"
