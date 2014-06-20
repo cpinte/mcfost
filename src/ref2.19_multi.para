@@ -6,8 +6,8 @@
   1.28e5                  nbr_photons_image  : images computation
 
 #Wavelength
-  50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum]
-  T T T 		  compute temperature?, compute sed?, use default wavelength grid ?
+  50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum]  Do not change this line unless you know what you are doing
+  T T T 		  compute temperature?, compute sed?, use default wavelength grid for output ?
   IMLup.lambda		  wavelength file (if previous parameter is F)
   F F			  separation of different contributions?, stokes parameters?
 
