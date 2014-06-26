@@ -768,7 +768,7 @@ subroutine Temp_nRE(lconverged)
 
      ! bin widths [Hz]
      U_lim = specific_heat(T_lim,l)*T_lim ! enthalpy of bin boundaries [erg]
-     delta_nu_bin = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
+     delta_nu_bin(:) = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
 
      ! compute transition matrix  Akj   [Hz]
 
