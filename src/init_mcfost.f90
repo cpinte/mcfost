@@ -134,6 +134,8 @@ subroutine initialisation_mcfost()
   lonly_scatt = .false.
   lHG = .false.
   lforce_PAH_equilibrium=.false.
+  lread_grain_size_distrib=.false.
+  lread_sh=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -768,6 +770,18 @@ subroutine initialisation_mcfost()
         read(s,*) correct_Tgas
      case("-force_PAH_equilibrium")
         lforce_PAH_equilibrium=.true.
+        i_arg = i_arg+1
+     case("-grain_size_distrib")
+        i_arg = i_arg + 1
+        lread_grain_size_distrib=.true.
+        call get_command_argument(i_arg,s)
+        grain_size_file = s
+        i_arg = i_arg+1
+     case("-sh") ! specific heat file
+        i_arg = i_arg + 1
+        lread_sh=.true.
+        call get_command_argument(i_arg,s)
+        sh_file = s
         i_arg = i_arg+1
      case default
         call display_help()

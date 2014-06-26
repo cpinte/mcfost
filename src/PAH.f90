@@ -10,17 +10,17 @@ module PAH
 
   use dust
   use optical_depth
+  use utils, only : interp
 
   implicit none
 
-contains
+  real(kind=db), dimension(:), allocatable :: file_sh_T, file_sh
 
+contains
 
 function specific_heat(T, taille_grain)
   ! C. Pinte
   ! 30/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -38,12 +38,9 @@ end function specific_heat
 
 !**********************************************************************
 
-
 function astrosil_specific_heat(T, taille_grain)
   ! C. Pinte
   ! 26/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -55,6 +52,7 @@ function astrosil_specific_heat(T, taille_grain)
 
   ! specific heat [J/K]
   astrosil_specific_heat = (Na-2.)* kb * (2.*sh_helper(T/500., 2) + sh_helper(T/1500., 3))
+
 end function astrosil_specific_heat
 
 !**********************************************************************
@@ -65,8 +63,6 @@ function PAH_specific_heat(T,taille_grain)
   ! optional output are mode energies hbarw [erg] and modes/energy g
   ! C. Pinte
   ! 30/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -227,6 +223,75 @@ subroutine test_PAH_specific_heat()
 end subroutine test_PAH_specific_heat
 
 !******************************************************
+
+subroutine read_file_specific_heat
+
+  integer :: ios, status, n_comment, n_Temperatures, k
+  real :: fbuffer
+
+  open(unit=1, file=sh_file, status='old', iostat=ios)
+  if (ios/=0) then
+     write(*,*) "ERROR : cannot open "//trim(sh_file)
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Reading "//trim(sh_file)
+
+  ! On elimine les lignes avec des commentaires
+  status = 1
+  n_comment = 0
+  do while (status /= 0)
+     n_comment = n_comment + 1
+     read(1,*,iostat=status) fbuffer
+  enddo
+  n_comment = n_comment - 1
+
+  ! On compte les lignes avec des donnees
+  status=0
+  n_Temperatures=1 ! On a deja lu une ligne en cherchant les commentaires
+  do while(status==0)
+     n_Temperatures=n_Temperatures+1
+     read(1,*,iostat=status)
+  enddo
+  n_Temperatures = n_Temperatures - 1
+
+  allocate(file_sh_T(n_Temperatures), file_sh(n_Temperatures))
+
+  ! Lecture proprement dite
+  rewind(1)
+  ! On passe les commentaires
+  do k=1, n_comment
+     read(1,*)
+  enddo
+
+  ! Lecture indices
+  do k=1,n_Temperatures
+     read(1,*) file_sh_T(k), file_sh(k)
+  enddo
+
+  return
+
+end subroutine read_file_specific_heat
+
+!******************************************************
+
+function file_specific_heat(T,taille_grain)
+  ! return the specific heat in [erg/K]
+
+  integer, intent(in) :: taille_grain ! indice taille de grain
+  real(kind=db), dimension(:), intent(in) :: T
+  real(kind=db), dimension(size(T)) :: file_specific_heat
+
+  integer :: k
+
+  ! todo : inerpoler a l'avance dans read_file_specific_heat
+  do k=1,size(T)
+     file_specific_heat(k) = interp(file_sh, file_sh_T, T(k)) * M_grain(taille_grain)
+  enddo
+
+end function file_specific_heat
+
+!**********************************************************************
 
 real function get_astrosil_Na(taille_grain)
   ! C. Pinte

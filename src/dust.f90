@@ -32,92 +32,166 @@ subroutine taille_grains()
 
   type(dust_pop_type), pointer :: dp
 
+  integer :: ios, status, n_comment, n_grains
+  real :: fbuffer
+
+
   ! Boucle sur les populations de grains
-  do i=1, n_pop
-     dp => dust_pop(i)
+     do i=1, n_pop
+        dp => dust_pop(i)
 
-     if (dp%aexp < 0) then
-        write(*,*) "****************************************"
-        write(*,*) "Warning: slope grains size negative !!!!"
-        write(*,*) "****************************************"
-     endif
-
-     if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
-        a=dp%amin
-        dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
-     else
-        if (abs(dp%aexp - 4.) > 1.0e-5) then
-           if (abs(dp%aexp - 1.) > 1.0e-5) then
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
-                   (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                   (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
-           else
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
-                   (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                   (log(dp%amax)-log(dp%amin))
+        if (lread_grain_size_distrib) then
+           if (n_pop > 1) then
+              write(*,*) "ERROR : you cannot provide a grain size distribution with more than 1 population"
+              write(*,*) "Exiting"
+              stop
            endif
-        else
-           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
-                (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
-                (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
-        endif
-     endif
 
-     ! Proprietes des grains
-     !exp_grains = (amax/amin)**(1./real(n_grains_tot))
-     if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
-        write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
-        write(*,*) "If yes, press return"
-        read(*,*)
-     endif
+           open(unit=1, file=grain_size_file, status='old', iostat=ios)
+           if (ios/=0) then
+              write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+              write(*,*) "Exiting"
+              stop
+           endif
+           write(*,*) "Reading "//trim(grain_size_file)
 
-     ! Taille des grains (recursif)
-     masse_pop = nbre_grains(dp%ind_debut)
-     exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
-     do  k=dp%ind_debut, dp%ind_fin
-        if (k==dp%ind_debut) then
-           a = dp%amin*sqrt(exp_grains)
-        else
-           a= r_grain(k-1) * exp_grains
-        endif
+           ! On elimine les lignes avec des commentaires
+           status = 1
+           n_comment = 0
+           do while (status /= 0)
+              n_comment = n_comment + 1
+              read(1,*,iostat=status) fbuffer
+           enddo
+           n_comment = n_comment - 1
 
-        r_grain(k) = a ! micron
-        S_grain(k) = pi * a**2 ! micron^2
-        M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+           ! On compte les lignes avec des donnees
+           status=0
+           n_grains=1 ! On a deja lu une ligne en cherchant les commentaires
+           do while(status==0)
+              n_grains=n_grains+1
+              read(1,*,iostat=status)
+           enddo
+           n_grains = n_grains - 1
 
-        ! Multiplication par a car da = a.dln(a)
-        nbre_grains(k) = a**(-dp%aexp) * a
-        grain(k)%methode_chauffage = dp%methode_chauffage
-        grain(k)%zone = dp%zone
-        grain(k)%pop = i
-        masse_pop = masse_pop + nbre_grains(k)
-     enddo !k
+           if (n_grains /= n_grains_tot) then
+              write(*,*) "ERROR : the number of grains must be the same as in the parameter file"
+              write(*,*) "I will correct that later"
+              write(*,*) "Exiting"
+              stop
+           endif
 
-     masse_pop = masse_pop * dp%avg_grain_mass
 
-     ! Normalisation du nombre de grains pour atteindre la bonne masse
-     nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+           ! Lecture proprement dite
+           rewind(1)
+           ! On passe les commentaires
+           do k=1, n_comment
+              read(1,*)
+           enddo
 
-     ! Normalisation de tous les grains au sein d'une pop
-     nbre_tot_grains = 0.0
-     do k=dp%ind_debut,dp%ind_fin
-        nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
-     enddo
+           ! Lecture indices
+           do k=1,n_grains
+              read(1,*) a, nbre_grains(k)
 
-     ! Fraction de grains de taille k au sein d'une pop
-     do  k=dp%ind_debut,dp%ind_fin
-        nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
-     enddo !k
+              r_grain(k) = a ! micron
+              S_grain(k) = pi * a**2 ! micron^2
+              M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
 
-     ! Total radius is kept constant with coating
-     if (dp%lcoating) then
-        correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
+              ! Multiplication par a car da = a.dln(a)
+              nbre_grains(k) =  nbre_grains(k) * a
+              grain(k)%methode_chauffage = dp%methode_chauffage
+              grain(k)%zone = dp%zone
+              grain(k)%pop = i
+              masse_pop = masse_pop + nbre_grains(k)
+           enddo ! k
+
+           dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+
+        else ! lread_grain_size_distribution
+
+           if (dp%aexp < 0) then
+              write(*,*) "****************************************"
+              write(*,*) "Warning: slope grains size negative !!!!"
+              write(*,*) "****************************************"
+           endif
+
+           if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
+              a=dp%amin
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
+           else
+              if (abs(dp%aexp - 4.) > 1.0e-5) then
+                 if (abs(dp%aexp - 1.) > 1.0e-5) then
+                    dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
+                         (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                         (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+                 else
+                    dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
+                         (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                         (log(dp%amax)-log(dp%amin))
+                 endif
+              else
+                 dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
+                      (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
+                      (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+              endif
+           endif
+
+           ! Proprietes des grains
+           !exp_grains = (amax/amin)**(1./real(n_grains_tot))
+           if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
+              write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
+              write(*,*) "If yes, press return"
+              read(*,*)
+           endif
+
+           ! Taille des grains (recursif)
+           masse_pop = nbre_grains(dp%ind_debut)
+           exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
+           do  k=dp%ind_debut, dp%ind_fin
+              if (k==dp%ind_debut) then
+                 a = dp%amin*sqrt(exp_grains)
+              else
+                 a= r_grain(k-1) * exp_grains
+              endif
+
+              r_grain(k) = a ! micron
+              S_grain(k) = pi * a**2 ! micron^2
+              M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+
+              ! Multiplication par a car da = a.dln(a)
+              nbre_grains(k) = a**(-dp%aexp) * a
+              grain(k)%methode_chauffage = dp%methode_chauffage
+              grain(k)%zone = dp%zone
+              grain(k)%pop = i
+              masse_pop = masse_pop + nbre_grains(k)
+           enddo !k
+
+        endif ! lread_grain_size_distribution
+
+        masse_pop = masse_pop * dp%avg_grain_mass
+
+        ! Normalisation du nombre de grains pour atteindre la bonne masse
+        nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+
+        ! Normalisation de tous les grains au sein d'une pop
+        nbre_tot_grains = 0.0
         do k=dp%ind_debut,dp%ind_fin
-           r_core(k) = r_grain(k)  * correct_fact_r
-        enddo ! k
-     endif
+           nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
+        enddo
 
-  enddo !i
+        ! Fraction de grains de taille k au sein d'une pop
+        do  k=dp%ind_debut,dp%ind_fin
+           nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
+        enddo !k
+
+        ! Total radius is kept constant with coating
+        if (dp%lcoating) then
+           correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
+           do k=dp%ind_debut,dp%ind_fin
+              r_core(k) = r_grain(k)  * correct_fact_r
+           enddo ! k
+        endif
+
+     enddo !i
 
   return
 

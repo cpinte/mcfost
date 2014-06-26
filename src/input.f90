@@ -12,10 +12,13 @@ module input
 
   contains
 
-subroutine draine_load(file,na,nb,nh,ns,a,b,x1,x2,x3,x4,nx)
+subroutine draine_load(file,na,nb,nh,ns, a,b,x1,x2,x3,x4,nx)
 
 !call draine_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
 !         aso_lambda, aso_rad, aso_Q_abs, aso_Q_sca, aso_g, tmp, 3)
+!
+!call draine_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
+!         aso_lambda, aso_rad, aso_Q_ext, aso_Q_abs, aso_Q_sca, aso_g, 4)
 
   implicit none
 
@@ -70,6 +73,60 @@ subroutine draine_load(file,na,nb,nh,ns,a,b,x1,x2,x3,x4,nx)
   return
 
 end subroutine draine_load
+
+!*************************************************************
+
+subroutine misselt_load(file,na,nb,nh,ns, a,b,x1,x2,x3,x4)
+!call misselt_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
+!         aso_lambda, aso_rad, aso_Q_ext, aso_Q_abs, aso_Q_sca, aso_g)
+
+  implicit none
+
+  character(len=512), intent(in) :: file
+  integer, intent(in) :: na, nb, nh, ns
+
+  ! nh : n header ; ns : n_skip
+
+  real, dimension(na) :: a
+  real, dimension(nb) :: b
+
+  real, dimension(na,nb), intent(out) :: x1,x2,x3,x4
+  real :: x
+
+  integer :: i,j,l, n_ligne
+
+  n_ligne=0
+
+  !write(*,*) na, nb, nh, ns, nx
+
+  open(unit=1,file=file)
+  ! header
+  do l=1, nh
+   !  n_ligne=n_ligne+1
+     read(1,*)
+  enddo
+  ! lecture
+  do i=1,nb
+     read(1,*) b(i)
+     read(1,*)
+     do j=1,na
+        !   n_ligne=n_ligne+1
+        !   write(*,*) n_ligne
+        read(1,*) x, a(j), x2(j,i), x3(j,i), x1(j,i), x4(j,i)
+     enddo
+     if (i < nb) then
+        ! skip ns ligne
+        do l=1,ns
+        !   n_ligne=n_ligne+1
+           read(1,*)
+        enddo
+     endif
+  enddo
+  close(unit=1)
+
+  return
+
+end subroutine misselt_load
 
 !*************************************************************
 
