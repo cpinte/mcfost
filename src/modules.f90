@@ -374,7 +374,7 @@ module grains
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
 
-     logical :: is_PAH, lcoating
+     logical :: is_opacity_file, is_PAH, lcoating
      integer :: ind_debut, ind_fin
   end type dust_pop_type
 

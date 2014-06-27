@@ -223,7 +223,7 @@ subroutine init_indices_optiques()
 
 
   do pop=1, n_pop
-     if (.not.dust_pop(pop)%is_PAH) then
+     if (.not.dust_pop(pop)%is_opacity_file) then
 
         n_components = dust_pop(pop)%n_components
         if (dust_pop(pop)%porosity > tiny_real) n_components = n_components + 1
@@ -399,7 +399,7 @@ subroutine init_indices_optiques()
         dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
-     else ! PAH
+     else ! fichier d'opacite
         ! we only set the material density
         dust_pop(pop)%component_rho1g(1) = 2.5
         dust_pop(pop)%rho1g_avg = 2.5
@@ -561,7 +561,7 @@ subroutine prop_grains(lambda, p_lambda)
 
         do i=1, n_pop
            dp = dust_pop(i)
-           if (dp%is_PAH) then
+           if (dp%is_opacity_file) then
               filename = trim(dp%indices(1))
 
               dir = in_dir(filename, dust_dir,  status=ios)
@@ -612,7 +612,7 @@ subroutine prop_grains(lambda, p_lambda)
   do  k=n_grains_tot,1,-1
      pop = grain(k)%pop
      a = r_grain(k)
-     if (.not.dust_pop(pop)%is_PAH) then ! theorie de mie ou gmm
+     if (.not.dust_pop(pop)%is_opacity_file) then
         amu1=tab_amu1(lambda,pop)
         amu2=tab_amu2(lambda,pop)
         alfa = 2.0 * pi * a / wavel
@@ -635,8 +635,8 @@ subroutine prop_grains(lambda, p_lambda)
            endif
            !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
-     else ! grain de PAH
-        is_grain_PAH(k) = .true.
+     else ! fichier d'opacite
+        if (dust_pop(pop)%is_PAH) is_grain_PAH(k) = .true.
         call mueller_PAH(lambda,p_lambda,k,qext, qsca,gsca)
      endif
      tab_albedo(lambda,k)=qsca/qext
