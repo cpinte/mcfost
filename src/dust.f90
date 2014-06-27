@@ -537,11 +537,13 @@ subroutine prop_grains(lambda, p_lambda)
 
   type(dust_pop_type) :: dp
 
-  ! PAH
-  real, dimension(PAH_n_lambda,PAH_n_rad) :: tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g
+  ! Opacity file
+  real, dimension(op_file_n_lambda,op_file_na) :: tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g
   character(len=512) :: filename, dir
-  real, dimension(PAH_n_lambda) :: tmp_PAH_lambda
-  real, dimension(PAH_n_rad) :: tmp_PAH_rad
+  real, dimension(op_file_n_lambda) :: tmp_lambda
+  real, dimension(op_file_na) :: tmp_r_grain
+  logical :: lread_op_file = .false.
+
 
   qext=0.0
   qsca=0.0
@@ -550,12 +552,12 @@ subroutine prop_grains(lambda, p_lambda)
   wavel=tab_lambda(lambda)
 
   if (lnRE) then
-     if (.not.lread_PAH) then ! variable logique pour ne lire qu'une seule fois le fichier de prop de PAH
-        allocate(PAH_Q_ext(PAH_n_lambda,PAH_n_rad,n_pop), &
-             PAH_Q_sca(PAH_n_lambda,PAH_n_rad,n_pop), &
-             PAH_g(PAH_n_lambda,PAH_n_rad,n_pop), stat=alloc_status)
+     if (.not.lread_op_file) then ! variable logique pour ne lire qu'une seule fois le fichier d'opacite
+        allocate(op_file_Q_ext(op_file_n_lambda,op_file_na,n_pop), &
+             op_file_Q_sca(op_file_n_lambda,op_file_na,n_pop), &
+             op_file_g(op_file_n_lambda,op_file_na,n_pop), stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error PAH_Q_ext'
+           write(*,*) 'Allocation error op_file_Q_ext'
            stop
         endif
 
@@ -577,24 +579,24 @@ subroutine prop_grains(lambda, p_lambda)
               ! load optical data from file
               call draine_load(filename, PAH_n_lambda, PAH_n_rad, 10, 1, &
                    tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
-              PAH_Q_ext(:,:,i) = tmp_Q_ext
-              PAH_Q_sca(:,:,i) = tmp_Q_sca
-              PAH_g(:,:,i) = tmp_g
-              PAH_lambda = tmp_PAH_lambda
-              log_PAH_rad = log(tmp_PAH_rad)
+              op_file_Q_ext(:,:,i) = tmp_Q_ext
+              op_file_Q_sca(:,:,i) = tmp_Q_sca
+              op_file_g(:,:,i) = tmp_g
+              op_file_lambda = tmp_lambda
+              log_op_file_r_grain = log(tmp_r_grain)
            endif
         enddo !i
 
         ! abs car le fichier de lambda pour les PAHs est a l'envers
-        PAH_delta_lambda(1) = abs(PAH_lambda(2) - PAH_lambda(1))
+        op_file_delta_lambda(1) = abs(op_file_lambda(2) - op_file_lambda(1))
         if (n_lambda > 1) then
-           PAH_delta_lambda(n_lambda) = abs(PAH_lambda(n_lambda) - PAH_lambda(n_lambda-1))
+           op_file_delta_lambda(n_lambda) = abs(op_file_lambda(n_lambda) - op_file_lambda(n_lambda-1))
         endif
-        do l=2,PAH_n_lambda-1
-           PAH_delta_lambda(l) = 0.5* abs(PAH_lambda(l+1) - PAH_lambda(l-1))
+        do l=2,op_file_n_lambda-1
+           op_file_delta_lambda(l) = 0.5* abs(op_file_lambda(l+1) - op_file_lambda(l-1))
         enddo
 
-        lread_PAH = .true.
+        lread_op_file = .true.
      endif
   endif
 
@@ -637,7 +639,7 @@ subroutine prop_grains(lambda, p_lambda)
         endif ! laggregate
      else ! fichier d'opacite
         if (dust_pop(pop)%is_PAH) is_grain_PAH(k) = .true.
-        call mueller_PAH(lambda,p_lambda,k,qext, qsca,gsca)
+        call mueller_opacity_file(lambda,p_lambda,k,qext, qsca,gsca)
      endif
      tab_albedo(lambda,k)=qsca/qext
      tab_g(lambda,k) = gsca

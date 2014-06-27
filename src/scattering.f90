@@ -858,9 +858,10 @@ end subroutine mueller_gmm
 
 !***************************************************
 
-subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
+subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
-  ! pour grains de PAH  apres lecture du fichier de Draine
+  ! pour grains apres lecture du fichier d'opacite
+  ! En particulier pour les PAHs de Draine
   ! Suppose une HG pour la fonction de phase et une polarisabilite nulle !!
   ! C. Pinte
   ! 31/01/07
@@ -882,12 +883,12 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   pop=grain(taille_grain)%pop
 
-  if (r_grain(taille_grain) < exp(log_PAH_rad(1))) then
-     write(*,*) "Minimum PAH grain size is",  exp(log_PAH_rad(1))
+  if (r_grain(taille_grain) < exp(log_op_file_r_grain(1))) then
+     write(*,*) "Minimum PAH grain size is",  exp(log_op_file_r_grain(1))
      write(*,*) "Exiting"
      stop
-  else if (r_grain(taille_grain) > exp(log_PAH_rad(PAH_n_rad))) then
-     write(*,*) "Maximum PAH grain size is",  exp(log_PAH_rad(PAH_n_rad))
+  else if (r_grain(taille_grain) > exp(log_op_file_r_grain(op_file_na))) then
+     write(*,*) "Maximum PAH grain size is",  exp(log_op_file_r_grain(op_file_na))
      write(*,*) "Exiting"
      stop
   endif
@@ -896,10 +897,10 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   ! Recherche en taille de grain
   ! tableau croissant
-  do j=2,PAH_n_rad-1
-     if (log_PAH_rad(j) > log_a) exit
+  do j=2,op_file_na-1
+     if (log_op_file_r_grain(j) > log_a) exit
   enddo
-  frac_a = (log_a-log_PAH_rad(j-1))/(log_PAH_rad(j)-log_PAH_rad(j-1))
+  frac_a = (log_a-log_op_file_r_grain(j-1))/(log_op_file_r_grain(j)-log_op_file_r_grain(j-1))
   frac_a_m1 = 1- frac_a
 
   ! Moyennage en longueur d'onde
@@ -908,13 +909,13 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   wl_max = tab_lambda_sup(lambda)
 
   qext = 0.0 ; qsca = 0.0 ; gsca = 0.0 ; norme = 0 ; N=0
-  do i=1,PAH_n_lambda
-     if ((PAH_lambda(i) > wl_min).and.(PAH_lambda(i) < wl_max)) then
+  do i=1,op_file_n_lambda
+     if ((op_file_lambda(i) > wl_min).and.(op_file_lambda(i) < wl_max)) then
         N = N+1
-        norme = norme + PAH_delta_lambda(i)
-        qext = qext + (frac_a * PAH_Q_ext(i,j,pop) +  frac_a_m1 * PAH_Q_ext(i,j-1,pop) ) * PAH_delta_lambda(i)
-        qsca = qsca + (frac_a * PAH_Q_sca(i,j,pop) +  frac_a_m1 * PAH_Q_sca(i,j-1,pop) ) * PAH_delta_lambda(i)
-        gsca = gsca + (frac_a * PAH_g(i,j,pop) +  frac_a_m1 * PAH_g(i,j-1,pop) ) * PAH_delta_lambda(i)
+        norme = norme + op_file_delta_lambda(i)
+        qext = qext + (frac_a * op_file_Q_ext(i,j,pop) +  frac_a_m1 * op_file_Q_ext(i,j-1,pop) ) * op_file_delta_lambda(i)
+        qsca = qsca + (frac_a * op_file_Q_sca(i,j,pop) +  frac_a_m1 * op_file_Q_sca(i,j-1,pop) ) * op_file_delta_lambda(i)
+        gsca = gsca + (frac_a * op_file_g(i,j,pop) +  frac_a_m1 * op_file_g(i,j-1,pop) ) * op_file_delta_lambda(i)
      endif
   enddo !i
   !write(*,*) lambda, N, norme
@@ -926,30 +927,30 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   else ! on peut pas moyenner, on fait une interpolation en log
      ! Recherche en longueur d'onde
      ! tableau decroissant
-     do i=2,PAH_n_lambda-1
-        if (log(PAH_lambda(i)) < log_wavel) exit
+     do i=2,op_file_n_lambda-1
+        if (log(op_file_lambda(i)) < log_wavel) exit
      enddo
-     frac_lambda = (log_wavel-log(PAH_lambda(i-1)))/(log(PAH_lambda(i))-log(PAH_lambda(i-1)))
+     frac_lambda = (log_wavel-log(op_file_lambda(i-1)))/(log(op_file_lambda(i))-log(op_file_lambda(i-1)))
 
      fact1 = (1.-frac_a)  * (1.-frac_lambda)
      fact2 = (1.-frac_a) * frac_lambda
      fact3 = frac_a * (1.-frac_lambda)
      fact4 = frac_a * frac_lambda
 
-     qext = exp(log(PAH_Q_ext(i-1,j-1,pop)) * fact1 &
-          + log(PAH_Q_ext(i,j-1,pop)) * fact2 &
-          + log(PAH_Q_ext(i-1,j,pop)) *  fact3&
-          + log(PAH_Q_ext(i,j,pop)) * fact4)
+     qext = exp(log(op_file_Q_ext(i-1,j-1,pop)) * fact1 &
+          + log(op_file_Q_ext(i,j-1,pop)) * fact2 &
+          + log(op_file_Q_ext(i-1,j,pop)) *  fact3&
+          + log(op_file_Q_ext(i,j,pop)) * fact4)
 
-     qsca = exp(log(PAH_Q_sca(i-1,j-1,pop)) * fact1 &
-          + log(PAH_Q_sca(i,j-1,pop)) * fact2 &
-          + log(PAH_Q_sca(i-1,j,pop)) * fact3 &
-          + log(PAH_Q_sca(i,j,pop)) * fact4)
+     qsca = exp(log(op_file_Q_sca(i-1,j-1,pop)) * fact1 &
+          + log(op_file_Q_sca(i,j-1,pop)) * fact2 &
+          + log(op_file_Q_sca(i-1,j,pop)) * fact3 &
+          + log(op_file_Q_sca(i,j,pop)) * fact4)
 
-     gsca = PAH_g(i-1,j-1,pop) * fact1 &
-          + PAH_g(i,j-1,pop) * fact2 &
-          + PAH_g(i-1,j,pop) * fact3 &
-          + PAH_g(i,j,pop) * fact4
+     gsca = op_file_g(i-1,j-1,pop) * fact1 &
+          + op_file_g(i,j-1,pop) * fact2 &
+          + op_file_g(i-1,j,pop) * fact3 &
+          + op_file_g(i,j,pop) * fact4
      ! Opacites testees OK
   endif
 
@@ -1000,7 +1001,7 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   return
 
-end subroutine mueller_PAH
+end subroutine mueller_opacity_file
 
 !**********************************************************************
 
