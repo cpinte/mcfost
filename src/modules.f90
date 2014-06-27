@@ -391,12 +391,11 @@ module grains
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
 
-  ! Pour lecture des fichiers de PAH de B.Draine
-  real, dimension(:,:,:), allocatable :: PAH_Q_ext, PAH_Q_abs, PAH_Q_sca, PAH_g
-  integer, parameter :: PAH_n_rad = 30,  PAH_n_lambda = 1201
-  real, dimension(PAH_n_rad) :: log_PAH_rad
-  real, dimension(PAH_n_lambda) :: PAH_lambda, PAH_delta_lambda
-  logical :: lread_PAH = .false.
+  ! Pour lecture des fichiers d'opacite, par exemple PAH de B.Draine
+  real, dimension(:,:,:), allocatable :: op_file_Q_ext, op_file_Q_abs, op_file_Q_sca, op_file_g
+  integer, parameter :: op_file_na = 121,  op_file_n_lambda = 1201
+  real, dimension(op_file_na) :: log_op_file_r_grain
+  real, dimension(op_file_n_lambda) :: op_file_lambda, op_file_delta_lambda
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
   real :: wavel
