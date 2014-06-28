@@ -313,6 +313,8 @@ subroutine init_reemission()
 
   enddo !t
 
+  if (lread_sh) call read_file_specific_heat()
+
   return
 
 end subroutine init_reemission
@@ -1457,7 +1459,6 @@ subroutine repartition_energie(lambda)
 
 
   E_disk(lambda) = sum(E_cell)
-
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda))
 
   ! Energie totale emise a une distance emise egale a la distance terre-etoile

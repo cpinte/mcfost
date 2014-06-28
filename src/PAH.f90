@@ -26,7 +26,11 @@ function specific_heat(T, taille_grain)
   real(kind=db), dimension(:), intent(in) :: T
   real(kind=db), dimension(size(T)) :: specific_heat
 
-  if (is_grain_PAH(taille_grain)) then
+  integer :: i
+
+  if (lread_sh) then
+     specific_heat = file_specific_heat(T,taille_grain)
+  else if (is_grain_PAH(taille_grain)) then
      specific_heat = PAH_specific_heat(T, taille_grain)
   else
      specific_heat = astrosil_specific_heat(T, taille_grain)
@@ -58,7 +62,7 @@ end function astrosil_specific_heat
 !**********************************************************************
 
 function PAH_specific_heat(T,taille_grain)
-  ! return the specific heat for PAHs, in [erg/K]
+  ! return the specific heat capacity for PAHs, in [erg/K]
   ! input is Temperature [K] and grain radius [cm]
   ! optional output are mode energies hbarw [erg] and modes/energy g
   ! C. Pinte
@@ -264,9 +268,9 @@ subroutine read_file_specific_heat
      read(1,*)
   enddo
 
-  ! Lecture indices
+  ! Lecture specific heat capacity
   do k=1,n_Temperatures
-     read(1,*) file_sh_T(k), file_sh(k)
+     read(1,*) file_sh_T(k), fbuffer, file_sh(k)
   enddo
 
   return
@@ -276,7 +280,7 @@ end subroutine read_file_specific_heat
 !******************************************************
 
 function file_specific_heat(T,taille_grain)
-  ! return the specific heat in [erg/K]
+  ! return the specific heat capacity in [erg/K]
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -284,9 +288,9 @@ function file_specific_heat(T,taille_grain)
 
   integer :: k
 
-  ! todo : inerpoler a l'avance dans read_file_specific_heat
+  ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     file_specific_heat(k) = interp(file_sh, file_sh_T, T(k)) * M_grain(taille_grain)
+     file_specific_heat(k) = interp(file_sh, file_sh_T, T(k)) * M_grain(taille_grain)  / 1.e7  ! todo : c'est des Joules l'unite non ?
   enddo
 
 end function file_specific_heat

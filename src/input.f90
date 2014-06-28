@@ -12,58 +12,119 @@ module input
 
   contains
 
-subroutine draine_load(file,na,nb,nh,ns, a,b,x1,x2,x3,x4,nx)
+subroutine read_opacity_file(pop)
 
-!call draine_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
-!         aso_lambda, aso_rad, aso_Q_abs, aso_Q_sca, aso_g, tmp, 3)
-!
-!call draine_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
-!         aso_lambda, aso_rad, aso_Q_ext, aso_Q_abs, aso_Q_sca, aso_g, 4)
+  integer, intent(in) :: pop
+  character(len=512) :: filename, dir
+
+  integer :: ios, l
+  type(dust_pop_type), pointer :: dp
+
+  dp => dust_pop(pop)
+
+  filename = trim(dp%indices(1))
+  dir = in_dir(filename, dust_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: dust file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  else
+     filename = trim(dir)//trim(filename) ;
+     write(*,*) "Reading opacity file "//trim(filename) ;
+  endif
+
+  ! load optical data from file
+  if (lread_Misselt) then
+     call misselt_load(filename, pop)
+  else
+     dp%component_rho1g(1) = 2.5
+     dp%rho1g_avg = 2.5
+     call draine_load(filename)
+     !call draine_load(filename, op_file_n_lambda, op_file_na, 10, 1, &
+    !      tmp_lambda, tmp_r_grain,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
+  endif
+
+  ! abs car le fichier de lambda pour les PAHs est a l'envers
+  op_file_delta_lambda(1) = abs(op_file_lambda(2) - op_file_lambda(1))
+  if (n_lambda > 1) then
+     op_file_delta_lambda(n_lambda) = abs(op_file_lambda(n_lambda) - op_file_lambda(n_lambda-1))
+  endif
+  do l=2,op_file_n_lambda-1
+     op_file_delta_lambda(l) = 0.5* abs(op_file_lambda(l+1) - op_file_lambda(l-1))
+  enddo
+
+  ! Correcting the grain size distribution to account for the material density
+  ! that we did not know at the time
+  nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) /  dp%rho1g_avg
+
+  return
+
+end subroutine read_opacity_file
+
+!*************************************************************
+
+subroutine alloc_mem_opacity_file()
+
+  integer :: alloc_status
+
+  allocate(op_file_Qext(op_file_n_lambda,op_file_na), op_file_Qsca(op_file_n_lambda,op_file_na), &
+       op_file_g(op_file_n_lambda,op_file_na), op_file_log_r_grain(op_file_na), &
+       op_file_lambda(op_file_n_lambda), op_file_delta_lambda(op_file_n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error opacity file'
+     stop
+  endif
+
+  return
+
+end subroutine alloc_mem_opacity_file
+
+!*************************************************************
+
+subroutine free_mem_opacity_file()
+
+  deallocate(op_file_Qext, op_file_Qsca, op_file_g, op_file_log_r_grain, &
+       op_file_lambda, op_file_delta_lambda)
+  return
+
+end subroutine free_mem_opacity_file
+
+!*************************************************************
+
+subroutine draine_load(file)
 
   implicit none
 
   character(len=512), intent(in) :: file
-  integer, intent(in) :: na, nb, nh, ns, nx
 
   ! nh : n header ; ns : n_skip
+  integer, parameter :: nh1 = 7, nh2 = 1, ns=1
 
-  real, dimension(na) :: a
-  real, dimension(nb) :: b
-
-  real, dimension(na,nb), intent(out) :: x1,x2,x3,x4
-
-  integer :: i,j,l, n_ligne
-
-  n_ligne=0
-
-  !write(*,*) na, nb, nh, ns, nx
+  real :: fbuffer, a
+  integer :: i,j,l
 
   open(unit=1,file=file)
   ! header
-  do l=1, nh
-   !  n_ligne=n_ligne+1
+  do l=1, nh1
      read(1,*)
   enddo
-  ! lecture
-  do i=1,nb
-     read(1,*) b(i)
+  read(1,*) op_file_na
+  read(1,*) op_file_n_lambda
+  call alloc_mem_opacity_file()
+  do l=1, nh2
      read(1,*)
-     if (nx==4) then
-        do j=1,na
-        !   n_ligne=n_ligne+1
-        !   write(*,*) n_ligne
-           read(1,*) a(j), x1(j,i), x2(j,i), x3(j,i), x4(j,i)
-        enddo
-     else if (nx==3) then
-        do j=1,na
-         !  n_ligne=n_ligne+1
-           read(1,*) a(j), x1(j,i), x2(j,i), x3(j,i)
-        enddo
-     endif
-     if (i < nb) then
+  enddo
+
+  ! lecture
+  do i=1, op_file_na
+     read(1,*) a ; op_file_log_r_grain(i) = log(a)
+     read(1,*)
+     do j=1, op_file_n_lambda
+        read(1,*) op_file_lambda(j), op_file_Qext(j,i), fbuffer, op_file_Qsca(j,i), op_file_g(j,i)
+     enddo
+     if (i < op_file_na) then
         ! skip ns ligne
         do l=1,ns
-        !   n_ligne=n_ligne+1
            read(1,*)
         enddo
      endif
@@ -76,48 +137,50 @@ end subroutine draine_load
 
 !*************************************************************
 
-subroutine misselt_load(file,na,nb,nh,ns, a,b,x1,x2,x3,x4)
-!call misselt_load(opt_file, aso_n_wav, aso_n_rad, 8, 3, &
-!         aso_lambda, aso_rad, aso_Q_ext, aso_Q_abs, aso_Q_sca, aso_g)
+subroutine misselt_load(file, pop)
+  ! Allocate and fills the arrays op_file_XXXX
+  ! C. Pinte
+  ! 27/06/2014
 
   implicit none
 
   character(len=512), intent(in) :: file
-  integer, intent(in) :: na, nb, nh, ns
+  integer, intent(in) :: pop
 
   ! nh : n header ; ns : n_skip
+  integer, parameter :: nh1 = 7, nh2 = 2, ns=1
 
-  real, dimension(na) :: a
-  real, dimension(nb) :: b
+  character(len=5) :: sbuffer
 
-  real, dimension(na,nb), intent(out) :: x1,x2,x3,x4
-  real :: x
-
-  integer :: i,j,l, n_ligne
-
-  n_ligne=0
-
-  !write(*,*) na, nb, nh, ns, nx
+  real :: fbuffer, fbuffer2, a, material_density
+  integer :: i,j,l, ibuffer
 
   open(unit=1,file=file)
   ! header
-  do l=1, nh
-   !  n_ligne=n_ligne+1
+  do l=1, nh1
      read(1,*)
   enddo
-  ! lecture
-  do i=1,nb
-     read(1,*) b(i)
+  read(1,*) sbuffer, op_file_na
+  read(1,*) sbuffer, op_file_n_lambda
+  read(1,*) ibuffer, material_density
+  dust_pop(pop)%component_rho1g(1) = material_density
+  dust_pop(pop)%rho1g_avg = material_density
+  call alloc_mem_opacity_file()
+
+  do l=1, nh2
      read(1,*)
-     do j=1,na
-        !   n_ligne=n_ligne+1
-        !   write(*,*) n_ligne
-        read(1,*) x, a(j), x2(j,i), x3(j,i), x1(j,i), x4(j,i)
+  enddo
+
+  ! lecture
+  do i=1,op_file_na
+     read(1,*) a ; op_file_log_r_grain(i) = log(a)
+     read(1,*)
+     do j=1,op_file_n_lambda
+        read(1,*) fbuffer, op_file_lambda(j), fbuffer2, op_file_Qsca(j,i), op_file_Qext(j,i), op_file_g(j,i)
      enddo
-     if (i < nb) then
+     if (i < op_file_na) then
         ! skip ns ligne
         do l=1,ns
-        !   n_ligne=n_ligne+1
            read(1,*)
         enddo
      endif

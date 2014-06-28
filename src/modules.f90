@@ -115,7 +115,7 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lread_grain_size_distrib, lread_sh
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lread_grain_size_distrib, lread_sh, lread_Misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
   logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium
@@ -392,13 +392,12 @@ module grains
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
 
   ! Pour lecture des fichiers d'opacite, par exemple PAH de B.Draine
-  real, dimension(:,:,:), allocatable :: op_file_Q_ext, op_file_Q_abs, op_file_Q_sca, op_file_g
-  integer, parameter :: op_file_na = 121,  op_file_n_lambda = 1201
-  real, dimension(op_file_na) :: log_op_file_r_grain
-  real, dimension(op_file_n_lambda) :: op_file_lambda, op_file_delta_lambda
+  integer :: op_file_na,  op_file_n_lambda
+  real, dimension(:,:), allocatable :: op_file_Qext, op_file_Qsca, op_file_g ! op_file_n_lambda,op_file_na
+  real, dimension(:), allocatable :: op_file_log_r_grain ! op_file_na
+  real, dimension(:), allocatable :: op_file_lambda, op_file_delta_lambda ! op_file_n_lambda
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
-  real :: wavel
 
   ! Tab de lambda
   real, dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
