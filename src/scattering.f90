@@ -9,6 +9,7 @@ module scattering
   use em_th
   use prop_star
   use grains
+  use input
 
   use utils
 
@@ -883,24 +884,24 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   pop=grain(taille_grain)%pop
 
-  if (r_grain(taille_grain) < exp(log_op_file_r_grain(1))) then
-     write(*,*) "Minimum PAH grain size is",  exp(log_op_file_r_grain(1))
+  if ((taille_grain == dust_pop(pop)%ind_debut).and.(lambda==1)) call read_opacity_file(pop)
+
+  if (r_grain(taille_grain) < exp(op_file_log_r_grain(1))) then
+     write(*,*) "Minimum PAH grain size is",  exp(op_file_log_r_grain(1))
      write(*,*) "Exiting"
      stop
-  else if (r_grain(taille_grain) > exp(log_op_file_r_grain(op_file_na))) then
-     write(*,*) "Maximum PAH grain size is",  exp(log_op_file_r_grain(op_file_na))
+  else if (r_grain(taille_grain) > exp(op_file_log_r_grain(op_file_na))) then
+     write(*,*) "Maximum PAH grain size is",  exp(op_file_log_r_grain(op_file_na))
      write(*,*) "Exiting"
      stop
   endif
 
-
-
   ! Recherche en taille de grain
   ! tableau croissant
   do j=2,op_file_na-1
-     if (log_op_file_r_grain(j) > log_a) exit
+     if (op_file_log_r_grain(j) > log_a) exit
   enddo
-  frac_a = (log_a-log_op_file_r_grain(j-1))/(log_op_file_r_grain(j)-log_op_file_r_grain(j-1))
+  frac_a = (log_a-op_file_log_r_grain(j-1))/(op_file_log_r_grain(j)-op_file_log_r_grain(j-1))
   frac_a_m1 = 1- frac_a
 
   ! Moyennage en longueur d'onde
@@ -913,9 +914,9 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
      if ((op_file_lambda(i) > wl_min).and.(op_file_lambda(i) < wl_max)) then
         N = N+1
         norme = norme + op_file_delta_lambda(i)
-        qext = qext + (frac_a * op_file_Q_ext(i,j,pop) +  frac_a_m1 * op_file_Q_ext(i,j-1,pop) ) * op_file_delta_lambda(i)
-        qsca = qsca + (frac_a * op_file_Q_sca(i,j,pop) +  frac_a_m1 * op_file_Q_sca(i,j-1,pop) ) * op_file_delta_lambda(i)
-        gsca = gsca + (frac_a * op_file_g(i,j,pop) +  frac_a_m1 * op_file_g(i,j-1,pop) ) * op_file_delta_lambda(i)
+        qext = qext + (frac_a * op_file_Qext(i,j) +  frac_a_m1 * op_file_Qext(i,j-1) ) * op_file_delta_lambda(i)
+        qsca = qsca + (frac_a * op_file_Qsca(i,j) +  frac_a_m1 * op_file_Qsca(i,j-1) ) * op_file_delta_lambda(i)
+        gsca = gsca + (frac_a * op_file_g(i,j) +  frac_a_m1 * op_file_g(i,j-1) ) * op_file_delta_lambda(i)
      endif
   enddo !i
   !write(*,*) lambda, N, norme
@@ -937,23 +938,24 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
      fact3 = frac_a * (1.-frac_lambda)
      fact4 = frac_a * frac_lambda
 
-     qext = exp(log(op_file_Q_ext(i-1,j-1,pop)) * fact1 &
-          + log(op_file_Q_ext(i,j-1,pop)) * fact2 &
-          + log(op_file_Q_ext(i-1,j,pop)) *  fact3&
-          + log(op_file_Q_ext(i,j,pop)) * fact4)
+     qext = exp(log(op_file_Qext(i-1,j-1)) * fact1 &
+          + log(op_file_Qext(i,j-1)) * fact2 &
+          + log(op_file_Qext(i-1,j)) *  fact3&
+          + log(op_file_Qext(i,j)) * fact4)
 
-     qsca = exp(log(op_file_Q_sca(i-1,j-1,pop)) * fact1 &
-          + log(op_file_Q_sca(i,j-1,pop)) * fact2 &
-          + log(op_file_Q_sca(i-1,j,pop)) * fact3 &
-          + log(op_file_Q_sca(i,j,pop)) * fact4)
+     qsca = exp(log(op_file_Qsca(i-1,j-1)) * fact1 &
+          + log(op_file_Qsca(i,j-1)) * fact2 &
+          + log(op_file_Qsca(i-1,j)) * fact3 &
+          + log(op_file_Qsca(i,j)) * fact4)
 
-     gsca = op_file_g(i-1,j-1,pop) * fact1 &
-          + op_file_g(i,j-1,pop) * fact2 &
-          + op_file_g(i-1,j,pop) * fact3 &
-          + op_file_g(i,j,pop) * fact4
+     gsca = op_file_g(i-1,j-1) * fact1 &
+          + op_file_g(i,j-1) * fact2 &
+          + op_file_g(i-1,j) * fact3 &
+          + op_file_g(i,j) * fact4
      ! Opacites testees OK
   endif
 
+  if ((taille_grain == dust_pop(pop)%ind_fin).and.(lambda==n_lambda)) call free_mem_opacity_file()
 
   !! Matrices de mueller
   if (aniso_method==1) then

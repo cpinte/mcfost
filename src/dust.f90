@@ -37,82 +37,82 @@ subroutine taille_grains()
 
 
   ! Boucle sur les populations de grains
-     do i=1, n_pop
-        dp => dust_pop(i)
+  do i=1, n_pop
+     dp => dust_pop(i)
 
-        if (lread_grain_size_distrib) then
-           if (n_pop > 1) then
-              write(*,*) "ERROR : you cannot provide a grain size distribution with more than 1 population"
-              write(*,*) "Exiting"
-              stop
-           endif
+     if (lread_grain_size_distrib) then
+        if (n_pop > 1) then
+           write(*,*) "ERROR : you cannot provide a grain size distribution with more than 1 population"
+           write(*,*) "Exiting"
+           stop
+        endif
 
-           open(unit=1, file=grain_size_file, status='old', iostat=ios)
-           if (ios/=0) then
-              write(*,*) "ERROR : cannot open "//trim(grain_size_file)
-              write(*,*) "Exiting"
-              stop
-           endif
-           write(*,*) "Reading "//trim(grain_size_file)
+        open(unit=1, file=grain_size_file, status='old', iostat=ios)
+        if (ios/=0) then
+           write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+           write(*,*) "Exiting"
+           stop
+        endif
+        write(*,*) "Reading "//trim(grain_size_file)
 
-           ! On elimine les lignes avec des commentaires
-           status = 1
-           n_comment = 0
-           do while (status /= 0)
-              n_comment = n_comment + 1
-              read(1,*,iostat=status) fbuffer
-           enddo
-           n_comment = n_comment - 1
+        ! On elimine les lignes avec des commentaires
+        status = 1
+        n_comment = 0
+        do while (status /= 0)
+           n_comment = n_comment + 1
+           read(1,*,iostat=status) fbuffer
+        enddo
+        n_comment = n_comment - 1
 
-           ! On compte les lignes avec des donnees
-           status=0
-           n_grains=1 ! On a deja lu une ligne en cherchant les commentaires
-           do while(status==0)
-              n_grains=n_grains+1
-              read(1,*,iostat=status)
-           enddo
-           n_grains = n_grains - 1
+        ! On compte les lignes avec des donnees
+        status=0
+        n_grains=1 ! On a deja lu une ligne en cherchant les commentaires
+        do while(status==0)
+           n_grains=n_grains+1
+           read(1,*,iostat=status)
+        enddo
+        n_grains = n_grains - 1
 
-           if (n_grains /= n_grains_tot) then
-              write(*,*) "ERROR : the number of grains must be the same as in the parameter file"
-              write(*,*) "I will correct that later"
-              write(*,*) "Exiting"
-              stop
-           endif
+        if (n_grains /= n_grains_tot) then
+           write(*,*) "ERROR : the number of grains must be the same as in the parameter file"
+           write(*,*) "I will correct that later", n_grains, n_grains_tot
+           write(*,*) "Exiting"
+           stop
+        endif
 
 
-           ! Lecture proprement dite
-           rewind(1)
-           ! On passe les commentaires
-           do k=1, n_comment
-              read(1,*)
-           enddo
+        ! Lecture proprement dite
+        rewind(1)
+        ! On passe les commentaires
+        do k=1, n_comment
+           read(1,*)
+        enddo
 
-           ! Lecture indices
-           do k=1,n_grains
-              read(1,*) a, nbre_grains(k)
+        ! Lecture indices
+        masse_pop = 0.0
+        do k=1,n_grains
+           read(1,*) a, nbre_grains(k)
 
-              r_grain(k) = a ! micron
-              S_grain(k) = pi * a**2 ! micron^2
-              M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+           r_grain(k) = a ! micron
+           S_grain(k) = pi * a**2 ! micron^2
+           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
 
-              ! Multiplication par a car da = a.dln(a)
-              nbre_grains(k) =  nbre_grains(k) * a
-              grain(k)%methode_chauffage = dp%methode_chauffage
-              grain(k)%zone = dp%zone
-              grain(k)%pop = i
-              masse_pop = masse_pop + nbre_grains(k)
-           enddo ! k
+           ! Multiplication par a car da = a.dln(a)
+           nbre_grains(k) =  nbre_grains(k) * a
+           grain(k)%methode_chauffage = dp%methode_chauffage
+           grain(k)%zone = dp%zone
+           grain(k)%pop = i
+           masse_pop = masse_pop + nbre_grains(k)
+        enddo ! k
 
-           dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+        dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+     else ! lread_grain_size_distribution
 
-        else ! lread_grain_size_distribution
-
-           if (dp%aexp < 0) then
-              write(*,*) "****************************************"
-              write(*,*) "Warning: slope grains size negative !!!!"
-              write(*,*) "****************************************"
-           endif
+        if (dp%aexp < 0) then
+           write(*,*) "****************************************"
+           write(*,*) "Warning: slope grains size negative !!!!"
+           write(*,*) "****************************************"
+        endif
 
            if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
               a=dp%amin
@@ -169,8 +169,10 @@ subroutine taille_grains()
 
         masse_pop = masse_pop * dp%avg_grain_mass
 
+
         ! Normalisation du nombre de grains pour atteindre la bonne masse
         nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+        ! we need to correct and divide by rho1g when reading the material density afterwards
 
         ! Normalisation de tous les grains au sein d'une pop
         nbre_tot_grains = 0.0
@@ -400,17 +402,17 @@ subroutine init_indices_optiques()
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
      else ! fichier d'opacite
-        ! we only set the material density
-        dust_pop(pop)%component_rho1g(1) = 2.5
-        dust_pop(pop)%rho1g_avg = 2.5
+
+        ! Force a temporary density, we will correct for it in read_opacity_file
+        dust_pop(pop)%component_rho1g(1) = 1.0
+        dust_pop(pop)%rho1g_avg = 1.0
 
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix PAH with other component"
            write(*,*) "Exiting"
            stop
         endif
-
-     endif ! fin test PAH
+     endif ! fin test fichier opacite
 
   enddo ! pop
 
@@ -532,18 +534,8 @@ subroutine prop_grains(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
-  real :: a, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
-  integer :: k, alloc_status, i, pop, l, ios
-
-  type(dust_pop_type) :: dp
-
-  ! Opacity file
-  real, dimension(op_file_n_lambda,op_file_na) :: tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g
-  character(len=512) :: filename, dir
-  real, dimension(op_file_n_lambda) :: tmp_lambda
-  real, dimension(op_file_na) :: tmp_r_grain
-  logical :: lread_op_file = .false.
-
+  real :: a, wavel, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
+  integer :: k, i, pop, l
 
   qext=0.0
   qsca=0.0
@@ -551,56 +543,8 @@ subroutine prop_grains(lambda, p_lambda)
   ! Longueur d'onde
   wavel=tab_lambda(lambda)
 
-  if (lnRE) then
-     if (.not.lread_op_file) then ! variable logique pour ne lire qu'une seule fois le fichier d'opacite
-        allocate(op_file_Q_ext(op_file_n_lambda,op_file_na,n_pop), &
-             op_file_Q_sca(op_file_n_lambda,op_file_na,n_pop), &
-             op_file_g(op_file_n_lambda,op_file_na,n_pop), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error op_file_Q_ext'
-           stop
-        endif
-
-        do i=1, n_pop
-           dp = dust_pop(i)
-           if (dp%is_opacity_file) then
-              filename = trim(dp%indices(1))
-
-              dir = in_dir(filename, dust_dir,  status=ios)
-              if (ios /=0) then
-                 write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-                 write(*,*) "Exiting"
-                 stop
-              else
-                 filename = trim(dir)//trim(filename) ;
-                 write(*,*) "Reading "//trim(filename) ;
-              endif
-
-              ! load optical data from file
-              call draine_load(filename, PAH_n_lambda, PAH_n_rad, 10, 1, &
-                   tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
-              op_file_Q_ext(:,:,i) = tmp_Q_ext
-              op_file_Q_sca(:,:,i) = tmp_Q_sca
-              op_file_g(:,:,i) = tmp_g
-              op_file_lambda = tmp_lambda
-              log_op_file_r_grain = log(tmp_r_grain)
-           endif
-        enddo !i
-
-        ! abs car le fichier de lambda pour les PAHs est a l'envers
-        op_file_delta_lambda(1) = abs(op_file_lambda(2) - op_file_lambda(1))
-        if (n_lambda > 1) then
-           op_file_delta_lambda(n_lambda) = abs(op_file_lambda(n_lambda) - op_file_lambda(n_lambda-1))
-        endif
-        do l=2,op_file_n_lambda-1
-           op_file_delta_lambda(l) = 0.5* abs(op_file_lambda(l+1) - op_file_lambda(l-1))
-        enddo
-
-        lread_op_file = .true.
-     endif
-  endif
-
   ! Prop optiques
+  ! Une premiere boucle pour les grains definis par un fichier d'indice
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,alfa,qext,qsca,fact,gsca,amu1,amu2,pop) &
@@ -613,8 +557,8 @@ subroutine prop_grains(lambda, p_lambda)
   ! et savoir des le debut si l'alloc. mem. ds bhmie passe ou pas
   do  k=n_grains_tot,1,-1
      pop = grain(k)%pop
-     a = r_grain(k)
      if (.not.dust_pop(pop)%is_opacity_file) then
+        a = r_grain(k)
         amu1=tab_amu1(lambda,pop)
         amu2=tab_amu2(lambda,pop)
         alfa = 2.0 * pi * a / wavel
@@ -637,24 +581,45 @@ subroutine prop_grains(lambda, p_lambda)
            endif
            !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
-     else ! fichier d'opacite
-        if (dust_pop(pop)%is_PAH) is_grain_PAH(k) = .true.
-        call mueller_opacity_file(lambda,p_lambda,k,qext, qsca,gsca)
-     endif
-     tab_albedo(lambda,k)=qsca/qext
-     tab_g(lambda,k) = gsca
-     ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-     ! a² microns² -> 1e-8 cm²             \
-     ! density en cm-3                      > reste facteur 149595.0
-     ! longueur de vol en AU = 1.5e13 cm   /
-     fact =  pi * a * a * 149595.0
-     !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-     q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
-     q_sca(lambda,k) = qsca * fact
-     q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+        tab_albedo(lambda,k)=qsca/qext
+        tab_g(lambda,k) = gsca
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² microns² -> 1e-8 cm²             \
+        ! density en cm-3                      > reste facteur 149595.0
+        ! longueur de vol en AU = 1.5e13 cm   /
+        fact =  pi * a * a * 149595.0
+        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        q_sca(lambda,k) = qsca * fact
+        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+     endif ! is_opacity_file
   enddo !k
   !$omp enddo
   !$omp end parallel
+
+  ! On refait exactement la meme boucle en sequentielle (pour eviter pb d'allocation en parallel)
+  ! pour les grains definis par un fichier d'opacite
+  ! Boucle a l'endroit cette fois
+  do  k=1,n_grains_tot
+     pop = grain(k)%pop
+     if (dust_pop(pop)%is_opacity_file) then
+        a = r_grain(k)
+        if (dust_pop(pop)%is_PAH) is_grain_PAH(k) = .true.
+        call mueller_opacity_file(lambda,p_lambda,k,qext, qsca,gsca)
+
+        tab_albedo(lambda,k)=qsca/qext
+        tab_g(lambda,k) = gsca
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² microns² -> 1e-8 cm²             \
+        ! density en cm-3                      > reste facteur 149595.0
+        ! longueur de vol en AU = 1.5e13 cm   /
+        fact =  pi * a * a * 149595.0
+        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        q_sca(lambda,k) = qsca * fact
+        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+     endif ! is_opacity_file
+  enddo !k
 
   return
 

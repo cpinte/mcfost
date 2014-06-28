@@ -136,6 +136,8 @@ subroutine initialisation_mcfost()
   lforce_PAH_equilibrium=.false.
   lread_grain_size_distrib=.false.
   lread_sh=.false.
+  lread_misselt=.false.
+
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -771,18 +773,21 @@ subroutine initialisation_mcfost()
      case("-force_PAH_equilibrium")
         lforce_PAH_equilibrium=.true.
         i_arg = i_arg+1
-     case("-grain_size_distrib")
+     case("-grain_size_distrib_file")
         i_arg = i_arg + 1
         lread_grain_size_distrib=.true.
         call get_command_argument(i_arg,s)
         grain_size_file = s
         i_arg = i_arg+1
-     case("-sh") ! specific heat file
+     case("-sh_file") ! specific heat file
         i_arg = i_arg + 1
         lread_sh=.true.
         call get_command_argument(i_arg,s)
         sh_file = s
         i_arg = i_arg+1
+     case("-read_Misselt") ! read input files from K. Misselt for TRUST benchmarks
+        i_arg = i_arg + 1
+        lread_Misselt=.true.
      case default
         call display_help()
      end select
