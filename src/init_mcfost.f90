@@ -134,6 +134,7 @@ subroutine initialisation_mcfost()
   lonly_scatt = .false.
   lHG = .false.
   lforce_PAH_equilibrium=.false.
+  lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
   lread_sh=.false.
   lread_misselt=.false.
@@ -773,6 +774,13 @@ subroutine initialisation_mcfost()
      case("-force_PAH_equilibrium")
         lforce_PAH_equilibrium=.true.
         i_arg = i_arg+1
+     case("-force_out_PAH_equilibrium")
+        lforce_PAH_out_equilibrium=.true.
+        i_arg = i_arg+1
+        if (lforce_PAH_equilibrium) then
+           write(*,*) "ERROR: cannot force eq. and out eq."
+           write(*,*) "Exiting"
+        endif
      case("-grain_size_distrib_file")
         i_arg = i_arg + 1
         lread_grain_size_distrib=.true.
