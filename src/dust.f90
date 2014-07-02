@@ -591,7 +591,7 @@ subroutine prop_grains(lambda, p_lambda)
         !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
         q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
         q_sca(lambda,k) = qsca * fact
-        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k) ! section efficace
      endif ! is_opacity_file
   enddo !k
   !$omp enddo
