@@ -96,6 +96,8 @@ subroutine compute_othin_sublimation_radius()
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
 
+  sublimation_radius = sublimation_radius * 1.6
+
   do i=1,n_zones
      !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
      if (sublimation_radius > disk_zone(i)%rmin) then
@@ -216,4 +218,3 @@ end subroutine equilibre_hydrostatique
 !**********************************************************
 
 end module disk_physics
-

@@ -328,12 +328,13 @@ contains
           lstrat=.true.
        endif
        read(1,*) lmigration
-       read(1,*) lhydrostatic
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+       read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
        if (status/=0) correct_Rsub = 1.0
+       read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
@@ -876,9 +877,9 @@ contains
           lstrat=.true.
        endif
        read(1,*) lmigration
-       read(1,*) lhydrostatic
        read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
        if (status/=0) correct_Rsub = 1.0
+       read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
