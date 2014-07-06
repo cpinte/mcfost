@@ -313,7 +313,7 @@ subroutine init_reemission()
 
   enddo !t
 
-  if (lread_sh) call read_file_specific_heat()
+  if (lread_Misselt) call read_file_specific_heat()
 
   return
 

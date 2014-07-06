@@ -673,6 +673,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   logical :: ok
 
   lcompute = .true.
+  if (lread_Misselt) return
 
   if (letape_th) then
      filename=".dust_prop1.tmp" ;
