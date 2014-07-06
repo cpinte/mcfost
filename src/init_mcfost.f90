@@ -137,8 +137,6 @@ subroutine initialisation_mcfost()
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
   lread_sh=.false.
-  lread_misselt=.false.
-
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -793,9 +791,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         sh_file = s
         i_arg = i_arg+1
-     case("-read_Misselt") ! read input files from K. Misselt for TRUST benchmarks
-        i_arg = i_arg + 1
-        lread_Misselt=.true.
      case default
         call display_help()
      end select
