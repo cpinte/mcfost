@@ -28,7 +28,7 @@ function specific_heat(T, taille_grain)
 
   integer :: i
 
-  if (lread_sh) then
+  if (lread_Misselt) then
      specific_heat = file_specific_heat(T,taille_grain)
   else if (is_grain_PAH(taille_grain)) then
      specific_heat = PAH_specific_heat(T, taille_grain)
@@ -239,7 +239,7 @@ subroutine read_file_specific_heat
      write(*,*) "Exiting"
      stop
   endif
-  write(*,*) "Reading "//trim(sh_file)
+  write(*,*) "Reading specific heat capacity: "//trim(sh_file)
 
   ! On elimine les lignes avec des commentaires
   status = 1

@@ -156,6 +156,7 @@ subroutine misselt_load(file, pop)
   integer :: i,j,l, ibuffer
 
   open(unit=1,file=file)
+  read(1,*)  sh_file
   ! header
   do l=1, nh1
      read(1,*)
