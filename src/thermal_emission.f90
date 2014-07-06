@@ -313,6 +313,8 @@ subroutine init_reemission()
 
   enddo !t
 
+  if (lread_Misselt) call read_file_specific_heat()
+
   return
 
 end subroutine init_reemission
@@ -768,7 +770,7 @@ subroutine Temp_nRE(lconverged)
 
      ! bin widths [Hz]
      U_lim = specific_heat(T_lim,l)*T_lim ! enthalpy of bin boundaries [erg]
-     delta_nu_bin = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
+     delta_nu_bin(:) = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
 
      ! compute transition matrix  Akj   [Hz]
 
@@ -818,7 +820,7 @@ subroutine Temp_nRE(lconverged)
      !$omp private(i,j,KJ_absorbe, lambda, T, T2) &
      !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,Tlim,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
-     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium) &
+     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_rad, nz, q_abs_x_cst, xJ_abs, J0, n_phot_L_tot, volume, n_T) &
      !$omp shared(log_tab_nu, tab_nu, log_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,nu,Proba_temperature, Akj,B,X,nu_bin,tab_Temp,T_min,T_max) &
@@ -921,9 +923,13 @@ subroutine Temp_nRE(lconverged)
                  stop
               endif
 
+              ! Forcing equilibrium or no equilibrium
               if (lforce_PAH_equilibrium) then
                  t_cool=1.0 ; t_abs = 0.0
+              else if (lforce_PAH_out_equilibrium) then
+                 t_cool = 0.0 ; t_abs = 1.0
               endif
+
               if (t_cool < t_abs) then !  calcul proba temperature
                  l_RE(i,j,l) = .false.
                  log_KJ_absorbe(:,id) = log(KJ_absorbe_nRE(:,id)+tiny_db)
@@ -1457,7 +1463,6 @@ subroutine repartition_energie(lambda)
 
 
   E_disk(lambda) = sum(E_cell)
-
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda))
 
   ! Energie totale emise a une distance emise egale a la distance terre-etoile

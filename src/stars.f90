@@ -458,7 +458,11 @@ subroutine repartition_energie_etoiles()
         else ! on est en dehors du spectre fournit
            if (tab_lambda(lambda) < wl_spectre_min) then
               cst_wl=cst_th/(etoile(i)%T*wl)
-              terme =  surface/((wl**5)*(exp(cst_wl)-1.0))  ! BB faute de mieux
+              if (cst_wl < 500.) then
+                 terme =  surface/((wl**5)*(exp(cst_wl)-1.0))  ! BB faute de mieux
+              else
+                 terme = tiny_real
+              endif
               terme0 = terme
            else if (tab_lambda(lambda) > wl_spectre_max) then ! extrapolation loi de puissance -2 en lambda.F_lambda
               ! Le corps noir ne marche pas car le niveau est plus eleve a cause du line-blanketing
@@ -484,7 +488,9 @@ subroutine repartition_energie_etoiles()
      E_stars(lambda) = prob_E_star(lambda,n_etoiles)  * correct_step2
 
      ! Normalisation a 1 de la proba d'emissition des etoiles
-     prob_E_star(lambda,:) = prob_E_star(lambda,:)/prob_E_star(lambda,n_etoiles)
+     if (prob_E_star(lambda,n_etoiles) > 0.) then
+        prob_E_star(lambda,:) = prob_E_star(lambda,:)/prob_E_star(lambda,n_etoiles)
+     endif
   enddo ! lambda
 
   correct_UV = sum(spectre_etoiles) / sum(spectre_etoiles0)
