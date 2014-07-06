@@ -115,10 +115,10 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lread_grain_size_distrib, lread_Misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -257,7 +257,7 @@ module disk
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
   logical :: lpuffed_rim
 
-  character(len=512) :: density_file
+  character(len=512) :: density_file, grain_size_file, sh_file
 
   ! Correction locale de la desnite (dans un anneau)
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
@@ -374,7 +374,7 @@ module grains
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
 
-     logical :: is_PAH, lcoating
+     logical :: is_opacity_file, is_PAH, lcoating
      integer :: ind_debut, ind_fin
   end type dust_pop_type
 
@@ -391,15 +391,13 @@ module grains
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
 
-  ! Pour lecture des fichiers de PAH de B.Draine
-  real, dimension(:,:,:), allocatable :: PAH_Q_ext, PAH_Q_abs, PAH_Q_sca, PAH_g
-  integer, parameter :: PAH_n_rad = 30,  PAH_n_lambda = 1201
-  real, dimension(PAH_n_rad) :: log_PAH_rad
-  real, dimension(PAH_n_lambda) :: PAH_lambda, PAH_delta_lambda
-  logical :: lread_PAH = .false.
+  ! Pour lecture des fichiers d'opacite, par exemple PAH de B.Draine
+  integer :: op_file_na,  op_file_n_lambda
+  real, dimension(:,:), allocatable :: op_file_Qext, op_file_Qsca, op_file_g ! op_file_n_lambda,op_file_na
+  real, dimension(:), allocatable :: op_file_log_r_grain ! op_file_na
+  real, dimension(:), allocatable :: op_file_lambda, op_file_delta_lambda ! op_file_n_lambda
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
-  real :: wavel
 
   ! Tab de lambda
   real, dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda

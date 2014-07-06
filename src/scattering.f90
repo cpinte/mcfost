@@ -9,6 +9,7 @@ module scattering
   use em_th
   use prop_star
   use grains
+  use input
 
   use utils
 
@@ -858,9 +859,10 @@ end subroutine mueller_gmm
 
 !***************************************************
 
-subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
+subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
-  ! pour grains de PAH  apres lecture du fichier de Draine
+  ! pour grains apres lecture du fichier d'opacite
+  ! En particulier pour les PAHs de Draine
   ! Suppose une HG pour la fonction de phase et une polarisabilite nulle !!
   ! C. Pinte
   ! 31/01/07
@@ -876,45 +878,52 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
   real :: norme, somme2, somme_prob, log_a, log_wavel, wl_min, wl_max
 
-
   log_a=log(r_grain(taille_grain))
   log_wavel = log(tab_lambda(lambda))
 
   pop=grain(taille_grain)%pop
 
-  if (r_grain(taille_grain) < exp(log_PAH_rad(1))) then
-     write(*,*) "Minimum PAH grain size is",  exp(log_PAH_rad(1))
-     write(*,*) "Exiting"
-     stop
-  else if (r_grain(taille_grain) > exp(log_PAH_rad(PAH_n_rad))) then
-     write(*,*) "Maximum PAH grain size is",  exp(log_PAH_rad(PAH_n_rad))
-     write(*,*) "Exiting"
-     stop
+  if ((taille_grain == dust_pop(pop)%ind_debut).and.(lambda==1)) call read_opacity_file(pop)
+
+  ! Ordre croissant pour les tailles de grains
+  if (r_grain(taille_grain) < exp(op_file_log_r_grain(1))) then
+     if (lambda==1) then
+        write(*,*) "WARNING: index=",taille_grain, "grain size=",r_grain(taille_grain)
+        write(*,*) "Minimum grain size in opacity file is",  exp(op_file_log_r_grain(1))
+        write(*,*) "Smaller grains are assumed to have the same opacity"
+     endif
+    j = 2
+    frac_a = 0.0 ; frac_a_m1 = 1.0
+  else if (r_grain(taille_grain) > exp(op_file_log_r_grain(op_file_na))) then
+     if (lambda==1) then
+        write(*,*) "WARNING: index=",taille_grain, "grain size=",r_grain(taille_grain)
+        write(*,*) "Maximum grain size in opacity file is",  exp(op_file_log_r_grain(op_file_na))
+        write(*,*) "Larger grains are assumed to have the same opacity"
+     endif
+     j = op_file_na
+     frac_a = 1.0 ; frac_a_m1 = 0.
+  else
+     ! Recherche en taille de grain
+     ! tableau croissant
+     do j=2,op_file_na
+        if (op_file_log_r_grain(j) > log_a) exit
+     enddo
+     frac_a = (log_a-op_file_log_r_grain(j-1))/(op_file_log_r_grain(j)-op_file_log_r_grain(j-1))
+     frac_a_m1 = 1 - frac_a
   endif
 
-
-
-  ! Recherche en taille de grain
-  ! tableau croissant
-  do j=2,PAH_n_rad-1
-     if (log_PAH_rad(j) > log_a) exit
-  enddo
-  frac_a = (log_a-log_PAH_rad(j-1))/(log_PAH_rad(j)-log_PAH_rad(j-1))
-  frac_a_m1 = 1- frac_a
-
   ! Moyennage en longueur d'onde
-  ! tableau decroissant
   wl_min = tab_lambda_inf(lambda)
   wl_max = tab_lambda_sup(lambda)
 
   qext = 0.0 ; qsca = 0.0 ; gsca = 0.0 ; norme = 0 ; N=0
-  do i=1,PAH_n_lambda
-     if ((PAH_lambda(i) > wl_min).and.(PAH_lambda(i) < wl_max)) then
+  do i=1,op_file_n_lambda
+     if ((op_file_lambda(i) > wl_min).and.(op_file_lambda(i) < wl_max)) then
         N = N+1
-        norme = norme + PAH_delta_lambda(i)
-        qext = qext + (frac_a * PAH_Q_ext(i,j,pop) +  frac_a_m1 * PAH_Q_ext(i,j-1,pop) ) * PAH_delta_lambda(i)
-        qsca = qsca + (frac_a * PAH_Q_sca(i,j,pop) +  frac_a_m1 * PAH_Q_sca(i,j-1,pop) ) * PAH_delta_lambda(i)
-        gsca = gsca + (frac_a * PAH_g(i,j,pop) +  frac_a_m1 * PAH_g(i,j-1,pop) ) * PAH_delta_lambda(i)
+        norme = norme + op_file_delta_lambda(i)
+        qext = qext + (frac_a * op_file_Qext(i,j) +  frac_a_m1 * op_file_Qext(i,j-1) ) * op_file_delta_lambda(i)
+        qsca = qsca + (frac_a * op_file_Qsca(i,j) +  frac_a_m1 * op_file_Qsca(i,j-1) ) * op_file_delta_lambda(i)
+        gsca = gsca + (frac_a * op_file_g(i,j) +  frac_a_m1 * op_file_g(i,j-1) ) * op_file_delta_lambda(i)
      endif
   enddo !i
   !write(*,*) lambda, N, norme
@@ -925,34 +934,55 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
      gsca = gsca / norme
   else ! on peut pas moyenner, on fait une interpolation en log
      ! Recherche en longueur d'onde
-     ! tableau decroissant
-     do i=2,PAH_n_lambda-1
-        if (log(PAH_lambda(i)) < log_wavel) exit
-     enddo
-     frac_lambda = (log_wavel-log(PAH_lambda(i-1)))/(log(PAH_lambda(i))-log(PAH_lambda(i-1)))
+     if (op_file_lambda(2) > op_file_lambda(1)) then  ! Ordre croisant
+        do i=2,op_file_n_lambda
+           if (log(op_file_lambda(i)) > log_wavel) exit
+        enddo
+        !log(op_file_lambda(i)) > log_wavel >  log(op_file_lambda(i-1))
+        frac_lambda = (log_wavel-log(op_file_lambda(i-1)))/(log(op_file_lambda(i))-log(op_file_lambda(i-1)))
 
-     fact1 = (1.-frac_a)  * (1.-frac_lambda)
-     fact2 = (1.-frac_a) * frac_lambda
-     fact3 = frac_a * (1.-frac_lambda)
-     fact4 = frac_a * frac_lambda
+        fact1 = frac_a_m1 * (1.-frac_lambda)
+        fact2 = frac_a_m1 * frac_lambda
+        fact3 = frac_a * (1.-frac_lambda)
+        fact4 = frac_a * frac_lambda
 
-     qext = exp(log(PAH_Q_ext(i-1,j-1,pop)) * fact1 &
-          + log(PAH_Q_ext(i,j-1,pop)) * fact2 &
-          + log(PAH_Q_ext(i-1,j,pop)) *  fact3&
-          + log(PAH_Q_ext(i,j,pop)) * fact4)
+     else ! Ordre decroisant
+        do i=2,op_file_n_lambda
+           if (log(op_file_lambda(i)) < log_wavel) exit
+        enddo
+        !log(op_file_lambda(i-1)) > log_wavel >  log(op_file_lambda(i))
+        frac_lambda = (log_wavel-log(op_file_lambda(i)))/(log(op_file_lambda(i-1))-log(op_file_lambda(i)))
 
-     qsca = exp(log(PAH_Q_sca(i-1,j-1,pop)) * fact1 &
-          + log(PAH_Q_sca(i,j-1,pop)) * fact2 &
-          + log(PAH_Q_sca(i-1,j,pop)) * fact3 &
-          + log(PAH_Q_sca(i,j,pop)) * fact4)
+        fact2 = (1.-frac_a)  * (1.-frac_lambda)
+        fact1 = (1.-frac_a) * frac_lambda
+        fact4 = frac_a * (1.-frac_lambda)
+        fact3 = frac_a * frac_lambda
+     endif
 
-     gsca = PAH_g(i-1,j-1,pop) * fact1 &
-          + PAH_g(i,j-1,pop) * fact2 &
-          + PAH_g(i-1,j,pop) * fact3 &
-          + PAH_g(i,j,pop) * fact4
-     ! Opacites testees OK
+
+     if ((frac_a > 1).or.(frac_a < 0).or.(frac_lambda > 1).or.(frac_lambda < 0)) then
+        write(*,*) "ERROR : mueller_opacity_file"
+        write(*,*) frac_a, frac_lambda
+        stop
+     endif
+
+     qext = exp(log(op_file_Qext(i-1,j-1)) * fact1 &
+          + log(op_file_Qext(i,j-1)) * fact2 &
+          + log(op_file_Qext(i-1,j)) *  fact3 &
+          + log(op_file_Qext(i,j)) * fact4)
+
+     qsca = exp(log(op_file_Qsca(i-1,j-1)) * fact1 &
+          + log(op_file_Qsca(i,j-1)) * fact2 &
+          + log(op_file_Qsca(i-1,j)) * fact3 &
+          + log(op_file_Qsca(i,j)) * fact4)
+
+     gsca = op_file_g(i-1,j-1) * fact1 &
+          + op_file_g(i,j-1) * fact2 &
+          + op_file_g(i-1,j) * fact3 &
+          + op_file_g(i,j) * fact4
   endif
 
+  if ((taille_grain == dust_pop(pop)%ind_fin).and.(lambda==n_lambda)) call free_mem_opacity_file()
 
   !! Matrices de mueller
   if (aniso_method==1) then
@@ -1000,7 +1030,7 @@ subroutine mueller_PAH(lambda,p_lambda,taille_grain,qext,qsca,gsca)
 
   return
 
-end subroutine mueller_PAH
+end subroutine mueller_opacity_file
 
 !**********************************************************************
 

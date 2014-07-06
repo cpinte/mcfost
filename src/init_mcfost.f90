@@ -134,6 +134,8 @@ subroutine initialisation_mcfost()
   lonly_scatt = .false.
   lHG = .false.
   lforce_PAH_equilibrium=.false.
+  lforce_PAH_out_equilibrium=.false.
+  lread_grain_size_distrib=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -768,6 +770,19 @@ subroutine initialisation_mcfost()
         read(s,*) correct_Tgas
      case("-force_PAH_equilibrium")
         lforce_PAH_equilibrium=.true.
+        i_arg = i_arg+1
+     case("-force_out_PAH_equilibrium")
+        lforce_PAH_out_equilibrium=.true.
+        i_arg = i_arg+1
+        if (lforce_PAH_equilibrium) then
+           write(*,*) "ERROR: cannot force eq. and out eq."
+           write(*,*) "Exiting"
+        endif
+     case("-grain_size_distrib_file")
+        i_arg = i_arg + 1
+        lread_grain_size_distrib=.true.
+        call get_command_argument(i_arg,s)
+        grain_size_file = s
         i_arg = i_arg+1
      case default
         call display_help()
