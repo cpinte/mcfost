@@ -911,7 +911,7 @@ module ray_tracing
   real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
   ! methode RT 1
-  integer, parameter :: n_az_rt = 45
+  integer :: n_az_rt
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, n_rad, nz, n_az_rt, 2, ncpus
   real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! n_rad, nz, n_az_rt, 2, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2

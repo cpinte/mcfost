@@ -2690,7 +2690,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
                     endif
                     delta_zj=-1
                  endif !(zj0==1)
-              endif
+              endif ! l3D
            endif ! monte ou descend
            t=(zlim-z0)*inv_w
            ! correct pb precision
@@ -2705,8 +2705,6 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
            ! on ne franchit pas d'interface azimuthale
            t_phi = 1.0e30
         else
-
-
            ! Quelle cellule on va franchir
            if (dotprod > 0.0) then
               tan_angle_lim = tan_phi_lim(phik0)
@@ -4059,43 +4057,71 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         if (dotprod == 0.0_db) then
            t=1.0e10
         else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 if (z0 > 0.0_db) then
+           if (dotprod > 0.0_db) then ! on se rapproche de la surface
+              if (l3D) then
+                 if (zj0==nz+1) then
+                    delta_zj=0
                     zlim=1.0e10
-                 else
+                 else if (zj0==-(nz+1)) then
+                    delta_zj=0
                     zlim=-1.0e10
+                 else
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                       delta_zj=1
+                    else
+                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                       delta_zj=-1
+                    endif
                  endif
-              else
+              else ! 2D
+                 if (zj0==nz+1) then
+                    delta_zj=0
+                    if (z0 > 0.0_db) then
+                       zlim=1.0e10
+                    else
+                       zlim=-1.0e10
+                    endif
+                 else
+                    if (z0 > 0.0) then
+                       zlim=z_lim(ri0,zj0+1)*correct_plus
+                    else
+                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                    endif
+                    delta_zj=1
+                 endif
+              endif ! l3D
+           else ! on se rappoche du midplane
+              if (l3D) then
                  if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
-                 else
-                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
-                 endif
-                 delta_zj=1
-              endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
-                 else
-                    zlim=z_lim(ri0,2)*correct_moins
-                 endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
+                    zlim=z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=-1
+                    if (zj0==1) delta_zj=-2 ! pas d'indice 0
                  else
                     zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                    delta_zj=1
+                    if (zj0==-1) delta_zj=2 ! pas d'indice 0
                  endif
-                 delta_zj=-1
-              endif !(zj0==1)
+              else ! 2D
+                 if (zj0==1) then
+                    ! on traverse le plan eq donc on va remonter
+                    ! et z va changer de signe
+                    delta_zj=1
+                    if (z0 > 0.0_db) then
+                       zlim=-z_lim(ri0,2)*correct_moins
+                    else
+                       zlim=z_lim(ri0,2)*correct_moins
+                    endif
+                 else !(zj0==1)
+                    ! on ne traverse pas z=0.
+                    if (z0 > 0.0_db) then
+                       zlim=z_lim(ri0,zj0)*correct_moins
+                    else
+                       zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                    endif
+                    delta_zj=-1
+                 endif !(zj0==1)
+              endif !l3D
            endif ! monte ou descend
            t=(zlim-z0)*inv_w
            ! correct pb precision
@@ -4148,7 +4174,9 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         else
            zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
            if (zj1>nz) zj1=nz+1
-!           if (z1 < 0.0) zj1=-zj1
+           if (l3D) then
+              if (z1 < 0.0) zj1=-zj1
+           endif
         endif
         phik1=phik0
      else if (t < t_phi) then ! z
@@ -4171,7 +4199,9 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         ri1=ri0
         zj1= floor(abs(z1)/zmax(ri1)*nz) + 1
         if (zj1>nz) zj1=nz+1
-   !     if (z1 < 0.0) zj1=-zj1
+        if (l3D) then
+           if (z1 < 0.0) zj1=-zj1
+        endif
         phik1=phik0+delta_phi
         if (phik1 == 0) phik1=N_az
         if (phik1 == N_az+1) phik1=1
