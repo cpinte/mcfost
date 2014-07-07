@@ -908,7 +908,7 @@ module ray_tracing
   real, dimension(0:nang_scatt) :: tab_cos_scatt
 
   ! intensite specifique
-  real, dimension(:,:), allocatable :: J_th ! n_rad, nz
+  real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
   ! methode RT 1
   integer, parameter :: n_az_rt = 45
