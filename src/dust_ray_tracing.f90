@@ -50,7 +50,11 @@ subroutine alloc_ray_tracing()
      nang_ray_tracing = 1 ;
   endif
 
-  allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),stat=alloc_status)
+  if (l3D) then
+     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,0:nang_scatt),stat=alloc_status)
+  else
+     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),stat=alloc_status)
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
      stop
@@ -90,7 +94,11 @@ subroutine alloc_ray_tracing()
   endif
   Stokes_ray_tracing = 0.0_db
 
-  allocate(J_th(n_rad,nz,n_az), stat=alloc_status)
+  if (l3D) then
+     allocate(J_th(n_rad,-nz:nz,n_az), stat=alloc_status)
+  else
+     allocate(J_th(n_rad,nz,1), stat=alloc_status)
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
      stop
@@ -98,19 +106,27 @@ subroutine alloc_ray_tracing()
   J_th = 0.0_db
 
   if (lscatt_ray_tracing1) then
-     allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
-
-     mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     if (l3D) then
+        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,-nz:nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+        mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * 2 * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     else
+        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+        mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     endif
      if (mem_size > 500) write(*,*) "Trying to allocate", mem_size, "MB for ray-tracing"
-
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xI_scatt'
         stop
      endif
      xI_scatt = 0.0_db
 
-     allocate(xsin_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), &
-          xN_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     if (l3D) then
+        allocate(xsin_scatt(RT_n_ibin,n_rad,-nz:nz,n_az_rt,0:1,nb_proc), &
+             xN_scatt(RT_n_ibin,n_rad,-nz:nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     else
+        allocate(xsin_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), &
+             xN_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xsin_scatt'
         stop
@@ -126,8 +142,11 @@ subroutine alloc_ray_tracing()
      endif
      I_scatt = 0.0_db
 
-
-     allocate(eps_dust1(N_type_flux,n_rad,nz,n_az_rt,0:1), stat=alloc_status)
+     if (l3D) then
+        allocate(eps_dust1(N_type_flux,n_rad,-nz:nz,n_az_rt,0:1), stat=alloc_status)
+     else
+        allocate(eps_dust1(N_type_flux,n_rad,nz,n_az_rt,0:1), stat=alloc_status)
+     endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust1'
         stop
