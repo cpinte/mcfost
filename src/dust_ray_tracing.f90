@@ -32,8 +32,13 @@ subroutine alloc_ray_tracing()
   integer :: alloc_status
   real :: mem_size
 
-  ! 15 15 90 90 OK pour benchmark
+  if (l3D) then
+     n_az_rt = n_az
+  else
+     n_az_rt = 45
+  endif
 
+  ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
   n_theta_I = 15 ;
   nang_ray_tracing = 15 ;
