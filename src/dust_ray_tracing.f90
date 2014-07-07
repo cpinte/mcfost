@@ -2,6 +2,9 @@
 ! large g
 ! optimization memoire (ie, dimension 1 de eps_dust1)
 
+! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode pour SED --> pour 3D
+! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode pour image 2D
+
 module dust_ray_tracing
 
   use parametres
@@ -70,6 +73,7 @@ subroutine alloc_ray_tracing()
      tab_s34_o_s11_ray_tracing = 0.
   endif
 
+  ! datacube images
   if (lsed.and.(RT_sed_method == 1)) then
       allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_ibin,N_type_flux,nb_proc), stat=alloc_status)
   else
@@ -81,7 +85,7 @@ subroutine alloc_ray_tracing()
   endif
   Stokes_ray_tracing = 0.0_db
 
-  allocate(J_th(n_rad,nz), stat=alloc_status)
+  allocate(J_th(n_rad,nz,n_az), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
      stop
@@ -600,24 +604,27 @@ subroutine init_dust_source_fct1(lambda,ibin)
   ! Intensite specifique diffusion
   do i=1,n_rad
      facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
-     do j=1,nz
-        if (kappa(lambda,i,j,1) > tiny_db) then
-           ! TODO : pb de pola
-           do itype=1,N_type_flux
-              norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3),tiny_db)
-              I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
-           enddo ! itype
+     bz : do j=j_start,nz
+        if (j==0) cycle bz
+        do k=1, n_az
+           if (kappa(lambda,i,j,k) > tiny_db) then
+              ! TODO : pb de pola
+              do itype=1,N_type_flux
+                 norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3),tiny_db)
+                 I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,k)
+              enddo ! itype
 
-           eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j) ) / kappa(lambda,i,j,1)
-           if (lsepar_contrib) then
-              eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1)
-              eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j) / kappa(lambda,i,j,1)
-              eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1)
-           endif ! lsepar_contrib
-        else
-           eps_dust1(:,i,j,:,:) = 0.0_db
-        endif ! kappa > 0
-     enddo ! j
+              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,k) ) / kappa(lambda,i,j,k)
+              if (lsepar_contrib) then
+                 eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,k)
+                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j,k) / kappa(lambda,i,j,k)
+                 eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,k)
+              endif ! lsepar_contrib
+           else
+              eps_dust1(:,i,j,:,:) = 0.0_db
+           endif ! kappa > 0
+        enddo
+     enddo bz ! j
   enddo !i
 
 
@@ -644,11 +651,13 @@ end subroutine init_dust_source_fct1
 subroutine init_dust_source_fct2(lambda,ibin)
   ! RT2
   ! calcule la fct source pour integrer par ray-tracing
+  ! Cette version ne marche qu'en 2D
   ! C. Pinte
   ! 25/09/08
 
+
   integer, intent(in) :: lambda, ibin
-  integer :: i,j, iscatt, dir
+  integer :: i,j,k, iscatt, dir
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
@@ -673,7 +682,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
            ! Boucle sur les directions de ray-tracing
            do dir=0,1
               do iscatt = 1, nang_ray_tracing
-                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j) ) / kappa(lambda,i,j,1)
+                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
 
                  if (lsepar_pola) then
                     eps_dust2(2:4,iscatt,dir,i,j) =  sum(I_sca2(2:4,iscatt,dir,i,j,:),dim=2)  / kappa(lambda,i,j,1)
@@ -681,7 +690,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
                  if (lsepar_contrib) then
                     eps_dust2(n_Stokes+2,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+2,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
-                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j) / kappa(lambda,i,j,1)
+                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j,1) / kappa(lambda,i,j,1)
                     eps_dust2(n_Stokes+4,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+4,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
                  endif ! lsepar_contrib
               enddo ! iscatt
@@ -711,75 +720,84 @@ subroutine calc_Ith(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: i, j, l, T
+  integer :: i,j,k, l, T
   real(kind=db) ::  Temp, cst_wl, wl, coeff_exp, cst_E
 
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
-  J_th(:,:) = 0.0
+  J_th(:,:,:) = 0.0
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
      if (lRE_LTE) then
         cst_E=2.0*hp*c_light**2
         do i=1,n_rad
-           do j=1,nz
-              Temp=Temperature(i,j,1) ! que LTE pour le moment
-              cst_wl=cst_th/(Temp*wl)
-              if (cst_wl < 500.0) then
-                 coeff_exp=exp(cst_wl)
-                 J_th(i,j) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(lambda,i,j,1) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
-              else
-                 J_th(i,j) = 0.0_db
-              endif
-           enddo
-        enddo
+           bz : do j=j_start,nz
+              if (j==0) cycle bz
+              do k=1, n_az
+                 Temp=Temperature(i,j,k) ! que LTE pour le moment
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.0) then
+                    coeff_exp=exp(cst_wl)
+                    J_th(i,j,k) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(lambda,i,j,k) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
+                 else
+                    J_th(i,j,k) = 0.0_db
+                 endif
+              enddo ! k
+           enddo bz ! j
+        enddo ! i
      endif !lRE_LTE
 
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
         do i=1,n_rad
-           do j=1,nz
-              do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-                 Temp=Temperature_1grain(i,j,l)
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < 500.0) then
-                    coeff_exp=exp(cst_wl)
-                    J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         q_abs(lambda,l)*densite_pouss(i,j,1,l)
-                 endif
+           bz2 : do j=1,nz
+              if (j==0) cycle bz2
+              do k=1, n_az
+                 do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+                    Temp=Temperature_1grain(i,j,l) ! WARNING : TODO : this does not work in 3D
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < 500.0) then
+                       coeff_exp=exp(cst_wl)
+                       J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                            q_abs(lambda,l)*densite_pouss(i,j,k,l)
+                    endif
+                 enddo
               enddo
-           enddo
+           enddo bz2
         enddo
      endif !lRE_nLTE
 
      if (lnRE) then
         do i=1,n_rad
-           do j=1,nz
-              do l=grain_nRE_start,grain_nRE_end
-                 if (l_RE(i,j,l)) then ! le grain a une temperature
-                    Temp=Temperature_1grain_nRE(i,j,l)
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < 500.) then
-                       coeff_exp=exp(cst_wl)
-                       J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            q_abs(lambda,l)*densite_pouss(i,j,1,l)
-                    endif !cst_wl
-                 else ! ! la grain a une proba de T
-                    do T=1,n_T
-                       temp=tab_Temp(T)
+           bz3 : do j=j_start,nz
+              if (j==0) cycle bz3
+              do k=1, n_az
+                 do l=grain_nRE_start,grain_nRE_end
+                    if (l_RE(i,j,l)) then ! le grain a une temperature
+                       Temp=Temperature_1grain_nRE(i,j,l) ! WARNING : TODO : this does not work in 3D
                        cst_wl=cst_th/(Temp*wl)
                        if (cst_wl < 500.) then
                           coeff_exp=exp(cst_wl)
-                          J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                               q_abs(lambda,l)*densite_pouss(i,j,1,l) * Proba_Temperature(T,i,j,l)
+                          J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                               q_abs(lambda,l)*densite_pouss(i,j,k,l)
                        endif !cst_wl
-                    enddo ! T
-                 endif ! l_RE
-              enddo !
-           enddo !j
+                    else ! ! la grain a une proba de T
+                       do T=1,n_T
+                          temp=tab_Temp(T)
+                          cst_wl=cst_th/(Temp*wl)
+                          if (cst_wl < 500.) then
+                             coeff_exp=exp(cst_wl)
+                             J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                                  q_abs(lambda,l)*densite_pouss(i,j,k,l) * Proba_Temperature(T,i,j,l)
+                          endif !cst_wl
+                       enddo ! T
+                    endif ! l_RE
+                 enddo ! l
+              enddo !k
+           enddo bz3 ! j
         enddo ! i
      endif !lnRE
 
