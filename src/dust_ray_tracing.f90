@@ -117,7 +117,7 @@ subroutine alloc_ray_tracing()
 
   if (lscatt_ray_tracing1) then
      if (l3D) then
-        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,-nz:nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,-nz:nz,n_az_rt,1,nb_proc), stat=alloc_status)
         mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * 2 * nz * n_az_rt * nb_proc * 4 / 1024.**2
      else
         allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
@@ -392,7 +392,7 @@ end subroutine angles_scatt_ray_tracing
 
 !***********************************************************
 
-subroutine angle_scatt_rt(id,u,v,w)
+subroutine angle_scatt_rt1(id,u,v,w)
   ! Calcul le (ou les) angle(s) de diffusion pour le RT1
   ! dans une direction de diffusion a 1 position
   ! lance 1 seule pour unr direction de paquet
@@ -418,7 +418,6 @@ subroutine angle_scatt_rt(id,u,v,w)
      k = nint(acos(cos_scatt) * real(nang_scatt)/pi) ! TODO : + 1 pour test
      if (k > nang_scatt) k = nang_scatt
      if (k < 1) k = 1
-
      itheta_rt1(ibin,id) = k
      sin_scatt_rt1(ibin,id) = sqrt(1.0 - cos_scatt**2)
 
@@ -458,7 +457,7 @@ subroutine angle_scatt_rt(id,u,v,w)
 
   return
 
-end subroutine angle_scatt_rt
+end subroutine angle_scatt_rt1
 
 !***********************************************************
 
@@ -644,7 +643,7 @@ subroutine init_dust_source_fct1(lambda,ibin)
   if (l3D) then
 
      do i=1,n_rad
-        facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
+        facteur = energie_photon / volume(i)
         bz_3D : do j=j_start,nz
            if (j==0) cycle bz_3D
            do k=1, n_az
@@ -1472,7 +1471,7 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 
   real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, xi_az, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, i_az, i_az_p1, psup, ri1, zj1, ri2, zj2
-  integer :: phi_k, phi_k_p1, n_pola
+  integer :: phik, n_pola
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
 
@@ -1481,10 +1480,14 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 
   ! Interpolations angulaires
   if (lscatt_ray_tracing1) then
-     if (z > 0.0_db) then
-        psup=1
+     if (l3D) then
+        psup = 1
      else
-        psup=0
+        if (z > 0.0_db) then
+           psup=1
+        else
+           psup=0
+        endif
      endif
 
      phi_pos = atan2(y,x)
@@ -1502,9 +1505,9 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
 
      ! Cette methode est OK mais on voit les cellules
-     phi_k =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
-     if (phi_k > n_az_rt) phi_k = n_az_rt
-     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k,psup)  ! ??? ce n'est pas lineaire
+     phik =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
+     if (phik > n_az_rt) phik = n_az_rt
+     dust_source_fct(:) = eps_dust1(:,ri,zj,phik,psup)  ! ??? ce n'est pas lineaire
 
   else ! Methode 2 : la seule actuelle
      ! Pour interpolations spatiales
