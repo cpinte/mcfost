@@ -979,32 +979,32 @@ subroutine opacite2(lambda)
                  if (abs(norme) > 0.0_db) then
                     norme = 1.0_db / (norme * deux_pi)
 
-                    tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(lambda,i,j,pk,:) * norme
                     if (lsepar_pola) then
                        ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
                        ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                       tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
-                       tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
-                       tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(lambda,i,j,pk,:) * norme
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(lambda,i,j,pk,:) * norme
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(lambda,i,j,pk,:) * norme
                     endif
                  else
-                    tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     if (lsepar_pola) then
-                       tab_s12_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s33_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     endif
                  endif ! norme
 
                  if (lsepar_pola) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s12_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s33_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s34_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
                  endif
               else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
@@ -1012,14 +1012,14 @@ subroutine opacite2(lambda)
                  norme = 0.0
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))* &
+                    tab_s11_ray_tracing(lambda,i,j,pk,thetaj) =((1-gsca**2)/(2.0))* &
                          (1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
-                    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+                    norme=norme + tab_s11_ray_tracing(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
-                 tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)
+                 tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_ray_tracing(lambda,i,j,pk,:) / (norme * deux_pi)
               endif
 
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
+              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,pk,:) = 1.0 / (4.* nang_scatt)
 
             !  ! Verification normalization
             !  norme = 0.0
