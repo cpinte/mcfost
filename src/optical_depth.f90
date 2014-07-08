@@ -38,7 +38,7 @@ subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,f
 
    if (lcylindrical) then
      if (l3D) then
-        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
+        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
      else
         if (lopacity_wall) then
            call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
@@ -112,12 +112,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   a=u*u+v*v
 
-  ! pour ray-tracing
-  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
-
-  ! Calcule les angles de diffusion pour la direction de propagation donnee
-  if ((.not.letape_th).and.lscatt_ray_tracing1) call angle_scatt_rt(id,u,v,w)
-
   if (a > tiny_real) then
      inv_a=1.0_db/a
   else
@@ -129,6 +123,12 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   else
      inv_w=sign(huge_db,w) ! huge_real avant
   endif
+
+  ! pour ray-tracing
+  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
+
+  ! Calcule les angles de diffusion pour la direction de propagation donnee
+  if ((.not.letape_th).and.lscatt_ray_tracing1) call angle_scatt_rt1(id,u,v,w)
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -854,7 +854,7 @@ end subroutine length_deg2_sph
 
 !********************************************************************
 
-subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
+subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -867,6 +867,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
   integer, intent(inout) :: ri,zj, phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: u,v,w
+  logical, intent(in) :: flag_star
   real, intent(in) :: extrin
   real(kind=db), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
@@ -876,16 +877,15 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
+  real(kind=db) :: xm, ym, zm
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
 
   logical :: lcellule_non_vide
-
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
-
 
   x1=xio;y1=yio;z1=zio
   extr=extrin
@@ -907,12 +907,14 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
      inv_a=huge_real
   endif
 
-
   if (abs(w) > tiny_real) then
      inv_w=1.0/w
   else
      inv_w=sign(huge_db,w)
   endif
+
+  ! Calcule les angles de diffusion pour la direction de propagation donnee
+  if ((.not.letape_th).and.lscatt_ray_tracing1) call angle_scatt_rt1(id,u,v,w)
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -1130,10 +1132,23 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,extrin,l
         extr=extr-tau
         ltot=ltot+l
 
-        if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-        endif
+        if (lcellule_non_vide) then
+           if (letape_th) then
+              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
+              if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           else ! letape_th
+              if (lscatt_ray_tracing1) then
+                 xm = 0.5_db * (x0 + x1)
+                 ym = 0.5_db * (y0 + y1)
+                 zm = 0.5_db * (z0 + z1)
+
+                 ! TODO : RT : clean the 0 in the indices
+                 call calc_xI_scatt(id,lambda,ri0,zj0,phik0,1,l,Stokes(1),flag_star) ! psup=1 in 3D
+              endif
+
+           endif ! letape_th
+        endif ! lcellule_non_vide
+
      endif ! tau > extr
 
   enddo ! boucle infinie
@@ -4748,7 +4763,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     l_dark_zone(i,1:j,pk) = .true.
@@ -4777,7 +4792,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     l_dark_zone(i,j:-1,pk) = .true.
