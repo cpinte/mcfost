@@ -3353,6 +3353,10 @@ subroutine move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
      phik=1 ! pas 3D
   endif
 
+  if (zj == nz) then ! indice_cellule force nz si z > zmax, il faut corriger ca
+     if (ri < n_rad) zj = nz+1 ; ! suppose que zmaxmax est atteint dans la derniere cellule
+  endif
+
   return
 
 end subroutine move_to_grid
@@ -4234,7 +4238,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
         integ_ray_dust_cyl(:) = integ_ray_dust_cyl(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,zj0,xm,ym,zm)  ! mystique c'est pas linaire
+             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,zj0,phik0,xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
@@ -4539,7 +4543,7 @@ function integ_ray_dust_sph(id,lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
         integ_ray_dust_sph(:) = integ_ray_dust_sph(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,thetaj0,xm,ym,zm)
+             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,thetaj0,phik0,xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
