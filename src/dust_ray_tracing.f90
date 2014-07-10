@@ -1460,18 +1460,18 @@ end subroutine calc_Isca2_star
 
 !***********************************************************
 
-function dust_source_fct(lambda,ri,zj,x,y,z)
+function dust_source_fct(lambda,ri,zj,phik, x,y,z)
   ! La direction du rayon est maintenant fixee le long de l'axe x
   ! l'angle de diffusion ne depend que de la position x, y, z
 
-  integer, intent(in) :: lambda,ri, zj
+  integer, intent(in) :: lambda, ri, zj, phik
   real(kind=db), intent(in) :: x, y, z
 
   real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
 
   real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, xi_az, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, i_az, i_az_p1, psup, ri1, zj1, ri2, zj2
-  integer :: phik, n_pola
+  integer :: k, n_pola
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
 
@@ -1482,15 +1482,19 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
   if (lscatt_ray_tracing1) then
      if (l3D) then
         psup = 1
+        k = phik
      else
         if (z > 0.0_db) then
            psup=1
         else
            psup=0
         endif
+        ! Cette methode est OK mais on voit les cellules
+        phi_pos = atan2(y,x)
+        k =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
+        if (k > n_az_rt) k = n_az_rt
      endif
 
-     phi_pos = atan2(y,x)
 
      ! OK : lisse les images par rapport a la methode en dessous
 !---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
@@ -1504,10 +1508,8 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 !---
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
 
-     ! Cette methode est OK mais on voit les cellules
-     phik =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
-     if (phik > n_az_rt) phik = n_az_rt
-     dust_source_fct(:) = eps_dust1(:,ri,zj,phik,psup)  ! ??? ce n'est pas lineaire
+
+     dust_source_fct(:) = eps_dust1(:,ri,zj,k,psup)  ! ??? ce n'est pas lineaire
 
   else ! Methode 2 : la seule actuelle
      ! Pour interpolations spatiales
