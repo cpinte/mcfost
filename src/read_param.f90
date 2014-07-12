@@ -2737,7 +2737,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -3278,7 +3278,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -3811,7 +3811,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -4329,7 +4329,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -4846,7 +4846,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -5362,7 +5362,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -5739,7 +5739,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6098,7 +6098,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6465,7 +6465,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6834,7 +6834,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .true.
+    dust_pop%is_opacity_file = .true.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -7201,7 +7201,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -7539,7 +7539,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
@@ -7869,7 +7869,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -8180,7 +8180,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
