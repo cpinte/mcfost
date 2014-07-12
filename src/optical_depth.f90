@@ -4198,6 +4198,9 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
            endif
         endif
         phik1=phik0
+
+        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
+        if (ri0==0) call indice_cellule_3D_phi(x1,y1,z1,phik1)
      else if (t < t_phi) then ! z
         l=t
         delta_vol=t
