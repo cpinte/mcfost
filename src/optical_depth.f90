@@ -4229,6 +4229,19 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         if (phik1 == N_az+1) phik1=1
      endif
 
+     ! Correction if z1==0, otherwise dotprod will be 0 at the next iteration
+     if (z1 == 0.0_db) then
+        if (l3D) then
+           if (w > 0) then
+              z1 = prec_grille
+           else
+              z1 = -prec_grille
+           endif
+        else ! 2D
+           z1 = prec_grille
+        endif ! l3D
+     endif
+
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
         dtau =  l * kappa(lambda,ri0,zj0,phik0)
