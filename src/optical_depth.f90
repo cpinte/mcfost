@@ -2765,6 +2765,9 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
            endif
         endif
         phik1=phik0
+
+        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
+        if (ri0==0) call indice_cellule_3D_phi(x1,y1,z1,phik1)
      else if (t < t_phi) then ! z
         l=t
         delta_vol=t
@@ -2791,6 +2794,19 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         phik1=phik0+delta_phi
         if (phik1 == 0) phik1=N_az
         if (phik1 == N_az+1) phik1=1
+     endif
+
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) then
+        if (l3D) then
+           if (w > 0) then
+              z1 = prec_grille
+           else
+              z1 = -prec_grille
+           endif
+        else ! 2D
+           z1 = prec_grille
+        endif ! l3D
      endif
 
      if (lcellule_non_vide) then
@@ -4229,7 +4245,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         if (phik1 == N_az+1) phik1=1
      endif
 
-     ! Correction if z1==0, otherwise dotprod will be 0 at the next iteration
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
      if (z1 == 0.0_db) then
         if (l3D) then
            if (w > 0) then
