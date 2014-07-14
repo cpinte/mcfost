@@ -293,6 +293,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         zj1=zj0+delta_zj
      endif
 
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) z1 = prec_grille
+
      ! Calcul longeur de vol et profondeur optique dans la cellule
      tau=l*opacite ! opacite constante dans la cellule
 
@@ -707,6 +710,9 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         thetaj1=thetaj0+delta_theta
      endif
 
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) z1 = prec_grille
+
      ! Calcul longeur de vol et profondeur optique dans la cellule
      tau=l*opacite ! opacite constante dans la cellule
      ! Comparaison integrale avec tau
@@ -1111,6 +1117,9 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         if (phik1 == 0) phik1=N_az
         if (phik1 == N_az+1) phik1=1
      endif
+
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) z1 = sign(prec_grille,w)
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      tau=l*opacite ! opacite constante dans la cellule
@@ -2799,11 +2808,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
      ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
      if (z1 == 0.0_db) then
         if (l3D) then
-           if (w > 0) then
-              z1 = prec_grille
-           else
-              z1 = -prec_grille
-           endif
+           z1 = sign(prec_grille,w)
         else ! 2D
            z1 = prec_grille
         endif ! l3D
@@ -4248,11 +4253,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
      ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
      if (z1 == 0.0_db) then
         if (l3D) then
-           if (w > 0) then
-              z1 = prec_grille
-           else
-              z1 = -prec_grille
-           endif
+           z1 = sign(prec_grille,w)
         else ! 2D
            z1 = prec_grille
         endif ! l3D
