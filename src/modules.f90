@@ -317,7 +317,7 @@ module prop_star
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile
-  real, dimension(:,:), allocatable :: prob_E_star
+  real, dimension(:,:), allocatable :: CDF_E_star, prob_E_star
 
   real, dimension(:), allocatable :: E_stars !n_lambda
 
