@@ -1476,7 +1476,12 @@ subroutine dust_map(lambda,ibin)
   endif ! method
 
   ! Adding stellar contribution
-  call stars_map(lambda,ibin, u, v, w)
+  call compute_stars_map(lambda,ibin, u, v, w)
+
+  Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + stars_map
+  if (lsepar_contrib) then
+     Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + stars_map
+  endif
 
   if (lmono0) write(*,*) "Done"
 
@@ -1486,7 +1491,7 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine stars_map(lambda,ibin, u,v,w)
+subroutine compute_stars_map(lambda,ibin, u,v,w)
   ! Make a ray-traced map of the stars
 
   integer, intent(in) :: lambda, ibin
@@ -1500,12 +1505,12 @@ subroutine stars_map(lambda,ibin, u,v,w)
   integer :: id, ri, zj, phik, iray, istar, i,j
   logical :: in_map
 
-  real, dimension(:,:), allocatable :: map, map_1star
+  real, dimension(:,:), allocatable :: map_1star
 
+  stars_map = 0.0 ;
+  id = 1 ;
 
-  id = 1 ; map = 0.0 ;
-
-  allocate(map(igridx,igridy), map_1star(igridx,igridy))
+  allocate(map_1star(igridx,igridy))
 
   ! Energie
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
@@ -1558,7 +1563,11 @@ subroutine stars_map(lambda,ibin, u,v,w)
         endif
 
         ! Coordonnees pixel
-        call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
+         if (lsed.and.(RT_sed_method == 1)) then
+           i=1 ; j=1
+        else
+           call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
+        endif
 
         if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
         norme = norme + cos_thet
@@ -1567,17 +1576,12 @@ subroutine stars_map(lambda,ibin, u,v,w)
      map_1star = map_1star * (facteur * prob_E_star(lambda,istar)) / norme
 
      ! Adding all the stars
-     map = map + map_1star
+     stars_map = stars_map + map_1star
   enddo ! n_stars
-
-  Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + map
-  if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + map
-  endif
 
   return
 
-end subroutine stars_map
+end subroutine compute_stars_map
 
 !***********************************************************
 

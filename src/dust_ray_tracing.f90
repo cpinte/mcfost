@@ -94,15 +94,15 @@ subroutine alloc_ray_tracing()
 
   ! datacube images
   if (lsed.and.(RT_sed_method == 1)) then
-      allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_ibin,N_type_flux,nb_proc), stat=alloc_status)
+      allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_ibin,N_type_flux,nb_proc), stars_map(1,1), stat=alloc_status)
   else
-     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_ibin,N_type_flux,nb_proc), stat=alloc_status)
+     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_ibin,N_type_flux,nb_proc), stars_map(igridx,igridy), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Stokes_ray_tracing'
      stop
   endif
-  Stokes_ray_tracing = 0.0_db
+  Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
   if (l3D) then
      allocate(J_th(n_rad,-nz:nz,n_az), stat=alloc_status)

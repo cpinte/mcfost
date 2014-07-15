@@ -19,7 +19,7 @@ module mol_transfer
   use optical_depth
   use ProDiMo, only: read_ProDiMo2mcfost
   use dust_ray_tracing, only: init_directions_ray_tracing
-  use dust_transfer, only : flux_etoile_ray_tracing
+  use dust_transfer, only : compute_stars_map
   use stars
 
   implicit none
@@ -536,7 +536,7 @@ subroutine emission_line_map(imol,ibin)
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
-  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, cx, cy, lambda
+  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, cx, cy, lambda, iv
   real :: vmax_center_rt, extra_deltaV_rt
 
   ! Direction de visee pour le ray-tracing
@@ -724,15 +724,13 @@ subroutine emission_line_map(imol,ibin)
   ! --------------------------
   ! Ajout flux etoile
   ! --------------------------
-  ! Pixel central      ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
-  cx = igridx/2+1
-  cy = igridy/2+1
-
   do lambda = 1, mol(imol)%nTrans_raytracing
-     Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
+     call compute_stars_map(lambda,ibin, u, v, w)
 
-     spectre(cx,cy,:,lambda,ibin) = spectre(cx,cy,:,lambda,ibin) + Flux_etoile
-     continu(cx,cy,lambda,ibin) = continu(cx,cy,lambda,ibin) + Flux_etoile
+     do iv =  -n_speed_rt, n_speed_rt
+        spectre(:,:,iv,lambda,ibin) = spectre(:,:,iv,lambda,ibin) + stars_map(:,:)
+     enddo
+     continu(:,:,lambda,ibin) = continu(:,:,lambda,ibin) + stars_map(:,:)
   enddo
 
   return
