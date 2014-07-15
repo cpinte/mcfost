@@ -676,12 +676,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -1220,12 +1220,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -1763,12 +1763,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2310,12 +2310,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2844,12 +2844,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3385,12 +3385,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3918,12 +3918,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -4436,12 +4436,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -4952,12 +4952,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -5464,12 +5464,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -5834,12 +5834,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6193,12 +6193,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6560,12 +6560,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6929,12 +6929,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7297,12 +7297,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7629,12 +7629,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7949,12 +7949,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
     do i=1,n_etoiles
@@ -8242,12 +8242,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
     do i=1,n_etoiles

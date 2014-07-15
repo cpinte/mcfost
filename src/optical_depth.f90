@@ -1969,12 +1969,14 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
         zj1=zj0+delta_zj
      endif
 
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) z1 = prec_grille
+
      tau=l*opacite ! opacite constante dans la cellule
 
      tau_tot = tau_tot + tau
      ltot= ltot + l
      if (tau_tot < tiny_real) lmin=ltot
-
 
      ! Sauvgarde pour length_deg2_reloaded
      ! indice cellule
@@ -2020,6 +2022,291 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
 end subroutine length_deg2_tot_cyl
 
 !***********************************************************
+
+subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+! C. Pinte
+! 14/07/14
+
+  implicit none
+
+  integer, intent(in) :: id,lambda, ri,zj, phik
+  real(kind=db),dimension(4), intent(in) :: Stokes
+  real(kind=db), intent(in) :: u,v,w
+  real(kind=db), intent(in) :: xi,yi,zi
+  real, intent(out) :: tau_tot_out
+  real(kind=db), intent(out) :: lmin,lmax
+
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, phi
+  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
+  real(kind=db) :: delta_vol, l, ltot, tau, zlim, extr, dotprod, opacite, tau_tot
+  real(kind=db) :: correct_plus, correct_moins
+  real(kind=db) :: xm, ym, zm
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, n_save
+
+  logical :: lcellule_non_vide
+
+  ! Petit delta pour franchir la limite de la cellule
+  ! et ne pas etre pile-poil dessus
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
+  x1=xi;y1=yi;z1=zi
+  ri0=ri
+  zj0=zj
+  ri1=ri
+  zj1=zj
+  phik1=phik
+
+  tau_tot=0.0_db
+  nbr_cell = 0
+  n_save = 0
+
+  tab_length(id,:)=0.0_db
+
+  a=u*u+v*v
+
+  if (a > tiny(0.)) then
+     inv_a=1.0/a
+  else
+     inv_a=huge_real
+  endif
+
+  if (abs(w) > tiny_real) then
+     inv_w=1.0/w
+  else
+     inv_w=sign(huge_db,w)
+  endif
+
+
+  lmin=0.0_db
+  ltot=0.0_db
+
+  ! Boucle infinie sur les cellules
+  do ! Boucle infinie
+     ! Indice de la cellule
+     ri0=ri1 ; zj0=zj1 ; phik0=phik1
+     x0=x1 ; y0=y1 ; z0=z1
+
+     ! Test sortie
+     if (ri0>n_rad) then ! On est dans la derniere cellule
+        ! Le photon sort du disque
+        n_cell_traversees(id) = n_save
+        tau_tot_out=tau_tot
+        lmax=tab_length_tot(id,n_save)
+        return
+     elseif (abs(zj0) > nz) then
+         ! Test sortie vericale
+        if (abs(z0) > zmaxmax) then
+           n_cell_traversees(id) = n_save
+           tau_tot_out=tau_tot
+           lmax=tab_length_tot(id,n_save)
+           return
+        endif
+     endif ! Test sortie
+
+     nbr_cell = nbr_cell + 1
+
+     ! Detection interface
+     r_2=x0*x0+y0*y0
+     b=(x0*u+y0*v)*inv_a
+
+     if (ri0==0) then
+        lcellule_non_vide=.false.
+        opacite=0.0
+        ! Si on est avant le bord interne,  on passe forcement par rmin
+        ! et on cherche forcement la racine positive (unique)
+        c=(r_2-r_lim_2(0)*correct_plus)*inv_a
+        delta=b*b-c
+        rac=sqrt(delta)
+        s=-b+rac
+        t=huge_real
+        t_phi= huge_real
+        delta_rad=1
+     else
+        opacite=kappa(lambda,ri0,zj0,phik0)
+        ! 1) position interface radiale
+        ! on avance ou recule en r ? -> produit scalaire
+        dotprod=u*x0+v*y0
+        if (dotprod < 0.0) then
+           ! on recule : on cherche rayon inférieur
+           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
+           delta=b*b-c
+           if (delta < 0.0) then ! on ne rencontre pas le rayon inférieur
+              ! on cherche le rayon supérieur
+              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+              delta_rad=1
+           else
+              delta_rad=-1
+           endif
+        else
+           ! on avance : on cherche le rayon supérieur
+           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+           delta_rad=1
+        endif !dotprod
+        rac=sqrt(delta)
+        s=-b-rac
+        if (s < 0.0) then
+           s=-b+rac
+        else if (s==0.0) then
+           s=prec_grille
+        endif
+
+        ! 2) position interface verticale
+        ! on monte ou on descend par plan équatorial ?
+        dotprod=w*z0
+        if (dotprod == 0.0) then
+           t=1.0e10
+        else
+           if (dotprod > 0.0) then
+              ! on s'éloigne du midplane
+              if (zj0==nz+1) then
+                 delta_zj=0
+                 zlim=1.0e10
+              else if (zj0==-(nz+1)) then
+                 delta_zj=0
+                 zlim=-1.0e10
+              else
+                 if (z0 > 0.0) then
+                    zlim=z_lim(ri0,zj0+1)*correct_plus
+                    delta_zj=1
+                 else
+                    zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
+                    delta_zj=-1
+                 endif
+              endif
+           else
+              ! on se rapproche du midplane
+              if (z0 > 0.0) then
+                 zlim=z_lim(ri0,abs(zj0))*correct_moins
+                 delta_zj=-1
+                 if (zj0==1) delta_zj=-2 ! pas d'indice 0
+              else
+                 zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                 delta_zj=1
+                 if (zj0==-1) delta_zj=2 ! pas d'indice 0
+              endif
+           endif ! monte ou descend
+           t=(zlim-z0)*inv_w
+           ! correct pb precision
+           if (t < 0.0) t=prec_grille
+        endif !dotprod=0.0
+
+
+        ! 3) position interface azimuthale
+        dotprod =  x0*v - y0*u
+        if (abs(dotprod) < 1.0e-10) then
+           ! on ne franchit pas d'interface azimuthale
+           t_phi = 1.0e30
+        else
+           ! Quelle cellule on va franchir
+           if (dotprod > 0.0) then
+              tan_angle_lim = tan_phi_lim(phik0)
+              delta_phi=1
+           else
+              phik0m1=phik0-1
+              if (phik0m1==0) phik0m1=N_az
+              tan_angle_lim = tan_phi_lim(phik0m1)
+              delta_phi=-1
+           endif
+           ! Longueur av interserction
+           if (tan_angle_lim > 1.0d299) then
+              t_phi = -x0/u
+           else
+              den= v-u*tan_angle_lim
+              if (abs(den) > 1.0e-6) then
+                 t_phi = -(y0-x0*tan_angle_lim)/den
+              else
+                 t_phi = 1.0e30
+              endif
+           endif
+           if (t_phi < 0.0) t_phi = 1.0e30
+        endif !dotprod = 0.0
+
+     endif ! ri==0
+
+     ! 4) interface en r ou z ou phi ?
+     if ((s < t).and.(s < t_phi)) then ! r
+        l=s
+        delta_vol=s
+        ! Position au bord de la cellule suivante
+        x1=x0+delta_vol*u
+        y1=y0+delta_vol*v
+        z1=z0+delta_vol*w
+        ri1=ri0+delta_rad
+        if ((ri1<1).or.(ri1>n_rad)) then
+           zj1=zj0
+        else
+           zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+           if (zj1>nz) zj1=nz+1
+           if (z1 < 0.0) zj1=-zj1
+        endif
+
+        phik1=phik0
+        ! We need to find the azimuth when we enter the disc
+        ! It can be different from the initial azimuth if the star is not centered
+        ! so we need to compute it here
+        if (ri0==0) then
+           phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
+           phik1=floor(phi/(2*pi)*real(N_az))+1
+           if (phik1==n_az+1) phik1=n_az
+        endif
+
+     else if (t < t_phi) then ! z
+        l=t
+        delta_vol=t
+        ! Position au bord de la cellule suivante
+        x1=x0+delta_vol*u
+        y1=y0+delta_vol*v
+        z1=z0+delta_vol*w
+        ri1=ri0
+        zj1=zj0+delta_zj
+        phik1=phik0
+     else
+        l=t_phi
+        delta_vol=correct_plus*t_phi
+        ! Position au bord de la cellule suivante
+        x1=x0+delta_vol*u
+        y1=y0+delta_vol*v
+        z1=z0+delta_vol*w
+        ri1=ri0
+        zj1= floor(abs(z1)/zmax(ri1)*nz) + 1
+        if (zj1>nz) zj1=nz+1
+        if (z1 < 0.0) zj1=-zj1
+        phik1=phik0+delta_phi
+        if (phik1 == 0) phik1=N_az
+        if (phik1 == N_az+1) phik1=1
+     endif
+
+     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+     if (z1 == 0.0_db) z1 = sign(prec_grille,w)
+
+     tau=l*opacite ! opacite constante dans la cellule
+    ! Sauvgarde pour length_deg2_reloaded
+     ! indice cellule
+     if (tau > tiny_real) then
+        n_save=n_save+1
+        tab_cell_r(id,n_save) = ri0
+        tab_cell_z(id,n_save) = zj0
+        ! position initiale dans cellule
+        tab_x0(id,n_save) = x0
+        tab_y0(id,n_save) = y0
+        tab_z0(id,n_save) = z0
+        ! tau a la fin de la cellule et l dans cellule
+        tab_tau(id,n_save) = tau_tot
+        tab_length(id,n_save) = l !! BUG avec les cellules à tau=0
+        tab_length_tot(id,n_save) = ltot
+     endif
+
+
+  enddo ! boucle infinie
+  write(*,*) "BUG"
+  return
+
+end subroutine length_deg2_tot_3D
+
+!********************************************************
 
 subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
 ! Integration par calcul de la position de l'interface entre cellules

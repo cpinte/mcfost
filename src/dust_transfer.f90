@@ -1544,12 +1544,18 @@ subroutine stars_map(lambda,ibin, u,v,w)
         y0 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
-
-        ! Coordonnees initiale : position etoile dans la grille
-        call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
-
         Stokes = 0.0_db
-        call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax) ! Todo : phik --> length_deg2_tot_3D
+        if (l3D) then
+           ! Coordonnees initiale : position etoile dans la grille
+           call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
+
+           call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        else
+           ! Coordonnees initiale : position etoile dans la grille
+           call indice_cellule(x0,y0,z0,ri,zj)
+
+           call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        endif
 
         ! Coordonnees pixel
         call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
