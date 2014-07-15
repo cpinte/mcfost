@@ -1465,7 +1465,6 @@ subroutine dust_map(lambda,ibin)
      !$omp end do
      !$omp end parallel
 
-
      ! On recupere tout le flux par symetrie
      ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
      if (l_sym_ima) then
@@ -1476,24 +1475,8 @@ subroutine dust_map(lambda,ibin)
 
   endif ! method
 
-  ! Flux etoile
-  Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
-
-  ! Pixel central
-  if (ech_method==1) then
-     cx = 1
-     cy = 1
-  else
-     cx = igridx/2+1
-     cy = igridy/2+1
-  endif
-
-  ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
-  id = 1 ! le flux de l'etoile n'est que sur le 1 cpu
-  Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) + Flux_etoile
-  if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) + Flux_etoile
-  endif
+  ! Adding stellar contribution
+  call stars_map(lambda,ibin, u, v, w)
 
   if (lmono0) write(*,*) "Done"
 
@@ -1503,65 +1486,92 @@ end subroutine dust_map
 
 !***********************************************************
 
-function flux_etoile_ray_tracing(lambda,u,v,w) result(Flux)
+subroutine stars_map(lambda,ibin, u,v,w)
+  ! Make a ray-traced map of the stars
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, ibin
   real(kind=db), intent(in) :: u,v,w
 
   integer, parameter :: n_ray_star = 1000
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: Flux, x0,y0,z0, lmin, lmax,l, norme, x, y, z, argmt, srw02, cos_thet
+  real(kind=db) :: facteur, x0,y0,z0, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
   real :: rand, rand2, tau
-  integer :: id, i, j, k
+  integer :: id, ri, zj, phik, iray, istar, i,j
+  logical :: in_map
+
+  real, dimension(:,:), allocatable :: map, map_1star
 
 
-    ! Ajout etoile
-  id = 1 ; i=0 ; j=1 ;
+  id = 1 ; map = 0.0 ;
 
-  ! Etoile ponctuelle
-!  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
-!  Stokes = 0.0_db
-!  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-!  Flux_etoile =  exp(-tau)
-!  write(*,*)  "F0", Flux_etoile
+  allocate(map(igridx,igridy), map_1star(igridx,igridy))
 
-  ! Etoile non ponctuelle
-  Flux = 0.0_db
-  norme = 0.0_db
-  do k=1,n_ray_star
-     ! Position aleatoire sur la disque stellaire
-     rand  = sprng(stream(id))
-     rand2 = sprng(stream(id))
-
-     ! Position de depart aleatoire sur une sphere de rayon 1
-     z = 2.0_db * rand - 1.0_db
-     srw02 = sqrt(1.0-z*z)
-     argmt = pi*(2.0_db*rand2-1.0_db)
-     x = srw02 * cos(argmt)
-     y = srw02 * sin(argmt)
-
-     cos_thet = abs(x*u + y*v + z*w) ;
-     !cos_thet = 1.0_db ;
-
-     ! Position de depart aleatoire sur une sphere de rayon r_etoile
-     x0 = etoile(1)%x + x * etoile(1)%r
-     y0 = etoile(1)%y + y * etoile(1)%r
-     z0 = etoile(1)%z + z * etoile(1)%r
-
-     Stokes = 0.0_db
-     call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-     Flux = Flux + exp(-tau) * cos_thet
-     norme = norme + cos_thet
-  enddo
-  Flux = Flux / norme
-
-  Flux = Flux * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
+  ! Energie
+  facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
+
+  do istar=1, n_etoiles
+     map_1star = 0.0 ;
+
+     ! Etoile ponctuelle
+     !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
+     !  Stokes = 0.0_db
+     !  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+     !  Flux_etoile =  exp(-tau)
+     !  write(*,*)  "F0", Flux_etoile
+
+     ! Etoile non ponctuelle
+
+     norme = 0.0_db
+     do iray=1,n_ray_star
+        ! Position aleatoire sur la disque stellaire
+        rand  = sprng(stream(id))
+        rand2 = sprng(stream(id))
+
+        ! Position de depart aleatoire sur une sphere de rayon 1
+        z = 2.0_db * rand - 1.0_db
+        srw02 = sqrt(1.0-z*z)
+        argmt = pi*(2.0_db*rand2-1.0_db)
+        x = srw02 * cos(argmt)
+        y = srw02 * sin(argmt)
+
+        cos_thet = abs(x*u + y*v + z*w) ;
+        !cos_thet = 1.0_db ;
+
+        ! Position de depart aleatoire sur une sphere de rayon r_etoile
+        x0 = etoile(istar)%x + x * etoile(istar)%r
+        y0 = etoile(istar)%y + y * etoile(istar)%r
+        z0 = etoile(istar)%z + z * etoile(istar)%r
+
+
+        ! Coordonnees initiale : position etoile dans la grille
+        call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
+
+        Stokes = 0.0_db
+        call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax) ! Todo : phik --> length_deg2_tot_3D
+
+        ! Coordonnees pixel
+        call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
+
+        if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
+        norme = norme + cos_thet
+     enddo
+     ! Normalizing map
+     map_1star = map_1star * (facteur * prob_E_star(lambda,istar)) / norme
+
+     ! Adding all the stars
+     map = map + map_1star
+  enddo ! n_stars
+
+  Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + map
+  if (lsepar_contrib) then
+     Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + map
+  endif
 
   return
 
-end function flux_etoile_ray_tracing
+end subroutine stars_map
 
 !***********************************************************
 
