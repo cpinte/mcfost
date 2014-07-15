@@ -1049,7 +1049,7 @@ subroutine initialisation_mcfost()
 
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
-     if (lmono0) then
+     if (lmono0.and.(.not.l3D)) then
         lscatt_ray_tracing2 = .true.
         write(*,*) "Using ray-tracing method 2"
      else
