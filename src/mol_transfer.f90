@@ -603,12 +603,12 @@ subroutine emission_line_map(imol,ibin)
 
   if (abs(w) < 0.999999999_db) then
      ! vecteur de base 1
-     x1=0.0_db ; y1=cos_disk ; z1=sin_disk
+     x1=0.0_db ; y1=-cos_disk ; z1=sin_disk
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(1,1) = x2 ; Iaxis(1,2) = y2 ; Iaxis(1,3) =z2
 
      ! vecteur de base 2
-     x1=0.0_db ; y1=-sin_disk ; z1=cos_disk
+     x1=0.0_db ; y1=sin_disk ; z1=cos_disk
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(2,1) = x2 ; Iaxis(2,2) = y2 ; Iaxis(2,3) =z2
   else
