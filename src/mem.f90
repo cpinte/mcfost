@@ -1825,11 +1825,11 @@ subroutine alloc_emission_mol(imol)
 
      write(*,*) "WARNING : memory size if lots of pixels"
      allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
+          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stars_map(igridx,igridy), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
      allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(1,1,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
+          continu(1,1,nTrans_raytracing,RT_n_ibin), stars_map(1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre'
@@ -1837,6 +1837,7 @@ subroutine alloc_emission_mol(imol)
   endif
   spectre=0.0
   continu=0.0
+  stars_map=0.0
 
   return
 
