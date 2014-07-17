@@ -612,8 +612,8 @@ subroutine emission_line_map(imol,ibin)
      call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
      Iaxis(2,1) = x2 ; Iaxis(2,2) = y2 ; Iaxis(2,3) =z2
   else
-     Iaxis(1,1) = 0.0_db ; Iaxis(1,2) = -1.0_db ; Iaxis(1,3) = 0.0_db
-     Iaxis(2,1) = -1.0_db ; Iaxis(2,2) = 0.0_db ; Iaxis(2,3) = 0.0_db
+     Iaxis(1,1) = -sin_disk ; Iaxis(1,2) = cos_disk ; Iaxis(1,3) = 0.0_db
+     Iaxis(2,1) = -cos_disk ; Iaxis(2,2) = -sin_disk ; Iaxis(2,3) = 0.0_db
   endif
 
   ! position initiale hors modele (du cote de l'observateur)
