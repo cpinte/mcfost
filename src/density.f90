@@ -2624,6 +2624,8 @@ subroutine densite_file()
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
 
+  write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
+
   ! Au cas ou
   sph_dens = max(sph_dens,tiny_db)
 
@@ -2847,8 +2849,6 @@ subroutine densite_file()
   ! TODO : changer la distribution des grains
 
 
-
-
   ! Normalisation : on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
      densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)*nbre_grains(l)
@@ -2901,7 +2901,6 @@ subroutine densite_file()
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
-
 
   !write(*,*) "MODIFYING 3D DENSITY !!!"
   !k = 36
