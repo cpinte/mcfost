@@ -1169,7 +1169,19 @@ subroutine opacite2(lambda)
   endif
 
   ! On remet la densite à zéro si besoin
-  if (ldens0) densite_pouss(1,1,1,:) = 0.0_db
+  if (ldens0) then
+     densite_pouss(1,1,1,:) = 0.0_db
+     kappa(lambda,1,1,1) = 0.0_db
+     if (lRE_LTE) then
+        kappa_abs_eg(lambda,1,1,1) = 0.0_db
+     endif
+     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
+        kappa_sca(lambda,1,1,1) = 0.0_db
+     endif
+     if (lnRE) then
+        prob_kappa_abs_1grain(lambda,1,1,:) = 0.0
+     endif
+  endif
 
 !  write(*,*) "lambda", tab_lambda(lambda), tab_g_pos(lambda,1,1,1)
 !  write(*,*) tab_s11_ray_tracing(lambda,1,1,:)
