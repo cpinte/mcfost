@@ -1277,7 +1277,7 @@ subroutine opacite2(lambda)
      call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
      if (lsepar_pola) then
-        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:)/tab_s11_pos(:,1,1,1,:)
+        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:) ! Deja normalise par S11
         call cfitsWrite("data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 
