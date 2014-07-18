@@ -720,6 +720,7 @@ subroutine mcfost_get_ref_para()
 
   ref_file = "ref"//mcfost_release(1:4)//".para"
   ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
+  ref_file_3D = "ref"//mcfost_release(1:4)//"_3D.para"
 
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
   cmd = "curl "//trim(webpage)//ref_file//" -O -s"
