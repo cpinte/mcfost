@@ -211,6 +211,8 @@ subroutine define_grid4()
      lspherical = .true.
   endif
 
+  n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
+
   if (llinear_grid) then
 
      do i=1, n_rad+1

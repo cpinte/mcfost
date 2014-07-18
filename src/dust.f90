@@ -940,11 +940,12 @@ subroutine opacite2(lambda)
                  if (aniso_method==1) then
                     ! Moyennage matrice de mueller (long) (dernier indice : angle)
                     ! TODO : indice 1 suppose que mueller (via prop_grain) a ete calcule juste avant
-                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(1,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
+                    ! --> change en lambda depuis que l'on sauve les proprietes optiques (ie p_lambda pointe toujours sur lambda)
+                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(lambda,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(1,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
-                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(1,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
-                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(1,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
+                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(lambda,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
+                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(lambda,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
+                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(lambda,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
                     endif
                  endif !aniso_method
               else
@@ -1169,7 +1170,19 @@ subroutine opacite2(lambda)
   endif
 
   ! On remet la densite à zéro si besoin
-  if (ldens0) densite_pouss(1,1,1,:) = 0.0_db
+  if (ldens0) then
+     densite_pouss(1,1,1,:) = 0.0_db
+     kappa(lambda,1,1,1) = 0.0_db
+     if (lRE_LTE) then
+        kappa_abs_eg(lambda,1,1,1) = 0.0_db
+     endif
+     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
+        kappa_sca(lambda,1,1,1) = 0.0_db
+     endif
+     if (lnRE) then
+        prob_kappa_abs_1grain(lambda,1,1,:) = 0.0
+     endif
+  endif
 
 !  write(*,*) "lambda", tab_lambda(lambda), tab_g_pos(lambda,1,1,1)
 !  write(*,*) tab_s11_ray_tracing(lambda,1,1,:)
@@ -1265,7 +1278,7 @@ subroutine opacite2(lambda)
      call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
      if (lsepar_pola) then
-        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:)/tab_s11_pos(:,1,1,1,:)
+        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:) ! Deja normalise par S11
         call cfitsWrite("data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 
