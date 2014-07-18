@@ -843,9 +843,9 @@ subroutine initialisation_mcfost()
         ! on change les parametres par default pour gagner du temps
         ! et pour avoir des quantites integrees !!!
         ! BUG ici : +dust_prop renvoie les prop de la 1ere cellule
-        limg=.false.
-        lmono=.false.
-        lmono0=.false.
+        !limg=.false.
+        !lmono=.false.
+        !lmono0=.false.
         lstrat=.false.
         scattering_method=2
      endif

@@ -940,11 +940,12 @@ subroutine opacite2(lambda)
                  if (aniso_method==1) then
                     ! Moyennage matrice de mueller (long) (dernier indice : angle)
                     ! TODO : indice 1 suppose que mueller (via prop_grain) a ete calcule juste avant
-                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(1,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
+                    ! --> change en lambda depuis que l'on sauve les proprietes optiques (ie p_lambda pointe toujours sur lambda)
+                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(lambda,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(1,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
-                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(1,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
-                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(1,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
+                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(lambda,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
+                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(lambda,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
+                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(lambda,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
                     endif
                  endif !aniso_method
               else
