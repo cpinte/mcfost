@@ -2560,7 +2560,7 @@ subroutine densite_file()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdunum, hdutype, bitpix
   integer :: nullval, stat
   integer, dimension(4) :: naxes
   logical :: anynull
@@ -2573,6 +2573,9 @@ subroutine densite_file()
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
+
+  real(kind=db), dimension(:,:,:,:), allocatable :: sph_dens_db
+  real(kind=db), dimension(:), allocatable :: a_sph_db
 
   type(disk_zone_type) :: dz
 
@@ -2616,13 +2619,25 @@ subroutine densite_file()
   n_a = naxes(4)
   write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  nbuffer=npixels
 
   allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
   sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
   ! read_image
-  call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
+  if (bitpix==-32) then
+     call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
+  else if (bitpix==-64) then
+     allocate(sph_dens_db(n_rad,nz,n_az,n_a)) ; sph_dens_db = 0.0_db
+     call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_db,anynull,status)
+     sph_dens = real(sph_dens_db,kind=sl)
+     deallocate(sph_dens_db)
+  else
+     write(*,*) "ERROR: cannot read bitpix in fits file"
+     stop
+  endif
 
   write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
 
@@ -2668,13 +2683,32 @@ subroutine densite_file()
      endif
      npixels=naxes(1)
 
+     bitpix=0
+     call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
      ! read_image
-     call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
+     if (bitpix==-32) then
+        call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
+     else if (bitpix==-64) then
+        allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
+        call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
+        a_sph = real(a_sph_db,kind=sl)
+        deallocate(a_sph_db)
+     else
+        write(*,*) "ERROR: cannot read bitpix in fits file"
+        stop
+     endif
+
+     ! read_image
 
      ! On verifie que les grains sont tries
      do i=1, n_a-1
         if (a_sph(i) >= a_sph(i+1)) then
            write(*,*) "ERROR : grains must be ordered from small to large"
+           write(*,*) "I found the follwing grain sizes in the fits :"
+           do j=1, n_a
+              write(*,*) a_sph(j)
+           enddo
            write(*,*) "Exiting"
            stop
         endif
@@ -2706,13 +2740,28 @@ subroutine densite_file()
         endif
         npixels=naxes(1)
 
+        bitpix = 0
+        call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
         ! read_image
-        call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
+        if (bitpix==-32) then
+           call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
+        else if (bitpix==-64) then
+           allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
+           call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
+           n_a_sph = real(a_sph_db,kind=sl)
+           deallocate(a_sph_db)
+        else
+           write(*,*) "ERROR: cannot read bitpix in fits file"
+           stop
+        endif
 
         tmp = sum(n_a_sph)
+        write(*,*) "The following grain sizes were found in the fits file:"
         do i=1,n_a
            write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
         enddo
+        write(*,*) "They will be used to set the integrated grain size distribution"
 
 
         if (n_pop > 1) then
@@ -2734,13 +2783,17 @@ subroutine densite_file()
         ! Normalisation de tous les grains au sein d'une pop
         nbre_grains = nbre_grains / sum(nbre_grains)
      else
-        write(*,*) "Using grain size distribution from parameter file"
+        write(*,*) "The following grain sizes were found in the fits file:"
         do i=1,n_a
            write(*,*) i, a_sph(i), "microns"
         enddo
+        write(*,*) "Using values from parameter file to set the integrated grain size distribution"
      endif
 
-  endif ! n_a > 1
+  else ! n_a > 1
+     write(*,*) "Using grain size distribution from parameter file"
+     a_sph(1) = 1.0
+  endif
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -2798,8 +2851,6 @@ subroutine densite_file()
         enddo !k
      enddo bz_gas_mass3
   enddo ! i
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-
 
   if (lstrat) then
      write(*,*) "Differential spatial distribution"
@@ -2899,6 +2950,7 @@ subroutine densite_file()
 
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
 
