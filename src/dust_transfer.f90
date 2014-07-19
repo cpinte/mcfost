@@ -1454,6 +1454,7 @@ subroutine dust_map(lambda,ibin)
   ! Adding stellar contribution
   call compute_stars_map(lambda,ibin, u, v, w)
 
+  id = 1
   Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + stars_map
   if (lsepar_contrib) then
      Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + stars_map
