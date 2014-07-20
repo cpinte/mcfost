@@ -577,9 +577,9 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
      cosw = cos_omega_rt1(ibin,id)
      sinw = sin_omega_rt1(ibin,id)
 
-     RPO(2,2) = cosw
+     RPO(2,2) = -cosw
      ROP(2,2) = cosw
-     RPO(2,3) = sinw
+     RPO(2,3) = -sinw
      ROP(2,3) = -1.0_db * sinw
      RPO(3,2) = -1.0_db * sinw
      ROP(3,2) = sinw
