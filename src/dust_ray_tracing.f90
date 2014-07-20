@@ -518,7 +518,7 @@ end subroutine calc_xI_scatt
 
 !***********************************************************
 
-subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes)
+subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   ! RT1
   ! Calcul les matrices de Mueller pour une direction de diffusion
   ! lance dans chaque cellule traversee
@@ -532,13 +532,15 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes)
 
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: l
+  logical, intent(in) :: flag_star
   integer, intent(in) :: id, lambda, ri, zj, phik, psup
 
-  real(kind=db), dimension(4) :: C, D
+  real(kind=db), dimension(4) :: C, D, S
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
-  real(kind=db) :: cosw, sinw
+  real(kind=db) :: cosw, sinw, flux
   real :: s11, s12, s33, s34
-  integer :: ibin, it
+  integer :: ibin, it, p_ri, p_zj, p_phik
+
 
   ROP = 0.0_db
   RPO = 0.0_db
@@ -549,14 +551,24 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes)
 
   M = 0.0_db
 
+  if (lstrat) then
+     p_ri = ri
+     p_zj = zj
+     p_phik = phik
+  else
+     p_ri = 1
+     p_zj = 1
+     p_phik = 1
+  endif
+
   do ibin = 1, RT_n_ibin
      ! Matrice de Mueller
      it = itheta_rt1(ibin,id)
 
-     s11 = tab_s11_ray_tracing(lambda,ri,zj,phik,it)
-     s12 = tab_s12_ray_tracing(lambda,ri,zj,phik,it)
-     s33 = tab_s33_ray_tracing(lambda,ri,zj,phik,it)
-     s34 = tab_s34_ray_tracing(lambda,ri,zj,phik,it)
+     s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s12 = tab_s12_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s33 = tab_s33_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s34 = tab_s34_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
 
      M(1,1) = s11 ; M(2,2) = s11 ; M(1,2) = s12 ; M(2,1) = s12
      M(3,3) = s33 ; M(4,4) = s33 ; M(3,4) = -s34 ; M(4,3) = s34
@@ -585,17 +597,29 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes)
      D(3:4)=matmul(M(3:4,3:4),C(3:4))
 
      ! 2nde rotation
-     xI_scatt(2:3,ibin,ri,zj,phik,psup,id) =  xI_scatt(2:3,ibin,ri,zj,phik,psup,id) + l * matmul(RPO(2:3,2:3),D(2:3))
-     xI_scatt(1,ibin,ri,zj,phik,psup,id) =  xI_scatt(1,ibin,ri,zj,phik,psup,id) + l * D(1)
-     xI_scatt(4,ibin,ri,zj,phik,psup,id) =  xI_scatt(4,ibin,ri,zj,phik,psup,id) + l * D(4)
-  enddo ! ibin
+     S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
+     S(1)=D(1)
+     S(4)=D(4)
 
-  ! TODO :
+     xI_scatt(1:4,ibin,ri,zj,phik,psup,id) =  xI_scatt(1:4,ibin,ri,zj,phik,psup,id) + l * S(:)
+     xsin_scatt(ibin,ri,zj,phik,psup,id) =  xsin_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
+     xN_scatt(ibin,ri,zj,phik,psup,id) =  xN_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db
+
+     if (lsepar_contrib) then
+        flux = l * S(1)
+        if (flag_star) then
+           !n_Stokes+2 = 6
+           xI_scatt(6,ibin,ri,zj,phik,psup,id) =  xI_scatt(6,ibin,ri,zj,phik,psup,id) + flux
+        else
+           !n_Stokes+4 = 8
+           xI_scatt(8,ibin,ri,zj,phik,psup,id) =  xI_scatt(8,ibin,ri,zj,phik,psup,id) + flux
+        endif
+     endif
+  enddo ! ibin
 
   return
 
 end subroutine calc_xI_scatt_pola
-
 
 !***********************************************************
 
@@ -655,6 +679,11 @@ subroutine init_dust_source_fct1(lambda,ibin)
                  enddo ! itype
 
                  eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(lambda,i,j,k)
+
+                 if (lsepar_pola) then
+                    eps_dust1(2:4,i,j,k,:) =  I_scatt(2:4,k,:) / kappa(lambda,i,j,k)
+                 endif
+
                  if (lsepar_contrib) then
                     eps_dust1(n_Stokes+2,i,j,k,:) =    I_scatt(n_Stokes+2,k,:) / kappa(lambda,i,j,k)
                     eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(i,j,k) / kappa(lambda,i,j,k)

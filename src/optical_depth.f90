@@ -346,7 +346,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
                  ! xI_scatt(:,:,ri0,zj0,phi_k,psup,id) =  xI_scatt(:,:,ri0,zj0,phi_k,psup,id) + &
                  ! l * new_stokes_rt1(:,:,id)
                  write(*,*) "ERROR: implementation of polarizarion mode is not finished"
-                 write(*,*) "       in the ray-tracing mode 1"
+                 write(*,*) "       in the ray-tracing mode 1  2D"
                  write(*,*) "       Exiting."
                  stop
               else
@@ -1152,7 +1152,11 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
                  zm = 0.5_db * (z0 + z1)
 
                  ! TODO : RT : clean the 0 in the indices
-                 call calc_xI_scatt(id,lambda,ri0,zj0,phik0,1,l,Stokes(1),flag_star) ! psup=1 in 3D
+                 if (lsepar_pola) then
+                    call calc_xI_scatt_pola(id,lambda,ri0,zj0,phik0,1,l,Stokes(:),flag_star) ! psup=1 in 3D
+                 else
+                    call calc_xI_scatt(id,lambda,ri0,zj0,phik0,1,l,Stokes(1),flag_star) ! psup=1 in 3D
+                 endif
               endif
 
            endif ! letape_th
