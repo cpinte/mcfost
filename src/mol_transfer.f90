@@ -543,7 +543,7 @@ subroutine emission_line_map(imol,ibin)
 
   ! Direction de visee pour le ray-tracing
   uv = sin(tab_RT_incl(ibin) * deg_to_rad) ;  w = cos(tab_RT_incl(ibin) * deg_to_rad)
-  u = uv * cos(phi_RT * deg_to_rad) ; v = - uv * sin(phi_RT * deg_to_rad) ; ! signe - sur phi pour tourner de N->E
+  u = uv * cos(phi_RT * deg_to_rad) ; v = uv * sin(phi_RT * deg_to_rad) ;
   uvw = (/u,v,w/)
 
 
@@ -583,18 +583,18 @@ subroutine emission_line_map(imol,ibin)
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/-sin(phi_RT * deg_to_rad),-cos(phi_RT * deg_to_rad),0/)
+  x = (/sin(phi_RT * deg_to_rad),-cos(phi_RT * deg_to_rad),0/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
      ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
-     x_plan_image = rotation_3d(uvw, -ang_disque, x) ! signe - pour PA de N->E
+     x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
      x_plan_image = x
   endif
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
-  y_plan_image = cross_product(uvw, x_plan_image)
+  y_plan_image = cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
