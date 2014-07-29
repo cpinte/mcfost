@@ -418,10 +418,13 @@ subroutine define_dust_density()
                     if (lstrat.and.(settling_type == 2)) then
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
-                       OmegaTau = omega_tau(rho0,H,l)
-
-                       h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
-                       correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
+                       if (rho0 > tiny_db) then
+                          OmegaTau = omega_tau(rho0,H,l)
+                          h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
+                          correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
+                       else
+                          correct_strat(l) = 1.0
+                       endif
                     endif
 
 
@@ -3134,7 +3137,12 @@ real(kind=db) function omega_tau(rho,H,l)
   integer :: ipop
 
   ipop = grain(l)%pop
-  omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+  !write(*,*) ipop, dust_pop(ipop)%rho1g_avg, rho
+  if (rho > tiny_db) then
+     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+  else
+     omega_tau = huge_db
+  endif
 
   return
 

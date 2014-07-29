@@ -118,7 +118,7 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: i,j,pk,k,lambda,t
+  integer :: i,j,pk,k,lambda,t, pop
   real(kind=db) :: integ, integ2, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
@@ -313,7 +313,9 @@ subroutine init_reemission()
 
   enddo !t
 
-  if (lread_Misselt) call read_file_specific_heat()
+  do pop=1, n_pop
+     if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call read_file_specific_heat(pop)
+  enddo
 
   return
 
