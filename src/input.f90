@@ -22,40 +22,30 @@ subroutine read_opacity_file(pop)
 
   dp => dust_pop(pop)
 
+  ! We look for the directory and check if the file exists in  get_opacity_file_dim
+  ! We do not need to redo it here
   filename = trim(dp%indices(1))
-  dir = in_dir(filename, dust_dir,  status=ios)
-  if (ios /=0) then
-     write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-     write(*,*) "Exiting"
-     stop
-  else
-     filename = trim(dir)//trim(filename) ;
-     write(*,*) "Reading opacity file "//trim(filename) ;
-  endif
+  write(*,*) "Reading opacity file "//trim(filename) ;
 
   ! load optical data from file
-  if (lread_Misselt) then
+  if (dp%is_Misselt_opacity_file) then
      call misselt_load(filename, pop)
   else
      dp%component_rho1g(1) = 2.5
      dp%rho1g_avg = 2.5
-     call draine_load(filename)
+     call draine_load(filename, pop)
      !call draine_load(filename, op_file_n_lambda, op_file_na, 10, 1, &
     !      tmp_lambda, tmp_r_grain,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
   endif
 
   ! abs car le fichier de lambda pour les PAHs est a l'envers
-  op_file_delta_lambda(1) = abs(op_file_lambda(2) - op_file_lambda(1))
+  op_file_delta_lambda(1,pop) = abs(op_file_lambda(2,pop) - op_file_lambda(1,pop))
   if (n_lambda > 1) then
-     op_file_delta_lambda(n_lambda) = abs(op_file_lambda(n_lambda) - op_file_lambda(n_lambda-1))
+     op_file_delta_lambda(n_lambda,pop) = abs(op_file_lambda(n_lambda,pop) - op_file_lambda(n_lambda-1,pop))
   endif
-  do l=2,op_file_n_lambda-1
-     op_file_delta_lambda(l) = 0.5* abs(op_file_lambda(l+1) - op_file_lambda(l-1))
+  do l=2,op_file_n_lambda(pop)-1
+     op_file_delta_lambda(l,pop) = 0.5* abs(op_file_lambda(l+1,pop) - op_file_lambda(l-1,pop))
   enddo
-
-  ! Correcting the grain size distribution to account for the material density
-  ! that we did not know at the time
-  nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) /  dp%rho1g_avg
 
   return
 
@@ -63,16 +53,64 @@ end subroutine read_opacity_file
 
 !*************************************************************
 
+subroutine get_opacity_file_dim(pop)
+
+  integer, intent(in) :: pop
+  character(len=512) :: filename, dir
+  type(dust_pop_type), pointer :: dp
+
+  integer :: ios
+
+  dp => dust_pop(pop)
+
+  filename = trim(dp%indices(1))
+  dir = in_dir(filename, dust_dir,  status=ios)
+  if (ios /=0) then
+     write(*,*) "ERROR: dust file cannot be found:",trim(filename)
+     write(*,*) "Exiting"
+     stop
+  endif
+  filename = trim(dir)//trim(filename) ;
+
+  ! Updating indice filename with directory
+  dp%indices(1) = filename ;
+
+  if (dp%is_Misselt_opacity_file) then
+     call get_misselt_dim(filename, pop)
+  else
+     dp%component_rho1g(1) = 2.5
+     dp%rho1g_avg = 2.5
+     call get_draine_dim(filename, pop)
+  endif
+
+  return
+
+end subroutine get_opacity_file_dim
+
+!*************************************************************
+
 subroutine alloc_mem_opacity_file()
 
-  integer :: alloc_status
+  integer :: alloc_status, n_lambda, na, nT
 
-  allocate(op_file_Qext(op_file_n_lambda,op_file_na), op_file_Qsca(op_file_n_lambda,op_file_na), &
-       op_file_g(op_file_n_lambda,op_file_na), op_file_log_r_grain(op_file_na), &
-       op_file_lambda(op_file_n_lambda), op_file_delta_lambda(op_file_n_lambda), stat=alloc_status)
+  na = maxval(op_file_na(:))
+  n_lambda = maxval(op_file_n_lambda(:))
+
+  allocate(op_file_Qext(n_lambda,na,n_pop), op_file_Qsca(n_lambda,na,n_pop), &
+       op_file_g(n_lambda,na,n_pop), op_file_log_r_grain(na,n_pop), &
+       op_file_lambda(n_lambda,n_pop), op_file_delta_lambda(n_lambda,n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error opacity file'
      stop
+  endif
+
+  if (lnRE) then
+     nT = maxval(file_sh_nT(:))
+     allocate(file_sh_T(nT,n_pop), file_sh(nT,n_pop))
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error specific heat capacity file'
+        stop
+     endif
   endif
 
   return
@@ -82,20 +120,23 @@ end subroutine alloc_mem_opacity_file
 !*************************************************************
 
 subroutine free_mem_opacity_file()
+  ! Pas utilise pour le moment
 
   deallocate(op_file_Qext, op_file_Qsca, op_file_g, op_file_log_r_grain, &
        op_file_lambda, op_file_delta_lambda)
+
+  if (allocated(file_sh_T)) deallocate(file_sh_T, file_sh)
+
   return
 
 end subroutine free_mem_opacity_file
 
 !*************************************************************
 
-subroutine draine_load(file)
-
-  implicit none
+subroutine draine_load(file,pop)
 
   character(len=512), intent(in) :: file
+  integer, intent(in) :: pop
 
   ! nh : n header ; ns : n_skip
   integer, parameter :: nh1 = 7, nh2 = 1, ns=1
@@ -108,21 +149,21 @@ subroutine draine_load(file)
   do l=1, nh1
      read(1,*)
   enddo
-  read(1,*) op_file_na
-  read(1,*) op_file_n_lambda
-  call alloc_mem_opacity_file()
+  read(1,*) op_file_na(pop)
+  read(1,*) op_file_n_lambda(pop)
+
   do l=1, nh2
      read(1,*)
   enddo
 
   ! lecture
-  do i=1, op_file_na
-     read(1,*) a ; op_file_log_r_grain(i) = log(a)
+  do i=1, op_file_na(pop)
+     read(1,*) a ; op_file_log_r_grain(i,pop) = log(a)
      read(1,*)
-     do j=1, op_file_n_lambda
-        read(1,*) op_file_lambda(j), op_file_Qext(j,i), fbuffer, op_file_Qsca(j,i), op_file_g(j,i)
+     do j=1, op_file_n_lambda(pop)
+        read(1,*) op_file_lambda(j,pop), op_file_Qext(j,i,pop), fbuffer, op_file_Qsca(j,i,pop), op_file_g(j,i,pop)
      enddo
-     if (i < op_file_na) then
+     if (i < op_file_na(pop)) then
         ! skip ns ligne
         do l=1,ns
            read(1,*)
@@ -137,12 +178,35 @@ end subroutine draine_load
 
 !*************************************************************
 
+subroutine get_draine_dim(file,pop)
+
+  character(len=512), intent(in) :: file
+  integer, intent(in) :: pop
+
+  ! nh : n header ; ns : n_skip
+  integer, parameter :: nh1 = 7
+  integer :: l
+
+  open(unit=1,file=file)
+  ! header
+  do l=1, nh1
+     read(1,*)
+  enddo
+  read(1,*) op_file_na(pop)
+  read(1,*) op_file_n_lambda(pop)
+
+  close(unit=1)
+
+  return
+
+end subroutine get_draine_dim
+
+!*************************************************************
+
 subroutine misselt_load(file, pop)
   ! Allocate and fills the arrays op_file_XXXX
   ! C. Pinte
   ! 27/06/2014
-
-  implicit none
 
   character(len=512), intent(in) :: file
   integer, intent(in) :: pop
@@ -161,25 +225,24 @@ subroutine misselt_load(file, pop)
   do l=1, nh1
      read(1,*)
   enddo
-  read(1,*) sbuffer, op_file_na
-  read(1,*) sbuffer, op_file_n_lambda
+  read(1,*) sbuffer, op_file_na(pop)
+  read(1,*) sbuffer, op_file_n_lambda(pop)
   read(1,*) ibuffer, material_density
   dust_pop(pop)%component_rho1g(1) = material_density
   dust_pop(pop)%rho1g_avg = material_density
-  call alloc_mem_opacity_file()
 
   do l=1, nh2
      read(1,*)
   enddo
 
   ! lecture
-  do i=1,op_file_na
-     read(1,*) a ; op_file_log_r_grain(i) = log(a)
+  do i=1,op_file_na(pop)
+     read(1,*) a ; op_file_log_r_grain(i,pop) = log(a)
      read(1,*)
-     do j=1,op_file_n_lambda
-        read(1,*) fbuffer, op_file_lambda(j), fbuffer2, op_file_Qsca(j,i), op_file_Qext(j,i), op_file_g(j,i)
+     do j=1,op_file_n_lambda(pop)
+        read(1,*) fbuffer, op_file_lambda(j,pop), fbuffer2, op_file_Qsca(j,i,pop), op_file_Qext(j,i,pop), op_file_g(j,i,pop)
      enddo
-     if (i < op_file_na) then
+     if (i < op_file_na(pop)) then
         ! skip ns ligne
         do l=1,ns
            read(1,*)
@@ -194,9 +257,40 @@ end subroutine misselt_load
 
 !*************************************************************
 
-subroutine read_molecules_names(imol)
+subroutine get_misselt_dim(file, pop)
 
-  implicit none
+  character(len=512), intent(in) :: file
+  integer, intent(in) :: pop
+
+  ! nh : n header ; ns : n_skip
+  integer, parameter :: nh1 = 7
+
+  character(len=5) :: sbuffer
+  real :: material_density
+  integer :: l, ibuffer
+
+  open(unit=1,file=file)
+  read(1,*)  sh_file(pop)
+  ! header
+  do l=1, nh1
+     read(1,*)
+  enddo
+  read(1,*) sbuffer, op_file_na(pop)
+  read(1,*) sbuffer, op_file_n_lambda(pop)
+  read(1,*) ibuffer, material_density
+  dust_pop(pop)%component_rho1g(1) = material_density
+  dust_pop(pop)%rho1g_avg = material_density
+
+  close(unit=1)
+
+  return
+
+end subroutine get_misselt_dim
+
+!*************************************************************
+
+
+subroutine read_molecules_names(imol)
 
   integer, intent(in) :: imol
 
@@ -232,8 +326,6 @@ subroutine readmolecule(imol)
   ! Lit les parametres de la molecule etudiee
   ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq,
   ! iTransUpper, iTransLower + les donnees de collisions
-
-  implicit none
 
   integer, intent(in) :: imol
   integer, parameter :: nCollTemp_max = 50
@@ -355,8 +447,6 @@ end subroutine readmolecule
 !*************************************************************
 
 subroutine lect_Temperature()
-
-  implicit none
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
   real :: nullval
@@ -554,8 +644,6 @@ subroutine read_abundance(imol)
 
   ! C.pinte   1/10/07
 
-  implicit none
-
   integer, intent(in) :: imol
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
@@ -614,8 +702,6 @@ end subroutine read_abundance
 subroutine lect_lambda()
   ! Remplit la variable lambda_filename
   ! et le tableau de lambda pour sed2
-
-  implicit none
 
   integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
@@ -826,8 +912,6 @@ end subroutine read_struct_fits_file
 !***************************************************
 
 subroutine init_tab_Temp()
-
-  implicit none
 
   real(kind=db) :: delta_T
   integer :: t

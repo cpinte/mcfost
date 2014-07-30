@@ -172,7 +172,6 @@ subroutine taille_grains()
 
         ! Normalisation du nombre de grains pour atteindre la bonne masse
         nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
-        ! we need to correct and divide by rho1g when reading the material density afterwards
 
         ! Normalisation de tous les grains au sein d'une pop
         nbre_tot_grains = 0.0
@@ -221,8 +220,13 @@ subroutine init_indices_optiques()
   real, dimension(:), allocatable :: tab_l, tab_n, tab_k
   real, dimension(:,:), allocatable :: tab_tmp_amu1, tab_tmp_amu2
 
-  logical :: l_ordre_decroissant
+  logical :: l_ordre_decroissant, lread_opacity_file
 
+  logical, save :: lfirst = .true.
+
+  if (lfirst) then
+     lread_opacity_file = .false.
+  endif
 
   do pop=1, n_pop
      if (.not.dust_pop(pop)%is_opacity_file) then
@@ -402,19 +406,27 @@ subroutine init_indices_optiques()
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
      else ! fichier d'opacite
+        if (lfirst) then
+           ! We allocate the arrays to save dimension the 1st time we enter this section
+           if (.not.lread_opacity_file) then
+              allocate(op_file_na(n_pop), op_file_n_lambda(n_pop), file_sh_nT(n_pop))
+              op_file_na = 0 ; op_file_n_lambda = 0 ; file_sh_nT = 0
+           endif
+           lread_opacity_file = .true.
+        endif
 
-        ! Force a temporary density, we will correct for it in read_opacity_file
-        dust_pop(pop)%component_rho1g(1) = 1.0
-        dust_pop(pop)%rho1g_avg = 1.0
+        call get_opacity_file_dim(pop)
 
         if (dust_pop(pop)%n_components > 1) then
-           write(*,*) "ERROR : cannot mix PAH with other component"
+           write(*,*) "ERROR : cannot mix dust with opacity file with other component"
            write(*,*) "Exiting"
            stop
         endif
-     endif ! fin test fichier opacite
-
+     endif ! fichier d'opacite
   enddo ! pop
+
+  if (lfirst.and.lread_opacity_file) call alloc_mem_opacity_file()
+  lfirst = .false.
 
   return
 
