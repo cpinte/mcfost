@@ -562,6 +562,7 @@ contains
     endif
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
+    dust_pop%is_Misselt_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -606,8 +607,9 @@ contains
                 T_max = 2500.
              endif
              if (dust_pop(ind_pop)%indices(1)(1:7) == "Misselt") then
-                lread_Misselt=.true.
                 dust_pop(ind_pop)%is_opacity_file = .true.
+                dust_pop(ind_pop)%is_Misselt_opacity_file = .true.
+                lread_Misselt = .true.
                 if (dust_pop(ind_pop)%indices(1)(9:11) == "PAH") then
                    dust_pop(ind_pop)%is_PAH = .true.
                    T_max = 2500.

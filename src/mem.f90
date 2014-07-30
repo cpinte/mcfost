@@ -1257,12 +1257,7 @@ subroutine realloc_step2()
 
   integer :: alloc_status
 
-
-  if (scattering_method == 2) then ! prop par cellule
-     p_n_lambda = 1
-  else ! prop par grains
-     p_n_lambda = n_lambda2
-  endif
+  p_n_lambda = n_lambda2 ! Plus de pointeur a 1 depuis que l'on sauvegarde les proprietes optiques
 
   ! Liberation memoire
   if (ltemp) then

@@ -14,8 +14,6 @@ module PAH
 
   implicit none
 
-  real(kind=db), dimension(:), allocatable :: file_sh_T, file_sh
-
 contains
 
 function specific_heat(T, taille_grain)
@@ -228,18 +226,62 @@ end subroutine test_PAH_specific_heat
 
 !******************************************************
 
-subroutine read_file_specific_heat
+subroutine read_file_specific_heat(pop)
+
+  integer, intent(in) :: pop
+
+  integer :: ios, status, n_comment, k
+  real :: fbuffer
+
+  open(unit=1, file=sh_file(pop), status='old', iostat=ios)
+  if (ios/=0) then
+     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
+
+  ! On elimine les lignes avec des commentaires
+  status = 1
+  n_comment = 0
+  do while (status /= 0)
+     n_comment = n_comment + 1
+     read(1,*,iostat=status) fbuffer
+  enddo
+  n_comment = n_comment - 1
+
+  ! Lecture proprement dite
+  rewind(1)
+  ! On passe les commentaires
+  do k=1, n_comment
+     read(1,*)
+  enddo
+
+  ! Lecture specific heat capacity
+  do k=1,file_sh_nT(pop)
+     read(1,*) file_sh_T(k,pop), fbuffer, file_sh(k,pop)
+  enddo
+
+  return
+
+end subroutine read_file_specific_heat
+
+!******************************************************
+
+subroutine get_file_specific_heat_dim(pop)
+
+  integer, intent(in) :: pop
 
   integer :: ios, status, n_comment, n_Temperatures, k
   real :: fbuffer
 
-  open(unit=1, file=sh_file, status='old', iostat=ios)
+  open(unit=1, file=sh_file(pop), status='old', iostat=ios)
   if (ios/=0) then
-     write(*,*) "ERROR : cannot open "//trim(sh_file)
+     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
      write(*,*) "Exiting"
      stop
   endif
-  write(*,*) "Reading specific heat capacity: "//trim(sh_file)
+  write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
 
   ! On elimine les lignes avec des commentaires
   status = 1
@@ -259,25 +301,15 @@ subroutine read_file_specific_heat
   enddo
   n_Temperatures = n_Temperatures - 1
 
-  allocate(file_sh_T(n_Temperatures), file_sh(n_Temperatures))
-
-  ! Lecture proprement dite
-  rewind(1)
-  ! On passe les commentaires
-  do k=1, n_comment
-     read(1,*)
-  enddo
-
-  ! Lecture specific heat capacity
-  do k=1,n_Temperatures
-     read(1,*) file_sh_T(k), fbuffer, file_sh(k)
-  enddo
+  file_sh_nT(pop) = n_Temperatures
 
   return
 
-end subroutine read_file_specific_heat
+end subroutine get_file_specific_heat_dim
+
 
 !******************************************************
+
 
 function file_specific_heat(T,taille_grain)
   ! return the specific heat capacity in [erg/K]
@@ -286,11 +318,13 @@ function file_specific_heat(T,taille_grain)
   real(kind=db), dimension(:), intent(in) :: T
   real(kind=db), dimension(size(T)) :: file_specific_heat
 
-  integer :: k
+  integer :: k, pop
+
+  pop =  grain(taille_grain)%pop
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     file_specific_heat(k) = interp(file_sh, file_sh_T, T(k)) * M_grain(taille_grain)  / 1.e7  ! todo : c'est des Joules l'unite non ?
+     file_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  ! todo : c'est des Joules l'unite non ?
   enddo
 
 end function file_specific_heat
