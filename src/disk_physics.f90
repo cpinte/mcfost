@@ -65,6 +65,13 @@ subroutine compute_othin_sublimation_radius()
      endif
   enddo
 
+  if (E_dust < tiny_real) then
+     write(*,*) "Sublimation radius : something is wrong"
+     write(*,*) "Opacity is not defined yet"
+     write(*,*) "Maybe the parameter file is old ?"
+     write(*,*) "Exiting"
+     stop
+  endif
   sublimation_radius = sqrt(E_etoile/E_dust)
 
 
