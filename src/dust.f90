@@ -409,8 +409,8 @@ subroutine init_indices_optiques()
         if (lfirst) then
            ! We allocate the arrays to save dimension the 1st time we enter this section
            if (.not.lread_opacity_file) then
-              allocate(op_file_na(n_pop), op_file_n_lambda(n_pop), file_sh_nT(n_pop))
-              op_file_na = 0 ; op_file_n_lambda = 0 ; file_sh_nT = 0
+              allocate(op_file_na(n_pop), op_file_n_lambda(n_pop), sh_file(n_pop), file_sh_nT(n_pop))
+              op_file_na = 0 ; op_file_n_lambda = 0 ; sh_file = ""; file_sh_nT = 0
            endif
            lread_opacity_file = .true.
         endif

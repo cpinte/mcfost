@@ -771,7 +771,7 @@ subroutine initialisation_mcfost()
      case("-force_PAH_equilibrium")
         lforce_PAH_equilibrium=.true.
         i_arg = i_arg+1
-     case("-force_out_PAH_equilibrium")
+     case("-force_PAH_out_equilibrium")
         lforce_PAH_out_equilibrium=.true.
         i_arg = i_arg+1
         if (lforce_PAH_equilibrium) then
