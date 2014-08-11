@@ -91,7 +91,7 @@ end subroutine get_opacity_file_dim
 
 subroutine alloc_mem_opacity_file()
 
-  integer :: alloc_status, n_lambda, na, nT
+  integer :: alloc_status, n_lambda, na, nT, pop
 
   na = maxval(op_file_na(:))
   n_lambda = maxval(op_file_n_lambda(:))
@@ -105,6 +105,10 @@ subroutine alloc_mem_opacity_file()
   endif
 
   if (lnRE) then
+     do pop = 1, n_pop
+        call get_file_specific_heat_dim(pop)
+     enddo
+
      nT = maxval(file_sh_nT(:))
      allocate(file_sh_T(nT,n_pop), file_sh(nT,n_pop))
      if (alloc_status > 0) then
@@ -220,7 +224,7 @@ subroutine misselt_load(file, pop)
   integer :: i,j,l, ibuffer
 
   open(unit=1,file=file)
-  read(1,*)  sh_file
+  read(1,*)  sh_file(pop)
   ! header
   do l=1, nh1
      read(1,*)
@@ -289,6 +293,88 @@ end subroutine get_misselt_dim
 
 !*************************************************************
 
+subroutine read_file_specific_heat(pop)
+
+  integer, intent(in) :: pop
+
+  integer :: ios, status, n_comment, k
+  real :: fbuffer
+
+  open(unit=1, file=sh_file(pop), status='old', iostat=ios)
+  if (ios/=0) then
+     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
+
+  ! On elimine les lignes avec des commentaires
+  status = 1
+  n_comment = 0
+  do while (status /= 0)
+     n_comment = n_comment + 1
+     read(1,*,iostat=status) fbuffer
+  enddo
+  n_comment = n_comment - 1
+
+  ! Lecture proprement dite
+  rewind(1)
+  ! On passe les commentaires
+  do k=1, n_comment
+     read(1,*)
+  enddo
+
+  ! Lecture specific heat capacity
+  do k=1,file_sh_nT(pop)
+     read(1,*) file_sh_T(k,pop), fbuffer, file_sh(k,pop)
+  enddo
+
+  return
+
+end subroutine read_file_specific_heat
+
+!******************************************************
+
+subroutine get_file_specific_heat_dim(pop)
+
+  integer, intent(in) :: pop
+
+  integer :: ios, status, n_comment, n_Temperatures, k
+  real :: fbuffer
+
+  open(unit=1, file=sh_file(pop), status='old', iostat=ios)
+  if (ios/=0) then
+     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
+
+  ! On elimine les lignes avec des commentaires
+  status = 1
+  n_comment = 0
+  do while (status /= 0)
+     n_comment = n_comment + 1
+     read(1,*,iostat=status) fbuffer
+  enddo
+  n_comment = n_comment - 1
+
+  ! On compte les lignes avec des donnees
+  status=0
+  n_Temperatures=1 ! On a deja lu une ligne en cherchant les commentaires
+  do while(status==0)
+     n_Temperatures=n_Temperatures+1
+     read(1,*,iostat=status)
+  enddo
+  n_Temperatures = n_Temperatures - 1
+
+  file_sh_nT(pop) = n_Temperatures
+
+  return
+
+end subroutine get_file_specific_heat_dim
+
+!*************************************************************
 
 subroutine read_molecules_names(imol)
 
