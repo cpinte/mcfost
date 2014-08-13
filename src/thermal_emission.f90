@@ -778,7 +778,7 @@ subroutine Temp_nRE(lconverged)
      ! Afi with final < inital
      A(:,:,:)=0.
      do T=2,n_T
-        A(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / (nu_bin(T)-nu_bin(T-1))
+        A(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / (nu_bin(T)-nu_bin(T-1)) ! OK, il manque un 1/h par rapport a Krugel p265
      enddo
 
      ! Pour KJ_absorbe
@@ -845,7 +845,8 @@ subroutine Temp_nRE(lconverged)
 
               ! Inversion rapide Energie en temperature
               ! On prend energie juste en dessus energie moyenne -> t_cool un peu trop court
-              search : do T=1, n_T
+              kTu = kb * tab_Temp(1)
+              search : do T=2, n_T
                  if (nu_bin(T) > mean_abs_nu) then
                     kTu = kb * tab_Temp(T)
                     exit search
@@ -853,17 +854,19 @@ subroutine Temp_nRE(lconverged)
               enddo search
 
               ! radiative cooling time at mean photon energy
-              t_cool = 0.0_db
-              integ : do T=1, n_cooling_time
-                 if (en(T) > mean_abs_E) exit integ
-                 if (en(T)/kTu < 500.) then
-                    t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+              t_cool = 0.0
+              if (T <= n_T) then
+                 integ : do T=1, n_cooling_time
+                    if (en(T) > mean_abs_E) exit integ
+                    if (en(T)/kTu < 500.) then
+                       t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+                    endif
+                 enddo integ
+                 if (t_cool > tiny_db) then
+                    t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
+                 else
+                    t_cool = huge_real
                  endif
-              enddo integ
-              if (t_cool > tiny_db) then
-                 t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
-              else
-                 t_cool = huge_real
               endif
 
               ! Calcul Temperature equilibre
