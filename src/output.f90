@@ -1444,6 +1444,95 @@ subroutine write_disk_struct()
   if (status > 0) then
      call print_error(status)
   end if
+
+  ! ********************************************************************************
+  filename = "data_disk/grain_sizes_min.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain_min,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
+  filename = "data_disk/grain_sizes_max.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain_max,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
   ! ********************************************************************************
   filename = "data_disk/grain_masses.fits.gz"
 

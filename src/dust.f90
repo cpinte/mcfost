@@ -26,7 +26,7 @@ subroutine taille_grains()
   implicit none
   integer :: k, i, j
   real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
-  real(kind=db) :: exp_grains
+  real(kind=db) :: exp_grains, sqrt_exp_grains
   real :: masse_pop
   real :: correct_fact_r, correct_fact_S, correct_fact_M
 
@@ -146,14 +146,18 @@ subroutine taille_grains()
            ! Taille des grains (recursif)
            masse_pop = nbre_grains(dp%ind_debut)
            exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
+           sqrt_exp_grains = sqrt(exp_grains)
            do  k=dp%ind_debut, dp%ind_fin
               if (k==dp%ind_debut) then
-                 a = dp%amin*sqrt(exp_grains)
+                 a = dp%amin*sqrt_exp_grains
               else
                  a= r_grain(k-1) * exp_grains
               endif
 
               r_grain(k) = a ! micron
+              r_grain_min(k) = a/sqrt_exp_grains ! taille min
+              r_grain_max(k) = a*sqrt_exp_grains ! taille max
+
               S_grain(k) = pi * a**2 ! micron^2
               M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
 
