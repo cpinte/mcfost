@@ -153,7 +153,7 @@ real(kind=sl) function interp_sp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
+! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -172,10 +172,21 @@ real(kind=sl) function interp_sp(y, x, xp)
   !   write(*,*) "Error in interp : y and x must have same dim"
   !endif
 
-
   ! PAS D'EXTRAPOLATION
-  if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_sp = minval(y)
+  if (xp < minval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_sp = y(1)
+     else
+        interp_sp = y(n)
+     endif
+     return
+  endif
+  if (xp > maxval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_sp = y(n)
+     else
+        interp_sp = y(1)
+     endif
      return
   endif
 
@@ -204,7 +215,7 @@ real(kind=db) function interp_dp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
+! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -225,8 +236,20 @@ real(kind=db) function interp_dp(y, x, xp)
 
 
   ! PAS D'EXTRAPOLATION
-  if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_dp = minval(y)
+  if (xp < minval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_dp = y(1)
+     else
+        interp_dp = y(n)
+     endif
+     return
+  endif
+  if (xp > maxval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_dp = y(n)
+     else
+        interp_dp = y(1)
+     endif
      return
   endif
 
@@ -250,7 +273,6 @@ real(kind=db) function interp_dp(y, x, xp)
 end function interp_dp
 
 !**********************************************************************
-
 
 subroutine GaussSlv(a, b, n)
   ! Resolution d'un systeme d'equation par methode de Gauss
