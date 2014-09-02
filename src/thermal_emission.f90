@@ -803,11 +803,11 @@ subroutine Temp_nRE(lconverged)
 
      !$omp parallel &
      !$omp default(none) &
-     !$omp private(i,j,KJ_absorbe, lambda, T, T2) &
+     !$omp private(i,j,KJ_absorbe, lambda, wl, T, T2) &
      !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
      !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
-     !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T) &
+     !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(log_tab_nu, tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss)
@@ -832,6 +832,20 @@ subroutine Temp_nRE(lconverged)
               Jabs(:,id) =  Jabs(:,id)*n_phot_L_tot * (1.0/volume(i))
               KJ_absorbe = KJ_absorbe*n_phot_L_tot * (1.0/volume(i))
               KJ_absorbe_nRE(:,id) = KJ_absorbe_nRE(:,id)*n_phot_L_tot * (1.0/volume(i))
+
+
+              ! ADDING TRUST Radiation field
+              KJ_absorbe = 0.0
+              do lambda=1, n_lambda
+                 wl = tab_lambda(lambda)*1e-6
+                 !write(*,*) lambda, tab_lambda(lambda), Jabs(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+
+                 Jabs(lambda,id) = (Blambda_db(wl,etoile(1)%T) + Blambda_db(wl,3.) * 1e17* 0.)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                 !write(*,*) lambda, tab_lambda(lambda), Jabs(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                 KJ_absorbe = KJ_absorbe + q_abs(lambda,l) * Jabs(lambda,id)
+                 KJ_absorbe_nRE(lambda,id) =   q_abs_o_dnu(lambda)  * Jabs(lambda,id)
+              enddo
+              ! END ADDING TRUST Radiation field
 
               ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
 
@@ -923,6 +937,8 @@ subroutine Temp_nRE(lconverged)
                     do T2=1,T-1
                        ! Tres largement plus stable en interpolation lineaire que log !!!
                        ! Ca fait n'importe quoi en log en cas de flux faible
+                       !KJ_abs_interp = exp(interp(log(KJ_absorbe_nRE(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
+                       !A(T,T2,id) = 0.5 * KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
                        KJ_abs_interp = interp(KJ_absorbe_nRE(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
                        A(T,T2,id) = KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
                     end do
@@ -953,6 +969,7 @@ subroutine Temp_nRE(lconverged)
                  enddo
 
                  !! Normalisation
+                 X(1,id) = X(2,id)
                  X(:,id)=X(:,id)/sum(X(:,id))
 
                  do T=1, n_T ! boucle car passage tableau double -> simple bug avec ifort
@@ -1071,6 +1088,7 @@ subroutine Temp_nRE(lconverged)
      enddo !i
   enddo ! l
   !! FIN TEST
+  lconverged=.true.
 
   return
 
