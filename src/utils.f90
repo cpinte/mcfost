@@ -484,6 +484,34 @@ function Blambda(wl,T)
 
 end function Blambda
 
+
+function Blambda_db(wl,T)
+! Loi de Planck
+! Blambda en SI : W.m-2.s-1.sr-1
+! wl en m
+! C. Pinte
+! 23/05/09
+
+  implicit none
+
+  real(kind=db) ,intent(in) :: wl
+  real, intent(in) :: T
+  real(kind=db) :: Blambda_db
+
+  real(kind=db) :: hnu_kT
+
+  hnu_kT = (hp * c_light)/ (kb * T * wl)
+
+  if (hnu_kT > 700.) then
+     Blambda_db = 0.0_db
+  else
+     Blambda_db = 2.0_db*hp*c_light**2 / wl**5 / (exp(hnu_kT)-1.0_db)
+  endif
+
+  return
+
+end function Blambda_db
+
 !******************************************************
 
 function get_NH(NC)
