@@ -722,9 +722,9 @@ subroutine Temp_nRE(lconverged)
 
   real(kind=db), dimension(n_lambda) :: log_tab_nu, q_abs_o_dnu, tab_nu
 
-  real(kind=db), dimension(:,:), allocatable :: KJ_absorbe_nRE, log_KJ_absorbe, Jabs
+  real(kind=db), dimension(:,:), allocatable :: kJnu, lambda_Jlambda
 
-  real(kind=db) :: delta_T, KJ_abs_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, KJ_absorbe
+  real(kind=db) :: delta_T, kJnu_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
   integer :: l, i, j, k, T, T1, T2, lambda, alloc_status, id, T_int
 
@@ -750,12 +750,12 @@ subroutine Temp_nRE(lconverged)
   endif
   A=0.0 ; B=0.0 ;
 
-  allocate(KJ_absorbe_nRE(n_lambda,nb_proc), log_KJ_absorbe(n_lambda,nb_proc), Jabs(n_lambda,nb_proc), stat=alloc_status)
+  allocate(kJnu(n_lambda,nb_proc), lambda_Jlambda(n_lambda,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error A'
      stop
   endif
-  KJ_absorbe_nRE = 0.0 ; log_KJ_absorbe = 0.0 ; Jabs=0.0
+  kJnu = 0.0 ;  lambda_Jlambda=0.0
 
   delta_T=exp((1.0_db/(real(n_T,kind=db)))*log(T_max/T_min))
   T_lim(0) = T_min
@@ -779,12 +779,18 @@ subroutine Temp_nRE(lconverged)
      A(:,:,:)=0.
      do T=2,n_T
         A(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / (nu_bin(T)-nu_bin(T-1)) ! OK, il manque un 1/h par rapport a Krugel p265
+
+        !if (tab_Temp(T) < 10.)  A(T-1,T,:) =  A(T-1,T,:) * 1e5
      enddo
 
-     ! Pour KJ_absorbe
+
+
+     ! Pour kJnu
      do lambda=1, n_lambda
-        ! q_abs / dnu  : dnu = c wl^2 / dwl
-        q_abs_o_dnu(lambda) = q_abs(lambda,l)  / tab_delta_lambda(lambda) * (tab_lambda(lambda))**2/c_light * 1.0e-6
+        ! q_abs / dnu  : dnu = c dwl/wl^2    1/dnu = wl^2/(c.dwl)
+        q_abs_o_dnu(lambda) = q_abs(lambda,l) *  tab_lambda(lambda)**2 / (c_light*tab_delta_lambda(lambda)) * 1.0e-6
+!q_abs_o_dnu(lambda) = q_abs(lambda,l) *  tab_lambda(lambda) / (c_light*tab_delta_lambda(lambda)) * 1.0e-6
+        !q_abs_o_dnu(lambda) = q_abs(lambda,l)  * (tab_lambda(lambda))/c_light * 1.0e-6
      enddo
 
      ! Pour cooling time
@@ -803,10 +809,10 @@ subroutine Temp_nRE(lconverged)
 
      !$omp parallel &
      !$omp default(none) &
-     !$omp private(i,j,KJ_absorbe, lambda, wl, T, T2) &
-     !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
+     !$omp private(i,j,Int_k_lambda_Jlambda, lambda, wl, T, T2) &
+     !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
-     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
+     !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(log_tab_nu, tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max) &
@@ -821,40 +827,40 @@ subroutine Temp_nRE(lconverged)
 
            if (densite_pouss(i,j,1,l) > tiny_db) then
               ! Champ de radiation
-              KJ_absorbe=0.0
+              Int_k_lambda_Jlambda=0.0
               do lambda=1, n_lambda
                  ! conversion lambda et delta_lambda de micron -> m
-                 Jabs(lambda,id) = (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1))
-                 KJ_absorbe = KJ_absorbe + q_abs(lambda,l) * Jabs(lambda,id)
-                 KJ_absorbe_nRE(lambda,id) =   q_abs_o_dnu(lambda)  * Jabs(lambda,id)
+                 lambda_Jlambda(lambda,id) = (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1))
+                 Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
+                 kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
               enddo ! lambda
 
-              Jabs(:,id) =  Jabs(:,id)*n_phot_L_tot * (1.0/volume(i))
-              KJ_absorbe = KJ_absorbe*n_phot_L_tot * (1.0/volume(i))
-              KJ_absorbe_nRE(:,id) = KJ_absorbe_nRE(:,id)*n_phot_L_tot * (1.0/volume(i))
+              lambda_Jlambda(:,id) =  lambda_Jlambda(:,id)*n_phot_L_tot * (1.0/volume(i))
+              Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*n_phot_L_tot * (1.0/volume(i))
+              kJnu(:,id) = kJnu(:,id)*n_phot_L_tot * (1.0/volume(i))
 
 
               ! ADDING TRUST Radiation field
-              KJ_absorbe = 0.0
+              Int_k_lambda_Jlambda = 0.0
               do lambda=1, n_lambda
                  wl = tab_lambda(lambda)*1e-6
-                 !write(*,*) lambda, tab_lambda(lambda), Jabs(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                 !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
 
-                 Jabs(lambda,id) = (Blambda_db(wl,etoile(1)%T) + Blambda_db(wl,3.) * 1e17* 0.)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
-                 !write(*,*) lambda, tab_lambda(lambda), Jabs(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
-                 KJ_absorbe = KJ_absorbe + q_abs(lambda,l) * Jabs(lambda,id)
-                 KJ_absorbe_nRE(lambda,id) =   q_abs_o_dnu(lambda)  * Jabs(lambda,id)
+                 lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                 !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                 Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
+                 kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
               enddo
               ! END ADDING TRUST Radiation field
 
               ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
 
               ! time interval for photon absorption
-              t_abs = sum(q_abs(:,l)*Jabs(:,id)*tab_lambda(:)) * 1.0e-6/c_light
+              t_abs = sum(q_abs(:,l)*lambda_Jlambda(:,id)*tab_lambda(:)) * 1.0e-6/c_light
               t_abs = hp/(4.*pi*t_abs)
 
               ! mean absorbed photon energy
-              mean_abs_E = t_abs * 4*pi * KJ_absorbe ! D01 eq 46
+              mean_abs_E = t_abs * 4*pi * Int_k_lambda_Jlambda ! D01 eq 46
               mean_abs_nu = mean_abs_E/hp
 
               ! Inversion rapide Energie en temperature
@@ -885,10 +891,10 @@ subroutine Temp_nRE(lconverged)
 
               ! Calcul Temperature equilibre
               l_RE(i,j,l) = .true.
-              if (KJ_absorbe < tiny_real) then
+              if (Int_k_lambda_Jlambda < tiny_real) then
                  Temperature_1grain_nRE(i,j,l) = T_min
               else
-                 log_frac_E_abs=log(KJ_absorbe)
+                 log_frac_E_abs=log(Int_k_lambda_Jlambda)
 
                  if (log_frac_E_abs <  log_frac_E_em_1grain_nRE(l,1)) then
                     Temperature_1grain_nRE(i,j,l) = T_min
@@ -927,27 +933,30 @@ subroutine Temp_nRE(lconverged)
                  t_cool = 0.0 ; t_abs = 1.0
               endif
 
+              !t_cool = 0.0
+
               if (t_cool < t_abs) then !  calcul proba temperature
                  l_RE(i,j,l) = .false.
-                 log_KJ_absorbe(:,id) = log(KJ_absorbe_nRE(:,id)+tiny_db)
-
                  ! heating terms : select lower triangle
                  ! Afi with with f > i
                  do T=1,n_T
                     do T2=1,T-1
                        ! Tres largement plus stable en interpolation lineaire que log !!!
                        ! Ca fait n'importe quoi en log en cas de flux faible
-                       !KJ_abs_interp = exp(interp(log(KJ_absorbe_nRE(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
+                       !KJ_abs_interp = exp(interp(log(kJnu(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
                        !A(T,T2,id) = 0.5 * KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
-                       KJ_abs_interp = interp(KJ_absorbe_nRE(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
-                       A(T,T2,id) = KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
+                       kJnu_interp = interp(kJnu(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
+                       A(T,T2,id) = kJnu_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
+
+                       !if (tab_Temp(T) > 500.) A(T,T2,id) =  A(T,T2,id)! / 10
+
                     end do
                  end do
 
                  !! diagonal terms
-                 do T=1,n_T
-                    A(T,T,id) = -sum(A(T,:,id)) ! sum along k direction (diag. should be zero initially)
-                 enddo
+                 !do T=1,n_T
+                 !   A(T,T,id) = -sum(A(T,:,id)) ! sum along k direction (diag. should be zero initially)
+                 !enddo
 
                  !! compute probabilities P(T) using iterative formulation of GD89
 
@@ -966,7 +975,20 @@ subroutine Temp_nRE(lconverged)
                     if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
                     if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
                     X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db)
+                    if (A(T-1, T,id) < tiny_db) then
+                       write(*,*) l, T, id, "normaliztaion error"
+                       stop
+                    endif
+
                  enddo
+
+
+                 !X(1,id) = 1.e-250_db
+                 !do T=2, n_T
+                 !   if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
+                 !   if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
+                 !   X(T,id) =  abs(sum(A(1:T-1,T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db))
+                 !enddo
 
                  !! Normalisation
                  X(1,id) = X(2,id)
