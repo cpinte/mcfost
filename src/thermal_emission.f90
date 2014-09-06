@@ -812,7 +812,7 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss)
 
-     id =1 ! pour code sequentiel
+     id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
      do i=n_rad, 1, -1
@@ -937,9 +937,11 @@ subroutine Temp_nRE(lconverged)
 
                  !! compute B array
                  B(:,:,id) = 0.
-                 B(n_T,:,id) = A(n_T,:,id)
+                 B(n_T,1:n_T-1,id) = A(n_T,1:n_T-1,id)
                  do T=n_T-1,1,-1
-                    B(T,:,id) = A(T,:,id) + B(T+1,:,id)
+                    do T2=1,T-1
+                       B(T,T2,id) = A(T,T2,id) + B(T+1,T2,id)
+                    enddo
                  enddo
 
                  !! compute P array
@@ -1033,38 +1035,41 @@ subroutine Temp_nRE(lconverged)
 
 
   !! TEST
-!!$  l=grain_nRE_start ! TEST pour 1 taille de grains
-!!$  do i=1, n_rad
-!!$     do j=1, nz
-!!$        somme1=0.0
-!!$        somme2=0.0
-!!$        !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
-!!$        do lambda=1, n_lambda
-!!$           somme1 =   somme1 + q_abs(lambda,l)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1) )
-!!$           wl = tab_lambda(lambda)*1.0e-6
-!!$           delta_wl = tab_delta_lambda(lambda)*1.0e-6
-!!$           if (l_RE(i,j,l)) then
-!!$              Temp = Temperature_1grain_nRE(i,j,l)
-!!$              cst_wl=cst_th/(Temp*wl)
-!!$              if (cst_wl < 500.) then
-!!$                 somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-!!$              endif
-!!$           else
-!!$              do T=1, n_T
-!!$                 Temp = tab_Temp(T)
-!!$                 cst_wl=cst_th/(Temp*wl)
-!!$                 if (cst_wl < 500.) then
-!!$                    somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * Proba_Temperature(T,i,j,l)
-!!$                 endif !cst_wl
-!!$              enddo
-!!$           endif
-!!$        enddo ! lambda
-!!$        somme1=somme1 *n_phot_L_tot/volume(i)
-!!$        somme2=somme2*2.0*hp*c_light**2
-!!$        write(*,*) i,j,l_RE(i,j,l),  real(somme1/somme2)
-!!$       ! read(*,*)
-!!$     enddo !j
-!!$  enddo !i
+  do l=grain_nRE_start,grain_nRE_end ! TEST pour 1 taille de grains
+     do i=1, n_rad
+        do j=1, nz
+           somme1=0.0
+           somme2=0.0
+           !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
+           do lambda=1, n_lambda
+              somme1 =   somme1 + q_abs(lambda,l)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1) )
+              wl = tab_lambda(lambda)*1.0e-6
+              delta_wl = tab_delta_lambda(lambda)*1.0e-6
+              if (l_RE(i,j,l)) then
+                 Temp = Temperature_1grain_nRE(i,j,l)
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.) then
+                    somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                 endif
+              else
+                 do T=1, n_T
+                    Temp = tab_Temp(T)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < 500.) then
+                       somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * Proba_Temperature(T,i,j,l)
+                    endif !cst_wl
+                 enddo
+              endif
+           enddo ! lambda
+           somme1=somme1 *n_phot_L_tot/volume(i)
+           somme2=somme2*2.0*hp*c_light**2
+           write(*,*) i,j,l,l_RE(i,j,l),  real(somme1/somme2)
+
+           Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+           ! read(*,*)
+        enddo !j
+     enddo !i
+  enddo ! l
   !! FIN TEST
 
   return
