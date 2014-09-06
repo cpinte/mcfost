@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.11"
+  character(8), parameter :: mcfost_release = "2.19.12"
   real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -318,7 +318,7 @@ module prop_star
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile
-  real, dimension(:,:), allocatable :: prob_E_star
+  real, dimension(:,:), allocatable :: CDF_E_star, prob_E_star
 
   real, dimension(:), allocatable :: E_stars !n_lambda
 
@@ -903,8 +903,8 @@ module ray_tracing
   ! TODO : calculer automatiquement en fct de la fct de phase + interpolation
   integer :: nang_ray_tracing, nang_ray_tracing_star
 
-  real, dimension(:,:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! n_lambda, n_rad, nz, nang_scatt
-  real, dimension(:,:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! n_lambda, n_rad, nz, nang_scatt
+  real, dimension(:,:,:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! n_lambda, n_rad, nz, n_az, nang_scatt
+  real, dimension(:,:,:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! n_lambda, n_rad, nz, n_az, nang_scatt
 
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
@@ -912,10 +912,10 @@ module ray_tracing
   real, dimension(0:nang_scatt) :: tab_cos_scatt
 
   ! intensite specifique
-  real, dimension(:,:), allocatable :: J_th ! n_rad, nz
+  real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
   ! methode RT 1
-  integer, parameter :: n_az_rt = 45
+  integer :: n_az_rt
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, n_rad, nz, n_az_rt, 2, ncpus
   real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! n_rad, nz, n_az_rt, 2, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
@@ -933,6 +933,7 @@ module ray_tracing
   real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! 4, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_ibin, n_type_flux, ncpus
+  real, dimension(:,:), allocatable :: stars_map
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
 

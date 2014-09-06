@@ -2,6 +2,9 @@
 ! large g
 ! optimization memoire (ie, dimension 1 de eps_dust1)
 
+! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode pour SED --> pour 3D
+! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode pour image 2D
+
 module dust_ray_tracing
 
   use parametres
@@ -29,8 +32,13 @@ subroutine alloc_ray_tracing()
   integer :: alloc_status
   real :: mem_size
 
-  ! 15 15 90 90 OK pour benchmark
+  if (l3D) then
+     n_az_rt = n_az
+  else
+     n_az_rt = 45
+  endif
 
+  ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
   n_theta_I = 15 ;
   nang_ray_tracing = 15 ;
@@ -42,7 +50,11 @@ subroutine alloc_ray_tracing()
      nang_ray_tracing = 1 ;
   endif
 
-  allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),stat=alloc_status)
+  if (l3D) then
+     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
+  else
+     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
      stop
@@ -51,13 +63,23 @@ subroutine alloc_ray_tracing()
   tab_s11_ray_tracing = 0.
 
   if (lsepar_pola) then
-     allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),  &
-          tab_s33_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),&
-          tab_s34_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),&
-          tab_s12_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt),  &
-          tab_s33_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt), &
-          tab_s34_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,0:nang_scatt), &
-          stat=alloc_status)
+     if (l3D) then
+        allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),  &
+             tab_s33_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),&
+             tab_s34_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),&
+             tab_s12_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),  &
+             tab_s33_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt), &
+             tab_s34_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt), &
+             stat=alloc_status)
+     else
+        allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),  &
+             tab_s33_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),&
+             tab_s34_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),&
+             tab_s12_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),  &
+             tab_s33_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), &
+             tab_s34_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), &
+             stat=alloc_status)
+     endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s12_ray_tracing'
         stop
@@ -70,18 +92,23 @@ subroutine alloc_ray_tracing()
      tab_s34_o_s11_ray_tracing = 0.
   endif
 
+  ! datacube images
   if (lsed.and.(RT_sed_method == 1)) then
-      allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_ibin,N_type_flux,nb_proc), stat=alloc_status)
+      allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_ibin,N_type_flux,nb_proc), stars_map(1,1), stat=alloc_status)
   else
-     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_ibin,N_type_flux,nb_proc), stat=alloc_status)
+     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_ibin,N_type_flux,nb_proc), stars_map(igridx,igridy), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Stokes_ray_tracing'
      stop
   endif
-  Stokes_ray_tracing = 0.0_db
+  Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
-  allocate(J_th(n_rad,nz), stat=alloc_status)
+  if (l3D) then
+     allocate(J_th(n_rad,-nz:nz,n_az), stat=alloc_status)
+  else
+     allocate(J_th(n_rad,nz,1), stat=alloc_status)
+  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
      stop
@@ -89,19 +116,27 @@ subroutine alloc_ray_tracing()
   J_th = 0.0_db
 
   if (lscatt_ray_tracing1) then
-     allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
-
-     mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     if (l3D) then
+        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,-nz:nz,n_az_rt,1,nb_proc), stat=alloc_status)
+        mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * 2 * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     else
+        allocate(xI_scatt(N_type_flux,RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+        mem_size = (1.0*N_type_flux + 2) * RT_n_ibin * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2
+     endif
      if (mem_size > 500) write(*,*) "Trying to allocate", mem_size, "MB for ray-tracing"
-
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xI_scatt'
         stop
      endif
      xI_scatt = 0.0_db
 
-     allocate(xsin_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), &
-          xN_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     if (l3D) then
+        allocate(xsin_scatt(RT_n_ibin,n_rad,-nz:nz,n_az_rt,1,nb_proc), &
+             xN_scatt(RT_n_ibin,n_rad,-nz:nz,n_az_rt,1,nb_proc), stat=alloc_status)
+     else
+        allocate(xsin_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), &
+             xN_scatt(RT_n_ibin,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+     endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xsin_scatt'
         stop
@@ -117,8 +152,11 @@ subroutine alloc_ray_tracing()
      endif
      I_scatt = 0.0_db
 
-
-     allocate(eps_dust1(N_type_flux,n_rad,nz,n_az_rt,0:1), stat=alloc_status)
+     if (l3D) then
+        allocate(eps_dust1(N_type_flux,n_rad,-nz:nz,n_az_rt,0:1), stat=alloc_status)
+     else
+        allocate(eps_dust1(N_type_flux,n_rad,nz,n_az_rt,0:1), stat=alloc_status)
+     endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust1'
         stop
@@ -354,7 +392,7 @@ end subroutine angles_scatt_ray_tracing
 
 !***********************************************************
 
-subroutine angle_scatt_rt(id,u,v,w)
+subroutine angle_scatt_rt1(id,u,v,w)
   ! Calcul le (ou les) angle(s) de diffusion pour le RT1
   ! dans une direction de diffusion a 1 position
   ! lance 1 seule pour unr direction de paquet
@@ -380,7 +418,6 @@ subroutine angle_scatt_rt(id,u,v,w)
      k = nint(acos(cos_scatt) * real(nang_scatt)/pi) ! TODO : + 1 pour test
      if (k > nang_scatt) k = nang_scatt
      if (k < 1) k = 1
-
      itheta_rt1(ibin,id) = k
      sin_scatt_rt1(ibin,id) = sqrt(1.0 - cos_scatt**2)
 
@@ -420,11 +457,11 @@ subroutine angle_scatt_rt(id,u,v,w)
 
   return
 
-end subroutine angle_scatt_rt
+end subroutine angle_scatt_rt1
 
 !***********************************************************
 
-subroutine calc_xI_scatt(id,lambda,ri,zj,phi_k,psup,l,stokes,flag_star)
+subroutine calc_xI_scatt(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   ! RT1
   ! Calcul les matrices de Mueller pour une direction de diffusion
   ! lance dans chaque cellule traversee
@@ -442,33 +479,35 @@ subroutine calc_xI_scatt(id,lambda,ri,zj,phi_k,psup,l,stokes,flag_star)
 
   real(kind=db), intent(in) :: Stokes, l
   logical, intent(in) :: flag_star
-  integer, intent(in) :: id, lambda, ri, zj, phi_k, psup
+  integer, intent(in) :: id, lambda, ri, zj, phik, psup
 
   real(kind=db) :: flux
-  integer :: ibin, it, p_ri, p_zj
+  integer :: ibin, it, p_ri, p_zj, p_phik
 
   if (lstrat) then
      p_ri = ri
      p_zj = zj
+     p_phik = phik
   else
      p_ri = 1
      p_zj = 1
+     p_phik = 1
   endif
 
   do ibin = 1, RT_n_ibin
      it = itheta_rt1(ibin,id)
-     flux = l * stokes * tab_s11_ray_tracing(lambda,p_ri,p_zj,it) !* sin_scatt_rt1(ibin,id)
+     flux = l * stokes * tab_s11_ray_tracing(lambda,p_ri,p_zj,p_phik,it) !* sin_scatt_rt1(ibin,id)
      ! TODO : est-ce qu'il ne faut pas moyenner par le sin de l'angle de scatt dans la cellule azimuthale ???
 
-     xI_scatt(1,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(1,ibin,ri,zj,phi_k,psup,id) + flux
-     xsin_scatt(ibin,ri,zj,phi_k,psup,id) =  xsin_scatt(ibin,ri,zj,phi_k,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
-     xN_scatt(ibin,ri,zj,phi_k,psup,id) =  xN_scatt(ibin,ri,zj,phi_k,psup,id) + 1.0_db
+     xI_scatt(1,ibin,ri,zj,phik,psup,id) =  xI_scatt(1,ibin,ri,zj,phik,psup,id) + flux
+     xsin_scatt(ibin,ri,zj,phik,psup,id) =  xsin_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
+     xN_scatt(ibin,ri,zj,phik,psup,id) =  xN_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db
 
      if (lsepar_contrib) then
         if (flag_star) then
-           xI_scatt(n_Stokes+2,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(n_Stokes+2,ibin,ri,zj,phi_k,psup,id) + flux
+           xI_scatt(n_Stokes+2,ibin,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+2,ibin,ri,zj,phik,psup,id) + flux
         else
-           xI_scatt(n_Stokes+4,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(n_Stokes+4,ibin,ri,zj,phi_k,psup,id) + flux
+           xI_scatt(n_Stokes+4,ibin,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+4,ibin,ri,zj,phik,psup,id) + flux
         endif
      endif
   enddo ! ibin
@@ -479,7 +518,7 @@ end subroutine calc_xI_scatt
 
 !***********************************************************
 
-subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phi_k,psup,l,stokes)
+subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   ! RT1
   ! Calcul les matrices de Mueller pour une direction de diffusion
   ! lance dans chaque cellule traversee
@@ -487,17 +526,21 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phi_k,psup,l,stokes)
   ! C. Pinte
   ! 13/09/09, version intiale  19/01/08
 
+  ! TODO : a mettre a jour pour RT 3D !
+
   implicit none
 
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: l
-  integer, intent(in) :: id, lambda, ri, zj, phi_k, psup
+  logical, intent(in) :: flag_star
+  integer, intent(in) :: id, lambda, ri, zj, phik, psup
 
-  real(kind=db), dimension(4) :: C, D
+  real(kind=db), dimension(4) :: C, D, S
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
-  real(kind=db) :: cosw, sinw
+  real(kind=db) :: cosw, sinw, flux
   real :: s11, s12, s33, s34
-  integer :: ibin, it
+  integer :: ibin, it, p_ri, p_zj, p_phik
+
 
   ROP = 0.0_db
   RPO = 0.0_db
@@ -508,14 +551,24 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phi_k,psup,l,stokes)
 
   M = 0.0_db
 
+  if (lstrat) then
+     p_ri = ri
+     p_zj = zj
+     p_phik = phik
+  else
+     p_ri = 1
+     p_zj = 1
+     p_phik = 1
+  endif
+
   do ibin = 1, RT_n_ibin
      ! Matrice de Mueller
      it = itheta_rt1(ibin,id)
 
-     s11 = tab_s11_ray_tracing(lambda,ri,zj,it)
-     s12 = tab_s12_ray_tracing(lambda,ri,zj,it)
-     s33 = tab_s33_ray_tracing(lambda,ri,zj,it)
-     s34 = tab_s34_ray_tracing(lambda,ri,zj,it)
+     s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s12 = tab_s12_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s33 = tab_s33_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
+     s34 = tab_s34_ray_tracing(lambda,p_ri,p_zj,p_phik,it)
 
      M(1,1) = s11 ; M(2,2) = s11 ; M(1,2) = s12 ; M(2,1) = s12
      M(3,3) = s33 ; M(4,4) = s33 ; M(3,4) = -s34 ; M(4,3) = s34
@@ -524,9 +577,9 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phi_k,psup,l,stokes)
      cosw = cos_omega_rt1(ibin,id)
      sinw = sin_omega_rt1(ibin,id)
 
-     RPO(2,2) = cosw
+     RPO(2,2) = -cosw
      ROP(2,2) = cosw
-     RPO(2,3) = sinw
+     RPO(2,3) = -sinw
      ROP(2,3) = -1.0_db * sinw
      RPO(3,2) = -1.0_db * sinw
      ROP(3,2) = sinw
@@ -544,17 +597,29 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phi_k,psup,l,stokes)
      D(3:4)=matmul(M(3:4,3:4),C(3:4))
 
      ! 2nde rotation
-     xI_scatt(2:3,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(2:3,ibin,ri,zj,phi_k,psup,id) + l * matmul(RPO(2:3,2:3),D(2:3))
-     xI_scatt(1,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(1,ibin,ri,zj,phi_k,psup,id) + l * D(1)
-     xI_scatt(4,ibin,ri,zj,phi_k,psup,id) =  xI_scatt(4,ibin,ri,zj,phi_k,psup,id) + l * D(4)
-  enddo ! ibin
+     S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
+     S(1)=D(1)
+     S(4)=D(4)
 
-  ! TODO :
+     xI_scatt(1:4,ibin,ri,zj,phik,psup,id) =  xI_scatt(1:4,ibin,ri,zj,phik,psup,id) + l * S(:)
+     xsin_scatt(ibin,ri,zj,phik,psup,id) =  xsin_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
+     xN_scatt(ibin,ri,zj,phik,psup,id) =  xN_scatt(ibin,ri,zj,phik,psup,id) + 1.0_db
+
+     if (lsepar_contrib) then
+        flux = l * S(1)
+        if (flag_star) then
+           !n_Stokes+2 = 6
+           xI_scatt(6,ibin,ri,zj,phik,psup,id) =  xI_scatt(6,ibin,ri,zj,phik,psup,id) + flux
+        else
+           !n_Stokes+4 = 8
+           xI_scatt(8,ibin,ri,zj,phik,psup,id) =  xI_scatt(8,ibin,ri,zj,phik,psup,id) + flux
+        endif
+     endif
+  enddo ! ibin
 
   return
 
 end subroutine calc_xI_scatt_pola
-
 
 !***********************************************************
 
@@ -568,6 +633,7 @@ subroutine init_dust_source_fct1(lambda,ibin)
   integer :: i,j, alloc_status, l, k, itype
   real(kind=db) :: facteur, energie_photon, Temp, cst_wl, wl, cst, coeff_exp, cst_E, n_photons_envoyes
   real(kind=db), dimension(n_az_rt,0:1) :: norme
+  real(kind=db) :: norme_3D
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
 
@@ -598,28 +664,63 @@ subroutine init_dust_source_fct1(lambda,ibin)
   endif
 
   ! Intensite specifique diffusion
-  do i=1,n_rad
-     facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
-     do j=1,nz
-        if (kappa(lambda,i,j,1) > tiny_db) then
-           ! TODO : pb de pola
-           do itype=1,N_type_flux
-              norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3),tiny_db)
-              I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
-           enddo ! itype
+  if (l3D) then
 
-           eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j) ) / kappa(lambda,i,j,1)
-           if (lsepar_contrib) then
-              eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1)
-              eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j) / kappa(lambda,i,j,1)
-              eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1)
-           endif ! lsepar_contrib
-        else
-           eps_dust1(:,i,j,:,:) = 0.0_db
-        endif ! kappa > 0
-     enddo ! j
-  enddo !i
+     do i=1,n_rad
+        facteur = energie_photon / volume(i)
+        bz_3D : do j=j_start,nz
+           if (j==0) cycle bz_3D
+           do k=1, n_az
+              if (kappa(lambda,i,j,k) > tiny_db) then
+                 ! TODO : pb de pola
+                 do itype=1,N_type_flux
+                    norme_3D = sum(xN_scatt(ibin,i,j,k,1,:)) / max(sum(xsin_scatt(ibin,i,j,k,1,:)),tiny_db)
+                    I_scatt(itype,k,:) = sum(xI_scatt(itype,ibin,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(lambda,i,j,k)
+                 enddo ! itype
 
+                 eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(lambda,i,j,k)
+
+                 if (lsepar_pola) then
+                    eps_dust1(2:4,i,j,k,:) =  I_scatt(2:4,k,:) / kappa(lambda,i,j,k)
+                 endif
+
+                 if (lsepar_contrib) then
+                    eps_dust1(n_Stokes+2,i,j,k,:) =    I_scatt(n_Stokes+2,k,:) / kappa(lambda,i,j,k)
+                    eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(i,j,k) / kappa(lambda,i,j,k)
+                    eps_dust1(n_Stokes+4,i,j,k,:) =    I_scatt(n_Stokes+4,k,:) / kappa(lambda,i,j,k)
+                 endif ! lsepar_contrib
+              else
+                 eps_dust1(:,i,j,k,:) = 0.0_db
+              endif ! kappa > 0
+           enddo
+        enddo bz_3D ! j
+     enddo !i
+
+  else ! .not.l3D
+
+     do i=1,n_rad
+        facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
+        bz : do j=1,nz
+           if (kappa(lambda,i,j,1) > tiny_db) then
+              ! TODO : pb de pola
+              do itype=1,N_type_flux
+                 norme = sum(xN_scatt(ibin,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,i,j,:,:,:),dim=3),tiny_db)
+                 I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
+              enddo ! itype
+
+              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
+              if (lsepar_contrib) then
+                 eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1)
+                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j,1) / kappa(lambda,i,j,1)
+                 eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1)
+              endif ! lsepar_contrib
+           else
+              eps_dust1(:,i,j,:,:) = 0.0_db
+           endif ! kappa > 0
+        enddo bz  ! j
+     enddo !i
+
+  endif ! l3D
 
 !  write(*,*) maxval(eps_dust1(1,:,:,:,:)), maxval(eps_dust1(2,:,:,:,:)), maxval(eps_dust1(3,:,:,:,:)), maxval(eps_dust1(4,:,:,:,:)), maxval(eps_dust1(5,:,:,:,:))
 
@@ -644,11 +745,13 @@ end subroutine init_dust_source_fct1
 subroutine init_dust_source_fct2(lambda,ibin)
   ! RT2
   ! calcule la fct source pour integrer par ray-tracing
+  ! Cette version ne marche qu'en 2D
   ! C. Pinte
   ! 25/09/08
 
+
   integer, intent(in) :: lambda, ibin
-  integer :: i,j, iscatt, dir
+  integer :: i,j,k, iscatt, dir
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
@@ -673,7 +776,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
            ! Boucle sur les directions de ray-tracing
            do dir=0,1
               do iscatt = 1, nang_ray_tracing
-                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j) ) / kappa(lambda,i,j,1)
+                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
 
                  if (lsepar_pola) then
                     eps_dust2(2:4,iscatt,dir,i,j) =  sum(I_sca2(2:4,iscatt,dir,i,j,:),dim=2)  / kappa(lambda,i,j,1)
@@ -681,7 +784,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
                  if (lsepar_contrib) then
                     eps_dust2(n_Stokes+2,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+2,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
-                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j) / kappa(lambda,i,j,1)
+                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j,1) / kappa(lambda,i,j,1)
                     eps_dust2(n_Stokes+4,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+4,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
                  endif ! lsepar_contrib
               enddo ! iscatt
@@ -711,75 +814,84 @@ subroutine calc_Ith(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: i, j, l, T
+  integer :: i,j,k, l, T
   real(kind=db) ::  Temp, cst_wl, wl, coeff_exp, cst_E
 
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
-  J_th(:,:) = 0.0
+  J_th(:,:,:) = 0.0
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
      if (lRE_LTE) then
         cst_E=2.0*hp*c_light**2
         do i=1,n_rad
-           do j=1,nz
-              Temp=Temperature(i,j,1) ! que LTE pour le moment
-              cst_wl=cst_th/(Temp*wl)
-              if (cst_wl < 500.0) then
-                 coeff_exp=exp(cst_wl)
-                 J_th(i,j) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(lambda,i,j,1) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
-              else
-                 J_th(i,j) = 0.0_db
-              endif
-           enddo
-        enddo
+           bz : do j=j_start,nz
+              if (j==0) cycle bz
+              do k=1, n_az
+                 Temp=Temperature(i,j,k) ! que LTE pour le moment
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.0) then
+                    coeff_exp=exp(cst_wl)
+                    J_th(i,j,k) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(lambda,i,j,k) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
+                 else
+                    J_th(i,j,k) = 0.0_db
+                 endif
+              enddo ! k
+           enddo bz ! j
+        enddo ! i
      endif !lRE_LTE
 
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
         do i=1,n_rad
-           do j=1,nz
-              do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-                 Temp=Temperature_1grain(i,j,l)
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < 500.0) then
-                    coeff_exp=exp(cst_wl)
-                    J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         q_abs(lambda,l)*densite_pouss(i,j,1,l)
-                 endif
+           bz2 : do j=1,nz
+              if (j==0) cycle bz2
+              do k=1, n_az
+                 do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+                    Temp=Temperature_1grain(i,j,l) ! WARNING : TODO : this does not work in 3D
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < 500.0) then
+                       coeff_exp=exp(cst_wl)
+                       J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                            q_abs(lambda,l)*densite_pouss(i,j,k,l)
+                    endif
+                 enddo
               enddo
-           enddo
+           enddo bz2
         enddo
      endif !lRE_nLTE
 
      if (lnRE) then
         do i=1,n_rad
-           do j=1,nz
-              do l=grain_nRE_start,grain_nRE_end
-                 if (l_RE(i,j,l)) then ! le grain a une temperature
-                    Temp=Temperature_1grain_nRE(i,j,l)
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < 500.) then
-                       coeff_exp=exp(cst_wl)
-                       J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            q_abs(lambda,l)*densite_pouss(i,j,1,l)
-                    endif !cst_wl
-                 else ! ! la grain a une proba de T
-                    do T=1,n_T
-                       temp=tab_Temp(T)
+           bz3 : do j=j_start,nz
+              if (j==0) cycle bz3
+              do k=1, n_az
+                 do l=grain_nRE_start,grain_nRE_end
+                    if (l_RE(i,j,l)) then ! le grain a une temperature
+                       Temp=Temperature_1grain_nRE(i,j,l) ! WARNING : TODO : this does not work in 3D
                        cst_wl=cst_th/(Temp*wl)
                        if (cst_wl < 500.) then
                           coeff_exp=exp(cst_wl)
-                          J_th(i,j) = J_th(i,j) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                               q_abs(lambda,l)*densite_pouss(i,j,1,l) * Proba_Temperature(T,i,j,l)
+                          J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                               q_abs(lambda,l)*densite_pouss(i,j,k,l)
                        endif !cst_wl
-                    enddo ! T
-                 endif ! l_RE
-              enddo !
-           enddo !j
+                    else ! ! la grain a une proba de T
+                       do T=1,n_T
+                          temp=tab_Temp(T)
+                          cst_wl=cst_th/(Temp*wl)
+                          if (cst_wl < 500.) then
+                             coeff_exp=exp(cst_wl)
+                             J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                                  q_abs(lambda,l)*densite_pouss(i,j,k,l) * Proba_Temperature(T,i,j,l)
+                          endif !cst_wl
+                       enddo ! T
+                    endif ! l_RE
+                 enddo ! l
+              enddo !k
+           enddo bz3 ! j
         enddo ! i
      endif !lnRE
 
@@ -980,11 +1092,11 @@ subroutine calc_Isca2_new(lambda,ibin)
                     if (lstrat) then
                        do ri=1,n_rad
                           do zj=1,nz
-                             sum_s11(ri,zj) = sum_s11(ri,zj) + tab_s11_ray_tracing(lambda,ri,zj,k) * sin_scatt
+                             sum_s11(ri,zj) = sum_s11(ri,zj) + tab_s11_ray_tracing(lambda,ri,zj,1,k) * sin_scatt
                           enddo !zj
                        enddo !ri
                     else ! pas de strat
-                       sum_s11(1,1) = sum_s11(1,1) + tab_s11_ray_tracing(lambda,1,1,k) * sin_scatt
+                       sum_s11(1,1) = sum_s11(1,1) + tab_s11_ray_tracing(lambda,1,1,1,k) * sin_scatt
                     endif
 
                  enddo ! i1
@@ -1054,15 +1166,15 @@ subroutine calc_Isca2_new(lambda,ibin)
                  if (lstrat) then
                     do ri=1,n_rad
                        do zj=1,nz
-                          s12(ri,zj) = s11(ri,zj) * tab_s12_o_s11_ray_tracing(lambda,ri,zj,k)
-                          s33(ri,zj) = s11(ri,zj) * tab_s33_o_s11_ray_tracing(lambda,ri,zj,k)
-                          s34(ri,zj) = s11(ri,zj) * tab_s34_o_s11_ray_tracing(lambda,ri,zj,k)
+                          s12(ri,zj) = s11(ri,zj) * tab_s12_o_s11_ray_tracing(lambda,ri,zj,1,k)
+                          s33(ri,zj) = s11(ri,zj) * tab_s33_o_s11_ray_tracing(lambda,ri,zj,1,k)
+                          s34(ri,zj) = s11(ri,zj) * tab_s34_o_s11_ray_tracing(lambda,ri,zj,1,k)
                        enddo ! zj
                     enddo ! ri
                  else ! pas de strat
-                    s12(1,1) = s11(1,1) * tab_s12_o_s11_ray_tracing(lambda,1,1,k)
-                    s33(1,1) = s11(1,1) * tab_s33_o_s11_ray_tracing(lambda,1,1,k)
-                    s34(1,1) = s11(1,1) * tab_s34_o_s11_ray_tracing(lambda,1,1,k)
+                    s12(1,1) = s11(1,1) * tab_s12_o_s11_ray_tracing(lambda,1,1,1,k)
+                    s33(1,1) = s11(1,1) * tab_s33_o_s11_ray_tracing(lambda,1,1,1,k)
+                    s34(1,1) = s11(1,1) * tab_s34_o_s11_ray_tracing(lambda,1,1,1,k)
                  endif ! lstrat
               endif ! lsepar_pola
 
@@ -1317,10 +1429,10 @@ subroutine calc_Isca2_star(lambda,ibin)
                  ROP(3,3) = COSW
 
                  ! Matrice de Mueller
-                 s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,k)
-                 s12 = tab_s12_ray_tracing(lambda,p_ri,p_zj,k)
-                 s33 = tab_s33_ray_tracing(lambda,p_ri,p_zj,k)
-                 s34 = tab_s34_ray_tracing(lambda,p_ri,p_zj,k)
+                 s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,1,k)
+                 s12 = tab_s12_ray_tracing(lambda,p_ri,p_zj,1,k)
+                 s33 = tab_s33_ray_tracing(lambda,p_ri,p_zj,1,k)
+                 s34 = tab_s34_ray_tracing(lambda,p_ri,p_zj,1,k)
 
                  M(1,1) = s11
                  M(2,2) = s11
@@ -1352,7 +1464,7 @@ subroutine calc_Isca2_star(lambda,ibin)
 
                  eps_dust2_star(:,iscatt,dir,ri,zj) =  eps_dust2_star(:,iscatt,dir,ri,zj) + S(:)
               else ! .not.lsepar_pola
-                 s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,k)
+                 s11 = tab_s11_ray_tracing(lambda,p_ri,p_zj,1,k)
                  eps_dust2_star(1,iscatt,dir,ri,zj) =  eps_dust2_star(1,iscatt,dir,ri,zj) + s11 * stokes(1)
               endif ! lsepar_pola
 
@@ -1377,18 +1489,18 @@ end subroutine calc_Isca2_star
 
 !***********************************************************
 
-function dust_source_fct(lambda,ri,zj,x,y,z)
+function dust_source_fct(lambda,ri,zj,phik, x,y,z)
   ! La direction du rayon est maintenant fixee le long de l'axe x
   ! l'angle de diffusion ne depend que de la position x, y, z
 
-  integer, intent(in) :: lambda,ri, zj
+  integer, intent(in) :: lambda, ri, zj, phik
   real(kind=db), intent(in) :: x, y, z
 
   real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
 
   real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, xi_az, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, i_az, i_az_p1, psup, ri1, zj1, ri2, zj2
-  integer :: phi_k, phi_k_p1, n_pola
+  integer :: k, n_pola
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
 
@@ -1397,13 +1509,21 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 
   ! Interpolations angulaires
   if (lscatt_ray_tracing1) then
-     if (z > 0.0_db) then
-        psup=1
+     if (l3D) then
+        psup = 1
+        k = phik
      else
-        psup=0
+        if (z > 0.0_db) then
+           psup=1
+        else
+           psup=0
+        endif
+        ! Cette methode est OK mais on voit les cellules
+        phi_pos = atan2(y,x)
+        k =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
+        if (k > n_az_rt) k = n_az_rt
      endif
 
-     phi_pos = atan2(y,x)
 
      ! OK : lisse les images par rapport a la methode en dessous
 !---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
@@ -1417,10 +1537,8 @@ function dust_source_fct(lambda,ri,zj,x,y,z)
 !---
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
 
-     ! Cette methode est OK mais on voit les cellules
-     phi_k =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
-     if (phi_k > n_az_rt) phi_k = n_az_rt
-     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k,psup)  ! ??? ce n'est pas lineaire
+
+     dust_source_fct(:) = eps_dust1(:,ri,zj,k,psup)  ! ??? ce n'est pas lineaire
 
   else ! Methode 2 : la seule actuelle
      ! Pour interpolations spatiales

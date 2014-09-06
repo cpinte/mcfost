@@ -33,7 +33,7 @@ subroutine select_etoile(lambda,aleat,n_star)
   k=(kmax-kmin)/2
 
   do while ((kmax-kmin) > 1)
-     if (prob_E_star(lambda,k) < aleat) then
+     if (CDF_E_star(lambda,k) < aleat) then
         kmin = k
      else
         kmax = k
@@ -253,7 +253,7 @@ subroutine repartition_energie_etoiles()
 
   else ! les étoiles ne sont pas des corps noirs
      ! On calcule 2 trucs en meme tps :
-     ! - prob_E_star : proba a lambda fixe d'emission en fonction de l'etoile
+     ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
      ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
      ! Lecture des spectres
      do i=1, n_etoiles
@@ -406,7 +406,7 @@ subroutine repartition_energie_etoiles()
 
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
-  ! - prob_E_star : proba a lambda fixe d'emission en fonction de l'etoile
+  ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
   ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
   !---------------------------------------------------------------------------
 
@@ -427,7 +427,7 @@ subroutine repartition_energie_etoiles()
      ! delta_wl est la largeur du bin d'intégration
      spectre = 0.0 ;
      spectre0 = 0.0 ;
-     prob_E_star(lambda,0) = 0.0
+     CDF_E_star(lambda,0) = 0.0
 
      wl_inf =  tab_lambda_inf(lambda)
      wl_sup =  tab_lambda_sup(lambda)
@@ -478,18 +478,20 @@ subroutine repartition_energie_etoiles()
         spectre0 = spectre0 + terme0 * delta_wl
 
         ! Pas de le delta_wl car il faut comparer a emission du disque
-        prob_E_star(lambda,i) = prob_E_star(lambda,i-1) +  terme
+        prob_E_star(lambda,i) = terme
+        CDF_E_star(lambda,i) = CDF_E_star(lambda,i-1) +  terme
      enddo ! i, etoiles
      spectre_etoiles(lambda) = spectre
      spectre_etoiles0(lambda) = spectre0
 
      ! Emission totale des etoiles
      ! Correction par le Teff dans le fichier de parametres
-     E_stars(lambda) = prob_E_star(lambda,n_etoiles)  * correct_step2
+     E_stars(lambda) = CDF_E_star(lambda,n_etoiles)  * correct_step2
 
      ! Normalisation a 1 de la proba d'emissition des etoiles
-     if (prob_E_star(lambda,n_etoiles) > 0.) then
-        prob_E_star(lambda,:) = prob_E_star(lambda,:)/prob_E_star(lambda,n_etoiles)
+     if (CDF_E_star(lambda,n_etoiles) > 0.) then
+        prob_E_star(lambda,:) = prob_E_star(lambda,:)/CDF_E_star(lambda,n_etoiles)
+        CDF_E_star(lambda,:) = CDF_E_star(lambda,:)/CDF_E_star(lambda,n_etoiles)
      endif
   enddo ! lambda
 
