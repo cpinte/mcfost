@@ -333,7 +333,7 @@ contains
        if (status/=0) correct_Rsub = 1.0
        read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
+       T_min=1. ; T_max=2500. ; n_T=1000
     endif  ! lfits
 
     ! ---------------

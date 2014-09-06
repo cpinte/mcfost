@@ -239,8 +239,11 @@ function file_specific_heat(T,taille_grain)
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     file_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  ! todo : c'est des Joules l'unite non ?
+     file_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
+     ! todo 2 : facteur 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
   enddo
+
+  return
 
 end function file_specific_heat
 
