@@ -986,7 +986,7 @@ subroutine opacite2(lambda)
                  norme = 0.0_db
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
+                    norme=norme + tab_s11_pos(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
 
                  if (abs(norme) > 0.0_db) then
