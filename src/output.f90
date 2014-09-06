@@ -446,6 +446,42 @@ end subroutine capteur
 
 !**********************************************************************
 
+subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
+
+  real(kind=db), intent(in) :: x,y,z,u,v,w
+  integer, intent(out) :: i,j
+  logical, intent(out) :: in_map
+
+  real(kind=db) :: x2,y2,z2, y_map,z_map
+
+  !*****************************************************
+  !*----DETERMINATION DE LA POSITION SUR LA CARTE
+  !*----IL FAUT FAIRE UNE ROTATION DU POINT
+  !*    (X1,Y1,Z1) POUR RAMENER LES COORDONNEES DANS
+  !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
+  !*****************************************************
+
+  call rotation(x,y,z, u,v,w, x2,y2,z2)
+
+  ! rotation eventuelle du disque
+  y_map = y2 * cos_disk + z2 * sin_disk
+  z_map = z2 * cos_disk - y2 * sin_disk
+
+  i = int((y_map*zoom + 0.5*map_size)*size_pix) + deltapix_x
+  j = int((z_map*zoom + 0.5*map_size)*size_pix) + deltapix_y
+
+  if ((i<1).or.(i>igridx).or.(j<1).or.(j>igridy)) then
+     in_map = .false.
+  else
+     in_map = .true.
+  endif
+
+  return
+
+end subroutine find_pixel
+
+!**********************************************************************
+
 subroutine write_stokes_fits()
 
   implicit none

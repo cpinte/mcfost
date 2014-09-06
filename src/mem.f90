@@ -1027,7 +1027,7 @@ subroutine dealloc_em_th()
 
   !deallocate(E_stars,E_disk,frac_E_stars,E_totale)
 
-  deallocate(spectre_etoiles_cumul,spectre_etoiles, spectre_emission_cumul, prob_E_star, E_stars)
+  deallocate(spectre_etoiles_cumul,spectre_etoiles, spectre_emission_cumul, CDF_E_star, prob_E_star, E_stars)
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
 
@@ -1220,11 +1220,12 @@ subroutine realloc_dust_mol()
   spectre_etoiles_cumul = 0.0
   spectre_etoiles = 0.0
 
-  allocate(prob_E_star(n_lambda,0:n_etoiles), E_stars(n_lambda), stat=alloc_status)
+  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_star'
      stop
   endif
+  CDF_E_star = 0.0
   prob_E_star = 0.0
   E_stars = 0.0
 
@@ -1398,13 +1399,13 @@ subroutine realloc_step2()
   endif
   prob_E_cell = 0.0
 
-  deallocate(prob_E_star)
-  allocate(prob_E_star(n_lambda2,0:n_etoiles), stat=alloc_status)
+  deallocate(CDF_E_star,prob_E_star)
+  allocate(CDF_E_star(n_lambda2,0:n_etoiles), prob_E_star(n_lambda2,n_etoiles), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_star'
      stop
   endif
-  prob_E_star = 0.0
+  CDF_E_star = 0.0 ; prob_E_star = 0.0
 
   deallocate(spectre_etoiles_cumul, spectre_etoiles, spectre_emission_cumul)
   allocate(spectre_etoiles_cumul(0:n_lambda2),spectre_etoiles(n_lambda2),spectre_emission_cumul(0:n_lambda2), stat=alloc_status)
@@ -1820,11 +1821,11 @@ subroutine alloc_emission_mol(imol)
 
      write(*,*) "WARNING : memory size if lots of pixels"
      allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
+          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stars_map(igridx,igridy), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
      allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(1,1,nTrans_raytracing,RT_n_ibin), stat=alloc_status)
+          continu(1,1,nTrans_raytracing,RT_n_ibin), stars_map(1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre'
@@ -1832,6 +1833,7 @@ subroutine alloc_emission_mol(imol)
   endif
   spectre=0.0
   continu=0.0
+  stars_map=0.0
 
   return
 
@@ -1844,7 +1846,7 @@ subroutine dealloc_emission_mol()
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa, kappa_sca, emissivite_dust)
-  deallocate(spectre_etoiles, spectre_etoiles_cumul, prob_E_star, E_stars)
+  deallocate(spectre_etoiles, spectre_etoiles_cumul, CDF_E_star, prob_E_star, E_stars)
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
