@@ -129,6 +129,8 @@ subroutine init_reemission()
   real ::  yp1, ypn
   real, dimension(n_rad,nz) :: dfrac_E_em_1, dfrac_E_em_n
 
+   write(*,'(a35, $)') "Initializing thermal properties ..."
+
   lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
 
   !  cst_E=2.0*hp*c_light**2/L_etoile
@@ -317,6 +319,7 @@ subroutine init_reemission()
      if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call read_file_specific_heat(pop)
   enddo
 
+  write(*,*) "Done"
   return
 
 end subroutine init_reemission
