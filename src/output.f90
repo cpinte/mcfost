@@ -447,6 +447,42 @@ end subroutine capteur
 
 !**********************************************************************
 
+subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
+
+  real(kind=db), intent(in) :: x,y,z,u,v,w
+  integer, intent(out) :: i,j
+  logical, intent(out) :: in_map
+
+  real(kind=db) :: x2,y2,z2, y_map,z_map
+
+  !*****************************************************
+  !*----DETERMINATION DE LA POSITION SUR LA CARTE
+  !*----IL FAUT FAIRE UNE ROTATION DU POINT
+  !*    (X1,Y1,Z1) POUR RAMENER LES COORDONNEES DANS
+  !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
+  !*****************************************************
+
+  call rotation(x,y,z, u,v,w, x2,y2,z2)
+
+  ! rotation eventuelle du disque
+  y_map = y2 * cos_disk + z2 * sin_disk
+  z_map = z2 * cos_disk - y2 * sin_disk
+
+  i = int((y_map*zoom + 0.5*map_size)*size_pix) + deltapix_x
+  j = int((z_map*zoom + 0.5*map_size)*size_pix) + deltapix_y
+
+  if ((i<1).or.(i>igridx).or.(j<1).or.(j>igridy)) then
+     in_map = .false.
+  else
+     in_map = .true.
+  endif
+
+  return
+
+end subroutine find_pixel
+
+!**********************************************************************
+
 subroutine write_stokes_fits()
 
   implicit none
@@ -1105,7 +1141,7 @@ subroutine calc_optical_depth_map(lambda)
      enddo
   endif
 
-  write(*,*) "Writing optical_depth_map.fits.gz"
+  write(*,*) "Writing optical_depth_map.fits.gz for wl=", tab_lambda(lambda), "microns"
   filename = "optical_depth_map.fits.gz"
 
   status=0
@@ -1445,6 +1481,95 @@ subroutine write_disk_struct()
   if (status > 0) then
      call print_error(status)
   end if
+
+  ! ********************************************************************************
+  filename = "data_disk/grain_sizes_min.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain_min,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  ! ********************************************************************************
+  filename = "data_disk/grain_sizes_max.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  naxis=1
+  naxes(1:1) = shape(r_grain)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  call ftpkys(unit,'UNIT',"microns",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+  nelements=naxes(1)
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,r_grain_max,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
   ! ********************************************************************************
   filename = "data_disk/grain_masses.fits.gz"
 

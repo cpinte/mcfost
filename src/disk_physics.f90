@@ -65,6 +65,13 @@ subroutine compute_othin_sublimation_radius()
      endif
   enddo
 
+  if (E_dust < tiny_real) then
+     write(*,*) "Sublimation radius : something is wrong"
+     write(*,*) "Opacity is not defined yet"
+     write(*,*) "Maybe the parameter file is old ?"
+     write(*,*) "Exiting"
+     stop
+  endif
   sublimation_radius = sqrt(E_etoile/E_dust)
 
 
@@ -95,6 +102,8 @@ subroutine compute_othin_sublimation_radius()
 
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
+
+  sublimation_radius = sublimation_radius * 1.6
 
   do i=1,n_zones
      !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
@@ -216,4 +225,3 @@ end subroutine equilibre_hydrostatique
 !**********************************************************
 
 end module disk_physics
-

@@ -7,8 +7,8 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.7"
-  real, parameter :: required_utils_version = 2.19
+  character(8), parameter :: mcfost_release = "2.19.13"
+  real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
@@ -115,10 +115,10 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lread_grain_size_distrib, lread_misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -257,7 +257,8 @@ module disk
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
   logical :: lpuffed_rim
 
-  character(len=512) :: density_file
+  character(len=512) :: density_file, grain_size_file
+  character(len=512), dimension(:), allocatable :: sh_file
 
   ! Correction locale de la desnite (dans un anneau)
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
@@ -311,13 +312,15 @@ module prop_star
 !  real, parameter :: phi_spot = 0.*pi/180.
 
   type star_type
-     real :: r, T, M, x, y, z, fUV, slope_UV
+     real :: r, T, M, fUV, slope_UV
+     real(kind=db) :: x,y,z
      logical :: lb_body
      character(len=512) :: spectre
+     integer :: ri, zj, phik
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile
-  real, dimension(:,:), allocatable :: prob_E_star
+  real, dimension(:,:), allocatable :: CDF_E_star, prob_E_star
 
   real, dimension(:), allocatable :: E_stars !n_lambda
 
@@ -374,7 +377,7 @@ module grains
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
 
-     logical :: is_PAH, lcoating
+     logical :: is_opacity_file, is_PAH, is_Misselt_opacity_file, lcoating
      integer :: ind_debut, ind_fin
   end type dust_pop_type
 
@@ -387,19 +390,20 @@ module grains
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
-  real, dimension(:), allocatable :: r_grain, r_core, S_grain, M_grain !n_grains_tot
+  real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
   logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
 
-  ! Pour lecture des fichiers de PAH de B.Draine
-  real, dimension(:,:,:), allocatable :: PAH_Q_ext, PAH_Q_abs, PAH_Q_sca, PAH_g
-  integer, parameter :: PAH_n_rad = 30,  PAH_n_lambda = 1201
-  real, dimension(PAH_n_rad) :: log_PAH_rad
-  real, dimension(PAH_n_lambda) :: PAH_lambda, PAH_delta_lambda
-  logical :: lread_PAH = .false.
+  ! Pour lecture des fichiers d'opacite, par exemple PAH de B.Draine
+  integer, dimension(:), allocatable :: op_file_na,  op_file_n_lambda ! n_pop
+  real, dimension(:,:,:), allocatable :: op_file_Qext, op_file_Qsca, op_file_g ! op_file_n_lambda,op_file_na, n_pop
+  real, dimension(:,:), allocatable :: op_file_log_r_grain ! op_file_na, n_pop
+  real, dimension(:,:), allocatable :: op_file_lambda, op_file_delta_lambda ! op_file_n_lambda, n_pop
+  integer, dimension(:), allocatable :: file_sh_nT
+  real(kind=db), dimension(:,:), allocatable :: file_sh_T, file_sh ! nT, n_pop
+
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
-  real :: wavel
 
   ! Tab de lambda
   real, dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
@@ -900,8 +904,8 @@ module ray_tracing
   ! TODO : calculer automatiquement en fct de la fct de phase + interpolation
   integer :: nang_ray_tracing, nang_ray_tracing_star
 
-  real, dimension(:,:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! n_lambda, n_rad, nz, nang_scatt
-  real, dimension(:,:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! n_lambda, n_rad, nz, nang_scatt
+  real, dimension(:,:,:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! n_lambda, n_rad, nz, n_az, nang_scatt
+  real, dimension(:,:,:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! n_lambda, n_rad, nz, n_az, nang_scatt
 
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
@@ -909,10 +913,10 @@ module ray_tracing
   real, dimension(0:nang_scatt) :: tab_cos_scatt
 
   ! intensite specifique
-  real, dimension(:,:), allocatable :: J_th ! n_rad, nz
+  real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
   ! methode RT 1
-  integer, parameter :: n_az_rt = 45
+  integer :: n_az_rt
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, n_rad, nz, n_az_rt, 2, ncpus
   real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! n_rad, nz, n_az_rt, 2, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
@@ -930,6 +934,7 @@ module ray_tracing
   real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! 4, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_ibin, n_type_flux, ncpus
+  real, dimension(:,:), allocatable :: stars_map
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
 

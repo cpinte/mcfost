@@ -211,6 +211,8 @@ subroutine define_grid4()
      lspherical = .true.
   endif
 
+  n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
+
   if (llinear_grid) then
 
      do i=1, n_rad+1
@@ -1111,6 +1113,29 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
   return
 
 end subroutine indice_cellule_3D
+
+!******************************************************************************
+
+subroutine indice_cellule_3D_phi(xin,yin,zin,phik_out)
+
+  implicit none
+
+  real(kind=db), intent(in) :: xin,yin,zin
+  integer, intent(out) :: phik_out
+
+  real(kind=db) :: phi
+
+  if (zin /= 0.0) then
+     phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+     phik_out=floor(phi/(2*pi)*real(N_az))+1
+     if (phik_out==n_az+1) phik_out=n_az
+  else
+     phik_out=1
+  endif
+
+  return
+
+end subroutine indice_cellule_3D_phi
 
 !******************************************************************************
 

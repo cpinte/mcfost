@@ -10,23 +10,25 @@ module PAH
 
   use dust
   use optical_depth
+  use utils, only : interp
 
   implicit none
 
 contains
 
-
 function specific_heat(T, taille_grain)
   ! C. Pinte
   ! 30/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=db), dimension(:), intent(in) :: T
   real(kind=db), dimension(size(T)) :: specific_heat
 
-  if (is_grain_PAH(taille_grain)) then
+  integer :: i
+
+  if (lread_Misselt) then
+     specific_heat = file_specific_heat(T,taille_grain)
+  else if (is_grain_PAH(taille_grain)) then
      specific_heat = PAH_specific_heat(T, taille_grain)
   else
      specific_heat = astrosil_specific_heat(T, taille_grain)
@@ -38,12 +40,9 @@ end function specific_heat
 
 !**********************************************************************
 
-
 function astrosil_specific_heat(T, taille_grain)
   ! C. Pinte
   ! 26/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -55,18 +54,17 @@ function astrosil_specific_heat(T, taille_grain)
 
   ! specific heat [J/K]
   astrosil_specific_heat = (Na-2.)* kb * (2.*sh_helper(T/500., 2) + sh_helper(T/1500., 3))
+
 end function astrosil_specific_heat
 
 !**********************************************************************
 
 function PAH_specific_heat(T,taille_grain)
-  ! return the specific heat for PAHs, in [erg/K]
+  ! return the specific heat capacity for PAHs, in [erg/K]
   ! input is Temperature [K] and grain radius [cm]
   ! optional output are mode energies hbarw [erg] and modes/energy g
   ! C. Pinte
   ! 30/01/07
-
-  implicit none
 
   integer, intent(in) :: taille_grain
   real(kind=db), dimension(:), intent(in) :: T
@@ -227,6 +225,29 @@ subroutine test_PAH_specific_heat()
 end subroutine test_PAH_specific_heat
 
 !******************************************************
+
+function file_specific_heat(T,taille_grain)
+  ! return the specific heat capacity in [erg/K]
+
+  integer, intent(in) :: taille_grain ! indice taille de grain
+  real(kind=db), dimension(:), intent(in) :: T
+  real(kind=db), dimension(size(T)) :: file_specific_heat
+
+  integer :: k, pop
+
+  pop =  grain(taille_grain)%pop
+
+  ! todo : interpoler a l'avance dans read_file_specific_heat
+  do k=1,size(T)
+     file_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
+     ! todo 2 : facteur 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
+  enddo
+
+  return
+
+end function file_specific_heat
+
+!**********************************************************************
 
 real function get_astrosil_Na(taille_grain)
   ! C. Pinte

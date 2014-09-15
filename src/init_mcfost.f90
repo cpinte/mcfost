@@ -131,9 +131,11 @@ subroutine initialisation_mcfost()
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
   lremove = .false.
-
   lonly_scatt = .false.
   lHG = .false.
+  lforce_PAH_equilibrium=.false.
+  lforce_PAH_out_equilibrium=.false.
+  lread_grain_size_distrib=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -178,8 +180,8 @@ subroutine initialisation_mcfost()
         write(n_chiffres,fmt="(i4)") ceiling(log10(1.0*mcfost_auto_update))
         fmt1 = '(" Your version of mcfost is more than ", i'//adjustl(trim(n_chiffres))//'," days old")'
         write(*,fmt=fmt1) mcfost_auto_update
-        write(*,*) "checking for update ..."
-        lupdate = mcfost_update(.false.)
+        write(*,*) "Checking for update ..."
+        lupdate = mcfost_update(.false.,.false., mcfost_auto_update)
         if (lupdate) then ! On redemarre mcfost avec la meme ligne de commande
            write(*,*) "Restarting MCFOST ..."
            write(*,*) ""
@@ -195,7 +197,7 @@ subroutine initialisation_mcfost()
 
   ! Directories to search (ordered)
   if (my_mcfost_utils == "") then
-     write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
+     !write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
      allocate(search_dir(2)) ; n_dir = 2
      search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
   else
@@ -230,14 +232,16 @@ subroutine initialisation_mcfost()
         call mcfost_get_ref_para()
      else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
         call mcfost_get_manual()
+     else if (para(2:14)=="get_yorick") then ! force update utils
+        call get_yorick()
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then ! force update utils
         call update_utils(.true.)
      else if (para(2:2)=="u") then ! update binary
-        lupdate = mcfost_update(.false.)
+        lupdate = mcfost_update(.false.,.true.)
      else if (para(2:3)=="fu") then ! force update binary
-        lupdate =  mcfost_update(.true.)
+        lupdate =  mcfost_update(.true.,.true.)
      else
         call display_help()
      endif
@@ -764,6 +768,22 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) correct_Tgas
+     case("-force_PAH_equilibrium")
+        lforce_PAH_equilibrium=.true.
+        i_arg = i_arg+1
+     case("-force_PAH_out_equilibrium")
+        lforce_PAH_out_equilibrium=.true.
+        i_arg = i_arg+1
+        if (lforce_PAH_equilibrium) then
+           write(*,*) "ERROR: cannot force eq. and out eq."
+           write(*,*) "Exiting"
+        endif
+     case("-grain_size_distrib_file")
+        i_arg = i_arg + 1
+        lread_grain_size_distrib=.true.
+        call get_command_argument(i_arg,s)
+        grain_size_file = s
+        i_arg = i_arg+1
      case default
         call display_help()
      end select
@@ -823,9 +843,9 @@ subroutine initialisation_mcfost()
         ! on change les parametres par default pour gagner du temps
         ! et pour avoir des quantites integrees !!!
         ! BUG ici : +dust_prop renvoie les prop de la 1ere cellule
-        limg=.false.
-        lmono=.false.
-        lmono0=.false.
+        !limg=.false.
+        !lmono=.false.
+        !lmono0=.false.
         lstrat=.false.
         scattering_method=2
      endif
@@ -964,7 +984,8 @@ subroutine initialisation_mcfost()
 
   if (lstrat_SPH) lstrat=.true.
 
-  if (lemission_mol)  then
+  if (lemission_mol) then
+     lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
      do imol=1,n_molecules
         call read_molecules_names(imol)
         basename_data_dir2(imol) = "data_"//trim(mol(imol)%name)
@@ -1029,7 +1050,7 @@ subroutine initialisation_mcfost()
 
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
-     if (lmono0) then
+     if (lmono0.and.(.not.l3D)) then
         lscatt_ray_tracing2 = .true.
         write(*,*) "Using ray-tracing method 2"
      else
@@ -1059,6 +1080,7 @@ subroutine display_help()
   write(*,*) "       -v : displays version number, and available updates"
   write(*,*) "       -get_para or get_doc : downloads the current version of the parameter file"
   write(*,*) "       -get_manual : downloads the current version of manual"
+  write(*,*) "       -get_yorick : downloads the current version of yorick scripts"
   write(*,*) "       -u : updates MCFOST to most recent version"
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
   write(*,*) "       -h : displays full MCFOST history since v2.12.9"
@@ -1097,6 +1119,7 @@ subroutine display_help()
   write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
+  write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"

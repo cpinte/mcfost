@@ -7,13 +7,13 @@
 
 #Wavelength
   50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum] Do not change this line unless you know what you are doing
-  T T T 		  compute temperature?, compute sed?, use default wavelength grid for ouput ?
+  T T T 		  compute temperature?, compute sed?, use default wavelength grid for output ?
   IMLup.lambda		  wavelength file (if previous parameter is F)
   F T			  separation of different contributions?, stokes parameters?
 
 #Grid geometry and size
   1			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
-  100 70 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
+  100 70 36 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
 
 #Maps
   101 101 3000.           grid (nx,ny), size [AU]
@@ -32,7 +32,7 @@
   T	                  axial symmetry (important only if N_phi > 1)
 
 #Disk physics
-  1     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  3     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
   F                       dust radial migration
   F		  	  sublimate dust
   F                       hydostatic equilibrium
@@ -55,11 +55,16 @@
  1.5 			  flaring exponent
 
 #Grain properties
-  1  Number of species
-  Mie  1 2  0.0  1.0  0.9 Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  2  Number of species
+  Mie  1 2  0.0  0.75  0.9 Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
   Draine_Si_sUV.dat  1.0  Optical indices file, volume fraction
   1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
-  0.03  1000.0 3.5 100 	  amin, amax [mum], aexp, n_grains (log distribution)
+  0.1  1000.0 3.5 100 	  amin, amax [mum], aexp, n_grains (log distribution)
+
+Mie  1 2  0.0  0.25  0.9 Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  amor_carbon.dat   1.0  Optical indices file, volume fraction
+  1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  0.1  10.0 3.5 100 	  amin, amax [mum], aexp, n_grains (log distribution)
 
 #Molecular RT settings
   T T T 15.	          lpop, laccurate_pop, LTE, profile width (km.s^-1)
