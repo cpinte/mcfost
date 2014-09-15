@@ -312,9 +312,11 @@ module prop_star
 !  real, parameter :: phi_spot = 0.*pi/180.
 
   type star_type
-     real :: r, T, M, x, y, z, fUV, slope_UV
+     real :: r, T, M, fUV, slope_UV
+     real(kind=db) :: x,y,z
      logical :: lb_body
      character(len=512) :: spectre
+     integer :: ri, zj, phik
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile

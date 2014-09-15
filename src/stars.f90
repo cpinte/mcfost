@@ -48,7 +48,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v,w,w2)
+subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,z,u,v,w,w2)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -59,7 +59,7 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v
 
   integer, intent(in) :: n_star
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: ri, zj, phik
   real(kind=db), intent(out) :: x, y, z, u, v, w, w2
 
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi
@@ -92,7 +92,9 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,x,y,z,u,v
   y=y+etoile(n_star)%y
   z=z+etoile(n_star)%z
 
-  ri=0 ; zj=1
+  ri=etoile(n_star)%ri
+  zj=etoile(n_star)%zj
+  phik=etoile(n_star)%phik
 
   return
 
@@ -100,7 +102,7 @@ end subroutine em_sphere_uniforme
 
 !**********************************************************************
 
-subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,x,y,z,u,v,w,w2)
+subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,phik,x,y,z,u,v,w,w2)
 ! Emission isotrope
 ! C. Pinte
 ! 21/05/05
@@ -109,7 +111,7 @@ subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,x,y,z,u,v,w,w2)
 
   integer, intent(in) :: n_star
   real, intent(in) :: aleat1, aleat2
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: ri, zj, phik
   real(kind=db), intent(out) :: x, y, z, u, v, w, w2
 
   real(kind=db) :: srw02, argmt
@@ -127,7 +129,9 @@ subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,x,y,z,u,v,w,w2)
   y=etoile(n_star)%y
   z=etoile(n_star)%z
 
-  ri=0 ; zj=1
+  ri=etoile(n_star)%ri
+  zj=etoile(n_star)%zj
+  phik=etoile(n_star)%phik
 
   return
 
@@ -544,6 +548,20 @@ subroutine repartition_energie_etoiles()
         spectre_etoiles_cumul(lambda)=spectre_etoiles_cumul(lambda)/spectre_etoiles_cumul(n_lambda)
      enddo
   endif
+
+  ! Cellule d'origine dans laquelle est l'etoile
+  do i=1, n_etoiles
+     if (l3D) then
+        call indice_cellule_3D(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj,etoile(i)%phik)
+     else
+        if (lcylindrical) then
+           call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
+        else
+           call indice_cellule_sph(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
+        endif
+        etoile(i)%phik=1
+     endif
+  enddo
 
   return
 
