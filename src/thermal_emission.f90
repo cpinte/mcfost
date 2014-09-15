@@ -118,7 +118,7 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: i,j,pk,k,lambda,t
+  integer :: i,j,pk,k,lambda,t, pop
   real(kind=db) :: integ, integ2, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
@@ -128,6 +128,8 @@ subroutine init_reemission()
   real, dimension(1:n_T) :: xa,ya,y2
   real ::  yp1, ypn
   real, dimension(n_rad,nz) :: dfrac_E_em_1, dfrac_E_em_n
+
+   write(*,'(a35, $)') "Initializing thermal properties ..."
 
   lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
 
@@ -313,6 +315,11 @@ subroutine init_reemission()
 
   enddo !t
 
+  do pop=1, n_pop
+     if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call read_file_specific_heat(pop)
+  enddo
+
+  write(*,*) "Done"
   return
 
 end subroutine init_reemission
@@ -711,19 +718,18 @@ subroutine Temp_nRE(lconverged)
 
   real, parameter :: precision = 1.e-2
 
-  real(kind=db), dimension(:,:,:), allocatable :: Akj, B
-  real(kind=db), dimension(:,:), allocatable :: nu, log_nu ! alloc dynamique car bug  avec ifort pour n_T = 1000 a cause de la limite de stacksize a 8Mo
+  real(kind=db), dimension(:,:,:), allocatable :: A, B
   real(kind=db), dimension(:,:), allocatable :: X
   real(kind=db), dimension(n_T) :: nu_bin, delta_nu_bin
   real(kind=db), dimension(0:n_T) :: T_lim, U_lim
 
-  real(kind=db), dimension(n_lambda) :: log_tab_nu, q_abs_x_cst, tab_nu
+  real(kind=db), dimension(n_lambda) :: log_tab_nu, q_abs_o_dnu, tab_nu
 
   real(kind=db), dimension(:,:), allocatable :: KJ_absorbe_nRE, log_KJ_absorbe, Jabs
 
   real(kind=db) :: delta_T, KJ_abs_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, KJ_absorbe
 
-  integer :: l, i, j, k, T, T1, T2, lambda, alloc_status, id, Tlim, T_int
+  integer :: l, i, j, k, T, T1, T2, lambda, alloc_status, id, T_int
 
   integer, parameter :: n_cooling_time = 100
   real :: E_max
@@ -738,17 +744,18 @@ subroutine Temp_nRE(lconverged)
   real(kind=db) :: somme1, somme2, wl, delta_wl, Temp, cst_wl ! pour test
 
   write(*,*) "Calculating temperature probabilities of non equilibrium grains ..."
+  if (lforce_PAH_equilibrium) write(*,*) "Forcing equilibrium " ;
 
-  allocate(Akj(n_T,n_T,nb_proc), B(n_T,n_T,nb_proc), X(n_T,nb_proc), nu(n_T,n_T), log_nu(n_T, n_T), stat=alloc_status)
+  allocate(A(n_T,n_T,nb_proc), B(n_T,n_T,nb_proc), X(n_T,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error Akj'
+     write(*,*) 'Allocation error A'
      stop
   endif
-  Akj=0.0 ; B=0.0 ; nu=0.0 ; log_nu=0.0
+  A=0.0 ; B=0.0 ;
 
   allocate(KJ_absorbe_nRE(n_lambda,nb_proc), log_KJ_absorbe(n_lambda,nb_proc), Jabs(n_lambda,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error Akj'
+     write(*,*) 'Allocation error A'
      stop
   endif
   KJ_absorbe_nRE = 0.0 ; log_KJ_absorbe = 0.0 ; Jabs=0.0
@@ -758,45 +765,29 @@ subroutine Temp_nRE(lconverged)
   T_lim(1:n_T) = tab_Temp(:)*sqrt(delta_T)
 
   tab_nu = c_light/(tab_lambda*1.0e-6)
-  !log_tab_nu = log(c_light/(tab_lambda*1.0e-6))
 
   ! l est l'indice de taille de grains
   do l=grain_nRE_start, grain_nRE_end
      ! bin centers [Hz]
-     nu_bin = specific_heat(real(tab_Temp,kind=db),l) * tab_Temp/hp ! evaluate specific heat & enthalpy at bin centers
+     nu_bin(:) = specific_heat(real(tab_Temp,kind=db),l) * tab_Temp(:)/hp ! evaluate specific heat & enthalpy at bin centers
 
      ! bin widths [Hz]
-     U_lim = specific_heat(T_lim,l)*T_lim ! enthalpy of bin boundaries [erg]
-     delta_nu_bin = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
+     U_lim(:) = specific_heat(T_lim(:),l)*T_lim(:) ! enthalpy of bin boundaries [erg]
+     delta_nu_bin(:) = (U_lim(1:n_T)-U_lim(0:n_T-1))/hp  ! bin width [Hz]
 
-     ! compute transition matrix  Akj   [Hz]
-
-     ! matrix energy differences between bin centers [erg]
-     nu=0.
-     do T=1, n_T
-        nu(:,T) = nu_bin(:)
-     enddo
-
-     do T=1, n_T
-        nu(T,:) = abs(nu(T,:) - nu_bin(:))
-     enddo
-
-     !do T=1,n_T
-     !   do T2=1,T-1
-     !      log_nu(T,T2) = log(nu(T,T2))
-     !   enddo
-     !enddo
-
+     ! compute transition matrix  A   [Hz]
 
      !! cooling terms :  select one-off upper diagonal, on peut les calculer a l'avance
-     Akj=0.
+     ! Afi with final < inital
+     A(:,:,:)=0.
      do T=2,n_T
-        Akj(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / ((nu_bin(T)-nu_bin(T-1)))
+        A(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / (nu_bin(T)-nu_bin(T-1)) ! OK, il manque un 1/h par rapport a Krugel p265
      enddo
 
      ! Pour KJ_absorbe
      do lambda=1, n_lambda
-        q_abs_x_cst(lambda) = q_abs(lambda,l)  / tab_delta_lambda(lambda) * (tab_lambda(lambda))**2/c_light * 1.0e-6
+        ! q_abs / dnu  : dnu = c wl^2 / dwl
+        q_abs_o_dnu(lambda) = q_abs(lambda,l)  / tab_delta_lambda(lambda) * (tab_lambda(lambda))**2/c_light * 1.0e-6
      enddo
 
      ! Pour cooling time
@@ -816,21 +807,20 @@ subroutine Temp_nRE(lconverged)
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,KJ_absorbe, lambda, T, T2) &
-     !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,Tlim,kTu) &
+     !$omp private(KJ_abs_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
-     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe) &
-     !$omp shared(n_rad, nz, q_abs_x_cst, xJ_abs, J0, n_phot_L_tot, volume, n_T) &
-     !$omp shared(log_tab_nu, tab_nu, log_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
-     !$omp shared(delta_nu_bin,nu,Proba_temperature, Akj,B,X,nu_bin,tab_Temp,T_min,T_max) &
+     !$omp shared(l,KJ_absorbe_nRE, Jabs, log_KJ_absorbe, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
+     !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T) &
+     !$omp shared(log_tab_nu, tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
+     !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss)
 
-     id =1 ! pour code sequentiel
+     id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
      do i=n_rad, 1, -1
         !$ id = omp_get_thread_num() + 1
         do j=1,nz
-
 
            if (densite_pouss(i,j,1,l) > tiny_db) then
               ! Champ de radiation
@@ -839,7 +829,7 @@ subroutine Temp_nRE(lconverged)
                  ! conversion lambda et delta_lambda de micron -> m
                  Jabs(lambda,id) = (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1))
                  KJ_absorbe = KJ_absorbe + q_abs(lambda,l) * Jabs(lambda,id)
-                 KJ_absorbe_nRE(lambda,id) =   q_abs_x_cst(lambda)  * Jabs(lambda,id)
+                 KJ_absorbe_nRE(lambda,id) =   q_abs_o_dnu(lambda)  * Jabs(lambda,id)
               enddo ! lambda
 
               Jabs(:,id) =  Jabs(:,id)*n_phot_L_tot * (1.0/volume(i))
@@ -858,31 +848,29 @@ subroutine Temp_nRE(lconverged)
 
               ! Inversion rapide Energie en temperature
               ! On prend energie juste en dessus energie moyenne -> t_cool un peu trop court
-              search : do T=1, n_T
+              kTu = kb * tab_Temp(1)
+              search : do T=2, n_T
                  if (nu_bin(T) > mean_abs_nu) then
-                    Tlim=T
-                    kTu = kb * tab_Temp(Tlim)
+                    kTu = kb * tab_Temp(T)
                     exit search
                  endif
               enddo search
 
               ! radiative cooling time at mean photon energy
-              t_cool = 0.0_db
-              integ : do T=1, n_cooling_time
-                 if (en(T) > mean_abs_E) exit integ
-                 if (en(T)/kTu < 500.) then
-                    t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+              t_cool = 0.0
+              if (T <= n_T) then
+                 integ : do T=1, n_cooling_time
+                    if (en(T) > mean_abs_E) exit integ
+                    if (en(T)/kTu < 500.) then
+                       t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+                    endif
+                 enddo integ
+                 if (t_cool > tiny_db) then
+                    t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
+                 else
+                    t_cool = huge_real
                  endif
-              enddo integ
-              if (t_cool > tiny_db) then
-                 t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
-              else
-                 t_cool = huge_real
               endif
-
-              !           write(*,*) "t_cool", i, j, t_cool/t_abs
-              !           t_cool = 0.0 ; t_abs = 1.0
-
 
               ! Calcul Temperature equilibre
               l_RE(i,j,l) = .true.
@@ -914,43 +902,49 @@ subroutine Temp_nRE(lconverged)
 
               if (Temperature_1grain_nRE(i,j,l) > T_max) then
                  ! Impossible de definir proba de temperature
-                 t_cool = 1.0
-                 t_abs = 0.0
+                 t_cool = 1.0 ; t_abs = 0.0
                  write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
                  write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
                  write(*,*) "Exiting"
                  stop
               endif
 
-              !           t_cool=1.0 ; t_abs = 0.0
+              ! Forcing equilibrium or no equilibrium
+              if (lforce_PAH_equilibrium) then
+                 t_cool=1.0 ; t_abs = 0.0
+              else if (lforce_PAH_out_equilibrium) then
+                 t_cool = 0.0 ; t_abs = 1.0
+              endif
 
               if (t_cool < t_abs) then !  calcul proba temperature
                  l_RE(i,j,l) = .false.
                  log_KJ_absorbe(:,id) = log(KJ_absorbe_nRE(:,id)+tiny_db)
 
                  ! heating terms : select lower triangle
+                 ! Afi with with f > i
                  do T=1,n_T
                     do T2=1,T-1
                        ! Tres largement plus stable en interpolation lineaire que log !!!
                        ! Ca fait n'importe quoi en log en cas de flux faible
-                       !                    KJ_abs_interp = exp(interp(log_KJ_absorbe, log_tab_nu, log_nu(T,T2) ))
-                       KJ_abs_interp = interp(KJ_absorbe_nRE(:,id), tab_nu, nu(T,T2) )
-                       Akj(T,T2,id) = KJ_abs_interp * delta_nu_bin(T)/nu(T,T2)
+                       KJ_abs_interp = interp(KJ_absorbe_nRE(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
+                       A(T,T2,id) = KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
                     end do
                  end do
 
                  !! diagonal terms
                  do T=1,n_T
-                    Akj(T,T,id) = -sum(Akj(T,:,id)) ! sum along k direction (diag. should be zero initially)
+                    A(T,T,id) = -sum(A(T,:,id)) ! sum along k direction (diag. should be zero initially)
                  enddo
 
                  !! compute probabilities P(T) using iterative formulation of GD89
 
                  !! compute B array
                  B(:,:,id) = 0.
-                 B(n_T,:,id) = Akj(n_T,:,id)
+                 B(n_T,1:n_T-1,id) = A(n_T,1:n_T-1,id)
                  do T=n_T-1,1,-1
-                    B(T,:,id) = Akj(T,:,id) + B(T+1,:,id)
+                    do T2=1,T-1
+                       B(T,T2,id) = A(T,T2,id) + B(T+1,T2,id)
+                    enddo
                  enddo
 
                  !! compute P array
@@ -958,7 +952,7 @@ subroutine Temp_nRE(lconverged)
                  do T=2, n_T
                     if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
                     if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
-                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(Akj(T-1, T,id),tiny_db)
+                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db)
                  enddo
 
                  !! Normalisation
@@ -976,7 +970,7 @@ subroutine Temp_nRE(lconverged)
      !$omp end parallel
   enddo !l
 
-  deallocate(Akj, B, X, nu, log_nu)
+  deallocate(A, B, X)
 
   write(*,*) "Done"
 
@@ -1043,40 +1037,42 @@ subroutine Temp_nRE(lconverged)
   enddo !i
 
 
-
   !! TEST
-!!$  l=grain_nRE_start ! TEST pour 1 taille de grains
-!!$  do i=1, n_rad
-!!$     do j=1, nz
-!!$        somme1=0.0
-!!$        somme2=0.0
-!!$        !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
-!!$        do lambda=1, n_lambda
-!!$           somme1 =   somme1 + q_abs(lambda,l)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1) )
-!!$           wl = tab_lambda(lambda)*1.0e-6
-!!$           delta_wl = tab_delta_lambda(lambda)*1.0e-6
-!!$           if (l_RE(i,j,l)) then
-!!$              Temp = Temperature_1grain_nRE(i,j,l)
-!!$              cst_wl=cst_th/(Temp*wl)
-!!$              if (cst_wl < 500.) then
-!!$                 somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-!!$              endif
-!!$           else
-!!$              do T=1, n_T
-!!$                 Temp = tab_Temp(T)
-!!$                 cst_wl=cst_th/(Temp*wl)
-!!$                 if (cst_wl < 500.) then
-!!$                    somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * Proba_Temperature(T,i,j,l)
-!!$                 endif !cst_wl
-!!$              enddo
-!!$           endif
-!!$        enddo ! lambda
-!!$        somme1=somme1 *n_phot_L_tot/volume(i)
-!!$        somme2=somme2*2.0*hp*c_light**2
-!!$        write(*,*) i,j,l_RE(i,j,l),  real(somme1/somme2)
-!!$       ! read(*,*)
-!!$     enddo !j
-!!$  enddo !i
+  do l=grain_nRE_start,grain_nRE_end ! TEST pour 1 taille de grains
+     do i=1, n_rad
+        do j=1, nz
+           somme1=0.0
+           somme2=0.0
+           !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
+           do lambda=1, n_lambda
+              somme1 =   somme1 + q_abs(lambda,l)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1) )
+              wl = tab_lambda(lambda)*1.0e-6
+              delta_wl = tab_delta_lambda(lambda)*1.0e-6
+              if (l_RE(i,j,l)) then
+                 Temp = Temperature_1grain_nRE(i,j,l)
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.) then
+                    somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                 endif
+              else
+                 do T=1, n_T
+                    Temp = tab_Temp(T)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < 500.) then
+                       somme2 = somme2 + q_abs(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * Proba_Temperature(T,i,j,l)
+                    endif !cst_wl
+                 enddo
+              endif
+           enddo ! lambda
+           somme1=somme1 *n_phot_L_tot/volume(i)
+           somme2=somme2*2.0*hp*c_light**2
+           write(*,*) i,j,l,l_RE(i,j,l),  real(somme1/somme2)
+
+           Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+           ! read(*,*)
+        enddo !j
+     enddo !i
+  enddo ! l
   !! FIN TEST
 
   return
@@ -1094,17 +1090,10 @@ subroutine emission_nRE()
 
   implicit none
 
-!  integer, intent(in) ::  iter
-!  logical, intent(out) :: status
   integer :: i, j, k, T, l, lambda, n_max, alloc_status
-  real :: Temp, cst_wl, cst_wl_max, wl, delta_wl
+  real :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn
   real(kind=db) :: E_emise, frac_E_abs_nRE, Delta_E
   real(kind=db), dimension(:), allocatable :: E_cell, E_cell_old
-
-  ! TMP
-  real, parameter :: precision = 1.0e-3
-  logical :: status
-
 
   ! proba emission en fct lambda puis pour chaque lambda proba en fct position
   ! proba differentielle en fonction proba emission precedente
@@ -1113,11 +1102,18 @@ subroutine emission_nRE()
   frac_E_abs_nRE =  E_abs_nRE / nbre_photons_tot
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
   write(*,*) "Re-emitting this amount of energy"
-  status = .false.
 
   ! Quantite energie a reemettre
-  ! energie des paquets en supposant que ce soit le meme nombre que pour la premiere etape
-  E_paquet = frac_E_abs_nRE
+
+  ! energie des paquets en supposant que ce soit le meme nombre de paquets que pour la premiere etape
+  !E_paquet = frac_E_abs_nRE
+
+  ! Nouvelle methode : E_paquet reste constante et on modifie le nombre de paquets
+  ! + Modification E_paquet pour compenser erreur arrondi du au passage a un entier
+  fn = (nbre_photons_tot * frac_E_abs_nRE) / nbre_photons_loop ! nbre de photons "reel"
+  nbre_photons_eq_th = int( max( fn, 1.0) ) ! nbre de phtons entier
+  ! fn * 1.0 = nbre_photons_eq_th * E_paquet
+  E_paquet = fn /  nbre_photons_eq_th
 
   ! Pour iteration suivante
   E_abs_nRE = 0.0
@@ -1458,7 +1454,6 @@ subroutine repartition_energie(lambda)
 
 
   E_disk(lambda) = sum(E_cell)
-
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda))
 
   ! Energie totale emise a une distance emise egale a la distance terre-etoile

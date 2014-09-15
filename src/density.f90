@@ -418,10 +418,13 @@ subroutine define_dust_density()
                     if (lstrat.and.(settling_type == 2)) then
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
-                       OmegaTau = omega_tau(rho0,H,l)
-
-                       h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
-                       correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
+                       if (rho0 > tiny_db) then
+                          OmegaTau = omega_tau(rho0,H,l)
+                          h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
+                          correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
+                       else
+                          correct_strat(l) = 1.0
+                       endif
                     endif
 
 
@@ -2560,7 +2563,7 @@ subroutine densite_file()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdunum, hdutype, bitpix
   integer :: nullval, stat
   integer, dimension(4) :: naxes
   logical :: anynull
@@ -2573,6 +2576,9 @@ subroutine densite_file()
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
+
+  real(kind=db), dimension(:,:,:,:), allocatable :: sph_dens_db
+  real(kind=db), dimension(:), allocatable :: a_sph_db
 
   type(disk_zone_type) :: dz
 
@@ -2616,13 +2622,27 @@ subroutine densite_file()
   n_a = naxes(4)
   write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  nbuffer=npixels
 
   allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
   sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
   ! read_image
-  call ftgpve(unit,group,firstpix,nbuffer,nullval,sph_dens,anynull,status)
+  if (bitpix==-32) then
+     call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
+  else if (bitpix==-64) then
+     allocate(sph_dens_db(n_rad,nz,n_az,n_a)) ; sph_dens_db = 0.0_db
+     call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_db,anynull,status)
+     sph_dens = real(sph_dens_db,kind=sl)
+     deallocate(sph_dens_db)
+  else
+     write(*,*) "ERROR: cannot read bitpix in fits file"
+     stop
+  endif
+
+  write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
 
   ! Au cas ou
   sph_dens = max(sph_dens,tiny_db)
@@ -2641,54 +2661,17 @@ subroutine densite_file()
 !     write(*,*) i, a_sph(i), "microns"
 !  enddo
 
+  if (n_a > 1) then
 
-  read_n_a = 0
-  call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
-
-  !---------------------------------------------------------
-  ! HDU 2 : grain sizes
-  !---------------------------------------------------------
-  !  move to next hdu
-  call ftmrhd(unit,1,hdutype,status)
-
-  ! Check dimensions
-  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
-  if (nfound /= 1) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of HDU 2 file. Exiting.'
-     stop
-  endif
-  if ((naxes(1) /= n_a)) then
-     write(*,*) "Error : HDU 2 does not have the"
-     write(*,*) "right dimensions. Exiting."
-     stop
-  endif
-  npixels=naxes(1)
-
-  ! read_image
-  call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
-
-  ! On verifie que les grains sont tries
-  do i=1, n_a-1
-     if (a_sph(i) >= a_sph(i+1)) then
-        write(*,*) "ERROR : grains must be ordered from small to large"
-        write(*,*) "Exiting"
-        stop
-     endif
-  enddo
-
-
-  ! On lit au besoin la distribution en taille (dn(a) / da)
-  if (read_n_a==1) then
-     write(*,*) "Reading grain size distribution from fits file"
+     read_n_a = 0
+     call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
 
      !---------------------------------------------------------
-     ! HDU 3 : nombre de grains
+     ! HDU 2 : grain sizes
      !---------------------------------------------------------
      !  move to next hdu
      call ftmrhd(unit,1,hdutype,status)
 
-     nfound = 0 ; naxes = 0 ;
      ! Check dimensions
      call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
      if (nfound /= 1) then
@@ -2703,44 +2686,120 @@ subroutine densite_file()
      endif
      npixels=naxes(1)
 
+     bitpix=0
+     call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
      ! read_image
-     call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
-
-     tmp = sum(n_a_sph)
-     do i=1,n_a
-        write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
-     enddo
-
-
-     if (n_pop > 1) then
-        write(*,*) "ERROR : density fits interface only works for 1 dust pop"
+     if (bitpix==-32) then
+        call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
+     else if (bitpix==-64) then
+        allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
+        call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
+        a_sph = real(a_sph_db,kind=sl)
+        deallocate(a_sph_db)
+     else
+        write(*,*) "ERROR: cannot read bitpix in fits file"
         stop
      endif
 
-     allocate(log_a_sph(n_a), log_n_a_sph(n_a))
-     log_a_sph = log(a_sph) ; log_n_a_sph = log(n_a_sph)
+     ! read_image
 
-     ! Multiplication par a car da = a.dln(a)
-     do k=1, n_grains_tot
-        write(*,*) k
-        a = r_grain(k)
-        ! todo : peut etre optimise sans interp
-        nbre_grains(k) = exp( interp(log_n_a_sph, log_a_sph, log(a)) )  * a
-     enddo !k
-
-     ! Normalisation de tous les grains au sein d'une pop
-     nbre_grains = nbre_grains / sum(nbre_grains)
-  else
-     write(*,*) "Using grain size distribution from parameter file"
-     do i=1,n_a
-        write(*,*) i, a_sph(i), "microns"
+     ! On verifie que les grains sont tries
+     do i=1, n_a-1
+        if (a_sph(i) >= a_sph(i+1)) then
+           write(*,*) "ERROR : grains must be ordered from small to large"
+           write(*,*) "I found the follwing grain sizes in the fits :"
+           do j=1, n_a
+              write(*,*) a_sph(j)
+           enddo
+           write(*,*) "Exiting"
+           stop
+        endif
      enddo
+
+
+     ! On lit au besoin la distribution en taille (dn(a) / da)
+     if (read_n_a==1) then
+        write(*,*) "Reading grain size distribution from fits file"
+
+        !---------------------------------------------------------
+        ! HDU 3 : nombre de grains
+        !---------------------------------------------------------
+        !  move to next hdu
+        call ftmrhd(unit,1,hdutype,status)
+
+        nfound = 0 ; naxes = 0 ;
+        ! Check dimensions
+        call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+        if (nfound /= 1) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of HDU 2 file. Exiting.'
+           stop
+        endif
+        if ((naxes(1) /= n_a)) then
+           write(*,*) "Error : HDU 2 does not have the"
+           write(*,*) "right dimensions. Exiting."
+           stop
+        endif
+        npixels=naxes(1)
+
+        bitpix = 0
+        call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+        ! read_image
+        if (bitpix==-32) then
+           call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
+        else if (bitpix==-64) then
+           allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
+           call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
+           n_a_sph = real(a_sph_db,kind=sl)
+           deallocate(a_sph_db)
+        else
+           write(*,*) "ERROR: cannot read bitpix in fits file"
+           stop
+        endif
+
+        tmp = sum(n_a_sph)
+        write(*,*) "The following grain sizes were found in the fits file:"
+        do i=1,n_a
+           write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
+        enddo
+        write(*,*) "They will be used to set the integrated grain size distribution"
+
+
+        if (n_pop > 1) then
+           write(*,*) "ERROR : density fits interface only works for 1 dust pop"
+           stop
+        endif
+
+        allocate(log_a_sph(n_a), log_n_a_sph(n_a))
+        log_a_sph = log(a_sph) ; log_n_a_sph = log(n_a_sph)
+
+        ! Multiplication par a car da = a.dln(a)
+        do k=1, n_grains_tot
+           write(*,*) k
+           a = r_grain(k)
+           ! todo : peut etre optimise sans interp
+           nbre_grains(k) = exp( interp(log_n_a_sph, log_a_sph, log(a)) )  * a
+        enddo !k
+
+        ! Normalisation de tous les grains au sein d'une pop
+        nbre_grains = nbre_grains / sum(nbre_grains)
+     else
+        write(*,*) "The following grain sizes were found in the fits file:"
+        do i=1,n_a
+           write(*,*) i, a_sph(i), "microns"
+        enddo
+        write(*,*) "Using values from parameter file to set the integrated grain size distribution"
+     endif
+
+  else ! n_a > 1
+     write(*,*) "Using grain size distribution from parameter file"
+     a_sph(1) = 1.0
   endif
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
-
-
 
   ! Densite du gaz : gaz = plus petites particules
   dz = disk_zone(1)
@@ -2795,8 +2854,6 @@ subroutine densite_file()
         enddo !k
      enddo bz_gas_mass3
   enddo ! i
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-
 
   if (lstrat) then
      write(*,*) "Differential spatial distribution"
@@ -2844,8 +2901,6 @@ subroutine densite_file()
 
 
   ! TODO : changer la distribution des grains
-
-
 
 
   ! Normalisation : on a 1 grain en tout dans le disque
@@ -2898,14 +2953,14 @@ subroutine densite_file()
 
   masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
 
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   deallocate(sph_dens,a_sph)
 
-
-  write(*,*) "MODIFYING 3D DENSITY !!!"
-  k = 36
-  densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
-  densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
+  !write(*,*) "MODIFYING 3D DENSITY !!!"
+  !k = 36
+  !densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  !densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
 
   return
 
@@ -3082,7 +3137,12 @@ real(kind=db) function omega_tau(rho,H,l)
   integer :: ipop
 
   ipop = grain(l)%pop
-  omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+  !write(*,*) ipop, dust_pop(ipop)%rho1g_avg, rho
+  if (rho > tiny_db) then
+     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+  else
+     omega_tau = huge_db
+  endif
 
   return
 

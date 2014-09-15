@@ -26,98 +26,177 @@ subroutine taille_grains()
   implicit none
   integer :: k, i, j
   real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
-  real(kind=db) :: exp_grains
+  real(kind=db) :: exp_grains, sqrt_exp_grains
   real :: masse_pop
   real :: correct_fact_r, correct_fact_S, correct_fact_M
 
   type(dust_pop_type), pointer :: dp
 
+  integer :: ios, status, n_comment, n_grains
+  real :: fbuffer
+
+
   ! Boucle sur les populations de grains
   do i=1, n_pop
      dp => dust_pop(i)
 
-     if (dp%aexp < 0) then
-        write(*,*) "****************************************"
-        write(*,*) "Warning: slope grains size negative !!!!"
-        write(*,*) "****************************************"
-     endif
-
-     if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
-        a=dp%amin
-        dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
-     else
-        if (abs(dp%aexp - 4.) > 1.0e-5) then
-           if (abs(dp%aexp - 1.) > 1.0e-5) then
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
-                   (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                   (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
-           else
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
-                   (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                   (log(dp%amax)-log(dp%amin))
-           endif
-        else
-           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
-                (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
-                (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
-        endif
-     endif
-
-     ! Proprietes des grains
-     !exp_grains = (amax/amin)**(1./real(n_grains_tot))
-     if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
-        write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
-        write(*,*) "If yes, press return"
-        read(*,*)
-     endif
-
-     ! Taille des grains (recursif)
-     masse_pop = nbre_grains(dp%ind_debut)
-     exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
-     do  k=dp%ind_debut, dp%ind_fin
-        if (k==dp%ind_debut) then
-           a = dp%amin*sqrt(exp_grains)
-        else
-           a= r_grain(k-1) * exp_grains
+     if (lread_grain_size_distrib) then
+        if (n_pop > 1) then
+           write(*,*) "ERROR : you cannot provide a grain size distribution with more than 1 population"
+           write(*,*) "Exiting"
+           stop
         endif
 
-        r_grain(k) = a ! micron
-        S_grain(k) = pi * a**2 ! micron^2
-        M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+        open(unit=1, file=grain_size_file, status='old', iostat=ios)
+        if (ios/=0) then
+           write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+           write(*,*) "Exiting"
+           stop
+        endif
+        write(*,*) "Reading "//trim(grain_size_file)
 
-        ! Multiplication par a car da = a.dln(a)
-        nbre_grains(k) = a**(-dp%aexp) * a
-        grain(k)%methode_chauffage = dp%methode_chauffage
-        grain(k)%zone = dp%zone
-        grain(k)%pop = i
-        masse_pop = masse_pop + nbre_grains(k)
-     enddo !k
+        ! On elimine les lignes avec des commentaires
+        status = 1
+        n_comment = 0
+        do while (status /= 0)
+           n_comment = n_comment + 1
+           read(1,*,iostat=status) fbuffer
+        enddo
+        n_comment = n_comment - 1
 
-     masse_pop = masse_pop * dp%avg_grain_mass
+        ! On compte les lignes avec des donnees
+        status=0
+        n_grains=1 ! On a deja lu une ligne en cherchant les commentaires
+        do while(status==0)
+           n_grains=n_grains+1
+           read(1,*,iostat=status)
+        enddo
+        n_grains = n_grains - 1
 
-     ! Normalisation du nombre de grains pour atteindre la bonne masse
-     nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+        if (n_grains /= n_grains_tot) then
+           write(*,*) "ERROR : the number of grains must be the same as in the parameter file"
+           write(*,*) "I will correct that later", n_grains, n_grains_tot
+           write(*,*) "Exiting"
+           stop
+        endif
 
-     ! Normalisation de tous les grains au sein d'une pop
-     nbre_tot_grains = 0.0
-     do k=dp%ind_debut,dp%ind_fin
-        nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
-     enddo
 
-     ! Fraction de grains de taille k au sein d'une pop
-     do  k=dp%ind_debut,dp%ind_fin
-        nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
-     enddo !k
+        ! Lecture proprement dite
+        rewind(1)
+        ! On passe les commentaires
+        do k=1, n_comment
+           read(1,*)
+        enddo
 
-     ! Total radius is kept constant with coating
-     if (dp%lcoating) then
-        correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
-        do k=dp%ind_debut,dp%ind_fin
-           r_core(k) = r_grain(k)  * correct_fact_r
+        ! Lecture indices
+        masse_pop = 0.0
+        do k=1,n_grains
+           read(1,*) a, nbre_grains(k)
+
+           r_grain(k) = a ! micron
+           S_grain(k) = pi * a**2 ! micron^2
+           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+
+           ! Multiplication par a car da = a.dln(a)
+           nbre_grains(k) =  nbre_grains(k) * a
+           grain(k)%methode_chauffage = dp%methode_chauffage
+           grain(k)%zone = dp%zone
+           grain(k)%pop = i
+           masse_pop = masse_pop + nbre_grains(k)
         enddo ! k
-     endif
 
-  enddo !i
+        dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+     else ! lread_grain_size_distribution
+
+        if (dp%aexp < 0) then
+           write(*,*) "****************************************"
+           write(*,*) "Warning: slope grains size negative !!!!"
+           write(*,*) "****************************************"
+        endif
+
+           if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
+              a=dp%amin
+              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
+           else
+              if (abs(dp%aexp - 4.) > 1.0e-5) then
+                 if (abs(dp%aexp - 1.) > 1.0e-5) then
+                    dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
+                         (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                         (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+                 else
+                    dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
+                         (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
+                         (log(dp%amax)-log(dp%amin))
+                 endif
+              else
+                 dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
+                      (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
+                      (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+              endif
+           endif
+
+           ! Proprietes des grains
+           !exp_grains = (amax/amin)**(1./real(n_grains_tot))
+           if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
+              write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
+              write(*,*) "If yes, press return"
+              read(*,*)
+           endif
+
+           ! Taille des grains (recursif)
+           masse_pop = nbre_grains(dp%ind_debut)
+           exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
+           sqrt_exp_grains = sqrt(exp_grains)
+           do  k=dp%ind_debut, dp%ind_fin
+              if (k==dp%ind_debut) then
+                 a = dp%amin*sqrt_exp_grains
+              else
+                 a= r_grain(k-1) * exp_grains
+              endif
+
+              r_grain(k) = a ! micron
+              r_grain_min(k) = a/sqrt_exp_grains ! taille min
+              r_grain_max(k) = a*sqrt_exp_grains ! taille max
+
+              S_grain(k) = pi * a**2 ! micron^2
+              M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+
+              ! Multiplication par a car da = a.dln(a)
+              nbre_grains(k) = a**(-dp%aexp) * a
+              grain(k)%methode_chauffage = dp%methode_chauffage
+              grain(k)%zone = dp%zone
+              grain(k)%pop = i
+              masse_pop = masse_pop + nbre_grains(k)
+           enddo !k
+
+        endif ! lread_grain_size_distribution
+
+        masse_pop = masse_pop * dp%avg_grain_mass
+
+
+        ! Normalisation du nombre de grains pour atteindre la bonne masse
+        nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+
+        ! Normalisation de tous les grains au sein d'une pop
+        nbre_tot_grains = 0.0
+        do k=dp%ind_debut,dp%ind_fin
+           nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
+        enddo
+
+        ! Fraction de grains de taille k au sein d'une pop
+        do  k=dp%ind_debut,dp%ind_fin
+           nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
+        enddo !k
+
+        ! Total radius is kept constant with coating
+        if (dp%lcoating) then
+           correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
+           do k=dp%ind_debut,dp%ind_fin
+              r_core(k) = r_grain(k)  * correct_fact_r
+           enddo ! k
+        endif
+
+     enddo !i
 
   return
 
@@ -145,11 +224,16 @@ subroutine init_indices_optiques()
   real, dimension(:), allocatable :: tab_l, tab_n, tab_k
   real, dimension(:,:), allocatable :: tab_tmp_amu1, tab_tmp_amu2
 
-  logical :: l_ordre_decroissant
+  logical :: l_ordre_decroissant, lread_opacity_file
 
+  logical, save :: lfirst = .true.
+
+  if (lfirst) then
+     lread_opacity_file = .false.
+  endif
 
   do pop=1, n_pop
-     if (.not.dust_pop(pop)%is_PAH) then
+     if (.not.dust_pop(pop)%is_opacity_file) then
 
         n_components = dust_pop(pop)%n_components
         if (dust_pop(pop)%porosity > tiny_real) n_components = n_components + 1
@@ -325,20 +409,28 @@ subroutine init_indices_optiques()
         dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
-     else ! PAH
-        ! we only set the material density
-        dust_pop(pop)%component_rho1g(1) = 2.5
-        dust_pop(pop)%rho1g_avg = 2.5
+     else ! fichier d'opacite
+        if (lfirst) then
+           ! We allocate the arrays to save dimension the 1st time we enter this section
+           if (.not.lread_opacity_file) then
+              allocate(op_file_na(n_pop), op_file_n_lambda(n_pop), sh_file(n_pop), file_sh_nT(n_pop))
+              op_file_na = 0 ; op_file_n_lambda = 0 ; sh_file = ""; file_sh_nT = 0
+           endif
+           lread_opacity_file = .true.
+        endif
+
+        call get_opacity_file_dim(pop)
 
         if (dust_pop(pop)%n_components > 1) then
-           write(*,*) "ERROR : cannot mix PAH with other component"
+           write(*,*) "ERROR : cannot mix dust with opacity file with other component"
            write(*,*) "Exiting"
            stop
         endif
-
-     endif ! fin test PAH
-
+     endif ! fichier d'opacite
   enddo ! pop
+
+  if (lfirst.and.lread_opacity_file) call alloc_mem_opacity_file()
+  lfirst = .false.
 
   return
 
@@ -458,16 +550,8 @@ subroutine prop_grains(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
-  real :: a, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
-  integer :: k, alloc_status, i, pop, l, ios
-
-  type(dust_pop_type) :: dp
-
-  ! PAH
-  real, dimension(PAH_n_lambda,PAH_n_rad) :: tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g
-  character(len=512) :: filename, dir
-  real, dimension(PAH_n_lambda) :: tmp_PAH_lambda
-  real, dimension(PAH_n_rad) :: tmp_PAH_rad
+  real :: a, wavel, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
+  integer :: k, i, pop, l
 
   qext=0.0
   qsca=0.0
@@ -475,56 +559,8 @@ subroutine prop_grains(lambda, p_lambda)
   ! Longueur d'onde
   wavel=tab_lambda(lambda)
 
-  if (lnRE) then
-     if (.not.lread_PAH) then ! variable logique pour ne lire qu'une seule fois le fichier de prop de PAH
-        allocate(PAH_Q_ext(PAH_n_lambda,PAH_n_rad,n_pop), &
-             PAH_Q_sca(PAH_n_lambda,PAH_n_rad,n_pop), &
-             PAH_g(PAH_n_lambda,PAH_n_rad,n_pop), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error PAH_Q_ext'
-           stop
-        endif
-
-        do i=1, n_pop
-           dp = dust_pop(i)
-           if (dp%is_PAH) then
-              filename = trim(dp%indices(1))
-
-              dir = in_dir(filename, dust_dir,  status=ios)
-              if (ios /=0) then
-                 write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-                 write(*,*) "Exiting"
-                 stop
-              else
-                 filename = trim(dir)//trim(filename) ;
-                 write(*,*) "Reading "//trim(filename) ;
-              endif
-
-              ! load optical data from file
-              call draine_load(filename, PAH_n_lambda, PAH_n_rad, 10, 1, &
-                   tmp_PAH_lambda, tmp_PAH_rad,  tmp_Q_ext, tmp_Q_abs, tmp_Q_sca, tmp_g, 4)
-              PAH_Q_ext(:,:,i) = tmp_Q_ext
-              PAH_Q_sca(:,:,i) = tmp_Q_sca
-              PAH_g(:,:,i) = tmp_g
-              PAH_lambda = tmp_PAH_lambda
-              log_PAH_rad = log(tmp_PAH_rad)
-           endif
-        enddo !i
-
-        ! abs car le fichier de lambda pour les PAHs est a l'envers
-        PAH_delta_lambda(1) = abs(PAH_lambda(2) - PAH_lambda(1))
-        if (n_lambda > 1) then
-           PAH_delta_lambda(n_lambda) = abs(PAH_lambda(n_lambda) - PAH_lambda(n_lambda-1))
-        endif
-        do l=2,PAH_n_lambda-1
-           PAH_delta_lambda(l) = 0.5* abs(PAH_lambda(l+1) - PAH_lambda(l-1))
-        enddo
-
-        lread_PAH = .true.
-     endif
-  endif
-
   ! Prop optiques
+  ! Une premiere boucle pour les grains definis par un fichier d'indice
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,alfa,qext,qsca,fact,gsca,amu1,amu2,pop) &
@@ -537,8 +573,8 @@ subroutine prop_grains(lambda, p_lambda)
   ! et savoir des le debut si l'alloc. mem. ds bhmie passe ou pas
   do  k=n_grains_tot,1,-1
      pop = grain(k)%pop
-     a = r_grain(k)
-     if (.not.dust_pop(pop)%is_PAH) then ! theorie de mie ou gmm
+     if (.not.dust_pop(pop)%is_opacity_file) then
+        a = r_grain(k)
         amu1=tab_amu1(lambda,pop)
         amu2=tab_amu2(lambda,pop)
         alfa = 2.0 * pi * a / wavel
@@ -561,24 +597,45 @@ subroutine prop_grains(lambda, p_lambda)
            endif
            !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
-     else ! grain de PAH
-        is_grain_PAH(k) = .true.
-        call mueller_PAH(lambda,p_lambda,k,qext, qsca,gsca)
-     endif
-     tab_albedo(lambda,k)=qsca/qext
-     tab_g(lambda,k) = gsca
-     ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-     ! a² microns² -> 1e-8 cm²             \
-     ! density en cm-3                      > reste facteur 149595.0
-     ! longueur de vol en AU = 1.5e13 cm   /
-     fact =  pi * a * a * 149595.0
-     !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-     q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
-     q_sca(lambda,k) = qsca * fact
-     q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+        tab_albedo(lambda,k)=qsca/qext
+        tab_g(lambda,k) = gsca
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² microns² -> 1e-8 cm²             \
+        ! density en cm-3                      > reste facteur 149595.0
+        ! longueur de vol en AU = 1.5e13 cm   /
+        fact =  pi * a * a * 149595.0
+        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        q_sca(lambda,k) = qsca * fact
+        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k) ! section efficace
+     endif ! is_opacity_file
   enddo !k
   !$omp enddo
   !$omp end parallel
+
+  ! On refait exactement la meme boucle en sequentielle (pour eviter pb d'allocation en parallel)
+  ! pour les grains definis par un fichier d'opacite
+  ! Boucle a l'endroit cette fois
+  do  k=1,n_grains_tot
+     pop = grain(k)%pop
+     if (dust_pop(pop)%is_opacity_file) then
+        a = r_grain(k)
+        if (dust_pop(pop)%is_PAH) is_grain_PAH(k) = .true.
+        call mueller_opacity_file(lambda,p_lambda,k,qext, qsca,gsca)
+
+        tab_albedo(lambda,k)=qsca/qext
+        tab_g(lambda,k) = gsca
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² microns² -> 1e-8 cm²             \
+        ! density en cm-3                      > reste facteur 149595.0
+        ! longueur de vol en AU = 1.5e13 cm   /
+        fact =  pi * a * a * 149595.0
+        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        q_sca(lambda,k) = qsca * fact
+        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+     endif ! is_opacity_file
+  enddo !k
 
   return
 
@@ -632,6 +689,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   logical :: ok
 
   lcompute = .true.
+  if (lread_Misselt) return
 
   if (letape_th) then
      filename=".dust_prop1.tmp" ;
@@ -682,7 +740,6 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
 end subroutine read_saved_dust_prop
 
 !******************************************************************************
-
 
 subroutine opacite2(lambda)
 ! Calcule la table d'opacite et probsizecumul
@@ -899,11 +956,12 @@ subroutine opacite2(lambda)
                  if (aniso_method==1) then
                     ! Moyennage matrice de mueller (long) (dernier indice : angle)
                     ! TODO : indice 1 suppose que mueller (via prop_grain) a ete calcule juste avant
-                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(1,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
+                    ! --> change en lambda depuis que l'on sauve les proprietes optiques (ie p_lambda pointe toujours sur lambda)
+                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(lambda,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(1,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
-                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(1,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
-                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(1,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
+                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(lambda,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
+                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(lambda,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
+                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(lambda,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
                     endif
                  endif !aniso_method
               else
@@ -932,38 +990,38 @@ subroutine opacite2(lambda)
                  norme = 0.0_db
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
+                    norme=norme + tab_s11_pos(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
 
                  if (abs(norme) > 0.0_db) then
                     norme = 1.0_db / (norme * deux_pi)
 
-                    tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(lambda,i,j,pk,:) * norme
                     if (lsepar_pola) then
                        ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
                        ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                       tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
-                       tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
-                       tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(lambda,i,j,pk,:) * norme
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(lambda,i,j,pk,:) * norme
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(lambda,i,j,pk,:) * norme
                     endif
                  else
-                    tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     if (lsepar_pola) then
-                       tab_s12_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s33_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     endif
                  endif ! norme
 
                  if (lsepar_pola) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s12_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s33_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s34_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
                  endif
               else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
@@ -971,14 +1029,14 @@ subroutine opacite2(lambda)
                  norme = 0.0
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))* &
+                    tab_s11_ray_tracing(lambda,i,j,pk,thetaj) =((1-gsca**2)/(2.0))* &
                          (1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
-                    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+                    norme=norme + tab_s11_ray_tracing(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
-                 tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)
+                 tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_ray_tracing(lambda,i,j,pk,:) / (norme * deux_pi)
               endif
 
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
+              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,pk,:) = 1.0 / (4.* nang_scatt)
 
             !  ! Verification normalization
             !  norme = 0.0
@@ -1128,7 +1186,19 @@ subroutine opacite2(lambda)
   endif
 
   ! On remet la densite à zéro si besoin
-  if (ldens0) densite_pouss(1,1,1,:) = 0.0_db
+  if (ldens0) then
+     densite_pouss(1,1,1,:) = 0.0_db
+     kappa(lambda,1,1,1) = 0.0_db
+     if (lRE_LTE) then
+        kappa_abs_eg(lambda,1,1,1) = 0.0_db
+     endif
+     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
+        kappa_sca(lambda,1,1,1) = 0.0_db
+     endif
+     if (lnRE) then
+        prob_kappa_abs_1grain(lambda,1,1,:) = 0.0
+     endif
+  endif
 
 !  write(*,*) "lambda", tab_lambda(lambda), tab_g_pos(lambda,1,1,1)
 !  write(*,*) tab_s11_ray_tracing(lambda,1,1,:)
@@ -1224,7 +1294,7 @@ subroutine opacite2(lambda)
      call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
      if (lsepar_pola) then
-        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:)/tab_s11_pos(:,1,1,1,:)
+        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:) ! Deja normalise par S11
         call cfitsWrite("data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 

@@ -214,19 +214,22 @@ mcfost2prodimo : mcfost mcfost2prodimo.o
 release : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/linux_64bits web/macos_intel_64bits
-	cp mcfost web/macos_intel_64bits
-	openssl sha1 mcfost | awk '{print $$2}' > web/macos_intel_64bits/mcfost.sha1
+	mkdir web web/linux web/macos
+	cp mcfost web/macos
+	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
-	scp fosti:mcfost/src/mcfost web/linux_64bits/
-	scp fosti:mcfost/src/mcfost.sha1 web/linux_64bits/
+	scp fosti:mcfost/src/mcfost web/linux/
+	scp fosti:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para"}' ` web
+	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph --branches > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
+	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
+	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 
@@ -234,15 +237,18 @@ release : main
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/macos_intel_64bits
-	openssl sha1 mcfost | awk '{print $$2}' > web/macos_intel_64bits/mcfost.sha1
-	cp mcfost web/macos_intel_64bits
+	mkdir web web/macos
+	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
+	cp mcfost web/macos
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para"}' ` web
+	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
+	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
+	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
 

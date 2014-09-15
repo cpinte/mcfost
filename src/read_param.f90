@@ -59,6 +59,7 @@ contains
     correct_Rsub = 1.0_db
     lmigration = .false.
     lhydrostatic = .false.
+    lread_misselt=.false.
 
     if (abs(para_version - 2.19) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
@@ -328,12 +329,13 @@ contains
           lstrat=.true.
        endif
        read(1,*) lmigration
-       read(1,*) lhydrostatic
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+       read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
        if (status/=0) correct_Rsub = 1.0
+       read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
+       T_min=1. ; T_max=2500. ; n_T=1000
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
@@ -559,6 +561,8 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
+    dust_pop%is_Misselt_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -599,9 +603,19 @@ contains
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
+             if (dust_pop(ind_pop)%indices(1)(1:7) == "Misselt") then
+                dust_pop(ind_pop)%is_opacity_file = .true.
+                dust_pop(ind_pop)%is_Misselt_opacity_file = .true.
+                lread_Misselt = .true.
+                if (dust_pop(ind_pop)%indices(1)(9:11) == "PAH") then
+                   dust_pop(ind_pop)%is_PAH = .true.
+                   T_max = 2500.
+                endif
+             endif
+
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
              grain_nRE_end = grain_nRE_end +  dust_pop(ind_pop)%n_grains
@@ -664,12 +678,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -876,9 +890,9 @@ contains
           lstrat=.true.
        endif
        read(1,*) lmigration
-       read(1,*) lhydrostatic
        read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
        if (status/=0) correct_Rsub = 1.0
+       read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
@@ -1101,6 +1115,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop(ind_pop)%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -1141,7 +1156,7 @@ contains
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -1207,12 +1222,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -1643,6 +1658,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop(ind_pop)%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -1683,7 +1699,7 @@ contains
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -1749,12 +1765,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2188,6 +2204,8 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop(ind_pop)%is_opacity_file = .false.
+
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -2228,7 +2246,7 @@ contains
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -2294,12 +2312,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2721,6 +2739,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -2761,7 +2780,7 @@ contains
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -2827,12 +2846,12 @@ contains
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3261,6 +3280,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -3301,7 +3321,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -3367,12 +3387,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3793,6 +3813,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -3833,7 +3854,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -3899,12 +3920,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -4310,6 +4331,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -4350,7 +4372,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -4416,12 +4438,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -4826,6 +4848,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -4866,7 +4889,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -4931,12 +4954,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -5341,6 +5364,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -5381,7 +5405,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -5442,12 +5466,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -5717,6 +5741,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -5757,7 +5782,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -5811,12 +5836,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6075,8 +6100,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
-
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6117,7 +6141,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -6171,12 +6195,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6443,8 +6467,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
-
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6485,7 +6508,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -6539,12 +6562,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -6813,8 +6836,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
-
+    dust_pop%is_opacity_file = .true.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -6855,7 +6877,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -6909,12 +6931,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7181,8 +7203,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
-
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -7223,7 +7244,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -7278,12 +7299,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7520,7 +7541,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
+    dust_pop%is_opacity_file = .false.
 
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
@@ -7562,7 +7583,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -7610,12 +7631,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
 
@@ -7850,8 +7871,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
-
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -7892,7 +7912,7 @@ end subroutine read_para215
              ind_pop=ind_pop+1
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop(ind_pop)%is_PAH = .true.
+                dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
@@ -7931,12 +7951,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
     do i=1,n_etoiles
@@ -8162,7 +8182,7 @@ end subroutine read_para215
        stop
     endif
     dust_pop%is_PAH = .false.
-
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -8224,12 +8244,12 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(prob_E_star(n_lambda,0:n_etoiles), stat=alloc_status)
+    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error prob_E_star'
+       write(*,*) 'Allocation error CDF_E_star'
        stop
     endif
-    prob_E_star = 0.0
+    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
 
     do i=1,n_etoiles

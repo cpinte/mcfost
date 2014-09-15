@@ -623,7 +623,7 @@ subroutine transfert_poussiere()
         endif
         if (lnRE) then
            call Temp_nRE(flag_em_nRE)
-           if (n_iter > 10) then
+           if (n_iter > 50) then
               flag_em_nRE = .true.
               write(*,*) "WARNING: Reaching the maximum number of iterations"
               write(*,*) "radiation field may not be converged"
@@ -753,7 +753,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
-     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,x0,y0,z0,u0,v0,w0,w02)
+     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,phik,x0,y0,z0,u0,v0,w0,w02)
      !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
 
      if (w0 /= 0.0) then
@@ -1308,9 +1308,9 @@ subroutine dust_map(lambda,ibin)
 #include "sprng_f.h"
 
   integer, intent(in) :: lambda, ibin
-  real(kind=db) :: u,v,w
-  real(kind=db), dimension(2,3) :: Iaxis
-  real(kind=db), dimension(3) :: center, dx, dy, Icorner
+  real(kind=db) :: uv, u,v,w
+
+  real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
 
   real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, l, x0, y0, z0
@@ -1323,52 +1323,28 @@ subroutine dust_map(lambda,ibin)
 
   if (lmono0) write(*,'(a16, $)') " Ray-tracing ..."
 
+  phi_RT = 0.
+
   ! Direction de visee pour le ray-tracing
-  u = sin(tab_RT_incl(ibin)/180._db*pi) ;  v=0.0_db ; w = sqrt(1.0_db - u*u)
+  uv = sin(tab_RT_incl(ibin) * deg_to_rad) ;  w = cos(tab_RT_incl(ibin) * deg_to_rad)
+  u = uv * cos(phi_RT * deg_to_rad) ; v = uv * sin(phi_RT * deg_to_rad) ;
+  uvw = (/u,v,w/)
 
   ! Definition des vecteurs de base du plan image dans le repere universel
-  ! Iaxis(1,x,y,z) est le vecteur x_plan_image
-  ! Iaxis(2,x,y,z) est le vecteur y_plan_image
 
-!!$
-!!$!!! Ancienne methode : c'est trop complique de faire une rotation du plan image
-!!$!!! dommage, j'aimais bien avec des produits vectoriels
-!!$
-!!$  ! Iaxis1 = - (u,v,w) ^ (0,0,1) normalise
-!!$  ! Iaxis2 = (u,v,w) ^ Iaxis1
-!!$  norme = sqrt(v**2+u**2)
-!!$  if (norme > tiny_db) then
-!!$     Iaxis(1,1) = -v/norme ; Iaxis(1,2) = u/norme ; Iaxis(1,3) = 0.0_db  ! OK sans rotation
-!!$     Iaxis(2,1) = -w*Iaxis(1,2) ; Iaxis(2,2) = w*Iaxis(1,1) ; Iaxis(2,3) = u*Iaxis(1,2) - v*Iaxis(1,1)
-!!$  else ! direction verticale
-!!$     Iaxis(1,1) = 1.0_db ; Iaxis(1,2) = 0.0_db ; Iaxis(1,3) = 0.0_db
-!!$     Iaxis(2,1) = 0.0_db ; Iaxis(2,2) = -1.0_db ; Iaxis(2,3) = 0.0_db
-!!$  endif
-!!$
-!!$  write(*,*) "OLDx", real(Iaxis(1,:))
-!!$  write(*,*) "OLDy", real(Iaxis(2,:))
-!!$
-!!$!!! fin ancienne methde
+  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  x = (/sin(phi_RT * deg_to_rad),-cos(phi_RT * deg_to_rad),0/)
 
-  ! Pour rotation plan image (signe - pour convention astro)
-  cos_disk = cos(ang_disque/180._db*pi) ;  sin_disk = -sin(ang_disque/180._db*pi)
-
-  ! vecteur de base 1
-  if (abs(w) < 0.999999999_db) then
-     x1=0.0_db ; y1=-cos_disk ; z1=sin_disk
-     call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
-     Iaxis(1,1) = x2 ; Iaxis(1,2) = y2 ; Iaxis(1,3) =z2
-
-     ! vecteur de base 2
-     x1=0.0_db ; y1=sin_disk ; z1=cos_disk
-     call rotation(x1,y1,z1,-u,-v,-w,x2,y2,z2)
-     Iaxis(2,1) = x2 ; Iaxis(2,2) = y2 ; Iaxis(2,3) =z2
+  ! Vecteur x image avec PA
+  if (abs(ang_disque) > tiny_real) then
+     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     x_plan_image = rotation_3d(uvw, ang_disque, x)
   else
-     !Iaxis(1,1) = 1.0_db ; Iaxis(1,2) = 0.0_db ; Iaxis(1,3) = 0.0_db
-     !Iaxis(2,1) = 0.0_db ; Iaxis(2,2) = -1.0_db ; Iaxis(2,3) = 0.0_db
-     Iaxis(1,1) = 0.0_db ; Iaxis(1,2) = 1.0_db ; Iaxis(1,3) = 0.0_db
-     Iaxis(2,1) = -1.0_db ; Iaxis(2,2) = 0.0_db ; Iaxis(2,3) = 0.0_db
+     x_plan_image = x
   endif
+
+  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  y_plan_image =cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
@@ -1378,7 +1354,7 @@ subroutine dust_map(lambda,ibin)
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
   ! Coin en bas gauche de l'image
-  Icorner(:) = center(:) -  (0.5 * map_size / zoom) * (Iaxis(1,:) + Iaxis(2,:) )
+  Icorner(:) = center(:) -  (0.5 * map_size / zoom) * (x_plan_image + y_plan_image)
 
   ! Methode 1 = echantillonage log en r et uniforme en phi
   ! Methode 2 = echantillonage lineaire des pixels (carres donc) avec iteration sur les sous-pixels
@@ -1420,7 +1396,7 @@ subroutine dust_map(lambda,ibin)
      !$omp parallel &
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-     !$omp shared(tab_r,fact_A,Iaxis,center,dx,dy,u,v,w,i,j,ibin) &
+     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j,ibin) &
      !$omp shared(n_iter_min,n_iter_max,lambda,l_sym_ima,cst_phi)
      id =1 ! pour code sequentiel
 
@@ -1434,7 +1410,7 @@ subroutine dust_map(lambda,ibin)
         do phi_RT=1,n_phi_RT ! de 0 a pi
            phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
 
-           pixelcorner(:,id) = center(:) + r * sin(phi) * Iaxis(1,:) + r * cos(phi) * Iaxis(2,:) ! C'est le centre en fait car dx = dy = 0.
+           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
            call intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
@@ -1445,8 +1421,8 @@ subroutine dust_map(lambda,ibin)
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
-     dx(:) = Iaxis(1,:) * taille_pix
-     dy(:) = Iaxis(2,:) * taille_pix
+     dx(:) = x_plan_image * taille_pix
+     dy(:) = y_plan_image * taille_pix
 
      if (l_sym_ima) then
         igridx_max = igridx/2 + modulo(igridx,2)
@@ -1475,7 +1451,6 @@ subroutine dust_map(lambda,ibin)
      !$omp end do
      !$omp end parallel
 
-
      ! On recupere tout le flux par symetrie
      ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
      if (l_sym_ima) then
@@ -1486,23 +1461,13 @@ subroutine dust_map(lambda,ibin)
 
   endif ! method
 
-  ! Flux etoile
-  Flux_etoile = flux_etoile_ray_tracing(lambda,u,v,w)
+  ! Adding stellar contribution
+  call compute_stars_map(lambda,ibin, u, v, w)
 
-  ! Pixel central
-  if (ech_method==1) then
-     cx = 1
-     cy = 1
-  else
-     cx = igridx/2+1
-     cy = igridy/2+1
-  endif
-
-  ! TODO : l'etoile n'est dans ce cas pas resolu dans l'image !!!
-  id = 1 ! le flux de l'etoile n'est que sur le 1 cpu
-  Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,1,id) + Flux_etoile
+  id = 1
+  Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + stars_map
   if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,cx,cy,ibin,n_Stokes+1,id) + Flux_etoile
+     Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + stars_map
   endif
 
   if (lmono0) write(*,*) "Done"
@@ -1513,65 +1478,97 @@ end subroutine dust_map
 
 !***********************************************************
 
-function flux_etoile_ray_tracing(lambda,u,v,w) result(Flux)
+subroutine compute_stars_map(lambda,ibin, u,v,w)
+  ! Make a ray-traced map of the stars
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, ibin
   real(kind=db), intent(in) :: u,v,w
 
   integer, parameter :: n_ray_star = 1000
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: Flux, x0,y0,z0, lmin, lmax,l, norme, x, y, z, argmt, srw02, cos_thet
+  real(kind=db) :: facteur, x0,y0,z0, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
   real :: rand, rand2, tau
-  integer :: id, i, j, k
+  integer :: id, ri, zj, phik, iray, istar, i,j
+  logical :: in_map
 
+  real, dimension(:,:), allocatable :: map_1star
 
-    ! Ajout etoile
-  id = 1 ; i=0 ; j=1 ;
+  stars_map = 0.0 ;
+  id = 1 ;
 
-  ! Etoile ponctuelle
-!  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
-!  Stokes = 0.0_db
-!  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-!  Flux_etoile =  exp(-tau)
-!  write(*,*)  "F0", Flux_etoile
+  allocate(map_1star(igridx,igridy))
 
-  ! Etoile non ponctuelle
-  Flux = 0.0_db
-  norme = 0.0_db
-  do k=1,n_ray_star
-     ! Position aleatoire sur la disque stellaire
-     rand  = sprng(stream(id))
-     rand2 = sprng(stream(id))
-
-     ! Position de depart aleatoire sur une sphere de rayon 1
-     z = 2.0_db * rand - 1.0_db
-     srw02 = sqrt(1.0-z*z)
-     argmt = pi*(2.0_db*rand2-1.0_db)
-     x = srw02 * cos(argmt)
-     y = srw02 * sin(argmt)
-
-     cos_thet = abs(x*u + y*v + z*w) ;
-     !cos_thet = 1.0_db ;
-
-     ! Position de depart aleatoire sur une sphere de rayon r_etoile
-     x0 = etoile(1)%x + x * etoile(1)%r
-     y0 = etoile(1)%y + y * etoile(1)%r
-     z0 = etoile(1)%z + z * etoile(1)%r
-
-     Stokes = 0.0_db
-     call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
-     Flux = Flux + exp(-tau) * cos_thet
-     norme = norme + cos_thet
-  enddo
-  Flux = Flux / norme
-
-  Flux = Flux * E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
+  ! Energie
+  facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
+
+  do istar=1, n_etoiles
+     map_1star = 0.0 ;
+
+     ! Etoile ponctuelle
+     !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
+     !  Stokes = 0.0_db
+     !  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+     !  Flux_etoile =  exp(-tau)
+     !  write(*,*)  "F0", Flux_etoile
+
+     ! Etoile non ponctuelle
+
+     norme = 0.0_db
+     do iray=1,n_ray_star
+        ! Position aleatoire sur la disque stellaire
+        rand  = sprng(stream(id))
+        rand2 = sprng(stream(id))
+
+        ! Position de depart aleatoire sur une sphere de rayon 1
+        z = 2.0_db * rand - 1.0_db
+        srw02 = sqrt(1.0-z*z)
+        argmt = pi*(2.0_db*rand2-1.0_db)
+        x = srw02 * cos(argmt)
+        y = srw02 * sin(argmt)
+
+        cos_thet = abs(x*u + y*v + z*w) ;
+        !cos_thet = 1.0_db ;
+
+        ! Position de depart aleatoire sur une sphere de rayon r_etoile
+        x0 = etoile(istar)%x + x * etoile(istar)%r
+        y0 = etoile(istar)%y + y * etoile(istar)%r
+        z0 = etoile(istar)%z + z * etoile(istar)%r
+
+        Stokes = 0.0_db
+        if (l3D) then
+           ! Coordonnees initiale : position etoile dans la grille
+           call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
+
+           call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        else
+           ! Coordonnees initiale : position etoile dans la grille
+           call indice_cellule(x0,y0,z0,ri,zj)
+
+           call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        endif
+
+        ! Coordonnees pixel
+         if (lsed.and.(RT_sed_method == 1)) then
+           i=1 ; j=1
+        else
+           call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
+        endif
+
+        if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
+        norme = norme + cos_thet
+     enddo
+     ! Normalizing map
+     map_1star = map_1star * (facteur * prob_E_star(lambda,istar)) / norme
+
+     ! Adding all the stars
+     stars_map = stars_map + map_1star
+  enddo ! n_stars
 
   return
 
-end function flux_etoile_ray_tracing
+end subroutine compute_stars_map
 
 !***********************************************************
 

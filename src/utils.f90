@@ -153,7 +153,7 @@ real(kind=sl) function interp_sp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
+! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -172,10 +172,21 @@ real(kind=sl) function interp_sp(y, x, xp)
   !   write(*,*) "Error in interp : y and x must have same dim"
   !endif
 
-
   ! PAS D'EXTRAPOLATION
-  if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_sp = minval(y)
+  if (xp < minval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_sp = y(1)
+     else
+        interp_sp = y(n)
+     endif
+     return
+  endif
+  if (xp > maxval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_sp = y(n)
+     else
+        interp_sp = y(1)
+     endif
      return
   endif
 
@@ -204,7 +215,7 @@ real(kind=db) function interp_dp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
-! Modif : pas d'extrapolation : renvoie valeur mini en dehors de l'intervalle
+! Modif : pas d'extrapolation : renvoie valeur a xmin ou xmax
 ! C. Pinte
 ! 26/01/07
 
@@ -225,8 +236,20 @@ real(kind=db) function interp_dp(y, x, xp)
 
 
   ! PAS D'EXTRAPOLATION
-  if ((xp < minval(x)) .or. (xp > maxval(x))) then
-     interp_dp = minval(y)
+  if (xp < minval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_dp = y(1)
+     else
+        interp_dp = y(n)
+     endif
+     return
+  endif
+  if (xp > maxval(x)) then
+     if (x(n) > x(1)) then ! xcroissant
+        interp_dp = y(n)
+     else
+        interp_dp = y(1)
+     endif
      return
   endif
 
@@ -250,7 +273,6 @@ real(kind=db) function interp_dp(y, x, xp)
 end function interp_dp
 
 !**********************************************************************
-
 
 subroutine GaussSlv(a, b, n)
   ! Resolution d'un systeme d'equation par methode de Gauss
@@ -507,12 +529,14 @@ end subroutine mcfost_setup
 
 !***********************************************************
 
-function mcfost_update(lforce_update)
+function mcfost_update(lforce_update, lmanual, n_days)
 
-  logical, intent(in) :: lforce_update
+  logical, intent(in) :: lforce_update, lmanual
+  integer, intent(in), optional :: n_days
   logical :: lupdate, mcfost_update
 
-  character(len=512) :: cmd, url, url_sha1, last_version, machtype, ostype, system, current_binary
+  character(len=512) :: cmd, url, url_sha1, last_version, current_binary, s
+  character(len=32) :: system
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -524,10 +548,19 @@ function mcfost_update(lforce_update)
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
-     write(*,*) "ERROR: Cannot get MCFOST last version number."
-     write(*,*) "Current version file not found."
-     write(*,*) "Exiting"
-     stop
+     write(*,*) "ERROR: Cannot connect to MCFOST server."
+     if (lmanual) then
+        write(*,*) "Exiting."
+        stop
+     else ! if it is an auto-update, we don't exit
+        mcfost_update = .false.
+        ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
+        write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
+        write(s,*) (n_days-1) * 3600 * 24
+        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "//trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+        call appel_syst(cmd, syst_status)
+        return
+     endif
   endif
 
   open(unit=1, file="version.txt", status='old',iostat=ios)
@@ -536,7 +569,7 @@ function mcfost_update(lforce_update)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
-     write(*,*) "Exiting"
+     write(*,*) "Exiting."
      stop
   endif
 
@@ -555,58 +588,38 @@ function mcfost_update(lforce_update)
   write(*,*) " "
 
   if (lupdate) then
-     ! get system info
-     call get_environment_variable('OSTYPE',ostype)
-     call get_environment_variable('MACHTYPE',machtype)
-     system = trim(ostype)//" "//trim(machtype)
-
+     ! get system info with uname : Darwin or Linux
+     cmd = "uname > arch.txt" ;  call appel_syst(cmd, syst_status)
+     open(unit=1, file="arch.txt", status='old',iostat=ios)
+     read(1,*,iostat=ios) system
+     close(unit=1,status="delete",iostat=ios)
+     if (ios/=0) then
+        write(*,*) "Unknown operating system : error 1"
+        write(*,*) "Cannot download new binary"
+        write(*,*) "Exiting."
+        stop
+     endif
 
      ! get the correct url corresponding to the system
-     if (ostype(1:5)=="linux") then
-        if (machtype(1:4)=="i386") then
-           url = trim(webpage)//"linux_32bits/mcfost"
-           url_sha1 = trim(webpage)//"linux_32bits/mcfost.sha1"
-        else if (machtype(1:6)=="x86_64") then
-           url = trim(webpage)//"linux_64bits/mcfost"
-           url_sha1 = trim(webpage)//"linux_64bits/mcfost.sha1"
-        else
-           write(*,*) "Linux system but unknown architecture"
-           write(*,*) "Cannot download new binary"
-           write(*,*) "Exiting."
-           stop
-        endif
-         system = trim(ostype)//" "//trim(machtype)
-     else if (ostype(1:6)=="darwin") then
-        system = "MacOS X x86_64"
-        url = trim(webpage)//"macos_intel_64bits/mcfost"
-        url_sha1 = trim(webpage)//"macos_intel_64bits/mcfost.sha1"
+     if (system(1:5)=="Linux") then
+        url = trim(webpage)//"linux/mcfost"
+        url_sha1 = trim(webpage)//"linux/mcfost.sha1"
+     else if (system(1:6)=="Darwin") then
+        url = trim(webpage)//"macos/mcfost"
+        url_sha1 = trim(webpage)//"macos/mcfost.sha1"
      else
-        write(*,*) "Unknown operating system"
+        write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
-        write(*,*) " "
-        write(*,*) "Detected configuration:"
-        write(*,*) "OSTYPE: ", trim(ostype)
-        write(*,*) "MACHTYPE: ", trim(machtype)
-        write(*,*) " "
-        write(*,*) "You can try to update the environement variables OSTYPE & MACHTYPE"
-        write(*,*) "Known values:"
-        write(*,*) " - OSTYPE: linux or darwin"
-        write(*,*) " - MACHTYPE: i386 or x86_64"
-
         write(*,*) "Exiting."
         stop
      endif
 
      write(*,*) "Your system is ", trim(system)
 
-
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     !cmd = "wget -q "//trim(url)//" -O mcfost_update"
-     cmd = "curl "//trim(url)//" -o mcfost_update -s"
-     call appel_syst(cmd, syst_status)
-     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s"
-     call appel_syst(cmd, syst_status)
+     cmd = "curl "//trim(url)//" -o mcfost_update -s"    ; call appel_syst(cmd, syst_status)
+     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s" ; call appel_syst(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
@@ -617,12 +630,11 @@ function mcfost_update(lforce_update)
         stop
      endif
 
-
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
-     if (ostype(1:5)=="linux") then
+     if (system(1:5)=="Linux") then
         cmd = "sha1sum  mcfost_update > mcfost_update.sha1"
-     else if (ostype(1:6)=="darwin") then
+     else if (system(1:6)=="Darwin") then
         cmd = "openssl sha1 mcfost_update | awk '{print $2}' > mcfost_update.sha1"
      endif
      call appel_syst(cmd, syst_status)
@@ -636,11 +648,13 @@ function mcfost_update(lforce_update)
      close(unit=1,status="delete",iostat=ios)
 
      if ( (ios/=0) .or. (mcfost_sha1/=mcfost_update_sha1)) then
-        cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
+        !cmd = "rm -rf mcfost_update" ; call appel_syst(cmd, syst_status)
         write(*,*) " "
         write(*,*) "ERROR: binary sha1 is incorrect. MCFOST has not been updated."
-        write(*,*) mcfost_sha1
+        write(*,*) "The downloaded file has sha1: "
         write(*,*) mcfost_update_sha1
+        write(*,*) "It should be:"
+        write(*,*) mcfost_sha1
         write(*,*) "Exiting"
         stop
      else
@@ -723,15 +737,19 @@ subroutine mcfost_get_ref_para()
   character(len=512) :: cmd
   character(len=12) :: ref_file
   character(len=18) :: ref_file_multi
+  character(len=15) :: ref_file_3D
   integer ::  syst_status
 
   ref_file = "ref"//mcfost_release(1:4)//".para"
   ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
+  ref_file_3D = "ref"//mcfost_release(1:4)//"_3D.para"
 
-  write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi
+  write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
   cmd = "curl "//trim(webpage)//ref_file//" -O -s"
   call appel_syst(cmd, syst_status)
   cmd = "curl "//trim(webpage)//ref_file_multi//" -O -s"
+  call appel_syst(cmd, syst_status)
+  cmd = "curl "//trim(webpage)//ref_file_3D//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST reference file"
@@ -768,6 +786,33 @@ subroutine mcfost_get_manual()
   return
 
 end subroutine mcfost_get_manual
+
+!***********************************************************
+
+subroutine mcfost_get_yorick()
+
+  character(len=512) :: cmd
+  character(len=128) :: yo_dir, yo_file1, yo_file2
+  integer ::  syst_status
+
+  yo_dir = "yorick/"
+  yo_file1 = "mcfost_struct.i"
+  yo_file2 = "mcfost_utils.i"
+
+  write(*,*) "Getting MCFOST yorick files: ", trim(yo_file1), " ", trim(yo_file2)
+  cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; &
+       curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
+  call appel_syst(cmd, syst_status)
+  if (syst_status/=0) then
+     write(*,*) "Cannot get MCFOST yorick package"
+     write(*,*) "Exiting"
+     stop
+  endif
+  write(*,*) "Done"
+
+  return
+
+end subroutine mcfost_get_yorick
 
 !***********************************************************
 
@@ -968,6 +1013,28 @@ real function get_mcfost_utils_version()
   return
 
 end function get_mcfost_utils_version
+
+!***********************************************************
+
+subroutine get_yorick()
+
+  character(len=512) :: cmd
+  integer ::  syst_status
+
+  write(*,*) "Downloading MCFOST yorick ..."
+  write(*,*) "mcfost_struct.i"
+  write(*,*) "mcfost_utils.i"
+  cmd = "curl "//trim(utils_webpage)//"yorick/mcfost_struct.i -s -O ; curl "//trim(utils_webpage)//"yorick/mcfost_utils.i -s -O"
+  call appel_syst(cmd, syst_status)
+  if (syst_status == 0) then
+     write(*,*) "Done"
+  else
+     write(*,*) "Error during download."
+  endif
+
+  return
+
+end subroutine get_yorick
 
 !***********************************************************
 
@@ -1271,6 +1338,69 @@ logical function real_equality(x,y)
   return
 
 end function real_equality
+
+!************************************************************
+
+function rotation_3d(axis,angle,v)
+  ! Rotates a vector around an axis vector in 3D.
+  !
+  !  Parameters:
+  !    - axis : the axis vector for the rotation. Must be normalized !
+  !    - angle :the angle, in degrees, of the rotation.
+  !    - v : the vector to be rotated.
+  !  Output: the rotated vector.
+  !
+  ! C. Pinte 17/07/14
+
+
+  real(kind=db), dimension(3), intent(in) :: axis, v
+  real(kind=db), intent(in) :: angle
+  real(kind=db), dimension(3) :: rotation_3d
+
+  real(kind=db), dimension(3) :: vn, vn2, vp
+  real(kind=db) :: norm
+
+  ! Compute the parallel component of the vector.
+  vp(:) = dot_product(v, axis) * axis(:)
+
+  ! Compute the normal component of the vector.
+  vn(:) = v(:) - vp(:)
+
+  norm = sqrt(sum(vn*vn))
+  if (norm < tiny_db) then
+     rotation_3d(:) = vp(:)
+     return
+  endif
+  vn(:) = vn(:)/norm
+
+  ! Compute a second vector, lying in the plane, perpendicular
+  ! to vn, and forming a right-handed system.
+  vn2(:) = cross_product(axis, vn)
+
+  ! Rotate the normal component by the angle.
+  vn(:) = norm * (cos(angle * deg_to_rad) * vn(:) + sin(angle * deg_to_rad) * vn2(:))
+
+  ! The rotated vector is the parallel component plus the rotated component.
+  rotation_3d(:) = vp(:) + vn(:)
+
+  return
+
+end function rotation_3d
+
+!************************************************************
+
+function cross_product(v1, v2)
+
+  real(kind=db), dimension(3), intent(in) :: v1, v2
+  real(kind=db), dimension(3) :: cross_product
+
+  cross_product(1) = v1(2) * v2(3) - v1(3) * v2(2)
+  cross_product(2) = v1(3) * v2(1) - v1(1) * v2(3)
+  cross_product(3) = v1(1) * v2(2) - v1(2) * v2(1)
+
+  return
+
+end function cross_product
 
 !************************************************************
 
