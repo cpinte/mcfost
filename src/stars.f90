@@ -171,8 +171,23 @@ subroutine repartition_energie_etoiles()
 ! Fusion avec create_b_body : la routine cree aussi spectre_etoile
 ! la proba d'emettre a lambda pour toutes les etoiles
 ! (Calculs redondants)
+!
+! renvoie :
+! - spectre_etoiles
+! - CDF_E_star, prob_E_star
+! - E_stars
+! - spectre_etoiles_cumul, spectre_etoiles
+! - L_etoile, E_photon
 
   implicit none
+
+  real, dimension(n_lambda,n_etoiles) :: prob_E_star0
+  real(kind=db), dimension(n_lambda) :: log_lambda, spectre_etoiles0
+  real(kind=db), dimension(n_etoiles) ::  L_star0, correct_Luminosity
+
+  real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
+  real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
+  character(len=512) :: filename, dir
 
   integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l, ios
   real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
@@ -180,13 +195,7 @@ subroutine repartition_energie_etoiles()
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV
   real(kind=db) :: fact_sup, fact_inf, cst_spectre_etoiles
 
-  real(kind=db), dimension(n_etoiles) ::  L_star0, correct_Luminosity
   real(kind=db) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
-  real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
-  real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
-  real(kind=db), dimension(n_lambda) :: log_lambda, spectre_etoiles0
-
-  character(len=512) :: filename, dir
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, naxes1_ref
   real :: nullval
@@ -464,6 +473,7 @@ subroutine repartition_energie_etoiles()
 
         ! Pas de le delta_wl car il faut comparer a emission du disque
         prob_E_star(lambda,i) = terme
+        prob_E_star0(lambda,i) = terme0
       enddo ! lambda
   enddo ! etoiles
 
@@ -478,6 +488,7 @@ subroutine repartition_energie_etoiles()
 
      do i=1, n_etoiles
         terme = prob_E_star(lambda,i)
+        terme0 = prob_E_star0(lambda,i)
 
         spectre = spectre + terme * delta_wl  ! Somme sur toutes les etoiles
         spectre0 = spectre0 + terme0 * delta_wl
