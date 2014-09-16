@@ -1853,7 +1853,7 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower,indice_Trans)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, tab_deltaV, spectre,continu, tab_Cmb_mol, Jmol, maser_map)
+       tab_v, tab_deltaV, spectre,continu, stars_map, tab_Cmb_mol, Jmol, maser_map)
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 
