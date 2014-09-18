@@ -734,7 +734,7 @@ contains
 
     read(1,*) para_version
 
-        ! -------------------------
+    ! -------------------------
     ! Number of photon packages
     ! -------------------------
     read(1,*)
@@ -1115,7 +1115,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -1658,7 +1658,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -2204,7 +2204,7 @@ contains
        stop
     endif
     dust_pop%is_PAH = .false.
-    dust_pop(ind_pop)%is_opacity_file = .false.
+    dust_pop%is_opacity_file = .false.
 
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
