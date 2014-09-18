@@ -410,6 +410,9 @@ subroutine repartition_energie_etoiles()
   !---------------------------------------------------
   ! Integration du spectre dans les bandes de MCFOST
   !---------------------------------------------------
+  spectre_etoiles(:) = 0.0
+  spectre_etoiles0(:) = 0.0
+
   log_lambda = log(tab_lambda(:))
   do i=1,n_etoiles
      surface=4*pi*(etoile(i)%r**2)
