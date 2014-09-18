@@ -582,14 +582,19 @@ subroutine prop_grains(lambda, p_lambda)
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
-              call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
                  call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
-              call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              if (alfa < 1e4) then
+                 call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
+              endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
               write(*,*) "Exiting"
