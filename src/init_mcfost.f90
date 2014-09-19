@@ -136,6 +136,7 @@ subroutine initialisation_mcfost()
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
+  lchange_Tmax_PAH=.true.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -474,6 +475,7 @@ subroutine initialisation_mcfost()
      case("-output_density_grid")
         ldisk_struct=.true.
         i_arg = i_arg+1
+        lstop_after_init= .true.
      case("-disk_struct")
         ldisk_struct=.true.
         i_arg = i_arg+1
@@ -784,6 +786,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         grain_size_file = s
         i_arg = i_arg+1
+     case("-Tmax_PAH")
+        i_arg = i_arg + 1
+        lchange_Tmax_PAH=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) Tmax_PAH
      case default
         call display_help()
      end select
@@ -1120,6 +1128,8 @@ subroutine display_help()
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
