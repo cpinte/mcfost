@@ -49,7 +49,7 @@ subroutine taille_grains()
 
         open(unit=1, file=grain_size_file, status='old', iostat=ios)
         if (ios/=0) then
-           write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+           write(*,*) "ERROR : cannot open grain size file"//trim(grain_size_file)
            write(*,*) "Exiting"
            stop
         endif
@@ -417,9 +417,9 @@ subroutine init_indices_optiques()
               op_file_na = 0 ; op_file_n_lambda = 0 ; sh_file = ""; file_sh_nT = 0
            endif
            lread_opacity_file = .true.
-        endif
 
-        call get_opacity_file_dim(pop)
+           call get_opacity_file_dim(pop)
+        endif
 
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix dust with opacity file with other component"

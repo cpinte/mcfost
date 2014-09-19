@@ -1066,9 +1066,10 @@ subroutine Temp_nRE(lconverged)
            enddo ! lambda
            somme1=somme1 *n_phot_L_tot/volume(i)
            somme2=somme2*2.0*hp*c_light**2
-           write(*,*) i,j,l,l_RE(i,j,l),  real(somme1/somme2)
 
-           Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+           if (somme2 > tiny_db) then
+              Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+           endif
            ! read(*,*)
         enddo !j
      enddo !i

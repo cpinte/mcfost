@@ -15,6 +15,7 @@ module init_mcfost
   use mem
   use ProdiMo
   use utils
+  use filter
 
   implicit none
 
@@ -34,7 +35,7 @@ subroutine initialisation_mcfost()
 
   logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
 
-
+  call check_init()
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
 
@@ -136,7 +137,7 @@ subroutine initialisation_mcfost()
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
-  lchange_Tmax_PAH=.true.
+  lchange_Tmax_PAH=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
