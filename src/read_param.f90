@@ -334,6 +334,7 @@ contains
        read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=2500. ; n_T=1000
+       if (lchange_Tmax_PAH) T_max = Tmax_PAH
     endif  ! lfits
 
     ! ---------------
@@ -605,6 +606,7 @@ contains
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              if (dust_pop(ind_pop)%indices(1)(1:7) == "Misselt") then
                 dust_pop(ind_pop)%is_opacity_file = .true.
@@ -613,6 +615,7 @@ contains
                 if (dust_pop(ind_pop)%indices(1)(9:11) == "PAH") then
                    dust_pop(ind_pop)%is_PAH = .true.
                    T_max = 2500.
+                   if (lchange_Tmax_PAH) T_max = Tmax_PAH
                 endif
              endif
 
@@ -1158,6 +1161,7 @@ contains
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -1701,6 +1705,7 @@ contains
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -2248,6 +2253,7 @@ contains
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -2782,6 +2788,7 @@ contains
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -3323,6 +3330,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -3856,6 +3864,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -4374,6 +4383,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -4891,6 +4901,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -5407,6 +5418,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -5784,6 +5796,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6143,6 +6156,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6510,6 +6524,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -6879,6 +6894,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7246,6 +7262,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7585,6 +7602,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
@@ -7914,6 +7932,7 @@ end subroutine read_para215
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
                 T_max = 2500.
+                if (lchange_Tmax_PAH) T_max = Tmax_PAH
              endif
              dust_pop(ind_pop)%ind_debut = grain_nRE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_nRE_end + dust_pop(ind_pop)%n_grains
