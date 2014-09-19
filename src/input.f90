@@ -106,7 +106,7 @@ subroutine alloc_mem_opacity_file()
 
   if (lnRE) then
      do pop = 1, n_pop
-        call get_file_specific_heat_dim(pop)
+        if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call get_file_specific_heat_dim(pop)
      enddo
 
      nT = maxval(file_sh_nT(:))
@@ -302,7 +302,7 @@ subroutine read_file_specific_heat(pop)
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
   if (ios/=0) then
-     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
      write(*,*) "Exiting"
      stop
   endif
@@ -344,7 +344,7 @@ subroutine get_file_specific_heat_dim(pop)
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
   if (ios/=0) then
-     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
      write(*,*) "Exiting"
      stop
   endif
