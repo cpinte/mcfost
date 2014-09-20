@@ -746,14 +746,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
      call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,phik,x0,y0,z0,u0,v0,w0,w02)
      !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
 
-     if (w0 /= 0.0) then
-        phi=modulo(atan2(v0,u0),2*real(pi,kind=db))
-        phik=floor(phi/(2*pi)*real(N_az))+1
-        if (phik==n_az+1) phik=n_az
-     else
-        phik=1
-     endif
-
      ! Lumiere non polarisee emanant de l'etoile
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
@@ -1493,6 +1485,7 @@ subroutine compute_stars_map(lambda,ibin, u,v,w)
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
 
+  in_map = .true. ! for SED
   do istar=1, n_etoiles
      map_1star = 0.0 ;
 
@@ -1549,11 +1542,12 @@ subroutine compute_stars_map(lambda,ibin, u,v,w)
         if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
         norme = norme + cos_thet
      enddo
+
      ! Normalizing map
-     map_1star = map_1star * (facteur * prob_E_star(lambda,istar)) / norme
+     map_1star(:,:) = map_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
 
      ! Adding all the stars
-     stars_map = stars_map + map_1star
+     stars_map(:,:) = stars_map(:,:) + map_1star(:,:)
   enddo ! n_stars
 
   return

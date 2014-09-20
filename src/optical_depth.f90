@@ -1088,7 +1088,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         ! so we need to compute it here
         if (ri0==0) then
            phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
-           phik1=floor(phi/(2*pi)*real(N_az))+1
+           phik1=floor(phi*un_sur_deux_pi*real(N_az))+1
            if (phik1==n_az+1) phik1=n_az
         endif
 
