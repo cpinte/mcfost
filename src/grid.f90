@@ -1073,7 +1073,6 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
 
   r2 = xin*xin+yin*yin
 
-
   if (r2 < r_lim_2(0)) then
      ri_out=0
   else if (r2 > Rmax2) then

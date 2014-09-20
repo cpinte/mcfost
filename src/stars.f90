@@ -92,9 +92,13 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
   y=y+etoile(n_star)%y
   z=z+etoile(n_star)%z
 
-  ri=etoile(n_star)%ri
-  zj=etoile(n_star)%zj
-  phik=etoile(n_star)%phik
+  !ri=etoile(n_star)%ri
+  !zj=etoile(n_star)%zj
+  !phik=etoile(n_star)%phik
+
+  ! L'etoile peut occuper plusieurs cellules
+  ! todo : tester a l'avance si c'est le cas
+  call indice_cellule_3D(x,y,z,ri,zj,phik)
 
   return
 

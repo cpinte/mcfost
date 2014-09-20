@@ -699,6 +699,7 @@ module constantes
   ! Quelques reels utiles
   real(kind=db), parameter :: pi =3.141592653589793238462643383279502884197_db ! ca devrait etre bon la
   real(kind=db), parameter :: deux_pi = 2.0_db * pi
+  real(kind=db), parameter :: un_sur_deux_pi = 1.0_db/deux_pi
   real(kind=db), parameter :: quatre_pi = 4.0_db * pi
   real(kind=db), parameter :: quatre_tiers_pi = 4.0_db/3.0_db * pi
   real(kind=db), parameter :: pi_sur_deux = 0.5_db * pi
