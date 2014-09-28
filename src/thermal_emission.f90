@@ -738,7 +738,7 @@ subroutine Temp_nRE(lconverged)
   integer :: Tpeak
   real :: maxP
 
-  real(kind=db) :: somme1, somme2, wl, delta_wl, Temp, cst_wl ! pour test
+  real(kind=db) :: somme1, somme2, wl, wl_mum, delta_wl, Temp, cst_wl ! pour test
 
   write(*,*) "Calculating temperature probabilities of non equilibrium grains ..."
   if (lforce_PAH_equilibrium) write(*,*) "Forcing equilibrium " ;
@@ -809,13 +809,13 @@ subroutine Temp_nRE(lconverged)
 
      !$omp parallel &
      !$omp default(none) &
-     !$omp private(i,j,Int_k_lambda_Jlambda, lambda, wl, T, T2) &
+     !$omp private(i,j,Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,k,log_frac_E_abs) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(log_tab_nu, tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
-     !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max) &
+     !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lMathis_field,Mathis_field) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss)
 
      id = 1 ! pour code sequentiel
@@ -842,15 +842,51 @@ subroutine Temp_nRE(lconverged)
 
               ! ADDING TRUST Radiation field
               Int_k_lambda_Jlambda = 0.0
-              do lambda=1, n_lambda
-                 wl = tab_lambda(lambda)*1e-6
-                 !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+              if (lMathis_field) then
+                 do lambda=1, n_lambda
+                    wl_mum =  tab_lambda(lambda)
+                    wl = tab_lambda(lambda) * 1e-6
 
-                 lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.25965e-08
-                 !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
-                 Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
-                 kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-              enddo
+                    if (wl_mum < 0.0912) then
+                       lambda_Jlambda(lambda,id) = 0.0_db
+                       !write(*,*) "TEST1", wl_mum, lambda_Jlambda(lambda,id)
+                    else if (wl_mum < 0.110) then
+
+                       lambda_Jlambda(lambda,id) = 3069 * wl_mum**3.4172
+                       !write(*,*) "TEST2", wl_mum, lambda_Jlambda(lambda,id)
+                    else if (wl_mum <  0.134) then
+                       lambda_Jlambda(lambda,id) = 1.627
+                       !write(*,*) "TEST3", wl_mum, lambda_Jlambda(lambda,id)
+
+                    else if (wl_mum <  0.250) then
+
+                       lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**-1.6678
+                       !write(*,*) "TEST4", wl_mum, lambda_Jlambda(lambda,id)
+                    else
+                       lambda_Jlambda(lambda,id) = 1e-14 * Blambda_db(wl,7500.) &
+                            + 1e-13 * Blambda_db(wl,4000.) &
+                            + 4e-13 * Blambda_db(wl,3000.)
+                       !write(*,*) "TEST5", wl_mum, lambda_Jlambda(lambda,id)
+                    endif
+                    lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1e-2
+                    !write(*,*) lambda, wl_mum, lambda_Jlambda(lambda,id)
+
+
+                    Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
+                    kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+                 enddo
+
+              else
+                 do lambda=1, n_lambda
+                    wl = tab_lambda(lambda)*1e-6
+                    !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+
+                    lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                    !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                    Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
+                    kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+                 enddo
+              endif
               ! END ADDING TRUST Radiation field
 
               ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
