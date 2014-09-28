@@ -136,6 +136,7 @@ subroutine initialisation_mcfost()
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
+  lMathis_field = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -783,6 +784,12 @@ subroutine initialisation_mcfost()
         lread_grain_size_distrib=.true.
         call get_command_argument(i_arg,s)
         grain_size_file = s
+        i_arg = i_arg+1
+     case("-Mathis_field")
+        i_arg = i_arg + 1
+        lMathis_field=.true.
+        call get_command_argument(i_arg,s)
+        read(s,*) Mathis_field
         i_arg = i_arg+1
      case default
         call display_help()
