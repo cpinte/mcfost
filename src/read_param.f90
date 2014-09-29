@@ -333,7 +333,7 @@ contains
        if (status/=0) correct_Rsub = 1.0
        read(1,*) lhydrostatic
        read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=2500. ; n_T=1000
+       T_min= 1.0 ; T_max=3500. ; n_T=1000
     endif  ! lfits
 
     ! ---------------
@@ -604,7 +604,7 @@ contains
              dust_pop(ind_pop) = dust_pop_tmp(i)
              if (dust_pop(ind_pop)%indices(1)(1:3) == "PAH") then
                 dust_pop(ind_pop)%is_PAH = .true. ; dust_pop(ind_pop)%is_opacity_file = .true.
-                T_max = 2500.
+                T_max = 3500.
              endif
              if (dust_pop(ind_pop)%indices(1)(1:7) == "Misselt") then
                 dust_pop(ind_pop)%is_opacity_file = .true.
@@ -612,7 +612,7 @@ contains
                 lread_Misselt = .true.
                 if (dust_pop(ind_pop)%indices(1)(9:11) == "PAH") then
                    dust_pop(ind_pop)%is_PAH = .true.
-                   T_max = 2500.
+                   T_max = 3500.
                 endif
              endif
 
