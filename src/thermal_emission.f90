@@ -795,7 +795,7 @@ subroutine Temp_nRE(lconverged)
 
      ! Pour cooling time
      E_max = real(maxval(U_lim))
-     en_lim = spanl(1.0e-6*E_max,E_max, n_cooling_time+1)
+     en_lim = spanl(1.0e-10*E_max,E_max, n_cooling_time+1)
      do T=1,n_cooling_time
         en(T) = 0.5 * (en_lim(T+1) + en_lim(T))
         delta_en(T) = en_lim(T+1) - en_lim(T)
@@ -1118,7 +1118,7 @@ subroutine Temp_nRE(lconverged)
            somme2=0.0
            !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
            do lambda=1, n_lambda
-              somme1 =   somme1 + q_abs(lambda,l)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1) )
+              somme1 = somme1 + q_abs(lambda,l)  * lambda_Jlambda(lambda,1)
               wl = tab_lambda(lambda)*1.0e-6
               delta_wl = tab_delta_lambda(lambda)*1.0e-6
               if (l_RE(i,j,l)) then
@@ -1137,9 +1137,11 @@ subroutine Temp_nRE(lconverged)
                  enddo
               endif
            enddo ! lambda
-           somme1=somme1 *n_phot_L_tot/volume(i)
+           !somme1=somme1 *n_phot_L_tot/volume(i)
+
+           !somme1 = Int_k_lambda_Jlambda  ! pas defini openmp
            somme2=somme2*2.0*hp*c_light**2
-           write(*,*) i,j,l,l_RE(i,j,l),  real(somme1/somme2)
+           write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
 
            Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
            ! read(*,*)
