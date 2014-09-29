@@ -843,6 +843,7 @@ subroutine Temp_nRE(lconverged)
               ! ADDING TRUST Radiation field
               Int_k_lambda_Jlambda = 0.0
               if (lMathis_field) then
+                 id = 1
                  do lambda=1, n_lambda
                     wl_mum =  tab_lambda(lambda)
                     wl = tab_lambda(lambda) * 1e-6
@@ -868,7 +869,7 @@ subroutine Temp_nRE(lconverged)
                             + 4e-13 * Blambda_db(wl,3000.)
                        !write(*,*) "TEST5", wl_mum, lambda_Jlambda(lambda,id)
                     endif
-                    lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1e-2
+                    lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1.3e-2
                     !write(*,*) lambda, wl_mum, lambda_Jlambda(lambda,id)
 
 
@@ -1012,7 +1013,7 @@ subroutine Temp_nRE(lconverged)
                     if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
                     X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db)
                     if (A(T-1, T,id) < tiny_db) then
-                       write(*,*) l, T, id, "normaliztaion error"
+                       write(*,*) l, T, id, "normalization error"
                        stop
                     endif
 
