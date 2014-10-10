@@ -1269,7 +1269,7 @@ subroutine write_disk_struct()
   real, dimension(n_rad,nz,n_az) :: dens
   real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
   real, dimension(n_rad) :: vol
-  real(kind=db), dimension(n_rad,nz,2) :: grid
+  real(kind=db), dimension(:,:,:,:), allocatable :: grid
 
 
   allocate(dust_dens(n_rad,nz,n_az,n_grains_tot), stat = alloc_status)
@@ -1677,33 +1677,55 @@ subroutine write_disk_struct()
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-64
   extend=.true.
+  group=1
+  fpixel=1
 
-  naxis=3
+
+  naxis=4
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=2
+  naxes(3)=1
+  naxes(4)=2
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  if (l3D) then
+     naxes(2)=2*nz+1
+     naxes(3)=n_az
+     naxes(4)=3
+
+     allocate(grid(n_rad,2*nz+1,n_az,3))
+     do i=1, n_rad
+        grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
+        do j=1,nz
+           grid(i,nz+1+j,:,2) = (real(j)-0.5)*delta_z(i)
+           grid(i,nz+1-j,:,2) = -(real(j)-0.5)*delta_z(i)
+        enddo
+     enddo
+
+     do i=1, n_az
+        grid(:,:,i,3) = (i-0.5)/n_az * deux_pi
+     enddo
+  else
+     allocate(grid(n_rad,nz,1,2))
+
+     do i=1, n_rad
+        grid(i,:,1,1) = sqrt(r_lim(i) * r_lim(i-1))
+        do j=1,nz
+           grid(i,j,1,2) = (real(j)-0.5)*delta_z(i)
+        enddo
+     enddo
+  endif
+
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
   ! Write  optional keywords to the header
   call ftpkys(unit,'UNIT',"AU",' ',status)
   call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
   call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
-
-  !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
-
-   do i=1, n_rad
-     grid(i,:,1) = sqrt(r_lim(i) * r_lim(i-1))
-     do j=1,nz
-        grid(i,j,2) = (real(j)-0.5)*delta_z(i)
-        !write(*,*) i, j, grid(i,j,1), grid(i,j,2)
-     enddo
-  enddo
+  if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
 
   ! le d signifie real*8
   call ftpprd(unit,group,fpixel,nelements,grid,status)
@@ -1963,7 +1985,7 @@ subroutine ecriture_temperature(iTemperature)
      if (l3D) then
         naxis=3
         naxes(1)=n_rad
-        naxes(2)=nz
+        naxes(2)=2*nz+1
         naxes(3)=n_az
 
         !  Write the required header keywords.
@@ -1976,7 +1998,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)*naxes(3)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature(:,1:nz,:),status)
+        call ftppre(unit,group,fpixel,nelements,temperature(:,:,:),status)
      else
         naxis=2
         naxes(1)=n_rad

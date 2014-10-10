@@ -35,7 +35,6 @@ subroutine initialisation_mcfost()
 
   logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
 
-  call check_init()
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
 
@@ -810,6 +809,7 @@ subroutine initialisation_mcfost()
   else
      call read_para()
   endif
+  call check_init()
 
   if (lemission_mol.and.para_version < 2.11) then
      write(*,*) "ERROR: parameter version must be larger than 2.10"
