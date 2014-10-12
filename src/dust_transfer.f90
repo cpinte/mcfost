@@ -1516,7 +1516,7 @@ subroutine compute_stars_map(lambda,ibin, u,v,w)
 
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
         x0 = etoile(istar)%x + x * etoile(istar)%r
-        y0 = etoile(istar)%y + y * etoile(istar)%r
+        y0 = -(etoile(istar)%y + y * etoile(istar)%r)
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
         Stokes = 0.0_db
