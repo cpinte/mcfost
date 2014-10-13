@@ -882,7 +882,7 @@ subroutine Temp_nRE(lconverged)
                     wl = tab_lambda(lambda)*1e-6
                     !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
 
-                    lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.25965e-08
+                    lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
                     !write(*,*) lambda, tab_lambda(lambda), lambda_Jlambda(lambda,1),  Blambda_db(wl,etoile(1)%T)*wl / disk_zone(1)%Rin**2 * 7.25965e-08
                     Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + q_abs(lambda,l) * lambda_Jlambda(lambda,id)
                     kJnu(lambda,id) =   q_abs_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
