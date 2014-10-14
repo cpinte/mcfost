@@ -127,7 +127,7 @@ module parametres
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
-  logical :: lbenchmark_water1, lbenchmark_water2, lbenchmark_water3, lMathis_field
+  logical :: lbenchmark_water1, lbenchmark_water2, lbenchmark_water3, lbenchmark_SHG, lMathis_field
   real :: Mathis_field
 
   ! Disque de debris calcule par code dynamique

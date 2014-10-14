@@ -85,6 +85,7 @@ subroutine initialisation_mcfost()
   lbenchmark_water1 = .false.
   lbenchmark_water2 = .false.
   lbenchmark_water3 = .false.
+  lbenchmark_SHG = .false.
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
@@ -787,18 +788,26 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         grain_size_file = s
         i_arg = i_arg+1
-     case("-Mathis_field")
-        i_arg = i_arg + 1
-        lMathis_field=.true.
-        call get_command_argument(i_arg,s)
-        read(s,*) Mathis_field
-        i_arg = i_arg+1
      case("-Tmax_PAH")
         i_arg = i_arg + 1
         lchange_Tmax_PAH=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) Tmax_PAH
+     case("-benchmark_SHG")
+        i_arg = i_arg + 1
+        lbenchmark_SHG=.true.
+     case("-Mathis_field")
+        if (.not.lbenchmark_SHG) then
+           write(*,*) "ERROR: Mathis field can only be used with the SHG benchmark"
+           write(*,*) "Exiting"
+           stop
+        endif
+        i_arg = i_arg + 1
+        lMathis_field=.true.
+        call get_command_argument(i_arg,s)
+        read(s,*) Mathis_field
+        i_arg = i_arg+1
      case default
         call display_help()
      end select
