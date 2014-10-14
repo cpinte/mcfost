@@ -1073,7 +1073,6 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
 
   r2 = xin*xin+yin*yin
 
-
   if (r2 < r_lim_2(0)) then
      ri_out=0
   else if (r2 > Rmax2) then
@@ -1113,6 +1112,29 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
   return
 
 end subroutine indice_cellule_3D
+
+!******************************************************************************
+
+subroutine indice_cellule_3D_phi(xin,yin,zin,phik_out)
+
+  implicit none
+
+  real(kind=db), intent(in) :: xin,yin,zin
+  integer, intent(out) :: phik_out
+
+  real(kind=db) :: phi
+
+  if (zin /= 0.0) then
+     phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+     phik_out=floor(phi/(2*pi)*real(N_az))+1
+     if (phik_out==n_az+1) phik_out=n_az
+  else
+     phik_out=1
+  endif
+
+  return
+
+end subroutine indice_cellule_3D_phi
 
 !******************************************************************************
 

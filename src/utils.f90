@@ -1369,4 +1369,67 @@ end function real_equality
 
 !************************************************************
 
+function rotation_3d(axis,angle,v)
+  ! Rotates a vector around an axis vector in 3D.
+  !
+  !  Parameters:
+  !    - axis : the axis vector for the rotation. Must be normalized !
+  !    - angle :the angle, in degrees, of the rotation.
+  !    - v : the vector to be rotated.
+  !  Output: the rotated vector.
+  !
+  ! C. Pinte 17/07/14
+
+
+  real(kind=db), dimension(3), intent(in) :: axis, v
+  real(kind=db), intent(in) :: angle
+  real(kind=db), dimension(3) :: rotation_3d
+
+  real(kind=db), dimension(3) :: vn, vn2, vp
+  real(kind=db) :: norm
+
+  ! Compute the parallel component of the vector.
+  vp(:) = dot_product(v, axis) * axis(:)
+
+  ! Compute the normal component of the vector.
+  vn(:) = v(:) - vp(:)
+
+  norm = sqrt(sum(vn*vn))
+  if (norm < tiny_db) then
+     rotation_3d(:) = vp(:)
+     return
+  endif
+  vn(:) = vn(:)/norm
+
+  ! Compute a second vector, lying in the plane, perpendicular
+  ! to vn, and forming a right-handed system.
+  vn2(:) = cross_product(axis, vn)
+
+  ! Rotate the normal component by the angle.
+  vn(:) = norm * (cos(angle * deg_to_rad) * vn(:) + sin(angle * deg_to_rad) * vn2(:))
+
+  ! The rotated vector is the parallel component plus the rotated component.
+  rotation_3d(:) = vp(:) + vn(:)
+
+  return
+
+end function rotation_3d
+
+!************************************************************
+
+function cross_product(v1, v2)
+
+  real(kind=db), dimension(3), intent(in) :: v1, v2
+  real(kind=db), dimension(3) :: cross_product
+
+  cross_product(1) = v1(2) * v2(3) - v1(3) * v2(2)
+  cross_product(2) = v1(3) * v2(1) - v1(1) * v2(3)
+  cross_product(3) = v1(1) * v2(2) - v1(2) * v2(1)
+
+  return
+
+end function cross_product
+
+!************************************************************
+
 end module utils

@@ -49,7 +49,7 @@ subroutine taille_grains()
 
         open(unit=1, file=grain_size_file, status='old', iostat=ios)
         if (ios/=0) then
-           write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+           write(*,*) "ERROR : cannot open grain size file"//trim(grain_size_file)
            write(*,*) "Exiting"
            stop
         endif
@@ -417,9 +417,9 @@ subroutine init_indices_optiques()
               op_file_na = 0 ; op_file_n_lambda = 0 ; sh_file = ""; file_sh_nT = 0
            endif
            lread_opacity_file = .true.
-        endif
 
-        call get_opacity_file_dim(pop)
+           call get_opacity_file_dim(pop)
+        endif
 
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix dust with opacity file with other component"
@@ -582,14 +582,19 @@ subroutine prop_grains(lambda, p_lambda)
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
-              call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
                  call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
-              call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              if (alfa < 1e4) then
+                 call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
+              endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
               write(*,*) "Exiting"
@@ -990,38 +995,38 @@ subroutine opacite2(lambda)
                  norme = 0.0_db
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    norme=norme + tab_s11_pos(lambda,i,j,1,thetaj) * sin(angle)
+                    norme=norme + tab_s11_pos(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
 
                  if (abs(norme) > 0.0_db) then
                     norme = 1.0_db / (norme * deux_pi)
 
-                    tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_pos(lambda,i,j,1,:) * norme
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(lambda,i,j,pk,:) * norme
                     if (lsepar_pola) then
                        ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
                        ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                       tab_s12_ray_tracing(lambda,i,j,:) =  - tab_s12_pos(lambda,i,j,1,:) * norme
-                       tab_s33_ray_tracing(lambda,i,j,:) =  - tab_s33_pos(lambda,i,j,1,:) * norme
-                       tab_s34_ray_tracing(lambda,i,j,:) =  - tab_s34_pos(lambda,i,j,1,:) * norme
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(lambda,i,j,pk,:) * norme
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(lambda,i,j,pk,:) * norme
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(lambda,i,j,pk,:) * norme
                     endif
                  else
-                    tab_s11_ray_tracing(lambda,i,j,:) =  0.0_db
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     if (lsepar_pola) then
-                       tab_s12_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s33_ray_tracing(lambda,i,j,:) =  0.0_db
-                       tab_s34_ray_tracing(lambda,i,j,:) =  0.0_db
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  0.0_db
                     endif
                  endif ! norme
 
                  if (lsepar_pola) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,:) = tab_s12_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,:) = tab_s33_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,:) = tab_s34_ray_tracing(lambda,i,j,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,:),tiny_real)
+                    tab_s12_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s12_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s33_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s33_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s34_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s34_ray_tracing(lambda,i,j,pk,:) / &
+                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
                  endif
               else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(lambda,i,j,pk)
@@ -1029,14 +1034,14 @@ subroutine opacite2(lambda)
                  norme = 0.0
                  do thetaj=0,nang_scatt
                     angle = real(thetaj)/real(nang_scatt)*pi
-                    tab_s11_ray_tracing(lambda,i,j,thetaj) =((1-gsca**2)/(2.0))* &
+                    tab_s11_ray_tracing(lambda,i,j,pk,thetaj) =((1-gsca**2)/(2.0))* &
                          (1+gsca**2-2*gsca*cos((real(j))/real(nang_scatt)*pi))**(-1.5)
-                    norme=norme + tab_s11_ray_tracing(lambda,i,j,thetaj) * sin(angle)
+                    norme=norme + tab_s11_ray_tracing(lambda,i,j,pk,thetaj) * sin(angle)
                  enddo
-                 tab_s11_ray_tracing(lambda,i,j,:) =  tab_s11_ray_tracing(lambda,i,j,:) / (norme * deux_pi)
+                 tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_ray_tracing(lambda,i,j,pk,:) / (norme * deux_pi)
               endif
 
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,:) = 1.0 / (4.* nang_scatt)
+              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,pk,:) = 1.0 / (4.* nang_scatt)
 
             !  ! Verification normalization
             !  norme = 0.0

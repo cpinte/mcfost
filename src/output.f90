@@ -446,6 +446,42 @@ end subroutine capteur
 
 !**********************************************************************
 
+subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
+
+  real(kind=db), intent(in) :: x,y,z,u,v,w
+  integer, intent(out) :: i,j
+  logical, intent(out) :: in_map
+
+  real(kind=db) :: x2,y2,z2, y_map,z_map
+
+  !*****************************************************
+  !*----DETERMINATION DE LA POSITION SUR LA CARTE
+  !*----IL FAUT FAIRE UNE ROTATION DU POINT
+  !*    (X1,Y1,Z1) POUR RAMENER LES COORDONNEES DANS
+  !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
+  !*****************************************************
+
+  call rotation(x,y,z, u,v,w, x2,y2,z2)
+
+  ! rotation eventuelle du disque
+  y_map = y2 * cos_disk + z2 * sin_disk
+  z_map = z2 * cos_disk - y2 * sin_disk
+
+  i = int((y_map*zoom + 0.5*map_size)*size_pix) + deltapix_x
+  j = int((z_map*zoom + 0.5*map_size)*size_pix) + deltapix_y
+
+  if ((i<1).or.(i>igridx).or.(j<1).or.(j>igridy)) then
+     in_map = .false.
+  else
+     in_map = .true.
+  endif
+
+  return
+
+end subroutine find_pixel
+
+!**********************************************************************
+
 subroutine write_stokes_fits()
 
   implicit none
@@ -1230,15 +1266,19 @@ subroutine write_disk_struct()
   logical :: simple, extend
   character(len=512) :: filename
 
-  real, dimension(n_rad,nz,n_az) :: dens
+  real, dimension(:,:,:), allocatable :: dens
   real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
   real, dimension(n_rad) :: vol
-  real(kind=db), dimension(n_rad,nz,2) :: grid
+  real(kind=db), dimension(:,:,:,:), allocatable :: grid
 
 
-  allocate(dust_dens(n_rad,nz,n_az,n_grains_tot), stat = alloc_status)
+  if (l3D) then
+     allocate(dens(n_rad,-nz:nz,n_az), dust_dens(n_rad,-nz:nz,n_az,n_grains_tot), stat = alloc_status)
+  else
+     allocate(dens(n_rad,nz,1),dust_dens(n_rad,nz,1,n_grains_tot), stat = alloc_status)
+  endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error dust density table for fits file'
+     write(*,*) 'Allocation error density tables for fits file'
      stop
   endif
 
@@ -1260,16 +1300,12 @@ subroutine write_disk_struct()
   bitpix=-32
   extend=.true.
 
-  naxis=2
+  naxis=3
   naxes(1)=n_rad
   naxes(2)=nz
-  nelements=naxes(1)*naxes(2)
-
-  if (l3D) then
-     naxis=3
-     naxes(3)=n_az
-     nelements=naxes(1)*naxes(2)*naxes(3)
-  endif
+  if (l3D) naxes(2)=2*nz+1
+  naxes(3)=n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1282,7 +1318,7 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
-  dens =  densite_gaz(:,1:nz,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  dens =  densite_gaz(:,:,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1312,12 +1348,17 @@ subroutine write_disk_struct()
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-64
   extend=.true.
+  group=1
+  fpixel=1
 
   naxis=4
   naxes(1) = n_rad
   naxes(2) = nz
   naxes(3) = n_az
+  if (l3D) naxes(2)=2*nz+1
   naxes(4) = n_grains_tot
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1327,13 +1368,9 @@ subroutine write_disk_struct()
   call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
 
   !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens = densite_pouss(:,1:nz,:,:) * m3_to_cm3
+  dust_dens = densite_pouss(:,:,:,:) * m3_to_cm3
   call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
   !  Close the file and free the unit number.
@@ -1361,11 +1398,15 @@ subroutine write_disk_struct()
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
   extend=.true.
+  group=1
+  fpixel=1
 
   naxis=3
   naxes(1) = n_rad
   naxes(2) = nz
+  if (l3D) naxes(2)=2*nz+1
   naxes(3) = n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1375,20 +1416,17 @@ subroutine write_disk_struct()
   call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
 
   !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
-
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens = densite_pouss(:,1:nz,:,:)
+  dust_dens = densite_pouss(:,:,:,:)
   dens = 0.0
   do k=1,n_az
-     do j=1,nz
+     bz : do j=j_start,nz
+        if (j==0) cycle bz
         do i=1,n_rad
            dens(i,j,k) = sum(densite_pouss(i,j,k,:) * M_grain(:)) ! M_grain en g
         enddo !i
-     enddo !j
+     enddo bz !j
   enddo !k
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -1641,33 +1679,55 @@ subroutine write_disk_struct()
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-64
   extend=.true.
+  group=1
+  fpixel=1
 
-  naxis=3
+
+  naxis=4
   naxes(1)=n_rad
   naxes(2)=nz
-  naxes(3)=2
+  naxes(3)=1
+  naxes(4)=2
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  if (l3D) then
+     naxes(2)=2*nz+1
+     naxes(3)=n_az
+     naxes(4)=3
+
+     allocate(grid(n_rad,2*nz+1,n_az,3))
+     do i=1, n_rad
+        grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
+        do j=1,nz
+           grid(i,nz+1+j,:,2) = (real(j)-0.5)*delta_z(i)
+           grid(i,nz+1-j,:,2) = -(real(j)-0.5)*delta_z(i)
+        enddo
+     enddo
+
+     do i=1, n_az
+        grid(:,:,i,3) = (i-0.5)/n_az * deux_pi
+     enddo
+  else
+     allocate(grid(n_rad,nz,1,2))
+
+     do i=1, n_rad
+        grid(i,:,1,1) = sqrt(r_lim(i) * r_lim(i-1))
+        do j=1,nz
+           grid(i,j,1,2) = (real(j)-0.5)*delta_z(i)
+        enddo
+     enddo
+  endif
+
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
   ! Write  optional keywords to the header
   call ftpkys(unit,'UNIT',"AU",' ',status)
   call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
   call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
-
-  !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
-
-   do i=1, n_rad
-     grid(i,:,1) = sqrt(r_lim(i) * r_lim(i-1))
-     do j=1,nz
-        grid(i,j,2) = (real(j)-0.5)*delta_z(i)
-        !write(*,*) i, j, grid(i,j,1), grid(i,j,2)
-     enddo
-  enddo
+  if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
 
   ! le d signifie real*8
   call ftpprd(unit,group,fpixel,nelements,grid,status)
@@ -1927,7 +1987,7 @@ subroutine ecriture_temperature(iTemperature)
      if (l3D) then
         naxis=3
         naxes(1)=n_rad
-        naxes(2)=nz
+        naxes(2)=2*nz+1
         naxes(3)=n_az
 
         !  Write the required header keywords.
@@ -1940,7 +2000,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)*naxes(3)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature(:,1:nz,:),status)
+        call ftppre(unit,group,fpixel,nelements,temperature,status)
      else
         naxis=2
         naxes(1)=n_rad
