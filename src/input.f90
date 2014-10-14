@@ -106,7 +106,7 @@ subroutine alloc_mem_opacity_file()
 
   if (lnRE) then
      do pop = 1, n_pop
-        call get_file_specific_heat_dim(pop)
+        if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call get_file_specific_heat_dim(pop)
      enddo
 
      nT = maxval(file_sh_nT(:))
@@ -302,7 +302,7 @@ subroutine read_file_specific_heat(pop)
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
   if (ios/=0) then
-     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
      write(*,*) "Exiting"
      stop
   endif
@@ -344,7 +344,7 @@ subroutine get_file_specific_heat_dim(pop)
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
   if (ios/=0) then
-     write(*,*) "ERROR : cannot open "//trim(sh_file(pop))
+     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
      write(*,*) "Exiting"
      stop
   endif
@@ -539,8 +539,6 @@ subroutine lect_Temperature()
   integer, dimension(4) :: naxes
   logical :: anynull
 
-  real, dimension(n_rad,nz,n_az) :: tmp_temp
-
   if (lRE_LTE) then
      status=0
      !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -567,11 +565,12 @@ subroutine lect_Temperature()
            write(*,*) 'of Temperature.fits.gz file. Exiting.'
            stop
         endif
-        if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az)) then
+        if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz+1).or.(naxes(3) /= n_az)) then
            write(*,*) "Error : Temperature.fits.gz does not have the"
            write(*,*) "right dimensions. Exiting."
+           write(*,*) "# fits file,   required"
            write(*,*) naxes(1), n_rad
-           write(*,*) naxes(2), nz
+           write(*,*) naxes(2), 2*nz+1
            write(*,*) naxes(3), n_az
 
            stop
@@ -594,24 +593,12 @@ subroutine lect_Temperature()
         npixels=naxes(1)*naxes(2)
      endif
 
-
-
      nbuffer=npixels
      ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,tmp_temp,anynull,status)
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,temperature,anynull,status)
 
-     if (l3D) then
-        do j=1, nz
-           temperature(:,-j,:) = tmp_temp(:,j,:)
-           temperature(:,j,:) = tmp_temp(:,j,:)
-        enddo
-        Temperature(:,0,:) = T_min
-     else
-        Temperature(:,:,1) = tmp_temp(:,:,1)
-     endif
-
-       call ftclos(unit, status)
-       call ftfiou(unit, status)
+     call ftclos(unit, status)
+     call ftfiou(unit, status)
   endif
 
   if (lRE_nLTE) then

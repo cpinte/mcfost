@@ -129,6 +129,8 @@ subroutine init_reemission()
   real ::  yp1, ypn
   real, dimension(n_rad,nz) :: dfrac_E_em_1, dfrac_E_em_n
 
+   write(*,'(a35, $)') "Initializing thermal properties ..."
+
   lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
 
   !  cst_E=2.0*hp*c_light**2/L_etoile
@@ -317,6 +319,7 @@ subroutine init_reemission()
      if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call read_file_specific_heat(pop)
   enddo
 
+  write(*,*) "Done"
   return
 
 end subroutine init_reemission
@@ -506,7 +509,7 @@ subroutine Temp_finale()
 
   implicit none
 
-  integer :: l, l1, l2, T_int, T1, T2
+  integer :: l, l1, l2, T_int, T1, T2, alloc_status
   real :: Temp, Temp1, Temp2, proba, frac, log_frac_E_abs
 
   real(kind=db), dimension(:,:,:), allocatable :: J_abs
@@ -514,17 +517,24 @@ subroutine Temp_finale()
   integer :: i,j, pk
 
   if (l3D) then
-     allocate(J_abs(n_rad,-nz:nz,n_az))
+     allocate(J_abs(n_rad,-nz:nz,n_az), stat=alloc_status)
   else
-     allocate(J_abs(n_rad,nz,1))
+     allocate(J_abs(n_rad,nz,1), stat=alloc_status)
+  endif
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error J_abs in Temp_finale'
+     stop
   endif
 
   ! Calcul de la temperature de la cellule et stokage energie recue + T
   ! Utilisation temperature precedente
 
   ! Somme sur differents processeurs
-  J_abs=sum(xKJ_abs,dim=4)
+  do pk=1, n_az ! boucle pour eviter des problemes d'allocation memoire en 3D
+     J_abs(:,:,pk)=sum(xKJ_abs(:,:,pk,:),dim=3)
+  enddo
   J_abs(:,:,:)= J_abs(:,:,:)*n_phot_L_tot + E0(:,:,:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+
 
   !$omp parallel &
   !$omp default(none) &
@@ -1141,10 +1151,11 @@ subroutine Temp_nRE(lconverged)
 
            !somme1 = Int_k_lambda_Jlambda  ! pas defini openmp
            somme2=somme2*2.0*hp*c_light**2
-           write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
 
-           Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
-           ! read(*,*)
+           !write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
+           if (somme2 > tiny_db) then
+              Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+           endif
         enddo !j
      enddo !i
   enddo ! l
@@ -1576,10 +1587,6 @@ subroutine chauffage_interne()
   ! 27/02/06
 
   implicit none
-
-  integer :: lambda, i, j
-  real :: wl, delta_wl, cst_wl, cst_wl_max
-
 
   ! Energie venant de l'equilibre avec nuage à T_min
   E0(:,:,:) = exp(log_frac_E_em(:,:,:,1))

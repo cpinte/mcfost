@@ -70,8 +70,8 @@ subroutine init_GG_Tau_mol()
   ldust_mol = .true.
 
   do i=1,n_rad
-     Temperature(i,:,1) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
-     Tcin(i,:,1) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
+     Temperature(i,:,:) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
+     Tcin(i,:,:) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
   enddo
 
   write(*,*) "Density @ 100 AU", real(densite_gaz(1,1,1) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
@@ -91,7 +91,7 @@ subroutine init_HH_30_mol()
   ldust_mol = .true.
 
   do i=1,n_rad
-     Temperature(i,:,1) = 12.0 * (r_grid(i,1)/100.)**(-0.55)
+     Temperature(i,:,:) = 12.0 * (r_grid(i,1)/100.)**(-0.55)
      vfield(i,:) = 2.0 * (r_grid(i,1)/100.)**(-0.55)
   enddo
 
@@ -631,6 +631,7 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
      nu = tab_nLevel(ri,zj,phik,iTransUpper(iiTrans))
      nl = tab_nLevel(ri,zj,phik,iTransLower(iiTrans))
 
+
      ! Opacite et emissivite raie
      kap = (nl*fBlu(iiTrans) - nu*fBul(iiTrans))
      eps =  nu*fAul(iiTrans)
@@ -741,7 +742,7 @@ subroutine init_dust_mol(imol)
            do ri=1,n_rad
               do zj=1,nz
                  !kappa_abs_eg(iTrans,ri,zj,1) =  kap * masse(ri,zj,1)/(volume(ri) * AU_to_cm**2)
-                 kappa_abs_eg(iTrans,ri,zj,1) =  kap * (densite_gaz(ri,1,1) * cm_to_m**3) * masse_mol_gaz / &
+                 kappa_abs_eg(iTrans,ri,zj,phik) =  kap * (densite_gaz(ri,zj,phik) * cm_to_m**3) * masse_mol_gaz / &
                       gas_dust / cm_to_AU
               enddo
            enddo
@@ -831,16 +832,17 @@ subroutine equilibre_LTE_mol()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,k,l) &
-  !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance)
+  !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance,j_start)
   !$omp do
   do i=1, n_rad
-     do j=1, nz
+     bz : do j=j_start, nz
+        if (j==0) cycle bz
         do k=1, n_az
            tab_nLevel(i,j,k,1) = 1.0
            do l=2, nLevels
               ! Utilisation de la temperature de la poussiere comme temperature LTE
               tab_nLevel(i,j,k,l) = tab_nLevel(i,j,k,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
-                   exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
+                   exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,k)))
            enddo
            ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
            ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Temperature(i,j,1)))
@@ -849,7 +851,7 @@ subroutine equilibre_LTE_mol()
            ! Normalisation
            tab_nLevel(i,j,k,:) = densite_gaz(i,j,k) * tab_abundance(i,j,k) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
         enddo !k
-     enddo !j
+     enddo bz !j
   enddo!i
   !$omp end do
   !$omp  end parallel
@@ -891,11 +893,11 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   endif
 
   ! Matrice d'excitations/desexcitations collisionnelles
-  Temp = Tcin(ri,zj,1)
-  nH2 = densite_gaz(ri,zj,1) * cm_to_m**3
+  Temp = Tcin(ri,zj,phik)
+  nH2 = densite_gaz(ri,zj,phik) * cm_to_m**3
 
   ! Pour test
-  Tdust = Temperature(ri,zj,1)
+  Tdust = Temperature(ri,zj,phik)
 
   C = 0._db
   do iPart = 1, nCollPart
@@ -1036,7 +1038,7 @@ subroutine equilibre_othin_mol_pop2()
 
   Jmol(:,:) = 0.0_db
 
-  id =1 ! TODO : parallelisation
+  id = 1 ! TODO : parallelisation
 
   ! Par securite : sauvegarde population 1
   tab_nLevel_tmp(:,:,:,:) =  tab_nLevel(:,:,:,:)
@@ -1232,11 +1234,12 @@ subroutine freeze_out()
   write (*,*) "Freezing out of molecules"
 
   do k=1, n_az
-     do j=1, nz
+     bz : do j=j_start, nz
+        if (j==0) cycle bz
         do i=1, n_rad
            if (Temperature(i,j,k) < T_freeze_out)  tab_abundance(i,j,k) = 0.
         enddo
-     enddo
+     enddo bz
   enddo
 
   return

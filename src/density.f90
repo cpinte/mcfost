@@ -2566,10 +2566,10 @@ subroutine densite_file()
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdunum, hdutype, bitpix
   integer :: nullval, stat
   integer, dimension(4) :: naxes
-  logical :: anynull
+  logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a
+  integer :: k, l, i, n_a, read_n_a, j_start_file
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
   character(len=5) :: s
@@ -2581,7 +2581,6 @@ subroutine densite_file()
   real(kind=db), dimension(:), allocatable :: a_sph_db
 
   type(disk_zone_type) :: dz
-
 
   ! Lecture donnees
   status=0
@@ -2609,7 +2608,7 @@ subroutine densite_file()
      stop
   endif
 
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az) ) then
+  if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
@@ -2623,7 +2622,17 @@ subroutine densite_file()
   write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  if (naxes(2) == 2*nz+1) then
+     l3D_file = .true.
+  else
+     l3D_file = .false.
+  endif
+
+  if (l3D_file) then
+     allocate(sph_dens(n_rad,-nz:nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  else
+     allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  endif
   sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
   bitpix = 0
@@ -2633,7 +2642,12 @@ subroutine densite_file()
   if (bitpix==-32) then
      call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
   else if (bitpix==-64) then
-     allocate(sph_dens_db(n_rad,nz,n_az,n_a)) ; sph_dens_db = 0.0_db
+     if (l3D_file) then
+        allocate(sph_dens_db(n_rad,-nz:nz,n_az,n_a))
+     else
+        allocate(sph_dens_db(n_rad,nz,n_az,n_a))
+     endif
+     sph_dens_db = 0.0_db
      call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_db,anynull,status)
      sph_dens = real(sph_dens_db,kind=sl)
      deallocate(sph_dens_db)
@@ -2804,18 +2818,30 @@ subroutine densite_file()
   ! Densite du gaz : gaz = plus petites particules
   dz = disk_zone(1)
   !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
+  if (l3D_file) then
+     j_start_file=-nz
+  else
+     j_start_file=1
+  endif
   do k=1, n_az
-     do j=1,nz
-        do i=1, n_rad
-           densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
-        enddo
+     do j=j_start_file,nz
+        if (j==0) then
+           densite_gaz(i,j,k) =0.0
+        else
+           do i=1, n_rad
+              densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+           enddo
+        endif
      enddo
   enddo
 
   ! Symetrie verticale en z
-  do j=1,nz
-     densite_gaz(:,-j,:) = densite_gaz(:,j,:)
-  enddo
+  if (.not.l3D_file) then
+     write(*,*) "Making the density file symetric relative to the z=0 plane"
+     do j=1,nz
+        densite_gaz(:,-j,:) = densite_gaz(:,j,:)
+     enddo
+  endif
 
   ! Calcul de la masse de gaz de la zone
   mass = 0.
@@ -2860,29 +2886,45 @@ subroutine densite_file()
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-           !write(*,*) k, r_grain(k), "p"
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+           endif
         else if (r_grain(k) > a_sph(n_a)) then ! Gros grains
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
-           !write(*,*) k, r_grain(k), "g"
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,n_a)
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
+           endif
         else  ! Autres grains : interpolation
-           !write(*,*) k, r_grain(k), "i"
            if (r_grain(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
                 ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+                ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
+           endif
         endif
      enddo
   else ! Tous les grains suivent le gas
      write(*,*) "Constant spatial distribution"
      do k=1,n_grains_tot
-        densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+        if (l3D_file) then
+           densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
+        else
+           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+        endif
      enddo
   endif  !lstrat
 
   ! Symetrie verticale en z
-  do j=1,nz
-     densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
-  enddo
+  if (.not.l3D_file) then
+     do j=1,nz
+        densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
+     enddo
+  endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot

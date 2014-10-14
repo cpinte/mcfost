@@ -15,6 +15,7 @@ module init_mcfost
   use mem
   use ProdiMo
   use utils
+  use filter
 
   implicit none
 
@@ -33,7 +34,6 @@ subroutine initialisation_mcfost()
   character(len=128)  :: fmt1
 
   logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
-
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -137,6 +137,7 @@ subroutine initialisation_mcfost()
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
   lMathis_field = .false.
+  lchange_Tmax_PAH=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -475,6 +476,7 @@ subroutine initialisation_mcfost()
      case("-output_density_grid")
         ldisk_struct=.true.
         i_arg = i_arg+1
+        lstop_after_init= .true.
      case("-disk_struct")
         ldisk_struct=.true.
         i_arg = i_arg+1
@@ -791,6 +793,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) Mathis_field
         i_arg = i_arg+1
+     case("-Tmax_PAH")
+        i_arg = i_arg + 1
+        lchange_Tmax_PAH=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) Tmax_PAH
      case default
         call display_help()
      end select
@@ -808,6 +816,7 @@ subroutine initialisation_mcfost()
   else
      call read_para()
   endif
+  call check_init()
 
   if (lemission_mol.and.para_version < 2.11) then
      write(*,*) "ERROR: parameter version must be larger than 2.10"
@@ -991,7 +1000,8 @@ subroutine initialisation_mcfost()
 
   if (lstrat_SPH) lstrat=.true.
 
-  if (lemission_mol)  then
+  if (lemission_mol) then
+     lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
      do imol=1,n_molecules
         call read_molecules_names(imol)
         basename_data_dir2(imol) = "data_"//trim(mol(imol)%name)
@@ -1056,7 +1066,7 @@ subroutine initialisation_mcfost()
 
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
-     if (lmono0) then
+     if (lmono0.and.(.not.l3D)) then
         lscatt_ray_tracing2 = .true.
         write(*,*) "Using ray-tracing method 2"
      else
@@ -1111,8 +1121,8 @@ subroutine display_help()
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
-  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
-  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
+!  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
+!  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
@@ -1126,6 +1136,8 @@ subroutine display_help()
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
@@ -1141,8 +1153,8 @@ subroutine display_help()
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
-  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
-  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall,"
+!  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
+  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file <density_file>"
