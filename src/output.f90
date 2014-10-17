@@ -763,7 +763,7 @@ subroutine ecriture_map_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id, xcenter, lambda, itype, ibin
+  integer :: i,j,group,fpixel,nelements, alloc_status, id, xcenter, lambda, itype, ibin, iaz
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -772,7 +772,7 @@ subroutine ecriture_map_ray_tracing()
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
 
-  allocate(image(igridx, igridy, RT_n_ibin, 1, N_type_flux), stat=alloc_status)
+  allocate(image(igridx, igridy, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error RT image'
      stop
@@ -800,8 +800,8 @@ subroutine ecriture_map_ray_tracing()
   naxis=5
   naxes(1)=igridx
   naxes(2)=igridy
-  naxes(3)= RT_n_ibin
-  naxes(4)=1 ! N_phi
+  naxes(3)= RT_n_incl
+  naxes(4)= RT_n_az
   naxes(5)=N_type_flux
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
@@ -850,31 +850,33 @@ subroutine ecriture_map_ray_tracing()
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
   do itype=1,N_type_flux
-     do ibin=1,RT_n_ibin
-        do j=1,igridy
-           do i=1,igridx
-              image(i,j,ibin,1,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,itype,:))
-           enddo !i
-        enddo !j
+     do ibin=1,RT_n_incl
+        do iaz=1,RT_n_az
+           do j=1,igridy
+              do i=1,igridx
+                 image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+              enddo !i
+           enddo !j
+        enddo ! iaz
      enddo !ibin
   enddo ! itype
 
   if (l_sym_ima) then
      xcenter = igridx/2 + modulo(igridx,2)
      do i=xcenter+1,igridx
-        image(i,:,:,1,1) = image(igridx-i+1,:,:,1,1)
+        image(i,:,:,:,1) = image(igridx-i+1,:,:,:,1)
 
         if (lsepar_pola) then
-           image(i,:,:,1,2) = image(igridx-i+1,:,:,1,2)
-           image(i,:,:,1,3) = - image(igridx-i+1,:,:,1,3)
-           image(i,:,:,1,4) = image(igridx-i+1,:,:,1,4)
+           image(i,:,:,:,2) = image(igridx-i+1,:,:,:,2)
+           image(i,:,:,:,3) = - image(igridx-i+1,:,:,:,3)
+           image(i,:,:,:,4) = image(igridx-i+1,:,:,:,4)
         endif
 
         if (lsepar_contrib) then
-           image(i,:,:,1,n_Stokes+1) = image(igridx-i+1,:,:,1,n_Stokes+1)
-           image(i,:,:,1,n_Stokes+2) = image(igridx-i+1,:,:,1,n_Stokes+2)
-           image(i,:,:,1,n_Stokes+3) = image(igridx-i+1,:,:,1,n_Stokes+3)
-           image(i,:,:,1,n_Stokes+4) = image(igridx-i+1,:,:,1,n_Stokes+4)
+           image(i,:,:,:,n_Stokes+1) = image(igridx-i+1,:,:,:,n_Stokes+1)
+           image(i,:,:,:,n_Stokes+2) = image(igridx-i+1,:,:,:,n_Stokes+2)
+           image(i,:,:,:,n_Stokes+3) = image(igridx-i+1,:,:,:,n_Stokes+3)
+           image(i,:,:,:,n_Stokes+4) = image(igridx-i+1,:,:,:,n_Stokes+4)
         endif
      enddo
   endif ! l_sym_image
@@ -909,7 +911,7 @@ subroutine ecriture_sed_ray_tracing()
   character(len = 512) :: filename
   logical :: simple, extend
 
-  real, dimension(n_lambda2, RT_n_ibin, 1, N_type_flux) :: sed_rt
+  real, dimension(n_lambda2, RT_n_incl, RT_n_az, N_type_flux) :: sed_rt
 
   lambda=1
 
@@ -929,8 +931,8 @@ subroutine ecriture_sed_ray_tracing()
   bitpix=-32
   naxis=4
   naxes(1)=n_lambda2
-  naxes(2)= RT_n_ibin
-  naxes(3)=1 ! N_phi
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
   naxes(4)=N_type_flux
 
   extend=.true.
@@ -941,11 +943,11 @@ subroutine ecriture_sed_ray_tracing()
 
   sed_rt = 0.0_db
   if (RT_sed_method == 1) then
-     sed_rt(:,:,1,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:),dim=4)
+     sed_rt(:,:,:,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:,:),dim=5)
   else
      do i=1,igridx
         do j=1,igridy
-           sed_rt(:,:,1,:) = sed_rt(:,:,1,:) +sum(Stokes_ray_tracing(:,i,j,:,:,:),dim=4)
+           sed_rt(:,:,:,:) = sed_rt(:,:,:,:) + sum(Stokes_ray_tracing(:,i,j,:,:,:,:),dim=5)
         enddo
      enddo
   endif
@@ -2620,7 +2622,7 @@ subroutine ecriture_spectre(imol)
   ! Line map
   !------------------------------------------------------------------------------
   bitpix=-32
-  naxis=5
+  naxis=6
   if (RT_line_method==1) then
      naxes(1)=1
      naxes(2)=1
@@ -2630,8 +2632,9 @@ subroutine ecriture_spectre(imol)
   endif
   naxes(3)=2*n_speed_rt+1
   naxes(4)=ntrans
-  naxes(5)=RT_n_ibin
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+  naxes(5)=RT_n_incl
+  naxes(6)=RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
 
   ! create new hdu
   !call ftcrhd(unit, status)
@@ -2658,13 +2661,13 @@ subroutine ecriture_spectre(imol)
      if (RT_line_method==1) then
         ! On ajoute les 2 parties du spectres
         do iv = -n_speed_rt, -1
-           spectre(1,1,iv,:,:) = spectre(1,1,iv,:,:) + spectre(1,1,-iv,:,:)
+           spectre(1,1,iv,:,:,:) = spectre(1,1,iv,:,:,:) + spectre(1,1,-iv,:,:,:)
         enddo
         ! On symetrise
         do iv =1, n_speed_rt
-           spectre(1,1,iv,:,:) = spectre(1,1,-iv,:,:)
+           spectre(1,1,iv,:,:,:) = spectre(1,1,-iv,:,:,:)
         enddo
-        spectre(1,1,0,:,:) = spectre(1,1,0,:,:) * 2.
+        spectre(1,1,0,:,:,:) = spectre(1,1,0,:,:,:) * 2.
         ! On divise par deux
         spectre = spectre * 0.5
      else
@@ -2672,12 +2675,12 @@ subroutine ecriture_spectre(imol)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
            do i=xcenter+1,igridx
               do iv=-n_speed_rt,n_speed_rt
-                 spectre(i,:,iv,:,:) = spectre(igridx-i+1,:,-iv,:,:)
+                 spectre(i,:,iv,:,:,:) = spectre(igridx-i+1,:,-iv,:,:,:)
               enddo
            enddo
         else ! infall : meme profil de raie des 2 cotes
            do i=xcenter+1,igridx
-              spectre(i,:,:,:,:) = spectre(igridx-i+1,:,:,:,:)
+              spectre(i,:,:,:,:,:) = spectre(igridx-i+1,:,:,:,:,:)
            enddo
         endif
      endif ! lkeplerian
@@ -2690,7 +2693,7 @@ subroutine ecriture_spectre(imol)
   ! HDU 2 : Continuum map
   !------------------------------------------------------------------------------
   bitpix=-32
-  naxis=4
+  naxis=5
   if (RT_line_method==1) then
      naxes(1)=1
      naxes(2)=1
@@ -2699,8 +2702,9 @@ subroutine ecriture_spectre(imol)
      naxes(2)=igridy
   endif
   naxes(3)=ntrans
-  naxes(4)=RT_n_ibin
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  naxes(4)=RT_n_incl
+  naxes(4)=RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
   ! create new hdu
   call ftcrhd(unit, status)
@@ -2711,7 +2715,7 @@ subroutine ecriture_spectre(imol)
   if (l_sym_ima.and.(RT_line_method==2)) then
      xcenter = igridx/2 + modulo(igridx,2)
      do i=xcenter+1,igridx
-        continu(i,:,:,:) = continu(igridx-i+1,:,:,:)
+        continu(i,:,:,:,:) = continu(igridx-i+1,:,:,:,:)
      enddo
   endif ! l_sym_image
 

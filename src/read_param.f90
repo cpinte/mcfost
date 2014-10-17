@@ -276,7 +276,8 @@ contains
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -840,7 +841,8 @@ contains
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -1384,7 +1386,8 @@ contains
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -1930,7 +1933,8 @@ contains
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -2478,7 +2482,8 @@ contains
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -3008,7 +3013,8 @@ end subroutine read_para215
        capt_fin = N_thet
     endif
 
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -3547,7 +3553,8 @@ end subroutine read_para215
        capt_debut = 1
        capt_fin = N_thet
     endif
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -4080,7 +4087,8 @@ end subroutine read_para215
        capt_debut = 1
        capt_fin = N_thet
     endif
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -4596,7 +4604,8 @@ end subroutine read_para215
        capt_debut = 1
        capt_fin = N_thet
     endif
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then
@@ -5115,7 +5124,8 @@ end subroutine read_para215
        capt_debut = 1
        capt_fin = N_thet
     endif
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+    RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
     if (lfits) then

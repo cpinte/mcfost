@@ -569,8 +569,8 @@ module resultats
   real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes, n_phot_envoyes_loc
 
   ! Line transfer
-  real, dimension(:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,x,y
-  real, dimension(:,:,:,:), allocatable :: continu ! trans,thetai,x,y
+  real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
+  real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
 
 end module resultats
 
@@ -894,11 +894,12 @@ module ray_tracing
   logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
 
   ! inclinaisons
-  real :: RT_imin, RT_imax
-  integer ::  RT_n_ibin
+  real :: RT_imin, RT_imax, RT_az_min, RT_az_max
+  integer ::  RT_n_incl, RT_n_az
   logical :: lRT_i_centered
-  real, dimension(:), allocatable :: tab_RT_incl
-  real(kind=db), dimension(:), allocatable :: tab_u_rt, tab_v_rt, tab_w_rt
+  real, dimension(:), allocatable :: tab_RT_incl, tab_RT_az
+  real(kind=db), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
+  real(kind=db), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt
 
   ! Sauvegarde champ de radiation pour rt2
   integer ::  n_phi_I,  n_theta_I ! 15 et 9 ok avec 30 et 30 en mode SED
@@ -920,24 +921,24 @@ module ray_tracing
 
   ! methode RT 1
   integer :: n_az_rt
-  real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, n_rad, nz, n_az_rt, 2, ncpus
-  real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! n_rad, nz, n_az_rt, 2, ncpus
+  real, dimension(:,:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
+  real, dimension(:,:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
-  integer, dimension(:,:), allocatable :: itheta_rt1
-  real(kind=db), dimension(:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1
-  real(kind=db), dimension(:,:,:,:,:), allocatable ::  eps_dust1 !4,n_rad, nz, n_az_rt,0:1,4
+  integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=db), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=db), dimension(:,:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_rad, nz, n_az_rt,0:1
 
   ! methode RT 2
   real, dimension(:,:,:,:,:,:), allocatable :: xI ! 4, n_theta_I, n_phi_I, nrad, nz, ncpus
   real, dimension(:,:,:), allocatable :: xI_star, xw_star, xl_star ! nrad, nz, ncpus
 
   ! Fonction source: Ok en simple
-  real, dimension(:,:,:,:,:,:), allocatable ::  I_sca2 ! 4, nang_ray_tracing, 2, n_rad, nz, ncpus
-  real, dimension(:,:,:,:,:), allocatable ::  eps_dust2 ! 4, nang_ray_tracing, 2, n_rad, nz
-  real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! 4, nang_ray_tracing, 2, n_rad, nz
+  real, dimension(:,:,:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz, ncpus
+  real, dimension(:,:,:,:,:), allocatable ::  eps_dust2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
+  real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
-  real, dimension(:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_ibin, n_type_flux, ncpus
-  real, dimension(:,:), allocatable :: stars_map
+  real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
+  real, dimension(:,:), allocatable :: stars_map ! nx, ny
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
 
