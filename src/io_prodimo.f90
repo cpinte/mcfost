@@ -10,7 +10,7 @@ module ProDiMo
   use prop_star
   use resultats
   use utils
-  use ray_tracing, only:  RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+  use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use read_params
   use sha
 
@@ -1132,7 +1132,7 @@ contains
 
     ! Inclinaisons
     read(1,*)
-    read(1,*) RT_imin, RT_imax, RT_n_ibin, lRT_i_centered
+    read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
 
     read(1,*)
     read(1,*)
