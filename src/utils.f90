@@ -547,7 +547,8 @@ subroutine mcfost_setup()
   call mcfost_get_ref_para()
   call mcfost_get_manual()
   ! Write date of the last time an update was search for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
+       //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
   write(*,*) "MCFOST set-up was sucessful"
@@ -585,7 +586,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
         write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
         write(s,*) (n_days-1) * 3600 * 24
-        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "//trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
+             //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
         call appel_syst(cmd, syst_status)
         return
      endif
@@ -828,8 +830,8 @@ subroutine mcfost_get_yorick()
   yo_file2 = "mcfost_utils.i"
 
   write(*,*) "Getting MCFOST yorick files: ", trim(yo_file1), " ", trim(yo_file2)
-  cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; &
-       curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
+  cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; curl "&
+       //trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST yorick package"

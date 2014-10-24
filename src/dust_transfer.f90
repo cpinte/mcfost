@@ -1449,7 +1449,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda,ibin, u, v, w)
+  call compute_stars_map(lambda, iaz, u, v, w)
 
   id = 1
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map
@@ -1465,16 +1465,16 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda,ibin, u,v,w)
+subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! Make a ray-traced map of the stars
 
-  integer, intent(in) :: lambda, ibin
+  integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
   integer, parameter :: n_ray_star = 1000
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: facteur, x0,y0,z0, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
+  real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
   real :: rand, rand2, tau
   integer :: id, ri, zj, phik, iray, istar, i,j
   logical :: in_map
@@ -1520,9 +1520,12 @@ subroutine compute_stars_map(lambda,ibin, u,v,w)
         !cos_thet = 1.0_db ;
 
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
-        x0 = etoile(istar)%x + x * etoile(istar)%r
-        y0 = -(etoile(istar)%y + y * etoile(istar)%r)
+        x1 = etoile(istar)%x + x * etoile(istar)%r
+        y1 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
+
+        x0 = x1 * cos(tab_RT_az(iaz) * deg_to_rad) + y1 * sin(tab_RT_az(iaz) * deg_to_rad)
+        y0 = x1 * sin(tab_RT_az(iaz) * deg_to_rad) - y1 * cos(tab_RT_az(iaz) * deg_to_rad)
 
         Stokes = 0.0_db
         if (l3D) then

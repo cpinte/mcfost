@@ -211,16 +211,17 @@ mcfost2prodimo : mcfost mcfost2prodimo.o
 # Release
 #*************************************************************
 
-release : main
+release : clean main
+	git tag -d release
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/macos
 	cp mcfost web/macos
 	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
-	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
-	scp fosti:mcfost/src/mcfost web/linux/
-	scp fosti:mcfost/src/mcfost.sha1 web/linux/
+	rsync -Pu *.f90 Makefile dmz:mcfost/src
+	ssh dmz "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
+	scp dmz:mcfost/src/mcfost web/linux/
+	scp dmz:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
@@ -232,6 +233,7 @@ release : main
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
+	git tag release
 
 
 release_mac : main

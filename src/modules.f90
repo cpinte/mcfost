@@ -6,8 +6,8 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.15"
+  real, parameter :: mcfost_version = 2.20
+  character(8), parameter :: mcfost_release = "2.20.0"
   real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -115,7 +115,8 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lread_grain_size_distrib, lread_misselt
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
+  logical :: lread_grain_size_distrib, lread_Misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
   logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH
@@ -919,7 +920,7 @@ module ray_tracing
   ! intensite specifique
   real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
-  ! methode RT 1
+  ! methode RT 1 : todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
   integer :: n_az_rt
   real, dimension(:,:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
