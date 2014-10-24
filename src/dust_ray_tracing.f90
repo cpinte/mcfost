@@ -276,10 +276,10 @@ subroutine init_directions_ray_tracing()
   endif
 
   if (RT_n_az==1) then
-     tab_RT_az(1) = RT_az_min *pi/180.
+     tab_RT_az(1) = RT_az_min
   else
      do iaz=1, RT_n_az
-        tab_RT_az(iaz) = (RT_az_min +  (real(iaz) - 1)/(real(RT_n_az) -1) * (RT_az_max - RT_az_min) ) * pi/180.
+        tab_RT_az(iaz) = (RT_az_min +  (real(iaz) - 1)/(real(RT_n_az) -1) * (RT_az_max - RT_az_min) )
      enddo
   endif
 
@@ -287,11 +287,11 @@ subroutine init_directions_ray_tracing()
   do ibin=1, RT_n_incl
      ! 0 est remplace par un epsilon car il faut donner un axe de reference
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
-     tab_uv_rt(ibin) = sin(max(tab_RT_incl(ibin),1e-20)/180._db*pi) ! uv_rt mais v_rt = 0 ici
+     tab_uv_rt(ibin) = sin(max(tab_RT_incl(ibin),1e-20)*deg_to_rad) ! uv_rt mais v_rt = 0 ici
      tab_w_rt(ibin) = sqrt(1.0_db - tab_uv_rt(ibin)*tab_uv_rt(ibin))
      do iaz =1, RT_n_az
-        tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * cos(tab_RT_az(iaz))
-        tab_v_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz))
+        tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
+        tab_v_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz)*deg_to_rad)
      enddo
   enddo
 
@@ -1539,7 +1539,7 @@ function dust_source_fct(lambda,ri,zj,phik, x,y,z)
         endif
         ! Cette methode est OK mais on voit les cellules
         phi_pos = atan2(y,x)
-        k =  floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
+        k = floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
         if (k > n_az_rt) k = n_az_rt
      endif
 
