@@ -2588,7 +2588,7 @@ subroutine ecriture_spectre(imol)
 
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(5) :: naxes
+  integer, dimension(6) :: naxes
   integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans, xcenter,i, iiTrans
   logical :: simple, extend
 
