@@ -1431,9 +1431,9 @@ subroutine calc_Isca2_star(lambda,ibin)
                  ROP(2,2) = COSW
                  RPO(2,3) = SINW
                  ROP(2,3) = -1.0_db * SINW
-                 RPO(3,2) = -1.0_db * SINW
+                 RPO(3,2) = SINW
                  ROP(3,2) = SINW
-                 RPO(3,3) = COSW
+                 RPO(3,3) = -COSW
                  ROP(3,3) = COSW
 
                  ! Matrice de Mueller
