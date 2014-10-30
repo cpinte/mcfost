@@ -56,7 +56,7 @@ subroutine alloc_ray_tracing()
      allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
+     Write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
      stop
   endif
   kappa_sca = 0.
@@ -487,7 +487,11 @@ subroutine calc_xI_scatt(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   if (lstrat) then
      p_ri = ri
      p_zj = zj
-     p_phik = phik
+     if (l3D) then
+        p_phik = phik
+     else
+        p_phik = 1
+     endif
   else
      p_ri = 1
      p_zj = 1
@@ -554,7 +558,11 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   if (lstrat) then
      p_ri = ri
      p_zj = zj
-     p_phik = phik
+     if (l3D) then
+        p_phik = phik
+     else
+        p_phik = 1
+     endif
   else
      p_ri = 1
      p_zj = 1
