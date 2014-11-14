@@ -168,7 +168,7 @@ contains
     if (lforce_ProDiMo_PAH) data_ProDiMo = trim(data_ProDiMO)//"_fPAH="//sProDiMo_fPAH
 
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
-    tau_dark_zone_eq_th = 15000.
+    !tau_dark_zone_eq_th = 15000.
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
