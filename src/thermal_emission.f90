@@ -307,6 +307,8 @@ subroutine init_reemission()
            else
               write(*,*) "Error in init_reemission"
               write(*,*) "Pb in opacity of non-equilibrium grains"
+              write(*,*) "grain", k, "q_abs seems to be incorrect"
+              write(*,*) q_abs(:,k)
               write(*,*) "Exiting"
               stop
            endif
