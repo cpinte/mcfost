@@ -725,7 +725,7 @@ subroutine Temp_nRE(lconverged)
 
   logical, intent(out) :: lconverged
 
-  real, parameter :: precision = 1.e-2
+  real, parameter :: precision = 5.e-2
 
   real(kind=db), dimension(:,:,:), allocatable :: A, B
   real(kind=db), dimension(:,:), allocatable :: X
@@ -1148,7 +1148,8 @@ subroutine Temp_nRE(lconverged)
      enddo !i
   enddo ! l
   !! FIN TEST
-  lconverged=.true.
+
+!  lconverged = .true. ! TMP
 
   return
 
