@@ -973,10 +973,10 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
           + log(op_file_Qext(i-1,j,pop)) *  fact3 &
           + log(op_file_Qext(i,j,pop)) * fact4)
 
-     qsca = exp(log(op_file_Qsca(i-1,j-1,pop)) * fact1 &
-          + log(op_file_Qsca(i,j-1,pop)) * fact2 &
-          + log(op_file_Qsca(i-1,j,pop)) * fact3 &
-          + log(op_file_Qsca(i,j,pop)) * fact4)
+     qsca = exp(log(max(op_file_Qsca(i-1,j-1,pop),tiny_real)) * fact1 &
+          + log(max(op_file_Qsca(i,j-1,pop),tiny_real)) * fact2 &
+          + log(max(op_file_Qsca(i-1,j,pop),tiny_real)) * fact3 &
+          + log(max(op_file_Qsca(i,j,pop),tiny_real)) * fact4)
 
      gsca = op_file_g(i-1,j-1,pop) * fact1 &
           + op_file_g(i,j-1,pop) * fact2 &
