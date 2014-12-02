@@ -866,7 +866,7 @@ subroutine Temp_nRE(lconverged)
                        else if (wl_mum <  0.134) then
                           lambda_Jlambda(lambda,id) = 1.627
                        else if (wl_mum <  0.250) then
-                          lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**-1.6678
+                          lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**(-1.6678)
                        else
                           lambda_Jlambda(lambda,id) = 1e-14 * Blambda_db(wl,7500.) &
                                + 1e-13 * Blambda_db(wl,4000.) &
