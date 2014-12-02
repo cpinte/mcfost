@@ -300,17 +300,22 @@ subroutine Temp_approx_diffusion_vertical()
   call clean_temperature()
 
   ! Pour initier la premiere boucle
-  Temperature_old = T_min
-  Temp0 = Temperature
+  !-- Temperature_old = T_min
+  !-- Temp0 = Temperature
 
-  k=1
+  k=1 ! variable azimuth
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp shared(k,ri_in_dark_zone,ri_out_dark_zone,n_rad) &
+  !$omp private(i,lconverged,n_iter,precision,stabilite,max_delta_E_r)
+  !$omp do schedule(dynamic,1)
   do i=max(ri_in_dark_zone(k) - delta_cell_dark_zone,3) , min(ri_out_dark_zone(k) + delta_cell_dark_zone,n_rad-2)
 
      lconverged=.false.
      precision = 1.0e-6
      stabilite=2.
 
-     do while (.not.lconverged)
+     !-- do while (.not.lconverged)
         ! Passage temperature -> densite d'energie
         call temperature_to_DensE(i)
 
@@ -320,7 +325,7 @@ subroutine Temp_approx_diffusion_vertical()
         if (stabilite < 0.01) then
            write(*,*) "Error : diffusion approximation does not seem to converge"
            write(*,*) "Exiting"
-           return
+           stop
         endif
 
         ! Iterations
@@ -332,13 +337,13 @@ subroutine Temp_approx_diffusion_vertical()
            call iter_Temp_approx_diffusion_vertical(i,stabilite,max_delta_E_r,lconverged)
 
            !test divergence
-           if (.not.lconverged) then
-              stabilite = 0.5 * stabilite
-              precision = 0.1 * precision
-              Temperature = Temp0
-              Temperature_old = T_min
-              exit infinie
-           endif
+          !-- if (.not.lconverged) then
+          !--    stabilite = 0.5 * stabilite
+          !--    precision = 0.1 * precision
+          !--    Temperature(i,:,:) = Temp0(i,:,:)
+          !--    Temperature_old = T_min
+          !--    exit infinie
+          !-- endif
 
 !           write(*,*) n_iter, max_delta_E_r, precision  !, maxval(DensE)
 
@@ -349,12 +354,11 @@ subroutine Temp_approx_diffusion_vertical()
            call setDiffusion_coeff(i)
 
         enddo infinie
-     enddo
-
+     !-- enddo
      write(*,*) "Radius", i  ,"/", ri_out_dark_zone(k) + delta_cell_dark_zone, "   T computed using", n_iter," iterations"
-
-
   enddo !i
+  !$omp end do
+  !$omp end parallel
 
   write(*,*) "Done"
 
