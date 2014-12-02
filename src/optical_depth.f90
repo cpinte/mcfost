@@ -1143,7 +1143,8 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
         if (lcellule_non_vide) then
            if (letape_th) then
-              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
+              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + &
+                   kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
               if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
            else ! letape_th
               if (lscatt_ray_tracing1) then

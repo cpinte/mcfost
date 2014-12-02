@@ -51,9 +51,11 @@ subroutine alloc_ray_tracing()
   endif
 
   if (l3D) then
-     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
+     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
+          tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
   else
-     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
+     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), &
+          tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
   endif
   if (alloc_status > 0) then
      Write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
