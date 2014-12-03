@@ -682,6 +682,10 @@ subroutine initialisation_mcfost()
      case("-prodimo")
         i_arg = i_arg + 1
         lprodimo = .true.
+        mcfost2ProDiMo_version = 5
+     case("-prodimo4")
+        i_arg = i_arg + 1
+        lprodimo = .true.
         mcfost2ProDiMo_version = 4
      case("-prodimo3")
         i_arg = i_arg + 1
