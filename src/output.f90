@@ -1959,7 +1959,7 @@ subroutine ecriture_temperature(iTemperature)
 
   if (lRE_LTE) then
      if (iTemperature == 2) then
-        filename = trim(data_dir)//"/Temperature2.fits.gz"
+        filename = "!"//trim(data_dir)//"/Temperature2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
         filename = trim(data_dir)//"/Temperature.fits.gz"
      endif

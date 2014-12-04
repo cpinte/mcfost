@@ -33,7 +33,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -139,6 +139,7 @@ subroutine initialisation_mcfost()
   lread_grain_size_distrib=.false.
   lMathis_field = .false.
   lchange_Tmax_PAH=.false.
+  lno_T = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -812,6 +813,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) Mathis_field
         i_arg = i_arg+1
+     case("-no_T")
+        i_arg = i_arg + 1
+        lno_T=.true.
      case default
         call display_help()
      end select
@@ -849,6 +853,8 @@ subroutine initialisation_mcfost()
      write(*,*) "         it can be turned back on with -rt2"
      lsepar_pola = .false.
   endif
+
+  if (lno_T) ltemp = .false.
 
   write(*,*) 'Input file read successfully'
 
@@ -1139,6 +1145,7 @@ subroutine display_help()
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
+  write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
