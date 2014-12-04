@@ -1013,11 +1013,11 @@ subroutine densite_data2()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst,nz,n_grains_tot) &
+     !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
      !$omp shared(b0_int, b1_int, b2_int, b3_int, b4_int,ntot_grains) &
-     !$omp private(j,k,z,density,k_min,proba,h,dSigma, somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp private(j,k,z,h,dSigma, somme)&
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z(j) = (real(j)-0.5)*delta_z(i)
@@ -1183,11 +1183,10 @@ subroutine densite_data_SPH_binaire()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst) &
-     !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
+     !$omp shared(i,rcyl,amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
      !$omp shared(b0_int, b1_int, b2_int,ntot_grains,nz,n_grains_tot) &
-     !$omp private(j,k,z,density,k_min,proba,h,dSigma, somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z) &
+     !$omp private(j,k,z,h,dSigma, somme)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z(j) = (real(j)-0.5)*delta_z(i)
@@ -1381,11 +1380,11 @@ subroutine densite_data_SPH_TTauri()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst,nz) &
+     !$omp shared(i,rcyl,nz) &
      !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int, a3_int, a4_int)&
      !$omp shared(b0_int, b1_int, b2_int, b3_int, b4_int,ntot_grains,h,dSigma, n_grains_tot) &
-     !$omp private(j,k,z,density,k_min,proba,somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp private(j,k,z,somme)&
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z = (real(j)-0.5)*delta_z(i)
@@ -2162,7 +2161,7 @@ subroutine densite_eqdiff()
      !$omp default(none) &
      !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss) &
-     !$omp private(j,k,z,density,k_min,proba)&
+     !$omp private(j,k,z) &
      !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,rho,correct_strat, delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
