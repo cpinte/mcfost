@@ -285,7 +285,7 @@ subroutine init_benchmark_water3()
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
   real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
 
-  real :: junk, rayon, log_rayon, frac
+  real :: rayon, log_rayon, frac
 
   ldust_mol = .true.
 
@@ -378,7 +378,7 @@ subroutine init_molecular_disk(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i, j
+  integer :: i
 
   ldust_mol  = .true.
   lkeplerian = .true.
@@ -439,7 +439,7 @@ subroutine init_Doppler_profiles(imol)
 
   integer, intent(in) :: imol
 
-  real(kind=db) :: sigma2, sigma2_m1, v, flux, vmax
+  real(kind=db) :: sigma2, sigma2_m1, vmax
   integer :: i, j, k, iv, n_speed
 
   n_speed = mol(imol)%n_speed_rt
@@ -695,17 +695,18 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, iiTrans, ri, zj, phik, p_lambda
+  integer :: iTrans, ri, zj, phik, p_lambda
   real(kind=db) :: f, Jnu
   real :: T, wl, kap
 
-  real(kind=db) :: cst_wl, coeff_exp, cst_E
+  real(kind=db) :: cst_E
 
   real, parameter :: gas_dust = 100
   real, parameter :: delta_lambda = 0.025
 
-  WRITE(*,*) "hard-coded gas_dust =", gas_dust
+  WRITE(*,*) "WARNING : hard-coded gas_dust =", gas_dust
 
+  phik=1
 
   cst_E=2.0*hp*c_light**2
 
@@ -882,7 +883,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   real(kind=db), dimension(nLevels) :: B
   real(kind=db), dimension(nLevels) :: cTot
   real(kind=db) :: boltzFac, JJmol
-  integer :: iLower, iUpper, iLevel, i, j, eq, n_eq
+  integer :: i, j, eq, n_eq
   integer :: itrans, l, k, iPart
   real(kind=db) :: collEx, colldeEx
 
@@ -1031,14 +1032,10 @@ subroutine equilibre_othin_mol_pop2()
 
   implicit none
 
-  integer :: ri, zj, phik, id
-
   real(kind=db) :: tab_nLevel_tmp(n_rad,nz,1,nLevels)  ! pas 3D
   logical :: ldouble_RT_tmp
 
   Jmol(:,:) = 0.0_db
-
-  id = 1 ! TODO : parallelisation
 
   ! Par securite : sauvegarde population 1
   tab_nLevel_tmp(:,:,:,:) =  tab_nLevel(:,:,:,:)
@@ -1069,10 +1066,10 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
   integer, intent(in) :: id,ri, zj, phik, n_rayons
   integer, dimension(2), intent(in) :: ispeed
 
-  real(kind=db), dimension(ispeed(1):ispeed(2)) :: tau, etau, P, opacite, Snu
-  real(kind=db) :: Jext, Jint, somme, J
+  real(kind=db), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
+  real(kind=db) :: somme, J
 
-  integer :: iTrans, iray, iv
+  integer :: iTrans, iray
 
   Jmol(:,id) = 0.0_db
 

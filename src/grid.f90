@@ -62,11 +62,7 @@ subroutine define_physical_zones()
   ! 03/05/11
 
   integer :: i, j, index, i_region, iter, ir, k
-  type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
-  type(disk_zone_type) :: dz
-
   logical, dimension(n_zones) :: zone_scanned
-
   real(kind=db) :: r1, r2, minR, maxR
   character(len=10) :: n1, n2
 
@@ -186,16 +182,13 @@ subroutine define_grid4()
   real, parameter :: pi = 3.1415926535
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
-  integer :: i,j,k, izone, i_subdivide, iz_subdivide, ii, ii_min, ii_max
+  integer :: i,j,k, izone, ii, ii_min, ii_max
 
   !tab en cylindrique ou spherique suivant grille
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
-  real(kind=db) ::   r_i, r_f, dr, fac, r0, rout_cell, H, hzone
+  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
   integer :: ir, iz, n_cells, n_rad_region, n_rad_in_region, n_empty, istart
-
-  real(kind=db), dimension(n_rad-n_rad_in+2) :: tab_r_tmp
-  real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
 
@@ -1349,10 +1342,7 @@ subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
   real, intent(in) :: aleat1, aleat2, aleat3
   real(kind=db), intent(out) :: x,y,z
 
-  real(kind=db) :: r, theta, phi, r_cos_theta, w
-
-  integer :: ri_tmp, thetaj_tmp
-
+  real(kind=db) :: r, theta, phi, r_cos_theta
 
   ! Position radiale
   r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
@@ -1417,20 +1407,6 @@ subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
   return
 
 end subroutine pos_em_cellule_sph
-
-!***********************************************************
-
-subroutine verif_cellule_1(lambda)
-! Verifie opacite cellule 1
-  implicit none
-
-  integer, intent(in) :: lambda
-  integer :: n
-  real :: tau
-
-  n = 1 + floor(log(tau-1.)/log(2.))
-
-end subroutine verif_cellule_1
 
 !***********************************************************
 

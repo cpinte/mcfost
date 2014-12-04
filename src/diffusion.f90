@@ -289,7 +289,6 @@ subroutine Temp_approx_diffusion_vertical()
 
   implicit none
 
-  real, dimension(n_rad,nz,1) :: Temp0
   real :: max_delta_E_r, stabilite, precision
   integer :: n_iter, i, k
   logical :: lconverged
@@ -384,8 +383,8 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   real, intent(out) :: max_delta_E_r
   logical, intent(out) :: lconverge
 
-  real(kind=db) :: dt, dE_dr_m1, dE_dr_p1, dE_dz_m1, dE_dz_p1, d2E_dr2, d2E_dz2
-  real(kind=db) :: D_Laplacien_E, dr, dz, delta_E, delta_E_r, frac, Dcoeff_p, Dcoeff_m
+  real(kind=db) :: dt, dE_dr_m1, dE_dr_p1, d2E_dr2, d2E_dz2
+  real(kind=db) :: D_Laplacien_E, dr, dz, delta_E, delta_E_r
   real(kind=db), dimension(n_rad,nz,n_az) :: tab_dt
   integer :: i,j,k
 
@@ -514,8 +513,8 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   real, intent(out) :: max_delta_E_r
   logical, intent(out) :: lconverge
 
-  real(kind=db) :: dt, dE_dr_m1, dE_dr_p1, dE_dz_m1, dE_dz_p1, d2E_dr2, d2E_dz2
-  real(kind=db) :: D_Laplacien_E, dr, dz, delta_E, delta_E_r, frac, Dcoeff_p, Dcoeff_m
+  real(kind=db) :: dt, dE_dz_m1, dE_dz_p1, d2E_dz2
+  real(kind=db) :: D_Laplacien_E, dz, delta_E, delta_E_r
   real(kind=db), dimension(nz) :: tab_dt
   integer :: j,k
 

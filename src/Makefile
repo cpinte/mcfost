@@ -47,8 +47,8 @@ MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
 FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
 ifeq ($(ARCH),LINUX)
-MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
-#MACH = -xW -axP # for fostino and ifort 10
+#MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
+MACH = -xW -axP # for fostino and ifort 10
 FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 endif
 
@@ -93,7 +93,8 @@ FC_SER = gfortran -m32 -cpp
 FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 MACH = #-march=athlon
 PREC =
@@ -113,7 +114,9 @@ FC_SER = gfortran -m64 -cpp
 FC_OMP = gfortran -m64 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
+#-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 
 MACH = #-march=athlon
@@ -218,10 +221,10 @@ release : main
 	mkdir web web/linux web/macos
 	cp mcfost web/macos
 	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
-	rsync -Pu *.f90 Makefile dmz:mcfost/src
-	ssh dmz "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
-	scp dmz:mcfost/src/mcfost web/linux/
-	scp dmz:mcfost/src/mcfost.sha1 web/linux/
+	rsync -Pu *.f90 Makefile fosti:mcfost/src
+	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
+	scp fosti:mcfost/src/mcfost web/linux/
+	scp fosti:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web

@@ -147,8 +147,8 @@ contains
 
     ! TODO : linit_gaz
 
-    real :: wl_min, eps_PAH, mPAH, masse_PAH, norme, a
-    integer :: i, j, pop, k, NC, NH, alloc_status, ir, iz, NC_0
+    real :: eps_PAH, mPAH, masse_PAH, norme, a
+    integer :: i, pop, k, NC, NH, alloc_status, ir, iz, NC_0
     real, dimension(:), allocatable :: fPAH
 
     ! Maximum 4 zones dans ProDiMo
@@ -398,7 +398,7 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l, i, iRegion
+    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme
 
@@ -1068,19 +1068,16 @@ contains
     ! C.Pinte
     ! 12/07/09
 
-    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdunum, hdutype
+    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdutype
     integer :: imol, syst_status, n_files, n_rad_m2p, nz_m2p, n_lambda_m2p, i, j, l
-    real :: nullval, buffer, Tdust
+    real :: nullval, Tdust
     logical :: anynull
 
     integer, dimension(4) :: naxes
 
     character(len=30) :: errtext
-    character (len=80) :: errmessage, comment
+    character (len=80) :: errmessage
     character(len=512) :: filename, mol_para, cmd
-
-    real, dimension(:,:), allocatable :: temperature_ProDiMo
-
 
     !**************************************************************
     ! 1) Lecture des parametres dans le fichier .para de data_th
@@ -1405,7 +1402,7 @@ contains
 
     integer, intent(in) :: imol
 
-    integer :: fits_status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype,alloc_status
+    integer :: fits_status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdutype,alloc_status
     real :: nullval
     logical :: anynull
     integer, dimension(4) :: naxes
@@ -1428,15 +1425,8 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, vmax, sigma2_m1, r_cyl
-    real(kind=db) :: S, dz, dV, Somme
-    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed, l, keyword_status
-
-
-    ! TMP
-    integer :: iTrans, iUp, iLow
-    real(kind=db) :: cst, nUp, nLow
-    real :: Tex
+    real :: sigma2, sigma2_m1, r_cyl
+    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status
 
     n_speed_rt = mol(imol)%n_speed_rt
 

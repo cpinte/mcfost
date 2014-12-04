@@ -160,11 +160,9 @@ real(kind=sl) function interp_sp(y, x, xp)
   implicit none
 
   real(kind=sl), dimension(:), intent(in) :: x, y
-  real(kind=sl) :: xp
+  real(kind=sl) :: xp, frac
 
-  integer :: n, np, j, ny
-
-  real :: frac
+  integer :: n, j
 
   n=size(x) !; ny=size(y)
 
@@ -222,11 +220,9 @@ real(kind=db) function interp_dp(y, x, xp)
   implicit none
 
   real(kind=db), dimension(:), intent(in) :: x, y
-  real(kind=db) :: xp
+  real(kind=db) :: xp, frac
 
-  integer :: n, np, j, ny
-
-  real :: frac
+  integer :: n, j
 
   n=size(x) !; ny=size(y)
 
@@ -337,7 +333,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
   real(kind=db), intent(in) ::  xinit, yinit, zinit, u1, v1, w1
   real(kind=db), intent(out) :: xfin, yfin, zfin
 
-  real(kind=db) :: cost, sint, sing, prod, x, theta
+  real(kind=db) :: cost, sint, sing, prod, theta
 
   if (w1 > 0.999999999_db) then
      cost = 1.0_db
@@ -1120,7 +1116,7 @@ function bubble_sort(data_in)
 
   integer :: i, pass, n, tmp_i
   logical :: sorted
-  real ::  temp
+  real(kind=db) ::  temp
 
   n = size(data_in)
   allocate(bubble_sort(n),data(n))

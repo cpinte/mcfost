@@ -119,17 +119,12 @@ subroutine init_reemission()
   implicit none
 
   integer :: i,j,pk,k,lambda,t, pop
-  real(kind=db) :: integ, integ2, coeff_exp, cst_wl, cst, wl
+  real(kind=db) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
   real(kind=db), dimension(n_lambda) :: B, dB_dT
 
-  ! Pour spline
-  real, dimension(1:n_T) :: xa,ya,y2
-  real ::  yp1, ypn
-  real, dimension(n_rad,nz) :: dfrac_E_em_1, dfrac_E_em_n
-
-   write(*,'(a35, $)') "Initializing thermal properties ..."
+  write(*,'(a35, $)') "Initializing thermal properties ..."
 
   lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
 
@@ -340,7 +335,7 @@ subroutine reemission(id,ri,zj,phik,pri,pzj,pphik,E,aleat,lambda)
   integer, intent(out) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2
-  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs, E_abs
+  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   ! Absorption d'un photon : on ajoute son energie dans la cellule
   !xE_abs(ri,zj,phik,id) = xE_abs(ri,zj,phik,id) + E
@@ -418,7 +413,7 @@ subroutine reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
-  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs, E_abs
+  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   lambda0=lambda
 
@@ -511,8 +506,8 @@ subroutine Temp_finale()
 
   implicit none
 
-  integer :: l, l1, l2, T_int, T1, T2, alloc_status
-  real :: Temp, Temp1, Temp2, proba, frac, log_frac_E_abs
+  integer :: T_int, T1, T2, alloc_status
+  real :: Temp, Temp1, Temp2, frac, log_frac_E_abs
 
   real(kind=db), dimension(:,:,:), allocatable :: J_abs
 
@@ -609,10 +604,8 @@ subroutine Temp_finale_nLTE()
 
   implicit none
 
-  integer :: l, l1, l2, T_int, T1, T2
-  real(kind=db) :: Temp, Temp1, Temp2, proba, frac, log_frac_E_abs, J_absorbe
-
-  real :: rcyl, z
+  integer :: T_int, T1, T2
+  real(kind=db) :: Temp, Temp1, Temp2, frac, log_frac_E_abs, J_absorbe
 
   integer :: i,j, k, lambda
 
@@ -732,13 +725,13 @@ subroutine Temp_nRE(lconverged)
   real(kind=db), dimension(n_T) :: nu_bin, delta_nu_bin
   real(kind=db), dimension(0:n_T) :: T_lim, U_lim
 
-  real(kind=db), dimension(n_lambda) :: log_tab_nu, q_abs_o_dnu, tab_nu
+  real(kind=db), dimension(n_lambda) :: q_abs_o_dnu, tab_nu
 
   real(kind=db), dimension(:,:), allocatable :: kJnu, lambda_Jlambda
 
   real(kind=db) :: delta_T, kJnu_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
-  integer :: l, i, j, k, T, T1, T2, lambda, alloc_status, id, T_int
+  integer :: l, i, j, T, T1, T2, lambda, alloc_status, id, T_int
 
   integer, parameter :: n_cooling_time = 100
   real :: E_max
