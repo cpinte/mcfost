@@ -169,7 +169,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real, parameter :: precision_sub = 1.0e-3
   real, parameter :: precision = 1.0e-1
 
-  integer :: etape, etape_start, etape_end, ri, zj, phik, l, iray, iTrans, n_rayons
+  integer :: etape, etape_start, etape_end, ri, zj, phik, iray, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
   integer, dimension(nb_proc) :: max_n_iter_loc
 
@@ -527,7 +527,7 @@ subroutine emission_line_map(imol,ibin)
 
   real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
-  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2
+  real(kind=db) :: taille_pix
   integer :: i,j, id, igridx_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
@@ -536,7 +536,7 @@ subroutine emission_line_map(imol,ibin)
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
-  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, cx, cy, lambda, iv
+  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, lambda, iv
   real :: vmax_center_rt, extra_deltaV_rt
 
   phi_RT = 0.
@@ -741,10 +741,10 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
 
   real(kind=db) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(3) :: sdx, sdy
-  real :: npix2, diff, vmax_center_rt
+  real :: npix2, diff
 
   real, parameter :: precision = 1.e-2
-  integer :: i, j, subpixels, iray, ri, zj, phik , iv, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
+  integer :: i, j, subpixels, iray, ri, zj, phik, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
 
   logical :: lintersect, labs
 

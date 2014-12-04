@@ -24,11 +24,11 @@ subroutine taille_grains()
 ! C. Pinte 14/01/05
 
   implicit none
-  integer :: k, i, j
-  real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
+  integer :: k, i
+  real :: a, nbre_tot_grains
   real(kind=db) :: exp_grains, sqrt_exp_grains
   real :: masse_pop
-  real :: correct_fact_r, correct_fact_S, correct_fact_M
+  real :: correct_fact_r
 
   type(dust_pop_type), pointer :: dp
 
@@ -217,7 +217,7 @@ subroutine init_indices_optiques()
 
   real :: frac, fbuffer
   real, dimension(:), allocatable :: f
-  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment, n_components
+  integer :: i, k, ii, alloc_status, pop, status, n_ind, ios, n_comment, n_components
 
   character(len=512) :: filename, dir
 
@@ -460,7 +460,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
 
   complex, dimension(size(m)) :: eps
 
-  integer :: n, i, iter, k
+  integer :: n, iter, k
   complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, S
 
   ! Number of components
@@ -551,7 +551,7 @@ subroutine prop_grains(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
   real :: a, wavel, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
-  integer :: k, i, pop, l
+  integer :: k, pop
 
   qext=0.0
   qsca=0.0
@@ -760,7 +760,7 @@ subroutine opacite2(lambda)
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, pk, k, ii, jj, kk, l, k_min, thetaj
+  integer :: i,j, pk, k, l, k_min, thetaj
   real(kind=db) ::  density, proba, q_sca_tot, q_ext_tot,norme
   logical :: lcompute_obs
 
@@ -769,9 +769,7 @@ subroutine opacite2(lambda)
 !  real :: delta_prob1, delta_probn, yp1, ypn
 !  real :: yp_p1, yp_m1, ypp
 
-
-
-  real :: z, rcyl, somme, gsca
+  real :: somme, gsca
 
   logical :: ldens0
 

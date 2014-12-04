@@ -278,20 +278,15 @@ subroutine define_dust_density()
 
   implicit none
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, izone, pop
+  integer :: i,j, k, l, izone, pop
   real(kind=db), dimension(n_pop) :: cst, cst_pous
-  real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
-  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, h_H2, coeff_strat, proba
-  real(kind=db) :: puffed, facteur, z0, phi, surface, norme, S
+  real(kind=db) :: rcyl, rsph, mass
+  real(kind=db) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
+  real(kind=db) :: puffed, facteur, z0, phi, surface, norme
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=db) :: rho, rho0, ztilde, dtilde, h, hd
-
-  ! Pour puffed-up inner rim
-  real(kind=db) :: correct_H
-
-  real(kind=db) :: s_opt
+  real(kind=db) :: rho0, ztilde, dtilde, h, s_opt
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
@@ -933,14 +928,12 @@ subroutine densite_data2()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a
+  real ::  rcyl
 
   real, dimension(nz) :: z
 
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, h, dsigma, ntot_grains, somme
+  real(kind=db) :: h, dsigma, ntot_grains, somme
 
   real, dimension(5) ::  a_sph,a1, a2, a0, b0, b1, b2, b3, b4
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, b0_int, b1_int, b2_int, b3_int, b4_int
@@ -1110,14 +1103,12 @@ subroutine densite_data_SPH_binaire()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a
+  real ::  rcyl
 
   real, dimension(nz) :: z
 
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, h, dsigma, ntot_grains, somme
+  real(kind=db) :: h, dsigma, ntot_grains, somme
 
   real, dimension(5) ::  a_sph,a1, a2, a0, b0, b1, b2
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, b0_int, b1_int, b2_int
@@ -1278,14 +1269,10 @@ subroutine densite_data_SPH_TTauri()
   real, parameter :: G = 6.672e-8
 
   integer, parameter :: nbre_a = 6
-  integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l
+  real ::  rcyl, z
 
-  real :: z
-
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, ntot_grains, somme
+  real(kind=db) :: ntot_grains, somme
 
   real, dimension(nbre_a) ::  a_sph, a0, a1, a2, a3, a4, b0, b1, b2, b3, b4
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, a3_int, a4_int, b0_int, b1_int, b2_int, b3_int, b4_int
@@ -1484,19 +1471,16 @@ subroutine densite_data_SPH_TTauri_1()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a, alloc_status
+  real ::  cst, cst_pous, rcyl
+  real :: fact_exp, coeff_exp, r0
 
   real, dimension(nz) :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real :: exp_grains
 
   real, dimension(:,:), allocatable :: sph
   real, dimension(:), allocatable ::  a_sph, beta_sph, surf_sph, h0_sph, sigma_sph
-
-  real ::  q_sca_tot, q_ext_tot,norme
 
   real(kind=db) :: somme, mass
 
@@ -1722,21 +1706,13 @@ subroutine densite_data_SPH_TTauri_2()
   real, parameter :: G = 6.672e-8
 
   integer, parameter :: nbre_a = 6
-  integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
-
-  real :: z
-
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, ntot_grains, somme
+  integer :: i,j, k, ii, jj, l
+  real(kind=db) :: somme
 
   real, dimension(nbre_a) ::  a_sph
   real, dimension(n_rad,nz,nbre_a) :: rho
   real :: HH, SS, rr, zz
 
-  real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, a3_int, a4_int, b0_int, b1_int, b2_int, b3_int, b4_int
-  real(kind=db), dimension(n_grains_tot) :: h, dsigma
   real(kind=db) :: mass, fact
 
   character(len=512) :: s, dir
@@ -1878,8 +1854,8 @@ subroutine densite_data_LAURE_SED()
   integer, parameter :: nvert = 50
   real, dimension(nr,nvert) :: rho, T
 
-  real :: TT, tautau, z_r ! buffer
-  real ::  M
+  real :: tautau, z_r ! buffer
+  real :: M
 
   integer :: i, j, k, l, pop, sys_status
   real(kind=db) :: facteur, mass
@@ -2048,9 +2024,9 @@ subroutine densite_eqdiff()
   real, parameter :: G = 6.672e-8
   real, parameter :: gas_dust = 100
 
-  integer :: i,j, k, l, k_min, jj
-  real :: cst, cst_pous, cst_gaz, M_star, a
-  real :: fact_exp, density,  c_sound, proba, coeff_grav, omega, D0, eps, pas_z, somme1, somme2, correct,test
+  integer :: i,j, k, jj
+  real :: cst, cst_pous, cst_gaz, M_star
+  real :: fact_exp, c_sound, coeff_grav, omega, D0, eps, pas_z, somme1, somme2, correct,test
 
   real, dimension(1) :: y
 
@@ -2219,7 +2195,7 @@ subroutine derivs(x,y,dydx)
   REAL(SP), INTENT(IN) :: x
   REAL(SP), DIMENSION(:), INTENT(IN) :: y
   REAL(SP), DIMENSION(:), INTENT(OUT) :: dydx
-  real :: rho_gaz, schlt
+  real :: rho_gaz
 
   type(disk_zone_type) :: dz
 
@@ -2247,11 +2223,11 @@ subroutine densite_data_hd32297()
 
 
 !  integer, parameter :: nr=1150
-  integer :: i, j, k, kmin, longueur, status, nr, alloc_status
+  integer :: i, j, k, kmin, status, nr, alloc_status, longueur
   real, dimension(:), allocatable :: rayon, dens
   real, dimension(n_rad) :: density
   real, dimension(nz) ::  z
-  real :: somme, mass, rcyl, coeff_exp, a, b, gamma
+  real :: somme, mass, rcyl, coeff_exp, gamma
 
   character(len=62) :: buf
 
@@ -2384,13 +2360,11 @@ subroutine densite_data_gap()
 
   implicit none
 
-  integer :: i, j, k, kmin, longueur, status, nr, alloc_status
+  integer :: i, j, k, kmin, status, nr, alloc_status
   real, dimension(:), allocatable :: rayon, dens
   real, dimension(n_rad) :: density
   real, dimension(nz) ::  z
-  real :: somme, mass, rcyl, coeff_exp, a, b, gamma
-
-  character(len=62) :: buf
+  real :: somme, mass, rcyl, coeff_exp
 
   integer :: ind_debut, ind_fin
   real :: r_debut, r_fin
@@ -2563,8 +2537,8 @@ subroutine densite_file()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdunum, hdutype, bitpix
-  integer :: nullval, stat
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdutype, bitpix
+  integer :: nullval
   integer, dimension(4) :: naxes
   logical :: anynull, l3D_file
   character(len=80) :: comment
@@ -2572,7 +2546,6 @@ subroutine densite_file()
   integer :: k, l, i, n_a, read_n_a, j_start_file
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
-  character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
@@ -3296,13 +3269,13 @@ subroutine densite_Seb_Charnoz2()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j
   integer :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull
 
   integer :: k, l, i
-  real(kind=db) :: somme, mass, somme2
+  real(kind=db) :: somme, somme2
 
   real, dimension(n_rad,nz) :: dens
 

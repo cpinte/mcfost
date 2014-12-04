@@ -151,7 +151,7 @@ subroutine loi_Wien(lambda)
   real :: T
   real :: wl
 
-!  T = maxval(etoile%T)
+  T = maxval(etoile%T)
 
   wl = 2898./T
 
@@ -193,15 +193,14 @@ subroutine repartition_energie_etoiles()
   real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   character(len=512) :: filename, dir
 
-  integer :: lambda, i, n, l1, l2, lambda_mini, lambda_maxi, n_lambda_spectre, l, ios
+  integer :: lambda, i, n, n_lambda_spectre, l, ios
   real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
-  real(kind=db) :: somme_spectre, somme_bb
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV
   real(kind=db) :: fact_sup, fact_inf, cst_spectre_etoiles
 
   real(kind=db) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, naxes1_ref
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, naxes1_ref
   real :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull
@@ -605,7 +604,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 
   integer :: phik
   real :: aleat1, aleat2, aleat3, aleat4
-  real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi, l, w2
+  real(kind=db) :: srw02, argmt, cospsi, phi, l, w2
 
   ! Energie a 1
   stokes(:) = 0. ; stokes(1)  = 1.

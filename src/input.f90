@@ -15,9 +15,9 @@ module input
 subroutine read_opacity_file(pop)
 
   integer, intent(in) :: pop
-  character(len=512) :: filename, dir
+  character(len=512) :: filename
 
-  integer :: ios, l
+  integer :: l
   type(dust_pop_type), pointer :: dp
 
   dp => dust_pop(pop)
@@ -339,7 +339,7 @@ subroutine get_file_specific_heat_dim(pop)
 
   integer, intent(in) :: pop
 
-  integer :: ios, status, n_comment, n_Temperatures, k
+  integer :: ios, status, n_comment, n_Temperatures
   real :: fbuffer
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
@@ -421,8 +421,6 @@ subroutine readmolecule(imol)
   integer :: i, j, iLow, iUp, iPart, ios
   real :: a, freq, eu
   real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
-
-  character(len=10) :: buffer
 
   filename = trim(mol(imol)%filename)
   dir = in_dir(filename, mol_dir,  status=ios)
@@ -534,7 +532,7 @@ end subroutine readmolecule
 
 subroutine lect_Temperature()
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
   real :: nullval
   integer, dimension(4) :: naxes
   logical :: anynull
@@ -719,7 +717,7 @@ subroutine read_abundance(imol)
 
   integer, intent(in) :: imol
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels
   real :: nullval
   integer, dimension(4) :: naxes
   logical :: anynull

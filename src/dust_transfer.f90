@@ -41,14 +41,12 @@ subroutine transfert_poussiere()
 #include "sprng_f.h"
 
   ! Energie des paquets
-  real(kind=db), dimension(4) :: Stokes, Stokes_old
-
+  real(kind=db), dimension(4) :: Stokes
 
   ! Parametres simu
-  integer :: time, lambda_seuil, ymap0, xmap0, ndifus, nbre_phot2, sig, signal
-  integer :: n_dif_max, nbr_arg, i_arg, ind_etape, first_etape_obs
-  real ::  delta_time, cpu_time_begin, cpu_time_end
-  integer :: etape_start, nnfot1_start, n_iter, iTrans, ibin
+  integer :: time, lambda_seuil, ymap0, xmap0, nbre_phot2
+  integer :: ind_etape, first_etape_obs
+  integer :: etape_start, nnfot1_start, n_iter, ibin
 
   real :: n_phot_lim
   logical :: lpacket_alive, lintersect
@@ -717,7 +715,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
   real :: rand, rand2, rand3, rand4
   integer :: i_star
 
-  real(kind=db) :: w02, phi, srw02
+  real(kind=db) :: w02, srw02
   real :: argmt
 
   ! Spot
@@ -1295,8 +1293,8 @@ subroutine dust_map(lambda,ibin)
   real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
 
-  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2, l, x0, y0, z0
-  integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, nethod, ech_method, cx, cy, k
+  real(kind=db) :: taille_pix, l, x0, y0, z0
+  integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
 
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000

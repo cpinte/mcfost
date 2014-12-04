@@ -26,7 +26,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   logical, intent(in) :: flag_star, flag_scatt
   real(kind=db), dimension(4)  :: stok
 
-  integer :: capt, c_phi, imap1, jmap1, imap2, jmap2, i
+  integer :: capt, c_phi, imap1, jmap1, imap2, jmap2
   real(kind=db) :: xprim, yprim, zprim, ytmp, ztmp
 
   x1=xin ; y1=yin ; z1=zin
@@ -488,10 +488,9 @@ subroutine write_stokes_fits()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status, id
 
   integer :: lambda=1
-  integer :: image_type=1
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -763,7 +762,7 @@ subroutine ecriture_map_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id, xcenter, lambda, itype, ibin
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -904,7 +903,7 @@ subroutine ecriture_sed_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id, lambda
+  integer :: i,j,group,fpixel,nelements, lambda
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -995,20 +994,18 @@ subroutine write_origin()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
-
-  integer :: lambda=1
-  integer :: image_type=1
+  integer :: group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend
 
-  real :: o_star, frac_star, somme_disk
+  real :: o_star
   real, dimension(n_rad, nz) :: o_disk
 
   filename = trim(data_dir)//"/origine.fits.gz"
 
   ! Normalisation
+  o_star = sum(star_origin(1,:))
   o_disk(:,:) = o_disk(:,:) / (sum(o_disk) + o_star)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1086,7 +1083,7 @@ subroutine calc_optical_depth_map(lambda)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,k, group,fpixel,nelements, alloc_status, id
+  integer :: i,j,k, group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
@@ -1197,7 +1194,7 @@ subroutine reemission_stats()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -1261,7 +1258,7 @@ subroutine write_disk_struct()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1761,7 +1758,7 @@ subroutine ecriture_J()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj
+  integer :: group,fpixel,nelements, lambda, ri, zj
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1846,7 +1843,7 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l
+  integer :: group,fpixel,nelements, lambda, ri, zj, l
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1950,13 +1947,10 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: n,k, i, j, lambda, l
-  real :: flux, nbre_photons, facteur
-
-
+  integer :: i, j, l
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2202,7 +2196,7 @@ subroutine ecriture_Tex(imol)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2290,12 +2284,12 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=db) :: somme
-  integer ::  i, j, k, l
+  integer ::  i, j, l
   real, dimension(n_rad,nz) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2370,15 +2364,15 @@ subroutine ecriture_sed(ised)
 
   integer, intent(in) :: ised
 
-  integer :: n,k, i, j, lambda
-  real :: flux, flux_q, flux_u, flux_v, flux_star, flux_star_scat, flux_disk, flux_disk_scat, facteur, nbre_photons
+  integer :: lambda
+  real :: facteur
   real, dimension(n_lambda2) :: n_photons_envoyes
 
   character(len=512) :: filename
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
 
@@ -2531,7 +2525,7 @@ subroutine ecriture_pops(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans
+  integer :: group,fpixel,nelements
   logical :: simple, extend
 
   real, dimension(n_rad,nz,1,nLevels) :: tab_nLevel_io ! pas en 3D
@@ -2589,7 +2583,7 @@ subroutine ecriture_spectre(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans, xcenter,i, iiTrans
+  integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
   logical :: simple, extend
 
   real, dimension(:,:,:,:), allocatable ::  O ! nv, nTrans, n_rad, nz
@@ -2853,7 +2847,7 @@ subroutine cfitsWrite(filename,tab,dim)
   integer, dimension(:), intent(in) :: dim ! dim == shape(tab)
 
   integer :: status,unit,blocksize,bitpix,naxis
-  integer :: group,fpixel,nelements, alloc_status
+  integer :: group,fpixel,nelements
   logical :: simple, extend
 
   !  Get an unused Logical Unit Number to use to open the FITS file.

@@ -18,7 +18,7 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -723,9 +723,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1268,9 +1267,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1812,9 +1810,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2360,9 +2357,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2897,7 +2893,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
@@ -3439,7 +3435,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
@@ -3971,7 +3967,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -4490,7 +4486,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, status, imol
+    integer :: i, j, alloc_status, ios, ind_pop, status, imol
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -5005,7 +5001,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -5521,7 +5517,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -5892,7 +5888,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -6252,7 +6248,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -6622,7 +6618,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -6993,7 +6989,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -7361,7 +7357,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -7694,7 +7690,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -8014,7 +8010,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, alloc_status, ios, tmpint, j, ind_pop
+    integer :: i, alloc_status, ios, j, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
