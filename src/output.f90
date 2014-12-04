@@ -1415,7 +1415,6 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens = densite_pouss(:,:,:,:)
   dens = 0.0
   do k=1,n_az
      bz : do j=j_start,nz
