@@ -422,8 +422,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   do k=1, n_az
      !$omp parallel &
      !$omp default(none) &
-     !$omp private(i,j,dE_dr_m1,dE_dr_p1,Dcoeff_p,Dcoeff_m,d2E_dr2,dE_dz_p1,delta_E_r) &
-     !$omp private(D_Laplacien_E,delta_E,dE_dz_m1,d2E_dz2) &
+     !$omp private(i,j,dE_dr_m1,dE_dr_p1,d2E_dr2,delta_E_r,D_Laplacien_E,delta_E,d2E_dz2) &
      !$omp shared(DensE_m1,r_grid,z_grid,Dcoeff,ri_in_dark_zone,ri_out_dark_zone,zj_sup_dark_zone,max_delta_E_r) &
      !$omp shared(DensE,dt,delta_z,k,n_rad)
      !$omp do schedule(dynamic,10)
