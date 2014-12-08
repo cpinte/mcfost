@@ -853,7 +853,7 @@ subroutine lect_lambda()
 
 
   if (lProDiMo) then
-     write(*,*) "WARNING:  matching step2 wavelength bins to ProDiMo set-up"
+     write(*,*) "WARNING: matching step2 wavelength bins to ProDiMo set-up"
      tab_lambda2_inf(1) = 0.0912
      tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
      tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
@@ -873,6 +873,11 @@ subroutine lect_lambda()
         endif
      enddo
   endif ! lProDiMo
+
+
+  do lambda=1, n_lambda2
+     tab_delta_lambda2(lambda) = 0.01 * tab_lambda2(lambda)
+  enddo
 
   return
 
