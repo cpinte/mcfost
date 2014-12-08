@@ -538,6 +538,22 @@ contains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
              somme = somme + dust_pop_tmp(n_pop)%frac_mass
              dust_pop_tmp(n_pop)%zone = j
+
+             ! Checking which type of opacity file it is
+             dust_pop_tmp(n_pop)%is_PAH = .false.
+             dust_pop_tmp(n_pop)%is_opacity_file = .false.
+             dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .false.
+             if (dust_pop_tmp(n_pop)%indices(1)(1:3) == "PAH") then
+                dust_pop_tmp(n_pop)%is_PAH = .true. ; dust_pop_tmp(n_pop)%is_opacity_file = .true.
+             else  if (dust_pop_tmp(n_pop)%indices(1)(1:7) == "Misselt") then
+                dust_pop_tmp(n_pop)%is_opacity_file = .true.
+                dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .true.
+                lread_Misselt = .true.
+                if (dust_pop_tmp(n_pop)%indices(1)(9:11) == "PAH") then
+                   dust_pop_tmp(n_pop)%is_PAH = .true.
+                endif
+             endif
+
           enddo
 
           ! renormalisation des fraction en masse
@@ -548,12 +564,12 @@ contains
        enddo !n_zones
     endif ! lfits
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+!    if (lRE_LTE.and.lRE_nLTE) then
+!       write(*,*) "Error : cannot mix grains in LTE and nLTE"
+!       write(*,*) " Is it usefull anyway ???"
+!       write(*,*) "Exiting"
+!       stop
+!    endif
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
@@ -561,9 +577,9 @@ contains
        write(*,*) 'Allocation error n_pop tmp'
        stop
     endif
-    dust_pop%is_PAH = .false.
-    dust_pop%is_opacity_file = .false.
-    dust_pop%is_Misselt_opacity_file = .false.
+    !dust_pop%is_PAH = .false.
+    !dust_pop%is_opacity_file = .false.
+    !dust_pop%is_Misselt_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -577,7 +593,6 @@ contains
              dust_pop(ind_pop)%ind_debut = grain_RE_LTE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_RE_LTE_end + dust_pop(ind_pop)%n_grains
              grain_RE_LTE_end = grain_RE_LTE_end +  dust_pop(ind_pop)%n_grains
-
           endif
        enddo
     endif

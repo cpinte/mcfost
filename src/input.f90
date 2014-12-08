@@ -560,7 +560,7 @@ subroutine lect_Temperature()
         call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
         if (nfound /= 3) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature.fits.gz file. Exiting.'
+           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
         if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz+1).or.(naxes(3) /= n_az)) then
@@ -578,10 +578,9 @@ subroutine lect_Temperature()
         call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
         if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature.fits.gz file. Exiting.'
+           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
-
 
         if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
            write(*,*) "Error : Temperature.fits.gz does not have the"
@@ -604,10 +603,10 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-     write(*,*) "Reading temperature file : "//trim(Tfile)
+     write(*,*) "Reading temperature file : "//trim(Tfile_nLTE)
 
      readwrite=0
-     call ftopen(unit,Tfile,readwrite,blocksize,status)
+     call ftopen(unit,Tfile_nLTE,readwrite,blocksize,status)
      if (status /= 0) then ! le fichier temperature n'existe pas
         write(*,*) "ERROR : temperature file needed"
         stop
@@ -621,7 +620,8 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature.fits.gz file. Exiting.'
+        write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+        write(*,*) "Found", nfound, "axes", naxes
         stop
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
