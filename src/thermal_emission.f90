@@ -418,8 +418,8 @@ subroutine reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
-  kmin=0
-  kmax=n_grains_RE_nLTE
+  kmin=grain_RE_nLTE_start
+  kmax=grain_RE_nLTE_end
   k=(kmin+kmax)/2
 
   do while((kmax-kmin) > 1)
@@ -1409,13 +1409,6 @@ subroutine repartition_energie(lambda)
                     endif
                  endif !cst_wl
               endif ! Temp==0.0
-
-              if (lweight_emission) then
-                 E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
-              else
-                 E_cell_corrected(l) = E_cell(l)
-              endif
-
            enddo !pk
         enddo bz !j
      enddo !i
@@ -1447,13 +1440,7 @@ subroutine repartition_energie(lambda)
                  endif !cst_wl
               endif ! Temp==0.0
            enddo !k
-           E_cell(l) = E_emise
-           if (lweight_emission) then
-              E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
-           else
-              E_cell_corrected(l) = E_cell(l)
-           endif
-
+           E_cell(l) = E_cell(l) + E_emise
         enddo !j
      enddo !i
   endif
@@ -1511,16 +1498,22 @@ subroutine repartition_energie(lambda)
               endif ! l_RE
            enddo !k
            E_cell(l) =  E_cell(l) + E_emise
-           if (lweight_emission) then
-              E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
-           else
-              E_cell_corrected(l) = E_cell(l)
-           endif
         enddo !j
      enddo !i
 
   endif
 
+  do i=1,n_rad
+     do j=1,nz
+        ! Combinaison des 2 indices pour dichotomie
+        l=j+nz*(i-1)
+        if (lweight_emission) then
+           E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
+        else
+           E_cell_corrected(l) = E_cell(l)
+        endif
+     enddo
+  enddo
 
   E_disk(lambda) = sum(E_cell)
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda))
