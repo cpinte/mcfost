@@ -872,7 +872,7 @@ subroutine opacite2(lambda)
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
-     if (.not.lmono) then
+     if (letape_th) then
         do i=1, n_rad
            do j=1, nz
               prob_kappa_abs_1grain(lambda,i,j,0)=0.0
@@ -890,7 +890,7 @@ subroutine opacite2(lambda)
 
 
   if (lkappa_abs_grain) then
-     if (.not.lmono) then
+     if (letape_th) then
         write(*,*) "Error : lkappa_abs_grain only monochrmatic"
         stop
      endif
