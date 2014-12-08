@@ -2028,7 +2028,7 @@ subroutine ecriture_temperature(iTemperature)
         stop
      endif
 
-     filename = trim(data_dir)//"/Temperature.fits.gz"
+     filename = trim(data_dir)//"/Temperature_nLTE.fits.gz"
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
@@ -2069,8 +2069,6 @@ subroutine ecriture_temperature(iTemperature)
         call print_error(status)
      end if
   endif
-
-
 
   if (lnRE .and. iTemperature==1) then
      if (l3D) then

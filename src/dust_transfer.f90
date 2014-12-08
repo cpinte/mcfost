@@ -983,7 +983,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
-        if (.not.lmono) then
+        if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
            E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0 - proba_abs_RE(lambda,ri, zj, p_phik))
            ! Multiplication par proba abs sur grain en eq. radiatif
@@ -993,7 +993,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               lpacket_alive = .false.
               return
            endif
-        endif
+        endif ! lnRE
 
         flag_star=.false.
         flag_scatt=.false.
@@ -1001,8 +1001,20 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         rand = sprng(stream(id))
 
         ! Choix longueur d'onde
-        if (lRE_LTE) call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
-        if (lRE_nLTE) then
+        if (lRE_LTE) then
+           if (lRE_nLTE) then
+              ! on choisit si grain a LTE ou nLTE
+              if (rand > proba_abs_RE_nLTE(lambda,ri, zj, p_phik)) then ! LTE
+                 rand = sprng(stream(id))
+                 call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+              else ! nLTE
+                 rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+                 call reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+              endif
+           else ! uniquement LTE
+              call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+           endif
+        else if (lRE_nLTE) then ! uniquement nLTE
            rand2 = sprng(stream(id))
            call reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
         endif

@@ -502,7 +502,7 @@ module opacity
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca !n_lambda,n_rad,nz+1, (n_az)
-  real, dimension(:,:,:,:), allocatable :: proba_abs_RE !n_lambda,n_rad,nz+1, (n_az)
+  real, dimension(:,:,:,:), allocatable :: proba_abs_RE, proba_abs_RE_nLTE !n_lambda,n_rad,nz+1, (n_az)
   real, dimension(:,:,:,:), allocatable :: prob_kappa_abs_1grain !n_lambda,n_rad,nz+1, 0:n_grains
   real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
@@ -656,6 +656,7 @@ module em_th
   real :: T_rm
 
   character(len=512) :: Tfile = "./data_th/Temperature.fits.gz"
+  character(len=512) :: Tfile_nLTE = "./data_th/Temperature_nLTE.fits.gz"
   character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_Diff_approx.fits.gz"
   character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
 

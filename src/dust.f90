@@ -773,7 +773,7 @@ subroutine opacite2(lambda)
 
   logical :: ldens0
 
-  real(kind=db) :: kappa_abs_RE, kappa_abs_tot, angle
+  real(kind=db) :: kappa_abs_RE_nLTE, kappa_abs_RE, kappa_abs_tot, angle
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
@@ -827,6 +827,7 @@ subroutine opacite2(lambda)
            kappa(lambda,i,j,pk) = 0.0
            kappa_abs_tot = 0.0
            kappa_abs_RE = 0.0
+           kappa_abs_RE_nLTE = 0.0
            do  k=1,n_grains_tot
               density=densite_pouss(i,j,pk,k)
               kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + q_ext(lambda,k) * density
@@ -846,6 +847,7 @@ subroutine opacite2(lambda)
               do k=grain_RE_nLTE_start,grain_RE_nLTE_end
                  density=densite_pouss(i,j,pk,k)
                  kappa_abs_RE = kappa_abs_RE + q_abs(lambda,k) * density
+                 kappa_abs_RE_nLTE = kappa_abs_RE_nLTE + q_abs(lambda,k) * density
               enddo
            endif
 
@@ -857,12 +859,16 @@ subroutine opacite2(lambda)
               enddo
            endif
 
-           if (kappa_abs_tot > tiny_db) proba_abs_RE(lambda,i,j,pk) = kappa_abs_RE/kappa_abs_tot
+           if (lnRE.and.(kappa_abs_tot > tiny_db)) proba_abs_RE(lambda,i,j,pk) = kappa_abs_RE/kappa_abs_tot
+           if ((lRE_LTE.and.lRE_nLTE).and.(kappa_abs_RE > tiny_db)) &
+              proba_abs_RE_nLTE(lambda,i,j,pk) = kappa_abs_RE_nLTE/kappa_abs_RE
+
         enddo !pk
      enddo bz !j
   enddo !i
 
-  proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
+  if (lnRE) proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
+  if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE(lambda,:,nz+1,:) = proba_abs_RE_nLTE(lambda,:,nz,:)
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
