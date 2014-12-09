@@ -1032,7 +1032,7 @@ contains
        ! HDU 19 : temperature table
        !------------------------------------------------------------------------------
        bitpix=-32
-       naxis=4
+       naxis=1
        naxes(1)=n_T
        nelements=naxes(1)
 
