@@ -140,6 +140,7 @@ subroutine initialisation_mcfost()
   lMathis_field = .false.
   lchange_Tmax_PAH=.false.
   lno_T = .false.
+  lISM_heating = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -684,6 +685,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 5
+        lISM_heating=.true.
      case("-prodimo4")
         i_arg = i_arg + 1
         lprodimo = .true.
@@ -816,6 +818,9 @@ subroutine initialisation_mcfost()
      case("-no_T")
         i_arg = i_arg + 1
         lno_T=.true.
+     case("-ISM_heating")
+        i_arg = i_arg + 1
+        lISM_heating=.true.
      case default
         call display_help()
      end select
@@ -1158,6 +1163,7 @@ subroutine display_help()
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
   write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
   write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
+  write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"

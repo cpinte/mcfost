@@ -119,7 +119,7 @@ module parametres
   logical :: lread_grain_size_distrib, lread_misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -328,7 +328,7 @@ module prop_star
 
   real :: L_etoile
 
-  real, dimension(:), allocatable :: I_ISM
+  real, dimension(:), allocatable :: E_ISM
   real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
 
 end module prop_star
@@ -646,7 +646,7 @@ module em_th
 
   ! Choix cellule d'emission pour cas monochromatique
   real(kind=db), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
-  real, dimension(:), allocatable :: frac_E_stars, E_totale !n_lambda
+  real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
   ! Biais de l'emission vers la surface du disque
   real, dimension(:,:), allocatable :: weight_proba_emission, correct_E_emission

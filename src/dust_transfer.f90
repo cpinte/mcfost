@@ -257,6 +257,11 @@ subroutine transfert_poussiere()
      if (ltemp.or.lsed_complete) then
         frac_E_stars=1.0 ! dans phase1 tous les photons partent de l'etoile
         call repartition_energie_etoiles()
+        if (lISM_heating) then
+           call repartition_energie_ISM()
+        else
+           E_ISM = 0.0 ;
+        endif
 
         if (.not.lbenchmark_Pascucci) then
            if (lscatt_ray_tracing.and.lsed_complete) then
@@ -324,7 +329,8 @@ subroutine transfert_poussiere()
         else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
            frac_E_stars=1.0
            call lect_section_eff
-           call repartition_energie_etoiles
+           call repartition_energie_etoiles()
+           E_ISM = 0.0
            if (lcylindrical) call integ_tau(15) !TODO
         endif ! Fin bench
 
@@ -407,6 +413,7 @@ subroutine transfert_poussiere()
            call init_indices_optiques()
 
            call repartition_energie_etoiles()
+           E_ISM = 0.0 ! ISM done a second step in SED step2 calculation
 
            if (lscatt_ray_tracing) then
               call alloc_ray_tracing()
@@ -494,7 +501,6 @@ subroutine transfert_poussiere()
         p_nnfot2(id) = 0
         n_phot_envoyes_loc(lambda,id) = 0.0
         photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(lambda,id) < n_phot_lim))
-           nnfot2(id)=nnfot2(id)+1.0_db
            n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
            n_phot_envoyes_loc(lambda,id) = n_phot_envoyes_loc(lambda,id) + 1.0_db
 
@@ -505,7 +511,12 @@ subroutine transfert_poussiere()
            endif
 
            ! Emission du paquet
-           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star)
+           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,lintersect)
+           if (.not.lintersect) then
+              cycle photon
+           else
+              nnfot2(id)=nnfot2(id)+1.0_db
+           endif
 
            ! Propagation du packet
            if (lforce_1st_scatt) then
@@ -699,7 +710,7 @@ end subroutine transfert_poussiere
 
 !***********************************************************
 
-subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
+subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,lintersect)
   ! C. Pinte
   ! 27/05/09
 
@@ -709,6 +720,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
   integer, intent(out) :: ri, zj, phik
   real(kind=db), intent(out) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(4), intent(out) :: Stokes
+  logical, intent(out) :: lintersect
 
   ! Proprietes du packet
   logical, intent(out) :: flag_star
@@ -726,8 +738,9 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
   real :: hc_lk, correct_spot, cos_thet_spot, x_spot, y_spot, z_spot
 
 
-
   ! TODO : flag_scat et flag_direct_star, id en argument ??
+
+  lintersect = .true.
 
   rand = sprng(stream(id))
   if (rand <= frac_E_stars(lambda)) then ! Emission depuis étoile
@@ -779,7 +792,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
         endif
      endif ! lspot
 
-  else ! Emission depuis le disque
+  else  if (rand <= frac_E_disk(lambda)) then! Emission depuis le disque
      flag_star=.false.
 
      ! Position initiale
@@ -790,7 +803,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      call  pos_em_cellule(ri,zj,phik,rand,rand2,rand3,x0,y0,z0)
-
 
      ! Direction de vol (uniforme)
      rand = sprng(stream(id))
@@ -806,6 +818,9 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star)
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      if (lweight_emission) Stokes(1) = Stokes(1) * correct_E_emission(ri,zj)
+  else ! Emission ISM
+     flag_star=.false.
+     call emit_packet_ISM(id,ri,zj,x0,y0,z0,u0,v0,w0,stokes,lintersect)
   endif !(rand < prob_E_star)
 
 

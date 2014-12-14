@@ -323,7 +323,7 @@ contains
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
-         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
+         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
 
     do ri=1, n_rad
        do zj=1,nz
@@ -727,7 +727,7 @@ contains
 
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi
+           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
 
        do ri=1, n_rad
           do zj=1,nz

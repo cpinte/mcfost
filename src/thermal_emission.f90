@@ -1130,10 +1130,9 @@ subroutine Temp_nRE(lconverged)
                  endif
               enddo ! lambda
               !somme1=somme1 *n_phot_L_tot/volume(i)
-
               !somme1 = Int_k_lambda_Jlambda  ! pas defini openmp
-              somme2=somme2*2.0*hp*c_light**2
 
+              somme2=somme2*2.0*hp*c_light**2
               !write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
               if (somme2 > tiny_db) then
                  Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
@@ -1415,8 +1414,6 @@ subroutine repartition_energie(lambda)
      enddo !i
   endif
 
-
-
   ! Cas nLTE
   if (lRE_nLTE) then
      do i=1,n_rad
@@ -1517,7 +1514,8 @@ subroutine repartition_energie(lambda)
   enddo
 
   E_disk(lambda) = sum(E_cell)
-  frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda))
+  frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda)+E_ISM(lambda))
+  frac_E_disk(lambda)=(E_star+E_disk(lambda))/(E_star+E_disk(lambda)+E_ISM(lambda))
 
   ! Energie totale emise a une distance emise egale a la distance terre-etoile
   ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
@@ -1527,18 +1525,16 @@ subroutine repartition_energie(lambda)
   ! kappa_abs en AU-1, volume en Au**3
   surface=4*pi*(pc_to_AU*distance)**2
   if (l_sym_centrale) then
-     E_totale(lambda) = 2.0*pi*hp*c_light**2/surface * (E_star+E_disk(lambda)) * real(N_thet)*real(N_phi)
+     E_totale(lambda) = 2.0*pi*hp*c_light**2/surface * (E_star+E_disk(lambda)+E_ISM(lambda)) * real(N_thet)*real(N_phi)
   else
-     E_totale(lambda) = 2.0*pi*hp*c_light**2/surface * (E_star+E_disk(lambda)) * real(2*N_thet)*real(N_phi)
+     E_totale(lambda) = 2.0*pi*hp*c_light**2/surface * (E_star+E_disk(lambda)+E_ISM(lambda)) * real(2*N_thet)*real(N_phi)
   endif
-
 
   ! Distribution (spatiale) cumulee d'energie
   prob_E_cell(lambda,0)=0.0
   do l=1, n_max
      prob_E_cell(lambda,l) = prob_E_cell(lambda,l-1) + E_cell_corrected(l)
   enddo
-
 
   ! Normalisation du facteur de correction
   if (lweight_emission) then
