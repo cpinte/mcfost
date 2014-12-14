@@ -236,20 +236,21 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
   ! **************************************************
-  allocate(E_stars(n_lambda), E_disk(n_lambda), stat=alloc_status)
+  allocate(E_stars(n_lambda), E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error E_stars'
      stop
   endif
   E_stars = 0.0
   E_disk = 0.0
+  E_ISM = 0.0
 
-  allocate(frac_E_stars(n_lambda), E_totale(n_lambda), stat=alloc_status)
+  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error frac_E_stars'
      stop
   endif
-  frac_E_stars = 0.0 ; E_totale = 0.0
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   allocate(spectre_etoiles_cumul(0:n_lambda), spectre_etoiles(n_lambda), spectre_emission_cumul(0:n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1431,22 +1432,23 @@ subroutine realloc_step2()
   spectre_etoiles = 0.0
   spectre_emission_cumul = 0.0
 
-  deallocate(E_stars, E_disk)
-  allocate(E_stars(n_lambda2), E_disk(n_lambda2), stat=alloc_status)
+  deallocate(E_stars, E_disk,E_ISM)
+  allocate(E_stars(n_lambda2), E_disk(n_lambda2), E_ISM(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error E_stars'
      stop
   endif
   E_stars = 0.0
   E_disk = 0.0
+  E_ISM = 0.0
 
-  deallocate(frac_E_stars, E_totale)
-  allocate(frac_E_stars(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
+  deallocate(frac_E_stars, frac_E_disk, E_totale)
+  allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error frac_E_stars'
      stop
   endif
-  frac_E_stars = 0.0 ; E_totale = 0.0
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(tab_albedo)
   allocate(tab_albedo(n_lambda2,n_grains_tot), stat=alloc_status)
@@ -1868,7 +1870,7 @@ subroutine dealloc_emission_mol()
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa, kappa_sca, emissivite_dust)
-  deallocate(spectre_etoiles, spectre_etoiles_cumul, CDF_E_star, prob_E_star, E_stars)
+  deallocate(spectre_etoiles, spectre_etoiles_cumul, CDF_E_star, prob_E_star, E_stars, E_ISM)
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
