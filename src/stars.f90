@@ -585,6 +585,23 @@ end subroutine repartition_energie_etoiles
 
 !***********************************************************
 
+subroutine repartition_energie_ISM
+
+  real :: wl
+  integer :: lambda
+
+  do lambda=1, n_lambda
+     wl = tab_lambda(lambda) * 1e-6
+
+     E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) &
+          * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2)
+  enddo
+
+end subroutine repartition_energie_ISM
+
+!***********************************************************
+
+
 subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur une sphere et la direction de vol
@@ -640,7 +657,6 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   z = z * l
 
   call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
-
 
   return
 
