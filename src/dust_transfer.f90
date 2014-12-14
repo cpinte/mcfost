@@ -60,7 +60,7 @@ subroutine transfert_poussiere()
   real(kind=db) :: x,y,z, u,v,w
   real :: rand
   integer :: i, ri, zj, phik
-  logical :: flag_star, flag_scatt
+  logical :: flag_star, flag_scatt, flag_ISM
 
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -468,7 +468,7 @@ subroutine transfert_poussiere()
      !$omp default(none) &
      !$omp firstprivate(lambda) &
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,rand) &
-     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_scatt) &
+     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc,nbre_phot2,nnfot2,lforce_1st_scatt) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
@@ -511,7 +511,7 @@ subroutine transfert_poussiere()
            endif
 
            ! Emission du paquet
-           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,lintersect)
+           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            if (.not.lintersect) then
               cycle photon
            else
@@ -521,13 +521,13 @@ subroutine transfert_poussiere()
            ! Propagation du packet
            if (lforce_1st_scatt) then
               call force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
-              if (lpacket_alive) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
+              if (lpacket_alive) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
            else
-              call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
+              call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
            endif
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
-           if (lpacket_alive) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
+           if (lpacket_alive.and.(.not.flag_ISM)) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
 
         enddo photon !nnfot2
      enddo !nnfot1
@@ -549,7 +549,7 @@ subroutine transfert_poussiere()
         !$omp parallel &
         !$omp default(none) &
         !$omp shared(lambda,nnfot2,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
-        !$omp private(id, flag_star,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive)
+        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive)
 
         flag_star = .false.
         phik=1
@@ -563,6 +563,7 @@ subroutine transfert_poussiere()
 
               ! Emission du paquet
               call emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
+              flag_ISM = .true.
 
               ! Le photon sert a quelquechose ou pas ??
               if (.not.lintersect) then
@@ -570,7 +571,7 @@ subroutine transfert_poussiere()
               else
                  nnfot2(id) = nnfot2(id) + 1.0_db
                  ! Propagation du packet
-                 call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
+                 call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM ! nnfot2
         enddo ! nnfot1
@@ -710,7 +711,7 @@ end subroutine transfert_poussiere
 
 !***********************************************************
 
-subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,lintersect)
+subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_ISM,lintersect)
   ! C. Pinte
   ! 27/05/09
 
@@ -723,7 +724,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,l
   logical, intent(out) :: lintersect
 
   ! Proprietes du packet
-  logical, intent(out) :: flag_star
+  logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
   integer :: i_star
 
@@ -745,6 +746,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,l
   rand = sprng(stream(id))
   if (rand <= frac_E_stars(lambda)) then ! Emission depuis étoile
      flag_star=.true.
+     flag_ISM=.false.
 
      rand = sprng(stream(id))
      ! Choix de l'étoile
@@ -794,6 +796,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,l
 
   else  if (rand <= frac_E_disk(lambda)) then! Emission depuis le disque
      flag_star=.false.
+     flag_ISM=.false.
 
      ! Position initiale
      rand = sprng(stream(id))
@@ -820,6 +823,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,l
      if (lweight_emission) Stokes(1) = Stokes(1) * correct_E_emission(ri,zj)
   else ! Emission ISM
      flag_star=.false.
+     flag_ISM=.true.
      call emit_packet_ISM(id,ri,zj,x0,y0,z0,u0,v0,w0,stokes,lintersect)
   endif !(rand < prob_E_star)
 
@@ -828,7 +832,7 @@ end subroutine emit_packet
 
 !***********************************************************
 
-subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
+subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
 
@@ -842,7 +846,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   real(kind=db), intent(inout) :: x,y,z,u,v,w
   real(kind=db), dimension(4), intent(inout) :: stokes
 
-  logical, intent(inout) :: flag_star
+  logical, intent(inout) :: flag_star, flag_ISM
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
@@ -1013,6 +1017,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         flag_star=.false.
         flag_scatt=.false.
         flag_direct_star = .false.
+        flag_ISM=.false.
         rand = sprng(stream(id))
 
         ! Choix longueur d'onde
