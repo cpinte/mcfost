@@ -257,7 +257,11 @@ subroutine transfert_poussiere()
      if (ltemp.or.lsed_complete) then
         frac_E_stars=1.0 ! dans phase1 tous les photons partent de l'etoile
         call repartition_energie_etoiles()
-        call repartition_energie_ISM()
+        if (lISM_heating) then
+           call repartition_energie_ISM()
+        else
+           E_ISM = 0.0 ;
+        endif
 
         if (.not.lbenchmark_Pascucci) then
            if (lscatt_ray_tracing.and.lsed_complete) then
