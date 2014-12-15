@@ -777,7 +777,7 @@ subroutine lect_lambda()
   integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
 
-  real, parameter :: wl_factor = 1.025
+  real, parameter :: wl_factor = 1.0005
 
   character(len=512) :: dir
 
