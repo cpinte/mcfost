@@ -720,6 +720,15 @@ contains
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
+
+       if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
+          if (etoile(i)%r > Rmin) then
+             write(*,*) "ERROR : inner disk radius is smaller than stellar radius"
+             write(*,*) "Exiting"
+             stop
+          endif
+       endif
+
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
