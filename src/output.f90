@@ -2088,23 +2088,40 @@ subroutine ecriture_temperature(iTemperature)
      !  Initialize parameters about the FITS image
      simple=.true.
      extend=.true.
+     group=1
+     fpixel=1
 
-     ! 1er HDU : Temperature ou Proba Temparature
+     !------------------------------------------------------------------------------
+     ! 1er HDU : Temperature d'equilibre
+     !------------------------------------------------------------------------------
+     bitpix=-32
+     naxis=3
+     naxes(1)=n_rad
+     naxes(2)=nz
+     naxes(3)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+
+     !------------------------------------------------------------------------------
+     ! 2eme HDU : is the grain at equilibrium ?
+     !------------------------------------------------------------------------------
      bitpix=32
      naxis=3
      naxes(1)=n_rad
      naxes(2)=nz
      naxes(3)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)
 
+      ! create new hdu
+     call ftcrhd(unit, status)
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)
 
      ! le j signifie integer
      do i=1, n_rad
@@ -2120,50 +2137,43 @@ subroutine ecriture_temperature(iTemperature)
      enddo
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
 
-     ! 2eme HDU : Proba Temperature
-     call FTCRHD(unit, status)
+     !------------------------------------------------------------------------------
+     ! 3eme HDU temperature table
+     !------------------------------------------------------------------------------
      bitpix=-32
+     naxis=1
+     naxes(1)=n_T
+     nelements=naxes(1)
+
+     ! create new hdu
+     call ftcrhd(unit, status)
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
 
 
+     !------------------------------------------------------------------------------
+     ! 4eme HDU : Proba Temperature
+     !------------------------------------------------------------------------------
+     bitpix=-32
      naxis=4
      naxes(1)=n_T
      naxes(2)=n_rad
      naxes(3)=nz
      naxes(4)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+     ! create new hdu
+     call ftcrhd(unit, status)
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
-
-
-     ! 3eme HDU : Temperature
-     call FTCRHD(unit, status)
-     bitpix=-32
-
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_grains_nRE
-
-     !  Write the required header keywords.
-     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)
-
-     ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
