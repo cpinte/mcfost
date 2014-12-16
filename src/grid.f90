@@ -209,7 +209,7 @@ subroutine define_grid4()
   if (llinear_grid) then
 
      do i=1, n_rad+1
-        tab_r(i) = Rmin + (Rmin - Rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = Rmin + (Rmax - Rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i)
      enddo
