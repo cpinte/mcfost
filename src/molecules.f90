@@ -704,8 +704,6 @@ subroutine init_dust_mol(imol)
   real, parameter :: gas_dust = 100
   real, parameter :: delta_lambda = 0.025
 
-  WRITE(*,*) "WARNING : hard-coded gas_dust =", gas_dust
-
   phik=1
 
   cst_E=2.0*hp*c_light**2
@@ -727,6 +725,7 @@ subroutine init_dust_mol(imol)
      enddo
 
      if (lbenchmark_water3) then ! opacite en loi de puissance
+        write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
 
         do iTrans=1,mol(imol)%nTrans_raytracing
            wl = tab_lambda(iTrans)
