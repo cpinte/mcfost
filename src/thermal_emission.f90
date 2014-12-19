@@ -701,7 +701,7 @@ subroutine Temp_finale_nLTE()
      write(*,*) "WARNING : temperature > sublimation temperature"
      write(*,*) "WARNING : temperature = ", maxval(Temperature_1grain)
   else
-     write(*,*) "Max. temperature = ", maxval(Temperature_1grain)
+     write(*,*) "Max. temperature NLTE = ", maxval(Temperature_1grain)
   endif
 
   return
