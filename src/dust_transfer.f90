@@ -322,6 +322,7 @@ subroutine transfert_poussiere()
               call lect_temperature()
               call Temp_approx_diffusion_vertical()
               ! call Temp_approx_diffusion()
+              call diffusion_approx_nLTE_nRE()
               call ecriture_temperature(2)
               return
            endif
@@ -653,7 +654,8 @@ subroutine transfert_poussiere()
 
            if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lforce_diff_approx)) then
               call Temp_approx_diffusion_vertical()
-             ! call Temp_approx_diffusion()
+              ! call Temp_approx_diffusion()
+              call diffusion_approx_nLTE_nRE()
               call ecriture_temperature(2)
            endif
 

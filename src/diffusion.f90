@@ -594,4 +594,33 @@ end subroutine iter_Temp_approx_diffusion_vertical
 
 !************************************************************
 
+subroutine diffusion_approx_nLTE_nRE()
+
+  integer :: i,j,k
+
+  if (lRE_nLTE) then
+     do k=1,n_az
+        do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
+           do j=1,zj_sup_dark_zone(i,1)
+              Temperature_1grain(i,j,:) = Temperature(i,j,k)
+           enddo !j
+        enddo !j
+     enddo !k
+  endif
+
+  if (lnRE) then
+      do k=1,n_az
+        do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
+           do j=1,zj_sup_dark_zone(i,1)
+              Temperature_1grain_nRE(i,j,:) = Temperature(i,j,k)
+              l_RE(i,j,:) = .true.
+           enddo !j
+        enddo !j
+     enddo !k
+  endif
+
+  return
+
+end subroutine diffusion_approx_nLTE_nRE
+
 end module diffusion

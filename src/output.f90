@@ -2022,13 +2022,18 @@ subroutine ecriture_temperature(iTemperature)
      end if
   endif
 
-  if (lRE_nLTE .and. iTemperature==1) then
+  if (lRE_nLTE) then
      if (l3D) then
         write(*,*) "ERROR : 3D nLTE version not written yet"
         stop
      endif
 
-     filename = trim(data_dir)//"/Temperature_nLTE.fits.gz"
+     if (iTemperature == 2) then
+        filename = "!"//trim(data_dir)//"/Temperature_nLTE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+     else
+        filename = trim(data_dir)//"/Temperature_nLTE.fits.gz"
+     endif
+
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
@@ -2076,7 +2081,12 @@ subroutine ecriture_temperature(iTemperature)
         stop
      endif
 
-     filename = trim(data_dir)//"/Temperature_nRE.fits.gz"
+     if (iTemperature == 2) then
+        filename = "!"//trim(data_dir)//"/Temperature_nRE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+     else
+        filename = trim(data_dir)//"/Temperature_nRE.fits.gz"
+     endif
+
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
