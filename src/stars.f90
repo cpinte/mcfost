@@ -594,7 +594,7 @@ subroutine repartition_energie_ISM
      wl = tab_lambda(lambda) * 1e-6
 
      E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) &
-          * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2)
+          * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2) * 0.4
   enddo
 
 end subroutine repartition_energie_ISM
