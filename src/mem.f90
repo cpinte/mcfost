@@ -287,21 +287,29 @@ subroutine alloc_dynamique()
   if (l3D) then
      allocate(amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az),  stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
+          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
      allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
           kappa_abs_eg(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1),  stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
+          kappa_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
   amax_reel = 0.0 ; kappa=0.0 ; kappa_abs_eg=0.0 ;
-  if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
-  if (lnRE)  proba_abs_RE=0.0
+  proba_abs_RE_LTE=0.0
+  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+  if (lnRE)  then
+     proba_abs_RE=0.0
+     kappa_abs_RE=0.0
+  endif
 
   if (l3D) then
      allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
@@ -558,12 +566,12 @@ subroutine alloc_dynamique()
      Proba_Temperature=0.0
      Temperature_1grain_nRE=0.0
 
-     allocate(l_RE(n_rad,nz,grain_nRE_start:grain_nRE_end),stat=alloc_status)
+     allocate(l_RE(n_rad,nz,grain_nRE_start:grain_nRE_end), lchange_nRE(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error l_RE'
         stop
      endif
-     l_RE=.false.
+     l_RE=.false. ; lchange_nRE = .false.
   endif
 
 
@@ -598,11 +606,11 @@ subroutine alloc_dynamique()
 
 
      if (l3D) then
-        allocate(xKJ_abs(n_rad,-nz:nz,n_az,nb_proc), xE_abs(n_rad,-nz:nz,n_az,nb_proc), &
+        allocate(xKJ_abs(n_rad,-nz:nz,n_az,nb_proc), &
              xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,-nz:nz,n_az,nb_proc),&
              stat=alloc_status)
      else
-        allocate(xKJ_abs(n_rad,nz,1,nb_proc), xE_abs(n_rad,nz,1,nb_proc), &
+        allocate(xKJ_abs(n_rad,nz,1,nb_proc),  &
              xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,nz,1,nb_proc), &
              stat=alloc_status)
      endif
@@ -610,7 +618,7 @@ subroutine alloc_dynamique()
         write(*,*) 'Allocation error xKJ_abs'
         stop
      endif
-     xKJ_abs = 0.0 ; xE_abs = 0.0 ; xJ_abs=0.0 ; nbre_reemission = 0.0
+     xKJ_abs = 0.0 ; xJ_abs=0.0 ; nbre_reemission = 0.0
 
      if (l3D) then
         allocate(E0(n_rad,-nz:nz,n_az), J0(n_lambda,n_rad,-nz:nz,n_az),  stat=alloc_status)
@@ -669,13 +677,6 @@ subroutine alloc_dynamique()
         endif
         log_frac_E_em_1grain=0.0
 
-        allocate(xE_abs_1grain(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xE_abs_1grain'
-           stop
-        endif
-        xE_abs_1grain = 0.0
-
         allocate(xT_ech_1grain(nb_proc,n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain'
@@ -695,13 +696,6 @@ subroutine alloc_dynamique()
         frac_E_em_1grain_nRE=0.0
         log_frac_E_em_1grain_nRE=0.0
 
-        !allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        !if (alloc_status > 0) then
-        !   write(*,*) 'Allocation error log_frac_E_em_1grain'
-        !   stop
-        !endif
-        !log_frac_E_em_1grain=0.0
-
         allocate(Temperature_1grain_nRE_old(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Proba_Temperature'
@@ -718,6 +712,20 @@ subroutine alloc_dynamique()
         endif
         Tpeak_old=0
         maxP_old=0.
+
+        allocate(xT_ech_1grain_nRE(nb_proc,n_rad,nz,grain_nRE_start:grain_nRE_end),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xT_ech_1grain_nRE'
+           stop
+        endif
+        xT_ech_1grain_nRE = 2
+
+        allocate(prob_delta_T_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T,n_lambda),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error prob_delta_T_1grain_nRE'
+           stop
+        endif
+        prob_delta_T_1grain_nRE=0.0
 
         if (lRE_nlTE) then
            allocate(Temperature_1grain_old(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
@@ -1037,8 +1045,9 @@ subroutine dealloc_em_th()
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
 
   deallocate(amax_reel,kappa,kappa_abs_eg)
-  if (lRE_LTE.and.lRE_nLTE) deallocate(proba_abs_RE)
-  if (lnRE) deallocate(proba_abs_RE_nLTE)
+  deallocate(proba_abs_RE_LTE)
+  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
 
   deallocate(tab_albedo_pos,tab_g_pos)
 
@@ -1060,18 +1069,18 @@ subroutine dealloc_em_th()
      if (lsed_complete) then
         deallocate(log_frac_E_em)
         deallocate(DensE, DensE_m1, Dcoeff)
-        deallocate(xKJ_abs,xE_abs,xJ_abs,nbre_reemission)
+        deallocate(xKJ_abs,xJ_abs,nbre_reemission)
         deallocate(E0,J0,xT_ech,prob_delta_T)
      endif
 
      if (lRE_nLTE) then
         deallocate(prob_kappa_abs_1grain,prob_delta_T_1grain,log_frac_E_em_1grain)
-        deallocate(xE_abs_1grain,xT_ech_1grain)
+        deallocate(xT_ech_1grain)
      endif
 
      if (lnRE) then
         deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE)
-        deallocate(Temperature_1grain_nRE_old)
+        deallocate(Temperature_1grain_nRE_old,prob_delta_T_1grain_nRE,xT_ech_1grain_nRE)
         deallocate(Emissivite_nRE_old)
         deallocate(Tpeak_old)
         if (lRE_nlTE) deallocate(Temperature_1grain_old)
@@ -1172,23 +1181,31 @@ subroutine realloc_dust_mol()
           kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           emissivite_dust(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
+          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
      allocate(kappa(n_lambda,n_rad,nz+1,1),kappa_abs_eg(n_lambda,n_rad,nz+1,1), &
           kappa_sca(n_lambda,n_rad,nz+1,1), &
           emissivite_dust(n_lambda,n_rad,nz+1,1), &
           amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
+          kappa_abs_RE(n_lambda,n_rad,nz+1,1),stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa (realloc)'
      stop
   endif
   kappa = 0.0 ; kappa_abs_eg = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
-  if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
-  if (lnRE)  proba_abs_RE=0.0
+  proba_abs_RE_LTE=0.0
+  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+  if (lnRE)  then
+     proba_abs_RE=0.0
+     kappa_abs_RE=0.0
+  endif
 
   if (l3D) then
      allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
@@ -1258,8 +1275,9 @@ subroutine clean_mem_dust_mol()
   deallocate(q_ext, q_sca, q_abs, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
   deallocate(kappa_abs_eg,amax_reel)
-  if (lRE_LTE.and.lRE_nLTE) deallocate(proba_abs_RE_nLTE)
-  if (lnRE) deallocate(proba_abs_RE)
+  deallocate(proba_abs_RE_LTE)
+  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
   deallocate(tab_albedo_pos, tab_g_pos)
   deallocate(ech_prob,valeur_prob)
 
@@ -1280,6 +1298,7 @@ subroutine realloc_step2()
      if (lRE_LTE)  deallocate(prob_delta_T, log_frac_E_em, xT_ech)
      if (lRE_nLTE) deallocate(prob_kappa_abs_1grain, prob_delta_T_1grain, log_frac_E_em_1grain,xT_ech_1grain)
      deallocate(xJ_abs, xKJ_abs, nbre_reemission)
+     if (lnRE) deallocate(prob_delta_T_1grain_nRE,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
   endif
 
   if (lProDiMo) then
@@ -1666,26 +1685,27 @@ subroutine realloc_step2()
   endif ! method
 
   deallocate(amax_reel, kappa, kappa_abs_eg)
-  if (lRE_LTE.and.lRE_nLTE) deallocate(proba_abs_RE_nLTE)
-  if (lnRE) deallocate(proba_abs_RE)
+  deallocate(proba_abs_RE_LTE)
+  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
   if (l3D) then
      allocate(amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda,n_rad,-nz-1:nz+1,n_az), &
           kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
      allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
           kappa_abs_eg(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
   amax_reel = 0.0 ; kappa=0.0 ; kappa_abs_eg=0.0 ;
-  if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
-  if (lnRE)  proba_abs_RE=0.0
+  !if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
+  !if (lnRE)  proba_abs_RE=0.0
 
 
   if (lorigine) then
