@@ -624,6 +624,7 @@ subroutine transfert_poussiere()
         endif
         if (lnRE) then
            call Temp_nRE(flag_em_nRE)
+           call update_proba_abs_nRE()
            if (n_iter > 10) then
               flag_em_nRE = .true.
               write(*,*) "WARNING: Reaching the maximum number of iterations"
@@ -1006,7 +1007,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      else ! Absorption
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
-           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0 - proba_abs_RE(lambda,ri, zj, p_phik))
+           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(lambda,ri, zj, p_phik))
            ! Multiplication par proba abs sur grain en eq. radiatif
            Stokes = Stokes * proba_abs_RE(lambda,ri, zj, p_phik)
 
@@ -1020,28 +1021,25 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         flag_scatt=.false.
         flag_direct_star = .false.
         flag_ISM=.false.
-        rand = sprng(stream(id))
 
         ! Choix longueur d'onde
-        if (lRE_LTE) then
-           if (lRE_nLTE) then
-              ! on choisit si grain a LTE ou nLTE
-              if (rand > proba_abs_RE_nLTE(lambda,ri, zj, p_phik)) then ! LTE
-                 rand = sprng(stream(id))
-                 call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
-              else ! nLTE
-                 rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-                 call reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
-              endif
-           else ! uniquement LTE
-              call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
-           endif
-        else if (lRE_nLTE) then ! uniquement nLTE
-           rand2 = sprng(stream(id))
-           call reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+        rand = sprng(stream(id))
+        !write(*,*) rand, Proba_abs_RE_LTE(lambda,ri, zj, p_phik)
+        if (rand <= Proba_abs_RE_LTE(lambda,ri, zj, p_phik)) then
+           ! Cas RE - LTE
+           rand = sprng(stream(id))
+           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+        else  if (rand <= Proba_abs_RE_LTE_p_nLTE(lambda,ri, zj, p_phik)) then
+           ! Cas RE - nLTE
+           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+        else
+           ! Cas nRE - qRE
+           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
         endif
 
-        ! Nouvelle direction de vol : emission uniforme
+        ! Nouvelle direction de vol : emission isotrope
         rand = sprng(stream(id))
         w = 2.0 * rand - 1.0
         w02 =  1.0 - w*w
@@ -1262,10 +1260,10 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
            rand = sprng(stream(id))
 
            ! Choix longueur d'onde
-           if (lRE_LTE) call reemission(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+           if (lRE_LTE) call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
            if (lRE_nLTE) then
               rand2 = sprng(stream(id))
-              call reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
            endif
 
            ! Nouvelle direction de vol : emission uniforme
