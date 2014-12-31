@@ -859,18 +859,23 @@ subroutine opacite2(lambda)
               enddo
            endif
 
-           if (lnRE.and.(k_abs_tot > tiny_db)) then
-              kappa_abs_RE(lambda,i,j,pk) =  k_abs_RE
-              proba_abs_RE(lambda,i,j,pk) = k_abs_RE/k_abs_tot
-           endif
-           if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(lambda,i,j,pk) = k_abs_RE_LTE/k_abs_RE
-           if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) = 1.0 ! so far, might be updated if nRE --> qRE grains
+           if (letape_th) then
+              if (lnRE.and.(k_abs_tot > tiny_db)) then
+                 kappa_abs_RE(lambda,i,j,pk) =  k_abs_RE
+                 proba_abs_RE(lambda,i,j,pk) = k_abs_RE/k_abs_tot
+              endif
+
+              if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(lambda,i,j,pk) = k_abs_RE_LTE/k_abs_RE
+              if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(lambda,i,j,pk) = 1.0 ! so far, might be updated if nRE --> qRE grains
+           endif ! letape_th
         enddo !pk
      enddo bz !j
   enddo !i
 
-  if (lnRE) proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
-  if (lRE_nLTE) proba_abs_RE_LTE_p_nLTE(lambda,:,nz+1,:) = proba_abs_RE_LTE_p_nLTE(lambda,:,nz,:)
+  if (letape_th) then
+     if (lnRE) proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
+     if (lRE_nLTE) proba_abs_RE_LTE_p_nLTE(lambda,:,nz+1,:) = proba_abs_RE_LTE_p_nLTE(lambda,:,nz,:)
+  endif
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
