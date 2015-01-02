@@ -2075,7 +2075,7 @@ subroutine ecriture_temperature(iTemperature)
      end if
   endif
 
-  if (lnRE .and. iTemperature==1) then
+  if (lnRE) then
      if (l3D) then
         write(*,*) "ERROR : 3D nRE version not written yet"
         stop
