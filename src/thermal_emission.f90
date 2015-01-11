@@ -729,8 +729,8 @@ subroutine Temp_nRE(lconverged)
 
   implicit none
 
-!  logical, intent(in) :: lfinal
-  logical, intent(out) :: lconverged
+!  logical, intent(in) :: lfinal ! TODO
+   logical, intent(out) :: lconverged
 
   real, parameter :: precision = 5.e-2
 
@@ -1311,7 +1311,7 @@ subroutine update_proba_abs_nRE()
               correct_m1 = 1.0_db/correct ! < 1
 
               ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
-              if (lall_grains_eq == .true.) then
+              if (lall_grains_eq) then
                  proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
               else
                  proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
