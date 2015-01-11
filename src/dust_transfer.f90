@@ -758,7 +758,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
-     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,phik,x0,y0,z0,u0,v0,w0,w02)
+     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,phik,x0,y0,z0,u0,v0,w0,w02,lintersect)
      !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
 
      ! Lumiere non polarisee emanant de l'etoile

@@ -48,7 +48,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,z,u,v,w,w2)
+subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,z,u,v,w,w2,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -61,6 +61,7 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
   integer, intent(out) :: ri, zj, phik
   real(kind=db), intent(out) :: x, y, z, u, v, w, w2
+  logical, intent(out) :: lintersect
 
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi
 
@@ -99,6 +100,8 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
   ! L'etoile peut occuper plusieurs cellules
   ! todo : tester a l'avance si c'est le cas
   call indice_cellule_3D(x,y,z,ri,zj,phik)
+  lintersect = .true.
+  if (ri==n_rad) call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
 
   return
 
