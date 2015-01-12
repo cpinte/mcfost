@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.17"
+  character(8), parameter :: mcfost_release = "2.19.18"
   real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -498,11 +498,10 @@ module opacity
   real(kind=db), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
   real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
 
-
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
-  real(kind=db), dimension(:,:,:,:), allocatable :: kappa
-  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca !n_lambda,n_rad,nz+1, (n_az)
-  real, dimension(:,:,:,:), allocatable :: proba_abs_RE, proba_abs_RE_nLTE !n_lambda,n_rad,nz+1, (n_az)
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca, kappa_abs_RE !n_lambda,n_rad,nz+1, (n_az)
+  real, dimension(:,:,:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE !n_lambda,n_rad,nz+1, (n_az)
   real, dimension(:,:,:,:), allocatable :: prob_kappa_abs_1grain !n_lambda,n_rad,nz+1, 0:n_grains
   real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
@@ -617,19 +616,18 @@ module em_th
   ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
   real, dimension(:,:,:,:,:), allocatable :: prob_delta_T !n_rad,nz+1,(n_az),0:n_T,n_lambda
   real, dimension(:,:,:), allocatable :: prob_delta_T_1grain !n_grains,0:n_T,n_lambda
-
+  real, dimension(:,:,:), allocatable :: prob_delta_T_1grain_nRE !n_grains,0:n_T,n_lambda
 
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
-  real(kind=db), dimension(:,:,:,:), allocatable :: xKJ_abs, xE_abs, nbre_reemission !n_rad, nz, n_az, id
+  real(kind=db), dimension(:,:,:,:), allocatable :: xKJ_abs, nbre_reemission !n_rad, nz, n_az, id
   real(kind=db), dimension(:,:,:), allocatable :: E0 !n_rad, nz, n_az
   real(kind=db), dimension(:,:,:,:), allocatable :: J0 !n_lambda, n_rad, nz, n_az
-  real(kind=db), dimension(:,:,:,:), allocatable :: xE_abs_1grain !id, n_rad, nz, n_grains
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
   real(kind=db), dimension(:,:,:,:), allocatable :: xJ_abs !id, n_lambda, n_rad, nz
   real, dimension(:,:,:,:), allocatable :: xN_abs !id, n_lambda, n_rad, nz
   integer, dimension(:,:,:,:), allocatable :: xT_ech !id, n_rad, nz, n_az
-  integer, dimension(:,:,:,:), allocatable :: xT_ech_1grain !id, n_rad, nz, n_grains
+  integer, dimension(:,:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE !id, n_rad, nz, n_grains
 
   real(kind=db) :: E_abs_nRE, E_abs_nREm1
   ! emissivite en unite qq (manque une cst mais travail en relatif)
@@ -640,7 +638,7 @@ module em_th
   real, dimension(:,:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
   integer, dimension(:,:,:), allocatable :: Tpeak_old
   real, dimension(:,:,:,:), allocatable :: Proba_Temperature !n_T, n_rad,nz, n_grains
-  logical, dimension(:,:,:), allocatable :: l_RE ! n_rad, nz, n_grains
+  logical, dimension(:,:,:), allocatable :: l_RE, lchange_nRE ! n_rad, nz, n_grains
   real :: nbre_photons_tot, n_phot_L_tot,  n_phot_L_tot0
 
 
