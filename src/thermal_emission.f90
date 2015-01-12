@@ -307,7 +307,21 @@ subroutine init_reemission()
               write(*,*) "Exiting"
               stop
            endif
-           enddo
+        enddo
+
+        do k=grain_nRE_start,grain_nRE_end
+           integ3(1) = 0.0
+           do lambda=2, n_lambda
+              ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
+              integ3(lambda) = integ3(lambda-1) + q_abs(lambda,k) * dB_dT(lambda)
+           enddo !l
+           ! Normalisation a 1
+           if (integ3(n_lambda) > tiny(0.0_db)) then
+              do lambda=1, n_lambda
+                 prob_delta_T_1grain_nRE(k,T,lambda) = integ3(lambda)/integ3(n_lambda)
+              enddo !l
+           endif
+        enddo !k
      endif !lnRE
 
   enddo !t
@@ -323,7 +337,7 @@ end subroutine init_reemission
 
 !********************************************************************
 
-subroutine reemission(id,ri,zj,phik,pri,pzj,pphik,E,aleat,lambda)
+subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,E,aleat,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
@@ -397,11 +411,11 @@ subroutine reemission(id,ri,zj,phik,pri,pzj,pphik,E,aleat,lambda)
 
   return
 
-end subroutine reemission
+end subroutine im_reemission_LTE
 
 !********************************************************************
 
-subroutine reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
+subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
 
@@ -459,7 +473,6 @@ subroutine reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
   ! Save pour prochaine reemission et/ou T finale
   xT_ech_1grain(id,ri,zj,k)=T_int
 
-
   ! Interpolation lineaire entre energies emises pour des
   ! temperatures echantillonees voisines
   T2=T_int
@@ -494,7 +507,7 @@ subroutine reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
 
   return
 
-end subroutine reemission_NLTE
+end subroutine im_reemission_NLTE
 
 !********************************************************************
 
@@ -716,7 +729,8 @@ subroutine Temp_nRE(lconverged)
 
   implicit none
 
-  logical, intent(out) :: lconverged
+!  logical, intent(in) :: lfinal ! TODO
+   logical, intent(out) :: lconverged
 
   real, parameter :: precision = 5.e-2
 
@@ -784,11 +798,8 @@ subroutine Temp_nRE(lconverged)
      A(:,:,:)=0.
      do T=2,n_T
         A(T-1,T,:) = frac_E_em_1grain_nRE(l,T) / (nu_bin(T)-nu_bin(T-1)) ! OK, il manque un 1/h par rapport a Krugel p265
-
         !if (tab_Temp(T) < 10.)  A(T-1,T,:) =  A(T-1,T,:) * 1e5
      enddo
-
-
 
      ! Pour kJnu
      do lambda=1, n_lambda
@@ -809,7 +820,6 @@ subroutine Temp_nRE(lconverged)
 
      cst_t_cool =(real(hp,kind=db)**3 * real(c_light,kind=db)**2) / (8*pi)
 
-
      ! Boucle sur les cellules
 
      !$omp parallel &
@@ -821,7 +831,7 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss,l_dark_zone,Temperature)
+     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss,l_dark_zone,Temperature,lchange_nRE)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
@@ -921,7 +931,6 @@ subroutine Temp_nRE(lconverged)
                  endif
 
                  ! Calcul Temperature equilibre
-                 l_RE(i,j,l) = .true.
                  if (Int_k_lambda_Jlambda < tiny_real) then
                     Temperature_1grain_nRE(i,j,l) = T_min
                  else
@@ -946,7 +955,6 @@ subroutine Temp_nRE(lconverged)
                        Temperature_1grain_nRE(i,j,l)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
                     endif
                  endif
-
 
                  if (Temperature_1grain_nRE(i,j,l) > T_max) then
                     ! Impossible de definir proba de temperature
@@ -1026,7 +1034,16 @@ subroutine Temp_nRE(lconverged)
                        Proba_Temperature(T,i,j,l) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
                     enddo
 
-                 endif ! test : t_cool > t_abs
+                 else  ! test : t_cool > t_abs : on est a a l'equilibre
+
+                    if (.not.l_RE(i,j,l)) then ! on n'etait pas a l'equilibre a l'iteration precedente
+                       l_RE(i,j,l) = .true.
+                       lchange_nRE(i,j,l) = .true.
+                    else
+                       lchange_nRE(i,j,l) = .false. ! on etait deja a l'equilibre
+                    endif
+
+                 endif ! test : t_cool vs t_abs
               endif ! densite_pouss > 0.
            endif ! l_dark_zone
         enddo !j
@@ -1148,6 +1165,175 @@ subroutine Temp_nRE(lconverged)
 
 end subroutine Temp_nRE
 
+!********************************************************************
+
+subroutine im_reemission_qRE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
+! Calcul de la temperature de la cellule
+! Reemission d'un photon a la bonne longeur d'onde
+
+  implicit none
+
+  integer, intent(in) :: id,ri,zj,pri,pzj
+  real(kind=db), intent(in) :: E
+  real, intent(in) :: aleat1, aleat2
+  integer, intent(inout) :: lambda
+
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
+  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
+
+  lambda0=lambda
+
+  ! Selection du grain qui absorbe le photon
+  kmin=grain_nRE_start
+  kmax=grain_nRE_end
+  k=(kmin+kmax)/2
+
+  do while((kmax-kmin) > 1)
+     if (prob_kappa_abs_1grain(lambda0,pri,pzj,k) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
+        kmin = k
+     else
+        kmax = k
+     endif
+     k = (kmin + kmax)/2
+  enddo   ! while
+  k=kmax
+
+  ! Absorption d'un photon : on ajoute son energie dans la cellule
+!  xE_abs(ri,zj,id) = xE_abs(ri,zj,id) + E
+!  xE_abs_1grain(ri,zj,k,id) = xE_abs_1grain(ri,zj,k,id) + E
+!  E_abs=sum(xE_abs_1grain(ri,zj,k,:))
+!  frac_E_abs=E_abs/(nbre_photons_tot*densite_pouss(ri,zj,k)*volume(ri))
+
+  ! Mean intensity
+  ! Somme sur differents processeurs
+  J_abs=0.0
+  do ilambda=1, n_lambda
+     J_abs =  J_abs + q_abs(ilambda,k)  * (sum(xJ_abs(ilambda,ri,zj,:)) + J0(ilambda,ri,zj,1))
+  enddo ! ilambda
+ ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
+  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(ri) )
+
+  ! Temperature echantillonee juste sup. a la temperature de la cellule
+  T_int=maxval(xT_ech_1grain_nRE(:,ri,zj,k))
+
+  ! On incremente eventuellement la zone de temperature
+  do while((log_frac_E_em_1grain_nRE(k,T_int) < log_frac_E_abs).and.(T_int < n_T))
+     T_int=T_int+1
+  enddo  ! LIMITE MAX
+
+  ! Save pour prochaine reemission et/ou T finale
+  xT_ech_1grain_nRE(id,ri,zj,k)=T_int
+
+  ! Interpolation lineaire entre energies emises pour des
+  ! temperatures echantillonees voisines
+  T2=T_int
+  Temp2=tab_Temp(T2)
+  T1=T_int-1
+  Temp1=tab_Temp(T1)
+  frac=(log_frac_E_abs-log_frac_E_em_1grain_nRE(k,T1))/(log_frac_E_em_1grain_nRE(k,T2)-log_frac_E_em_1grain_nRE(k,T1))
+  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
+
+  !**********************************************************************
+  ! Choix de la longeur d'onde de reemission
+  ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
+  frac_T2=(Temp-Temp1)/(Temp2-Temp1)
+  frac_T1=1.0-frac_T2
+
+  l1=0
+  l2=n_lambda
+  l=(l1+l2)/2
+
+  do while((l2-l1) > 1)
+     proba=frac_T1*prob_delta_T_1grain_nRE(k,T1,l)+frac_T2*prob_delta_T_1grain_nRE(k,T2,l)
+     if(aleat2 > proba) then
+        l1=l
+     else
+        l2=l
+     endif
+     l=(l1+l2)/2
+  enddo
+  lambda=l+1
+
+  return
+
+end subroutine im_reemission_qRE
+
+!**********************************************************************
+
+subroutine update_proba_abs_nRE()
+  ! Update the various probabilities of absorption for the immediate re-emission
+  ! to take into account nRE grains which are actually at equilibrium
+  ! C. Pinte
+  ! 19/12/2014
+
+  ! TODO :
+  ! reemission immadiate : 3 types : RE_LTE, RE_nLTE, nRE_qRE
+  ! reemission decalee : nRE
+
+  ! besoin de kappa_abs_tot et de kappa_abs_RE_tot : pour mettre a jour les proba relatives
+
+  ! P_LTE = k_LTE / (k_LTE + k_nLTE + k_qRE) = k_LTE / k_RE
+  ! P_LTE_p_nLTE = (k_LTE + k_nLTE) / (k_LTE + k_nLTE + k_qRE) = k_LTE_p_nLTE / k_RE
+  ! P_abs_RE =  (k_LTE + k_nLTE + k_qRE) /  (k_LTE + k_nLTE + k_qRE + k_nRE) = k_RE / k_tot
+  ! kRE est modifie cat k_qRE l'est
+
+  ! je peux m'en sortir en ne sauvegardant que 1) k_LTE + k_nLTE = k_LTE_p_nLTE et 2) kRE iteration precedente
+  ! --> donne k_RE = k_LTE_p_nLTE + k_qRE
+  ! puis P_LTE = P_LTE_old * k_RE_old / k_RE_new et P_abs_RE = k_RE_new / k_RE_old * P_abs_RE_old
+
+  real(kind=db) :: correct, correct_m1,  kappa_abs_RE_new,  kappa_abs_RE_old, delta_kappa_abs_qRE
+  integer :: i,j, l, k, lambda
+  logical :: lall_grains_eq
+
+  write(*,*) "Setting grains at qRE and updating nRE pobabilities"
+
+  k = 1 ;
+
+  do lambda=1, n_lambda
+     do j=1,nz
+        do i=1,n_rad
+           delta_kappa_abs_qRE = 0.0_db
+           lall_grains_eq = .true.
+           do l=grain_nRE_start,grain_nRE_end
+              if (lchange_nRE(i,j,l)) then ! 1 grain a change de status a cette iteration
+                 delta_kappa_abs_qRE =  q_abs(lambda,l) * densite_pouss(i,j,k,l)
+              else
+                 if (.not.l_RE(i,j,l)) lall_grains_eq = .true. ! il reste des grains qui ne sont pas a l'equilibre
+              endif
+           enddo !l
+
+           if (delta_kappa_abs_qRE > tiny_db) then ! au moins 1 grain a change de status, on met a jour les differentes probabilites
+              kappa_abs_RE_old = kappa_abs_RE(lambda,i,j,k)
+              kappa_abs_RE_new = kappa_abs_RE(lambda,i,j,k) + delta_kappa_abs_qRE
+              kappa_abs_RE(lambda,i,j,k) = kappa_abs_RE_new
+
+              correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
+              correct_m1 = 1.0_db/correct ! < 1
+
+              ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
+              if (lall_grains_eq) then
+                 proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+              else
+                 proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+              endif
+
+              ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
+              Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
+              Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
+
+              ! Todo : update proba_abs_1grain
+
+           endif
+        enddo !j
+     enddo ! k
+  enddo ! lambda
+
+  write(*,*) "Done"
+
+  return
+
+end subroutine update_proba_abs_nRE
+
 !**********************************************************************
 
 subroutine emission_nRE()
@@ -1168,7 +1354,7 @@ subroutine emission_nRE()
   ! proba differentielle en fonction proba emission precedente
 
   !E_abs_nRE est en nbre de paquets !!!
-  frac_E_abs_nRE =  E_abs_nRE / nbre_photons_tot
+  frac_E_abs_nRE = E_abs_nRE / nbre_photons_tot
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
   write(*,*) "Re-emitting this amount of energy"
 
@@ -1214,7 +1400,7 @@ subroutine emission_nRE()
      !$omp private(i,j,l,k,E_emise,Temp,cst_wl,T) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end,n_max) &
      !$omp shared(n_rad,nz,l_RE, Temperature_1grain_nRE,n_T,q_abs,densite_pouss,volume,tab_Temp,Proba_Temperature) &
-     !$omp shared(Emissivite_nRE_old,cst_wl_max)
+     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE)
      !$omp do
      do i=1,n_rad
         do j=1,nz
@@ -1223,12 +1409,14 @@ subroutine emission_nRE()
            E_emise = 0.0
            do k=grain_nRE_start,grain_nRE_end
               if (l_RE(i,j,k)) then ! le grain a une temperature
-                 Temp = Temperature_1grain_nRE(i,j,k)
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < cst_wl_max) then
-                    E_emise = E_emise + 4.0*q_abs(lambda,k)*densite_pouss(i,j,1,k)* &
-                         volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                 endif
+                 if (lchange_nRE(i,j,k)) then ! la grain passe en qRE a cette iteration : il faut le compter
+                    Temp = Temperature_1grain_nRE(i,j,k)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < cst_wl_max) then
+                       E_emise = E_emise + 4.0*q_abs(lambda,k)*densite_pouss(i,j,1,k)* &
+                            volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                    endif
+                 endif ! le grain etait en qRE avant, il est traite en re-emission immediate
               else ! densite de proba de Temperature
                  do T=1,n_T
                     temp=tab_Temp(T)
