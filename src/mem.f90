@@ -1045,9 +1045,11 @@ subroutine dealloc_em_th()
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
 
   deallocate(amax_reel,kappa,kappa_abs_eg)
-  deallocate(proba_abs_RE_LTE)
-  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
-  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  if (allocated(proba_abs_RE_LTE)) then
+     deallocate(proba_abs_RE_LTE)
+     if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+     if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  endif
 
   deallocate(tab_albedo_pos,tab_g_pos)
 
