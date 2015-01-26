@@ -165,6 +165,15 @@ subroutine alloc_dynamique()
   endif
   densite_pouss = 0.0
 
+  if (lSigma_file) then
+     allocate(Surface_density(n_rad), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error Sigma'
+        stop
+     endif
+     Surface_density = 0.0_db
+  endif
+
   if (l3D) then
      allocate(l_dark_zone(0:n_rad+1,-nz-1:nz+1,n_az), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
