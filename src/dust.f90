@@ -35,10 +35,13 @@ subroutine taille_grains()
   integer :: ios, status, n_comment, n_grains
   real :: fbuffer
 
+  is_PAH = .false.
 
   ! Boucle sur les populations de grains
   do i=1, n_pop
      dp => dust_pop(i)
+
+     if (dp%is_PAH) is_PAH = .true.
 
      if (lread_grain_size_distrib) then
         if (n_pop > 1) then
