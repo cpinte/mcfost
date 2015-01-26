@@ -390,6 +390,7 @@ module grains
   integer :: n_pop
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
+  logical :: is_PAH
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
   real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot

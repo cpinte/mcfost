@@ -399,10 +399,11 @@ contains
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
     integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion, k
+    integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme
 
-    logical :: simple, extend
+    logical :: simple, extend, lPAH_nRE
     character(len=512) :: filename
     character :: s
 
@@ -418,7 +419,33 @@ contains
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
-    integer, dimension(n_rad,nz,grain_nRE_start:grain_nRE_end) :: is_eq
+    integer, dimension(:,:,:), allocatable :: is_eq
+
+    lPAH_nRE = .false.
+    test_PAH : do i=1, n_pop
+       if (dust_pop(i)%is_PAH.and.(dust_pop(i)%methode_chauffage==3)) then
+          lPAH_nRE = .true.
+          exit test_PAH
+       endif
+    enddo test_PAH
+
+
+    if (lPAH_nRE) then
+       iPAH_start = grain_nRE_start
+       iPAH_end = grain_nRE_end
+       n_grains_PAH=n_grains_nRE
+    else
+       iPAH_start = grain_RE_nLTE_start
+       iPAH_end = grain_RE_nLTE_end
+       n_grains_PAH=n_grains_RE_nLTE
+    endif
+
+    allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
+    if (alloc_status > 0) then
+       write(*,*) 'Allocation error opaciteis_eq forProDiMo.fits.gz'
+       stop
+    endif
+    is_eq = 0
 
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
@@ -481,7 +508,7 @@ contains
     endif
 
     if (mcfost2ProDiMo_version >=5) then
-       if (lnRE) then
+       if (is_PAH) then
           call ftpkyj(unit,'PAH_present',1,' ',status)
        else
           call ftpkyj(unit,'PAH_present',0,' ',status)
@@ -570,22 +597,21 @@ contains
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
     norme = sum(r_grain(:)**2 * nbre_grains(:))
-    if (lRE_nLTE) then
-       do ri=1, n_rad
-          do zj=1, nz
-             Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
-          enddo !j
-       enddo !i
-
-       write(*,*) "************************************************************"
-       write(*,*) "WARNING: nLTE mode in MCFOST"
-       write(*,*) "Crude averaging of the temperature distribution for ProDiMo"
-       write(*,*) "T = \int T(a) * n(a) * a^2 da / \int n(a) * a^2 da"
-       write(*,*) "Max. averaged temperature = ", maxval(Temperature(:,:,1))
-       write(*,*) "************************************************************"
-
-    endif
-
+    !if (lRE_nLTE) then
+    !   do ri=1, n_rad
+    !      do zj=1, nz
+    !         Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
+    !      enddo !j
+    !   enddo !i
+    !
+    !   write(*,*) "************************************************************"
+    !   write(*,*) "WARNING: nLTE mode in MCFOST"
+    !   write(*,*) "Crude averaging of the temperature distribution for ProDiMo"
+    !   write(*,*) "T = \int T(a) * n(a) * a^2 da / \int n(a) * a^2 da"
+    !   write(*,*) "Max. averaged temperature = ", maxval(Temperature(:,:,1))
+    !   write(*,*) "************************************************************"
+    !
+    !endif
 
     !  Write the array to the FITS file.
     call ftppre(unit,group,fpixel,nelements,Temperature(:,:,1),status)
@@ -820,12 +846,12 @@ contains
           opacite(ri,zj,1,:) = kappa(:,ri,zj,1)
           if (lRE_LTE) then
              opacite(ri,zj,2,:) = kappa_abs_eg(:,ri,zj,1)
-          else if (lRE_nLTE) then ! Patch, c'est pas super propre
-             do lambda=1,n_lambda
-                do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
-                enddo ! k
-             enddo ! lambda
+          !else if (lRE_nLTE) then ! Patch, c'est pas super propre
+          !   do lambda=1,n_lambda
+          !      do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+          !         opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+          !      enddo ! k
+          !   enddo ! lambda
           endif
        enddo ! ri
     enddo !zj
@@ -920,7 +946,8 @@ contains
        call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)
     endif
 
-    if ((mcfost2ProDiMo_version >=5).and.lnRE) then
+    if ((mcfost2ProDiMo_version >=5).and.is_PAH) then
+
        !------------------------------------------------------------------------------
        ! HDU 15 : PAH density
        !------------------------------------------------------------------------------
@@ -943,7 +970,7 @@ contains
        k=1 ! azimuth
        do ri=1, n_rad
           do zj=1,nz
-             dens(ri,zj) = sum(densite_pouss(ri,zj,k, grain_nRE_start:grain_nRE_end) * M_grain(grain_nRE_start:grain_nRE_end)) ! M_grain en g
+             dens(ri,zj) = sum(densite_pouss(ri,zj,k, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
           enddo
        enddo
        call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -968,7 +995,7 @@ contains
        do zj=1,nz
           do ri=1,n_rad
              do lambda=1,n_lambda
-                do l=grain_nRE_start,grain_nRE_end
+                do l= iPAH_start, iPAH_end
                    opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
                    opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
                 enddo ! l
@@ -984,7 +1011,7 @@ contains
        naxis=3
        naxes(1)=n_rad
        naxes(2)=nz
-       naxes(3)=n_grains_nRE
+       naxes(3)=n_grains_PAH
        nelements=naxes(1)*naxes(2)*naxes(3)
 
         ! create new hdu
@@ -992,16 +1019,24 @@ contains
 
        !  Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-       call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+       if (lPAH_nRE) then
+          call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+       else
+          call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
+       endif
 
        !------------------------------------------------------------------------------
        ! HDU 18 : is PAH at equilibrium
        !------------------------------------------------------------------------------
+
+       ! todo : put 1 for nLTE case
+
        bitpix=32
        naxis=3
        naxes(1)=n_rad
        naxes(2)=nz
-       naxes(3)=n_grains_nRE
+       naxes(3)=n_grains_PAH
+       nelements=naxes(1)*naxes(2)*naxes(3)
 
        ! create new hdu
        call ftcrhd(unit, status)
@@ -1015,55 +1050,63 @@ contains
        nelements=naxes(1)*naxes(2)*naxes(3)
 
        ! le j signifie integer
-       do ri=1, n_rad
-          do zj=1,nz
-             do l=grain_nRE_start, grain_nRE_end
-                if (l_RE(ri,zj,l)) then
-                   is_eq(ri,zj,l) = 1
-                else
-                   is_eq(ri,zj,l) = 0
-                endif
+       if (lPAH_nRE) then
+          do ri=1, n_rad
+             do zj=1,nz
+                do l=grain_nRE_start, grain_nRE_end
+                   if (l_RE(ri,zj,l)) then
+                      is_eq(ri,zj,l) = 1
+                   else
+                      is_eq(ri,zj,l) = 0
+                   endif
+                enddo
              enddo
           enddo
-       enddo
+       else
+          is_eq(:,:,:) = 1
+       endif
        call ftpprj(unit,group,fpixel,nelements,is_eq,status)
 
-       !------------------------------------------------------------------------------
-       ! HDU 19 : temperature table
-       !------------------------------------------------------------------------------
-       bitpix=-32
-       naxis=1
-       naxes(1)=n_T
-       nelements=naxes(1)
 
-       ! create new hdu
-       call ftcrhd(unit, status)
+       if (lPAH_nRE) then
+          !------------------------------------------------------------------------------
+          ! HDU 19 : temperature table
+          !------------------------------------------------------------------------------
+          bitpix=-32
+          naxis=1
+          naxes(1)=n_T
+          nelements=naxes(1)
 
-       !  Write the required header keywords.
-       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+          ! create new hdu
+          call ftcrhd(unit, status)
 
-       ! le e signifie real*4
-       call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
+          !  Write the required header keywords.
+          call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-       !------------------------------------------------------------------------------
-       ! HDU 20 : PAH temperature probability density
-       !------------------------------------------------------------------------------
-       bitpix=-32
-       naxis=4
-       naxes(1)=n_T
-       naxes(2)=n_rad
-       naxes(3)=nz
-       naxes(4)=n_grains_nRE
-       nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+          ! le e signifie real*4
+          call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
 
-       ! create new hdu
-       call ftcrhd(unit, status)
+          !------------------------------------------------------------------------------
+          ! HDU 20 : PAH temperature probability density
+          !------------------------------------------------------------------------------
+          bitpix=-32
+          naxis=4
+          naxes(1)=n_T
+          naxes(2)=n_rad
+          naxes(3)=nz
+          naxes(4)=n_grains_nRE
+          nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-       !  Write the required header keywords.
-       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+          ! create new hdu
+          call ftcrhd(unit, status)
 
-       ! le e signifie real*4
-       call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
+          !  Write the required header keywords.
+          call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+          ! le e signifie real*4
+          call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
+       endif !lPAH_nRE
+
     endif
 
     !  Close the file and free the unit number.
@@ -1074,7 +1117,7 @@ contains
     if (status > 0) then
        call print_error(status)
        stop
-    end if
+    endif
 
     return
 
