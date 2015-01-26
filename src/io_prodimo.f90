@@ -420,6 +420,7 @@ contains
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
     integer, dimension(:,:,:), allocatable :: is_eq
+    logical, dimension(n_grains_tot) :: mask_not_PAH
 
     lPAH_nRE = .false.
     test_PAH : do i=1, n_pop
@@ -428,7 +429,6 @@ contains
           exit test_PAH
        endif
     enddo test_PAH
-
 
     if (lPAH_nRE) then
        iPAH_start = grain_nRE_start
@@ -439,6 +439,8 @@ contains
        iPAH_end = grain_RE_nLTE_end
        n_grains_PAH=n_grains_RE_nLTE
     endif
+
+    mask_not_PAH = .not.grain(:)%is_PAH
 
     allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
     if (alloc_status > 0) then
@@ -877,12 +879,12 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
-          N = sum(densite_pouss(ri,zj,1,:))
+          N = sum(densite_pouss(ri,zj,1,:),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
+             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:),mask=mask_not_PAH) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2,mask=mask_not_PAH) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3,mask=mask_not_PAH) / N
           else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
@@ -1028,9 +1030,6 @@ contains
        !------------------------------------------------------------------------------
        ! HDU 18 : is PAH at equilibrium
        !------------------------------------------------------------------------------
-
-       ! todo : put 1 for nLTE case
-
        bitpix=32
        naxis=3
        naxes(1)=n_rad
