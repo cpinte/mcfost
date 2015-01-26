@@ -157,7 +157,7 @@ subroutine transfert_poussiere()
   !call densite_data_hd32297(para) ! grille redefinie dans routine
   if (ldensity_file) then
      call densite_file()
-  elseif (lgap) then
+  else if (lgap) then
      call densite_data_gap
   else if (lstrat_SPH) then
      call densite_data_SPH_TTauri_2
@@ -174,6 +174,7 @@ subroutine transfert_poussiere()
   else if (lread_Seb_Charnoz2) then
      call densite_Seb_Charnoz2()
   else
+     if (lsigma_file) call read_sigma_file()
      call define_density()
   endif
 

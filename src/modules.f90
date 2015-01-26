@@ -115,7 +115,7 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file
   logical :: lread_grain_size_distrib, lread_misselt
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
@@ -259,7 +259,7 @@ module disk
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
   logical :: lpuffed_rim
 
-  character(len=512) :: density_file, grain_size_file
+  character(len=512) :: density_file, sigma_file, grain_size_file
   character(len=512), dimension(:), allocatable :: sh_file
 
   ! Correction locale de la desnite (dans un anneau)
@@ -664,20 +664,6 @@ end module em_th
 
 !********************************************************************
 
-module ki2
-
-  use parametres
-  implicit none
-  save
-
-  real :: sigma
-  integer :: n_ker
-  real, dimension(:,:), allocatable :: noyau, intensite
-
-end module ki2
-
-!***********************************************************
-
 module ode_data
 
   implicit none
@@ -838,6 +824,7 @@ module molecular_emission
 
   ! densite_gaz gives the midplane density for j=0
   real(kind=db), dimension(:,:,:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=db), dimension(:), allocatable :: Surface_density
 
   real(kind=db), dimension(:,:), allocatable :: ds
   real(kind=db), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus

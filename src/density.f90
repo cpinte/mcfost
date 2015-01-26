@@ -39,7 +39,7 @@ subroutine define_gas_density()
 
   integer :: i,j, k, izone, alloc_status
   real(kind=db), dimension(n_zones) :: cst_gaz
-  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C
+  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
 
   type(disk_zone_type) :: dz
 
@@ -144,7 +144,18 @@ subroutine define_gas_density()
 
               enddo !k
            enddo bz !j
+
+           if ((lSigma_file).and.(izone==1)) then
+              ! Normalisation pour densite de surface dans fichier
+              ! todo : only works for k = 1
+              somme = 0.0
+              bz2 : do j=min(0,j_start),nz
+                 somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
+              enddo bz2
+              densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+           endif
         enddo ! i
+
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
@@ -286,7 +297,7 @@ subroutine define_dust_density()
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=db) :: rho0, ztilde, dtilde, h, s_opt
+  real(kind=db) :: rho0, ztilde, dtilde, h, s_opt, somme
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
@@ -445,6 +456,16 @@ subroutine define_dust_density()
                  enddo !l
               enddo !k
            enddo bz !j
+
+           if ((lSigma_file).and.(izone==1)) then
+              ! Normalisation pour densite de surface dans fichier
+              ! todo : only works for k = 1
+              somme = 0.0
+              do j=min(0,j_start),nz
+                 somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
+              enddo
+              densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+           endif
 
 
            if (lstrat.and.(settling_type == 2)) then
@@ -2572,7 +2593,7 @@ subroutine densite_file()
   firstpix=1
   nullval=-999
 
-  !  determine the size of temperature file
+  !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
   if (nfound /= 4) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -2631,7 +2652,7 @@ subroutine densite_file()
   write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
 
   ! Au cas ou
-  sph_dens = max(sph_dens,tiny_db)
+  sph_dens = max(sph_dens,tiny_real)
 
   ! Lecture des tailles de grains (en microns)
 !  if (n_a > 99999) then
@@ -2979,6 +3000,86 @@ subroutine densite_file()
   return
 
 end subroutine densite_file
+
+!**********************************************************
+
+subroutine read_Sigma_file()
+  ! Nouvelle routine pour lire une densite de surface
+  ! C. Pinte
+  ! 22/01/15
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdutype, bitpix
+  integer :: nullval
+  integer, dimension(1) :: naxes
+  logical :: anynull
+  character(len=80) :: comment
+  real, dimension(:), allocatable :: sigma_sl
+
+  ! Lecture donnees
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+  write(*,*) "Reading surface density file : "//trim(sigma_file)
+
+  if (n_zones > 1) then
+     write(*,*) "This surface density will be applied to zone 1"
+     ! todo : a verifier apres reordering
+  endif
+
+  readwrite=0
+  call ftopen(unit,sigma_file,readwrite,blocksize,status)
+  if (status /= 0) then ! le fichier temperature n'existe pas
+     write(*,*) "ERROR : surface density file needed"
+     stop
+  endif
+
+  group=1
+  firstpix=1
+  nullval=-999
+
+  ! determine the size of density file
+  call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+  if (nfound /= 1) then
+     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     stop
+  endif
+
+  if ((naxes(1) /= n_rad)) then
+     write(*,*) "Error : "//trim(sigma_file)//" does not have the"
+     write(*,*) "right dimensions. Exiting."
+     write(*,*) "# fits_file vs mcfost_grid"
+     write(*,*) naxes(1), n_rad
+     stop
+  endif
+  npixels=naxes(1)
+
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  ! read_image
+  if (bitpix==-32) then
+     allocate(sigma_sl(n_rad))
+     sigma_sl = 0.0_db
+     call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sl,anynull,status)
+     surface_density = real(sigma_sl,kind=db)
+     deallocate(sigma_sl)
+  else if (bitpix==-64) then
+     call ftgpvd(unit,group,firstpix,npixels,nullval,surface_density,anynull,status)
+  else
+     write(*,*) "ERROR: cannot read bitpix in fits file"
+     stop
+  endif
+
+  ! Au cas ou
+  surface_density = max(surface_density,tiny_db)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  return
+
+end subroutine read_Sigma_file
 
 !**********************************************************
 
