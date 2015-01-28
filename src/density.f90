@@ -149,7 +149,7 @@ subroutine define_gas_density()
               ! Normalisation pour densite de surface dans fichier
               ! todo : only works for k = 1
               somme = 0.0
-              bz2 : do j=min(0,j_start),nz
+              bz2 : do j=min(1,j_start),nz
                  somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
               enddo bz2
               densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
@@ -460,11 +460,13 @@ subroutine define_dust_density()
            if ((lSigma_file).and.(izone==1)) then
               ! Normalisation pour densite de surface dans fichier
               ! todo : only works for k = 1
-              somme = 0.0
-              do j=min(0,j_start),nz
-                 somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
-              enddo
-              densite_pouss(i,j,1,l) = densite_pouss(i,j,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+              do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 somme = 0.0
+                 do j=min(1,j_start),nz
+                    somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
+                 enddo ! j
+                 densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+              enddo ! l
            endif
 
 
