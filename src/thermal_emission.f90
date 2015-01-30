@@ -1689,17 +1689,32 @@ subroutine repartition_energie(lambda)
 
   endif
 
-  do i=1,n_rad
-     do j=1,nz
-        ! Combinaison des 2 indices pour dichotomie
-        l=j+nz*(i-1)
-        if (lweight_emission) then
-           E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
-        else
-           E_cell_corrected(l) = E_cell(l)
-        endif
+  if (lweight_emission) then
+     do i=1,n_rad
+        bz2 : do j=j_start,nz
+           if (j==0) cycle bz2
+           if (l3D) then
+              if (j < 0) then
+                 jj = j + nz + 1
+              else
+                 jj = j + nz
+              endif
+           endif
+           do pk=1, n_az
+              if (l3D) then
+                 ! Combinaison des 3 indices pour dichotomie
+                 l= pk+n_az*(jj+2*nz*(i-1)-1)
+              else
+                 ! Combinaison des 2 indices pour dichotomie
+                 l= j+nz*(i-1)
+              endif
+              E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
+           enddo !pk
+        enddo bz2
      enddo
-  enddo
+  else ! no weight_emission
+     E_cell_corrected(:) = E_cell(:)
+  endif
 
   E_disk(lambda) = sum(E_cell)
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda)+E_ISM(lambda))
