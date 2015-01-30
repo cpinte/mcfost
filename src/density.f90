@@ -231,6 +231,11 @@ subroutine define_gas_density()
 
   ! Ajout cavite vide
   if (lcavity) then
+     if (n_az > 1) then
+        write(*,*) "Cavity not implemented yet in 3D. Ask Christophe if it is needed."
+        write(*,*) "ERROR"
+        stop
+     endif
      do i=1, n_rad
         do j = 1, nz
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
