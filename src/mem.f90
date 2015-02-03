@@ -23,6 +23,7 @@ subroutine alloc_dynamique()
   ! 12/05/05
 
   integer ::  alloc_status
+  real :: mem_size
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
@@ -645,8 +646,10 @@ subroutine alloc_dynamique()
 
      if (l3D) then
         allocate(prob_delta_T(p_n_rad,-p_nz:p_nz,p_n_az,n_T,n_lambda), stat=alloc_status)
+        mem_size = real(p_n_rad) * 2. * real(p_nz) * real(p_n_az) * n_T * n_lambda * 4 / 1024.**2
      else
         allocate(prob_delta_T(p_n_rad,p_nz,1,n_T,n_lambda), stat=alloc_status)
+        mem_size = real(p_n_rad) * real(p_nz) * n_T * n_lambda * 4 / 1024.**2
      endif
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_delta_T'
@@ -654,6 +657,7 @@ subroutine alloc_dynamique()
      endif
      prob_delta_T = 0
 
+     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
 
      if (lRE_nLTE) then
         allocate(prob_kappa_abs_1grain(n_lambda,n_rad,nz+1,0:n_grains_RE_nLTE),stat=alloc_status)
