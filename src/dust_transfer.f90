@@ -513,19 +513,18 @@ subroutine transfert_poussiere()
 
            ! Emission du paquet
            call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
-           if (.not.lintersect) then
-              cycle photon
-           else
-              nnfot2(id)=nnfot2(id)+1.0_db
-           endif
+           nnfot2(id)=nnfot2(id)+1.0_db  ! todo : peut-etre a ne faire que pour les packets qui intersecte (+ il faut garder leur)
+           lpacket_alive = .true.
 
-           ! Propagation du packet
-           if (lforce_1st_scatt) then
-              call force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
-              if (lpacket_alive) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
-                   flag_star,flag_ISM,flag_scatt,lpacket_alive)
-           else
-              call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+           if (lintersect) then
+              ! Propagation du packet
+              if (lforce_1st_scatt) then
+                 call force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
+                 if (lpacket_alive) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
+                      flag_star,flag_ISM,flag_scatt,lpacket_alive)
+              else
+                 call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+              endif
            endif
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
