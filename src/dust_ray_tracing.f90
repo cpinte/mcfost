@@ -1228,6 +1228,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                         S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
                         S(1)=D(1)
                         S(4)=D(4)
+                        S(3)=-S(3)
 
                         I_sca2(1:4,iscatt,dir,ri,zj,id) = I_sca2(1:4,iscatt,dir,ri,zj,id) + S(:)
 
