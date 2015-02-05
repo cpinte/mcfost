@@ -107,6 +107,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
   ldensity_file=.false.
+  lsigma_file = .false.
   ldebris=.false.
   lkappa_abs_grain=.false.
   lweight_emission=.false.
@@ -647,6 +648,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-sigma_file","-sigma")
+        i_arg = i_arg + 1
+        lsigma_file=.true.
+        call get_command_argument(i_arg,s)
+        sigma_file = s
+        i_arg = i_arg + 1
      case("-debris")
         i_arg = i_arg+1
         ldebris=.true.
@@ -1179,7 +1186,8 @@ subroutine display_help()
   write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
-  write(*,*) "        : -density_file <density_file>"
+  write(*,*) "        : -density_file or -df <density_file>"
+  write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"
