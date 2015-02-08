@@ -32,7 +32,7 @@
   T	                  axial symmetry (important only if N_phi > 1)
 
 #Disk physics
-  3     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  0     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
   F                       dust radial migration
   F		  	  sublimate dust
   F                       hydostatic equilibrium
@@ -43,7 +43,7 @@
 
 #Density structure
   1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = debris disk, 5 = wall
-  1.e-3    100.		  dust mass,  gas-to-dust mass ratio
+  1.e-8    100.		  dust mass,  gas-to-dust mass ratio
   10.  100.0  2           scale height, reference radius (AU), unused for envelope, vertical profile exponent (only for debris disk)
   1.0  0.0    300.  100.  Rin, edge, Rout, Rc (AU) Rc is only used for tappered-edge & debris disks (Rout set to 8*Rc if Rout==0)
   1.125                   flaring exponent, unused for envelope

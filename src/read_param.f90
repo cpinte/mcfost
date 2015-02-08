@@ -18,7 +18,7 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -545,6 +545,22 @@ contains
              if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
              somme = somme + dust_pop_tmp(n_pop)%frac_mass
              dust_pop_tmp(n_pop)%zone = j
+
+             ! Checking which type of opacity file it is
+             dust_pop_tmp(n_pop)%is_PAH = .false.
+             dust_pop_tmp(n_pop)%is_opacity_file = .false.
+             dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .false.
+             if (dust_pop_tmp(n_pop)%indices(1)(1:3) == "PAH") then
+                dust_pop_tmp(n_pop)%is_PAH = .true. ; dust_pop_tmp(n_pop)%is_opacity_file = .true.
+             else  if (dust_pop_tmp(n_pop)%indices(1)(1:7) == "Misselt") then
+                dust_pop_tmp(n_pop)%is_opacity_file = .true.
+                dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .true.
+                lread_Misselt = .true.
+                if (dust_pop_tmp(n_pop)%indices(1)(9:11) == "PAH") then
+                   dust_pop_tmp(n_pop)%is_PAH = .true.
+                endif
+             endif
+
           enddo
 
           ! renormalisation des fraction en masse
@@ -555,12 +571,12 @@ contains
        enddo !n_zones
     endif ! lfits
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+!    if (lRE_LTE.and.lRE_nLTE) then
+!       write(*,*) "Error : cannot mix grains in LTE and nLTE"
+!       write(*,*) " Is it usefull anyway ???"
+!       write(*,*) "Exiting"
+!       stop
+!    endif
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
@@ -568,9 +584,9 @@ contains
        write(*,*) 'Allocation error n_pop tmp'
        stop
     endif
-    dust_pop%is_PAH = .false.
-    dust_pop%is_opacity_file = .false.
-    dust_pop%is_Misselt_opacity_file = .false.
+    !dust_pop%is_PAH = .false.
+    !dust_pop%is_opacity_file = .false.
+    !dust_pop%is_Misselt_opacity_file = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
     ind_pop = 0
@@ -584,7 +600,6 @@ contains
              dust_pop(ind_pop)%ind_debut = grain_RE_LTE_end + 1
              dust_pop(ind_pop)%ind_fin = grain_RE_LTE_end + dust_pop(ind_pop)%n_grains
              grain_RE_LTE_end = grain_RE_LTE_end +  dust_pop(ind_pop)%n_grains
-
           endif
        enddo
     endif
@@ -711,6 +726,15 @@ contains
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
+
+
+       if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
+          if (etoile(i)%r > Rmin) then
+             write(*,*) "ERROR : inner disk radius is smaller than stellar radius"
+             write(*,*) "Exiting"
+             stop
+          endif
+       endif
 
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
@@ -1295,9 +1319,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1841,9 +1864,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2386,9 +2408,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2935,9 +2956,8 @@ contains
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
-    real :: gas_dust
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    real(kind=db) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -3473,7 +3493,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
@@ -4016,7 +4036,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, k, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
@@ -4549,7 +4569,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, imol, status
+    integer :: i, j, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -5069,7 +5089,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, status, imol
+    integer :: i, j, alloc_status, ios, ind_pop, status, imol
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -5585,7 +5605,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -6102,7 +6122,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -6473,7 +6493,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -6833,7 +6853,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 
@@ -7203,7 +7223,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -7574,7 +7594,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -7942,7 +7962,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -8275,7 +8295,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop
+    integer :: i, j, alloc_status, ios, ind_pop
     real :: version
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
@@ -8595,7 +8615,7 @@ end subroutine read_para215
 
     implicit none
 
-    integer :: i, alloc_status, ios, tmpint, j, ind_pop
+    integer :: i, alloc_status, ios, j, ind_pop
     real(kind=db) :: size_neb_tmp, somme
     real :: gas_dust
 

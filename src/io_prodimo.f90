@@ -147,8 +147,8 @@ contains
 
     ! TODO : linit_gaz
 
-    real :: wl_min, eps_PAH, mPAH, masse_PAH, norme, a
-    integer :: i, j, pop, k, NC, NH, alloc_status, ir, iz, NC_0
+    real :: eps_PAH, mPAH, masse_PAH, norme, a
+    integer :: i, pop, k, NC, NH, alloc_status, ir, iz, NC_0
     real, dimension(:), allocatable :: fPAH
 
     ! Maximum 4 zones dans ProDiMo
@@ -168,7 +168,7 @@ contains
     if (lforce_ProDiMo_PAH) data_ProDiMo = trim(data_ProDiMO)//"_fPAH="//sProDiMo_fPAH
 
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
-    tau_dark_zone_eq_th = 15000.
+    !tau_dark_zone_eq_th = 15000.
 
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
@@ -323,7 +323,7 @@ contains
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
-         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
+         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
 
     do ri=1, n_rad
        do zj=1,nz
@@ -398,11 +398,12 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l, i, iRegion
+    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion, k
+    integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme
 
-    logical :: simple, extend
+    logical :: simple, extend, lPAH_nRE
     character(len=512) :: filename
     character :: s
 
@@ -418,6 +419,35 @@ contains
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
+    integer, dimension(:,:,:), allocatable :: is_eq
+    logical, dimension(n_grains_tot) :: mask_not_PAH
+
+    lPAH_nRE = .false.
+    test_PAH : do i=1, n_pop
+       if (dust_pop(i)%is_PAH.and.(dust_pop(i)%methode_chauffage==3)) then
+          lPAH_nRE = .true.
+          exit test_PAH
+       endif
+    enddo test_PAH
+
+    if (lPAH_nRE) then
+       iPAH_start = grain_nRE_start
+       iPAH_end = grain_nRE_end
+       n_grains_PAH=n_grains_nRE
+    else
+       iPAH_start = grain_RE_nLTE_start
+       iPAH_end = grain_RE_nLTE_end
+       n_grains_PAH=n_grains_RE_nLTE
+    endif
+
+    mask_not_PAH = .not.grain(:)%is_PAH
+
+    allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
+    if (alloc_status > 0) then
+       write(*,*) 'Allocation error opaciteis_eq forProDiMo.fits.gz'
+       stop
+    endif
+    is_eq = 0
 
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
@@ -479,6 +509,14 @@ contains
        call ftpkyj(unit,'n_regions',n_regions,' ',status)
     endif
 
+    if (mcfost2ProDiMo_version >=5) then
+       if (is_PAH) then
+          call ftpkyj(unit,'PAH_present',1,' ',status)
+       else
+          call ftpkyj(unit,'PAH_present',0,' ',status)
+       endif
+    endif
+
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
     call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
     call ftpkye(unit,'Mstar',real(etoile(1)%M),-8,'[Msun]',status)
@@ -522,8 +560,6 @@ contains
        enddo
     endif ! mcfost2ProDiMo_version 3
 
-
-
     call ftpkye(unit,'amin',dust_pop(1)%amin,-8,'[micron]',status)
     call ftpkye(unit,'amax',dust_pop(1)%amax,-8,'[micron]',status)
     call ftpkye(unit,'aexp',dust_pop(1)%aexp,-8,'slope of grain size distribution',status)
@@ -563,22 +599,21 @@ contains
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
     norme = sum(r_grain(:)**2 * nbre_grains(:))
-    if (lRE_nLTE) then
-       do ri=1, n_rad
-          do zj=1, nz
-             Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
-          enddo !j
-       enddo !i
-
-       write(*,*) "************************************************************"
-       write(*,*) "WARNING: nLTE mode in MCFOST"
-       write(*,*) "Crude averaging of the temperature distribution for ProDiMo"
-       write(*,*) "T = \int T(a) * n(a) * a^2 da / \int n(a) * a^2 da"
-       write(*,*) "Max. averaged temperature = ", maxval(Temperature(:,:,1))
-       write(*,*) "************************************************************"
-
-    endif
-
+    !if (lRE_nLTE) then
+    !   do ri=1, n_rad
+    !      do zj=1, nz
+    !         Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
+    !      enddo !j
+    !   enddo !i
+    !
+    !   write(*,*) "************************************************************"
+    !   write(*,*) "WARNING: nLTE mode in MCFOST"
+    !   write(*,*) "Crude averaging of the temperature distribution for ProDiMo"
+    !   write(*,*) "T = \int T(a) * n(a) * a^2 da / \int n(a) * a^2 da"
+    !   write(*,*) "Max. averaged temperature = ", maxval(Temperature(:,:,1))
+    !   write(*,*) "************************************************************"
+    !
+    !endif
 
     !  Write the array to the FITS file.
     call ftppre(unit,group,fpixel,nelements,Temperature(:,:,1),status)
@@ -720,7 +755,7 @@ contains
 
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi
+           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
 
        do ri=1, n_rad
           do zj=1,nz
@@ -813,13 +848,12 @@ contains
           opacite(ri,zj,1,:) = kappa(:,ri,zj,1)
           if (lRE_LTE) then
              opacite(ri,zj,2,:) = kappa_abs_eg(:,ri,zj,1)
-          else if (lRE_nLTE) then ! Patch, c'est pas super propre
-             do lambda=1,n_lambda
-                do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
-
-                enddo ! k
-             enddo ! lambda
+          !else if (lRE_nLTE) then ! Patch, c'est pas super propre
+          !   do lambda=1,n_lambda
+          !      do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+          !         opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+          !      enddo ! k
+          !   enddo ! lambda
           endif
        enddo ! ri
     enddo !zj
@@ -845,12 +879,12 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
-          N = sum(densite_pouss(ri,zj,1,:))
+          N = sum(densite_pouss(ri,zj,1,:),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3) / N
+             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:),mask=mask_not_PAH) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2,mask=mask_not_PAH) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3,mask=mask_not_PAH) / N
           else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
@@ -914,6 +948,166 @@ contains
        call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)
     endif
 
+    if ((mcfost2ProDiMo_version >=5).and.is_PAH) then
+
+       !------------------------------------------------------------------------------
+       ! HDU 15 : PAH density
+       !------------------------------------------------------------------------------
+       bitpix=-32
+       naxis=2
+       naxes(1)=n_rad
+       naxes(2)=nz
+       nelements=naxes(1)*naxes(2)
+
+       ! create new hdu
+       call ftcrhd(unit, status)
+
+       !  Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+       ! Write  optional keywords to the header
+       call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
+
+       !  Write the array to the FITS file.
+       k=1 ! azimuth
+       do ri=1, n_rad
+          do zj=1,nz
+             dens(ri,zj) = sum(densite_pouss(ri,zj,k, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+          enddo
+       enddo
+       call ftppre(unit,group,fpixel,nelements,dens,status)
+
+       !------------------------------------------------------------------------------
+       ! HDU 16 : PAH opacity
+       !------------------------------------------------------------------------------
+       bitpix=-32
+       naxis=4
+       naxes(1)=n_rad
+       naxes(2)=nz
+       naxes(3)=2
+       naxes(4)=n_lambda
+       nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+       ! create new hdu
+       call ftcrhd(unit, status)
+
+       !  Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+       do zj=1,nz
+          do ri=1,n_rad
+             do lambda=1,n_lambda
+                do l= iPAH_start, iPAH_end
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                enddo ! l
+             enddo ! lambda
+          enddo ! ri
+       enddo !zj
+       call ftppre(unit,group,fpixel,nelements,opacite,status)
+
+       !------------------------------------------------------------------------------
+       ! HDU 17 : PAH Teq
+       !------------------------------------------------------------------------------
+       bitpix=-32
+       naxis=3
+       naxes(1)=n_rad
+       naxes(2)=nz
+       naxes(3)=n_grains_PAH
+       nelements=naxes(1)*naxes(2)*naxes(3)
+
+        ! create new hdu
+       call ftcrhd(unit, status)
+
+       !  Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+       if (lPAH_nRE) then
+          call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+       else
+          call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
+       endif
+
+       !------------------------------------------------------------------------------
+       ! HDU 18 : is PAH at equilibrium
+       !------------------------------------------------------------------------------
+       bitpix=32
+       naxis=3
+       naxes(1)=n_rad
+       naxes(2)=nz
+       naxes(3)=n_grains_PAH
+       nelements=naxes(1)*naxes(2)*naxes(3)
+
+       ! create new hdu
+       call ftcrhd(unit, status)
+
+       !  Write the required header keywords.
+       call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+       !  Write the array to the FITS file.
+       group=1
+       fpixel=1
+       nelements=naxes(1)*naxes(2)*naxes(3)
+
+       ! le j signifie integer
+       if (lPAH_nRE) then
+          do ri=1, n_rad
+             do zj=1,nz
+                do l=grain_nRE_start, grain_nRE_end
+                   if (l_RE(ri,zj,l)) then
+                      is_eq(ri,zj,l) = 1
+                   else
+                      is_eq(ri,zj,l) = 0
+                   endif
+                enddo
+             enddo
+          enddo
+       else
+          is_eq(:,:,:) = 1
+       endif
+       call ftpprj(unit,group,fpixel,nelements,is_eq,status)
+
+
+       if (lPAH_nRE) then
+          !------------------------------------------------------------------------------
+          ! HDU 19 : temperature table
+          !------------------------------------------------------------------------------
+          bitpix=-32
+          naxis=1
+          naxes(1)=n_T
+          nelements=naxes(1)
+
+          ! create new hdu
+          call ftcrhd(unit, status)
+
+          !  Write the required header keywords.
+          call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+          ! le e signifie real*4
+          call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
+
+          !------------------------------------------------------------------------------
+          ! HDU 20 : PAH temperature probability density
+          !------------------------------------------------------------------------------
+          bitpix=-32
+          naxis=4
+          naxes(1)=n_T
+          naxes(2)=n_rad
+          naxes(3)=nz
+          naxes(4)=n_grains_nRE
+          nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+          ! create new hdu
+          call ftcrhd(unit, status)
+
+          !  Write the required header keywords.
+          call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+          ! le e signifie real*4
+          call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
+       endif !lPAH_nRE
+
+    endif
+
     !  Close the file and free the unit number.
     call ftclos(unit, status)
     call ftfiou(unit, status)
@@ -922,7 +1116,7 @@ contains
     if (status > 0) then
        call print_error(status)
        stop
-    end if
+    endif
 
     return
 
@@ -1068,19 +1262,16 @@ contains
     ! C.Pinte
     ! 12/07/09
 
-    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdunum, hdutype
+    integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdutype
     integer :: imol, syst_status, n_files, n_rad_m2p, nz_m2p, n_lambda_m2p, i, j, l
-    real :: nullval, buffer, Tdust
+    real :: nullval, Tdust
     logical :: anynull
 
     integer, dimension(4) :: naxes
 
     character(len=30) :: errtext
-    character (len=80) :: errmessage, comment
+    character (len=80) :: errmessage
     character(len=512) :: filename, mol_para, cmd
-
-    real, dimension(:,:), allocatable :: temperature_ProDiMo
-
 
     !**************************************************************
     ! 1) Lecture des parametres dans le fichier .para de data_th
@@ -1405,7 +1596,7 @@ contains
 
     integer, intent(in) :: imol
 
-    integer :: fits_status, readwrite, unit, blocksize, nfound, group, firstpix, nbuffer, npixels, hdunum, hdutype,alloc_status
+    integer :: fits_status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdutype,alloc_status
     real :: nullval
     logical :: anynull
     integer, dimension(4) :: naxes
@@ -1428,15 +1619,8 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, vmax, sigma2_m1, r_cyl
-    real(kind=db) :: S, dz, dV, Somme
-    integer :: i,j, ri, zj, n1, n2, iv, n_speed_rt, n_speed, l, keyword_status
-
-
-    ! TMP
-    integer :: iTrans, iUp, iLow
-    real(kind=db) :: cst, nUp, nLow
-    real :: Tex
+    real :: sigma2, sigma2_m1, r_cyl
+    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status
 
     n_speed_rt = mol(imol)%n_speed_rt
 

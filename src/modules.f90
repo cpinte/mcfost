@@ -115,11 +115,10 @@ module parametres
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file
-  logical :: lread_grain_size_distrib, lread_Misselt
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -146,7 +145,7 @@ module parametres
   logical, parameter :: ltest_rt3 = .false. ! marche pas
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
-  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2
+  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_grain_size_distrib
 
 end module parametres
 
@@ -259,7 +258,7 @@ module disk
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
   logical :: lpuffed_rim
 
-  character(len=512) :: density_file, grain_size_file
+  character(len=512) :: density_file, sigma_file, grain_size_file
   character(len=512), dimension(:), allocatable :: sh_file
 
   ! Correction locale de la desnite (dans un anneau)
@@ -328,7 +327,7 @@ module prop_star
 
   real :: L_etoile
 
-  real, dimension(:), allocatable :: I_ISM
+  real, dimension(:), allocatable :: E_ISM
   real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
 
 end module prop_star
@@ -390,6 +389,7 @@ module grains
   integer :: n_pop
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
+  logical :: is_PAH
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
   real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot
@@ -498,11 +498,10 @@ module opacity
   real(kind=db), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
   real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
 
-
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
-  real(kind=db), dimension(:,:,:,:), allocatable :: kappa
-  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca !n_lambda,n_rad,nz+1, (n_az)
-  real, dimension(:,:,:,:), allocatable :: proba_abs_RE !n_lambda,n_rad,nz+1, (n_az)
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext
+  real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca, kappa_abs_RE !n_lambda,n_rad,nz+1, (n_az)
+  real, dimension(:,:,:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE !n_lambda,n_rad,nz+1, (n_az)
   real, dimension(:,:,:,:), allocatable :: prob_kappa_abs_1grain !n_lambda,n_rad,nz+1, 0:n_grains
   real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
@@ -617,19 +616,18 @@ module em_th
   ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
   real, dimension(:,:,:,:,:), allocatable :: prob_delta_T !n_rad,nz+1,(n_az),0:n_T,n_lambda
   real, dimension(:,:,:), allocatable :: prob_delta_T_1grain !n_grains,0:n_T,n_lambda
-
+  real, dimension(:,:,:), allocatable :: prob_delta_T_1grain_nRE !n_grains,0:n_T,n_lambda
 
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
-  real(kind=db), dimension(:,:,:,:), allocatable :: xKJ_abs, xE_abs, nbre_reemission !n_rad, nz, n_az, id
+  real(kind=db), dimension(:,:,:,:), allocatable :: xKJ_abs, nbre_reemission !n_rad, nz, n_az, id
   real(kind=db), dimension(:,:,:), allocatable :: E0 !n_rad, nz, n_az
   real(kind=db), dimension(:,:,:,:), allocatable :: J0 !n_lambda, n_rad, nz, n_az
-  real(kind=db), dimension(:,:,:,:), allocatable :: xE_abs_1grain !id, n_rad, nz, n_grains
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
   real(kind=db), dimension(:,:,:,:), allocatable :: xJ_abs !id, n_lambda, n_rad, nz
   real, dimension(:,:,:,:), allocatable :: xN_abs !id, n_lambda, n_rad, nz
   integer, dimension(:,:,:,:), allocatable :: xT_ech !id, n_rad, nz, n_az
-  integer, dimension(:,:,:,:), allocatable :: xT_ech_1grain !id, n_rad, nz, n_grains
+  integer, dimension(:,:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE !id, n_rad, nz, n_grains
 
   real(kind=db) :: E_abs_nRE, E_abs_nREm1
   ! emissivite en unite qq (manque une cst mais travail en relatif)
@@ -640,13 +638,13 @@ module em_th
   real, dimension(:,:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
   integer, dimension(:,:,:), allocatable :: Tpeak_old
   real, dimension(:,:,:,:), allocatable :: Proba_Temperature !n_T, n_rad,nz, n_grains
-  logical, dimension(:,:,:), allocatable :: l_RE ! n_rad, nz, n_grains
+  logical, dimension(:,:,:), allocatable :: l_RE, lchange_nRE ! n_rad, nz, n_grains
   real :: nbre_photons_tot, n_phot_L_tot,  n_phot_L_tot0
 
 
   ! Choix cellule d'emission pour cas monochromatique
   real(kind=db), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
-  real, dimension(:), allocatable :: frac_E_stars, E_totale !n_lambda
+  real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
   ! Biais de l'emission vers la surface du disque
   real, dimension(:,:), allocatable :: weight_proba_emission, correct_E_emission
@@ -656,6 +654,7 @@ module em_th
   real :: T_rm
 
   character(len=512) :: Tfile = "./data_th/Temperature.fits.gz"
+  character(len=512) :: Tfile_nLTE = "./data_th/Temperature_nLTE.fits.gz"
   character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_Diff_approx.fits.gz"
   character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
 
@@ -664,20 +663,6 @@ module em_th
 end module em_th
 
 !********************************************************************
-
-module ki2
-
-  use parametres
-  implicit none
-  save
-
-  real :: sigma
-  integer :: n_ker
-  real, dimension(:,:), allocatable :: noyau, intensite
-
-end module ki2
-
-!***********************************************************
 
 module ode_data
 
@@ -839,6 +824,7 @@ module molecular_emission
 
   ! densite_gaz gives the midplane density for j=0
   real(kind=db), dimension(:,:,:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=db), dimension(:), allocatable :: Surface_density
 
   real(kind=db), dimension(:,:), allocatable :: ds
   real(kind=db), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus

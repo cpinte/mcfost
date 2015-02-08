@@ -51,9 +51,11 @@ subroutine alloc_ray_tracing()
   endif
 
   if (l3D) then
-     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
+     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
+          tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
   else
-     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
+     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), &
+          tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
   endif
   if (alloc_status > 0) then
      Write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
@@ -422,7 +424,7 @@ subroutine angles_scatt_rt1(id,u,v,w)
 
   real(kind=db) :: v1pi, v1pj, v1pk, xnyp, costhet, theta, omega, cosw, sinw
   real :: cos_scatt
-  integer :: k, ibin, iaz, dir
+  integer :: k, ibin, iaz
 
   ! Direction observateur dans repere refence
   do ibin=1,RT_n_incl
@@ -657,8 +659,8 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   integer, intent(in) :: lambda, ibin, iaz
 
-  integer :: i,j, alloc_status, l, k, itype
-  real(kind=db) :: facteur, energie_photon, Temp, cst_wl, wl, cst, coeff_exp, cst_E, n_photons_envoyes
+  integer :: i,j, k, itype
+  real(kind=db) :: facteur, energie_photon, n_photons_envoyes
   real(kind=db), dimension(n_az_rt,0:1) :: norme
   real(kind=db) :: norme_3D
 
@@ -778,7 +780,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
 
   integer, intent(in) :: lambda, ibin
-  integer :: i,j,k, iscatt, dir
+  integer :: i,j, iscatt, dir
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
@@ -935,7 +937,7 @@ subroutine calc_Isca2_new(lambda,ibin)
 
   integer, intent(in) :: lambda, ibin
 
-  integer :: ri, zj, p_ri, p_zj, theta_I, phi_I, dir, iscatt, id, dir_I
+  integer :: ri, zj, p_ri, p_zj, theta_I, phi_I, dir, iscatt, id
   real(kind=db), dimension(4) :: Stokes, S, C, D
   real(kind=db) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon
   real(kind=db) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
@@ -944,8 +946,8 @@ subroutine calc_Isca2_new(lambda,ibin)
   real(kind=db), dimension(n_rad,nz) :: Inu_max
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
-  integer :: k, kmin, kmax, alloc_status, i1, i2, correct_w
-  real :: frac, frac_m1, cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
+  integer :: k, alloc_status, i1, i2, correct_w
+  real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
   real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
 
@@ -1245,6 +1247,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                         S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
                         S(1)=D(1)
                         S(4)=D(4)
+                        S(3)=-S(3)
 
                         I_sca2(1:4,iscatt,dir,ri,zj,id) = I_sca2(1:4,iscatt,dir,ri,zj,id) + S(:)
 
@@ -1303,23 +1306,20 @@ subroutine calc_Isca2_star(lambda,ibin)
 
   integer, intent(in) :: lambda, ibin
 
-  integer :: ri, zj, p_ri, p_zj, dir, iscatt, id, dir_I
+  integer :: ri, zj, p_ri, p_zj, dir, iscatt, id
   real(kind=db), dimension(4) :: Stokes, S, C, D
-  real(kind=db) :: x, y, z, u, v, w, phi, w02, facteur
+  real(kind=db) :: x, y, z, u, v, w, facteur
 
-  real(kind=db), dimension(n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w
   real(kind=db), dimension(n_rad,nz) :: Inu
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
-  integer :: k, kmin, kmax, alloc_status
-  real :: frac, frac_m1, s11, s12, s33, s34, cos_scatt
+  integer :: k
+  real :: s11, s12, s33, s34, cos_scatt
   real(kind=db) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
 
   real(kind=db), parameter :: prec = 0._db
-  real :: angle
 
   id = 1 ! TMP
-
 
   if (lmono0) then ! image
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
@@ -1450,9 +1450,9 @@ subroutine calc_Isca2_star(lambda,ibin)
                  ROP(2,2) = COSW
                  RPO(2,3) = SINW
                  ROP(2,3) = -1.0_db * SINW
-                 RPO(3,2) = -1.0_db * SINW
+                 RPO(3,2) = SINW
                  ROP(3,2) = SINW
-                 RPO(3,3) = COSW
+                 RPO(3,3) = -COSW
                  ROP(3,3) = COSW
 
                  ! Matrice de Mueller
@@ -1525,8 +1525,8 @@ function dust_source_fct(lambda,ri,zj,phik, x,y,z)
 
   real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
 
-  real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, xi_az, frac_r, frac_z, r
-  integer :: iscatt1, iscatt2, dir, i_az, i_az_p1, psup, ri1, zj1, ri2, zj2
+  real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, frac_r, frac_z, r
+  integer :: iscatt1, iscatt2, dir, psup, ri1, zj1, ri2, zj2
   integer :: k, n_pola
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0

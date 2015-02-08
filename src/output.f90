@@ -26,7 +26,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   logical, intent(in) :: flag_star, flag_scatt
   real(kind=db), dimension(4)  :: stok
 
-  integer :: capt, c_phi, imap1, jmap1, imap2, jmap2, i
+  integer :: capt, c_phi, imap1, jmap1, imap2, jmap2
   real(kind=db) :: xprim, yprim, zprim, ytmp, ztmp
 
   x1=xin ; y1=yin ; z1=zin
@@ -488,10 +488,9 @@ subroutine write_stokes_fits()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status, id
 
   integer :: lambda=1
-  integer :: image_type=1
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -763,7 +762,7 @@ subroutine ecriture_map_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id, xcenter, lambda, itype, ibin, iaz
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -906,7 +905,7 @@ subroutine ecriture_sed_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id, lambda
+  integer :: i,j,group,fpixel,nelements, lambda
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -997,20 +996,18 @@ subroutine write_origin()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
-
-  integer :: lambda=1
-  integer :: image_type=1
+  integer :: group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend
 
-  real :: o_star, frac_star, somme_disk
+  real :: o_star
   real, dimension(n_rad, nz) :: o_disk
 
   filename = trim(data_dir)//"/origine.fits.gz"
 
   ! Normalisation
+  o_star = sum(star_origin(1,:))
   o_disk(:,:) = o_disk(:,:) / (sum(o_disk) + o_star)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1088,7 +1085,7 @@ subroutine calc_optical_depth_map(lambda)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,k, group,fpixel,nelements, alloc_status, id
+  integer :: i,j,k, group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend, lmilieu
@@ -1199,7 +1196,7 @@ subroutine reemission_stats()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -1263,7 +1260,7 @@ subroutine write_disk_struct()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1420,7 +1417,6 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens = densite_pouss(:,:,:,:)
   dens = 0.0
   do k=1,n_az
      bz : do j=j_start,nz
@@ -1763,7 +1759,7 @@ subroutine ecriture_J()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj
+  integer :: group,fpixel,nelements, lambda, ri, zj
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1848,7 +1844,7 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, lambda, ri, zj, l
+  integer :: group,fpixel,nelements, lambda, ri, zj, l
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1952,13 +1948,10 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: n,k, i, j, lambda, l
-  real :: flux, nbre_photons, facteur
-
-
+  integer :: i, j, l
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1968,7 +1961,7 @@ subroutine ecriture_temperature(iTemperature)
 
   if (lRE_LTE) then
      if (iTemperature == 2) then
-        filename = trim(data_dir)//"/Temperature2.fits.gz"
+        filename = "!"//trim(data_dir)//"/Temperature2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
         filename = trim(data_dir)//"/Temperature.fits.gz"
      endif
@@ -2031,13 +2024,18 @@ subroutine ecriture_temperature(iTemperature)
      end if
   endif
 
-  if (lRE_nLTE .and. iTemperature==1) then
+  if (lRE_nLTE) then
      if (l3D) then
         write(*,*) "ERROR : 3D nLTE version not written yet"
         stop
      endif
 
-     filename = trim(data_dir)//"/Temperature.fits.gz"
+     if (iTemperature == 2) then
+        filename = "!"//trim(data_dir)//"/Temperature_nLTE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+     else
+        filename = trim(data_dir)//"/Temperature_nLTE.fits.gz"
+     endif
+
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
@@ -2079,15 +2077,18 @@ subroutine ecriture_temperature(iTemperature)
      end if
   endif
 
-
-
-  if (lnRE .and. iTemperature==1) then
+  if (lnRE) then
      if (l3D) then
         write(*,*) "ERROR : 3D nRE version not written yet"
         stop
      endif
 
-     filename = trim(data_dir)//"/Temperature_nRE.fits.gz"
+     if (iTemperature == 2) then
+        filename = "!"//trim(data_dir)//"/Temperature_nRE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+     else
+        filename = trim(data_dir)//"/Temperature_nRE.fits.gz"
+     endif
+
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
      call ftgiou (unit,status)
@@ -2099,23 +2100,40 @@ subroutine ecriture_temperature(iTemperature)
      !  Initialize parameters about the FITS image
      simple=.true.
      extend=.true.
+     group=1
+     fpixel=1
 
-     ! 1er HDU : Temperature ou Proba Temparature
+     !------------------------------------------------------------------------------
+     ! 1er HDU : Temperature d'equilibre
+     !------------------------------------------------------------------------------
+     bitpix=-32
+     naxis=3
+     naxes(1)=n_rad
+     naxes(2)=nz
+     naxes(3)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+
+     !------------------------------------------------------------------------------
+     ! 2eme HDU : is the grain at equilibrium ?
+     !------------------------------------------------------------------------------
      bitpix=32
      naxis=3
      naxes(1)=n_rad
      naxes(2)=nz
      naxes(3)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)
 
+      ! create new hdu
+     call ftcrhd(unit, status)
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)
 
      ! le j signifie integer
      do i=1, n_rad
@@ -2131,50 +2149,43 @@ subroutine ecriture_temperature(iTemperature)
      enddo
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
 
-     ! 2eme HDU : Proba Temperature
-     call FTCRHD(unit, status)
+     !------------------------------------------------------------------------------
+     ! 3eme HDU temperature table
+     !------------------------------------------------------------------------------
      bitpix=-32
+     naxis=1
+     naxes(1)=n_T
+     nelements=naxes(1)
+
+     ! create new hdu
+     call ftcrhd(unit, status)
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
 
 
+     !------------------------------------------------------------------------------
+     ! 4eme HDU : Proba Temperature
+     !------------------------------------------------------------------------------
+     bitpix=-32
      naxis=4
      naxes(1)=n_T
      naxes(2)=n_rad
      naxes(3)=nz
      naxes(4)=n_grains_nRE
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+     ! create new hdu
+     call ftcrhd(unit, status)
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
-
-
-     ! 3eme HDU : Temperature
-     call FTCRHD(unit, status)
-     bitpix=-32
-
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_grains_nRE
-
-     !  Write the required header keywords.
-     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)
-
-     ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
@@ -2204,7 +2215,7 @@ subroutine ecriture_Tex(imol)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2292,12 +2303,12 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=db) :: somme
-  integer ::  i, j, k, l
+  integer ::  i, j, l
   real, dimension(n_rad,nz) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2372,15 +2383,15 @@ subroutine ecriture_sed(ised)
 
   integer, intent(in) :: ised
 
-  integer :: n,k, i, j, lambda
-  real :: flux, flux_q, flux_u, flux_v, flux_star, flux_star_scat, flux_disk, flux_disk_scat, facteur, nbre_photons
+  integer :: lambda
+  real :: facteur
   real, dimension(n_lambda2) :: n_photons_envoyes
 
   character(len=512) :: filename
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
 
@@ -2533,7 +2544,7 @@ subroutine ecriture_pops(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans
+  integer :: group,fpixel,nelements
   logical :: simple, extend
 
   real, dimension(n_rad,nz,1,nLevels) :: tab_nLevel_io ! pas en 3D
@@ -2591,7 +2602,7 @@ subroutine ecriture_spectre(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id, iv, iTrans, xcenter,i, iiTrans
+  integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
   logical :: simple, extend
 
   real, dimension(:,:,:,:), allocatable ::  O ! nv, nTrans, n_rad, nz
@@ -2857,7 +2868,7 @@ subroutine cfitsWrite(filename,tab,dim)
   integer, dimension(:), intent(in) :: dim ! dim == shape(tab)
 
   integer :: status,unit,blocksize,bitpix,naxis
-  integer :: group,fpixel,nelements, alloc_status
+  integer :: group,fpixel,nelements
   logical :: simple, extend
 
   !  Get an unused Logical Unit Number to use to open the FITS file.

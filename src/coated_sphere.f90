@@ -39,7 +39,7 @@ contains
     complex, dimension(nang_scatt+1) :: S1,S2
 
     real :: rcore, rshell, wvno, gqsc
-    real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
+    real :: vi1, vi2, norme, somme_sin, somme_prob, somme2
     real :: qbs
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
@@ -182,8 +182,8 @@ contains
     real :: qext_HS, qsca_HS, qbs_HS, gqsc_HS, gsca_HS ! pour 1 HS
     complex, dimension(nang_scatt+1) :: S1,S2, s1_HS, s2_HS
 
-    real :: a, rcore, rshell, wvno, gqsc, factor, cext, csca
-    real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
+    real :: a, rcore, rshell, wvno, factor, cext, csca
+    real :: vi1, vi2, norme, somme_sin, somme_prob, somme1, somme2
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
@@ -638,11 +638,11 @@ contains
     complex, dimension(nang_scatt+1), intent(out) :: S1, S2
     ! ..
     ! .. Local Scalars ..
-    logical ::   inperr, pass1
-    integer ::   j, k, m, n, nmx1, nmx2, nn, jj, ll, alloc_status
+    logical ::   inperr
+    integer ::   j, m, n, nmx1, nmx2, nn, jj, ll, alloc_status
 
     real(kind=db) :: aa, aim, am1im, am1re, are, bb, bim, bm1im, bm1re, bre, cc, cosx1, cosx4
-    real(kind=db) :: dd, denom, dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4, fourpi
+    real(kind=db) :: dd, denom, dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4
     real(kind=db) :: rmm, rx, sinx1, sinx4, x1, x4, xcore, xshell, y1, y4
 
     complex(kind=db) :: ac, acoe, acoem1, bc, bcoe, bcoem1, dh1, dh2, dh4, dummy, dumsq

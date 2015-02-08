@@ -15,9 +15,9 @@ module input
 subroutine read_opacity_file(pop)
 
   integer, intent(in) :: pop
-  character(len=512) :: filename, dir
+  character(len=512) :: filename
 
-  integer :: ios, l
+  integer :: l
   type(dust_pop_type), pointer :: dp
 
   dp => dust_pop(pop)
@@ -339,7 +339,7 @@ subroutine get_file_specific_heat_dim(pop)
 
   integer, intent(in) :: pop
 
-  integer :: ios, status, n_comment, n_Temperatures, k
+  integer :: ios, status, n_comment, n_Temperatures
   real :: fbuffer
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
@@ -421,8 +421,6 @@ subroutine readmolecule(imol)
   integer :: i, j, iLow, iUp, iPart, ios
   real :: a, freq, eu
   real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
-
-  character(len=10) :: buffer
 
   filename = trim(mol(imol)%filename)
   dir = in_dir(filename, mol_dir,  status=ios)
@@ -534,7 +532,7 @@ end subroutine readmolecule
 
 subroutine lect_Temperature()
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
   real :: nullval
   integer, dimension(4) :: naxes
   logical :: anynull
@@ -562,7 +560,7 @@ subroutine lect_Temperature()
         call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
         if (nfound /= 3) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature.fits.gz file. Exiting.'
+           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
         if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz+1).or.(naxes(3) /= n_az)) then
@@ -580,10 +578,9 @@ subroutine lect_Temperature()
         call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
         if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature.fits.gz file. Exiting.'
+           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
-
 
         if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
            write(*,*) "Error : Temperature.fits.gz does not have the"
@@ -606,10 +603,10 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-     write(*,*) "Reading temperature file : "//trim(Tfile)
+     write(*,*) "Reading temperature file : "//trim(Tfile_nLTE)
 
      readwrite=0
-     call ftopen(unit,Tfile,readwrite,blocksize,status)
+     call ftopen(unit,Tfile_nLTE,readwrite,blocksize,status)
      if (status /= 0) then ! le fichier temperature n'existe pas
         write(*,*) "ERROR : temperature file needed"
         stop
@@ -623,7 +620,8 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature.fits.gz file. Exiting.'
+        write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+        write(*,*) "Found", nfound, "axes", naxes
         stop
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
@@ -657,13 +655,7 @@ subroutine lect_Temperature()
      firstpix=1
      nullval=-999
 
-
-!     call ftcrhd(unit, hdunum,status)
-!     write(*,*) hdunum
-!     read(*,*)
-
-
-     !  determine the size of temperature file
+     ! HDU 1 : Teq
      call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -673,10 +665,23 @@ subroutine lect_Temperature()
      npixels=naxes(1)*naxes(2)*naxes(3)
      nbuffer=npixels
      ! read_image
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain_nRE,anynull,status)
+
+     ! HDU 2 : is_eq
+     call ftmahd(unit,2,hdutype,status)
+     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+     if (nfound /= 3) then
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+        stop
+     endif
+     npixels=naxes(1)*naxes(2)*naxes(3)
+     nbuffer=npixels
+     ! read_image
      call ftgpvj(unit,group,firstpix,nbuffer,nullval,l_RE,anynull,status)
 
-     ! 2eme HDU
-     call ftmahd(unit,2,hdutype,status)
+     ! HDU 4 : proba temperature
+     call ftmahd(unit,4,hdutype,status)
 
      call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
      if (nfound /= 4) then
@@ -688,20 +693,6 @@ subroutine lect_Temperature()
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Proba_Temperature,anynull,status)
-
-     ! 3eme HDU
-     call ftmahd(unit,3,hdutype,status)
-
-     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
-     if (nfound /= 3) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature_nRE.fits.gz file HDU 3. Exiting.'
-        stop
-     endif
-     npixels=naxes(1)*naxes(2)*naxes(3)
-     nbuffer=npixels
-     ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain_nRE,anynull,status)
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -719,7 +710,7 @@ subroutine read_abundance(imol)
 
   integer, intent(in) :: imol
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels
   real :: nullval
   integer, dimension(4) :: naxes
   logical :: anynull
@@ -779,7 +770,7 @@ subroutine lect_lambda()
   integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
 
-  real, parameter :: wl_factor = 1.025
+  real, parameter :: wl_factor = 1.0005
 
   character(len=512) :: dir
 
@@ -855,7 +846,7 @@ subroutine lect_lambda()
 
 
   if (lProDiMo) then
-     write(*,*) "WARNING:  matching step2 wavelength bins to ProDiMo set-up"
+     write(*,*) "WARNING: matching step2 wavelength bins to ProDiMo set-up"
      tab_lambda2_inf(1) = 0.0912
      tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
      tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
@@ -875,6 +866,11 @@ subroutine lect_lambda()
         endif
      enddo
   endif ! lProDiMo
+
+
+  do lambda=1, n_lambda2
+     tab_delta_lambda2(lambda) = 0.01 * tab_lambda2(lambda)
+  enddo
 
   return
 
