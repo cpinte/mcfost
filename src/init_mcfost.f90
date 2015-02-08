@@ -25,7 +25,7 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   integer :: current_date, update_date, mcfost_auto_update
   real :: wvl, opt_zoom, utils_version
 
@@ -33,7 +33,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
+  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -107,6 +107,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
   ldensity_file=.false.
+  lsigma_file = .false.
   ldebris=.false.
   lkappa_abs_grain=.false.
   lweight_emission=.false.
@@ -139,6 +140,8 @@ subroutine initialisation_mcfost()
   lread_grain_size_distrib=.false.
   lMathis_field = .false.
   lchange_Tmax_PAH=.false.
+  lno_T = .false.
+  lISM_heating = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -474,11 +477,7 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1
-     case("-output_density_grid")
-        ldisk_struct=.true.
-        i_arg = i_arg+1
-        lstop_after_init= .true.
-     case("-disk_struct")
+     case("-disk_struct","-output_density_grid")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .true.
@@ -649,6 +648,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-sigma_file","-sigma")
+        i_arg = i_arg + 1
+        lsigma_file=.true.
+        call get_command_argument(i_arg,s)
+        sigma_file = s
+        i_arg = i_arg + 1
      case("-debris")
         i_arg = i_arg+1
         ldebris=.true.
@@ -680,6 +685,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(s,*) correct_density_Rout
      case("-prodimo")
+        i_arg = i_arg + 1
+        lprodimo = .true.
+        mcfost2ProDiMo_version = 5
+        lISM_heating=.true.
+     case("-prodimo4")
         i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 4
@@ -808,6 +818,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) Mathis_field
         i_arg = i_arg+1
+     case("-no_T")
+        i_arg = i_arg + 1
+        lno_T=.true.
+     case("-ISM_heating")
+        i_arg = i_arg + 1
+        lISM_heating=.true.
      case default
         call display_help()
      end select
@@ -845,6 +861,8 @@ subroutine initialisation_mcfost()
      write(*,*) "         it can be turned back on with -rt2"
      lsepar_pola = .false.
   endif
+
+  if (lno_T) ltemp = .false.
 
   write(*,*) 'Input file read successfully'
 
@@ -1135,6 +1153,7 @@ subroutine display_help()
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
+  write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
@@ -1147,6 +1166,7 @@ subroutine display_help()
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
   write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
   write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
+  write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
@@ -1166,7 +1186,8 @@ subroutine display_help()
   write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
-  write(*,*) "        : -density_file <density_file>"
+  write(*,*) "        : -density_file or -df <density_file>"
+  write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"

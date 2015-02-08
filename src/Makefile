@@ -93,7 +93,8 @@ FC_SER = gfortran -m32 -cpp
 FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 MACH = #-march=athlon
 PREC =
@@ -113,7 +114,9 @@ FC_SER = gfortran -m64 -cpp
 FC_OMP = gfortran -m64 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
+#-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 
 MACH = #-march=athlon
@@ -211,7 +214,7 @@ mcfost2prodimo : mcfost mcfost2prodimo.o
 # Release
 #*************************************************************
 
-release : clean main
+release : main
 	git tag -d release
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web

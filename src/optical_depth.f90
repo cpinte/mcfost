@@ -75,12 +75,12 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, x_old, y_old, z_old
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm, factor
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, iscatt, dir, p_ri0, p_zj0
+  real(kind=db) :: phi_pos, phi_vol, xm, ym, zm, factor
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, p_ri0, p_zj0
   integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in
 
   logical :: lcellule_non_vide, lstop
@@ -473,19 +473,17 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, x_old, y_old, z_old, factor
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
-  real(kind=db) :: delta_vol, l, tau, tan_angle_lim, extr, dotprod, opacite
-  real(kind=db) :: correct_moins, correct_plus, uv, den, precision
+  real(kind=db) :: delta_vol, l, tau, extr, dotprod, opacite
+  real(kind=db) :: correct_moins, correct_plus, uv, precision
   real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
   integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0
-  integer :: theta_I, phi_I, phi_k, psup, thetaj_old, ri_old
+  integer :: theta_I, phi_I, thetaj_old, ri_old
   logical :: lcellule_non_vide, lstop
 
-  integer :: ri_tmp, thetaj_tmp
-
   real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
-  real(kind=db) :: x_tmp, y_tmp, z_tmp, t1_1, t1_2, t2_1, t2_2, a_theta_m1
+  real(kind=db) :: t1_1, t1_2, t2_1, t2_2, a_theta_m1
 
   logical :: detect_bug = .false.
 
@@ -879,7 +877,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, phi
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, phi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
@@ -1143,7 +1141,8 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
         if (lcellule_non_vide) then
            if (letape_th) then
-              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
+              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + &
+                   kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
               if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
            else ! letape_th
               if (lscatt_ray_tracing1) then
@@ -1190,9 +1189,9 @@ subroutine tau_deg2(id,lambda,E,ri,zj,xio,yio,zio,u,v,w,lin,tau_out,flag_sortie)
   real, intent(out) :: tau_out
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r
+  real(kind=db) :: x0, y0, z0, x1, y1, z1
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, ltot, tau, zlim, extr, dotprod, opacite
+  real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
   integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell
 
@@ -1642,19 +1641,15 @@ subroutine integ_tau(lambda)
 
   integer, intent(in) :: lambda
 
-  real :: integ, integ2,c_thet, s_thet, z, r, det_r, norme
-  integer :: i, h, ri, zj, j
+  real :: norme
+  integer :: i, ri, zj, j
 
   real(kind=db), dimension(4) :: Stokes
   ! angle de visee en deg
   real :: angle
   real(kind=db) :: x0, y0, z0, u0, v0, w0
-  real :: tau, tau2, dvol1, w02
+  real :: tau
   real(kind=db) :: lmin, lmax
-  logical :: flag_sortie
-  integer :: flag
-
-  real ::   tau_max, tau_min
 
   angle=angle_interet
 
@@ -1779,13 +1774,11 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
   real(kind=db), intent(out) :: lmin,lmax
 
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, xm, ym, zm
+  real(kind=db) :: x0, y0, z0, x1, y1, z1
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, ltot, tau, zlim, extr, dotprod, opacite, tau_tot
+  real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, n_save, iscatt, dir, p_ri0, p_zj0
-
-  real(kind=db), dimension(4,4) :: M
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, n_save
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
@@ -2040,11 +2033,10 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
   real, intent(out) :: tau_tot_out
   real(kind=db), intent(out) :: lmin,lmax
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, phi
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, phi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, ltot, tau, zlim, extr, dotprod, opacite, tau_tot
+  real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  real(kind=db) :: xm, ym, zm
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, n_save
 
   logical :: lcellule_non_vide
@@ -2327,18 +2319,16 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   real, intent(out) :: tau_tot_out
   real(kind=db), intent(out) :: lmin,lmax
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, zm, ym, r, ltot, tau_tot
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, ltot, tau_tot
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
-  real(kind=db) :: delta_vol, l, tau, tan_angle_lim, extr, dotprod, opacite
-  real(kind=db) :: correct_moins, correct_plus, uv, den
-  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, n_save, p_ri0, p_zj0
+  real(kind=db) :: delta_vol, l, tau, dotprod, opacite
+  real(kind=db) :: correct_moins, correct_plus, uv
+  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, n_save
 
   logical :: lcellule_non_vide
 
-  integer :: ri_tmp, thetaj_tmp
-
   real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
-  real(kind=db) :: x_tmp, y_tmp, z_tmp, t1_1, t1_2, t2_1, t2_2
+  real(kind=db) :: t1_1, t1_2, t2_1, t2_2
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
@@ -2588,8 +2578,8 @@ subroutine length_deg2_2nd(id,lambda,E_tot,E_trans,ri_io,zj_io,xio,yio,zio,u,v,w
   real(kind=db), intent(inout) :: xio, yio, zio
   real, intent(out) :: dvol
 
-  integer :: k,kmin,kmax, ri, zj
-  real(kind=db) :: l, length
+  integer :: k,kmin,kmax
+  real(kind=db) :: l
 
   ! Recherche position interaction
   ! Dichotomie d'apres resultats de length_deg2_tot
@@ -2658,8 +2648,7 @@ subroutine tau_deg2_2nd(id,lambda,E,ri_io,zj_io,xio,yio,zio,u,v,w,lin,tau_out,fl
   real(kind=db), intent(inout) :: xio, yio, zio
   real, intent(out) :: tau_out
 
-  integer :: k,kmin,kmax, ri, zj
-  real(kind=db) :: l, length
+  integer :: k,kmin,kmax
 
   ! Recherche position interaction
   ! Dichotomie d'apres resultats de length_deg2_tot
@@ -2708,10 +2697,10 @@ subroutine surface_tau()
 
   implicit none
 
-  integer :: id, lambda, i, j, ri, zj, phik
+  integer :: id, lambda, i, ri, zj, phik
   real(kind=db) :: x0, y0, z0
   real(kind=db) :: u0, v0, w0
-  real :: dist, dvol1
+  real :: dvol1
   real(kind=db) :: x1, y1, z1, u1, v1, w1
 
   real(kind=db), dimension(4) :: Stokes
@@ -2812,18 +2801,18 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
   real(kind=db), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: tspeed
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, s1, s2, t1, t2,  xphi, yphi, zphi
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, zlim2, dotprod, delta_vol_phi
+  real(kind=db) :: delta_vol, l, zlim, dotprod, delta_vol_phi
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=db) :: dtau_c, Snu_c
   real(kind=db), dimension(nTrans) :: tau_c
-  real(kind=db) :: correct_plus, correct_moins, fact, v0, v1, v_avg0
+  real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
-  integer :: ulevel, lLevel, iTrans, i, iv, ivpoint, iiTrans, n_vpoints
+  integer :: iTrans, ivpoint, iiTrans, n_vpoints
 
-  real :: nl, nu, facteur_tau
+  real :: facteur_tau
 
   logical :: lcellule_non_vide
 
@@ -3258,17 +3247,17 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
   real(kind=db), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: tspeed
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r, xphi, yphi, zphi
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, dotprod, delta_vol_phi, s1, s2
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
+  real(kind=db) :: b, c, s, rac, t, t_phi, delta, tan_angle_lim, den
+  real(kind=db) :: delta_vol, l, dotprod, delta_vol_phi
   real(kind=db),  dimension(ispeed(1):ispeed(2)) :: P
   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: dtau, dtau2, opacite, Snu
-  real(kind=db) :: correct_plus, correct_moins, fact, v0, v1, v_avg0, precision
+  real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0, precision
   integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1
-  integer :: ulevel, lLevel, iTrans, i, iv, nbr_cell, n, ivpoint, iiTrans, n_vpoints
+  integer :: iTrans, nbr_cell, ivpoint, iiTrans, n_vpoints
 
-  real :: nl, nu, facteur_tau
+  real :: facteur_tau
 
   logical :: lcellule_non_vide
 
@@ -3688,7 +3677,7 @@ subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
   integer, intent(out) :: ri, zj, phik
   logical, intent(out) :: lintersect
 
-  real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t, t1, t2
+  real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t1, t2
   real(kind=db) :: zlim, zlim2, delta_vol, inv_w, correct_moins, correct_plus
 
   correct_moins = 1.0_db - 1.0e-10_db
@@ -3881,14 +3870,11 @@ subroutine integ_tau_mol(imol)
 
   integer, intent(in) :: imol
 
-  real :: integ, integ2,c_thet, s_thet, z, r, det_r, norme, norme1
-  integer :: i, h, ri, zj
+  real ::  norme, norme1
+  integer :: i
 
-  ! angle de visee en deg
-  real(kind=db) :: x0, y0, z0, u0, v0, w0
-  real :: tau, tau2, dvol1, w02, lmin, lmax, vmax, tau_max, tau_min, angle
-  logical :: flag_sortie
-  integer :: flag,j, iTrans
+  real :: vmax, angle
+  integer :: j, iTrans
   integer :: n_speed
 
   integer, dimension(2) :: ispeed
@@ -3961,7 +3947,7 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, r
+  real(kind=db) :: x0, y0, z0, x1, y1, z1
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
@@ -4271,10 +4257,10 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
   real(kind=db), dimension(N_type_flux) :: integ_ray_dust_cyl
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, r, s1, s2, t1, t2,  xphi, yphi, zphi
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, zlim2, dotprod, delta_vol_phi
-  real(kind=db) :: correct_plus, correct_moins, fact, v0, v1, v_avg0
+  real(kind=db) :: delta_vol, l, zlim, dotprod
+  real(kind=db) :: correct_plus, correct_moins
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
 
   real(kind=db) :: tau, dtau
@@ -4599,10 +4585,10 @@ function integ_ray_dust_sph(id,lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
 
   real(kind=db), dimension(N_type_flux) :: integ_ray_dust_sph
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, r, s1, s2, t1, t2,  xphi, yphi, zphi
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, zlim2, dotprod, delta_vol_phi
-  real(kind=db) :: correct_plus, correct_moins, fact, precision
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, t1, t2
+  real(kind=db) :: b, c, s, rac, t, t_phi, delta, tan_angle_lim, den
+  real(kind=db) :: delta_vol, l, dotprod
+  real(kind=db) :: correct_plus, correct_moins, precision
   real(kind=db) :: tan_angle_lim1, tan_angle_lim2, a_theta, b_theta, c_theta
   real(kind=db) :: t1_1, t1_2, t2_1, t2_2, uv, r0_cyl, r0_2_cyl, r0_2, tan2
   integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, nbr_cell, delta_phi, phik0m1
@@ -4944,7 +4930,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: alloc_status, i, j, pk, n, id, ri, zj, phik
+  integer :: i, j, pk, n, id, ri, zj, phik
   real(kind=db) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, d_r, phi, r0
 
