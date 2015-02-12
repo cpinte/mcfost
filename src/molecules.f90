@@ -790,7 +790,7 @@ subroutine init_dust_mol(imol)
               do phik=1, n_az
                  ! Interpolation champ de radiation en longeur d'onde
                  if (lProDiMo2mcfost) then
-                    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, tab_lambda(iTrans))
+                    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
                  else
                     Jnu = 0.0 ! todo : pour prendre en compte scattering
                  endif

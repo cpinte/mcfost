@@ -27,7 +27,8 @@ subroutine initialisation_mcfost()
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   integer :: current_date, update_date, mcfost_auto_update
-  real :: wvl, opt_zoom, utils_version
+  real(kind=db) :: wvl
+  real :: opt_zoom, utils_version
 
   character(len=512) :: cmd, s, str_seed
   character(len=4) :: n_chiffres
@@ -824,6 +825,9 @@ subroutine initialisation_mcfost()
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
+     case("-casa")
+        i_arg = i_arg + 1
+        lcasa=.true.
      case default
         call display_help()
      end select
@@ -1151,6 +1155,7 @@ subroutine display_help()
 !  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
