@@ -1304,7 +1304,7 @@ subroutine opacite2(lambda)
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
 
-     call cfitsWrite("data_dust/lambda.fits.gz",tab_lambda,shape(tab_lambda))
+     call cfitsWrite("data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
      call cfitsWrite("data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("data_dust/g.fits.gz",g_lambda,shape(g_lambda))
