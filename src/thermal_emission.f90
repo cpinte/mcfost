@@ -1307,21 +1307,26 @@ subroutine update_proba_abs_nRE()
               kappa_abs_RE_new = kappa_abs_RE(lambda,i,j,k) + delta_kappa_abs_qRE
               kappa_abs_RE(lambda,i,j,k) = kappa_abs_RE_new
 
-              correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
-              correct_m1 = 1.0_db/correct ! < 1
-
-              ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
-              if (lall_grains_eq) then
-                 proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+              if (kappa_abs_RE_old < tiny_db) then
+                 write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
+                 write(*,*) "Exiting"
               else
-                 proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+                 correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
+                 correct_m1 = 1.0_db/correct ! < 1
+
+                 ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
+                 if (lall_grains_eq) then
+                    proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+                 else
+                    proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+                 endif
+
+                 ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
+                 Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
+                 Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
+
+                 ! Todo : update proba_abs_1grain
               endif
-
-              ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
-              Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
-              Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
-
-              ! Todo : update proba_abs_1grain
 
            endif
         enddo !j
