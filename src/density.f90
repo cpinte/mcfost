@@ -152,7 +152,9 @@ subroutine define_gas_density()
               bz2 : do j=min(1,j_start),nz
                  somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
               enddo bz2
-              densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+              if (somme > tiny_db) then
+                 densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+              endif
            endif
         enddo ! i
 
@@ -470,7 +472,9 @@ subroutine define_dust_density()
                  do j=min(1,j_start),nz
                     somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
                  enddo ! j
-                 densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+                 if (somme > tiny_db) then
+                    densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+                 endif
               enddo ! l
            endif
 
