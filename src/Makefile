@@ -222,7 +222,7 @@ release : main
 	cp mcfost web/macos
 	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
+	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
 	scp fosti:mcfost/src/mcfost web/linux/
 	scp fosti:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
@@ -266,7 +266,7 @@ release_utils :
 
 fosti :
 	rsync -Pur *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri/"
+	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri/"
 
 #*************************************************************
 # Nettoyage
