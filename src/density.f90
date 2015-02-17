@@ -482,7 +482,7 @@ subroutine define_dust_density()
            if (lstrat.and.(settling_type == 2)) then
               if (lspherical) then
                  write(*,*) "ERROR: settling following Dubrulle's prescription is only"
-                 write(*,*) "implemented on a spherical grid"
+                 write(*,*) "implemented on a cylindrical grid so far"
                  write(*,*) "Exiting"
                  stop
               endif
@@ -498,7 +498,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1.0e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -522,7 +522,7 @@ subroutine define_dust_density()
 
            if (lspherical) then
               write(*,*) "ERROR: settling following Fromang's prescription is only"
-              write(*,*) "implemented on a spharical grid"
+              write(*,*) "implemented on a cylindrical grid so far"
               write(*,*) "Exiting"
               stop
            endif
@@ -562,7 +562,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
