@@ -28,13 +28,13 @@ subroutine initialisation_mcfost()
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   integer :: current_date, update_date, mcfost_auto_update
   real(kind=db) :: wvl
-  real :: opt_zoom, utils_version
+  real :: opt_zoom, utils_version, PA
 
   character(len=512) :: cmd, s, str_seed
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+  logical :: lresol, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -70,6 +70,7 @@ subroutine initialisation_mcfost()
   laggregate=.false.
   l3D=.false.
   lresol=.false.
+  lPA = .false.
   lzoom=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -477,6 +478,16 @@ subroutine initialisation_mcfost()
         endif
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
+        i_arg= i_arg+1
+     case("-PA")
+        lPA = .true.
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : PA needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) PA
         i_arg= i_arg+1
      case("-disk_struct","-output_density_grid")
         ldisk_struct=.true.
@@ -1018,6 +1029,8 @@ subroutine initialisation_mcfost()
       size_pix=maxigrid/(map_size)
   endif
 
+  if (lPA) ang_disque = PA
+
   if (lzoom) then
      zoom = opt_zoom
      write(*,*) "Updating zoom =", zoom
@@ -1147,8 +1160,9 @@ subroutine display_help()
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
-  write(*,*) "        : -zoom <zoom> (override value in parameter file)"
-  write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
+  write(*,*) "        : -zoom <zoom> (overrides value in parameter file)"
+  write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
+  write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
