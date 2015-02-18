@@ -1366,9 +1366,6 @@ subroutine dust_map(lambda,ibin)
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Coin en bas gauche de l'image
-  Icorner(:) = center(:) -  (0.5 * map_size / zoom) * (x_plan_image + y_plan_image)
-
   ! Methode 1 = echantillonage log en r et uniforme en phi
   ! Methode 2 = echantillonage lineaire des pixels (carres donc) avec iteration sur les sous-pixels
   if (lsed) then
@@ -1436,6 +1433,9 @@ subroutine dust_map(lambda,ibin)
      taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
+
+     ! Coin en bas gauche de l'image
+     Icorner(:) = center(:) - ( 0.5* igridx * dx(:) +  0.5* igridy * dy(:))
 
      if (l_sym_ima) then
         igridx_max = igridx/2 + modulo(igridx,2)
