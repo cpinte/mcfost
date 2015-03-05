@@ -1203,7 +1203,7 @@ subroutine calc_optical_depth_map(lambda)
   endif
 
   write(*,*) "Writing optical_depth_map.fits.gz for wl=", tab_lambda(lambda), "microns"
-  filename = "optical_depth_map.fits.gz"
+  filename = "!optical_depth_map.fits.gz"
 
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
