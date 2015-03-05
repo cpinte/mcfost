@@ -489,11 +489,11 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) PA
         i_arg= i_arg+1
-     case("-disk_struct","-output_density_grid")
+     case("-disk_struct","-output_density_grid","-ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .true.
-     case("+disk_struct")
+     case("+disk_struct","+ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
