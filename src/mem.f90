@@ -1905,7 +1905,12 @@ subroutine dealloc_emission_mol()
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa, kappa_sca, emissivite_dust)
-  deallocate(spectre_etoiles, spectre_etoiles_cumul, CDF_E_star, prob_E_star, E_stars, E_ISM)
+  if (allocated(spectre_etoiles)) deallocate(spectre_etoiles)
+  if (allocated(spectre_etoiles_cumul)) deallocate(spectre_etoiles_cumul)
+  if (allocated(CDF_E_star)) deallocate(CDF_E_star)
+  if (allocated(prob_E_star)) deallocate(prob_E_star)
+  if (allocated(E_stars)) deallocate(E_stars)
+  if (allocated(E_ISM)) deallocate(E_ISM)
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
