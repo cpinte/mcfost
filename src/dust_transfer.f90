@@ -895,7 +895,10 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      !endif
      call length_deg2(id,lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
      if ((ri==0).and.(.not.flag_sortie)) write(*,*) "PB r", ri, zj
-     if ((zj > nz).and.(.not.flag_sortie)) write(*,*) "PB z", ri, zj, abs(z)
+     if ((zj > nz).and.(.not.flag_sortie)) then
+        write(*,*) "PB z", ri, zj, abs(z)
+        zj=nz
+     endif
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
