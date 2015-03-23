@@ -1055,7 +1055,7 @@ subroutine dealloc_em_th()
 
   deallocate(spectre_etoiles_cumul,spectre_etoiles, spectre_emission_cumul, CDF_E_star, prob_E_star, E_stars)
 
-  deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
+  deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
   deallocate(amax_reel,kappa,kappa_abs_eg)
   if (allocated(proba_abs_RE_LTE)) then
@@ -1120,12 +1120,14 @@ subroutine realloc_dust_mol()
   integer :: alloc_status
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
-       tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
+       tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
+       tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda (realloc)'
      stop
   endif
-  tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda= 0.0 ; tab_amu1=0.0 ; tab_amu2=0.0
+  tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda= 0.0 ;
+  tab_amu1=0.0 ; tab_amu2=0.0 ; tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
   allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1285,7 +1287,7 @@ subroutine clean_mem_dust_mol()
 
   ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, kappa_sca, emissivite_dust
   ! et spectre_etoiles, spectre_etoiles_cumul
-  deallocate(tab_amu1, tab_amu2)
+  deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(q_ext, q_sca, q_abs, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
@@ -1326,15 +1328,16 @@ subroutine realloc_step2()
   endif
 
   ! Liberation memoire step1 et reallocation step 2
-  deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2)
+  deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
   allocate(tab_lambda(n_lambda2),tab_lambda_inf(n_lambda2),tab_lambda_sup(n_lambda2),tab_delta_lambda(n_lambda2),&
-       tab_amu1(n_lambda2,n_pop),tab_amu2(n_lambda2,n_pop), stat=alloc_status)
+       tab_amu1(n_lambda2,n_pop),tab_amu2(n_lambda2,n_pop), &
+       tab_amu1_coating(n_lambda2,n_pop),tab_amu2_coating(n_lambda2,n_pop), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_lambda in init_lambda2'
      stop
   endif
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda=0.0
-  tab_amu1=0.0 ; tab_amu2=0.0
+  tab_amu1=0.0 ; tab_amu2=0.0 ;  tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
   deallocate(n_phot_sed2)
   allocate(n_phot_sed2(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
