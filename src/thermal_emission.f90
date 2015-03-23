@@ -831,7 +831,8 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss,l_dark_zone,Temperature,lchange_nRE)
+     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid) &
+     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules

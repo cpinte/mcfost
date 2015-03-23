@@ -94,7 +94,7 @@ module parametres
   real :: angle_interet, zoom, size_pix, tau_seuil, wl_seuil
 
   real, dimension(:), allocatable :: size_pix2
-  real, parameter :: cutoff = 7.0
+  real  :: cutoff = 7.0
 
   ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
