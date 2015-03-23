@@ -36,6 +36,9 @@ subroutine initialisation_mcfost()
 
   logical :: lresol, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
+  real :: nphot_img = 0.0
+  integer :: n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
+
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
 
@@ -839,6 +842,31 @@ subroutine initialisation_mcfost()
      case("-casa")
         i_arg = i_arg + 1
         lcasa=.true.
+     case("-cutoff")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cutoff
+        i_arg = i_arg + 1
+     case("-nphot_img")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nphot_img
+        i_arg = i_arg + 1
+     case("-n_rad")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_rad_opt
+        i_arg = i_arg + 1
+     case("-nz")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nz_opt
+        i_arg = i_arg + 1
+     case("-nT")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_T_opt
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -937,6 +965,10 @@ subroutine initialisation_mcfost()
   if (lonly_scatt) l_em_disk_image=.false.
   if (lHG.or.lisotropic) aniso_method=2
 
+  if (nphot_img > tiny_real) nbre_photons_image = max(nphot_img / nbre_photons_loop,1.)
+  if (n_rad_opt > 0) n_rad = n_rad_opt
+  if (nz_opt > 0) nz = nz_opt
+  if (n_T_opt > 0) n_T = n_T_opt
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
@@ -1170,6 +1202,7 @@ subroutine display_help()
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -casa : write an image ready for CASA"
+  write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
@@ -1213,6 +1246,9 @@ subroutine display_help()
   write(*,*) "        : -Laure_SED <file>"
   write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
+  write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
+  write(*,*) "        : -n_rad : overwrite value in parameter file"
+  write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
