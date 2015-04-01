@@ -617,7 +617,7 @@ subroutine write_stokes_fits()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
@@ -830,7 +830,7 @@ subroutine ecriture_map_ray_tracing()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
@@ -1037,7 +1037,7 @@ subroutine ecriture_sed_ray_tracing()
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1202,7 +1202,7 @@ subroutine calc_optical_depth_map(lambda)
      enddo
   endif
 
-  write(*,*) "Writing optical_depth_map.fits.gz for wl=", tab_lambda(lambda), "microns"
+  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sl), "microns"
   filename = "!optical_depth_map.fits.gz"
 
   status=0
@@ -2578,7 +2578,7 @@ subroutine ecriture_sed(ised)
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
