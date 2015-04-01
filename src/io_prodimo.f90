@@ -633,7 +633,7 @@ contains
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
     ! Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
+    call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
 
     !------------------------------------------------------------------------------
     ! HDU 4 : Spectre stellaire
