@@ -903,7 +903,10 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      !endif
      call length_deg2(id,lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
      if ((ri==0).and.(.not.flag_sortie)) write(*,*) "PB r", ri, zj
-     if ((zj > nz).and.(.not.flag_sortie)) write(*,*) "PB z", ri, zj, abs(z)
+     if ((zj > nz).and.(.not.flag_sortie)) then
+        write(*,*) "PB z", ri, zj, abs(z)
+        zj=nz
+     endif
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
@@ -1371,9 +1374,6 @@ subroutine dust_map(lambda,ibin,iaz)
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
-  ! Coin en bas gauche de l'image
-  Icorner(:) = center(:) -  (0.5 * map_size / zoom) * (x_plan_image + y_plan_image)
-
   ! Methode 1 = echantillonage log en r et uniforme en phi
   ! Methode 2 = echantillonage lineaire des pixels (carres donc) avec iteration sur les sous-pixels
   if (lsed) then
@@ -1441,6 +1441,9 @@ subroutine dust_map(lambda,ibin,iaz)
      taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
+
+     ! Coin en bas gauche de l'image
+     Icorner(:) = center(:) - ( 0.5* igridx * dx(:) +  0.5* igridy * dy(:))
 
      if (l_sym_ima) then
         igridx_max = igridx/2 + modulo(igridx,2)
