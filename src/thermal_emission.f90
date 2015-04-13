@@ -831,7 +831,8 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(n_rad, nz, q_abs_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid,densite_pouss,l_dark_zone,Temperature,lchange_nRE)
+     !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,q_abs,l_RE,r_grid) &
+     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
@@ -1307,21 +1308,26 @@ subroutine update_proba_abs_nRE()
               kappa_abs_RE_new = kappa_abs_RE(lambda,i,j,k) + delta_kappa_abs_qRE
               kappa_abs_RE(lambda,i,j,k) = kappa_abs_RE_new
 
-              correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
-              correct_m1 = 1.0_db/correct ! < 1
-
-              ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
-              if (lall_grains_eq) then
-                 proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+              if (kappa_abs_RE_old < tiny_db) then
+                 write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
+                 write(*,*) "Exiting"
               else
-                 proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+                 correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
+                 correct_m1 = 1.0_db/correct ! < 1
+
+                 ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
+                 if (lall_grains_eq) then
+                    proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+                 else
+                    proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+                 endif
+
+                 ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
+                 Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
+                 Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
+
+                 ! Todo : update proba_abs_1grain
               endif
-
-              ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
-              Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
-              Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
-
-              ! Todo : update proba_abs_1grain
 
            endif
         enddo !j

@@ -617,7 +617,7 @@ subroutine write_stokes_fits()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
@@ -766,17 +766,27 @@ subroutine ecriture_map_ray_tracing()
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
+  real, dimension(:,:,:,:), allocatable :: image_casa
 
-  allocate(image(igridx, igridy, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error RT image'
-     stop
+  if (lcasa) then
+     allocate(image_casa(igridx, igridy, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error RT image_casa'
+        stop
+     endif
+     image_casa = 0.0 ;
+  else
+     allocate(image(igridx, igridy, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error RT image'
+        stop
+     endif
+     image = 0.0 ;
   endif
-  image = 0.0 ;
 
   lambda=1
   filename = trim(data_dir)//"/RT.fits.gz"
@@ -796,13 +806,22 @@ subroutine ecriture_map_ray_tracing()
   extend=.true.
   bitpix=-32
 
-  naxis=5
-  naxes(1)=igridx
-  naxes(2)=igridy
-  naxes(3)= RT_n_incl
-  naxes(4)= RT_n_az
-  naxes(5)=N_type_flux
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+  if (lcasa) then
+     naxis=4
+     naxes(1)=igridx
+     naxes(2)=igridy
+     naxes(3)= 1 ! pola
+     naxes(4)=1 ! freq
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  else
+     naxis=5
+     naxes(1)=igridx
+     naxes(2)=igridy
+     naxes(3)= RT_n_incl
+     naxes(4)= RT_n_az
+     naxes(5)=N_type_flux
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -810,7 +829,7 @@ subroutine ecriture_map_ray_tracing()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkye(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
@@ -824,7 +843,26 @@ subroutine ecriture_map_ray_tracing()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
-  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+
+  if (lcasa) then
+     call ftpkys(unit,'BUNIT',"Jy/pixel",' ',status)
+     call ftpkyd(unit,'RESTFREQ',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
+     call ftpkys(unit,'BTYPE',"Intensity",' ',status)
+
+     ! 3eme axe
+     call ftpkys(unit,'CTYPE3',"STOKES",' ',status)
+     call ftpkye(unit,'CRVAL3',1.0,-3,'',status)
+     call ftpkye(unit,'CDELT3',1.0,-3,'',status)
+     call ftpkyj(unit,'CRPIX3',1,'',status)
+
+     ! 4eme axe
+     call ftpkys(unit,'CTYPE4',"FREQ",' ',status)
+     call ftpkyd(unit,'CRVAL4',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
+     call ftpkye(unit,'CDELT4',2e9,-3,'Hz',status) ! 2GHz by default
+     call ftpkyj(unit,'CRPIX4',0,'',status)
+  else
+     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+  endif
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
   if (lsepar_pola) then
@@ -848,45 +886,71 @@ subroutine ecriture_map_ray_tracing()
 
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
-  do itype=1,N_type_flux
-     do ibin=1,RT_n_incl
-        do iaz=1,RT_n_az
-           do j=1,igridy
-              do i=1,igridx
-                 image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
-              enddo !i
-           enddo !j
-        enddo ! iaz
-     enddo !ibin
-  enddo ! itype
+  if (lcasa) then
+     itype=1 ; ibin=1 ; iaz = 1
 
-  if (l_sym_ima) then
-     xcenter = igridx/2 + modulo(igridx,2)
-     do i=xcenter+1,igridx
-        image(i,:,:,:,1) = image(igridx-i+1,:,:,:,1)
+     W2m2_to_Jy = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
 
-        if (lsepar_pola) then
-           image(i,:,:,:,2) = image(igridx-i+1,:,:,:,2)
-           image(i,:,:,:,3) = - image(igridx-i+1,:,:,:,3)
-           image(i,:,:,:,4) = image(igridx-i+1,:,:,:,4)
-        endif
+     do j=1,igridy
+        do i=1,igridx
+           image_casa(i,j,1,1) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * W2m2_to_Jy
+        enddo !i
+     enddo !j
 
-        if (lsepar_contrib) then
-           image(i,:,:,:,n_Stokes+1) = image(igridx-i+1,:,:,:,n_Stokes+1)
-           image(i,:,:,:,n_Stokes+2) = image(igridx-i+1,:,:,:,n_Stokes+2)
-           image(i,:,:,:,n_Stokes+3) = image(igridx-i+1,:,:,:,n_Stokes+3)
-           image(i,:,:,:,n_Stokes+4) = image(igridx-i+1,:,:,:,n_Stokes+4)
-        endif
-     enddo
-  endif ! l_sym_image
+     if (l_sym_ima) then
+        xcenter = igridx/2 + modulo(igridx,2)
+        do i=xcenter+1,igridx
+           image_casa(i,:,1,1) = image_casa(igridx-i+1,:,1,1)
+        enddo
+     endif
 
-  ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,image,status)
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,image_casa,status)
+  else ! mode non casa
+     do itype=1,N_type_flux
+        do ibin=1,RT_n_incl
+           do iaz=1,RT_n_az
+              do j=1,igridy
+                 do i=1,igridx
+                    image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                 enddo !i
+              enddo !j
+           enddo ! iaz
+        enddo !ibin
+     enddo ! itype
+
+     if (l_sym_ima) then
+        xcenter = igridx/2 + modulo(igridx,2)
+        do i=xcenter+1,igridx
+           image(i,:,:,:,1) = image(igridx-i+1,:,:,:,1)
+
+           if (lsepar_pola) then
+              image(i,:,:,:,2) = image(igridx-i+1,:,:,:,2)
+              image(i,:,:,:,3) = - image(igridx-i+1,:,:,:,3)
+              image(i,:,:,:,4) = image(igridx-i+1,:,:,:,4)
+           endif
+
+           if (lsepar_contrib) then
+              image(i,:,:,:,n_Stokes+1) = image(igridx-i+1,:,:,:,n_Stokes+1)
+              image(i,:,:,:,n_Stokes+2) = image(igridx-i+1,:,:,:,n_Stokes+2)
+              image(i,:,:,:,n_Stokes+3) = image(igridx-i+1,:,:,:,n_Stokes+3)
+              image(i,:,:,:,n_Stokes+4) = image(igridx-i+1,:,:,:,n_Stokes+4)
+           endif
+        enddo
+     endif ! l_sym_image
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,image,status)
+  endif
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
-  deallocate(image)
+  if (lcasa) then
+     deallocate(image_casa)
+  else
+     deallocate(image)
+  endif
 
   !  Check for any error, and if so print out error messages
   if (status > 0) then
@@ -974,7 +1038,7 @@ subroutine ecriture_sed_ray_tracing()
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1139,8 +1203,8 @@ subroutine calc_optical_depth_map(lambda)
      enddo
   endif
 
-  write(*,*) "Writing optical_depth_map.fits.gz for wl=", tab_lambda(lambda), "microns"
-  filename = "optical_depth_map.fits.gz"
+  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sl), "microns"
+  filename = "!optical_depth_map.fits.gz"
 
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -2515,7 +2579,7 @@ subroutine ecriture_sed(ised)
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,tab_lambda,status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)

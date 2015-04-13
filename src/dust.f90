@@ -1304,10 +1304,13 @@ subroutine opacite2(lambda)
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
 
-     call cfitsWrite("data_dust/lambda.fits.gz",tab_lambda,shape(tab_lambda))
+     call cfitsWrite("data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
      call cfitsWrite("data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+
+     call cfitsWrite("data_dust/kappa_grain.fits.gz",q_abs,shape(q_abs)) ! lambda, n_grains
+
 
      S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
      call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))

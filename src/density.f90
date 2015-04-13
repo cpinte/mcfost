@@ -152,7 +152,9 @@ subroutine define_gas_density()
               bz2 : do j=min(1,j_start),nz
                  somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
               enddo bz2
-              densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+              if (somme > tiny_db) then
+                 densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+              endif
            endif
         enddo ! i
 
@@ -470,7 +472,9 @@ subroutine define_dust_density()
                  do j=min(1,j_start),nz
                     somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
                  enddo ! j
-                 densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+                 if (somme > tiny_db) then
+                    densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+                 endif
               enddo ! l
            endif
 
@@ -478,7 +482,7 @@ subroutine define_dust_density()
            if (lstrat.and.(settling_type == 2)) then
               if (lspherical) then
                  write(*,*) "ERROR: settling following Dubrulle's prescription is only"
-                 write(*,*) "implemented on a spherical grid"
+                 write(*,*) "implemented on a cylindrical grid so far"
                  write(*,*) "Exiting"
                  stop
               endif
@@ -494,7 +498,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1.0e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -518,7 +522,7 @@ subroutine define_dust_density()
 
            if (lspherical) then
               write(*,*) "ERROR: settling following Fromang's prescription is only"
-              write(*,*) "implemented on a spharical grid"
+              write(*,*) "implemented on a cylindrical grid so far"
               write(*,*) "Exiting"
               stop
            endif
@@ -558,7 +562,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 

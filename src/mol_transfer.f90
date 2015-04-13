@@ -119,7 +119,12 @@ subroutine mol_line_transfer()
            deallocate(indice_Trans)
            nTrans = mol(imol)%nTrans_raytracing
            allocate(indice_Trans(mol(imol)%nTrans_raytracing))
-           indice_Trans(:) = mol(imol)%indice_Trans_raytracing(:)
+
+           !write(*,*) shape(indice_Trans)
+           !write(*,*) shape(mol(imol)%indice_Trans_raytracing(:))
+           do iTrans=1, mol(imol)%nTrans_raytracing
+              indice_Trans(iTrans) = mol(imol)%indice_Trans_raytracing(iTrans)
+           enddo
         endif
 
         u0 = sin(angle_interet/180._db*pi) ;  v0=0.0_db ; w0 = sqrt(1.0_db - u0*u0)

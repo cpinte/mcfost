@@ -94,7 +94,7 @@ module parametres
   real :: angle_interet, zoom, size_pix, tau_seuil, wl_seuil
 
   real, dimension(:), allocatable :: size_pix2
-  real, parameter :: cutoff = 7.0
+  real  :: cutoff = 7.0
 
   ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
@@ -118,7 +118,7 @@ module parametres
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file
   logical :: lkappa_abs_grain, ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating
+  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -408,7 +408,7 @@ module grains
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
   ! Tab de lambda
-  real, dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
+  real(kind=db), dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
   real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
   real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
   real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2

@@ -27,13 +27,17 @@ subroutine initialisation_mcfost()
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   integer :: current_date, update_date, mcfost_auto_update
-  real :: wvl, opt_zoom, utils_version
+  real(kind=db) :: wvl
+  real :: opt_zoom, utils_version, PA
 
   character(len=512) :: cmd, s, str_seed
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+  logical :: lresol, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+
+  real :: nphot_img = 0.0
+  integer :: n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -69,6 +73,7 @@ subroutine initialisation_mcfost()
   laggregate=.false.
   l3D=.false.
   lresol=.false.
+  lPA = .false.
   lzoom=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -477,11 +482,21 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1
-     case("-disk_struct","-output_density_grid")
+     case("-PA")
+        lPA = .true.
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : PA needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) PA
+        i_arg= i_arg+1
+     case("-disk_struct","-output_density_grid","-ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .true.
-     case("+disk_struct")
+     case("+disk_struct","+ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
@@ -824,6 +839,34 @@ subroutine initialisation_mcfost()
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
+     case("-casa")
+        i_arg = i_arg + 1
+        lcasa=.true.
+     case("-cutoff")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cutoff
+        i_arg = i_arg + 1
+     case("-nphot_img")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nphot_img
+        i_arg = i_arg + 1
+     case("-n_rad")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_rad_opt
+        i_arg = i_arg + 1
+     case("-nz")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nz_opt
+        i_arg = i_arg + 1
+     case("-nT")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_T_opt
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -922,6 +965,10 @@ subroutine initialisation_mcfost()
   if (lonly_scatt) l_em_disk_image=.false.
   if (lHG.or.lisotropic) aniso_method=2
 
+  if (nphot_img > tiny_real) nbre_photons_image = max(nphot_img / nbre_photons_loop,1.)
+  if (n_rad_opt > 0) n_rad = n_rad_opt
+  if (nz_opt > 0) nz = nz_opt
+  if (n_T_opt > 0) n_T = n_T_opt
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
@@ -1013,6 +1060,8 @@ subroutine initialisation_mcfost()
       endif
       size_pix=maxigrid/(map_size)
   endif
+
+  if (lPA) ang_disque = PA
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1143,14 +1192,17 @@ subroutine display_help()
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
-  write(*,*) "        : -zoom <zoom> (override value in parameter file)"
-  write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
+  write(*,*) "        : -zoom <zoom> (overrides value in parameter file)"
+  write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
+  write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
 !  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -casa : write an image ready for CASA"
+  write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
@@ -1194,6 +1246,9 @@ subroutine display_help()
   write(*,*) "        : -Laure_SED <file>"
   write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
+  write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
+  write(*,*) "        : -n_rad : overwrite value in parameter file"
+  write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
