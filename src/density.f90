@@ -39,7 +39,7 @@ subroutine define_gas_density()
 
   integer :: i,j, k, izone, alloc_status
   real(kind=db), dimension(n_zones) :: cst_gaz
-  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C
+  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
 
   type(disk_zone_type) :: dz
 
@@ -144,7 +144,20 @@ subroutine define_gas_density()
 
               enddo !k
            enddo bz !j
+
+           if ((lSigma_file).and.(izone==1)) then
+              ! Normalisation pour densite de surface dans fichier
+              ! todo : only works for k = 1
+              somme = 0.0
+              bz2 : do j=min(1,j_start),nz
+                 somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
+              enddo bz2
+              if (somme > tiny_db) then
+                 densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+              endif
+           endif
         enddo ! i
+
 
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
@@ -231,6 +244,11 @@ subroutine define_gas_density()
 
   ! Ajout cavite vide
   if (lcavity) then
+     if (n_az > 1) then
+        write(*,*) "Cavity not implemented yet in 3D. Ask Christophe if it is needed."
+        write(*,*) "ERROR"
+        stop
+     endif
      do i=1, n_rad
         do j = 1, nz
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
@@ -278,20 +296,15 @@ subroutine define_dust_density()
 
   implicit none
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, izone, pop
+  integer :: i,j, k, l, izone, pop
   real(kind=db), dimension(n_pop) :: cst, cst_pous
-  real(kind=db) :: lrin,  lrout, ledge, rcyl, rsph, mass
-  real(kind=db) :: z, z_demi, fact_exp, coeff_exp, density, OmegaTau, h_H2, coeff_strat, proba
-  real(kind=db) :: puffed, facteur, z0, phi, surface, norme, S
+  real(kind=db) :: rcyl, rsph, mass
+  real(kind=db) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
+  real(kind=db) :: puffed, facteur, z0, phi, surface, norme
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=db) :: rho, rho0, ztilde, dtilde, h, hd
-
-  ! Pour puffed-up inner rim
-  real(kind=db) :: correct_H
-
-  real(kind=db) :: s_opt
+  real(kind=db) :: rho0, ztilde, dtilde, h, s_opt, somme
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
@@ -451,11 +464,25 @@ subroutine define_dust_density()
               enddo !k
            enddo bz !j
 
+           if ((lSigma_file).and.(izone==1)) then
+              ! Normalisation pour densite de surface dans fichier
+              ! todo : only works for k = 1
+              do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 somme = 0.0
+                 do j=min(1,j_start),nz
+                    somme = somme + densite_pouss(i,j,1,l)  *  (z_lim(i,j+1) - z_lim(i,j))
+                 enddo ! j
+                 if (somme > tiny_db) then
+                    densite_pouss(i,:,1,l) = densite_pouss(i,:,1,l)  * Surface_density(i)/somme * nbre_grains(l)
+                 endif
+              enddo ! l
+           endif
+
 
            if (lstrat.and.(settling_type == 2)) then
               if (lspherical) then
                  write(*,*) "ERROR: settling following Dubrulle's prescription is only"
-                 write(*,*) "implemented on a spherical grid"
+                 write(*,*) "implemented on a cylindrical grid so far"
                  write(*,*) "Exiting"
                  stop
               endif
@@ -471,7 +498,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1.0e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -495,7 +522,7 @@ subroutine define_dust_density()
 
            if (lspherical) then
               write(*,*) "ERROR: settling following Fromang's prescription is only"
-              write(*,*) "implemented on a spharical grid"
+              write(*,*) "implemented on a cylindrical grid so far"
               write(*,*) "Exiting"
               stop
            endif
@@ -535,7 +562,7 @@ subroutine define_dust_density()
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < tiny_db) then
+                    if (norme < 1e-200_db) then
                        densite_pouss(i,1,1,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -933,14 +960,12 @@ subroutine densite_data2()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a
+  real ::  rcyl
 
   real, dimension(nz) :: z
 
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, h, dsigma, ntot_grains, somme
+  real(kind=db) :: h, dsigma, ntot_grains, somme
 
   real, dimension(5) ::  a_sph,a1, a2, a0, b0, b1, b2, b3, b4
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, b0_int, b1_int, b2_int, b3_int, b4_int
@@ -1020,11 +1045,11 @@ subroutine densite_data2()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst,nz,n_grains_tot) &
+     !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
      !$omp shared(b0_int, b1_int, b2_int, b3_int, b4_int,ntot_grains) &
-     !$omp private(j,k,z,density,k_min,proba,h,dSigma, somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp private(j,k,z,h,dSigma, somme)&
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z(j) = (real(j)-0.5)*delta_z(i)
@@ -1110,14 +1135,12 @@ subroutine densite_data_SPH_binaire()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a
+  real ::  rcyl
 
   real, dimension(nz) :: z
 
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, h, dsigma, ntot_grains, somme
+  real(kind=db) :: h, dsigma, ntot_grains, somme
 
   real, dimension(5) ::  a_sph,a1, a2, a0, b0, b1, b2
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, b0_int, b1_int, b2_int
@@ -1192,11 +1215,10 @@ subroutine densite_data_SPH_binaire()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst) &
-     !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
+     !$omp shared(i,rcyl,amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int)&
      !$omp shared(b0_int, b1_int, b2_int,ntot_grains,nz,n_grains_tot) &
-     !$omp private(j,k,z,density,k_min,proba,h,dSigma, somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z) &
+     !$omp private(j,k,z,h,dSigma, somme)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z(j) = (real(j)-0.5)*delta_z(i)
@@ -1278,14 +1300,10 @@ subroutine densite_data_SPH_TTauri()
   real, parameter :: G = 6.672e-8
 
   integer, parameter :: nbre_a = 6
-  integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l
+  real ::  rcyl, z
 
-  real :: z
-
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, ntot_grains, somme
+  real(kind=db) :: ntot_grains, somme
 
   real, dimension(nbre_a) ::  a_sph, a0, a1, a2, a3, a4, b0, b1, b2, b3, b4
   real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, a3_int, a4_int, b0_int, b1_int, b2_int, b3_int, b4_int
@@ -1394,11 +1412,11 @@ subroutine densite_data_SPH_TTauri()
      ! Calcul opacite et probabilite de diffusion
      !$omp parallel &
      !$omp default(none) &
-     !$omp shared(i,rcyl, tab_beta, tab_surf, tab_h0, tab_cst,nz) &
+     !$omp shared(i,rcyl,nz) &
      !$omp shared(amax_reel,densite_pouss,z_lim,a1_int, a2_int, a0_int, a3_int, a4_int)&
      !$omp shared(b0_int, b1_int, b2_int, b3_int, b4_int,ntot_grains,h,dSigma, n_grains_tot) &
-     !$omp private(j,k,z,density,k_min,proba,somme)&
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,delta_z)
+     !$omp private(j,k,z,somme)&
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,q_ext,q_sca,delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         z = (real(j)-0.5)*delta_z(i)
@@ -1484,19 +1502,16 @@ subroutine densite_data_SPH_TTauri_1()
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, k, ii, jj, kk, l, k_min, nbre_a, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
+  integer :: i,j, k, l, nbre_a, alloc_status
+  real ::  cst, cst_pous, rcyl
+  real :: fact_exp, coeff_exp, r0
 
   real, dimension(nz) :: z
 
   real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real :: exp_grains
 
   real, dimension(:,:), allocatable :: sph
   real, dimension(:), allocatable ::  a_sph, beta_sph, surf_sph, h0_sph, sigma_sph
-
-  real ::  q_sca_tot, q_ext_tot,norme
 
   real(kind=db) :: somme, mass
 
@@ -1722,21 +1737,13 @@ subroutine densite_data_SPH_TTauri_2()
   real, parameter :: G = 6.672e-8
 
   integer, parameter :: nbre_a = 6
-  integer :: i,j, k, ii, jj, kk, l, k_min, alloc_status
-  real ::  cst, cst_pous, cst_gaz, lrin,  lrout, ledge, rcyl, M_star, a, test
-  real :: z_demi, fact_exp, coeff_exp, density, coeff_strat, proba, r0
-
-  real :: z
-
-  real, dimension(0:n_grains_tot) :: tab_cst, tab_surf, tab_beta, tab_h0
-  real(kind=db) :: exp_grains, ntot_grains, somme
+  integer :: i,j, k, ii, jj, l
+  real(kind=db) :: somme
 
   real, dimension(nbre_a) ::  a_sph
   real, dimension(n_rad,nz,nbre_a) :: rho
   real :: HH, SS, rr, zz
 
-  real, dimension(n_grains_tot) ::  a1_int, a2_int, a0_int, a3_int, a4_int, b0_int, b1_int, b2_int, b3_int, b4_int
-  real(kind=db), dimension(n_grains_tot) :: h, dsigma
   real(kind=db) :: mass, fact
 
   character(len=512) :: s, dir
@@ -1878,8 +1885,8 @@ subroutine densite_data_LAURE_SED()
   integer, parameter :: nvert = 50
   real, dimension(nr,nvert) :: rho, T
 
-  real :: TT, tautau, z_r ! buffer
-  real ::  M
+  real :: tautau, z_r ! buffer
+  real :: M
 
   integer :: i, j, k, l, pop, sys_status
   real(kind=db) :: facteur, mass
@@ -2048,9 +2055,9 @@ subroutine densite_eqdiff()
   real, parameter :: G = 6.672e-8
   real, parameter :: gas_dust = 100
 
-  integer :: i,j, k, l, k_min, jj
-  real :: cst, cst_pous, cst_gaz, M_star, a
-  real :: fact_exp, density,  c_sound, proba, coeff_grav, omega, D0, eps, pas_z, somme1, somme2, correct,test
+  integer :: i,j, k, jj
+  real :: cst, cst_pous, cst_gaz, M_star
+  real :: fact_exp, c_sound, coeff_grav, omega, D0, eps, pas_z, somme1, somme2, correct,test
 
   real, dimension(1) :: y
 
@@ -2186,7 +2193,7 @@ subroutine densite_eqdiff()
      !$omp default(none) &
      !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss) &
-     !$omp private(j,k,z,density,k_min,proba)&
+     !$omp private(j,k,z) &
      !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,q_ext,q_sca,rho,correct_strat, delta_z)
      !$omp do schedule(dynamic,10)
      do j=1,nz
@@ -2219,7 +2226,7 @@ subroutine derivs(x,y,dydx)
   REAL(SP), INTENT(IN) :: x
   REAL(SP), DIMENSION(:), INTENT(IN) :: y
   REAL(SP), DIMENSION(:), INTENT(OUT) :: dydx
-  real :: rho_gaz, schlt
+  real :: rho_gaz
 
   type(disk_zone_type) :: dz
 
@@ -2247,11 +2254,11 @@ subroutine densite_data_hd32297()
 
 
 !  integer, parameter :: nr=1150
-  integer :: i, j, k, kmin, longueur, status, nr, alloc_status
+  integer :: i, j, k, kmin, status, nr, alloc_status, longueur
   real, dimension(:), allocatable :: rayon, dens
   real, dimension(n_rad) :: density
   real, dimension(nz) ::  z
-  real :: somme, mass, rcyl, coeff_exp, a, b, gamma
+  real :: somme, mass, rcyl, coeff_exp, gamma
 
   character(len=62) :: buf
 
@@ -2384,13 +2391,11 @@ subroutine densite_data_gap()
 
   implicit none
 
-  integer :: i, j, k, kmin, longueur, status, nr, alloc_status
+  integer :: i, j, k, kmin, status, nr, alloc_status
   real, dimension(:), allocatable :: rayon, dens
   real, dimension(n_rad) :: density
   real, dimension(nz) ::  z
-  real :: somme, mass, rcyl, coeff_exp, a, b, gamma
-
-  character(len=62) :: buf
+  real :: somme, mass, rcyl, coeff_exp
 
   integer :: ind_debut, ind_fin
   real :: r_debut, r_fin
@@ -2563,16 +2568,15 @@ subroutine densite_file()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdunum, hdutype, bitpix
-  integer :: nullval, stat
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdutype, bitpix
+  integer :: nullval
   integer, dimension(4) :: naxes
-  logical :: anynull
+  logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a
+  integer :: k, l, i, n_a, read_n_a, j_start_file
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
-  character(len=5) :: s
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
@@ -2581,7 +2585,6 @@ subroutine densite_file()
   real(kind=db), dimension(:), allocatable :: a_sph_db
 
   type(disk_zone_type) :: dz
-
 
   ! Lecture donnees
   status=0
@@ -2601,7 +2604,7 @@ subroutine densite_file()
   firstpix=1
   nullval=-999
 
-  !  determine the size of temperature file
+  !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
   if (nfound /= 4) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
@@ -2609,7 +2612,7 @@ subroutine densite_file()
      stop
   endif
 
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_az) ) then
+  if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
@@ -2623,7 +2626,17 @@ subroutine densite_file()
   write(*,*) n_a, "grain sizes found"
   npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  if (naxes(2) == 2*nz+1) then
+     l3D_file = .true.
+  else
+     l3D_file = .false.
+  endif
+
+  if (l3D_file) then
+     allocate(sph_dens(n_rad,-nz:nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  else
+     allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+  endif
   sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
   bitpix = 0
@@ -2633,7 +2646,12 @@ subroutine densite_file()
   if (bitpix==-32) then
      call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
   else if (bitpix==-64) then
-     allocate(sph_dens_db(n_rad,nz,n_az,n_a)) ; sph_dens_db = 0.0_db
+     if (l3D_file) then
+        allocate(sph_dens_db(n_rad,-nz:nz,n_az,n_a))
+     else
+        allocate(sph_dens_db(n_rad,nz,n_az,n_a))
+     endif
+     sph_dens_db = 0.0_db
      call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_db,anynull,status)
      sph_dens = real(sph_dens_db,kind=sl)
      deallocate(sph_dens_db)
@@ -2645,7 +2663,7 @@ subroutine densite_file()
   write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
 
   ! Au cas ou
-  sph_dens = max(sph_dens,tiny_db)
+  sph_dens = max(sph_dens,tiny_real)
 
   ! Lecture des tailles de grains (en microns)
 !  if (n_a > 99999) then
@@ -2804,18 +2822,30 @@ subroutine densite_file()
   ! Densite du gaz : gaz = plus petites particules
   dz = disk_zone(1)
   !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
+  if (l3D_file) then
+     j_start_file=-nz
+  else
+     j_start_file=1
+  endif
   do k=1, n_az
-     do j=1,nz
-        do i=1, n_rad
-           densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
-        enddo
+     do j=j_start_file,nz
+        if (j==0) then
+           densite_gaz(i,j,k) =0.0
+        else
+           do i=1, n_rad
+              densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+           enddo
+        endif
      enddo
   enddo
 
   ! Symetrie verticale en z
-  do j=1,nz
-     densite_gaz(:,-j,:) = densite_gaz(:,j,:)
-  enddo
+  if (.not.l3D_file) then
+     write(*,*) "Making the density file symetric relative to the z=0 plane"
+     do j=1,nz
+        densite_gaz(:,-j,:) = densite_gaz(:,j,:)
+     enddo
+  endif
 
   ! Calcul de la masse de gaz de la zone
   mass = 0.
@@ -2860,29 +2890,45 @@ subroutine densite_file()
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-           !write(*,*) k, r_grain(k), "p"
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+           endif
         else if (r_grain(k) > a_sph(n_a)) then ! Gros grains
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
-           !write(*,*) k, r_grain(k), "g"
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,n_a)
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
+           endif
         else  ! Autres grains : interpolation
-           !write(*,*) k, r_grain(k), "i"
            if (r_grain(k) > a_sph(l+1)) l = l+1
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+           if (l3D_file) then
+              densite_pouss(:,:,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
                 ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
+           else
+              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
+                ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
+           endif
         endif
      enddo
   else ! Tous les grains suivent le gas
      write(*,*) "Constant spatial distribution"
      do k=1,n_grains_tot
-        densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+        if (l3D_file) then
+           densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
+        else
+           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
+        endif
      enddo
   endif  !lstrat
 
   ! Symetrie verticale en z
-  do j=1,nz
-     densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
-  enddo
+  if (.not.l3D_file) then
+     do j=1,nz
+        densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
+     enddo
+  endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot
@@ -2965,6 +3011,86 @@ subroutine densite_file()
   return
 
 end subroutine densite_file
+
+!**********************************************************
+
+subroutine read_Sigma_file()
+  ! Nouvelle routine pour lire une densite de surface
+  ! C. Pinte
+  ! 22/01/15
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdutype, bitpix
+  integer :: nullval
+  integer, dimension(1) :: naxes
+  logical :: anynull
+  character(len=80) :: comment
+  real, dimension(:), allocatable :: sigma_sl
+
+  ! Lecture donnees
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+  write(*,*) "Reading surface density file : "//trim(sigma_file)
+
+  if (n_zones > 1) then
+     write(*,*) "This surface density will be applied to zone 1"
+     ! todo : a verifier apres reordering
+  endif
+
+  readwrite=0
+  call ftopen(unit,sigma_file,readwrite,blocksize,status)
+  if (status /= 0) then ! le fichier temperature n'existe pas
+     write(*,*) "ERROR : surface density file needed"
+     stop
+  endif
+
+  group=1
+  firstpix=1
+  nullval=-999
+
+  ! determine the size of density file
+  call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+  if (nfound /= 1) then
+     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     stop
+  endif
+
+  if ((naxes(1) /= n_rad)) then
+     write(*,*) "Error : "//trim(sigma_file)//" does not have the"
+     write(*,*) "right dimensions. Exiting."
+     write(*,*) "# fits_file vs mcfost_grid"
+     write(*,*) naxes(1), n_rad
+     stop
+  endif
+  npixels=naxes(1)
+
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  ! read_image
+  if (bitpix==-32) then
+     allocate(sigma_sl(n_rad))
+     sigma_sl = 0.0_db
+     call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sl,anynull,status)
+     surface_density = real(sigma_sl,kind=db)
+     deallocate(sigma_sl)
+  else if (bitpix==-64) then
+     call ftgpvd(unit,group,firstpix,npixels,nullval,surface_density,anynull,status)
+  else
+     write(*,*) "ERROR: cannot read bitpix in fits file"
+     stop
+  endif
+
+  ! Au cas ou
+  surface_density = max(surface_density,tiny_db)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  return
+
+end subroutine read_Sigma_file
 
 !**********************************************************
 
@@ -3254,13 +3380,13 @@ subroutine densite_Seb_Charnoz2()
 
   implicit none
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j, hdunum, hdutype
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels,j
   integer :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull
 
   integer :: k, l, i
-  real(kind=db) :: somme, mass, somme2
+  real(kind=db) :: somme, somme2
 
   real, dimension(n_rad,nz) :: dens
 

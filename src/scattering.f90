@@ -319,7 +319,6 @@ subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
   integer :: J,JJ,N,NSTOP,NMX,NN
   real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD
   real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU
-  complex :: S1_0,S2_0
 !  real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0
   complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y
 !  complex (kind=db), dimension(nmxx):: D
@@ -579,7 +578,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
 
   complex, dimension(nang_scatt+1) :: S1,S2
 
-  real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme1, somme2, hg
+  real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme2
   complex :: refrel
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
@@ -712,7 +711,7 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
 
   integer :: j, i
 
-  real :: gsca, norme, somme_sin, somme_prob, somme1, somme2, hg
+  real :: gsca, norme, somme_sin, somme_prob, somme2
   real :: cext,cabs,csca,cbak,cpr,assym
   real :: cextv,cabsv,cscav,cbakv,cprv
   real :: cexts,cabss,cscas,cbaks,cprs
@@ -872,7 +871,7 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   integer, intent(in) :: taille_grain, lambda, p_lambda
   real, intent(out) :: qext,qsca,gsca
 
-  real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4, a
+  real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4
   integer :: i, j, pop, N
 
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
@@ -973,10 +972,10 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
           + log(op_file_Qext(i-1,j,pop)) *  fact3 &
           + log(op_file_Qext(i,j,pop)) * fact4)
 
-     qsca = exp(log(op_file_Qsca(i-1,j-1,pop)) * fact1 &
-          + log(op_file_Qsca(i,j-1,pop)) * fact2 &
-          + log(op_file_Qsca(i-1,j,pop)) * fact3 &
-          + log(op_file_Qsca(i,j,pop)) * fact4)
+     qsca = exp(log(max(op_file_Qsca(i-1,j-1,pop),tiny_real)) * fact1 &
+          + log(max(op_file_Qsca(i,j-1,pop),tiny_real)) * fact2 &
+          + log(max(op_file_Qsca(i-1,j,pop),tiny_real)) * fact3 &
+          + log(max(op_file_Qsca(i,j,pop),tiny_real)) * fact4)
 
      gsca = op_file_g(i-1,j-1,pop) * fact1 &
           + op_file_g(i,j-1,pop) * fact2 &
@@ -1112,10 +1111,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   integer, intent(in) :: lambda, ri, zj, phik
   real, intent(in) :: aleat
   real :: prob
-  integer :: p
-  integer :: kmin, kmax, k, l
-
-  real :: test, norme
+  integer :: kmin, kmax, k
 
   prob = aleat  ! probsizecumul(lambda,ri,zj,n_grains_tot) est normalise a 1.0
 

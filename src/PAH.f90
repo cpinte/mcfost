@@ -24,8 +24,6 @@ function specific_heat(T, taille_grain)
   real(kind=db), dimension(:), intent(in) :: T
   real(kind=db), dimension(size(T)) :: specific_heat
 
-  integer :: i
-
   if (lread_Misselt) then
      specific_heat = file_specific_heat(T,taille_grain)
   else if (is_grain_PAH(taille_grain)) then

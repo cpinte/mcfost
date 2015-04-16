@@ -12,8 +12,45 @@ module grid
 
   implicit none
 
+  ! Nombre de cellules totale
+  integer :: n_cells, nrz
+
   contains
 
+!******************************************************************************
+
+subroutine cylindrical2cell(i,j,k, icell)
+  ! icell is between 1 and n_rad * n_z * n_az
+
+  integer, intent(in) :: i,j,k
+  integer, intent(out) :: icell
+
+
+  icell = i + n_rad * ( j-1 + nz * (k-1))
+
+  return
+
+end subroutine cylindrical2cell
+
+!******************************************************************************
+
+subroutine cell2cylindrical(icell, i,j,k)
+
+  integer, intent(in) :: icell
+  integer, intent(out) :: i,j,k
+
+  integer :: ij ! indice combine iet j, ie : i + (j-1) * n_rad
+
+  k = icell/nrz + 1 ; if (k > n_az) k=n_az
+
+  ij = icell - k*nrz
+  j = (ij)/n_rad + 1 ; if (j > nz) j=nz
+
+  i = ij - j*nz
+
+  return
+
+end subroutine cell2cylindrical
 
 !******************************************************************************
 
@@ -35,7 +72,7 @@ module grid
    ! order following Rin
    order = bubble_sort(disk_zone(:)%Rmin)
 
-   ! Reordoring zones
+   ! Reordering zones
    do i=1, n_zones
       disk_zone(i) =  disk_zone_tmp(order(i))
       do ipop=1,n_pop  ! reordering zone index in pops
@@ -62,11 +99,7 @@ subroutine define_physical_zones()
   ! 03/05/11
 
   integer :: i, j, index, i_region, iter, ir, k
-  type(disk_zone_type), dimension(n_zones) :: disk_zone_tmp
-  type(disk_zone_type) :: dz
-
   logical, dimension(n_zones) :: zone_scanned
-
   real(kind=db) :: r1, r2, minR, maxR
   character(len=10) :: n1, n2
 
@@ -186,20 +219,20 @@ subroutine define_grid4()
   real, parameter :: pi = 3.1415926535
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
-  integer :: i,j,k, izone, i_subdivide, iz_subdivide, ii, ii_min, ii_max
+  integer :: i,j,k, izone, ii, ii_min, ii_max
 
   !tab en cylindrique ou spherique suivant grille
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
-  real(kind=db) ::   r_i, r_f, dr, fac, r0, rout_cell, H, hzone
+  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
   integer :: ir, iz, n_cells, n_rad_region, n_rad_in_region, n_empty, istart
-
-  real(kind=db), dimension(n_rad-n_rad_in+2) :: tab_r_tmp
-  real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+  nrz = n_rad * nz
+  n_cells = nrz * n_az
 
   Rmax2 = Rmax*Rmax
 
@@ -216,7 +249,7 @@ subroutine define_grid4()
   if (llinear_grid) then
 
      do i=1, n_rad+1
-        tab_r(i) = Rmin + (Rmin - Rmin) * real(i-1)/real(n_rad)
+        tab_r(i) = Rmin + (Rmax - Rmin) * real(i-1)/real(n_rad)
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i)
      enddo
@@ -564,6 +597,9 @@ subroutine define_grid3()
   real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
+
+  nrz = n_rad * nz
+  n_cells = nrz * n_az
 
   Rmax2=Rmax*Rmax
 
@@ -1073,7 +1109,6 @@ subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
 
   r2 = xin*xin+yin*yin
 
-
   if (r2 < r_lim_2(0)) then
      ri_out=0
   else if (r2 > Rmax2) then
@@ -1350,10 +1385,7 @@ subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
   real, intent(in) :: aleat1, aleat2, aleat3
   real(kind=db), intent(out) :: x,y,z
 
-  real(kind=db) :: r, theta, phi, r_cos_theta, w
-
-  integer :: ri_tmp, thetaj_tmp
-
+  real(kind=db) :: r, theta, phi, r_cos_theta
 
   ! Position radiale
   r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
@@ -1418,20 +1450,6 @@ subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
   return
 
 end subroutine pos_em_cellule_sph
-
-!***********************************************************
-
-subroutine verif_cellule_1(lambda)
-! Verifie opacite cellule 1
-  implicit none
-
-  integer, intent(in) :: lambda
-  integer :: n
-  real :: tau
-
-  n = 1 + floor(log(tau-1.)/log(2.))
-
-end subroutine verif_cellule_1
 
 !***********************************************************
 

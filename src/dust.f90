@@ -24,21 +24,24 @@ subroutine taille_grains()
 ! C. Pinte 14/01/05
 
   implicit none
-  integer :: k, i, j
-  real :: a, alfa, qext=0.0, qsca=0.0, M_tot, nbre_tot_grains
+  integer :: k, i
+  real :: a, nbre_tot_grains
   real(kind=db) :: exp_grains, sqrt_exp_grains
   real :: masse_pop
-  real :: correct_fact_r, correct_fact_S, correct_fact_M
+  real :: correct_fact_r
 
   type(dust_pop_type), pointer :: dp
 
   integer :: ios, status, n_comment, n_grains
   real :: fbuffer
 
+  is_PAH = .false.
 
   ! Boucle sur les populations de grains
   do i=1, n_pop
      dp => dust_pop(i)
+
+     if (dp%is_PAH) is_PAH = .true.
 
      if (lread_grain_size_distrib) then
         if (n_pop > 1) then
@@ -49,7 +52,7 @@ subroutine taille_grains()
 
         open(unit=1, file=grain_size_file, status='old', iostat=ios)
         if (ios/=0) then
-           write(*,*) "ERROR : cannot open "//trim(grain_size_file)
+           write(*,*) "ERROR : cannot open grain size file"//trim(grain_size_file)
            write(*,*) "Exiting"
            stop
         endif
@@ -217,7 +220,7 @@ subroutine init_indices_optiques()
 
   real :: frac, fbuffer
   real, dimension(:), allocatable :: f
-  integer :: n, i, k, ii, syst_status, alloc_status, pop, status, n_ind, buffer, ios, n_comment, n_components
+  integer :: i, k, ii, alloc_status, pop, status, n_ind, ios, n_comment, n_components
 
   character(len=512) :: filename, dir
 
@@ -417,9 +420,9 @@ subroutine init_indices_optiques()
               op_file_na = 0 ; op_file_n_lambda = 0 ; sh_file = ""; file_sh_nT = 0
            endif
            lread_opacity_file = .true.
-        endif
 
-        call get_opacity_file_dim(pop)
+           call get_opacity_file_dim(pop)
+        endif
 
         if (dust_pop(pop)%n_components > 1) then
            write(*,*) "ERROR : cannot mix dust with opacity file with other component"
@@ -460,7 +463,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
 
   complex, dimension(size(m)) :: eps
 
-  integer :: n, i, iter, k
+  integer :: n, iter, k
   complex :: eps_eff, eps_eff1, eps_eff2, a, b, c, delta, S
 
   ! Number of components
@@ -551,7 +554,7 @@ subroutine prop_grains(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
   real :: a, wavel, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
-  integer :: k, i, pop, l
+  integer :: k, pop
 
   qext=0.0
   qsca=0.0
@@ -582,14 +585,19 @@ subroutine prop_grains(lambda, p_lambda)
            call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
-              call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
                  call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
-              call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              if (alfa < 1e4) then
+                 call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+              else
+                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
+              endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
               write(*,*) "Exiting"
@@ -755,7 +763,7 @@ subroutine opacite2(lambda)
 
   real, parameter :: G = 6.672e-8
 
-  integer :: i,j, pk, k, ii, jj, kk, l, k_min, thetaj
+  integer :: i,j, pk, k, l, k_min, thetaj
   real(kind=db) ::  density, proba, q_sca_tot, q_ext_tot,norme
   logical :: lcompute_obs
 
@@ -764,13 +772,11 @@ subroutine opacite2(lambda)
 !  real :: delta_prob1, delta_probn, yp1, ypn
 !  real :: yp_p1, yp_m1, ypp
 
-
-
-  real :: z, rcyl, somme, gsca
+  real :: somme, gsca
 
   logical :: ldens0
 
-  real(kind=db) :: kappa_abs_RE, kappa_abs_tot, angle
+  real(kind=db) :: k_abs_RE_LTE, k_abs_RE, k_abs_tot, angle
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
@@ -822,12 +828,13 @@ subroutine opacite2(lambda)
         if (j==0) cycle bz
         do pk=1, n_az
            kappa(lambda,i,j,pk) = 0.0
-           kappa_abs_tot = 0.0
-           kappa_abs_RE = 0.0
+           k_abs_tot = 0.0
+           k_abs_RE = 0.0
+           k_abs_RE_LTE = 0.0
            do  k=1,n_grains_tot
               density=densite_pouss(i,j,pk,k)
               kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + q_ext(lambda,k) * density
-              kappa_abs_tot = kappa_abs_tot + q_abs(lambda,k) * density
+              k_abs_tot = k_abs_tot + q_abs(lambda,k) * density
            enddo !k
 
            if (lRE_LTE) then
@@ -835,14 +842,15 @@ subroutine opacite2(lambda)
               do k=grain_RE_LTE_start,grain_RE_LTE_end
                  density=densite_pouss(i,j,pk,k)
                  kappa_abs_eg(lambda,i,j,pk) =  kappa_abs_eg(lambda,i,j,pk) + q_abs(lambda,k) * density
-                 kappa_abs_RE = kappa_abs_RE + q_abs(lambda,k) * density
+                 k_abs_RE_LTE = k_abs_RE_LTE + q_abs(lambda,k) * density ! todo : idem kappa_abs_eg
+                 k_abs_RE = k_abs_RE + q_abs(lambda,k) * density
               enddo
             endif
 
            if (lRE_nLTE) then
               do k=grain_RE_nLTE_start,grain_RE_nLTE_end
                  density=densite_pouss(i,j,pk,k)
-                 kappa_abs_RE = kappa_abs_RE + q_abs(lambda,k) * density
+                 k_abs_RE = k_abs_RE + q_abs(lambda,k) * density
               enddo
            endif
 
@@ -854,16 +862,27 @@ subroutine opacite2(lambda)
               enddo
            endif
 
-           if (kappa_abs_tot > tiny_db) proba_abs_RE(lambda,i,j,pk) = kappa_abs_RE/kappa_abs_tot
+           if (letape_th) then
+              if (lnRE.and.(k_abs_tot > tiny_db)) then
+                 kappa_abs_RE(lambda,i,j,pk) =  k_abs_RE
+                 proba_abs_RE(lambda,i,j,pk) = k_abs_RE/k_abs_tot
+              endif
+
+              if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(lambda,i,j,pk) = k_abs_RE_LTE/k_abs_RE
+              if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(lambda,i,j,pk) = 1.0 ! so far, might be updated if nRE --> qRE grains
+           endif ! letape_th
         enddo !pk
      enddo bz !j
   enddo !i
 
-  proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
+  if (letape_th) then
+     if (lnRE) proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
+     if (lRE_nLTE) proba_abs_RE_LTE_p_nLTE(lambda,:,nz+1,:) = proba_abs_RE_LTE_p_nLTE(lambda,:,nz,:)
+  endif
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
-     if (.not.lmono) then
+     if (letape_th) then
         do i=1, n_rad
            do j=1, nz
               prob_kappa_abs_1grain(lambda,i,j,0)=0.0
@@ -881,7 +900,7 @@ subroutine opacite2(lambda)
 
 
   if (lkappa_abs_grain) then
-     if (.not.lmono) then
+     if (letape_th) then
         write(*,*) "Error : lkappa_abs_grain only monochrmatic"
         stop
      endif
@@ -1285,10 +1304,13 @@ subroutine opacite2(lambda)
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
 
-     call cfitsWrite("data_dust/lambda.fits.gz",tab_lambda,shape(tab_lambda))
+     call cfitsWrite("data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
      call cfitsWrite("data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+
+     call cfitsWrite("data_dust/kappa_grain.fits.gz",q_abs,shape(q_abs)) ! lambda, n_grains
+
 
      S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
      call cfitsWrite("data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))

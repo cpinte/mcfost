@@ -31,7 +31,7 @@ subroutine mol_line_transfer()
   implicit none
 
   real(kind=db) :: u0, v0, w0
-  integer :: iTrans, imol, ibin
+  integer :: iTrans, imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
 
@@ -119,13 +119,20 @@ subroutine mol_line_transfer()
            deallocate(indice_Trans)
            nTrans = mol(imol)%nTrans_raytracing
            allocate(indice_Trans(mol(imol)%nTrans_raytracing))
-           indice_Trans(:) = mol(imol)%indice_Trans_raytracing(:)
+
+           !write(*,*) shape(indice_Trans)
+           !write(*,*) shape(mol(imol)%indice_Trans_raytracing(:))
+           do iTrans=1, mol(imol)%nTrans_raytracing
+              indice_Trans(iTrans) = mol(imol)%indice_Trans_raytracing(iTrans)
+           enddo
         endif
 
         u0 = sin(angle_interet/180._db*pi) ;  v0=0.0_db ; w0 = sqrt(1.0_db - u0*u0)
 
-        do ibin=1,RT_n_ibin
-           call emission_line_map(imol,ibin)
+        do ibin=1,RT_n_incl
+           do iaz=1,RT_n_az
+              call emission_line_map(imol,ibin,iaz)
+           enddo
         enddo
 
         call ecriture_spectre(imol)
@@ -169,7 +176,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real, parameter :: precision_sub = 1.0e-3
   real, parameter :: precision = 1.0e-1
 
-  integer :: etape, etape_start, etape_end, ri, zj, phik, l, iray, iTrans, n_rayons
+  integer :: etape, etape_start, etape_end, ri, zj, phik, iray, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
   integer, dimension(nb_proc) :: max_n_iter_loc
 
@@ -512,7 +519,7 @@ end subroutine NLTE_mol_line_transfer
 
 !***********************************************************
 
-subroutine emission_line_map(imol,ibin)
+subroutine emission_line_map(imol,ibin,iaz)
   ! Creation de la carte d'emission moleculaire
   ! (ou du spectre s'il n'y a qu'un seul pixel)
   ! par ray-tracing dans une direction donnee
@@ -521,13 +528,13 @@ subroutine emission_line_map(imol,ibin)
 
   implicit none
 
-  integer, intent(in) :: imol, ibin
+  integer, intent(in) :: imol, ibin, iaz
 
   real(kind=db) :: x0,y0,z0,l, uv, u,v,w
 
   real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
-  real(kind=db) :: taille_pix, x1, y1, z1, x2, y2, z2
+  real(kind=db) :: taille_pix
   integer :: i,j, id, igridx_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
@@ -536,16 +543,12 @@ subroutine emission_line_map(imol,ibin)
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
-  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, cx, cy, lambda, iv
+  integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, lambda, iv
   real :: vmax_center_rt, extra_deltaV_rt
 
-  phi_RT = 0.
-
-  ! Direction de visee pour le ray-tracing
-  uv = sin(tab_RT_incl(ibin) * deg_to_rad) ;  w = cos(tab_RT_incl(ibin) * deg_to_rad)
-  u = uv * cos(phi_RT * deg_to_rad) ; v = uv * sin(phi_RT * deg_to_rad) ;
+ ! Direction de visee pour le ray-tracing
+  u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
-
 
   n_speed_rt = mol(imol)%n_speed_rt
   n_speed_center_rt = mol(imol)%n_speed_center_rt
@@ -582,8 +585,10 @@ subroutine emission_line_map(imol,ibin)
 
   ! Definition des vecteurs de base du plan image dans le repere universel
 
+  ! Definition des vecteurs de base du plan image dans le repere universel
+
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(phi_RT * deg_to_rad),-cos(phi_RT * deg_to_rad),0/)
+  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -635,7 +640,7 @@ subroutine emission_line_map(imol,ibin)
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
      !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-     !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,imol,ibin)
+     !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,imol,ibin,iaz)
      id =1 ! pour code sequentiel
 
      if (l_sym_ima) then
@@ -656,7 +661,7 @@ subroutine emission_line_map(imol,ibin)
            phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
-           call intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
@@ -680,7 +685,7 @@ subroutine emission_line_map(imol,ibin)
      !$omp default(none) &
      !$omp private(i,j,id) &
      !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy) &
-     !$omp shared(n_iter_min,n_iter_max,imol,ibin)
+     !$omp shared(n_iter_min,n_iter_max,imol,ibin,iaz)
 
      id =1 ! pour code sequentiel
      n_iter_min = 1 ! 3
@@ -693,7 +698,7 @@ subroutine emission_line_map(imol,ibin)
            !write(*,*) i,j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
-           call intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
@@ -708,9 +713,9 @@ subroutine emission_line_map(imol,ibin)
      call compute_stars_map(lambda,ibin, u, v, w)
 
      do iv =  -n_speed_rt, n_speed_rt
-        spectre(:,:,iv,lambda,ibin) = spectre(:,:,iv,lambda,ibin) + stars_map(:,:)
+        spectre(:,:,iv,lambda,ibin,iaz) = spectre(:,:,iv,lambda,ibin,iaz) + stars_map(:,:)
      enddo
-     continu(:,:,lambda,ibin) = continu(:,:,lambda,ibin) + stars_map(:,:)
+     continu(:,:,lambda,ibin,iaz) = continu(:,:,lambda,ibin,iaz) + stars_map(:,:)
   enddo
 
   return
@@ -719,7 +724,7 @@ end subroutine emission_line_map
 
 !***********************************************************
 
-subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
+subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
   ! Calcule l'intensite d'un pixel carre de taille, position et orientation arbitaires
   ! par une methode de Ray-tracing
   ! (u,v,w) pointe vers l'observateur
@@ -731,7 +736,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
 
   implicit none
 
-  integer, intent(in) :: ipix,jpix,id, imol, n_iter_min, n_iter_max, ibin
+  integer, intent(in) :: ipix,jpix,id, imol, n_iter_min, n_iter_max, ibin, iaz
   real(kind=db), dimension(3), intent(in) :: pixelcorner,dx,dy
   real(kind=db), intent(in) :: pixelsize,u,v,w
   real(kind=db), dimension(:,:), allocatable :: IP, IP_old
@@ -741,10 +746,10 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
 
   real(kind=db) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(3) :: sdx, sdy
-  real :: npix2, diff, vmax_center_rt
+  real :: npix2, diff
 
   real, parameter :: precision = 1.e-2
-  integer :: i, j, subpixels, iray, ri, zj, phik , iv, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
+  integer :: i, j, subpixels, iray, ri, zj, phik, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
 
   logical :: lintersect, labs
 
@@ -863,11 +868,11 @@ subroutine intensite_pixel_mol(id,imol,ibin,n_iter_min,n_iter_max,ipix,jpix,pixe
   ! profil de raie non convolue teste ok avec torus
 
   if (RT_line_method==1) then ! Sommation implicite sur les pixels
-     spectre(1,1,:,:,ibin) = spectre(1,1,:,:,ibin) + IP(:,:)
-     continu(1,1,:,ibin) = continu(1,1,:,ibin) + IPc(:)
+     spectre(1,1,:,:,ibin,iaz) = spectre(1,1,:,:,ibin,iaz) + IP(:,:)
+     continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + IPc(:)
   else
-     spectre(ipix,jpix,:,:,ibin) = IP(:,:)
-     continu(ipix,jpix,:,ibin) = IPc(:)
+     spectre(ipix,jpix,:,:,ibin,iaz) = IP(:,:)
+     continu(ipix,jpix,:,ibin,iaz) = IPc(:)
   endif
 
   return

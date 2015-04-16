@@ -160,11 +160,9 @@ real(kind=sl) function interp_sp(y, x, xp)
   implicit none
 
   real(kind=sl), dimension(:), intent(in) :: x, y
-  real(kind=sl) :: xp
+  real(kind=sl) :: xp, frac
 
-  integer :: n, np, j, ny
-
-  real :: frac
+  integer :: n, j
 
   n=size(x) !; ny=size(y)
 
@@ -222,11 +220,9 @@ real(kind=db) function interp_dp(y, x, xp)
   implicit none
 
   real(kind=db), dimension(:), intent(in) :: x, y
-  real(kind=db) :: xp
+  real(kind=db) :: xp, frac
 
-  integer :: n, np, j, ny
-
-  real :: frac
+  integer :: n, j
 
   n=size(x) !; ny=size(y)
 
@@ -337,7 +333,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
   real(kind=db), intent(in) ::  xinit, yinit, zinit, u1, v1, w1
   real(kind=db), intent(out) :: xfin, yfin, zfin
 
-  real(kind=db) :: cost, sint, sing, prod, x, theta
+  real(kind=db) :: cost, sint, sing, prod, theta
 
   if (w1 > 0.999999999_db) then
      cost = 1.0_db
@@ -484,6 +480,34 @@ function Blambda(wl,T)
 
 end function Blambda
 
+
+function Blambda_db(wl,T)
+! Loi de Planck
+! Blambda en SI : W.m-2.s-1.sr-1
+! wl en m
+! C. Pinte
+! 23/05/09
+
+  implicit none
+
+  real(kind=db) ,intent(in) :: wl
+  real, intent(in) :: T
+  real(kind=db) :: Blambda_db
+
+  real(kind=db) :: hnu_kT
+
+  hnu_kT = (hp * c_light)/ (kb * T * wl)
+
+  if (hnu_kT > 700.) then
+     Blambda_db = 0.0_db
+  else
+     Blambda_db = 2.0_db*hp*c_light**2 / wl**5 / (exp(hnu_kT)-1.0_db)
+  endif
+
+  return
+
+end function Blambda_db
+
 !******************************************************
 
 function get_NH(NC)
@@ -519,7 +543,8 @@ subroutine mcfost_setup()
   call mcfost_get_ref_para()
   call mcfost_get_manual()
   ! Write date of the last time an update was search for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
+       //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
   write(*,*) "MCFOST set-up was sucessful"
@@ -557,7 +582,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
         write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
         write(s,*) (n_days-1) * 3600 * 24
-        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "//trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
+             //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
         call appel_syst(cmd, syst_status)
         return
      endif
@@ -800,8 +826,8 @@ subroutine mcfost_get_yorick()
   yo_file2 = "mcfost_utils.i"
 
   write(*,*) "Getting MCFOST yorick files: ", trim(yo_file1), " ", trim(yo_file2)
-  cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; &
-       curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
+  cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; "//&
+       "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST yorick package"
@@ -1091,7 +1117,7 @@ function bubble_sort(data_in)
 
   integer :: i, pass, n, tmp_i
   logical :: sorted
-  real ::  temp
+  real(kind=db) ::  temp
 
   n = size(data_in)
   allocate(bubble_sort(n),data(n))
