@@ -15,6 +15,7 @@ module init_mcfost
   use mem
   use ProdiMo
   use utils
+  use filter
 
   implicit none
 
@@ -24,16 +25,19 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, iargc, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
   integer :: current_date, update_date, mcfost_auto_update
-  real :: wvl, opt_zoom, utils_version
+  real(kind=db) :: wvl
+  real :: opt_zoom, utils_version, PA
 
   character(len=512) :: cmd, s, str_seed
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate
+  logical :: lresol, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
+  real :: nphot_img = 0.0
+  integer :: n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -69,6 +73,7 @@ subroutine initialisation_mcfost()
   laggregate=.false.
   l3D=.false.
   lresol=.false.
+  lPA = .false.
   lzoom=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -85,6 +90,7 @@ subroutine initialisation_mcfost()
   lbenchmark_water1 = .false.
   lbenchmark_water2 = .false.
   lbenchmark_water3 = .false.
+  lbenchmark_SHG = .false.
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
@@ -106,6 +112,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
   ldensity_file=.false.
+  lsigma_file = .false.
   ldebris=.false.
   lkappa_abs_grain=.false.
   lweight_emission=.false.
@@ -136,6 +143,10 @@ subroutine initialisation_mcfost()
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
+  lMathis_field = .false.
+  lchange_Tmax_PAH=.false.
+  lno_T = .false.
+  lISM_heating = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -471,14 +482,21 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1
-     case("-output_density_grid")
-        ldisk_struct=.true.
+     case("-PA")
+        lPA = .true.
         i_arg = i_arg+1
-     case("-disk_struct")
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : PA needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) PA
+        i_arg= i_arg+1
+     case("-disk_struct","-output_density_grid","-ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .true.
-     case("+disk_struct")
+     case("+disk_struct","+ds")
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
@@ -645,6 +663,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-sigma_file","-sigma")
+        i_arg = i_arg + 1
+        lsigma_file=.true.
+        call get_command_argument(i_arg,s)
+        sigma_file = s
+        i_arg = i_arg + 1
      case("-debris")
         i_arg = i_arg+1
         ldebris=.true.
@@ -676,6 +700,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(s,*) correct_density_Rout
      case("-prodimo")
+        i_arg = i_arg + 1
+        lprodimo = .true.
+        mcfost2ProDiMo_version = 5
+        lISM_heating=.true.
+     case("-prodimo4")
         i_arg = i_arg + 1
         lprodimo = .true.
         mcfost2ProDiMo_version = 4
@@ -784,6 +813,60 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         grain_size_file = s
         i_arg = i_arg+1
+     case("-Tmax_PAH")
+        i_arg = i_arg + 1
+        lchange_Tmax_PAH=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) Tmax_PAH
+     case("-benchmark_SHG")
+        i_arg = i_arg + 1
+        lbenchmark_SHG=.true.
+     case("-Mathis_field")
+        if (.not.lbenchmark_SHG) then
+           write(*,*) "ERROR: Mathis field can only be used with the SHG benchmark"
+           write(*,*) "Exiting"
+           stop
+        endif
+        i_arg = i_arg + 1
+        lMathis_field=.true.
+        call get_command_argument(i_arg,s)
+        read(s,*) Mathis_field
+        i_arg = i_arg+1
+     case("-no_T")
+        i_arg = i_arg + 1
+        lno_T=.true.
+     case("-ISM_heating")
+        i_arg = i_arg + 1
+        lISM_heating=.true.
+     case("-casa")
+        i_arg = i_arg + 1
+        lcasa=.true.
+     case("-cutoff")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cutoff
+        i_arg = i_arg + 1
+     case("-nphot_img")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nphot_img
+        i_arg = i_arg + 1
+     case("-n_rad")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_rad_opt
+        i_arg = i_arg + 1
+     case("-nz")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) nz_opt
+        i_arg = i_arg + 1
+     case("-nT")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) n_T_opt
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -801,6 +884,7 @@ subroutine initialisation_mcfost()
   else
      call read_para()
   endif
+  call check_init()
 
   if (lemission_mol.and.para_version < 2.11) then
      write(*,*) "ERROR: parameter version must be larger than 2.10"
@@ -820,6 +904,8 @@ subroutine initialisation_mcfost()
      write(*,*) "         it can be turned back on with -rt2"
      lsepar_pola = .false.
   endif
+
+  if (lno_T) ltemp = .false.
 
   write(*,*) 'Input file read successfully'
 
@@ -879,6 +965,10 @@ subroutine initialisation_mcfost()
   if (lonly_scatt) l_em_disk_image=.false.
   if (lHG.or.lisotropic) aniso_method=2
 
+  if (nphot_img > tiny_real) nbre_photons_image = max(nphot_img / nbre_photons_loop,1.)
+  if (n_rad_opt > 0) n_rad = n_rad_opt
+  if (nz_opt > 0) nz = nz_opt
+  if (n_T_opt > 0) n_T = n_T_opt
 
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
@@ -970,6 +1060,8 @@ subroutine initialisation_mcfost()
       endif
       size_pix=maxigrid/(map_size)
   endif
+
+  if (lPA) ang_disque = PA
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1100,16 +1192,20 @@ subroutine display_help()
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to images"
-  write(*,*) "        : -zoom <zoom> (override value in parameter file)"
-  write(*,*) "        : -resol <nx> <ny> (override value in parameter file)"
+  write(*,*) "        : -zoom <zoom> (overrides value in parameter file)"
+  write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
+  write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
   write(*,*) "                             useful for optically thin disk in MC mode"
-  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
-  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
+!  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
+!  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -casa : write an image ready for CASA"
+  write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
+  write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
@@ -1120,6 +1216,9 @@ subroutine display_help()
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
+  write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
+  write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
@@ -1135,17 +1234,21 @@ subroutine display_help()
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
-  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
-  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall,"
+!  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
+  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
   write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
-  write(*,*) "        : -density_file <density_file>"
+  write(*,*) "        : -density_file or -df <density_file>"
+  write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"
   write(*,*) "        : -Laure_SED <file>"
   write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
+  write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
+  write(*,*) "        : -n_rad : overwrite value in parameter file"
+  write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"

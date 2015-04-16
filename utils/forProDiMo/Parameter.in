@@ -4,7 +4,7 @@
 -------------------------------------------------------------
 
 ----- star and irradiation -----
-0.7         ! Mstar       [Msun]   : stellar mass 
+0.7         ! Mstar       [Msun]   : stellar mass
 1.0         ! Lstar       [Lsun]   : stellar luminosity
 4000.0      ! Teff        [K]      : stellar effective temperature
 0.01        ! fUV         [-]      : LUV/Lstar
@@ -12,12 +12,12 @@
 .true.      ! Xrays       [-]      : use Xray chemistry and heating?
 1.E+30      ! Xray_Lum    [erg/s]  : X-ray luminosity
 2.E+7       ! Xray_Temp   [K]      : X-ray emission temperature
-1.7E-17     ! CRI         [1/s]    : cosmic ray ionisation of H2 
-1.0         ! CHI_ISM     [-]      : strength of incident vertical UV  
+1.7E-17     ! CRI         [1/s]    : cosmic ray ionisation of H2
+1.0         ! CHI_ISM     [-]      : strength of incident vertical UV
 
 ------ dust parameters ------
 2.094       ! rho_gr      [g/cm^3]: dust grain material mass density
-0.05        ! amin        [mic]   : minimum dust particle size  
+0.05        ! amin        [mic]   : minimum dust particle size
 3000.0      ! amax        [mic]   : maximum dust particle size
 3.7         ! apow        [-]     : dust size distr f(a)~a^-apow
 2           ! settle_method       : dust settling (Dubrulle et al. 1995)
@@ -44,8 +44,8 @@ onlyadd     ! handle_UMIST        : handle UMIST-data (erase/overwrite/onlyadd)
 .false.     ! solve_diskstruc     : solve the vertical hydrostatic eq.?
 .true.      ! MCFOST_LIKE         : parametric disk structure like in MCFOST?
 0.07        ! Rin         [AU]    : inner disk radius
-50.0        ! Rtaper      [AU]    : tapering-off radius        
-300.0       ! Rout        [AU]    : outer disk radius 
+50.0        ! Rtaper      [AU]    : tapering-off radius
+300.0       ! Rout        [AU]    : outer disk radius
 1.0         ! epsilon     [-]     : column density exponent
 10.0        ! MCFOST_H0   [AU]    : scale height ...
 100.0       ! MCFOST_RREF [AU]    : ... belonging to reference radius
@@ -85,10 +85,10 @@ onlyadd     ! handle_UMIST        : handle UMIST-data (erase/overwrite/onlyadd)
 45.0        ! incl      [deg]   : inclination (0=face-on)
 
 ------ line transfer? ------
-.false.     ! line_transfer     : calculate line transfer? 
+.false.     ! line_transfer     : calculate line transfer?
 .false.     ! write_pop         : write output for immediate line transfer?
 .false.     ! immediate_lines   : line RT directly after init (requires write_pop)?
-.false.     ! line_cube         : 3D-line cube output? 
+.false.     ! line_cube         : 3D-line cube output?
 .false.     ! FLiTs             : want to run FLiTs afterwards?
 
 ------ tolerances ------
@@ -112,7 +112,7 @@ onlyadd     ! handle_UMIST        : handle UMIST-data (erase/overwrite/onlyadd)
 ***  and add last line "forProDiMo.fits.gz", if you want to ***
 ***  run ProDiMo on top of MCFOST/MCMax                     ***
 ---------------------------------------------------------------
-.true.     ! radtrans          : continuum radiative transfer?
-.true.     ! restart           : run from restart?
-.false.    ! readMCFOST        : read from MCFOST/MCMax exchange file? forProDiMo.fits.gz
-
+.false.     ! radtrans          : continuum radiative transfer?
+.false.     ! restart           : run from restart?
+.true.    ! readMCFOST        : read from MCFOST/MCMax exchange file?
+forProDiMo.fits.gz

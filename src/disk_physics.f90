@@ -17,7 +17,7 @@ subroutine compute_othin_sublimation_radius()
 
   real(kind=db) :: E_dust, E_etoile
   real :: cst, wl, delta_wl
-  integer :: lambda, k, i
+  integer :: lambda, i
   real(kind=db) :: sublimation_radius, coeff_exp, cst_wl
 
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb

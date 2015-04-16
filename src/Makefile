@@ -93,7 +93,8 @@ FC_SER = gfortran -m32 -cpp
 FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 MACH = #-march=athlon
 PREC =
@@ -113,7 +114,9 @@ FC_SER = gfortran -m64 -cpp
 FC_OMP = gfortran -m64 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
+#-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
+#-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
 
 MACH = #-march=athlon
@@ -164,9 +167,9 @@ endif
 
 
 SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
-	benchmarks.f90 	read_param.f90 io_prodimo.f90 init_mcfost.f90 \
-	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 dust.f90 \
-	molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
+	benchmarks.f90 	read_param.f90 io_prodimo.f90 filter.f90 \
+	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
+	dust.f90 molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
 	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90 \
 	mcfost.f90
@@ -207,18 +210,22 @@ endif
 mcfost2prodimo : mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
 
+voronoi : Voronoi.o
+	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
+
 #*************************************************************
 # Release
 #*************************************************************
 
 release : main
+	git tag -d release
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/macos
 	cp mcfost web/macos
 	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
+	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; rm -f mcfost.sha1 ; sha1sum mcfost  | awk '{print $$1}' > mcfost.sha1"
 	scp fosti:mcfost/src/mcfost web/linux/
 	scp fosti:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
@@ -232,6 +239,7 @@ release : main
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	rm -rf web
+	git tag release
 
 
 release_mac : main
@@ -261,7 +269,7 @@ release_utils :
 
 fosti :
 	rsync -Pur *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make ; \cp -f mcfost ~/mcfost_cigri/"
+	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri/"
 
 #*************************************************************
 # Nettoyage
