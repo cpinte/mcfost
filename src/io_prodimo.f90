@@ -515,6 +515,12 @@ contains
        else
           call ftpkyj(unit,'PAH_present',0,' ',status)
        endif
+
+       if (lPAH_nRE) then
+          call ftpkyj(unit,'PAH_force_eq',0,' ',status)
+       else
+          call ftpkyj(unit,'PAH_force_eq',1,' ',status)
+       endif
     endif
 
     call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
@@ -1065,7 +1071,6 @@ contains
           is_eq(:,:,:) = 1
        endif
        call ftpprj(unit,group,fpixel,nelements,is_eq,status)
-
 
        if (lPAH_nRE) then
           !------------------------------------------------------------------------------
