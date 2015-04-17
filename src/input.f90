@@ -770,7 +770,7 @@ subroutine lect_lambda()
   integer :: alloc_status, lambda, status, n_comment, i, ios
   real :: fbuffer
 
-  real, parameter :: wl_factor = 1.0005
+  real :: wl_factor = 1.0005
 
   character(len=512) :: dir
 
@@ -844,29 +844,29 @@ subroutine lect_lambda()
   enddo
   close(unit=1)
 
-
   if (lProDiMo) then
-     write(*,*) "WARNING: matching step2 wavelength bins to ProDiMo set-up"
-     tab_lambda2_inf(1) = 0.0912
-     tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
-     tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
-     do lambda=2, n_lambda2
-        tab_lambda2_inf(lambda) = tab_lambda2_sup(lambda-1)
-        tab_lambda2_sup(lambda) = tab_lambda2(lambda)  * tab_lambda2(lambda)/tab_lambda2_inf(lambda)
-        tab_delta_lambda2(lambda) = tab_lambda2_sup(lambda) - tab_lambda2_inf(lambda)
-     enddo
+     if (abs(tab_lambda2(1) - 0.0912) > 1e-6) then
+        write(*,*) "WARNING: matching step2 wavelength bins to ProDiMo set-up"
+        tab_lambda2_inf(1) = 0.0912
+        tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
+        tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
+        do lambda=2, n_lambda2
+           tab_lambda2_inf(lambda) = tab_lambda2_sup(lambda-1)
+           tab_lambda2_sup(lambda) = tab_lambda2(lambda)  * tab_lambda2(lambda)/tab_lambda2_inf(lambda)
+           tab_delta_lambda2(lambda) = tab_lambda2_sup(lambda) - tab_lambda2_inf(lambda)
+        enddo
 
-     do lambda=1, n_lambda2
-        if (tab_delta_lambda2(lambda) <= 0.0) then
-           write(*,*) "ERROR in ProDiMo wavelength grid."
-           write(*,*) "Exiting"
-           write(*,*) lambda, "wl=", tab_lambda2(lambda), "delta=", tab_delta_lambda2(lambda)
-           write(*,*) "            min, max =", tab_lambda2_inf(lambda), tab_lambda2_sup(lambda)
-           stop
-        endif
-     enddo
-  endif ! lProDiMo
-
+        do lambda=1, n_lambda2
+           if (tab_delta_lambda2(lambda) <= 0.0) then
+              write(*,*) "ERROR in ProDiMo wavelength grid."
+              write(*,*) "Exiting"
+              write(*,*) lambda, "wl=", tab_lambda2(lambda), "delta=", tab_delta_lambda2(lambda)
+              write(*,*) "            min, max =", tab_lambda2_inf(lambda), tab_lambda2_sup(lambda)
+              stop
+           endif
+        enddo
+     endif ! test tab_lambda2 == 0.0912
+  endif !  lProDiMo
 
   do lambda=1, n_lambda2
      tab_delta_lambda2(lambda) = 0.01 * tab_lambda2(lambda)
