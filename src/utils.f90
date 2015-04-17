@@ -627,10 +627,10 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! get the correct url corresponding to the system
      if (system(1:5)=="Linux") then
-        url = trim(webpage)//"linux/mcfost"
+        url = trim(webpage)//"linux/mcfost_bin.tgz"
         url_sha1 = trim(webpage)//"linux/mcfost.sha1"
      else if (system(1:6)=="Darwin") then
-        url = trim(webpage)//"macos/mcfost"
+        url = trim(webpage)//"macos/mcfost_bin.tgz"
         url_sha1 = trim(webpage)//"macos/mcfost.sha1"
      else
         write(*,*) "Unknown operating system : error 2"
@@ -643,12 +643,12 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     cmd = "curl "//trim(url)//" -o mcfost_update -s"    ; call appel_syst(cmd, syst_status)
+     cmd = "curl "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
      cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s" ; call appel_syst(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
-        cmd = "rm -rf mcfost_update*"
+        cmd = "rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "ERROR during download. MCFOST has not been updated."
         write(*,*) "Exiting"
@@ -658,9 +658,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
      if (system(1:5)=="Linux") then
-        cmd = "sha1sum  mcfost_update > mcfost_update.sha1"
+        cmd = "sha1sum  mcfost_bin.tgz > mcfost_update.sha1"
      else if (system(1:6)=="Darwin") then
-        cmd = "openssl sha1 mcfost_update | awk '{print $2}' > mcfost_update.sha1"
+        cmd = "openssl sha1 mcfost_bin.tgz | awk '{print $2}' > mcfost_update.sha1"
      endif
      call appel_syst(cmd, syst_status)
 
@@ -683,6 +683,10 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,*) "Exiting"
         stop
      else
+        write(*,*) "Done"
+        write(*,'(a25, $)') "Decompressing binary ..."
+        cmd = "tar xzf mcfost_bin.tgz ; rm -rf mcfost_bin.tgz"
+        call appel_syst(cmd, syst_status)
         write(*,*) "Done"
      endif
 
