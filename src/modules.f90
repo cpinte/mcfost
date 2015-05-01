@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.19
-  character(8), parameter :: mcfost_release = "2.19.24"
+  character(8), parameter :: mcfost_release = "2.19.25"
   real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -498,6 +498,7 @@ module opacity
   real(kind=db), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
   real(kind=db), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
   real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
+  integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext
