@@ -119,6 +119,13 @@ subroutine alloc_dynamique()
   endif
   r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
 
+  allocate(tab_region(n_rad), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_region'
+     stop
+  endif
+  tab_region = 0
+
   allocate(z_lim(n_rad,nz+2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error z_lim'

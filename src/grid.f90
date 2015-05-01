@@ -165,6 +165,15 @@ subroutine define_physical_zones()
           i, disk_zone(i)%region, R1, R2
   enddo
 
+  ! Determine the zone for each cell
+  do ir = 1, n_regions
+     do i=1, n_rad
+        if ((r_grid(i,1) >  regions(ir)%Rmin).and.(r_grid(i,1) <  regions(ir)%Rmax)) then
+           tab_region(i) = ir
+        endif
+     enddo
+  enddo
+
   return
 
 end subroutine define_physical_zones

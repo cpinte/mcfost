@@ -420,7 +420,9 @@ contains
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
     integer, dimension(:,:,:), allocatable :: is_eq
+    real, dimension(:,:,:), allocatable :: TPAH_eq
     logical, dimension(n_grains_tot) :: mask_not_PAH
+    real, dimension(:,:,:,:), allocatable :: P_TPAH
 
     lPAH_nRE = .false.
     test_PAH : do i=1, n_pop
@@ -442,12 +444,13 @@ contains
 
     mask_not_PAH = .not.grain(:)%is_PAH
 
-    allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
+    !allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
+    allocate(is_eq(n_rad,nz,1), TPAH_eq(n_rad,nz,1), P_TPAH(n_T,n_rad,nz,1), stat=alloc_status)
     if (alloc_status > 0) then
-       write(*,*) 'Allocation error opaciteis_eq forProDiMo.fits.gz'
+       write(*,*) 'Allocation error is_eq forProDiMo.fits.gz'
        stop
     endif
-    is_eq = 0
+    is_eq = 0 ; TPAH_eq = 0.0 ; P_TPAH = 0.0
 
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
     if (alloc_status > 0) then
@@ -1004,8 +1007,10 @@ contains
           do ri=1,n_rad
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                   if (is_grain_PAH(l)) then
+                      opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
+                      opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                   endif ! is_grain_PAH
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1019,19 +1024,23 @@ contains
        naxis=3
        naxes(1)=n_rad
        naxes(2)=nz
-       naxes(3)=n_grains_PAH
+       naxes(3)= 1 !n_grains_PAH
        nelements=naxes(1)*naxes(2)*naxes(3)
 
-        ! create new hdu
+       ! create new hdu
        call ftcrhd(unit, status)
+
+       do i=1, n_rad
+          if (lPAH_nRE) then
+             TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,tab_region(i))
+          else
+             TPAH_eq(i,:,1) = temperature_1grain(i,:,tab_region(i))
+          endif
+       enddo
 
        !  Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-       if (lPAH_nRE) then
-          call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
-       else
-          call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
-       endif
+       call ftppre(unit,group,fpixel,nelements,TPAH_eq,status)
 
        !------------------------------------------------------------------------------
        ! HDU 18 : is PAH at equilibrium
@@ -1040,7 +1049,7 @@ contains
        naxis=3
        naxes(1)=n_rad
        naxes(2)=nz
-       naxes(3)=n_grains_PAH
+       naxes(3)=1 !n_grains_PAH
        nelements=naxes(1)*naxes(2)*naxes(3)
 
        ! create new hdu
@@ -1060,15 +1069,15 @@ contains
              do zj=1,nz
                 do l=grain_nRE_start, grain_nRE_end
                    if (l_RE(ri,zj,l)) then
-                      is_eq(ri,zj,l) = 1
+                      is_eq(ri,zj,1) = 1
                    else
-                      is_eq(ri,zj,l) = 0
+                      is_eq(ri,zj,1) = 0
                    endif
                 enddo
              enddo
           enddo
        else
-          is_eq(:,:,:) = 1
+          is_eq(:,:,1) = 1
        endif
        call ftpprj(unit,group,fpixel,nelements,is_eq,status)
 
@@ -1098,7 +1107,7 @@ contains
           naxes(1)=n_T
           naxes(2)=n_rad
           naxes(3)=nz
-          naxes(4)=n_grains_nRE
+          naxes(4)=1 !n_grains_nRE
           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
           ! create new hdu
@@ -1107,8 +1116,12 @@ contains
           !  Write the required header keywords.
           call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-          ! le e signifie real*4
-          call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
+          do i=1, n_rad
+             P_TPAH(:,i,:,1) = Proba_Temperature(:,i,:,tab_region(i))
+          enddo
+
+           ! le e signifie real*4
+          call ftppre(unit,group,fpixel,nelements,P_TPAH,status)
        endif !lPAH_nRE
 
     endif
