@@ -221,7 +221,7 @@ release : main
 	mkdir web web/linux web/macos
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
 	rsync -Pu *.f90 Makefile fosti:mcfost/src
 	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
@@ -247,7 +247,7 @@ release_mac : main
 	mkdir web web/macos
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost | awk '{print $$2}' > web/macos/mcfost.sha1
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
