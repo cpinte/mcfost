@@ -1003,14 +1003,13 @@ contains
        !  Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
+       opacite = 0.0
        do zj=1,nz
           do ri=1,n_rad
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   if (is_grain_PAH(l)) then
-                      opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                      opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
-                   endif ! is_grain_PAH
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1031,10 +1030,11 @@ contains
        call ftcrhd(unit, status)
 
        do i=1, n_rad
+          write(*,*) i, iPAH_start, tab_region(i)
           if (lPAH_nRE) then
-             TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,tab_region(i))
+             TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,iPAH_start-1+tab_region(i))
           else
-             TPAH_eq(i,:,1) = temperature_1grain(i,:,tab_region(i))
+             TPAH_eq(i,:,1) = temperature_1grain(i,:,iPAH_start-1+tab_region(i)) ! pas le bon index pour la taille de grain
           endif
        enddo
 
