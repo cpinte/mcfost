@@ -674,7 +674,7 @@ subroutine save_dust_prop(letape_th)
 
   open(1,file=filename,status='replace',form='unformatted')
   write(1) dust_pop_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, is_grain_PAH
   close(unit=1)
 
   return

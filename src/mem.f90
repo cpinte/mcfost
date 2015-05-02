@@ -1354,7 +1354,6 @@ subroutine realloc_step2()
   endif
   n_phot_sed2 = 0.0
 
-
   deallocate(sed)
   allocate(sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1362,7 +1361,6 @@ subroutine realloc_step2()
      stop
   endif
   sed = 0.0
-
 
 
   deallocate(sed_q)
@@ -1714,13 +1712,13 @@ subroutine realloc_step2()
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
   if (l3D) then
-     allocate(amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
+     allocate(amax_reel(n_lambda2,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda2,n_rad,-nz-1:nz+1,n_az), &
+          kappa_abs_eg(n_lambda2,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
     ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
     ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
   else
-     allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_eg(n_lambda,n_rad,nz+1,1), stat=alloc_status)
+     allocate(amax_reel(n_lambda2,n_rad,nz+1,1), kappa(n_lambda2,n_rad,nz+1,1), &
+          kappa_abs_eg(n_lambda2,n_rad,nz+1,1), stat=alloc_status)
     ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
     ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
   endif
