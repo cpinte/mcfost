@@ -946,7 +946,7 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
         fact4 = frac_a * frac_lambda
 
      else ! Ordre decroisant
-        do i=2,op_file_n_lambda(pop)
+        do i=2,op_file_n_lambda(pop)-1
            if (log(op_file_lambda(i,pop)) < log_wavel) exit
         enddo
         !log(op_file_lambda(i-1)) > log_wavel >  log(op_file_lambda(i))
