@@ -12,8 +12,45 @@ module grid
 
   implicit none
 
+  ! Nombre de cellules totale
+  integer :: n_cells, nrz
+
   contains
 
+!******************************************************************************
+
+subroutine cylindrical2cell(i,j,k, icell)
+  ! icell is between 1 and n_rad * n_z * n_az
+
+  integer, intent(in) :: i,j,k
+  integer, intent(out) :: icell
+
+
+  icell = i + n_rad * ( j-1 + nz * (k-1))
+
+  return
+
+end subroutine cylindrical2cell
+
+!******************************************************************************
+
+subroutine cell2cylindrical(icell, i,j,k)
+
+  integer, intent(in) :: icell
+  integer, intent(out) :: i,j,k
+
+  integer :: ij ! indice combine iet j, ie : i + (j-1) * n_rad
+
+  k = icell/nrz + 1 ; if (k > n_az) k=n_az
+
+  ij = icell - k*nrz
+  j = (ij)/n_rad + 1 ; if (j > nz) j=nz
+
+  i = ij - j*nz
+
+  return
+
+end subroutine cell2cylindrical
 
 !******************************************************************************
 
@@ -35,7 +72,7 @@ module grid
    ! order following Rin
    order = bubble_sort(disk_zone(:)%Rmin)
 
-   ! Reordoring zones
+   ! Reordering zones
    do i=1, n_zones
       disk_zone(i) =  disk_zone_tmp(order(i))
       do ipop=1,n_pop  ! reordering zone index in pops
@@ -193,6 +230,9 @@ subroutine define_grid4()
   type(disk_zone_type) :: dz
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+  nrz = n_rad * nz
+  n_cells = nrz * n_az
 
   Rmax2 = Rmax*Rmax
 
@@ -575,6 +615,9 @@ subroutine define_grid3()
   real(kind=db), dimension(n_rad_in+1) :: tab_r_tmp2
 
   type(disk_zone_type) :: dz
+
+  nrz = n_rad * nz
+  n_cells = nrz * n_az
 
   Rmax2=Rmax*Rmax
 

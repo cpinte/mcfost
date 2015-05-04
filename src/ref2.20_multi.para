@@ -1,0 +1,99 @@
+2.20                      mcfost version
+
+#Number of photon packages
+  1.28e5                  nbr_photons_eq_th  : T computation
+  1.28e3	          nbr_photons_lambda : SED computation
+  1.28e5                  nbr_photons_image  : images computation
+
+#Wavelength
+  50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum]  Do not change this line unless you know what you are doing
+  T T T 		  compute temperature?, compute sed?, use default wavelength grid for output ?
+  IMLup.lambda		  wavelength file (if previous parameter is F)
+  F F			  separation of different contributions?, stokes parameters?
+
+#Grid geometry and size
+  1			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
+  100 70 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
+
+#Maps
+  101 101 3000.           grid (nx,ny), size [AU]
+  10 1   1                MC : N_bin_incl, N_bin_az
+  45.  45.  1  F          RT: imin, imax, n_incl, centered ?
+  0    0.   1             RT: az_min, az_max, n_az angles
+  140.0			  distance (pc)
+  0.			  disk PA
+
+#Scattering method
+  0	                  0=auto, 1=grain prop, 2=cell prop
+  1	                  1=Mie, 2=hg (2 implies the loss of polarizarion)
+
+#Symetries
+  T	                  image symmetry
+  T	                  central symmetry
+  T	                  axial symmetry (important only if N_phi > 1)
+
+#Disk physics
+  1     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  F                       dust radial migration
+  F		  	  sublimate dust
+  F                       hydostatic equilibrium
+  F  1e-5		  viscous heating, alpha_viscosity
+
+#Number of zones : 1 zone = 1 density structure + corresponding grain properties
+  2
+
+#Density structure
+  1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = debris disk, 5 = wall
+  1.e-8    100.		  dust mass,  gas-to-dust mass ratio
+  10.  100.0   2          scale height, reference radius (AU), unused for envelope, vertical profile exponent (only for debris disk)
+  1.  0.  5.0 5.0         Rin, edge, Rout, Rc (AU) Rc is only used for tappered-edge disks (Rout set to 8*Rc if Rout==0)
+  1.125                   flaring exponent, unused for envelope
+  -0.5   -0.5   	  surface density exponent (or -gamma for tappered-edge disk), usually < 0, -gamma_exp (or alpha_in & alpha_out for debris disk)
+
+  1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = wall
+  1.e-3    100.		  dust mass,  gas-to-dust mass ratio
+  10.  100.0  2           scale height, reference radius (AU), unused for envelope, vertical profile exponent (only for debris disk)
+  10.  0.    300.0 100.0  Rin, edge, Rout, Rc (AU) Rc is only used for tappered-edge disks (Rout set to 8*Rc if Rout==0)
+  1.125                   flaring exponent, unused for envelope
+  -0.5  -0.5    	  surface density exponent (or -gamma for tappered-edge disk), usually < 0, -gamma_exp (or alpha_in & alpha_out for debris disk)
+
+#Cavity : everything is empty above the surface
+ F	  	     	  cavity ?
+ 15. 50.		  height, reference radius (AU)
+ 1.5 			  flaring exponent
+
+#Grain properties
+  1  Number of species
+  Mie   1 2    0.0  1.0   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  Draine_Si_sUV.dat  1.0  Optical indices file, volume fraction
+  1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
+
+
+  2  Number of species
+  Mie   2 2    0.0  0.999   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  Draine_Si_sUV.dat  0.8  Optical indices file, volume fraction
+  ice_opct.dat  0.2  Optical indices file, volume fraction
+  1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
+
+  Mie   1 2    0.0  1.e-3   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  PAHneu.dat  1.0  Optical indices file, volume fraction
+  3	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  5e-4  5e-4 3.5 1 	  amin, amax [mum], aexp, n_grains (log distribution)
+
+#Molecular RT settings
+  T T T 15.	          lpop, laccurate_pop, LTE, profile width (km.s^-1)
+  0.2 			  v_turb (delta)
+  1			  nmol
+  co@xpol.dat 6           molecular data filename, level_max
+  1.0 20     	  	  vmax (km.s^-1), n_speed
+  T 1.e-6 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
+  T  3                       ray tracing ?,  number of lines in ray-tracing
+  1 2 3	 		  transition numbers
+
+#Star properties
+  1 Number of stars
+  4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), is a blackbody?
+  lte4000-3.5.NextGen.fits.gz
+  0.1	2.2  fUV, slope_fUV
