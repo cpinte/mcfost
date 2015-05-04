@@ -218,7 +218,7 @@ voronoi : Voronoi.o
 #*************************************************************
 
 release : main
-	git tag -d release
+	- git tag -d release
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/macos
