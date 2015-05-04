@@ -33,23 +33,12 @@ subroutine alloc_dynamique()
   gauss_random_saved = 0.0_db
   lgauss_random_saved = .false.
 
-  allocate(nnfot2(nb_proc))
-  nnfot2=0.0_db
-
-  allocate(n_phot_sed2(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error n_phot_sed2'
-     stop
-  endif
-  n_phot_sed2 = 0.0
-
-
-  allocate(n_phot_envoyes(n_lambda,nb_proc), n_phot_envoyes_loc(n_lambda,nb_proc),  stat=alloc_status)
+  allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
   endif
-  n_phot_envoyes = 0.0 ; n_phot_envoyes_loc = 0.0
+  n_phot_envoyes = 0.0
 
   !***************************************************
   ! Tableaux relatifs a la propagation des paquets : othin ...
@@ -75,7 +64,7 @@ subroutine alloc_dynamique()
      write(*,*) 'Allocation error tab_length'
      stop
   endif
-  tab_length = 0.0 ; tab_tau = 0.0 ; tab_length_tot=0.0!tab_tau(id:0)=0.0
+  tab_length = 0.0 ; tab_tau = 0.0 ; tab_length_tot=0.0
 
 
   allocate(tab_x0(nb_proc,n_cell_max), tab_y0(nb_proc,n_cell_max), tab_z0(nb_proc,n_cell_max),stat=alloc_status)
@@ -783,63 +772,63 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs aux SEDs
   ! **************************************************
   if (lTemp.or.lsed) then
-     allocate(sed(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed'
         stop
      endif
      sed = 0.0
 
-     allocate(sed_q(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_q(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_q'
         stop
      endif
      sed_q = 0.0
 
-     allocate(sed_u(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_u(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_u'
         stop
      endif
      sed_u = 0.0
 
-     allocate(sed_v(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_v(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_v'
         stop
      endif
      sed_v = 0.0
 
-     allocate(sed_star(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_star(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_star'
         stop
      endif
      sed_star = 0.0
 
-     allocate(sed_star_scat(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_star_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_star_scat'
         stop
      endif
      sed_star_scat = 0.0
 
-     allocate(sed_disk(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_disk(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_disk'
         stop
      endif
      sed_disk = 0.0
 
-     allocate(sed_disk_scat(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(sed_disk_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sed_disk_scat'
         stop
      endif
      sed_disk_scat = 0.0
 
-     allocate(n_phot_sed(nb_proc,n_lambda,N_thet,N_phi), stat=alloc_status)
+     allocate(n_phot_sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error n_phot_sed'
         stop
@@ -1051,7 +1040,7 @@ end subroutine alloc_dynamique
 
 subroutine dealloc_em_th()
 
-  deallocate(nnfot2,n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc)
+  deallocate(n_phot_envoyes)
 
   !deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
   !deallocate(tab_x0,tab_y0,tab_z0)
@@ -1346,16 +1335,8 @@ subroutine realloc_step2()
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda=0.0
   tab_amu1=0.0 ; tab_amu2=0.0 ;  tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
-  deallocate(n_phot_sed2)
-  allocate(n_phot_sed2(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error n_phot_sed2'
-     stop
-  endif
-  n_phot_sed2 = 0.0
-
   deallocate(sed)
-  allocate(sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed'
      stop
@@ -1364,7 +1345,7 @@ subroutine realloc_step2()
 
 
   deallocate(sed_q)
-  allocate(sed_q(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_q(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_q'
      stop
@@ -1372,7 +1353,7 @@ subroutine realloc_step2()
   sed_q = 0.0
 
   deallocate(sed_u)
-  allocate(sed_u(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_u(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_u'
      stop
@@ -1380,7 +1361,7 @@ subroutine realloc_step2()
   sed_u = 0.0
 
   deallocate(sed_v)
-  allocate(sed_v(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_v(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_v'
      stop
@@ -1388,7 +1369,7 @@ subroutine realloc_step2()
   sed_v = 0.0
 
   deallocate(sed_star)
-  allocate(sed_star(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_star(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_star'
      stop
@@ -1396,7 +1377,7 @@ subroutine realloc_step2()
   sed_star = 0.0
 
   deallocate(sed_star_scat)
-  allocate(sed_star_scat(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_star_scat(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_star_scat'
      stop
@@ -1404,7 +1385,7 @@ subroutine realloc_step2()
   sed_star_scat = 0.0
 
   deallocate(sed_disk)
-  allocate(sed_disk(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_disk(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_disk'
      stop
@@ -1412,7 +1393,7 @@ subroutine realloc_step2()
   sed_disk = 0.0
 
   deallocate(sed_disk_scat)
-  allocate(sed_disk_scat(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(sed_disk_scat(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error sed_disk_scat'
      stop
@@ -1420,7 +1401,7 @@ subroutine realloc_step2()
   sed_disk_scat = 0.0
 
   deallocate(n_phot_sed)
-  allocate(n_phot_sed(nb_proc,n_lambda2,N_thet,N_phi), stat=alloc_status)
+  allocate(n_phot_sed(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_sed'
      stop
@@ -1436,13 +1417,13 @@ subroutine realloc_step2()
   sed2_io=0.0
   wave2_io=0.0
 
-  deallocate(n_phot_envoyes, n_phot_envoyes_loc)
-  allocate(n_phot_envoyes(n_lambda2,nb_proc), n_phot_envoyes_loc(n_lambda2,nb_proc),  stat=alloc_status)
+  deallocate(n_phot_envoyes)
+  allocate(n_phot_envoyes(n_lambda2,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error n_phot_envoyes'
      stop
   endif
-  n_phot_envoyes = 0.0 ; n_phot_envoyes_loc = 0.0
+  n_phot_envoyes = 0.0
 
   deallocate(prob_E_cell)
   if (l3D) then
@@ -1887,12 +1868,12 @@ subroutine alloc_emission_mol(imol)
      RT_line_method = 2 ! creation d'une carte avec pixels carres
 
      write(*,*) "WARNING : memory size if lots of pixels"
-     allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(igridx,igridy,nTrans_raytracing,RT_n_ibin), stars_map(igridx,igridy), stat=alloc_status)
+     allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+          continu(igridx,igridy,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(igridx,igridy), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
-     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_ibin), &
-          continu(1,1,nTrans_raytracing,RT_n_ibin), stars_map(1,1), stat=alloc_status)
+     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+          continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre'

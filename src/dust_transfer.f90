@@ -46,7 +46,7 @@ subroutine transfert_poussiere()
   ! Parametres simu
   integer :: time, lambda_seuil, ymap0, xmap0, nbre_phot2
   integer :: ind_etape, first_etape_obs
-  integer :: etape_start, nnfot1_start, n_iter, ibin
+  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz
 
   real :: n_phot_lim
   logical :: lpacket_alive, lintersect
@@ -56,20 +56,23 @@ subroutine transfert_poussiere()
   ! NEW
   integer, target :: lambda, lambda0
   integer, pointer, save :: p_lambda
+  integer :: capt
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand
   integer :: i, ri, zj, phik
   logical :: flag_star, flag_scatt, flag_ISM
 
-
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
 
   ! Paramètres parallelisation
   integer :: id=1
 
-  real(kind=db), dimension(:), pointer :: p_nnfot2
+  real(kind=db), target :: nnfot2, n_phot_sed2
+  real(kind=db), pointer :: p_nnfot2
+  real(kind=db) :: n_phot_envoyes_in_loop
 
+  nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
@@ -122,7 +125,6 @@ subroutine transfert_poussiere()
 
   ! Allocation dynamique
   call alloc_dynamique()
-  allocate(p_nnfot2(nb_proc))
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -279,7 +281,7 @@ subroutine transfert_poussiere()
            endif
            do lambda=1,n_lambda
               if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
@@ -469,13 +471,12 @@ subroutine transfert_poussiere()
      !$omp parallel &
      !$omp default(none) &
      !$omp firstprivate(lambda) &
-     !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,rand) &
-     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt) &
+     !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
+     !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-     !$omp shared(n_phot_sed2,n_phot_envoyes,n_phot_envoyes_loc,nbre_phot2,nnfot2,lforce_1st_scatt) &
+     !$omp shared(nbre_phot2,lforce_1st_scatt,n_phot_envoyes) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
      !$omp reduction(+:E_abs_nRE)
-
      if (letape_th) then
         p_nnfot2 => nnfot2
         E_abs_nRE = 0.0
@@ -483,7 +484,7 @@ subroutine transfert_poussiere()
         if (lmono0) then
            p_nnfot2 => nnfot2
         else
-           p_nnfot2 => n_phot_sed2(:,lambda,capt_sup,1)
+           p_nnfot2 => n_phot_sed2
 
            if (lProDiMo)  then
               p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
@@ -500,11 +501,12 @@ subroutine transfert_poussiere()
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
         if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
-        p_nnfot2(id) = 0
-        n_phot_envoyes_loc(lambda,id) = 0.0
-        photon : do while ((p_nnfot2(id) < nbre_phot2).and.(n_phot_envoyes_loc(lambda,id) < n_phot_lim))
+        p_nnfot2 = 0.0_db
+        n_phot_envoyes_in_loop = 0.0_db
+        photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_in_loop < n_phot_lim))
+           nnfot2=nnfot2+1.0_db
            n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
-           n_phot_envoyes_loc(lambda,id) = n_phot_envoyes_loc(lambda,id) + 1.0_db
+           n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_db
 
            ! Choix longueur d'onde
            if (.not.lmono) then
@@ -514,7 +516,6 @@ subroutine transfert_poussiere()
 
            ! Emission du paquet
            call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
-           nnfot2(id)=nnfot2(id)+1.0_db  ! todo : peut-etre a ne faire que pour les packets qui intersecte (+ il faut garder leur)
            lpacket_alive = .true.
 
            if (lintersect) then
@@ -529,8 +530,10 @@ subroutine transfert_poussiere()
            endif
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
-           if (lpacket_alive.and.(.not.flag_ISM)) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
-
+           if (lpacket_alive.and.(.not.flag_ISM)) then
+              call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
+           endif
         enddo photon !nnfot2
      enddo !nnfot1
      !$omp end do
@@ -550,8 +553,8 @@ subroutine transfert_poussiere()
 
         !$omp parallel &
         !$omp default(none) &
-        !$omp shared(lambda,nnfot2,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
-        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive)
+        !$omp shared(lambda,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
+        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive,nnfot2)
 
         flag_star = .false.
         phik=1
@@ -559,8 +562,8 @@ subroutine transfert_poussiere()
         !$omp do schedule(dynamic,1)
         do nnfot1=1,nbre_photons_loop
            !$ id = omp_get_thread_num() + 1
-           nnfot2(id) = 0.0_db
-           photon_ISM : do while (nnfot2(id) < nbre_photons_lambda)
+           nnfot2 = 0.0_db
+           photon_ISM : do while (nnfot2 < nbre_photons_lambda)
               n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_db
 
               ! Emission du paquet
@@ -571,7 +574,7 @@ subroutine transfert_poussiere()
               if (.not.lintersect) then
                  cycle photon_ISM
               else
-                 nnfot2(id) = nnfot2(id) + 1.0_db
+                 nnfot2 = nnfot2 + 1.0_db
                  ! Propagation du packet
                  call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
@@ -596,13 +599,17 @@ subroutine transfert_poussiere()
            time=int((time_end - time_begin)/time_tick)
            write (*,'("Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
 
-           do ibin=1,RT_n_ibin
+           do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
-                 call init_dust_source_fct1(lambda,ibin)
+                 do iaz=1, RT_n_az
+                    call init_dust_source_fct1(lambda,ibin,iaz)
+                    call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                 enddo
               else
+                 iaz=1
                  call init_dust_source_fct2(lambda,ibin)
+                 call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
               endif
-              call dust_map(lambda,ibin) ! Ne prend pas de temps en SED
 
               call system_clock(time_end)
               time=int((time_end - time_begin)/time_tick)
@@ -681,13 +688,17 @@ subroutine transfert_poussiere()
 
         ! SED ray-tracing
         if (lscatt_ray_tracing) then
-           do ibin=1,RT_n_ibin
+           do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
-                 call init_dust_source_fct1(lambda,ibin)
+                 do iaz=1, RT_n_az
+                    call init_dust_source_fct1(lambda,ibin,iaz)
+                    call dust_map(lambda,ibin,iaz)
+                 enddo
               else
+                 iaz=1
                  call init_dust_source_fct2(lambda,ibin)
+                 call dust_map(lambda,ibin,iaz)
               endif
-              call dust_map(lambda,ibin)
            enddo
 
            ! Pour longeur d'onde suivante
@@ -1079,7 +1090,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
 
   logical :: flag_sortie, flag_direct_star
 
-  integer :: p_ri, p_zj, p_phik, ri_save, zj_save, phik_save, taille_grain, itheta
+  integer :: p_ri, p_zj, p_phik, ri_save, zj_save, phik_save, taille_grain, itheta, capt
   real :: tau_max, rand, rand2, tau, dvol
   real(kind=db) :: frac_transmise, frac_diff, x_save, y_save, z_save, lmin, lmax, frac
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
@@ -1109,7 +1120,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
      ! fraction transmise
      frac_transmise = exp(-tau_max)
      Stokes(:) = frac_transmise * Stokes_old(:)
-     if (Stokes(1) > 1.0e-30) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt)
+     if (Stokes(1) > 1.0e-30) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
 
      ! tau_max=0.0 --> pas de diff
      if (tau_max >  tiny_real) then
@@ -1313,7 +1324,7 @@ end subroutine force_1st_scatt
 
 !***********************************************************
 
-subroutine dust_map(lambda,ibin)
+subroutine dust_map(lambda,ibin,iaz)
   ! Creation de la carte d'emission de la poussiere
   ! par ray-tracing dans une direction donnee
   ! C. Pinte
@@ -1323,8 +1334,8 @@ subroutine dust_map(lambda,ibin)
 
 #include "sprng_f.h"
 
-  integer, intent(in) :: lambda, ibin
-  real(kind=db) :: uv, u,v,w
+  integer, intent(in) :: lambda, ibin, iaz
+  real(kind=db) :: u,v,w
 
   real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner
@@ -1339,17 +1350,14 @@ subroutine dust_map(lambda,ibin)
 
   if (lmono0) write(*,'(a16, $)') " Ray-tracing ..."
 
-  phi_RT = 0.
-
   ! Direction de visee pour le ray-tracing
-  uv = sin(tab_RT_incl(ibin) * deg_to_rad) ;  w = cos(tab_RT_incl(ibin) * deg_to_rad)
-  u = uv * cos(phi_RT * deg_to_rad) ; v = uv * sin(phi_RT * deg_to_rad) ;
+  u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
 
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(phi_RT * deg_to_rad),-cos(phi_RT * deg_to_rad),0.0_db/)
+  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -1409,7 +1417,7 @@ subroutine dust_map(lambda,ibin)
      !$omp parallel &
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j,ibin) &
+     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j,ibin,iaz) &
      !$omp shared(n_iter_min,n_iter_max,lambda,l_sym_ima,cst_phi)
      id =1 ! pour code sequentiel
 
@@ -1424,7 +1432,7 @@ subroutine dust_map(lambda,ibin)
            phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
-           call intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
@@ -1450,7 +1458,7 @@ subroutine dust_map(lambda,ibin)
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
-     !$omp shared(Icorner,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy,n_iter_min,n_iter_max,ibin)
+     !$omp shared(Icorner,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy,n_iter_min,n_iter_max,ibin,iaz)
      id =1 ! pour code sequentiel
      n_iter_min = 2
      n_iter_max = 6
@@ -1461,7 +1469,7 @@ subroutine dust_map(lambda,ibin)
         do j = 1,igridy
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
-           call intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
      !$omp end do
@@ -1471,19 +1479,19 @@ subroutine dust_map(lambda,ibin)
      ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
      if (l_sym_ima) then
         do i=igridx_max+1,igridx
-           Stokes_ray_tracing(lambda,i,:,ibin,:,:) = Stokes_ray_tracing(lambda,igridx-i+1,:,ibin,:,:)
+           Stokes_ray_tracing(lambda,i,:,ibin,iaz,:,:) = Stokes_ray_tracing(lambda,igridx-i+1,:,ibin,iaz,:,:)
         enddo
      endif ! l_sym_image
 
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda,ibin, u, v, w)
+  call compute_stars_map(lambda, iaz, u, v, w)
 
   id = 1
-  Stokes_ray_tracing(lambda,:,:,ibin,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,1,id) + stars_map
+  Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map
   if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,n_Stokes+1,id) + stars_map
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) + stars_map
   endif
 
   if (lmono0) write(*,*) "Done"
@@ -1494,16 +1502,16 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda,ibin, u,v,w)
+subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! Make a ray-traced map of the stars
 
-  integer, intent(in) :: lambda, ibin
+  integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
   integer, parameter :: n_ray_star = 1000
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: facteur, x0,y0,z0, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
+  real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
   real :: rand, rand2, tau
   integer :: id, ri, zj, phik, iray, istar, i,j
   logical :: in_map
@@ -1549,9 +1557,12 @@ subroutine compute_stars_map(lambda,ibin, u,v,w)
         !cos_thet = 1.0_db ;
 
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
-        x0 = etoile(istar)%x + x * etoile(istar)%r
-        y0 = -(etoile(istar)%y + y * etoile(istar)%r)
+        x1 = etoile(istar)%x + x * etoile(istar)%r
+        y1 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
+
+        x0 = x1 * cos(tab_RT_az(iaz) * deg_to_rad) + y1 * sin(tab_RT_az(iaz) * deg_to_rad)
+        y0 = x1 * sin(tab_RT_az(iaz) * deg_to_rad) - y1 * cos(tab_RT_az(iaz) * deg_to_rad)
 
         Stokes = 0.0_db
         if (l3D) then
@@ -1590,7 +1601,7 @@ end subroutine compute_stars_map
 
 !***********************************************************
 
-subroutine intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
+subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
   ! Calcule l'intensite d'un pixel carre de taille, position et orientation arbitaires
   ! par une methode de Ray-tracing
   ! (u,v,w) pointe vers l'observateur
@@ -1602,7 +1613,7 @@ subroutine intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,ipix,jpix,p
 
   implicit none
 
-  integer, intent(in) :: lambda, ibin, ipix,jpix,id, n_iter_min, n_iter_max
+  integer, intent(in) :: lambda, ibin, iaz,ipix,jpix,id, n_iter_min, n_iter_max
   real(kind=db), dimension(3), intent(in) :: pixelcorner,dx,dy
   real(kind=db), intent(in) :: pixelsize,u,v,w
 
@@ -1687,9 +1698,9 @@ subroutine intensite_pixel_dust(id,ibin,n_iter_min,n_iter_max,lambda,ipix,jpix,p
 
   if (lsed) then
      ! Sommation sur les pixels implicite
-     Stokes_ray_tracing(lambda,ipix,jpix,ibin,:,id) = Stokes_ray_tracing(lambda,ipix,jpix,ibin,:,id) + Stokes(:)
+     Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) = Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) + Stokes(:)
   else
-     Stokes_ray_tracing(lambda,ipix,jpix,ibin,:,id) = Stokes(:)
+     Stokes_ray_tracing(lambda,ipix,jpix,ibin,iaz,:,id) = Stokes(:)
   endif
 
   return

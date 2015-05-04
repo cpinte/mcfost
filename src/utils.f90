@@ -543,7 +543,8 @@ subroutine mcfost_setup()
   call mcfost_get_ref_para()
   call mcfost_get_manual()
   ! Write date of the last time an update was search for
-  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "//trim(mcfost_utils)//"/.last_update"
+  cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
+       //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
   write(*,*) "MCFOST set-up was sucessful"

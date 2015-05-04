@@ -128,7 +128,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   ! Calcule les angles de diffusion pour la direction de propagation donnee
-  if ((.not.letape_th).and.lscatt_ray_tracing1) call angle_scatt_rt1(id,u,v,w)
+  if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -918,7 +918,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   endif
 
   ! Calcule les angles de diffusion pour la direction de propagation donnee
-  if ((.not.letape_th).and.lscatt_ray_tracing1) call angle_scatt_rt1(id,u,v,w)
+  if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie

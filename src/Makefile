@@ -210,6 +210,9 @@ endif
 mcfost2prodimo : mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
 
+voronoi : Voronoi.o
+	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
+
 #*************************************************************
 # Release
 #*************************************************************
