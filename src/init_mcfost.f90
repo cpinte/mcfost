@@ -245,6 +245,10 @@ subroutine initialisation_mcfost()
         call mcfost_get_manual()
      else if (para(2:14)=="get_yorick") then ! force update utils
         call get_yorick()
+     else if (para(2:4)=="url") then
+        write(*,*) trim(webpage)//"linux/mcfost_bin.tgz"
+        write(*,*) trim(webpage)//"mac/mcfost_bin.tgz"
+        stop
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then ! force update utils
