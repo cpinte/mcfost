@@ -47,9 +47,9 @@ MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
 FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
 ifeq ($(ARCH),LINUX)
-#MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
-MACH = -xW -axP # for fostino and ifort 10
-FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
+MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
+#MACH = -xW -axP # for fostino and ifort 10
+FFLAGS_EXE = $(PREC)  -static-intel #-static-libcxa -i-static
 endif
 
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
@@ -226,10 +226,10 @@ release : main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
-	rsync -Pu *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
-	scp fosti:mcfost/src/mcfost_bin.tgz web/linux/
-	scp fosti:mcfost/src/mcfost.sha1 web/linux/
+	rsync -Pu *.f90 Makefile froggy:mcfost/src
+	ssh froggy "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	scp froggy:mcfost/src/mcfost_bin.tgz web/linux/
+	scp froggy:mcfost/src/mcfost.sha1 web/linux/
 	rm -rf ../utils/Version
 	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
