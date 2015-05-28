@@ -579,12 +579,12 @@ subroutine define_grid4()
   enddo
 
   ! Just a check
-  do i=1, n_rad
-     if (tab_region(i) == 0) then
-        write(*,*) "ERROR in tab_region array", i, r_grid(i,1)
-        stop
-     endif
-  enddo
+!  do i=1, n_rad
+!     if (tab_region(i) == 0) then ! must be 0 in a gap
+!        write(*,*) "ERROR in tab_region array", i, r_grid(i,1)
+!        stop
+!     endif
+!  enddo
 
   return
 

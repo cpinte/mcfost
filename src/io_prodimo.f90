@@ -1030,11 +1030,14 @@ contains
        call ftcrhd(unit, status)
 
        do i=1, n_rad
-          write(*,*) i, iPAH_start, tab_region(i)
-          if (lPAH_nRE) then
-             TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,iPAH_start-1+tab_region(i))
+          if (tab_region(i) > 0) then ! region non vide
+             if (lPAH_nRE) then
+                TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,iPAH_start-1+tab_region(i))
+             else
+                TPAH_eq(i,:,1) = temperature_1grain(i,:,iPAH_start-1+tab_region(i)) ! pas le bon index pour la taille de grain
+             endif
           else
-             TPAH_eq(i,:,1) = temperature_1grain(i,:,iPAH_start-1+tab_region(i)) ! pas le bon index pour la taille de grain
+             TPAH_eq(i,:,1) = 1.0
           endif
        enddo
 
@@ -1117,7 +1120,11 @@ contains
           call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
           do i=1, n_rad
-             P_TPAH(:,i,:,1) = Proba_Temperature(:,i,:,tab_region(i))
+             if (tab_region(i) > 0) then
+                P_TPAH(:,i,:,1) = Proba_Temperature(:,i,:,tab_region(i))
+             else
+                P_TPAH(:,i,:,1) = 0.0
+             endif
           enddo
 
            ! le e signifie real*4
