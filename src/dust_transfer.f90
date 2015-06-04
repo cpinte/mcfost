@@ -222,7 +222,9 @@ subroutine transfert_poussiere()
      if (lopacite_only) stop
 
      if (l_em_disk_image) then ! le disque émet
-        call lect_Temperature()
+        if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
+           call lect_Temperature()
+        endif
      else ! Seule l'étoile émet
         Temperature=0.0
      endif !l_em_disk_image
@@ -243,7 +245,9 @@ subroutine transfert_poussiere()
      else
         etape_i=2
         letape_th=.false.
-        call lect_Temperature()
+        if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
+           call lect_Temperature()
+        endif
      endif
      if (lsed) then
         if (lsed_complete) then

@@ -1350,7 +1350,7 @@ subroutine save_data
   lmove_data = .false.
 
   if (lonly_diff_approx) return
-  if (lsed.and.(.not.ltemp)) return
+  !if (lsed.and.(.not.ltemp)) return
 
   if (ldust_prop .or. ldisk_struct) then
      if (is_dir(trim(data_dir))) then
