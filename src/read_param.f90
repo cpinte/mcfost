@@ -571,13 +571,6 @@ contains
        enddo !n_zones
     endif ! lfits
 
-!    if (lRE_LTE.and.lRE_nLTE) then
-!       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-!       write(*,*) " Is it usefull anyway ???"
-!       write(*,*) "Exiting"
-!       stop
-!    endif
-
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
     if (alloc_status > 0) then
@@ -1143,13 +1136,6 @@ contains
           enddo
        enddo !n_zones
     endif ! lfits
-
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
