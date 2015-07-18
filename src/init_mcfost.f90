@@ -15,7 +15,6 @@ module init_mcfost
   use mem
   use ProdiMo
   use utils
-  use filter
 
   implicit none
 
@@ -888,7 +887,6 @@ subroutine initialisation_mcfost()
   else
      call read_para()
   endif
-  call check_init()
 
   if (lemission_mol.and.para_version < 2.11) then
      write(*,*) "ERROR: parameter version must be larger than 2.10"
