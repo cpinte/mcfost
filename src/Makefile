@@ -49,7 +49,7 @@ endif
 ifeq ($(ARCH),LINUX)
 MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
 #MACH = -xW -axP # for fostino and ifort 10
-FFLAGS_EXE = $(PREC)  -static-intel #-static-libcxa -i-static
+FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 endif
 
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
@@ -167,7 +167,7 @@ endif
 
 
 SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
-	benchmarks.f90 	read_param.f90 io_prodimo.f90 filter.f90 \
+	benchmarks.f90 	read_param.f90 io_prodimo.f90 \
 	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
 	dust.f90 molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
