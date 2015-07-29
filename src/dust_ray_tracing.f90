@@ -24,6 +24,20 @@ module dust_ray_tracing
   contains
 
 
+integer function RT2d_to_RT1d(ibin, iaz)
+  ! Combines the 2d RT direction indices into 1 index
+  ! RT2d_to_RT1d is between 1 and RT_n_incl * RT_n_az
+
+  integer, intent(in) :: ibin,iaz
+
+  RT2d_to_RT1d = ibin + RT_n_incl * (iaz-1)
+
+  return
+
+end function RT2d_to_RT1d
+
+!******************************************************************************
+
 subroutine alloc_ray_tracing()
   ! Alloue les tableaux pour le ray-tracing
   ! C. Pinte
@@ -119,10 +133,10 @@ subroutine alloc_ray_tracing()
 
   if (lscatt_ray_tracing1) then
      if (l3D) then
-        allocate(xI_scatt(N_type_flux,RT_n_incl,RT_n_az,n_rad,-nz:nz,n_az_rt,1,nb_proc), stat=alloc_status)
+        allocate(xI_scatt(N_type_flux,RT_n_incl*RT_n_az,n_rad,-nz:nz,n_az_rt,1,nb_proc), stat=alloc_status)
         mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_rad * 2 * nz * n_az_rt * nb_proc * 4 / 1024.**2
      else
-        allocate(xI_scatt(N_type_flux,RT_n_incl,RT_n_az,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
+        allocate(xI_scatt(N_type_flux,RT_n_incl*RT_n_az,n_rad,nz,n_az_rt,0:1,nb_proc), stat=alloc_status)
         mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_rad * nz * n_az_rt * nb_proc * 4 / 1024.**2
      endif
      if (mem_size > 500) write(*,*) "Trying to allocate", mem_size, "MB for ray-tracing"
@@ -499,7 +513,7 @@ subroutine calc_xI_scatt(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   integer, intent(in) :: id, lambda, ri, zj, phik, psup
 
   real(kind=db) :: flux
-  integer :: ibin, iaz, it, p_ri, p_zj, p_phik
+  integer :: ibin, iaz, iRT, it, p_ri, p_zj, p_phik
 
   if (lstrat) then
      p_ri = ri
@@ -521,15 +535,16 @@ subroutine calc_xI_scatt(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
         flux = l * stokes * tab_s11_ray_tracing(lambda,p_ri,p_zj,p_phik,it) !* sin_scatt_rt1(ibin,id)
         ! TODO : est-ce qu'il ne faut pas moyenner par le sin de l'angle de scatt dans la cellule azimuthale ???
 
-        xI_scatt(1,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(1,ibin,iaz,ri,zj,phik,psup,id) + flux
+        iRT = RT2d_to_RT1d(ibin, iaz)
+        xI_scatt(1,iRT,ri,zj,phik,psup,id) =  xI_scatt(1,iRT,ri,zj,phik,psup,id) + flux
         xsin_scatt(ibin,iaz,ri,zj,phik,psup,id) =  xsin_scatt(ibin,iaz,ri,zj,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
         xN_scatt(ibin,iaz,ri,zj,phik,psup,id) =  xN_scatt(ibin,iaz,ri,zj,phik,psup,id) + 1.0_db
 
         if (lsepar_contrib) then
            if (flag_star) then
-              xI_scatt(n_Stokes+2,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+2,ibin,iaz,ri,zj,phik,psup,id) + flux
+              xI_scatt(n_Stokes+2,iRT,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+2,iRT,ri,zj,phik,psup,id) + flux
            else
-              xI_scatt(n_Stokes+4,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+4,ibin,iaz,ri,zj,phik,psup,id) + flux
+              xI_scatt(n_Stokes+4,iRT,ri,zj,phik,psup,id) =  xI_scatt(n_Stokes+4,iRT,ri,zj,phik,psup,id) + flux
            endif
         endif
      enddo ! iaz
@@ -562,7 +577,7 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
   real(kind=db) :: cosw, sinw, flux
   real :: s11, s12, s33, s34
-  integer :: ibin, iaz, it, p_ri, p_zj, p_phik
+  integer :: ibin, iaz, iRT, it, p_ri, p_zj, p_phik
 
 
   ROP = 0.0_db
@@ -629,7 +644,8 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
         S(1)=D(1)
         S(4)=D(4)
 
-        xI_scatt(1:4,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(1:4,ibin,iaz,ri,zj,phik,psup,id) + l * S(:)
+        iRT = RT2d_to_RT1d(ibin, iaz)
+        xI_scatt(1:4,iRT,ri,zj,phik,psup,id) =  xI_scatt(1:4,iRT,ri,zj,phik,psup,id) + l * S(:)
         xsin_scatt(ibin,iaz,ri,zj,phik,psup,id) =  xsin_scatt(ibin,iaz,ri,zj,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
         xN_scatt(ibin,iaz,ri,zj,phik,psup,id) =  xN_scatt(ibin,iaz,ri,zj,phik,psup,id) + 1.0_db
 
@@ -637,10 +653,10 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
            flux = l * S(1)
            if (flag_star) then
               !n_Stokes+2 = 6
-              xI_scatt(6,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(6,ibin,iaz,ri,zj,phik,psup,id) + flux
+              xI_scatt(6,iRT,ri,zj,phik,psup,id) =  xI_scatt(6,iRT,ri,zj,phik,psup,id) + flux
            else
               !n_Stokes+4 = 8
-              xI_scatt(8,ibin,iaz,ri,zj,phik,psup,id) =  xI_scatt(8,ibin,iaz,ri,zj,phik,psup,id) + flux
+              xI_scatt(8,iRT,ri,zj,phik,psup,id) =  xI_scatt(8,iRT,ri,zj,phik,psup,id) + flux
            endif
         endif
      enddo ! iaz
@@ -659,12 +675,13 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   integer, intent(in) :: lambda, ibin, iaz
 
-  integer :: i,j, k, itype
+  integer :: i,j, k, itype, iRT
   real(kind=db) :: facteur, energie_photon, n_photons_envoyes
   real(kind=db), dimension(n_az_rt,0:1) :: norme
   real(kind=db) :: norme_3D
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
+  iRT = RT2d_to_RT1d(ibin, iaz)
 
   eps_dust1(:,:,:,:,:) = 0.0_db
 
@@ -705,7 +722,8 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
                  ! TODO : pb de pola
                  do itype=1,N_type_flux
                     norme_3D = sum(xN_scatt(ibin,iaz,i,j,k,1,:)) / max(sum(xsin_scatt(ibin,iaz,i,j,k,1,:)),tiny_db)
-                    I_scatt(itype,k,:) = sum(xI_scatt(itype,ibin,iaz,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(lambda,i,j,k)
+
+                    I_scatt(itype,k,:) = sum(xI_scatt(itype,iRT,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(lambda,i,j,k)
                  enddo ! itype
 
                  eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(lambda,i,j,k)
@@ -735,7 +753,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
               ! TODO : pb de pola
               do itype=1,N_type_flux
                  norme = sum(xN_scatt(ibin,iaz,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,iaz,i,j,:,:,:),dim=3),tiny_db)
-                 I_scatt(itype,:,:) = sum(xI_scatt(itype,ibin,iaz,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
+                 I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
               enddo ! itype
 
               eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
