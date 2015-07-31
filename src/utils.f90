@@ -805,6 +805,7 @@ subroutine mcfost_get_manual()
 
   write(*,*) "Getting MCFOST manual: ", trim(doc_file)
   cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
+
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST manual"
@@ -832,6 +833,7 @@ subroutine mcfost_get_yorick()
   write(*,*) "Getting MCFOST yorick files: ", trim(yo_file1), " ", trim(yo_file2)
   cmd = "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file1)//" -O -s ; "//&
        "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
+
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "Cannot get MCFOST yorick package"
@@ -1043,28 +1045,6 @@ real function get_mcfost_utils_version()
   return
 
 end function get_mcfost_utils_version
-
-!***********************************************************
-
-subroutine get_yorick()
-
-  character(len=512) :: cmd
-  integer ::  syst_status
-
-  write(*,*) "Downloading MCFOST yorick ..."
-  write(*,*) "mcfost_struct.i"
-  write(*,*) "mcfost_utils.i"
-  cmd = "curl "//trim(utils_webpage)//"yorick/mcfost_struct.i -s -O ; curl "//trim(utils_webpage)//"yorick/mcfost_utils.i -s -O"
-  call appel_syst(cmd, syst_status)
-  if (syst_status == 0) then
-     write(*,*) "Done"
-  else
-     write(*,*) "Error during download."
-  endif
-
-  return
-
-end subroutine get_yorick
 
 !***********************************************************
 
