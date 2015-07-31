@@ -243,7 +243,7 @@ subroutine initialisation_mcfost()
      else if ((para(2:11)=="get_manual") .or. (para(2:8)=="get_doc")) then ! download current manual
         call mcfost_get_manual()
      else if (para(2:14)=="get_yorick") then ! force update utils
-        call get_yorick()
+        call mcfost_get_yorick()
      else if (para(2:4)=="url") then
         write(*,*) trim(webpage)//"linux/mcfost_bin.tgz"
         write(*,*) trim(webpage)//"mac/mcfost_bin.tgz"
