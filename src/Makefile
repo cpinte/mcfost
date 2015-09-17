@@ -37,7 +37,7 @@ ifeq ($(ipo),yes)
 OPTS2 = $(OPTS) -ipo
 OPTS = $(OPTS2)
 endif
-DEBUG_OPTS = -check all  -C -g  -fpe0 -d2 -traceback -no-ftz # -no-ftz permet eviter bug dans conversion db -> sl
+DEBUG_OPTS = -check all  -C -g  -fpe0 -traceback -no-ftz # -no-ftz permet eviter bug dans conversion db -> sl
 
 PREC = #
 FFLAGS =-c $(PREC)

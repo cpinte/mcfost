@@ -2839,18 +2839,10 @@ subroutine densite_file()
      enddo
   enddo
 
-  ! Symetrie verticale en z
-  if (.not.l3D_file) then
-     write(*,*) "Making the density file symetric relative to the z=0 plane"
-     do j=1,nz
-        densite_gaz(:,-j,:) = densite_gaz(:,j,:)
-     enddo
-  endif
-
   ! Calcul de la masse de gaz de la zone
   mass = 0.
   do i=1,n_rad
-     bz_gas_mass : do j=-nz,nz
+     bz_gas_mass : do j=j_start,nz
         if (j==0) cycle bz_gas_mass
         do k=1,n_az
            mass = mass + densite_gaz(i,j,k) *  masse_mol_gaz * volume(i)
@@ -2864,7 +2856,7 @@ subroutine densite_file()
      facteur = dz%diskmass * dz%gas_to_dust / mass
      ! Somme sur les zones pour densite finale
      do i=1,n_rad
-        bz_gas_mass2 : do j=-nz,nz
+        bz_gas_mass2 : do j=j_start,nz
            if (j==0) cycle bz_gas_mass2
            do k=1, n_az
               densite_gaz(i,j,k) = densite_gaz(i,j,k) * facteur
@@ -2872,7 +2864,6 @@ subroutine densite_file()
         enddo bz_gas_mass2
      enddo ! i
   endif
-
 
   ! Tableau de masse de gaz
   do i=1,n_rad
@@ -2923,18 +2914,11 @@ subroutine densite_file()
      enddo
   endif  !lstrat
 
-  ! Symetrie verticale en z
-  if (.not.l3D_file) then
-     do j=1,nz
-        densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
-     enddo
-  endif
-
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot
      somme=0.0
      do i=1,n_rad
-        do j=-nz,nz
+        do j=j_start,nz
            if (j==0) cycle
            do k=1,n_az
               if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = tiny_db
@@ -2973,7 +2957,7 @@ subroutine densite_file()
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do i=1,n_rad
-     do j=-nz,nz
+     do j=j_start,nz
         if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
@@ -2987,7 +2971,7 @@ subroutine densite_file()
 
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
-     do j=-nz,nz
+     do j=j_start,nz
         if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
