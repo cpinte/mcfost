@@ -2662,7 +2662,8 @@ subroutine densite_file()
 
   write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
 
-  ! Au cas ou
+  ! Au cas ou : on elimine les valeurs a 0
+  sph_dens = sph_dens/maxval(sph_dens) ! normalization avant d'ajouter une constante
   sph_dens = max(sph_dens,tiny_real)
 
   ! Lecture des tailles de grains (en microns)
