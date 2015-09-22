@@ -2694,13 +2694,15 @@ subroutine densite_file()
      ! Check dimensions
      call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
      if (nfound /= 1) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of HDU 2 file. Exiting.'
+        write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
+        write(*,*) 'HDU 2 has', nfound, 'dimensions.'
+        write(*,*) 'Exiting.'
         stop
      endif
      if ((naxes(1) /= n_a)) then
-        write(*,*) "Error : HDU 2 does not have the"
-        write(*,*) "right dimensions. Exiting."
+        write(*,*) "Error : HDU 2 does not have the right dimension"
+        write(*,*) "It has " naxes(1), "instead of ", n_a
+        write(*,*) "Exiting."
         stop
      endif
      npixels=naxes(1)
@@ -2751,13 +2753,15 @@ subroutine densite_file()
         ! Check dimensions
         call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
         if (nfound /= 1) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of HDU 2 file. Exiting.'
+           write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
+           write(*,*) 'HDU 3 has', nfound, 'dimensions.'
+           write(*,*) 'Exiting.'
            stop
         endif
         if ((naxes(1) /= n_a)) then
-           write(*,*) "Error : HDU 2 does not have the"
-           write(*,*) "right dimensions. Exiting."
+           write(*,*) "Error : HDU 3 does not have the right dimension"
+           write(*,*) "It has " naxes(1), "instead of ", n_a
+           write(*,*) "Exiting."
            stop
         endif
         npixels=naxes(1)
