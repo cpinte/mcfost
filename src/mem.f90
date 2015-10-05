@@ -205,15 +205,13 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs aux grains
   ! **************************************************
   allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
-       S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), is_grain_PAH(n_grains_tot), &
-       grain(n_grains_tot), stat=alloc_status)
+       S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error r_grain'
      stop
   endif
   nbre_grains = 0.0   ; r_core=0.0
   r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
-  is_grain_PAH=.false.
 
   allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then

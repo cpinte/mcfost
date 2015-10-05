@@ -31,7 +31,7 @@ module ProDiMo
   ! Variables a passer dans le Parameter.in
   real, dimension(:), allocatable :: ProDiMo_fPAH, ProDiMo_dust_gas, ProDiMo_Mdisk  ! n_regions
   integer :: ProDiMo_PAH_NC, ProDiMo_PAH_NH
-  logical :: ProDiMo_other_PAH
+  logical :: lPAH, ProDiMo_other_PAH
   character(len=10) :: sProDiMo_fPAH
 
   ! Grille de longeurs d'onde
@@ -203,6 +203,14 @@ contains
 
 
     ! Calcul des fPAH pour ProDiMo
+    lPAH = .false.
+    test_PAH : do i=1, n_pop
+       if (dust_pop(i)%is_PAH) then
+          lPAH = .true.
+          exit test_PAH
+       endif
+    enddo test_PAH
+
     allocate(fPAH(n_zones))
     NC_0 = 0
     fPAH = 0.0 ;
@@ -425,12 +433,12 @@ contains
     real, dimension(:,:,:,:), allocatable :: P_TPAH
 
     lPAH_nRE = .false.
-    test_PAH : do i=1, n_pop
+    test_PAH_nRE : do i=1, n_pop
        if (dust_pop(i)%is_PAH.and.(dust_pop(i)%methode_chauffage==3)) then
           lPAH_nRE = .true.
-          exit test_PAH
+          exit test_PAH_nRE
        endif
-    enddo test_PAH
+    enddo test_PAH_nRE
 
     if (lPAH_nRE) then
        iPAH_start = grain_nRE_start
@@ -442,7 +450,7 @@ contains
        n_grains_PAH=n_grains_RE_nLTE
     endif
 
-    mask_not_PAH = .not.grain(:)%is_PAH
+    mask_not_PAH(:) = .not.grain(:)%is_PAH
 
     !allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
     allocate(is_eq(n_rad,nz,1), TPAH_eq(n_rad,nz,1), P_TPAH(n_T,n_rad,nz,1), stat=alloc_status)
@@ -513,7 +521,7 @@ contains
     endif
 
     if (mcfost2ProDiMo_version >=5) then
-       if (is_PAH) then
+       if (lPAH) then
           call ftpkyj(unit,'PAH_present',1,' ',status)
        else
           call ftpkyj(unit,'PAH_present',0,' ',status)
@@ -957,7 +965,7 @@ contains
        call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)
     endif
 
-    if ((mcfost2ProDiMo_version >=5).and.is_PAH) then
+    if ((mcfost2ProDiMo_version >=5).and.lPAH) then
 
        !------------------------------------------------------------------------------
        ! HDU 15 : PAH density
@@ -1161,9 +1169,7 @@ contains
     integer :: status, i, iProDiMo, syst_status, ipop
     logical :: unchanged
 
-
     character :: s
-
 
     write (*,*) 'Creating directory '//trim(data_ProDiMo)
     ! Copy *.in files ()
