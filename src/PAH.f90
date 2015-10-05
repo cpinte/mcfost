@@ -26,7 +26,7 @@ function specific_heat(T, taille_grain)
 
   if (lread_Misselt) then
      specific_heat = file_specific_heat(T,taille_grain)
-  else if (is_grain_PAH(taille_grain)) then
+  else if (grain(taille_grain)%is_PAH) then
      specific_heat = PAH_specific_heat(T, taille_grain)
   else
      specific_heat = astrosil_specific_heat(T, taille_grain)

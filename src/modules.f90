@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.6"
+  character(8), parameter :: mcfost_release = "2.20.7"
   real, parameter :: required_utils_version = 2.191
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -111,7 +111,7 @@ module parametres
   integer :: n_cartes
   integer, parameter :: n_cartes_max = 4
 
-  logical :: letape_th, limg, lgap, lpah, lorigine, laggregate, l3D, lremove, lwarp, lcavity
+  logical :: letape_th, limg, lgap, lorigine, laggregate, l3D, lremove, lwarp, lcavity
   logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
@@ -359,7 +359,7 @@ module grains
 !*
 
   type dust_grain_type
-     real :: nbre_grains, a
+     real :: nbre_grains !, r
      integer :: zone, methode_chauffage, pop
      logical :: is_PAH
   end type dust_grain_type
@@ -389,12 +389,10 @@ module grains
   integer :: n_pop
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
-  logical :: is_PAH
 
   real,dimension(:), allocatable :: nbre_grains !n_grains_tot
   real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
-  logical, dimension(:), allocatable :: is_pop_PAH, is_grain_PAH !n_pop et n_grains_tot
 
   ! Pour lecture des fichiers d'opacite, par exemple PAH de B.Draine
   integer, dimension(:), allocatable :: op_file_na,  op_file_n_lambda ! n_pop
@@ -403,7 +401,6 @@ module grains
   real, dimension(:,:), allocatable :: op_file_lambda, op_file_delta_lambda ! op_file_n_lambda, n_pop
   integer, dimension(:), allocatable :: file_sh_nT
   real(kind=db), dimension(:,:), allocatable :: file_sh_T, file_sh ! nT, n_pop
-
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
