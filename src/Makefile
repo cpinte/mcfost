@@ -293,7 +293,6 @@ cleanall : clean cleandata
 #*************************************************************
 save :
 	git push dropbox
-	git push riri
 	git push phare
 	git push bitbucket
 	git push github
