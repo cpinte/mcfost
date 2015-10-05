@@ -716,7 +716,13 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   read(1,iostat=ios) dust_pop_save, grain, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
-  if (ios /= 0)  return
+  if (ios /= 0) then
+     write(*,*) " "
+     write(*,*) "ERROR: There is an issue with the .dust_prop*.tmp files"
+     write(*,*) "in this directory. Please remove them and restart MCFOST."
+     write(*,*) "Exiting."
+     stop
+  endif
 
   ! check if the dust population has changed
   ok = (n_lambda == n_lambda_save) .and. (real_equality(lambda_min,lambda_min_save)) .and. &
