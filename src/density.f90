@@ -2701,7 +2701,7 @@ subroutine densite_file()
      endif
      if ((naxes(1) /= n_a)) then
         write(*,*) "Error : HDU 2 does not have the right dimension"
-        write(*,*) "It has " naxes(1), "instead of ", n_a
+        write(*,*) "It has ", naxes(1), "instead of ", n_a
         write(*,*) "Exiting."
         stop
      endif
@@ -2760,7 +2760,7 @@ subroutine densite_file()
         endif
         if ((naxes(1) /= n_a)) then
            write(*,*) "Error : HDU 3 does not have the right dimension"
-           write(*,*) "It has " naxes(1), "instead of ", n_a
+           write(*,*) "It has ", naxes(1), "instead of ", n_a
            write(*,*) "Exiting."
            stop
         endif
