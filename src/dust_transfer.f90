@@ -1361,7 +1361,7 @@ subroutine dust_map(lambda,ibin,iaz)
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0/)
+  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._db/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
