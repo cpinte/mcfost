@@ -112,7 +112,8 @@ subroutine alloc_ray_tracing()
   if (lsed.and.(RT_sed_method == 1)) then
       allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_incl,RT_n_az,N_type_flux,nb_proc), stars_map(1,1), stat=alloc_status)
   else
-     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_incl,RT_n_az,N_type_flux,nb_proc), stars_map(igridx,igridy), stat=alloc_status)
+     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_incl,RT_n_az,N_type_flux,nb_proc), &
+          stars_map(igridx,igridy), stat=alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Stokes_ray_tracing'
@@ -179,8 +180,8 @@ subroutine alloc_ray_tracing()
      endif
      eps_dust1 =0._db
 
-     allocate(itheta_rt1(RT_n_incl,RT_n_az,nb_proc), sin_scatt_rt1(RT_n_incl,RT_n_az,nb_proc), sin_omega_rt1(RT_n_incl,RT_n_az,nb_proc), &
-          cos_omega_rt1(RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
+     allocate(itheta_rt1(RT_n_incl,RT_n_az,nb_proc), sin_scatt_rt1(RT_n_incl,RT_n_az,nb_proc), &
+          sin_omega_rt1(RT_n_incl,RT_n_az,nb_proc), cos_omega_rt1(RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error itheta_rt1'
         stop

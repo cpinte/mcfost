@@ -667,7 +667,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
    !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
 
 
-        if (scattering_method==1) then
+        if (scattering_method==1) then ! Matrice de Mueller par grain
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
            norme=s11(j) !* qext/q sca
            s11(j) = s11(j) / norme
