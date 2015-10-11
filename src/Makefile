@@ -44,7 +44,7 @@ FFLAGS =-c $(PREC)
 
 ifeq ($(ARCH),DARWIN)
 MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
-FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.4 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
+FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.6 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
 ifeq ($(ARCH),LINUX)
 MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
@@ -292,7 +292,6 @@ cleanall : clean cleandata
 # Sauvergarde
 #*************************************************************
 save :
-	git push dropbox
 	git push phare
 	git push bitbucket
 	git push github
