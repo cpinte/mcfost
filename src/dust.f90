@@ -655,6 +655,7 @@ subroutine save_dust_prop(letape_th)
   logical, intent(in) :: letape_th
 
   type(dust_pop_type), dimension(n_pop) :: dust_pop_save
+  type(dust_grain_type), dimension(n_grains_tot) :: grain_save
   character(len=512) :: filename, tab_wavelength_save
   integer :: n_lambda_save
   real :: lambda_min_save, lambda_max_save
@@ -664,6 +665,7 @@ subroutine save_dust_prop(letape_th)
   lambda_min_save = lambda_min
   lambda_max_save = lambda_max
   tab_wavelength_save = tab_wavelength
+  grain_save = grain
 
   if (letape_th) then
      filename=".dust_prop1.tmp" ;
@@ -672,7 +674,7 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) dust_pop_save, grain, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+  write(1) dust_pop_save, grain_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
 
@@ -688,6 +690,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   logical, intent(out) :: lcompute
 
   type(dust_pop_type), dimension(n_pop) :: dust_pop_save
+  type(dust_grain_type), dimension(n_grains_tot) :: grain_save
   character(len=512) :: filename, tab_wavelength_save
   integer :: n_lambda_save
   real :: lambda_min_save, lambda_max_save
@@ -713,15 +716,18 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  read(1,iostat=ios) dust_pop_save, grain, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  read(1,iostat=ios) dust_pop_save, grain_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, &
+       tab_s11, tab_s12, tab_s33, tab_s34, n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
   if (ios /= 0) then
      write(*,*) " "
-     write(*,*) "ERROR: There is an issue with the .dust_prop*.tmp files"
-     write(*,*) "in this directory. Please remove them and restart MCFOST."
-     write(*,*) "Exiting."
-     stop
+     write(*,*) "*********************************************************************************"
+     write(*,*) "WARNING: There is an issue with the .dust_prop*.tmp files"
+     write(*,*) "in this directory. I will recompute them."
+     write(*,*) "If there is an issue. Please remove the .dust_prop*.tmp files and restart MCFOST."
+     write(*,*) "*********************************************************************************"
+     write(*,*) " "
+     return
   endif
 
   ! check if the dust population has changed
@@ -746,6 +752,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
      ok = ok .and. (real_equality(dust_pop(pop)%dhs_maxf,dust_pop_save(pop)%dhs_maxf))
      if (.not.ok) return
   enddo ! pop
+
+  ! for some reason workd better with a temporary structure
+  grain = grain_save
 
   lcompute = .false.
   return

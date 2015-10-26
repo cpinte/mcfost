@@ -3008,7 +3008,7 @@ subroutine read_Sigma_file()
   ! C. Pinte
   ! 22/01/15
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,j, hdutype, bitpix
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels, bitpix
   integer :: nullval
   integer, dimension(1) :: naxes
   logical :: anynull

@@ -343,21 +343,6 @@ module grains
   implicit none
   save
 
-!**********************************************************************
-!*        INDICE REF.= N-IK (AMU1-IAMU2) ; A = RAYON GRAIN (MICRON)
-!*        LA DISTRIBUTION EN TAILLE DES GRAINS EST PRISE SELON
-!*        MATHIS, RUMPL & NORDSIECK (1997):
-!*                 N(A) = A^(-AEXP)    AVEC AEXP=3.5 A PRIORI
-!*        LA DISTRIBUTION S'ETEND DE AMIN A AMAX (MICRONS).
-!*
-!*        RHO1G = densite grains
-!*        AMU1 ET AMU2 DIFFERENTS DE 0.0
-!*
-!* Parametres de la distribution de grains
-!*
-!* amin=0.005, amax=0.9, aexp=3.7 are ISM values from Mathis & Whiffen (1989)
-!*
-
   type dust_grain_type
      real :: nbre_grains !, r
      integer :: zone, methode_chauffage, pop
