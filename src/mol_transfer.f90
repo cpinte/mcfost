@@ -530,7 +530,7 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   integer, intent(in) :: imol, ibin, iaz
 
-  real(kind=db) :: x0,y0,z0,l, uv, u,v,w
+  real(kind=db) :: x0,y0,z0,l, u,v,w
 
   real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=db), dimension(3,nb_proc) :: pixelcorner

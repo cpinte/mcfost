@@ -27,7 +27,7 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   real(kind=db), dimension(4)  :: stok
 
   integer, intent(out) :: capt
-  integer :: c_phi, imap1, jmap1, imap2, jmap2, i
+  integer :: c_phi, imap1, jmap1, imap2, jmap2
   real(kind=db) :: xprim, yprim, zprim, ytmp, ztmp
 
   x1=xin ; y1=yin ; z1=zin
