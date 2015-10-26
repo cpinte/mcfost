@@ -47,8 +47,10 @@ MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
 FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.6 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
 ifeq ($(ARCH),LINUX)
-MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy and ifort 13
-#MACH = -xW -axP # for fostino and ifort 10
+MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort 13
+ifeq ($(fostino),yes)
+MACH = -xW -axP # for fostino and ifort 10
+endif
 FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
 endif
 
@@ -270,10 +272,13 @@ release_utils :
 	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
 	rm -f mcfost_utils.tgz mcfost_utils.sha1
 
-
 fosti :
 	rsync -Pur *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri/"
+	ssh fosti "cd mcfost/src ; make clean mcfost fostino=yes; \cp -f mcfost ~/mcfost_cigri/"
+
+dmz :
+	rsync -Pur *.f90 Makefile dmz:mcfost/src
+	ssh dmz "cd mcfost/src ; make clean mcfost"
 
 #*************************************************************
 # Nettoyage
