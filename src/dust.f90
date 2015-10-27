@@ -899,14 +899,16 @@ subroutine opacite2(lambda)
      if (letape_th) then
         do i=1, n_rad
            do j=1, nz
-              prob_kappa_abs_1grain(lambda,i,j,0)=0.0
-              do  k=1, n_grains_RE_nLTE
+              prob_kappa_abs_1grain(lambda,i,j,grain_RE_nLTE_start-1)=0.0
+              do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
                  density=densite_pouss(i,j,1,k)
                  prob_kappa_abs_1grain(lambda,i,j,k)=prob_kappa_abs_1grain(lambda,i,j,k-1) + &
                       q_abs(lambda,k) * density
               enddo !k
-              prob_kappa_abs_1grain(lambda,i,j,:) =  prob_kappa_abs_1grain(lambda,i,j,:)/&
-                   prob_kappa_abs_1grain(lambda,i,j,n_grains_RE_nLTE)
+              if (prob_kappa_abs_1grain(lambda,i,j, grain_RE_nLTE_end) > tiny_real) then
+                 prob_kappa_abs_1grain(lambda,i,j,:) =  prob_kappa_abs_1grain(lambda,i,j,:)/&
+                      prob_kappa_abs_1grain(lambda,i,j, grain_RE_nLTE_end)
+              endif
            enddo !j
         enddo !i
      endif !.not.lmono
