@@ -19,7 +19,7 @@ module scattering
 
 !***************************************************
 
-subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
+subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 
   implicit none
 
@@ -35,12 +35,11 @@ subroutine BHMIE(X,REFREL,NANG,S1,S2,QEXT,QSCA,QBACK,GSCA)
   integer, parameter :: db = selected_real_kind(p=13,r=200)
 
 ! Arguments:
-  integer, intent(in) :: NANG
+  integer, intent(in) :: nang
   real, intent(in) :: x
-  complex, intent(in) :: REFREL
-  real, intent(out) :: GSCA,QBACK,QEXT,QSCA
-  complex, dimension(2*NANG-1), intent(out) :: S1,S2
-
+  complex, intent(in) :: refrel
+  real, intent(out) :: gsca,qback,qext,qsca
+  complex, dimension(2*nang-1), intent(out) :: s1,s2
 
 ! Local variables:
   integer :: J,JJ,N,NSTOP,NMX,NN
@@ -284,7 +283,7 @@ end subroutine BHMIE
 !***************************************************
 
 
-subroutine mueller2(lambda,taille_grain,x,amu1,amu2,qext,qsca,gsca)
+subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir de
 ! la sous-routine bhmie (grains spheriques)
@@ -325,7 +324,7 @@ subroutine mueller2(lambda,taille_grain,x,amu1,amu2,qext,qsca,gsca)
      nang= (nang_scatt+1) / 2 + 1
   endif
 
-  call bhmie(x,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
+  call bhmie(x,refrel,nang, s1,s2,qext,qsca,qback,gsca)
 
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
@@ -359,13 +358,13 @@ subroutine mueller2(lambda,taille_grain,x,amu1,amu2,qext,qsca,gsca)
         ! On rate le pic de diffraction (en particulier entre 0 et 1)
         somme_prob = 0.5*x**2*qsca
         prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-             0.5*x**2*qsca - prob_s11(lambda,taille_grain,nang_scatt)
+             somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
 
         ! Normalisation de la proba cumulee a 1
         prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
      endif ! scattering_method==1
 
-     do J=0,nang_scatt
+     do j=0,nang_scatt
         if (scattering_method==1) then ! Matrice de Mueller par grain
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
            norme=s11(j) !* qext/q sca
@@ -385,7 +384,7 @@ subroutine mueller2(lambda,taille_grain,x,amu1,amu2,qext,qsca,gsca)
 
   return
 
-end subroutine mueller2
+end subroutine mueller_Mie
 
 !***************************************************
 

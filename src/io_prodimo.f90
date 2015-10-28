@@ -1016,8 +1016,8 @@ contains
           do ri=1,n_rad
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + q_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l)
                 enddo ! l
              enddo ! lambda
           enddo ! ri

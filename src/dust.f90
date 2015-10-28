@@ -567,7 +567,7 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,x,qext,qsca,fact,gsca,amu1,amu2,pop) &
-  !$omp shared(r_grain,q_ext,q_sca,q_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
+  !$omp shared(r_grain,C_ext,C_sca,C_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop)
@@ -590,13 +590,13 @@ subroutine prop_grains(lambda, p_lambda)
                  amu2_coat=tab_amu2_coating(lambda,pop)
                  call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
               else
-                 call mueller2(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
               if (x < 1e4) then
                  call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
               else
-                 call mueller2(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
@@ -612,10 +612,10 @@ subroutine prop_grains(lambda, p_lambda)
         ! density en cm-3                      > reste facteur 149595.0
         ! longueur de vol en AU = 1.5e13 cm   /
         fact =  pi * a * a * 149595.0
-        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
-        q_sca(lambda,k) = qsca * fact
-        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k) ! section efficace
+        !C_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        C_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        C_sca(lambda,k) = qsca * fact
+        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k) ! section efficace
      endif ! is_opacity_file
   enddo !k
   !$omp enddo
@@ -629,7 +629,7 @@ subroutine prop_grains(lambda, p_lambda)
      if (dust_pop(pop)%is_opacity_file) then
         a = r_grain(k)
         x = 2.0 * pi * a / wavel
-        call mueller_opacity_file(lambda,p_lambda,k,x,qext, qsca,gsca)
+        call mueller_opacity_file(lambda,p_lambda,k,x, qext,qsca,gsca)
 
         tab_albedo(lambda,k)=qsca/qext
         tab_g(lambda,k) = gsca
@@ -638,10 +638,10 @@ subroutine prop_grains(lambda, p_lambda)
         ! density en cm-3                      > reste facteur 149595.0
         ! longueur de vol en AU = 1.5e13 cm   /
         fact =  pi * a * a * 149595.0
-        !q_geo(k) = pi * a * a * 1.e-12 ! en m^2
-        q_ext(lambda,k) = qext * fact ! todo : renommer C_ext
-        q_sca(lambda,k) = qsca * fact
-        q_abs(lambda,k) = q_ext(lambda,k) - q_sca(lambda,k)
+        !C_geo(k) = pi * a * a * 1.e-12 ! en m^2
+        C_ext(lambda,k) = qext * fact ! todo : renommer C_ext
+        C_sca(lambda,k) = qsca * fact
+        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k)
      endif ! is_opacity_file
   enddo !k
 
@@ -675,7 +675,7 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) dust_pop_save, grain_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+  write(1) dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
 
@@ -717,7 +717,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  read(1,iostat=ios) dust_pop_save, grain_save, q_ext, q_sca, q_abs, tab_g, tab_albedo, prob_s11, &
+  read(1,iostat=ios) dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, prob_s11, &
        tab_s11, tab_s12, tab_s33, tab_s34, n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
   if (ios /= 0) then
@@ -779,7 +779,7 @@ subroutine opacite2(lambda)
   real, parameter :: G = 6.672e-8
 
   integer :: i,j, pk, k, l, k_min, thetaj
-  real(kind=db) ::  density, proba, q_sca_tot, q_ext_tot,norme
+  real(kind=db) ::  density, proba, k_sca_tot, k_ext_tot,norme, dtheta, theta
   logical :: lcompute_obs
 
   ! Pour spline
@@ -848,24 +848,24 @@ subroutine opacite2(lambda)
            k_abs_RE_LTE = 0.0
            do  k=1,n_grains_tot
               density=densite_pouss(i,j,pk,k)
-              kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + q_ext(lambda,k) * density
-              k_abs_tot = k_abs_tot + q_abs(lambda,k) * density
+              kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + C_ext(lambda,k) * density
+              k_abs_tot = k_abs_tot + C_abs(lambda,k) * density
            enddo !k
 
            if (lRE_LTE) then
               kappa_abs_eg(lambda,i,j,pk) = 0.0
               do k=grain_RE_LTE_start,grain_RE_LTE_end
                  density=densite_pouss(i,j,pk,k)
-                 kappa_abs_eg(lambda,i,j,pk) =  kappa_abs_eg(lambda,i,j,pk) + q_abs(lambda,k) * density
-                 k_abs_RE_LTE = k_abs_RE_LTE + q_abs(lambda,k) * density ! todo : idem kappa_abs_eg
-                 k_abs_RE = k_abs_RE + q_abs(lambda,k) * density
+                 kappa_abs_eg(lambda,i,j,pk) =  kappa_abs_eg(lambda,i,j,pk) + C_abs(lambda,k) * density
+                 k_abs_RE_LTE = k_abs_RE_LTE + C_abs(lambda,k) * density ! todo : idem kappa_abs_eg
+                 k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
               enddo
             endif
 
            if (lRE_nLTE) then
               do k=grain_RE_nLTE_start,grain_RE_nLTE_end
                  density=densite_pouss(i,j,pk,k)
-                 k_abs_RE = k_abs_RE + q_abs(lambda,k) * density
+                 k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
               enddo
            endif
 
@@ -873,7 +873,7 @@ subroutine opacite2(lambda)
               kappa_sca(lambda,i,j,pk) = 0.0
               do k=1,n_grains_tot
                  density=densite_pouss(i,j,pk,k)
-                 kappa_sca(lambda,i,j,pk) =  kappa_sca(lambda,i,j,pk) + q_sca(lambda,k) * density
+                 kappa_sca(lambda,i,j,pk) =  kappa_sca(lambda,i,j,pk) + C_sca(lambda,k) * density
               enddo
            endif
 
@@ -904,7 +904,7 @@ subroutine opacite2(lambda)
               do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
                  density=densite_pouss(i,j,1,k)
                  prob_kappa_abs_1grain(lambda,i,j,k)=prob_kappa_abs_1grain(lambda,i,j,k-1) + &
-                      q_abs(lambda,k) * density
+                      C_abs(lambda,k) * density
               enddo !k
               if (prob_kappa_abs_1grain(lambda,i,j, grain_RE_nLTE_end) > tiny_real) then
                  prob_kappa_abs_1grain(lambda,i,j,:) =  prob_kappa_abs_1grain(lambda,i,j,:)/&
@@ -929,7 +929,7 @@ subroutine opacite2(lambda)
         do j=1,nz
            pk=1
            do  k=1,n_grains_tot
-              kappa_abs_tmp(i,j,k) =  q_abs(lambda,k) * densite_pouss(i,j,pk,k)
+              kappa_abs_tmp(i,j,k) =  C_abs(lambda,k) * densite_pouss(i,j,pk,k)
            enddo !k
         enddo
      enddo
@@ -954,9 +954,9 @@ subroutine opacite2(lambda)
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,valeur_prob,amax_reel,somme) &
-  !$omp private(i,j,k,pk,density,k_min,proba,q_sca_tot,q_ext_tot,norme,angle,gsca)&
+  !$omp private(i,j,k,pk,density,k_min,proba,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
   !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
-  !$omp shared(q_ext,q_sca,densite_pouss,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
+  !$omp shared(C_ext,C_sca,densite_pouss,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop)
   !$omp do schedule(dynamic,1)
@@ -964,8 +964,8 @@ subroutine opacite2(lambda)
      bz2 : do j=pj_start,p_nz
         if (j==0) cycle bz2
         do pk=1, p_n_az
-           q_sca_tot=0.0
-           q_ext_tot=0.0
+           k_sca_tot=0.0
+           k_ext_tot=0.0
 
            if (scattering_method == 2) then
               if (aniso_method==1) then
@@ -983,35 +983,35 @@ subroutine opacite2(lambda)
            somme=0.0
            do  k=1,n_grains_tot
               density=densite_pouss(i,j,pk,k)
-              q_sca_tot = q_sca_tot + q_sca(lambda,k)*density
-              q_ext_tot = q_ext_tot + q_ext(lambda,k)*density
-              tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk) + q_sca(lambda,k)*density * tab_g(lambda,k)
-              !somme = somme + q_sca(lambda,k)*density
+              k_sca_tot = k_sca_tot + C_sca(lambda,k) * density
+              k_ext_tot = k_ext_tot + C_ext(lambda,k) * density
+              tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk) + C_sca(lambda,k) * density * tab_g(lambda,k)
+              !somme = somme + C_sca(lambda,k)*density
 
               if (scattering_method == 2) then
                  if (aniso_method==1) then
                     ! Moyennage matrice de mueller (long) (dernier indice : angle)
                     ! TODO : indice 1 suppose que mueller (via prop_grain) a ete calcule juste avant
                     ! --> change en lambda depuis que l'on sauve les proprietes optiques (ie p_lambda pointe toujours sur lambda)
-                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11(lambda,k,:) * density +  tab_s11_pos(lambda,i,j,pk,:)
+                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11_pos(lambda,i,j,pk,:) + tab_s11(lambda,k,:) * density
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12(lambda,k,:) * density +  tab_s12_pos(lambda,i,j,pk,:)
-                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33(lambda,k,:) * density +  tab_s33_pos(lambda,i,j,pk,:)
-                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34(lambda,k,:) * density +  tab_s34_pos(lambda,i,j,pk,:)
+                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12_pos(lambda,i,j,pk,:) + tab_s12(lambda,k,:) * density
+                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33_pos(lambda,i,j,pk,:) + tab_s33(lambda,k,:) * density
+                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34_pos(lambda,i,j,pk,:) + tab_s34(lambda,k,:) * density
                     endif
                  endif !aniso_method
               else
                  ! Au choix suivant que l'on considère un albedo par cellule ou par grain
                  ! albedo par cellule :
-                 probsizecumul(lambda,i,j,pk,k) = probsizecumul(lambda,i,j,pk,k-1) + q_sca(lambda,k)*density
+                 probsizecumul(lambda,i,j,pk,k) = probsizecumul(lambda,i,j,pk,k-1) + C_sca(lambda,k)*density
                  ! albedo par grains :
-                 !              probsizecumul(lambda,i,j,k) = probsizecumul(lambda,i,j,k-1) + q_ext(lambda,k)*density
+                 !              probsizecumul(lambda,i,j,k) = probsizecumul(lambda,i,j,k-1) + C_ext(lambda,k)*density
               endif !scattering_method
            enddo !k
 
 
-           if (q_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = q_sca_tot/q_ext_tot
-           if (q_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/q_sca_tot
+           if (k_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = k_sca_tot/k_ext_tot
+           if (k_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/k_sca_tot
 
 
 
@@ -1188,7 +1188,7 @@ subroutine opacite2(lambda)
                  ! Propriétés optiques des cellules
                  prob_s11_pos(lambda,i,j,pk,:)=1.0
                  prob_s11_pos(lambda,i,j,pk,0)=0.0
-                 ! Normalisation (idem que dans mueller2)
+                 ! Normalisation (idem que dans mueller)
                  tab_s11_pos(lambda,i,j,pk,:)=1.0
                  if (lsepar_pola) then
                     tab_s12_pos(lambda,i,j,pk,:)=0.0
@@ -1304,7 +1304,7 @@ subroutine opacite2(lambda)
 
 ! write(*,*) tab_lambda(lambda), kappa(lambda, 1, 40,1) !, kappa_abs_eg(lambda, 1, 1,1), densite_pouss(1,1,1,1)
 
-!  write(*,*) sum(densite_pouss),   q_abs(lambda,1), r_grain(1)
+!  write(*,*) sum(densite_pouss),   C_abs(lambda,1), r_grain(1)
 !  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
@@ -1326,7 +1326,7 @@ subroutine opacite2(lambda)
      call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-     call cfitsWrite("!data_dust/kappa_grain.fits.gz",q_abs,shape(q_abs)) ! lambda, n_grains
+     call cfitsWrite("!data_dust/kappa_grain.fits.gz",C_abs,shape(C_abs)) ! lambda, n_grains
 
      S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
      call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
