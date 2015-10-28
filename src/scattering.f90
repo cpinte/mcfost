@@ -557,7 +557,7 @@ end subroutine BHMIE
 !***************************************************
 
 
-subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
+subroutine mueller2(lambda,taille_grain,x,amu1,amu2,qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir de
 ! la sous-routine bhmie (grains spheriques)
@@ -571,7 +571,7 @@ subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
   implicit none
   integer, intent(in) :: lambda, taille_grain
   real, intent(in) :: amu1, amu2
-  real, intent(in) :: alpha
+  real, intent(in) :: x ! 2*pi*a/wl
   real, intent(out) :: qext, qsca, gsca
 
   integer :: j, nang
@@ -598,7 +598,7 @@ subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
      nang= (nang_scatt+1) / 2 + 1
   endif
 
-  call bhmie(alpha,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
+  call bhmie(x,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
 
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
@@ -627,12 +627,12 @@ subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
            !somme_sin = somme_sin + sin(theta)*dtheta
         enddo
 
-        ! s11 est calculee telle que la normalisation soit: 0.5*alpha**2*qsca
-        ! il y a un soucis numerique quand alpha >> 1 car la resolution en angle n'est pas suffisante
+        ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+        ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
         ! On rate le pic de diffraction (en particulier entre 0 et 1)
-        somme_prob = 0.5*alpha**2*qsca
+        somme_prob = 0.5*x**2*qsca
         prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-             0.5*alpha**2*qsca - prob_s11(lambda,taille_grain,nang_scatt)
+             0.5*x**2*qsca - prob_s11(lambda,taille_grain,nang_scatt)
 
         ! Normalisation de la proba cumulee a 1
         prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
@@ -646,7 +646,7 @@ subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
            s12(j) = s12(j) / norme
            s33(j) = s33(j) / norme
            s34(j) = s34(j) / norme
-        endif ! Sinon normalisation a 0.5*alpha**2*Qsca propto section efficace de diffusion
+        endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
 
         tab_s11(lambda,taille_grain,j) = s11(j)
         tab_s12(lambda,taille_grain,j) = s12(j)
@@ -699,7 +699,8 @@ subroutine mueller_gmm(lambda,taille_grain,alfa,qext,qsca,gsca)
 
 
   write(*,*) "mueller_gmm ne marche pas plus !!!"
-  write(*,*) " il faut coriger pour la nouvelle de nang_scatt"
+  write(*,*) "Il faut coriger pour la nouvelle definition de nang_scatt"
+  write(*,*) "Il faut aussi corriger la normalisation de s11 (faire comme mueller2)"
   stop
 
 
@@ -830,7 +831,7 @@ end subroutine mueller_gmm
 
 !***************************************************
 
-subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
+subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
   ! pour grains apres lecture du fichier d'opacite
   ! En particulier pour les PAHs de Draine
@@ -841,13 +842,14 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
   implicit none
 
   integer, intent(in) :: taille_grain, lambda, p_lambda
+  real, intent(in) :: x
   real, intent(out) :: qext,qsca,gsca
 
   real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4
   integer :: i, j, pop, N
 
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
-  real :: norme, somme2, somme_prob, log_a, log_wavel, wl_min, wl_max
+  real :: norme, somme_prob, log_a, log_wavel, wl_min, wl_max, theta, dtheta
 
   log_a=log(r_grain(taille_grain))
   log_wavel = log(tab_lambda(lambda))
@@ -968,20 +970,25 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,qext,qsca,gsca)
      ! Polarisabilite nulle
      s12=0.0 ; s33 = 0.0 ; s34 = 0.0
 
-     ! Integration S11 pour tirer angle
-     prob_s11(p_lambda,taille_grain,0)=0.0
-     somme2 = 0.0
+     if (scattering_method==1) then
+        prob_s11(lambda,taille_grain,0)=0.0
+        dtheta = pi/real(nang_scatt)
+        do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+           theta = real(j)*dtheta
+           prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+           !somme_sin = somme_sin + sin(theta)*dtheta
+        enddo
 
-     do j=1,nang_scatt
-        prob_s11(p_lambda,taille_grain,j)=prob_s11(p_lambda,taille_grain,j-1)+&
-             s11(j)*sin(real(j)/real(nang_scatt)*pi)
-     enddo
+        ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+        ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
+        ! On rate le pic de diffraction (en particulier entre 0 et 1)
+        somme_prob = 0.5*x**2*qsca
+        prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+             0.5*x**2*qsca - prob_s11(lambda,taille_grain,nang_scatt)
 
-     ! Normalisation
-     somme_prob=prob_s11(p_lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
-     do j=1,nang_scatt
-        prob_s11(p_lambda,taille_grain,j)=prob_s11(p_lambda,taille_grain,j)/somme_prob
-     enddo
+        ! Normalisation de la proba cumulee a 1
+        prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+     endif ! scattering_method==1
 
      do j=0,nang_scatt
         if (scattering_method==1) then

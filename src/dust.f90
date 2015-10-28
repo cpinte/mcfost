@@ -553,7 +553,7 @@ subroutine prop_grains(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
   real, parameter :: pi = 3.1415926535
-  real :: a, wavel, alfa, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
+  real :: a, wavel, x, qext, qsca, fact, gsca, amu1, amu2, amu1_coat, amu2_coat
   integer :: k, pop
 
   qext=0.0
@@ -566,7 +566,7 @@ subroutine prop_grains(lambda, p_lambda)
   ! Une premiere boucle pour les grains definis par un fichier d'indice
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(k,a,alfa,qext,qsca,fact,gsca,amu1,amu2,pop) &
+  !$omp private(k,a,x,qext,qsca,fact,gsca,amu1,amu2,pop) &
   !$omp shared(r_grain,q_ext,q_sca,q_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
@@ -580,9 +580,9 @@ subroutine prop_grains(lambda, p_lambda)
         a = r_grain(k)
         amu1=tab_amu1(lambda,pop)
         amu2=tab_amu2(lambda,pop)
-        alfa = 2.0 * pi * a / wavel
+        x = 2.0 * pi * a / wavel
         if (laggregate) then
-           call mueller_gmm(p_lambda,k,alfa,qext,qsca,gsca)
+           call mueller_gmm(p_lambda,k,x,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
               if (dust_pop(pop)%lcoating) then
@@ -590,13 +590,13 @@ subroutine prop_grains(lambda, p_lambda)
                  amu2_coat=tab_amu2_coating(lambda,pop)
                  call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
               else
-                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
+                 call mueller2(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
-              if (alfa < 1e4) then
+              if (x < 1e4) then
                  call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
               else
-                 call mueller2(p_lambda,k,alfa,amu1,amu2, qext,qsca,gsca)
+                 call mueller2(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
@@ -628,7 +628,8 @@ subroutine prop_grains(lambda, p_lambda)
      pop = grain(k)%pop
      if (dust_pop(pop)%is_opacity_file) then
         a = r_grain(k)
-        call mueller_opacity_file(lambda,p_lambda,k,qext, qsca,gsca)
+        x = 2.0 * pi * a / wavel
+        call mueller_opacity_file(lambda,p_lambda,k,x,qext, qsca,gsca)
 
         tab_albedo(lambda,k)=qsca/qext
         tab_g(lambda,k) = gsca
