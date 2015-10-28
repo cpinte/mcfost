@@ -557,7 +557,7 @@ end subroutine BHMIE
 !***************************************************
 
 
-subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
+subroutine mueller2(lambda,taille_grain,alpha,amu1,amu2,qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir de
 ! la sous-routine bhmie (grains spheriques)
@@ -571,21 +571,19 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
   implicit none
   integer, intent(in) :: lambda, taille_grain
   real, intent(in) :: amu1, amu2
-  real, intent(in) :: alfa
+  real, intent(in) :: alpha
   real, intent(out) :: qext, qsca, gsca
 
   integer :: j, nang
 
   complex, dimension(nang_scatt+1) :: S1,S2
 
-  real :: x, vi1, vi2, qback, norme, somme_sin, somme_prob, somme2
+  real :: vi1, vi2, qback, norme, somme_sin, somme_prob, theta, dtheta
   complex :: refrel
   real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
 
   refrel = cmplx(amu1,amu2)
-
-  x = alfa
 
   if (modulo(nang_scatt,2)==1) then
      write(*,*) "ERROR : nang_scatt must be an EVEN number"
@@ -600,7 +598,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
      nang= (nang_scatt+1) / 2 + 1
   endif
 
-  call bhmie(X,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
+  call bhmie(alpha,REFREL,NANG,s1,s2,QEXT,QSCA,QBACK,GSCA)
 
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
@@ -619,54 +617,28 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
      enddo !j
 
      ! Integration S11 pour tirer angle
-     somme_sin= 0.0
-     somme2 = 0.0
-     prob_s11(lambda,taille_grain,0)=0.0
-     do j=1,nang_scatt
-        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+&
-             s11(j)*sin(real(j)/real(nang_scatt)*pi)
-        somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
-        !     somme2=somme2+s12(j)*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-        ! Somme2 sert juste pour faire des plots
-     enddo
+     !somme_sin= 0.0
+     if (scattering_method==1) then
+        prob_s11(lambda,taille_grain,0)=0.0
+        dtheta = pi/real(nang_scatt)
+        do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+           theta = real(j)*dtheta
+           prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+           !somme_sin = somme_sin + sin(theta)*dtheta
+        enddo
 
-     ! Normalisation
-     somme_prob=prob_s11(lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
-     ! Soit int_0^\pi (i1(t)+i2(t)) sin(t) = x**2*qsca
-     do j=1,nang_scatt
-        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
-     enddo
+        ! s11 est calculee telle que la normalisation soit: 0.5*alpha**2*qsca
+        ! il y a un soucis numerique quand alpha >> 1 car la resolution en angle n'est pas suffisante
+        ! On rate le pic de diffraction (en particulier entre 0 et 1)
+        somme_prob = 0.5*alpha**2*qsca
+        prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+             0.5*alpha**2*qsca - prob_s11(lambda,taille_grain,nang_scatt)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!$  open(unit=1,file='diffusion.dat')
-!!$
-!!$  write(*,*) 'g=',gsca
-!!$  somme1=0.0
-!!$  somme2=0.0
-!!$  do J=1,2*NANG
-!!$     hg=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j)-0.5)/180.*pi))**(-1.5)
-!!$     somme1=somme1+s11(j)/somme_prob*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     somme2=somme2+hg*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     write(1,*) (real(j)-0.5), s11(j)/somme_prob,hg , 0.5E0*CABS(S2(J))*CABS(S2(J)), 0.5E0*CABS(S1(J))*CABS(S1(J))
-!!$  enddo
-!!$  write(*,*) somme1, somme2
-!!$  close(unit=1)
-!!$!  stop
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Normalisation de la proba cumulee a 1
+        prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+     endif ! scattering_method==1
 
      do J=0,nang_scatt
-!     ! Normalisation pour diffusion isotrope et E_sca(theta)
-!     if (j == 1)  then
-!        norme = somme_prob/somme_sin
-!     endif
-
-! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
-! PAR CELLULE)
-! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
-
-   !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
-
-
         if (scattering_method==1) then ! Matrice de Mueller par grain
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
            norme=s11(j) !* qext/q sca
@@ -674,7 +646,7 @@ subroutine mueller2(lambda,taille_grain,alfa,amu1,amu2,qext,qsca,gsca)
            s12(j) = s12(j) / norme
            s33(j) = s33(j) / norme
            s34(j) = s34(j) / norme
-        endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
+        endif ! Sinon normalisation a 0.5*alpha**2*Qsca propto section efficace de diffusion
 
         tab_s11(lambda,taille_grain,j) = s11(j)
         tab_s12(lambda,taille_grain,j) = s12(j)
@@ -1859,7 +1831,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
 
    ! Tirage aleatoire de l'angle de diffusion autour entre l'angle k et l'angle k-1
    ! diffusion uniforme (lineaire en cos)
-   cospsi=cos((real(k)-1.0)*pi/180.) + aleat2*(cos((real(k))*pi/180.)-cos((real(k)-1.0)*pi/180.))
+   cospsi=cos((real(k)-1.0)*pi/real(nang_scatt)) + aleat2*(cos((real(k))*pi/real(nang_scatt))-cos((real(k)-1.0)*pi/real(nang_scatt)))
 
    return
 
@@ -1904,8 +1876,8 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
 
    ! Tirage aleatoire de l'angle de diffusion entre l'angle k et l'angle k-1
    ! diffusion uniforme (lineaire en cos)
-   cospsi=cos((real(k,kind=db)-1.0_db)*pi/180._db) + &
-        aleat2*(cos((real(k,kind=db))*pi/180._db)-cos((real(k,kind=db)-1.0_db)*pi/180._db))
+   cospsi=cos((real(k,kind=db)-1.0_db)*pi/real(nang_scatt,kind=db)) + &
+        aleat2*(cos((real(k,kind=db))*pi/real(nang_scatt,kind=db))-cos((real(k,kind=db)-1.0_db)*pi/real(nang_scatt,kind=db)))
 
    return
 
