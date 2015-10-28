@@ -905,7 +905,7 @@ subroutine calc_Ith(lambda)
                     if (cst_wl < 500.0) then
                        coeff_exp=exp(cst_wl)
                        J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            q_abs(lambda,l)*densite_pouss(i,j,k,l)
+                            C_abs(lambda,l)*densite_pouss(i,j,k,l)
                     endif
                  enddo
               enddo
@@ -925,7 +925,7 @@ subroutine calc_Ith(lambda)
                        if (cst_wl < 500.) then
                           coeff_exp=exp(cst_wl)
                           J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                               q_abs(lambda,l)*densite_pouss(i,j,k,l)
+                               C_abs(lambda,l)*densite_pouss(i,j,k,l)
                        endif !cst_wl
                     else ! ! la grain a une proba de T
                        do T=1,n_T
@@ -934,7 +934,7 @@ subroutine calc_Ith(lambda)
                           if (cst_wl < 500.) then
                              coeff_exp=exp(cst_wl)
                              J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                                  q_abs(lambda,l)*densite_pouss(i,j,k,l) * Proba_Temperature(T,i,j,l)
+                                  C_abs(lambda,l)*densite_pouss(i,j,k,l) * Proba_Temperature(T,i,j,l)
                           endif !cst_wl
                        enddo ! T
                     endif ! l_RE

@@ -58,7 +58,7 @@ module parametres
   logical :: lscattering_method1
 
   ! Theorie de Mie ou HG
-  integer :: aniso_method
+  integer :: aniso_method ! 1 = full phase function, 2 = HG
   logical :: lmethod_aniso1
 
   integer :: RT_sed_method ! cf routine dust_map pour def
@@ -397,7 +397,7 @@ module grains
 
   ! Parametres de diffusion des grains
   real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
-  real, dimension(:,:), allocatable :: tab_g, tab_albedo, q_ext, q_sca, q_abs!n_lambda,n_grains
+  real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs!n_lambda,n_grains
   !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
   ! aggregats
