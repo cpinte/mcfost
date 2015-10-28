@@ -860,18 +860,15 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
+    opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
-          opacite(ri,zj,1,:) = kappa(:,ri,zj,1)
-          if (lRE_LTE) then
-             opacite(ri,zj,2,:) = kappa_abs_eg(:,ri,zj,1)
-          !else if (lRE_nLTE) then ! Patch, c'est pas super propre
-          !   do lambda=1,n_lambda
-          !      do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-          !         opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + q_abs(lambda,l) * densite_pouss(ri,zj,1,l)
-          !      enddo ! k
-          !   enddo ! lambda
-          endif
+          do lambda=1,n_lambda
+             do l= grain_RE_LTE_start, grain_RE_LTE_end
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l)
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+             enddo ! l
+          enddo ! lambda
        enddo ! ri
     enddo !zj
 
