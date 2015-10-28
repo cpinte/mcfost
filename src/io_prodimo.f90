@@ -409,7 +409,7 @@ contains
     integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion, k
     integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
-    real :: wl, norme
+    real :: wl, norme, Ttmp
 
     logical :: simple, extend, lPAH_nRE
     character(len=512) :: filename
@@ -992,7 +992,7 @@ contains
        call ftppre(unit,group,fpixel,nelements,dens,status)
 
        !------------------------------------------------------------------------------
-       ! HDU 16 : PAH opacity
+       ! HDU 16 : total PAH opacity
        !------------------------------------------------------------------------------
        bitpix=-32
        naxis=4
@@ -1034,17 +1034,23 @@ contains
        ! create new hdu
        call ftcrhd(unit, status)
 
-       do i=1, n_rad
-          if (tab_region(i) > 0) then ! region non vide
-             if (lPAH_nRE) then
-                TPAH_eq(i,:,1) = temperature_1grain_nRE(i,:,iPAH_start-1+tab_region(i))
-             else
-                TPAH_eq(i,:,1) = temperature_1grain(i,:,iPAH_start-1+tab_region(i)) ! pas le bon index pour la taille de grain
-             endif
-          else
-             TPAH_eq(i,:,1) = 1.0
-          endif
-       enddo
+       ! Average temperature at the moment, as ProDiMo can only handle 1 PAH so far
+       TPAH_eq = 0.0
+       do zj=1,nz
+          do ri=1,n_rad
+             norme = 0.0
+             do l= iPAH_start, iPAH_end
+                if (lPAH_nRE) then
+                   Ttmp = temperature_1grain_nRE(ri,zj,l)
+                else
+                   Ttmp = temperature_1grain(ri,zj,l)
+                endif
+                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(ri,zj,1,l)
+                norme = norme + densite_pouss(ri,zj,1,l)
+             enddo ! l
+             TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
+          enddo ! ri
+       enddo !zj
 
        !  Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
