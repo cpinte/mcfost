@@ -42,14 +42,14 @@ subroutine taille_grains()
 
       if (lread_grain_size_distrib) then
         if (n_pop > 1) then
-           write(*,*) "ERROR : you cannot provide a grain size distribution with more than 1 population"
+           write(*,*) "ERROR: you cannot provide a grain size distribution with more than 1 population"
            write(*,*) "Exiting"
            stop
         endif
 
         open(unit=1, file=grain_size_file, status='old', iostat=ios)
         if (ios/=0) then
-           write(*,*) "ERROR : cannot open grain size file"//trim(grain_size_file)
+           write(*,*) "ERROR: cannot open grain size file"//trim(grain_size_file)
            write(*,*) "Exiting"
            stop
         endif
@@ -74,7 +74,7 @@ subroutine taille_grains()
         n_grains = n_grains - 1
 
         if (n_grains /= n_grains_tot) then
-           write(*,*) "ERROR : the number of grains must be the same as in the parameter file"
+           write(*,*) "ERROR: the number of grains must be the same as in the parameter file"
            write(*,*) "I will correct that later", n_grains, n_grains_tot
            write(*,*) "Exiting"
            stop
@@ -385,7 +385,7 @@ subroutine init_indices_optiques()
            else ! coating : 2 composants max pour coating
               !write(*,*) "Applying coating for pop.", pop
               if (n_components /= 2) then
-                 write(*,*) "ERROR : coating can only be computed with 2 components"
+                 write(*,*) "ERROR: coating can only be computed with 2 components"
                  write(*,*) "there is", n_components, "components in pop #", pop
                  write(*,*) "Exiting"
                  stop
@@ -412,6 +412,7 @@ subroutine init_indices_optiques()
         dust_pop(pop)%rho1g_avg = dust_pop(pop)%rho1g_avg * (1.0-dust_pop(pop)%porosity)
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
+
      else ! fichier d'opacite
         if (lfirst) then
            ! We allocate the arrays to save dimension the 1st time we enter this section
@@ -720,14 +721,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   read(1,iostat=ios) dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, prob_s11, &
        tab_s11, tab_s12, tab_s33, tab_s34, n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
-  if (ios /= 0) then
-     write(*,*) " "
-     write(*,*) "*********************************************************************************"
-     write(*,*) "WARNING: There is an issue with the .dust_prop*.tmp files"
-     write(*,*) "in this directory. I will recompute them."
-     write(*,*) "If there is an issue. Please remove the .dust_prop*.tmp files and restart MCFOST."
-     write(*,*) "*********************************************************************************"
-     write(*,*) " "
+  if (ios /= 0) then ! if some dimension changed
      return
   endif
 
