@@ -280,6 +280,10 @@ dmz :
 	rsync -Pur *.f90 Makefile dmz:mcfost/src
 	ssh dmz "cd mcfost/src ; make clean mcfost"
 
+wardlaw :
+	rsync -Pur *.f90 Makefile wardlaw:mcfost/src
+	ssh wardlaw "source .login ; cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/bin/"
+
 #*************************************************************
 # Nettoyage
 #*************************************************************
