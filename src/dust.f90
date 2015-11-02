@@ -676,7 +676,8 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+  write(1) para_version, dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, &
+       prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
 
@@ -695,7 +696,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   type(dust_grain_type), dimension(n_grains_tot) :: grain_save
   character(len=512) :: filename, tab_wavelength_save
   integer :: n_lambda_save
-  real :: lambda_min_save, lambda_max_save
+  real :: lambda_min_save, lambda_max_save, para_version_save
 
   integer :: i, pop, ios
   logical :: ok
@@ -718,12 +719,17 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  read(1,iostat=ios) dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, prob_s11, &
-       tab_s11, tab_s12, tab_s33, tab_s34, n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  read(1,iostat=ios) para_version_save, dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, &
+       prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
+       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
   if (ios /= 0) then ! if some dimension changed
      return
   endif
+
+  ! The parameter version has to be the same for safety
+  ! in case something important was modified between 2 versions
+  if (para_version /= para_version_save) return
 
   ! check if the dust population has changed
   ok = (n_lambda == n_lambda_save) .and. (real_equality(lambda_min,lambda_min_save)) .and. &
