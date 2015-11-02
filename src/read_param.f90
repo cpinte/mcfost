@@ -23,6 +23,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -182,8 +183,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -198,9 +198,9 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
+
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
@@ -227,8 +227,7 @@ contains
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -245,8 +244,7 @@ contains
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
@@ -293,8 +291,7 @@ contains
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
@@ -309,8 +306,7 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
@@ -324,8 +320,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) settling_type, exp_strat, a_strat
        if (settling_type == 0) then
           lstrat = .false.
@@ -350,8 +345,7 @@ contains
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -384,8 +378,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -456,8 +449,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -466,8 +458,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -657,8 +648,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -680,8 +670,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -715,11 +704,10 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
-
 
        if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
           if (etoile(i)%r > Rmin) then
@@ -752,6 +740,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -763,8 +752,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -779,8 +767,7 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -808,8 +795,7 @@ contains
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -826,8 +812,7 @@ contains
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
@@ -871,11 +856,11 @@ contains
        read(1,*) map_size
        map_size = 2*map_size ! compatibilite avec size_neb
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
@@ -890,8 +875,7 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
@@ -905,8 +889,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) settling_type, exp_strat, a_strat
        if (settling_type == 0) then
           lstrat = .false.
@@ -931,8 +914,7 @@ contains
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -965,8 +947,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -1037,8 +1018,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -1047,8 +1027,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -1223,8 +1202,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -1246,8 +1224,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -1281,7 +1258,7 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -1309,6 +1286,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -1320,8 +1298,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -1336,8 +1313,7 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -1365,8 +1341,7 @@ contains
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -1383,8 +1358,7 @@ contains
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
@@ -1431,8 +1405,7 @@ contains
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
@@ -1447,8 +1420,7 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
@@ -1462,8 +1434,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) settling_type, exp_strat, a_strat
        if (settling_type == 0) then
           lstrat = .false.
@@ -1486,8 +1457,7 @@ contains
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -1520,8 +1490,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -1586,8 +1555,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -1596,8 +1564,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -1767,8 +1734,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -1791,8 +1757,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -1826,7 +1791,7 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -1854,6 +1819,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -1865,8 +1831,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -1881,8 +1846,7 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -1910,8 +1874,7 @@ contains
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -1928,8 +1891,7 @@ contains
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size, zoom
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
     if (ios/=0) then
@@ -1972,17 +1934,18 @@ contains
        read(1,*) map_size
        map_size = 2*map_size ! compatibilite avec size_neb
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -1991,12 +1954,12 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -2006,8 +1969,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) settling_type, exp_strat, a_strat
        if (settling_type == 0) then
           lstrat = .false.
@@ -2022,14 +1984,14 @@ contains
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -2062,8 +2024,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -2130,8 +2091,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -2140,8 +2100,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -2311,8 +2270,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -2335,8 +2293,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -2370,7 +2327,7 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -2398,6 +2355,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -2411,8 +2369,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -2427,8 +2384,7 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -2452,12 +2408,10 @@ contains
        endif
     endif
 
-
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -2471,11 +2425,11 @@ contains
        n_az=1
     endif
     n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size, zoom
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
     if (ios/=0) then
@@ -2518,17 +2472,18 @@ contains
        read(1,*) map_size
        map_size = 2*map_size ! compatibilite avec size_neb
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -2537,12 +2492,12 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -2552,8 +2507,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) settling_type, exp_strat, a_strat
        if (settling_type == 0) then
           lstrat = .false.
@@ -2568,14 +2522,14 @@ contains
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -2608,8 +2562,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -2677,8 +2630,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -2687,8 +2639,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -2859,8 +2810,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -2883,8 +2833,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -2918,7 +2867,7 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -2946,6 +2895,7 @@ contains
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     real :: fnbre_photons_eq_th, fnbre_photons_lambda, fnbre_photons_image
 
@@ -2959,8 +2909,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
@@ -2975,8 +2924,7 @@ contains
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -3004,8 +2952,7 @@ contains
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -3066,17 +3013,18 @@ contains
        read(1,*) map_size
        map_size = 2*map_size ! compatibilite avec size_neb
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -3085,12 +3033,12 @@ contains
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -3100,8 +3048,7 @@ contains
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lstrat, exp_strat, a_strat
        if (ldebris) then
           lstrat=.true.
@@ -3111,14 +3058,14 @@ contains
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -3151,8 +3098,7 @@ contains
           disk_zone(j)%gas_to_dust = 100.
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -3220,8 +3166,7 @@ contains
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -3230,8 +3175,7 @@ contains
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -3394,8 +3338,7 @@ contains
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -3418,8 +3361,7 @@ contains
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -3453,7 +3395,7 @@ contains
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -3484,6 +3426,7 @@ end subroutine read_para215
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old')
@@ -3495,8 +3438,7 @@ end subroutine read_para215
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
@@ -3506,8 +3448,7 @@ end subroutine read_para215
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -3535,8 +3476,7 @@ end subroutine read_para215
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -3550,11 +3490,11 @@ end subroutine read_para215
        n_az=1
     endif
     n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) igridx, igridy, zoom
     read(1,*,iostat=ios) N_thet, N_phi, n_cartes
     if (ios/=0) then
@@ -3597,17 +3537,18 @@ end subroutine read_para215
        read(1,*) map_size
        map_size = 2*map_size
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -3616,12 +3557,12 @@ end subroutine read_para215
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -3632,8 +3573,7 @@ end subroutine read_para215
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) gas_dust
        read(1,*) lstrat, exp_strat, a_strat
        if (ldebris) then
@@ -3644,14 +3584,14 @@ end subroutine read_para215
        read(1,*) lchauff_int, alpha
        T_min=1. ; T_max=1500. ; n_T=100
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -3683,8 +3623,7 @@ end subroutine read_para215
           disk_zone(j)%surf=0.0
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry <=2) is_there_disk = .true.
@@ -3763,8 +3702,7 @@ end subroutine read_para215
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -3773,8 +3711,7 @@ end subroutine read_para215
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -3937,8 +3874,7 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -3961,8 +3897,7 @@ end subroutine read_para215
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -3996,7 +3931,7 @@ end subroutine read_para215
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -4027,6 +3962,7 @@ end subroutine read_para215
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old')
@@ -4038,8 +3974,7 @@ end subroutine read_para215
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
@@ -4048,8 +3983,7 @@ end subroutine read_para215
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -4078,8 +4012,7 @@ end subroutine read_para215
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -4093,11 +4026,11 @@ end subroutine read_para215
        n_az=1
     endif
     n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom, n_cartes
     if (ios/=0) then
        n_cartes=1
@@ -4137,17 +4070,18 @@ end subroutine read_para215
        read(1,*) map_size
        map_size = 2* map_size
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -4156,12 +4090,12 @@ end subroutine read_para215
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -4172,8 +4106,7 @@ end subroutine read_para215
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) gas_dust
        read(1,*) lstrat, exp_strat, a_strat
        if (ldebris) then
@@ -4184,14 +4117,14 @@ end subroutine read_para215
        read(1,*) lchauff_int, alpha
        read(1,*) T_min, T_max, n_T
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -4223,8 +4156,7 @@ end subroutine read_para215
           disk_zone(j)%surf=0.0
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
@@ -4298,8 +4230,7 @@ end subroutine read_para215
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -4308,8 +4239,7 @@ end subroutine read_para215
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -4472,8 +4402,7 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -4496,8 +4425,7 @@ end subroutine read_para215
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -4531,7 +4459,7 @@ end subroutine read_para215
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
@@ -4560,6 +4488,7 @@ end subroutine read_para215
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
+    character(len=100) :: line_buffer
 
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old')
@@ -4572,8 +4501,7 @@ end subroutine read_para215
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
     tau_seuil  = 1.0e31
@@ -4582,8 +4510,7 @@ end subroutine read_para215
     ! ----------
     ! Wavelength
     ! ----------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
     lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
@@ -4612,8 +4539,7 @@ end subroutine read_para215
     ! -------------------------------
     ! Grid geometry / input FITS file
     ! -------------------------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (.not.lfits) then
        read(1,*) grid_type
        read(1,*) n_rad, nz, n_az, n_rad_in
@@ -4627,11 +4553,11 @@ end subroutine read_para215
        n_az=1
     endif
     n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom, n_cartes
     if (ios/=0) then
        n_cartes=1
@@ -4671,17 +4597,18 @@ end subroutine read_para215
        read(1,*) map_size
        map_size = 2*map_size
     endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     if (lfits) then
        scattering_method=0  ! Use "auto" mode to store dust properties
     else
        read(1,*) scattering_method
     endif ! lfits
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
@@ -4690,12 +4617,12 @@ end subroutine read_para215
        l_sym_centrale=.false.
        l_sym_axiale=.false.
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) l_sym_ima
        read(1,*) l_sym_centrale
        read(1,*) l_sym_axiale
     endif ! lfits
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
@@ -4706,8 +4633,7 @@ end subroutine read_para215
        lchauff_int=.false. ; alpha=0.0
        T_min=1. ; T_max=1500. ; n_T=100
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) gas_dust
        read(1,*) lstrat, exp_strat, a_strat
        if (ldebris) then
@@ -4718,14 +4644,14 @@ end subroutine read_para215
        read(1,*) lchauff_int, alpha
        read(1,*) T_min, T_max, n_T
     endif  ! lfits
+
     ! ---------------
     ! Number of zones
     ! ---------------
     if (lfits) then
        n_zones=1
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) n_zones
        if (n_zones > 1) then
           lstrat=.true. ; exp_strat=0.
@@ -4757,8 +4683,7 @@ end subroutine read_para215
           disk_zone(j)%surf=0.0
        enddo ! n_zones
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        do j=1,n_zones
           read(1,*) disk_zone(j)%geometry
           if (disk_zone(j)%geometry ==1) is_there_disk = .true.
@@ -4832,8 +4757,7 @@ end subroutine read_para215
        cavity%sclht=15. ; cavity%rref=50.
        cavity%exp_beta=1.5
     else
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lcavity
        read(1,*) cavity%sclht, cavity%rref
        read(1,*) cavity%exp_beta
@@ -4842,8 +4766,7 @@ end subroutine read_para215
     ! ----------------
     ! Grain properties
     ! ----------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
     if (lfits) then
@@ -4992,8 +4915,7 @@ end subroutine read_para215
     ! Molecular RT settings
     ! ---------------------
     if (.not.lfits) then
-       read(1,*)
-       read(1,*)
+       read(1,*) line_buffer
        read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
        read(1,*) vitesse_turb
        vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
@@ -5016,8 +4938,7 @@ end subroutine read_para215
     ! ---------------
     ! Star properties
     ! ---------------
-    read(1,*)
-    read(1,*)
+    read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
        write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
@@ -5051,7 +4972,7 @@ end subroutine read_para215
        if (.not.etoile(i)%lb_body) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
