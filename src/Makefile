@@ -114,7 +114,7 @@ endif
 ifeq ($(COMPILO),gfortran)
 FC_SER = gfortran -m64 -cpp
 FC_OMP = gfortran -m64 -cpp -fopenmp
-OPTS = -O3 -ffast-math  -funroll-loops
+OPTS = -O3 -funroll-loops -ffinite-math-only -fno-trapping-math #-ffast-math : -funsafe-math-optimizations make mcfost stall, rest not much faster than 03
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
 DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
 #-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
