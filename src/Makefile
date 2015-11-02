@@ -288,7 +288,7 @@ wardlaw :
 # Nettoyage
 #*************************************************************
 clean :
-	rm -rf *.o  *.mod
+	rm -rf *.o  *.mod .dust_prop*.tmp
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
