@@ -860,13 +860,18 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
+    ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+    ! C_ext = a² microns² -> 1e-8 cm²             \
+    ! density en cm-3                      > reste facteur 149595.0
+    ! longueur de vol en AU = 1.5e13 cm   /
+    facteur = AU_to_cm * mum_to_cm**2 
     opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
