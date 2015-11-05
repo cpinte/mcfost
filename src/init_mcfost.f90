@@ -113,7 +113,6 @@ subroutine initialisation_mcfost()
   ldensity_file=.false.
   lsigma_file = .false.
   ldebris=.false.
-  lkappa_abs_grain=.false.
   lweight_emission=.false.
   lprodimo=.false.
   lProDiMo_input_dir=.false.
@@ -681,9 +680,6 @@ subroutine initialisation_mcfost()
         endif
         call get_command_argument(i_arg,debris_file)
         i_arg = i_arg+1
-     case("-kappa_abs_grain")
-        i_arg = i_arg+1
-        lkappa_abs_grain = .true.
      case("-dg_ratio")
         i_arg = i_arg+1
         ldust_gas_ratio = .true.

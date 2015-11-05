@@ -916,30 +916,6 @@ subroutine opacite2(lambda)
   endif !lnLTE
 
 
-  if (lkappa_abs_grain) then
-     if (letape_th) then
-        write(*,*) "Error : lkappa_abs_grain only monochrmatic"
-        stop
-     endif
-
-     allocate(kappa_abs_tmp(n_rad,nz,n_grains_tot))
-
-     kappa_abs_tmp =0._db
-     do i=1, n_rad
-        do j=1,nz
-           pk=1
-           do  k=1,n_grains_tot
-              kappa_abs_tmp(i,j,k) =  C_abs(lambda,k) * densite_pouss(i,j,pk,k)
-           enddo !k
-        enddo
-     enddo
-
-     write(*,*) "Writing kappa_abs_grain.fits.gz"
-     call cfitsWrite("kappa_abs_grain.fits.gz",kappa_abs_tmp,shape(kappa_abs_tmp))
-     deallocate(kappa_abs_tmp)
-     write(*,*) "Done"
-     stop
-  endif !lkappa_abs_grain
 
   if (lscatt_ray_tracing) then
      do thetaj=0,nang_scatt
@@ -947,7 +923,6 @@ subroutine opacite2(lambda)
         tab_cos_scatt(thetaj) = cos(angle)
      enddo
   endif
-
 
   !$omp parallel &
   !$omp default(none) &
