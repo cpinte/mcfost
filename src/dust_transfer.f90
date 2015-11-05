@@ -208,7 +208,7 @@ subroutine transfert_poussiere()
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
-     call opacite2(1)
+     call opacite(1)
      call integ_tau(1) !TODO
 
      if (loptical_depth_map) call calc_optical_depth_map(1)
@@ -285,7 +285,7 @@ subroutine transfert_poussiere()
            endif
            do lambda=1,n_lambda
               if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
+              call opacite(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
@@ -298,7 +298,7 @@ subroutine transfert_poussiere()
               do lambda=1,n_lambda
                  ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
                  call prop_grains(lambda, p_lambda)
-                 call opacite2(lambda)
+                 call opacite(lambda)
               enddo
            endif ! ldust_sublimation
 
@@ -409,8 +409,8 @@ subroutine transfert_poussiere()
            if (ltemp.and.lsed_complete) then
               write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda
-                 call prop_grains(lambda, p_lambda) ! recalcul pour opacite2
-                 call opacite2(lambda)
+                 call prop_grains(lambda, p_lambda) ! recalcul pour opacite
+                 call opacite(lambda)
               enddo
               write(*,*) "Done"
            endif
@@ -438,7 +438,7 @@ subroutine transfert_poussiere()
            endif
            do lambda=1,n_lambda2
               if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
-              call opacite2(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+              call opacite(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"

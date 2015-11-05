@@ -13,7 +13,6 @@ module coated_sphere
   integer, save ::   maxmsg = 0, nummsg = 100
   logical, save :: msglim = .false.
 
-
 contains
 
   subroutine mueller_coated_sphere(lambda,taille_grain,wl,amu1,amu2,amu1_coat,amu2_coat,qext,qsca,gsca)
@@ -39,8 +38,7 @@ contains
     complex, dimension(nang_scatt+1) :: S1,S2
 
     real :: rcore, rshell, wvno, gqsc
-    real :: vi1, vi2, norme, somme_sin, somme_prob, somme2
-    real :: qbs
+    real :: vi1, vi2, norme, somme_prob, qbs, x, theta, dtheta
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
 
@@ -66,13 +64,10 @@ contains
     rcore=r_core(taille_grain)
     rshell=r_grain(taille_grain)
 
-    !write(*,*) rcore, rshell
-
     wvno= 2.0 * pi / wl
+    x = rshell * wvno
 
-    !write(*,*) wl,refrel,refrel_coat
-
-    call dmilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
+    call dMiLay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
     gsca = gqsc / qsca ! dmilay return gsca * qsca
 
     ! Passage des valeurs dans les tableaux de mcfost
@@ -85,74 +80,44 @@ contains
           vi1 = cabs(S2(J+1))*cabs(S2(J+1))
           vi2 = cabs(S1(J+1))*cabs(S1(J+1))
           s11(j) = 0.5*(vi1 + vi2)
-          !        write(*,*) j, s11(j), vi1, vi2 ! PB : s11(1) super grand
           s12(j) = 0.5*(vi1 - vi2)
           s33(j)=real(S2(J+1)*conjg(S1(J+1)))
           s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
        enddo !j
 
        ! Integration S11 pour tirer angle
-       somme_sin= 0.0
-       somme2 = 0.0
-       prob_s11(lambda,taille_grain,0)=0.0
-       do j=1,nang_scatt
-          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+&
-               s11(j)*sin(real(j)/real(nang_scatt)*pi)
-          somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
-          !     somme2=somme2+s12(j)*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-          ! Somme2 sert juste pour faire des plots
-       enddo
+       if (scattering_method==1) then
+          prob_s11(lambda,taille_grain,0)=0.0
+          dtheta = pi/real(nang_scatt)
+          do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+             theta = real(j)*dtheta
+             prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+          enddo
 
-       ! Normalisation
-       somme_prob=prob_s11(lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
-       ! Soit int_0^\pi (i1(t)+i2(t)) sin(t) = x**2*qsca
-       do j=1,nang_scatt
-          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
-       enddo
+          ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+          ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
+          ! On rate le pic de diffraction (en particulier entre 0 et 1)
+          somme_prob = 0.5*x**2*qsca
+          prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+               somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!$  open(unit=1,file='diffusion.dat')
-!!$
-!!$  write(*,*) 'g=',gsca
-!!$  somme1=0.0
-!!$  somme2=0.0
-!!$  do J=1,2*NANG
-!!$     hg=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j)-0.5)/180.*pi))**(-1.5)
-!!$     somme1=somme1+s11(j)/somme_prob*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     somme2=somme2+hg*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     write(1,*) (real(j)-0.5), s11(j)/somme_prob,hg , 0.5E0*CABS(S2(J))*CABS(S2(J)), 0.5E0*CABS(S1(J))*CABS(S1(J))
-!!$  enddo
-!!$  write(*,*) somme1, somme2
-!!$  close(unit=1)
-!!$!  stop
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          ! Normalisation de la proba cumulee a 1
+          prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+       endif ! scattering_method==1
 
-       do J=0,nang_scatt
-          !     ! Normalisation pour diffusion isotrope et E_sca(theta)
-          !     if (j == 1)  then
-          !        norme = somme_prob/somme_sin
-          !     endif
-
-          ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
-          ! PAR CELLULE)
-          ! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
-
-          !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
-
-
-          if (scattering_method==1) then
+       do j=0,nang_scatt
+          if (scattering_method==1) then ! Matrice de Mueller par grain
              ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-             norme=s11(j) !* qext/q sca
-             s11(j) = s11(j) / norme
-             s12(j) = s12(j) / norme
-             s33(j) = s33(j) / norme
-             s34(j) = s34(j) / norme
-          endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
+             norme=s11(j)
+          else ! Sinon normalisation a Qsca
+             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
+             norme = 0.5 * x**2
+          endif
 
-          tab_s11(lambda,taille_grain,j) = s11(j)
-          tab_s12(lambda,taille_grain,j) = s12(j)
-          tab_s33(lambda,taille_grain,j) = s33(j)
-          tab_s34(lambda,taille_grain,j) = s34(j)
+          tab_s11(lambda,taille_grain,j) = s11(j) / norme
+          tab_s12(lambda,taille_grain,j) = s12(j) / norme
+          tab_s33(lambda,taille_grain,j) = s33(j) / norme
+          tab_s34(lambda,taille_grain,j) = s34(j) / norme
        enddo
 
     endif ! aniso_method ==1
@@ -183,9 +148,9 @@ contains
     complex, dimension(nang_scatt+1) :: S1,S2, s1_HS, s2_HS
 
     real :: a, rcore, rshell, wvno, factor, cext, csca
-    real :: vi1, vi2, norme, somme_sin, somme_prob, somme1, somme2
+    real :: vi1, vi2, norme, somme_prob, theta, dtheta, x
     complex :: refrel, refrel_coat
-    real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
+    real, dimension(0:nang_scatt) :: S11,S12,S33,S34
 
     integer, parameter :: N_vf = 20
     real(kind=db), dimension(N_vf) :: f, wf
@@ -210,129 +175,84 @@ contains
     a = r_grain(taille_grain)
 
     wvno= 2.0 * pi / wl
+    x = wvno * a
 
     ipop = grain(taille_grain)%pop
 
     ! Calcul des poids pour integration de Gauss-Legendre
-    call gauleg(0.0_db,real(dust_pop(ipop)%dhs_maxf,kind=db),f,wf,N_vf) ; wf = wf/sum(wf) ! todo : a ne faire que pour 1 taille de grain
+    call GauLeg(0.0_db,real(dust_pop(ipop)%dhs_maxf,kind=db),f,wf,N_vf) ; wf = wf/sum(wf)
+    ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
 
     cext=0 ; csca=0 ; gsca=0 ; s1=0 ; s2=0
     do i=1,N_vf
-       rshell = a/((1.-f(i))**(1./3.))
-       rcore = rshell * f(i)**(1./3.)
+       rshell = a/((1.-f(i))**un_tiers)
+       rcore = rshell * f(i)**un_tiers
 
-       call dmilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext_HS,qsca_HS,qbs_HS,gqsc_HS,s1_HS,s2_HS)
+       call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext_HS,qsca_HS,qbs_HS,gqsc_HS,s1_HS,s2_HS)
        gsca_HS = gqsc_HS / qsca_HS ! dmilay return gsca * qsca
 
        if(qext_HS < 0_db) qext_HS = 0_db
        if(qsca_HS < 0_db) qsca_HS = 0_db
 
-       factor = pi*rshell**2*wf(i)
-       cext = cext + factor * qext_HS
+       factor = pi*rshell**2 * wf(i)
+       cext = cext + factor * qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
        csca = csca + factor * qsca_HS
        gsca = gsca + factor * qsca_HS * gsca_HS
 
-       norme = 0.0 ;
-       somme_sin = 0.0 ;
-       somme1 = 0.0
-       do j=0,nang_scatt
-          norme = norme + 0.5 * (cabs(s1_HS(j+1))**2  + cabs(s2_HS(j+1))**2 ) * &
-               sin(real(j)/real(nang_scatt)*pi)
-          somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
-
-          !somme1 = somme1 + 0.5 * (cabs(s1_HS(j+1))**2  + cabs(s2_HS(j+1))**2 ) * &
-          !     sin(real(j)/real(nang_scatt)*pi) * cos(real(j)/real(nang_scatt)*pi)
-
-       enddo
-!       somme1 = somme1 / norme
-       norme = norme / somme_sin
-
-       s1 = s1 + factor * s1_HS/norme * qsca_HS
-       s2 = s2 + factor * s2_HS/norme * qsca_HS
+       s1 = s1 + s1_HS * wf(i)
+       s2 = s2 + s2_HS * wf(i)
     enddo
     if (csca > 0.) gsca = gsca/csca
 
-    factor = pi*a**2
+    factor = pi*a**2 ! va etre remultiplie par pi*a**2 a la sortie dans dust.f90
     qext = cext/factor
     qsca = csca/factor
 
     ! Passage des valeurs dans les tableaux de mcfost
     if (aniso_method==1) then
 
-       !  QABS=QEXT-QSCA
+       ! QABS=QEXT-QSCA
        ! Calcul des elements de la matrice de diffusion
        ! indices decales de 1 par rapport a bhmie
        do J=0,nang_scatt
           vi1 = cabs(S2(J+1))*cabs(S2(J+1))
           vi2 = cabs(S1(J+1))*cabs(S1(J+1))
           s11(j) = 0.5*(vi1 + vi2)
-          !        write(*,*) j, s11(j), vi1, vi2 ! PB : s11(1) super grand
           s12(j) = 0.5*(vi1 - vi2)
           s33(j)=real(S2(J+1)*conjg(S1(J+1)))
           s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
        enddo !j
 
-       ! Integration S11 pour tirer angle
-       somme_sin= 0.0
-       somme2 = 0.0
        prob_s11(lambda,taille_grain,0)=0.0
-       do j=1,nang_scatt
-          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+&
-               s11(j)*sin(real(j)/real(nang_scatt)*pi)
-          somme_sin = somme_sin + sin(real(j)/real(nang_scatt)*pi)
-          !     somme2=somme2+s12(j)*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-          ! Somme2 sert juste pour faire des plots
+       dtheta = pi/real(nang_scatt)
+       do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+          theta = real(j)*dtheta
+          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
        enddo
 
-       ! Normalisation
-       somme_prob=prob_s11(lambda,taille_grain,nang_scatt) ! = (0.5*x**2*qsca)
-       ! Soit int_0^\pi (i1(t)+i2(t)) sin(t) = x**2*qsca
-       do j=1,nang_scatt
-          prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
-       enddo
+       ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+       ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
+       ! On rate le pic de diffraction (en particulier entre 0 et 1)
+       somme_prob = 0.5*x**2*qsca
+       prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+            somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!$  open(unit=1,file='diffusion.dat')
-!!$
-!!$  write(*,*) 'g=',gsca
-!!$  somme1=0.0
-!!$  somme2=0.0
-!!$  do J=1,2*NANG
-!!$     hg=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j)-0.5)/180.*pi))**(-1.5)
-!!$     somme1=somme1+s11(j)/somme_prob*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     somme2=somme2+hg*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     write(1,*) (real(j)-0.5), s11(j)/somme_prob,hg , 0.5E0*CABS(S2(J))*CABS(S2(J)), 0.5E0*CABS(S1(J))*CABS(S1(J))
-!!$  enddo
-!!$  write(*,*) somme1, somme2
-!!$  close(unit=1)
-!!$!  stop
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       ! Normalisation de la proba cumulee a 1
+       prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
 
-       do J=0,nang_scatt
-          !     ! Normalisation pour diffusion isotrope et E_sca(theta)
-          !     if (j == 1)  then
-          !        norme = somme_prob/somme_sin
-          !     endif
-
-          ! NORMALISATION ENLEVEE POUR LES CALCULS DES TAB_POS (MATRICES DE MUELLER
-          ! PAR CELLULE)
-          ! A REMETTRE POUR MATRICES DE MUELLER PAR GRAINS
-
-          !     write(*,*) real(j)-0.5, s11(j), s12(j), s33(j), s34(j)
-
-          if (scattering_method==1) then
+       do j=0,nang_scatt
+          if (scattering_method==1) then ! Matrice de Mueller par grain
              ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-             norme=s11(j) !* qext/q sca
-             s11(j) = s11(j) / norme
-             s12(j) = s12(j) / norme
-             s33(j) = s33(j) / norme
-             s34(j) = s34(j) / norme
-          endif ! Sinon normalisation a 0.5*x**2*Qsca propto section efficace de diffusion
+             norme=s11(j)
+          else ! Sinon normalisation a Qsca
+             ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
+             norme = 0.5 * x**2
+          endif
 
-          tab_s11(lambda,taille_grain,j) = s11(j)
-          tab_s12(lambda,taille_grain,j) = s12(j)
-          tab_s33(lambda,taille_grain,j) = s33(j)
-          tab_s34(lambda,taille_grain,j) = s34(j)
+          tab_s11(lambda,taille_grain,j) = s11(j) / norme
+          tab_s12(lambda,taille_grain,j) = s12(j) / norme
+          tab_s33(lambda,taille_grain,j) = s33(j) / norme
+          tab_s34(lambda,taille_grain,j) = s34(j) / norme
        enddo
 
     endif ! aniso_method ==1
