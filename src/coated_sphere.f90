@@ -152,8 +152,11 @@ contains
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) :: S11,S12,S33,S34
 
-    integer, parameter :: N_vf = 20
-    real(kind=db), dimension(N_vf) :: f, wf
+    integer :: N_vf
+    real(kind=db), dimension(:), allocatable :: f, wf
+
+    N_vf = min(max(20., deux_pi * r_grain(taille_grain)/tab_lambda(lambda)), 100.)
+    allocate(f(N_vf), wf(N_vf))
 
     refrel = cmplx(1.0,0.0) ! vide
     refrel_coat = cmplx(amu1,amu2)
@@ -257,6 +260,7 @@ contains
 
     endif ! aniso_method ==1
 
+    deallocate(f,wf)
     return
 
   end subroutine mueller_DHS
