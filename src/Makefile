@@ -292,7 +292,7 @@ clean :
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
-	rm -rf data* seed*
+	rm -rf data* seed* .dust_prop*.tmp
 
 cleanall : clean cleandata
 	rm -rf mcfost
