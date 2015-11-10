@@ -683,7 +683,7 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
   !if ((taille_grain == dust_pop(pop)%ind_fin).and.(lambda==n_lambda)) call free_mem_opacity_file()
 
   !! Matrices de mueller
-  if (aniso_method==1) then
+  if (aniso_method==1) then ! we have to compute a phase function from g
 
      ! HG avec le g interpole dans la table
      do j=0,nang_scatt
@@ -699,13 +699,12 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
         do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
            theta = real(j)*dtheta
            prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
-           !somme_sin = somme_sin + sin(theta)*dtheta
         enddo
 
-        ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+        ! s11 est calculee telle que la normalisation soit: 1.0 (def de la HG)
         ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
         ! On rate le pic de diffraction (en particulier entre 0 et 1)
-        somme_prob = 0.5*x**2*qsca
+        somme_prob = 1.0
         prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
              somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
 
@@ -713,14 +712,17 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
         prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
      endif ! scattering_method==1
 
-
      do j=0,nang_scatt
         if (scattering_method==1) then ! Matrice de Mueller par grain
            ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
            norme=s11(j)
         else ! Sinon normalisation a Qsca
-           ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
-           norme = 0.5 * x**2
+           ! La normalisation par default est 1 pour la HG
+           if (qsca > 1e-35) then
+              norme = 1./qsca
+           else ! we don't care there won't be any scattering
+              norme = huge_real* 1e-4
+           endif
         endif
 
         tab_s11(lambda,taille_grain,j) = s11(j) / norme

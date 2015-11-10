@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.9"
+  character(8), parameter :: mcfost_release = "2.20.10"
   real, parameter :: required_utils_version = 2.208
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -397,7 +397,7 @@ module grains
 
   ! Parametres de diffusion des grains
   real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
-  real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs!n_lambda,n_grains
+  real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs, C_abs_norm !n_lambda,n_grains
   !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
   ! aggregats
