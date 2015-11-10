@@ -601,7 +601,7 @@ subroutine transfert_poussiere()
 
            call system_clock(time_end)
            time=int((time_end - time_begin)/time_tick)
-           write (*,'("Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+           write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
 
            do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
@@ -617,7 +617,7 @@ subroutine transfert_poussiere()
 
               call system_clock(time_end)
               time=int((time_end - time_begin)/time_tick)
-              write (*,'("Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+              write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
            enddo
 
            call ecriture_map_ray_tracing()
@@ -1512,11 +1512,12 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
-  integer, parameter :: n_ray_star = 1000
+  integer, parameter :: n_ray_star_SED = 1000
 
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
-  real :: rand, rand2, tau
+  real :: rand, rand2, tau, pix_size
+  integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, ri, zj, phik, iray, istar, i,j
   logical :: in_map
 
@@ -1531,6 +1532,20 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
 
+  ! Test si etoile est resolue
+  n_ray_star(:) = n_ray_star_SED
+
+  if (lmono0) then
+     pix_size = map_size/zoom / max(igridx,igridy)
+     do istar=1, n_etoiles
+        if (2*etoile(istar)%r > pix_size) then
+           n_ray_star(istar) = n_ray_star_SED * int(max(etoile(istar)%r/pix_size**2,1.))
+           if (istar==1) write(*,*) ""
+           write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
+        endif
+     enddo
+  endif
+
   in_map = .true. ! for SED
   do istar=1, n_etoiles
      map_1star = 0.0 ;
@@ -1543,9 +1558,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !  write(*,*)  "F0", Flux_etoile
 
      ! Etoile non ponctuelle
-
      norme = 0.0_db
-     do iray=1,n_ray_star
+     do iray=1,n_ray_star(istar)
         ! Position aleatoire sur la disque stellaire
         rand  = sprng(stream(id))
         rand2 = sprng(stream(id))
