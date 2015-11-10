@@ -108,6 +108,7 @@ subroutine taille_grains()
         enddo ! k
 
         dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+
      else ! lread_grain_size_distribution
 
         if (dp%aexp < 0) then
@@ -571,7 +572,7 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,x,qext,qsca,gsca,amu1,amu2,pop) &
-  !$omp shared(r_grain,C_ext,C_sca,C_abs,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
+  !$omp shared(r_grain,C_ext,C_sca,C_abs,C_abs_norm,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot,S_grain) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop)
@@ -612,9 +613,17 @@ subroutine prop_grains(lambda, p_lambda)
         tab_albedo(lambda,k)=qsca/qext
         tab_g(lambda,k) = gsca
 
+        ! section efficace
         C_ext(lambda,k) = qext * S_grain(k)
         C_sca(lambda,k) = qsca * S_grain(k)
-        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k) ! section efficace
+        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k)
+
+        ! Normalisation des opacites pour etre en AU^-1 pour fichier thermal_emission.f90
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² microns² -> 1e-8 cm²             \
+        ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0
+        ! longueur de vol en AU = 1.5e13 cm   /
+        C_abs_norm(lambda,k) = C_abs(lambda,k) * AU_to_cm * mum_to_cm**2
      endif ! is_opacity_file
   enddo !k
   !$omp enddo
@@ -636,6 +645,7 @@ subroutine prop_grains(lambda, p_lambda)
         C_ext(lambda,k) = qext * S_grain(k)
         C_sca(lambda,k) = qsca * S_grain(k)
         C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k)
+        C_abs_norm(lambda,k) = C_abs(lambda,k) * AU_to_cm * mum_to_cm**2
      endif ! is_opacity_file
   enddo !k
 
@@ -682,7 +692,7 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) para_version, dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, &
+  write(1) para_version, dust_pop_save, grain_save, C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
        prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
@@ -725,7 +735,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  read(1,iostat=ios) para_version_save, dust_pop_save, grain_save, C_ext, C_sca, C_abs, tab_g, tab_albedo, &
+  read(1,iostat=ios) para_version_save, dust_pop_save, grain_save, C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
        prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
   close(unit=1)
@@ -924,7 +934,7 @@ subroutine opacite(lambda)
   ! Normalisation des opacites pour etre en AU^-1
   ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
   ! a² microns² -> 1e-8 cm²             \
-  ! density en cm-3                      > reste facteur 149595.0
+  ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0
   ! longueur de vol en AU = 1.5e13 cm   /
   ! fact =  pi * a * a * 149595.0
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
