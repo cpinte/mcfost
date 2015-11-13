@@ -1086,7 +1086,6 @@ subroutine initialisation_mcfost()
   if (lstrat_SPH) lstrat=.true.
 
   if (lemission_mol) then
-     lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
      do imol=1,n_molecules
         call read_molecules_names(imol)
         basename_data_dir2(imol) = "data_"//trim(mol(imol)%name)

@@ -37,7 +37,7 @@ subroutine mol_line_transfer()
 
   ! Liberation memoire
   call dealloc_em_th()
-
+  lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
   call init_directions_ray_tracing() ! TODO : on peut le faire apres
 
   do imol=1,n_molecules

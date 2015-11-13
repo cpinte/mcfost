@@ -197,7 +197,7 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error xI_star'
         stop
      endif
-     xI_star = 0.0_db ;  xl_star = 0.0_db
+     xI_star = 0.0_db ;  xw_star = 0.0_db ; xl_star = 0.0_db
 
      allocate(eps_dust2(N_type_flux,nang_ray_tracing,0:1,n_rad,nz), &
           I_sca2(N_type_flux,nang_ray_tracing,0:1,n_rad,nz,nb_proc), stat=alloc_status)
@@ -240,7 +240,7 @@ subroutine alloc_ray_tracing()
         stop
      endif
      xI = 0.0_db
-  endif
+  endif !lscatt_ray_tracing1
 
   return
 
@@ -253,10 +253,19 @@ subroutine dealloc_ray_tracing()
   ! C. Pinte
   ! 13/10/08
 
+  deallocate(kappa_sca,tab_s11_ray_tracing)
+  if (lsepar_pola) then
+     deallocate(tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing)
+     deallocate(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing)
+  endif
+  deallocate(Stokes_ray_tracing,stars_map,J_th)
 
-  deallocate(eps_dust2, eps_dust2_star, I_sca2)
-  deallocate(cos_thet_ray_tracing,omega_ray_tracing)
-  deallocate(xI)
+  if (lscatt_ray_tracing1) then
+     deallocate(xI_scatt,I_scatt, xsin_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
+  else
+     deallocate(xI_star,xw_star,xl_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,xI)
+  endif
+  deallocate(tab_RT_incl,tab_RT_az,tab_uv_rt,tab_u_rt,tab_v_rt,tab_w_rt)
 
   return
 
