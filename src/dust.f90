@@ -671,30 +671,18 @@ end subroutine prop_grains
 subroutine save_dust_prop(letape_th)
 
   logical, intent(in) :: letape_th
-
-  type(dust_pop_type), dimension(n_pop) :: dust_pop_save
-  type(dust_grain_type), dimension(n_grains_tot) :: grain_save
-  character(len=512) :: filename, tab_wavelength_save
-  integer :: n_lambda_save
-  real :: lambda_min_save, lambda_max_save
-
-  dust_pop_save = dust_pop
-  n_lambda_save = n_lambda
-  lambda_min_save = lambda_min
-  lambda_max_save = lambda_max
-  tab_wavelength_save = tab_wavelength
-  grain_save = grain
+  character(len=512) :: filename
 
   if (letape_th) then
-     filename=".dust_prop1.tmp" ;
+     filename="_dust_prop_th.tmp" ;
   else
-     filename=".dust_prop2.tmp" ;
+     filename="_dust_prop_SED.tmp" ;
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  write(1) para_version, dust_pop_save, grain_save, C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
-       prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  write(1) para_version, scattering_method, dust_pop, grain, &
+       n_lambda, lambda_min, lambda_max, tab_wavelength, &
+       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34
   close(unit=1)
 
   return
@@ -711,7 +699,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   type(dust_pop_type), dimension(n_pop) :: dust_pop_save
   type(dust_grain_type), dimension(n_grains_tot) :: grain_save
   character(len=512) :: filename, tab_wavelength_save
-  integer :: n_lambda_save
+  integer :: n_lambda_save, scattering_method_save
   real :: lambda_min_save, lambda_max_save, para_version_save
 
   integer :: i, pop, ios
@@ -721,9 +709,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   if (lread_Misselt) return
 
   if (letape_th) then
-     filename=".dust_prop1.tmp" ;
+     filename="_dust_prop_th.tmp" ;
   else
-     filename=".dust_prop2.tmp" ;
+     filename="_dust_prop_SED.tmp" ;
   endif
 
   ! check if there is a dust population file
@@ -735,9 +723,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  read(1,iostat=ios) para_version_save, dust_pop_save, grain_save, C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
-       prob_s11, tab_s11, tab_s12, tab_s33, tab_s34, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save
+  read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, &
+       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, &
+       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34
   close(unit=1)
   if (ios /= 0) then ! if some dimension changed
      return
@@ -746,6 +734,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   ! The parameter version has to be the same for safety
   ! in case something important was modified between 2 versions
   if (para_version /= para_version_save) return
+
+  ! If the scattering method changed, the normalization is off
+  if ( scattering_method /=  scattering_method_save) return
 
   ! check if the dust population has changed
   ok = (n_lambda == n_lambda_save) .and. (real_equality(lambda_min,lambda_min_save)) .and. &

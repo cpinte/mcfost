@@ -88,6 +88,7 @@ subroutine transfert_poussiere()
         scattering_method = 2
      endif
   endif
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
   if (lscattering_method1) then
      lambda = 1

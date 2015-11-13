@@ -288,11 +288,14 @@ wardlaw :
 # Nettoyage
 #*************************************************************
 clean :
-	rm -rf *.o  *.mod .dust_prop*.tmp
+	rm -rf *.o  *.mod _dust_prop*.tmp
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
-	rm -rf data* seed* .dust_prop*.tmp
+	rm -rf data* seed*
+
+cleandata_dust :
+	rm -rf _dust_prop*.tmp
 
 cleanall : clean cleandata
 	rm -rf mcfost
