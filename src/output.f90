@@ -2026,7 +2026,7 @@ subroutine ecriture_temperature(iTemperature)
 
   if (lRE_LTE) then
      if (iTemperature == 2) then
-        filename = "!"//trim(data_dir)//"/Temperature2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+        filename = "!"//trim(data_dir)//"/Temperature_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
         filename = trim(data_dir)//"/Temperature.fits.gz"
      endif
@@ -2096,7 +2096,7 @@ subroutine ecriture_temperature(iTemperature)
      endif
 
      if (iTemperature == 2) then
-        filename = "!"//trim(data_dir)//"/Temperature_nLTE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+        filename = "!"//trim(data_dir)//"/Temperature_nLTE_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
         filename = trim(data_dir)//"/Temperature_nLTE.fits.gz"
      endif
@@ -2149,7 +2149,7 @@ subroutine ecriture_temperature(iTemperature)
      endif
 
      if (iTemperature == 2) then
-        filename = "!"//trim(data_dir)//"/Temperature_nRE2.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
+        filename = "!"//trim(data_dir)//"/Temperature_nRE_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
         filename = trim(data_dir)//"/Temperature_nRE.fits.gz"
      endif
@@ -2462,10 +2462,10 @@ subroutine ecriture_sed(ised)
 
   !! Ecriture SED
   if (ised ==1) then
-     filename = trim(data_dir)//"/sed1.fits.gz"
+     filename = trim(data_dir)//"/.sed_th.fits.gz"
   else
-     filename = trim(data_dir)//"/sed2.fits.gz"
-     if (lProDiMo) write(*,*) "WARNING: sed2.fits.gz will be noisy due to the use of ProDiMo mode"
+     filename = trim(data_dir)//"/sed_mc.fits.gz"
+     if (lProDiMo) write(*,*) "WARNING: sed_mc.fits.gz will be noisy due to the use of ProDiMo mode"
   endif
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
