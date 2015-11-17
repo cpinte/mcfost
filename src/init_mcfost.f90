@@ -905,6 +905,7 @@ subroutine initialisation_mcfost()
 
   if (lno_T) ltemp = .false.
 
+
   write(*,*) 'Input file read successfully'
 
 
