@@ -801,7 +801,7 @@ subroutine opacite(lambda)
   real(kind=db) :: k_abs_RE_LTE, k_abs_RE, k_abs_tot, angle
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
-  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
@@ -1290,7 +1290,7 @@ subroutine opacite(lambda)
 !  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
-     write(*,*) "Writing dust propreties"
+     write(*,*) "Writing dust properties"
      ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
 
      ! Only do it after the last pass through the wavelength table
@@ -1299,6 +1299,7 @@ subroutine opacite(lambda)
      allocate(albedo_lambda(n_lambda))
      allocate(g_lambda(n_lambda))
      allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
+     allocate(kappa_grain(n_lambda,n_grains_tot))
 
      kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1,1,1)/(volume(1)*AU_to_cm**3))) ! cm^2/g
      albedo_lambda=tab_albedo_pos(:,1,1,1)
@@ -1308,7 +1309,11 @@ subroutine opacite(lambda)
      call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
      call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
      call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-     call cfitsWrite("!data_dust/kappa_grain.fits.gz",C_abs,shape(C_abs)) ! lambda, n_grains
+
+     do l=1, n_lambda
+        kappa_grain(l,:) = C_abs(l,:) * mum_to_cm**2 / M_grain(:) ! cm^2/g
+     enddo
+     call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
      S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
      call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
@@ -1318,7 +1323,7 @@ subroutine opacite(lambda)
         call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 
-     deallocate(kappa_lambda,albedo_lambda,g_lambda,pol_lambda_theta)
+     deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
 
      if (lstop_after_init) then
         write(*,*) "Exiting"

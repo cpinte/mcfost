@@ -327,13 +327,13 @@ subroutine initialisation_mcfost()
         limg=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -img. Error #1"
            stop
         endif
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -img. Error #2"
            stop
         endif
         i_arg = i_arg+1
@@ -342,13 +342,13 @@ subroutine initialisation_mcfost()
         lopacite_only=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -op. Error #1"
            stop
         endif
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -op. Error #2"
            stop
         endif
         i_arg = i_arg+1
