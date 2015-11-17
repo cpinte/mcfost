@@ -46,7 +46,7 @@ subroutine transfert_poussiere()
   ! Parametres simu
   integer :: time, lambda_seuil, ymap0, xmap0, nbre_phot2
   integer :: ind_etape, first_etape_obs
-  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz
+  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, nnfot1_cumul
 
   real :: n_phot_lim
   logical :: lpacket_alive, lintersect
@@ -384,7 +384,6 @@ subroutine transfert_poussiere()
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
 
-
      if (letape_th) then ! Calcul des temperatures
         nbre_phot2 = nbre_photons_eq_th
         n_phot_lim = 1.0e30 ! on ne tue pas les paquets
@@ -468,6 +467,10 @@ subroutine transfert_poussiere()
         write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
      endif
 
+     if (letape_th) write(*,*) "Computing temperature structure ..."
+     if (lmono0)    write(*,*) "Computing MC radiation field ..."
+     if (laffichage) call progress_bar(0)
+
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
         write(*,*) tab_lambda(lambda) ,frac_E_stars(lambda)
      endif
@@ -479,8 +482,8 @@ subroutine transfert_poussiere()
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-     !$omp shared(nbre_phot2,lforce_1st_scatt,n_phot_envoyes) &
-     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
+     !$omp shared(nbre_phot2,lforce_1st_scatt,n_phot_envoyes,nb_proc) &
+     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda, nnfot1_cumul,ibar) &
      !$omp reduction(+:E_abs_nRE)
      if (letape_th) then
         p_nnfot2 => nnfot2
@@ -502,10 +505,10 @@ subroutine transfert_poussiere()
 
      id = 1 ! Pour code sequentiel
      !$ id = omp_get_thread_num() + 1
+     ibar=1 ;  nnfot1_cumul = 0
 
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
-        if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
         p_nnfot2 = 0.0_db
         n_phot_envoyes_in_loop = 0.0_db
         photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_in_loop < n_phot_lim))
@@ -540,6 +543,18 @@ subroutine transfert_poussiere()
               if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
            endif
         enddo photon !nnfot2
+
+        ! Progress bar
+        !$omp atomic
+        nnfot1_cumul = nnfot1_cumul+1
+        if (laffichage) then
+           if (real(nnfot1_cumul) > 0.02*ibar * real(nbre_photons_loop)) then
+              call progress_bar(ibar)
+              !$omp atomic
+              ibar = ibar+1
+           endif
+           if (nnfot1_cumul == nbre_photons_loop) call progress_bar(50)
+        endif
      enddo !nnfot1
      !$omp end do
      !$omp end parallel
