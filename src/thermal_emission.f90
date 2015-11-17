@@ -1142,7 +1142,8 @@ subroutine Temp_nRE(lconverged)
                        Temp = tab_Temp(T)
                        cst_wl=cst_th/(Temp*wl)
                        if (cst_wl < 500.) then
-                          somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * Proba_Temperature(T,i,j,l)
+                          somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
+                               Proba_Temperature(T,i,j,l)
                        endif !cst_wl
                     enddo
                  endif
