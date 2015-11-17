@@ -2664,7 +2664,7 @@ subroutine densite_file()
 
   ! Au cas ou : on elimine les valeurs a 0
   sph_dens = sph_dens/maxval(sph_dens) ! normalization avant d'ajouter une constante
-  sph_dens = max(sph_dens,tiny_real)
+  sph_dens = max(sph_dens,1e6*tiny_real)
 
   ! Lecture des tailles de grains (en microns)
 !  if (n_a > 99999) then
