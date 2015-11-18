@@ -472,6 +472,7 @@ subroutine transfert_poussiere()
      if (laffichage) call progress_bar(0)
 
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
+        if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. energy emitted by star"
         write(*,*) tab_lambda(lambda) ,frac_E_stars(lambda)
      endif
 
