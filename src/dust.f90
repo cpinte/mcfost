@@ -587,21 +587,21 @@ subroutine prop_grains(lambda, p_lambda)
         amu2=tab_amu2(lambda,pop)
         x = 2.0 * pi * a / wavel
         if (laggregate) then
-           call mueller_GMM(p_lambda,k,x,qext,qsca,gsca)
+           call Mueller_GMM(p_lambda,k,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
-                 call mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
+                 call Mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
               else
-                 call mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
               if (x < 1e4) then
-                 call mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
               else
-                 call mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
@@ -637,7 +637,7 @@ subroutine prop_grains(lambda, p_lambda)
      if (dust_pop(pop)%is_opacity_file) then
         a = r_grain(k)
         x = 2.0 * pi * a / wavel
-        call mueller_opacity_file(lambda,p_lambda,k,x, qext,qsca,gsca)
+        call Mueller_opacity_file(p_lambda,k, qext,qsca,gsca)
 
         tab_albedo(lambda,k)=qsca/qext
         tab_g(lambda,k) = gsca

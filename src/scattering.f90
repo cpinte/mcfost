@@ -384,7 +384,7 @@ end subroutine mueller_Mie
 
 !***************************************************
 
-subroutine mueller_GMM(lambda,taille_grain,alfa,qext,qsca,gsca)
+subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir du
 ! code gmm01TrA (clusters de sphères)
@@ -397,8 +397,8 @@ subroutine mueller_GMM(lambda,taille_grain,alfa,qext,qsca,gsca)
 !****************************************************************
 
   implicit none
+
   integer, intent(in) :: lambda, taille_grain
-  real, intent(in) :: alfa
   real, intent(out) :: qext, qsca
 
   integer, parameter :: nang2 = 2*nang_scatt+1
@@ -554,7 +554,7 @@ end subroutine mueller_GMM
 
 !***************************************************
 
-subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
+subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
   ! pour grains apres lecture du fichier d'opacite
   ! En particulier pour les PAHs de Draine
@@ -564,8 +564,7 @@ subroutine mueller_opacity_file(lambda,p_lambda,taille_grain,x,qext,qsca,gsca)
 
   implicit none
 
-  integer, intent(in) :: taille_grain, lambda, p_lambda
-  real, intent(in) :: x
+  integer, intent(in) :: taille_grain, lambda
   real, intent(out) :: qext,qsca,gsca
 
   real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4
@@ -1479,7 +1478,7 @@ end subroutine isotrope
 
 !********************************************************************
 
-subroutine hg(lambda, g, aleat, itheta, cospsi)
+subroutine hg(g, aleat, itheta, cospsi)
 !********************************************************
 !* CALCUL DU COSINUS DE L'ANGLE DE DIFFUSION, COS(PSI)
 !*
@@ -1496,7 +1495,6 @@ subroutine hg(lambda, g, aleat, itheta, cospsi)
   ! Le calcul de cospsi se fait en double precision mais on
   ! renvoie cospsi en simple precision
   ! Passage cospsi en db lors passage length_deg2 en db
-  integer, intent(in) :: lambda
   real, intent(in) :: g
   real, intent(in) :: aleat
   real(kind=db), intent(out) :: cospsi

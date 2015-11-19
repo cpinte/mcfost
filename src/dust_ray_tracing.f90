@@ -1545,11 +1545,11 @@ end subroutine calc_Isca2_star
 
 !***********************************************************
 
-function dust_source_fct(lambda,ri,zj,phik, x,y,z)
+function dust_source_fct(ri,zj,phik, x,y,z)
   ! La direction du rayon est maintenant fixee le long de l'axe x
   ! l'angle de diffusion ne depend que de la position x, y, z
 
-  integer, intent(in) :: lambda, ri, zj, phik
+  integer, intent(in) :: ri, zj, phik
   real(kind=db), intent(in) :: x, y, z
 
   real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
