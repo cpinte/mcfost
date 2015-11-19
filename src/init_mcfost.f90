@@ -64,7 +64,6 @@ subroutine initialisation_mcfost()
   ldust_gas_ratio = .false.
   lstop_after_init= .false.
   lwall=.false.
-  lgap=.false.
   lpah=.false.
   ln_zone=.false. ; n_zones=1
   limg=.false.
@@ -120,11 +119,7 @@ subroutine initialisation_mcfost()
   lProDiMo2mcfost_test = .false.
   lforce_ProDiMo_PAH = .false.
   lforce_diff_approx = .false.
-  lstrat_SPH = .false. ; lno_strat_SPH=.true.
-  lstrat_SPH_bin = .false. ; lno_strat_SPH_bin=.true.
   lgap_ELT=.false.
-  lLaure_SED=.false.
-  lforce_T_Laure_SED = .false.
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
@@ -352,10 +347,6 @@ subroutine initialisation_mcfost()
            stop
         endif
         i_arg = i_arg+1
-     case("-gap")
-        lgap=.true.
-        write(*,*) "Gap"
-        i_arg = i_arg+1
      case("-n-zone")
         ln_zone=.true.
         write(*,*) "n-zone disk calculation"
@@ -451,22 +442,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
-     case("-strat_SPH")
-        lstrat_SPH=.true.
-        lno_strat_SPH=.false.
-        i_arg = i_arg+1
-     case("-no_strat_SPH")
-        lstrat_SPH=.true.
-        lno_strat_SPH=.true.
-        i_arg = i_arg+1
-     case("-strat_SPH_bin")
-        lstrat_SPH_bin=.true.
-        lno_strat_SPH_bin=.false.
-        i_arg = i_arg+1
-     case("-no_strat_SPH_bin")
-        lstrat_SPH_bin=.true.
-        lno_strat_SPH_bin=.true.
-        i_arg = i_arg+1
      case("-resol")
         lresol=.true.
         i_arg = i_arg+1
@@ -751,17 +726,6 @@ subroutine initialisation_mcfost()
      case("-prodimo2mcfost")
         i_arg = i_arg+1
         lProDiMo2mcfost_test=.true.
-     case("-Laure_SED")
-        i_arg = i_arg+1
-        lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename)
-        i_arg = i_arg + 1
-     case("-Laure_SED_force_T")
-        i_arg = i_arg+1
-        lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename)
-        i_arg = i_arg + 1
-        lforce_T_Laure_SED = .true.
      case("-spot")
         i_arg = i_arg+1
         lspot=.true.
@@ -1084,8 +1048,6 @@ subroutine initialisation_mcfost()
 !     igridy = 1
 !  endif
 
-  if (lstrat_SPH) lstrat=.true.
-
   if (lemission_mol) then
      do imol=1,n_molecules
         call read_molecules_names(imol)
@@ -1238,8 +1200,6 @@ subroutine display_help()
   write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
-  write(*,*) "        : -strat_SPH"
-  write(*,*) "        : -no_strat_SPH"
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
@@ -1252,8 +1212,6 @@ subroutine display_help()
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap_ELT <R> <sigma>"
-  write(*,*) "        : -Laure_SED <file>"
-  write(*,*) "        : -Laure_SED_force_T <file>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"

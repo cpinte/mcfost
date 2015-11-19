@@ -160,18 +160,10 @@ subroutine transfert_poussiere()
   !call densite_data_hd32297(para) ! grille redefinie dans routine
   if (ldensity_file) then
      call densite_file()
-  else if (lgap) then
-     call densite_data_gap
-  else if (lstrat_SPH) then
-     call densite_data_SPH_TTauri_2
-  else if (lstrat_SPH_bin) then
-     call densite_data_SPH_binaire
   else if (lfits) then
      call densite_fits
   else if (ldebris) then
      call densite_debris
-  else if (lLaure_SED) then
-     call densite_data_LAURE_SED()
   else if (lread_Seb_Charnoz) then
      call densite_Seb_Charnoz()
   else if (lread_Seb_Charnoz2) then
@@ -645,7 +637,6 @@ subroutine transfert_poussiere()
         letape_th=.false. ! A priori, on a calcule la temperature
         if (lRE_LTE) then
            call Temp_finale()
-           if (lforce_T_Laure_SED)call force_T_Laure_SED()
            if (lreemission_stats) call reemission_stats()
         end if
         if (lRE_nLTE) then
