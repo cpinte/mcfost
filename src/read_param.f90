@@ -44,19 +44,6 @@ contains
        stop
     endif
 
-    if (para_version < 0.) then
-       if (ldebris) then
-          write(*,*) "You cannot use the -debris option to feed a FITS file density table"
-          write(*,*) "Exiting!"
-          stop
-       else
-          write(*,*) "You are running MCFOST with a user-specified density structure"
-          write(*,*) ""
-          lfits=.true.
-          para_version=-para_version
-       endif
-    endif
-
     correct_Rsub = 1.0_db
     lmigration = .false.
     lhydrostatic = .false.
@@ -225,16 +212,11 @@ contains
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -263,11 +245,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -284,75 +262,50 @@ contains
     read(1,*) RT_az_min, RT_az_max, RT_n_az
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
+    read(1,*) line_buffer
+    read(1,*) settling_type, exp_strat, a_strat
+    if (settling_type == 0) then
+       lstrat = .false.
     else
-       read(1,*) line_buffer
-       read(1,*) settling_type, exp_strat, a_strat
-       if (settling_type == 0) then
-          lstrat = .false.
-       else
-          lstrat = .true.
-       endif
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*) lmigration
-       read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lhydrostatic
-       read(1,*) lchauff_int, alpha
-       T_min= 1.0 ; T_max=3000. ; n_T=300
-       if (lchange_Tmax_PAH) T_max = Tmax_PAH
-    endif  ! lfits
+       lstrat = .true.
+    endif
+    read(1,*) lmigration
+    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lhydrostatic
+    read(1,*) lchauff_int, alpha
+    T_min= 1.0 ; T_max=3000. ; n_T=300
+    if (lchange_Tmax_PAH) T_max = Tmax_PAH
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -365,44 +318,30 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
-             write(*,*) "WARNING : debris disk, setting settling to 0"
-             settling_type=0
-             lstrat = .false.
-          endif
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
+          write(*,*) "WARNING : debris disk, setting settling to 0"
+          settling_type=0
+          lstrat = .false.
+       endif
 
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref, disk_zone(j)%vert_exponent
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
-          disk_zone(j)%Rmax = disk_zone(j)%Rout
-          if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
-       enddo ! n_zones
-    endif ! lfits
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref, disk_zone(j)%vert_exponent
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
+       disk_zone(j)%Rmax = disk_zone(j)%Rout
+       if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
+    enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
@@ -444,16 +383,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -461,106 +394,66 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
-                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-                write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-                write(*,*) "Exiting"
-                stop
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
-                     / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
-
-             ! Checking which type of opacity file it is
-             dust_pop_tmp(n_pop)%is_PAH = .false.
-             dust_pop_tmp(n_pop)%is_opacity_file = .false.
-             dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .false.
-             if (dust_pop_tmp(n_pop)%indices(1)(1:3) == "PAH") then
-                dust_pop_tmp(n_pop)%is_PAH = .true. ; dust_pop_tmp(n_pop)%is_opacity_file = .true.
-             else  if (dust_pop_tmp(n_pop)%indices(1)(1:7) == "Misselt") then
-                dust_pop_tmp(n_pop)%is_opacity_file = .true.
-                dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .true.
-                lread_Misselt = .true.
-                if (dust_pop_tmp(n_pop)%indices(1)(9:11) == "PAH") then
-                   dust_pop_tmp(n_pop)%is_PAH = .true.
-                endif
-             endif
-
+          if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
+               (dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
+             write(*,*) "Exiting"
+             stop
+          endif
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
-
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
+                  / V_somme
           enddo
-       enddo !n_zones
-    endif ! lfits
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+
+          ! Checking which type of opacity file it is
+          dust_pop_tmp(n_pop)%is_PAH = .false.
+          dust_pop_tmp(n_pop)%is_opacity_file = .false.
+          dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .false.
+          if (dust_pop_tmp(n_pop)%indices(1)(1:3) == "PAH") then
+             dust_pop_tmp(n_pop)%is_PAH = .true. ; dust_pop_tmp(n_pop)%is_opacity_file = .true.
+          else  if (dust_pop_tmp(n_pop)%indices(1)(1:7) == "Misselt") then
+             dust_pop_tmp(n_pop)%is_opacity_file = .true.
+             dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .true.
+             lread_Misselt = .true.
+             if (dust_pop_tmp(n_pop)%indices(1)(9:11) == "PAH") then
+                dust_pop_tmp(n_pop)%is_PAH = .true.
+             endif
+          endif
+
+       enddo
+
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
@@ -647,25 +540,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -793,16 +683,11 @@ contains
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -831,11 +716,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -852,76 +733,50 @@ contains
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
+    read(1,*) line_buffer
+    read(1,*) settling_type, exp_strat, a_strat
+    if (settling_type == 0) then
+       lstrat = .false.
     else
-       read(1,*) line_buffer
-       read(1,*) settling_type, exp_strat, a_strat
-       if (settling_type == 0) then
-          lstrat = .false.
-       else
-          lstrat = .true.
-       endif
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*) lmigration
-       read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lhydrostatic
-       read(1,*) lchauff_int, alpha
-       T_min= 1.0 ; T_max=3000. ; n_T=300
-       if (lchange_Tmax_PAH) T_max = Tmax_PAH
-    endif  ! lfits
+       lstrat = .true.
+    endif
+    read(1,*) lmigration
+    read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lhydrostatic
+    read(1,*) lchauff_int, alpha
+    T_min= 1.0 ; T_max=3000. ; n_T=300
+    if (lchange_Tmax_PAH) T_max = Tmax_PAH
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -934,44 +789,30 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
-             write(*,*) "WARNING : debris disk, setting settling to 0"
-             settling_type=0
-             lstrat = .false.
-          endif
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
+          write(*,*) "WARNING : debris disk, setting settling to 0"
+          settling_type=0
+          lstrat = .false.
+       endif
 
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref, disk_zone(j)%vert_exponent
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
-          disk_zone(j)%Rmax = disk_zone(j)%Rout
-          if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
-       enddo ! n_zones
-    endif ! lfits
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref, disk_zone(j)%vert_exponent
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
+       disk_zone(j)%Rmax = disk_zone(j)%Rout
+       if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
+    enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
@@ -1013,16 +854,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -1030,90 +865,50 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
-                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-                write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-                write(*,*) "Exiting"
-                stop
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
-                     / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
+               (dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
+             write(*,*) "Exiting"
+             stop
+          endif
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
+                  / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
@@ -1201,25 +996,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -1339,16 +1131,11 @@ contains
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -1377,11 +1164,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -1398,73 +1181,50 @@ contains
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
+    read(1,*) line_buffer
+    read(1,*) settling_type, exp_strat, a_strat
+    if (settling_type == 0) then
+       lstrat = .false.
     else
-       read(1,*) line_buffer
-       read(1,*) settling_type, exp_strat, a_strat
-       if (settling_type == 0) then
-          lstrat = .false.
-       else
-          lstrat = .true.
-       endif
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*) lmigration
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lhydrostatic
-       read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
-    endif  ! lfits
+       lstrat = .true.
+    endif
+    read(1,*) lmigration
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lhydrostatic
+    read(1,*) lchauff_int, alpha
+    T_min=1. ; T_max=1500. ; n_T=100
+
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
+
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -1477,39 +1237,6 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
-          disk_zone(j)%Rmax = disk_zone(j)%Rout
-          if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
-       enddo ! n_zones
-    endif ! lfits
-
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
     Rmax = maxval(disk_zone(:)%Rmax)
@@ -1550,16 +1277,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -1567,90 +1288,50 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
-                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-                write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-                write(*,*) "Exiting"
-                stop
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
-                     / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
+               (dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
+             write(*,*) "Exiting"
+             stop
+          endif
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
+                  / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -1733,26 +1414,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -1872,16 +1549,11 @@ contains
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -1909,11 +1581,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -1930,75 +1598,47 @@ contains
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
+    read(1,*) line_buffer
+    read(1,*) settling_type, exp_strat, a_strat
+    if (settling_type == 0) then
+       lstrat = .false.
     else
-       read(1,*) line_buffer
-       read(1,*) settling_type, exp_strat, a_strat
-       if (settling_type == 0) then
-          lstrat = .false.
-       else
-          lstrat = .true.
-       endif
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
-    endif  ! lfits
+       lstrat = .true.
+    endif
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    T_min=1. ; T_max=1500. ; n_T=100
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -2011,40 +1651,26 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
-          if (disk_zone(j)%geometry == 2) then ! tappered-edge
-             disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
-          else
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
-       enddo ! n_zones
-    endif ! lfits
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
+       if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          disk_zone(j)%Rc =  disk_zone(j)%Rout
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+       else
+          disk_zone(j)%Rmax = disk_zone(j)%Rout
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
+    enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
@@ -2086,16 +1712,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -2103,90 +1723,50 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass, dust_pop_tmp(n_pop)%dhs_maxf
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
-                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-                write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-                write(*,*) "Exiting"
-                stop
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
-                     / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
+               (dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
+             write(*,*) "Exiting"
+             stop
+          endif
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
+                  / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -2269,26 +1849,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -2409,16 +1985,11 @@ contains
     endif
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -2447,11 +2018,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -2468,75 +2035,47 @@ contains
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
+    read(1,*) line_buffer
+    read(1,*) settling_type, exp_strat, a_strat
+    if (settling_type == 0) then
+       lstrat = .false.
     else
-       read(1,*) line_buffer
-       read(1,*) settling_type, exp_strat, a_strat
-       if (settling_type == 0) then
-          lstrat = .false.
-       else
-          lstrat = .true.
-       endif
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
-    endif  ! lfits
+       lstrat = .true.
+    endif
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    T_min=1. ; T_max=1500. ; n_T=100
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -2549,41 +2088,27 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
-          if (disk_zone(j)%geometry == 2) then ! tappered-edge
-             disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
-          else
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
-          disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
-       enddo ! n_zones
-    endif ! lfits
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
+       if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          disk_zone(j)%Rc =  disk_zone(j)%Rout
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+       else
+          disk_zone(j)%Rmax = disk_zone(j)%Rout
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
+       disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
+    enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
@@ -2625,16 +2150,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -2642,90 +2161,50 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%type, dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
-                  (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-                write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-                write(*,*) "Exiting"
-                stop
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
-                     / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
+               (dust_pop_tmp(n_pop)%type=="dhs")) ) then
+             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
+             write(*,*) "Exiting"
+             stop
+          endif
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
+                  / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -2809,26 +2288,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -2950,16 +2425,11 @@ contains
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -2988,11 +2458,7 @@ contains
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -3009,70 +2475,42 @@ contains
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size ! compatibilite avec size_neb
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*) line_buffer
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
-    endif  ! lfits
+    read(1,*) line_buffer
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    T_min=1. ; T_max=1500. ; n_T=100
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -3085,41 +2523,27 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-          disk_zone(j)%gas_to_dust = 100.
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
-          read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
-          if (disk_zone(j)%geometry == 2) then ! tappered-edge
-             disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
-          else
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
-          disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
-       enddo ! n_zones
-    endif ! lfits
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%Rout, disk_zone(j)%edge
+       if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          disk_zone(j)%Rc =  disk_zone(j)%Rout
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+       else
+          disk_zone(j)%Rmax = disk_zone(j)%Rout
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
+       disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
+    enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
@@ -3161,16 +2585,10 @@ contains
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -3178,83 +2596,43 @@ contains
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -3337,26 +2715,22 @@ contains
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -3474,16 +2848,11 @@ end subroutine read_para215
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -3512,11 +2881,7 @@ end subroutine read_para215
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
 
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
-    endif  ! lfits
+    capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -3533,72 +2898,43 @@ end subroutine read_para215
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       gas_dust=100.
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*) line_buffer
-       read(1,*) gas_dust
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       T_min=1. ; T_max=1500. ; n_T=100
-    endif  ! lfits
+    read(1,*) line_buffer
+    read(1,*) gas_dust
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    T_min=1. ; T_max=1500. ; n_T=100
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -3611,50 +2947,37 @@ end subroutine read_para215
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry <=2) is_there_disk = .true.
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
-          read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
-          if (disk_zone(j)%geometry == 2) then ! tappered-edge
-             disk_zone(j)%Rc =  disk_zone(j)%Rout
-             disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
-          else
-             disk_zone(j)%Rmax = disk_zone(j)%Rout
-          endif
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
-          disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
+       read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
+       if (disk_zone(j)%geometry == 2) then ! tappered-edge
+          disk_zone(j)%Rc =  disk_zone(j)%Rout
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc
+       else
+          disk_zone(j)%Rmax = disk_zone(j)%Rout
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
+       disk_zone(j)%moins_gamma_exp = disk_zone(j)%surf
 
-          if (j==1) then
-             map_size=2*size_neb_tmp
-          else
-             if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-                write(*,*) "Error : different values for size_neb"
-                write(*,*) "Exiting"
-                stop
-             endif
+       if (j==1) then
+          map_size=2*size_neb_tmp
+       else
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
+             write(*,*) "Error : different values for size_neb"
+             write(*,*) "Exiting"
+             stop
           endif
-       enddo ! n_zones
-    endif ! lfits
+       endif
+    enddo ! n_zones
 
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
@@ -3697,16 +3020,10 @@ end subroutine read_para215
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -3714,83 +3031,43 @@ end subroutine read_para215
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -3873,26 +3150,22 @@ end subroutine read_para215
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -4010,16 +3283,11 @@ end subroutine read_para215
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -4046,11 +3314,7 @@ end subroutine read_para215
        read(1,*) igridx2(i), igridy2(i)
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
-    endif  ! lfits
+    read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -4066,72 +3330,43 @@ end subroutine read_para215
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2* map_size
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       gas_dust=100.
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*) line_buffer
-       read(1,*) gas_dust
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       read(1,*) T_min, T_max, n_T
-    endif  ! lfits
+    read(1,*) line_buffer
+    read(1,*) gas_dust
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    read(1,*) T_min, T_max, n_T
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -4144,44 +3379,31 @@ end subroutine read_para215
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
-          read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry ==1) is_there_disk = .true.
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
+       read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
 
-          if (j==1) then
-             map_size=2*size_neb_tmp
-          else
-             if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-                write(*,*) "Error : different values for size_neb"
-                write(*,*) "Exiting"
-                stop
-             endif
+       if (j==1) then
+          map_size=2*size_neb_tmp
+       else
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
+             write(*,*) "Error : different values for size_neb"
+             write(*,*) "Exiting"
+             stop
           endif
-       enddo ! n_zones
-    endif ! lfits
+       endif
+    enddo ! n_zones
 
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
@@ -4225,16 +3447,10 @@ end subroutine read_para215
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -4242,83 +3458,43 @@ end subroutine read_para215
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
+               dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
+             dust_pop_tmp(n_pop)%lcoating = .true.
           else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
-
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
-
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
+             dust_pop_tmp(n_pop)%lcoating = .false.
           endif
-       enddo !n_zones
-    else ! lfits
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             !read(1,*) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%n_components, dust_pop_tmp(n_pop)%mixing_rule, &
-                  dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             if ( (dust_pop_tmp(n_pop)%n_components > 1).and.(dust_pop_tmp(n_pop)%mixing_rule == 2) ) then
-                dust_pop_tmp(n_pop)%lcoating = .true.
-             else
-                dust_pop_tmp(n_pop)%lcoating = .false.
-             endif
-             V_somme = 0.0
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
-                V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
-             enddo
-             ! renormalisation des fraction en volume
-             do k=1, dust_pop_tmp(n_pop)%n_components
-                dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
-             enddo
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
+          V_somme = 0.0
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
+             V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          ! renormalisation des fraction en volume
+          do k=1, dust_pop_tmp(n_pop)%n_components
+             dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
+          enddo
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-       enddo !n_zones
-    endif ! lfits
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -4401,26 +3577,22 @@ end subroutine read_para215
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -4537,16 +3709,11 @@ end subroutine read_para215
 
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*) line_buffer
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -4573,11 +3740,7 @@ end subroutine read_para215
        read(1,*) igridx2(i), igridy2(i)
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
-    endif  ! lfits
+    read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -4593,72 +3756,43 @@ end subroutine read_para215
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size
-    endif  ! lfits
 
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
 
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*) line_buffer
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
 
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       gas_dust=100.
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*) line_buffer
-       read(1,*) gas_dust
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       read(1,*) T_min, T_max, n_T
-    endif  ! lfits
+    read(1,*) line_buffer
+    read(1,*) gas_dust
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    read(1,*) T_min, T_max, n_T
 
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*) line_buffer
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -4671,44 +3805,31 @@ end subroutine read_para215
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-       enddo ! n_zones
-    else
-       read(1,*) line_buffer
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
-          read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry ==1) is_there_disk = .true.
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
+       read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
 
-          if (j==1) then
-             map_size=2*size_neb_tmp
-          else
-             if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-                write(*,*) "Error : different values for size_neb"
-                write(*,*) "Exiting"
-                stop
-             endif
+       if (j==1) then
+          map_size=2*size_neb_tmp
+       else
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
+             write(*,*) "Error : different values for size_neb"
+             write(*,*) "Exiting"
+             stop
           endif
-       enddo ! n_zones
-    endif ! lfits
+       endif
+    enddo ! n_zones
 
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
@@ -4752,16 +3873,10 @@ end subroutine read_para215
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*) line_buffer
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*) line_buffer
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -4769,69 +3884,29 @@ end subroutine read_para215
     read(1,*) line_buffer
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
-          else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices, dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
 
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
-          endif
-       enddo !n_zones
-    else
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
-             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
-          enddo
-
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-
-       enddo !n_zones
-    endif ! lfits
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -4914,26 +3989,22 @@ end subroutine read_para215
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*) line_buffer
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-
-    endif ! lfits
+    read(1,*) line_buffer
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -5048,17 +4119,12 @@ end subroutine read_para215
     endif
 
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*)
     read(1,*)
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -5085,11 +4151,7 @@ end subroutine read_para215
        read(1,*) igridx2(i), igridy2(i)
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
-    endif  ! lfits
+    read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -5105,72 +4167,45 @@ end subroutine read_para215
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size
-    endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*)
     read(1,*)
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       gas_dust=100.
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) gas_dust
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
-       if (status/=0) correct_Rsub = 1.0
-       read(1,*) lchauff_int, alpha
-       read(1,*) T_min, T_max, n_T
-    endif  ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) gas_dust
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
+    if (status/=0) correct_Rsub = 1.0
+    read(1,*) lchauff_int, alpha
+    read(1,*) T_min, T_max, n_T
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -5183,46 +4218,32 @@ end subroutine read_para215
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-       enddo ! n_zones
-    else
-       read(1,*)
-       read(1,*)
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
-          read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
+    read(1,*)
+    read(1,*)
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry ==1) is_there_disk = .true.
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
+       read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
 
-          if (j==1) then
-             map_size=2*size_neb_tmp
-          else
-             if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-                write(*,*) "Error : different values for size_neb"
-                write(*,*) "Exiting"
-                stop
-             endif
+       if (j==1) then
+          map_size=2*size_neb_tmp
+       else
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
+             write(*,*) "Error : different values for size_neb"
+             write(*,*) "Exiting"
+             stop
           endif
-       enddo ! n_zones
-    endif ! lfits
-
+       endif
+    enddo ! n_zones
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     rmin = minval(disk_zone(:)%rmin)
@@ -5266,17 +4287,11 @@ end subroutine read_para215
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -5285,70 +4300,29 @@ end subroutine read_para215
     read(1,*)
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
-          else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
 
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
-          endif
-       enddo !n_zones
-    else
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
-             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
-          enddo
-
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-
-       enddo !n_zones
-    endif ! lfits
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -5431,26 +4405,23 @@ end subroutine read_para215
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       read(1,*)
-       read(1,*)
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) vitesse_turb
-       vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
-       read(1,*) n_molecules
-       allocate(mol(n_molecules))
-       do imol=1,n_molecules
-          read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
-          read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-          mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-          read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
-          read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
-          read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
-          mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
-          mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
-       enddo
-
-    endif ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) vitesse_turb
+    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    read(1,*) n_molecules
+    allocate(mol(n_molecules))
+    do imol=1,n_molecules
+       read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
+       read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
+       read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
+       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       mol(imol)%n_speed_center_rt = mol(imol)%n_speed_rt
+       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
+    enddo
 
     ! ---------------
     ! Star properties
@@ -5562,23 +4533,15 @@ end subroutine read_para215
        endif
     endif
 
-    if (lfits) then
-       tau_seuil=1.0e16; wl_seuil=0.81
-    else
-       read(1,*) tau_seuil, wl_seuil
-    endif  ! lfits
+    read(1,*) tau_seuil, wl_seuil
     ! -------------------------------
-    ! Grid geometry / input FITS file
+    ! Grid geometry
     ! -------------------------------
     read(1,*)
     read(1,*)
-    if (.not.lfits) then
-       read(1,*) grid_type
-       read(1,*) n_rad, nz, n_az, n_rad_in
-    else
-       read(1,*) struct_fits_file
-       call read_struct_fits_file()
-    endif ! lfits
+    read(1,*) grid_type
+    read(1,*) n_rad, nz, n_az, n_rad_in
+
 
     if ((.not.l3D).and.(n_az > 1)) then
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
@@ -5605,11 +4568,7 @@ end subroutine read_para215
        read(1,*) igridx2(i), igridy2(i)
        maxigrid2(i) = max(igridx2(i), igridy2(i))
     enddo
-    if (lfits) then
-       capt_interet=N_thet ; delta_capt=1 ; angle_interet=90. ; lonly_capt_interet=.false.
-    else
-       read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
-    endif  ! lfits
+    read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
     if (lonly_capt_interet) then
@@ -5625,71 +4584,46 @@ end subroutine read_para215
     RT_az_min = 0.0 ; RT_az_max = 0.0 ; RT_n_az = 1 ;
     read(1,*) distance
     read(1,*) ang_disque
-    if (lfits) then
-       read(1,*) map_size
-       map_size = 2*map_size
-    endif  ! lfits
+
     ! -----------------
     ! Scattering method
     ! -----------------
     read(1,*)
     read(1,*)
-    if (lfits) then
-       scattering_method=0  ! Use "auto" mode to store dust properties
-    else
-       read(1,*) scattering_method
-    endif ! lfits
+    read(1,*) scattering_method
     read(1,*) aniso_method
+
     ! ----------
     ! Symmetries
     ! ----------
-    if (lfits) then
-       l_sym_ima=.false.
-       l_sym_centrale=.false.
-       l_sym_axiale=.false.
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) l_sym_ima
-       read(1,*) l_sym_centrale
-       read(1,*) l_sym_axiale
-    endif ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) l_sym_ima
+    read(1,*) l_sym_centrale
+    read(1,*) l_sym_axiale
+
     ! ----------------------
     ! Dust global properties
     ! ----------------------
-    if (lfits) then
-       gas_dust=100.
-       lstrat=.true. ; exp_strat=0.0 ; a_strat=1.0
-       ldust_sublimation=.false.
-       lchauff_int=.false. ; alpha=0.0
-       T_min=1. ; T_max=1500. ; n_T=100
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) gas_dust
-       read(1,*) lstrat, exp_strat, a_strat
-       if (ldebris) then
-          lstrat=.true.
-       endif
-       read(1,*) ldust_sublimation
-       read(1,*) lchauff_int, alpha
-       read(1,*) T_min, T_max, n_T
-    endif  ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) gas_dust
+    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*) ldust_sublimation
+    read(1,*) lchauff_int, alpha
+    read(1,*) T_min, T_max, n_T
+
     ! ---------------
     ! Number of zones
     ! ---------------
-    if (lfits) then
-       n_zones=1
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) n_zones
-       if (n_zones > 1) then
-          lstrat=.true. ; exp_strat=0.
-          write(*,*) "You are using a n-zone parameter file"
-          write(*,*) "lstrat is set to true and exp_strat to 0."
-       endif
-    endif ! lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) n_zones
+    if (n_zones > 1) then
+       lstrat=.true. ; exp_strat=0.
+       write(*,*) "You are using a n-zone parameter file"
+       write(*,*) "lstrat is set to true and exp_strat to 0."
+    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) then
@@ -5702,45 +4636,32 @@ end subroutine read_para215
     ! -----------------
     ! Density structure
     ! -----------------
-    if (lfits) then
-       do j=1,n_zones
-          disk_zone(j)%geometry=1
-          is_there_disk = .true.
-          disk_zone(j)%diskmass=1.e-5
-          disk_zone(j)%sclht=struct_file_zmax/cutoff
-          disk_zone(j)%rref=struct_file_rref
-          disk_zone(j)%rin=struct_file_rin ; disk_zone(j)%rout=struct_file_rout ; disk_zone(j)%edge=0.0
-          disk_zone(j)%exp_beta=struct_file_beta
-          disk_zone(j)%surf=0.0
-       enddo ! n_zones
-    else
-       read(1,*)
-       read(1,*)
-       do j=1,n_zones
-          read(1,*) disk_zone(j)%geometry
-          if (disk_zone(j)%geometry ==1) is_there_disk = .true.
-          if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
-          if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
-             write(*,*) "WARNING : you are using an envelope density structure"
-             write(*,*) "          with a cylindrical grid !!!!"
-          endif
-          read(1,*) disk_zone(j)%diskmass
-          read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
-          read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
-          read(1,*) disk_zone(j)%exp_beta
-          read(1,*) disk_zone(j)%surf
+    read(1,*)
+    read(1,*)
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry ==1) is_there_disk = .true.
+       if (disk_zone(j)%geometry == 2) disk_zone(j)%geometry = 3 ! update avec tappered-edge
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%rref
+       read(1,*) disk_zone(j)%rin, disk_zone(j)%rout, size_neb_tmp, disk_zone(j)%edge
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf
 
-          if (j==1) then
-             map_size=2*size_neb_tmp
-          else
-             if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-                write(*,*) "Error : different values for size_neb"
-                write(*,*) "Exiting"
-                stop
-             endif
+       if (j==1) then
+          map_size=2*size_neb_tmp
+       else
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
+             write(*,*) "Error : different values for size_neb"
+             write(*,*) "Exiting"
+             stop
           endif
-       enddo ! n_zones
-    endif ! lfits
+       endif
+    enddo ! n_zones
 
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
@@ -5784,17 +4705,11 @@ end subroutine read_para215
     ! ------
     ! Cavity
     ! ------
-    if (lfits) then
-       lcavity=.false.
-       cavity%sclht=15. ; cavity%rref=50.
-       cavity%exp_beta=1.5
-    else
-       read(1,*)
-       read(1,*)
-       read(1,*) lcavity
-       read(1,*) cavity%sclht, cavity%rref
-       read(1,*) cavity%exp_beta
-    endif  !lfits
+    read(1,*)
+    read(1,*)
+    read(1,*) lcavity
+    read(1,*) cavity%sclht, cavity%rref
+    read(1,*) cavity%exp_beta
 
     ! ----------------
     ! Grain properties
@@ -5803,70 +4718,29 @@ end subroutine read_para215
     read(1,*)
     lRE_LTE=.false. ; lRE_nLTE=.false. ; lnRE=.false.
     n_pop=0
-    if (lfits) then
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          if (n_especes(j) /= struct_file_nspecies) then
-             write(*,*) "ERROR! Number of species in parameter file does not match structure of input FITS file"
-             write(*,*) "Exiting."
-             stop
-          else
-             somme=0.0
-             do i=1, n_especes(j)
-                n_pop = n_pop+1
-                dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
-                read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-                if (ios/=0) then
-                   write(*,*) 'Error reading file: Incorrect number of lines in parameter file!'
-                   write(*,*) 'Check the coherence of the number of species'
-                   write(*,*) 'Exiting'
-                   stop
-                endif
+    do j=1, n_zones
+       read(1,*) n_especes(j)
+       somme=0.0
+       do i=1, n_especes(j)
+          n_pop = n_pop+1
+          dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
+          read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
+          read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
+          read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
+          if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
+          somme = somme + dust_pop_tmp(n_pop)%frac_mass
+          dust_pop_tmp(n_pop)%zone = j
+       enddo
 
-                read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-                read(1,*) dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amin=struct_file_amin*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%amax=struct_file_amax*dust_pop_tmp(n_pop)%sblow
-                dust_pop_tmp(n_pop)%aexp=0.0;  dust_pop_tmp(n_pop)%n_grains=struct_file_n_grains
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-                if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-                somme = somme + dust_pop_tmp(n_pop)%frac_mass
-                dust_pop_tmp(n_pop)%zone = j
-             enddo
+       ! renormalisation des fraction en masse
+       do i=1,n_especes(j)
+          dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
+          dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
+       enddo
 
-             ! renormalisation des fraction en masse
-             do i=1,n_especes(j)
-                dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-                dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-             enddo
-          endif
-       enddo !n_zones
-    else
-       do j=1, n_zones
-          read(1,*) n_especes(j)
-          somme=0.0
-          do i=1, n_especes(j)
-             n_pop = n_pop+1
-             dust_pop_tmp(n_pop)%n_components = 1 ; dust_pop_tmp(n_pop)%component_volume_fraction(1) = 1.0
-             read(1,*) dust_pop_tmp(n_pop)%indices(1), dust_pop_tmp(n_pop)%porosity, dust_pop_tmp(n_pop)%frac_mass
-             read(1,*) dust_pop_tmp(n_pop)%methode_chauffage
-             read(1,*) dust_pop_tmp(n_pop)%amin, dust_pop_tmp(n_pop)%amax, dust_pop_tmp(n_pop)%aexp, dust_pop_tmp(n_pop)%n_grains
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 1) lRE_LTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 2) lRE_nLTE=.true.
-             if (dust_pop_tmp(n_pop)%methode_chauffage == 3) lnRE=.true.
-             somme = somme + dust_pop_tmp(n_pop)%frac_mass
-             dust_pop_tmp(n_pop)%zone = j
-          enddo
-
-          ! renormalisation des fraction en masse
-          do i=1,n_especes(j)
-             dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass = dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass/somme
-             dust_pop_tmp(n_pop-n_especes(j)+i)%masse =  dust_pop_tmp(n_pop-n_especes(j)+i)%frac_mass * disk_zone(j)%diskmass
-          enddo
-
-       enddo !n_zones
-    endif ! lfits
+    enddo !n_zones
 
     if (lRE_LTE.and.lRE_nLTE) then
        write(*,*) "Error : cannot mix grains in LTE and nLTE"
@@ -5949,22 +4823,20 @@ end subroutine read_para215
     ! ---------------------
     ! Molecular RT settings
     ! ---------------------
-    if (.not.lfits) then
-       n_molecules = 1 ;
-       allocate(mol(1))
-       read(1,*)
-       read(1,*)
-       read(1,*) mol(1)%vmax_center_rt, vitesse_turb, mol(1)%n_speed_rt
-       mol(1)%vmax_center_rt = mol(1)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
-       vitesse_turb = vitesse_turb * 1.e3
-       read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
-       read(1,*) mol(1)%filename, mol(1)%iLevel_max
-       read(1,*) mol(1)%lcst_abundance, mol(1)%abundance, mol(1)%abundance_file
-       read(1,*) mol(1)%lline, mol(1)%nTrans_raytracing
-       read(1,*) mol(1)%indice_Trans_rayTracing(1:mol(1)%nTrans_raytracing)
-       mol(1)%n_speed_center_rt = mol(1)%n_speed_rt
-       mol(1)%n_extraV_rt = 0 ; mol(1)%extra_deltaV_rt = 0.0
-    endif ! lfits
+    n_molecules = 1 ;
+    allocate(mol(1))
+    read(1,*)
+    read(1,*)
+    read(1,*) mol(1)%vmax_center_rt, vitesse_turb, mol(1)%n_speed_rt
+    mol(1)%vmax_center_rt = mol(1)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * 1.e3
+    read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
+    read(1,*) mol(1)%filename, mol(1)%iLevel_max
+    read(1,*) mol(1)%lcst_abundance, mol(1)%abundance, mol(1)%abundance_file
+    read(1,*) mol(1)%lline, mol(1)%nTrans_raytracing
+    read(1,*) mol(1)%indice_Trans_rayTracing(1:mol(1)%nTrans_raytracing)
+    mol(1)%n_speed_center_rt = mol(1)%n_speed_rt
+    mol(1)%n_extraV_rt = 0 ; mol(1)%extra_deltaV_rt = 0.0
 
     ! ---------------
     ! Star properties
@@ -6126,9 +4998,6 @@ end subroutine read_para215
     read(1,*)
     read(1,*) gas_dust
     read(1,*) lstrat, exp_strat, a_strat
-    if (ldebris) then
-       lstrat=.true.
-    endif
     read(1,*) ldust_sublimation
     read(1,*) lchauff_int, alpha
     read(1,*) T_min, T_max, n_T

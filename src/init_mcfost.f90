@@ -111,7 +111,6 @@ subroutine initialisation_mcfost()
   loutput_mc=.true.
   ldensity_file=.false.
   lsigma_file = .false.
-  ldebris=.false.
   lweight_emission=.false.
   lprodimo=.false.
   lProDiMo_input_dir=.false.
@@ -646,15 +645,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         sigma_file = s
         i_arg = i_arg + 1
-     case("-debris")
-        i_arg = i_arg+1
-        ldebris=.true.
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : debris disk structure file needed"
-           stop
-        endif
-        call get_command_argument(i_arg,debris_file)
-        i_arg = i_arg+1
      case("-dg_ratio")
         i_arg = i_arg+1
         ldust_gas_ratio = .true.
@@ -1209,7 +1199,6 @@ subroutine display_help()
   write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
-  write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
   write(*,*) "        : -gap <R> <sigma>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"

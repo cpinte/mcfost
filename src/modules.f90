@@ -129,13 +129,6 @@ module parametres
   logical :: lbenchmark_water1, lbenchmark_water2, lbenchmark_water3, lbenchmark_SHG, lMathis_field
   real :: Mathis_field
 
-  ! Disque de debris calcule par code dynamique
-  ! ldebris -> using a text file for input density table
-  ! lfits -> using a FITS file for input density table
-  ! Can't do both! This is checked within read_param
-  logical :: ldebris, lfits
-  character(len=512) :: debris_file, struct_fits_file
-
   ! Prodimo
   logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
 

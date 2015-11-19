@@ -876,108 +876,6 @@ subroutine lect_lambda()
 
 end subroutine lect_lambda
 
-!**********************************************************************
-
-subroutine read_struct_fits_file()
-  ! Need to read the FITS file once here to read off the header keywords necessary to define the grid.
-  ! Minimal set of keywords: AMIN, AMAX [in micron], RIN, ROUT, ZMAX, RREF [in AU] and BETA, plus the NAXIS suite.
-  ! Grid structure has to follow H(r) = H0 x (r/r0)^beta, and ZMAX is the total height at radius RREF.
-  ! Format of input FITS file: n_rad x nz x n_grains [x n_species]
-
-  integer :: unit, status, blocksize, readwrite, nfound_dim
-  integer, dimension(4) :: naxes
-  character(len=80) :: comment
-
-  grid_type=1
-
-  status=0
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  call ftgiou(unit,status)
-
-  readwrite=0
-  call ftopen(unit,struct_fits_file,readwrite,blocksize,status)
-  if (status /= 0)then
-     write(*,*) 'ERROR opening fits file '//trim(struct_fits_file)
-     stop
-  endif
-
-  !  determine the size of the input file (Not more than 4 dimensions!)
-  call ftgknj(unit,'NAXIS',1,4,naxes,nfound_dim,status)
-  !  check that it found at least 3 NAXISn keywords
-  if (nfound_dim < 3) then
-     write(*,*) 'ERROR! File '//trim(struct_fits_file)//' does has not enough dimensions (3 are required)'
-     stop
-  endif
-
-  if (nfound_dim == 4) then
-     struct_file_nspecies=naxes(4)
-  else
-     struct_file_nspecies=1
-  endif
-  write(*,*) "Input structure file contains ",struct_file_nspecies," dust population(s)"
-
-  ! determine spatial extent of grid (rin, rout, zmax, beta, rref)
-  status=0
-  call ftgkye(unit,'RIN',struct_file_rin,comment,status)
-  if (status /= 0) then
-     write(*,*) 'ERROR! Input file does not contain RIN keyword'
-     stop
-  else
-     status=0
-     call ftgkye(unit,'ROUT',struct_file_rout,comment,status)
-     if (status /= 0) then
-        write(*,*) 'ERROR! Input file does not contain ROUT keyword'
-        stop
-     else
-        status=0
-        call ftgkye(unit,'ZMAX',struct_file_zmax,comment,status)
-        if (status /= 0) then
-           write(*,*) 'ERROR! Input file does not contain ZMAX keyword'
-           stop
-        else
-           status=0
-           call ftgkye(unit,'BETA',struct_file_beta,comment,status)
-           if (status /= 0) then
-              write(*,*) 'ERROR! Input file does not contain BETA keyword'
-              stop
-           else
-              status=0
-              call ftgkye(unit,'RREF',struct_file_rref,comment,status)
-              if (status /= 0) then
-                 write(*,*) 'ERROR! Input file does not contain RREF keyword'
-                 stop
-              endif
-           endif
-        endif
-     endif
-  endif
-
-  ! determine extent of grain size distribution
-  status=0
-  call ftgkye(unit,'AMIN',struct_file_amin,comment,status)
-  if (status /= 0) then
-     write(*,*) 'ERROR! Input file does not contain AMIN keyword'
-     stop
-  else
-     status=0
-     call ftgkye(unit,'AMAX',struct_file_amax,comment,status)
-     if (status /= 0) then
-        write(*,*) 'ERROR! Input file does not contain AMAX keyword'
-        stop
-     endif
-  endif
-
-  ! closing input file and freeing unit number
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
-
-  n_rad=naxes(1) ; nz=naxes(2) ; n_az=1 ; n_rad_in=1
-  struct_file_n_grains = naxes(3)
-
-  return
-
-end subroutine read_struct_fits_file
-
 !***************************************************
 
 subroutine init_tab_Temp()
@@ -995,5 +893,7 @@ subroutine init_tab_Temp()
   enddo
 
 end subroutine init_tab_Temp
+
+!***************************************************
 
 end module input
