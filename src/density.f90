@@ -706,10 +706,10 @@ subroutine define_dust_density()
      enddo
   endif
 
-  if (lgap_ELT) then
+  if (lgap_Gaussian) then
      do i=1, n_rad
         densite_pouss(i,:,:,:) = densite_pouss(i,:,:,:) * &
-             (1.0 - exp(-0.5 * ((r_grid(i,1) - r_gap_ELT) / sigma_gap_ELT)**2 ))
+             (1.0 - exp(-0.5 * ((r_grid(i,1) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
      enddo
   endif
 
