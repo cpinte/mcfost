@@ -119,7 +119,7 @@ subroutine initialisation_mcfost()
   lProDiMo2mcfost_test = .false.
   lforce_ProDiMo_PAH = .false.
   lforce_diff_approx = .false.
-  lgap_ELT=.false.
+  lgap_Gaussian=.false.
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
@@ -705,15 +705,15 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,sProDiMo_fPAH)
         i_arg = i_arg + 1
         read(sProDiMo_fPAH,*) ProDiMo_fPAH
-     case("-gap_ELT")
+     case("-gap")
         i_arg = i_arg+1
-        lgap_ELT=.true.
+        lgap_Gaussian=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
-        read(s,*) r_gap_ELT
+        read(s,*) r_gap_Gaussian
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
-        read(s,*) sigma_gap_ELT
+        read(s,*) sigma_gap_Gaussian
      case("-only_scatt")
         i_arg = i_arg+1
         lonly_scatt = .true.
@@ -1211,7 +1211,7 @@ subroutine display_help()
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
-  write(*,*) "        : -gap_ELT <R> <sigma>"
+  write(*,*) "        : -gap <R> <sigma>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"

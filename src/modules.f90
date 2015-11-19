@@ -136,8 +136,6 @@ module parametres
   logical :: ldebris, lfits
   character(len=512) :: debris_file, struct_fits_file
 
-  character(len=512) :: Laure_SED_filename
-
   ! Prodimo
   logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
 
@@ -263,8 +261,8 @@ module disk
   ! Correction locale de la desnite (dans un anneau)
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
-  logical :: lgap_ELT
-  real :: r_gap_ELT, sigma_gap_ELT
+  logical :: lgap_Gaussian
+  real :: r_gap_Gaussian, sigma_gap_Gaussian
 
   ! Fichier de Gasp pour la structure du disque
   real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta
@@ -614,7 +612,7 @@ module em_th
   ! emissivite en unite qq (manque une cst mais travail en relatif)
   real(kind=db), dimension(:,:,:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
 
-  real, dimension(:,:,:), allocatable :: Temperature, Temperature_old, Temperature_Laure_SED !n_rad,nz,n_az
+  real, dimension(:,:,:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
   real, dimension(:,:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
   real, dimension(:,:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
   integer, dimension(:,:,:), allocatable :: Tpeak_old
