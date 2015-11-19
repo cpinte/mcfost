@@ -160,10 +160,6 @@ subroutine transfert_poussiere()
   !call densite_data_hd32297(para) ! grille redefinie dans routine
   if (ldensity_file) then
      call densite_file()
-  else if (lfits) then
-     call densite_fits
-  else if (ldebris) then
-     call densite_debris
   else if (lread_Seb_Charnoz) then
      call densite_Seb_Charnoz()
   else if (lread_Seb_Charnoz2) then
