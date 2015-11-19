@@ -982,7 +982,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
                  endif
               endif
            else ! fonction de phase HG
-              call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
+              call hg(tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1012,7 +1012,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! Nouveaux paramètres de Stokes
               if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
-              call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
+              call hg(tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1053,15 +1053,15 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         if (rand <= Proba_abs_RE_LTE(lambda,ri, zj, p_phik)) then
            ! Cas RE - LTE
            rand = sprng(stream(id))
-           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,lambda)
         else  if (rand <= Proba_abs_RE_LTE_p_nLTE(lambda,ri, zj, p_phik)) then
            ! Cas RE - nLTE
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
         else
            ! Cas nRE - qRE
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
         endif
 
         ! Nouvelle direction de vol : emission isotrope
@@ -1219,7 +1219,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
                     endif
                  endif
               else ! fonction de phase HG
-                 call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
+                 call hg(tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
                  if (lisotropic) then ! Diffusion isotrope
                     itheta=1
                     cospsi=2.0*rand-1.0
@@ -1249,7 +1249,7 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
                  ! Nouveaux paramètres de Stokes
                  if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
               else ! fonction de phase HG
-                 call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
+                 call hg(tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
                  if (lisotropic)  then ! Diffusion isotrope
                     itheta=1
                     cospsi=2.0*rand-1.0
@@ -1285,10 +1285,10 @@ subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fla
            rand = sprng(stream(id))
 
            ! Choix longueur d'onde
-           if (lRE_LTE) call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+           if (lRE_LTE) call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,lambda)
            if (lRE_nLTE) then
               rand2 = sprng(stream(id))
-              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
            endif
 
            ! Nouvelle direction de vol : emission uniforme
@@ -1686,9 +1686,9 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
            call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)  !BUG
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel
-             ! write(*,*) i,j,  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+             ! write(*,*) i,j,  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
               !write(*,*) "pixel"
-              Stokes(:) = Stokes(:) +  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+              Stokes(:) = Stokes(:) +  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
      enddo !i

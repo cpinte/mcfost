@@ -337,14 +337,13 @@ end subroutine init_reemission
 
 !********************************************************************
 
-subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,E,aleat,lambda)
+subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
   integer, intent(in) :: id,ri,zj,phik,pri,pzj, pphik
-  real(kind=db), intent(in) :: E
   real, intent(in) ::  aleat
   integer, intent(out) :: lambda
 
@@ -415,14 +414,13 @@ end subroutine im_reemission_LTE
 
 !********************************************************************
 
-subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
+subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
   integer, intent(in) :: id,ri,zj,pri,pzj
-  real(kind=db), intent(in) :: E
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
@@ -1169,14 +1167,13 @@ end subroutine Temp_nRE
 
 !********************************************************************
 
-subroutine im_reemission_qRE(id,ri,zj,pri,pzj,E,aleat1,aleat2,lambda)
+subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
   integer, intent(in) :: id,ri,zj,pri,pzj
-  real(kind=db), intent(in) :: E
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 

@@ -1,7 +1,7 @@
 2.20                      mcfost version
 
 #Number of photon packages
-  1.28e5                  nbr_photons_eq_th  : T computation
+  1.28e7                  nbr_photons_eq_th  : T computation
   1.28e3	          nbr_photons_lambda : SED computation
   1.28e5                  nbr_photons_image  : images computation
 

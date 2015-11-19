@@ -4209,7 +4209,7 @@ end subroutine length_deg2_opacity_wall
 
 !********************************************************************
 
-function integ_ray_dust(id,lambda,ri,zj,phik,x,y,z,u,v,w)
+function integ_ray_dust(lambda,ri,zj,phik,x,y,z,u,v,w)
   ! Generalisation de la routine length_deg2
   ! Modif depuis la routine moleculaire
   ! Propage un paquet depuis un point d'origine donne
@@ -4219,16 +4219,16 @@ function integ_ray_dust(id,lambda,ri,zj,phik,x,y,z,u,v,w)
 
   implicit none
 
-  integer, intent(in) :: id, lambda, ri,zj, phik
+  integer, intent(in) :: lambda, ri,zj, phik
   real(kind=db), intent(in) :: u,v,w
   real(kind=db), intent(in) :: x,y,z
 
   real(kind=db), dimension(N_type_flux) :: integ_ray_dust
 
   if (lcylindrical) then
-     integ_ray_dust(:) = integ_ray_dust_cyl(id,lambda,ri,zj,phik,x,y,z,u,v,w)
+     integ_ray_dust(:) = integ_ray_dust_cyl(lambda,ri,zj,phik,x,y,z,u,v,w)
   else
-     integ_ray_dust(:) = integ_ray_dust_sph(id,lambda,ri,zj,phik,x,y,z,u,v,w)
+     integ_ray_dust(:) = integ_ray_dust_sph(lambda,ri,zj,phik,x,y,z,u,v,w)
   endif
 
   return
@@ -4237,7 +4237,7 @@ end function integ_ray_dust
 
 !***********************************************************
 
-function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
+function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
   ! Generalisation de la routine length_deg2
   ! Propage un paquet depuis un point d'origine donne
   ! et integre l'equation du transfert radiatif
@@ -4251,7 +4251,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
   implicit none
 
-  integer, intent(in) :: id, lambda, ri_in, zj_in, phik_in
+  integer, intent(in) :: lambda, ri_in, zj_in, phik_in
   real(kind=db), intent(in) :: u,v,w
   real(kind=db), intent(in) :: x,y,z
 
@@ -4548,7 +4548,7 @@ function integ_ray_dust_cyl(id,lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
         integ_ray_dust_cyl(:) = integ_ray_dust_cyl(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,zj0,phik0,xm,ym,zm)
+             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(ri0,zj0,phik0,xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
@@ -4567,7 +4567,7 @@ end function integ_ray_dust_cyl
 
 !***********************************************************
 
-function integ_ray_dust_sph(id,lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
+function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
   ! Generalisation de la routine length_deg2
   ! Propage un paquet depuis un point d'origine donne
   ! et integre l'equation du transfert radiatif
@@ -4579,7 +4579,7 @@ function integ_ray_dust_sph(id,lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
 
   implicit none
 
-  integer, intent(in) :: id, lambda, ri_in, thetaj_in, phik_in
+  integer, intent(in) :: lambda, ri_in, thetaj_in, phik_in
   real(kind=db), intent(in) :: u,v,w
   real(kind=db), intent(in) :: x,y,z
 
@@ -4853,7 +4853,7 @@ function integ_ray_dust_sph(id,lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
         integ_ray_dust_sph(:) = integ_ray_dust_sph(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(lambda,ri0,thetaj0,phik0,xm,ym,zm)
+             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(ri0,thetaj0,phik0,xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
