@@ -110,6 +110,7 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
   ldensity_file=.false.
+  lphantom_file=.false.
   lsigma_file = .false.
   lweight_emission=.false.
   lprodimo=.false.
@@ -636,6 +637,12 @@ subroutine initialisation_mcfost()
      case("-density_file","-df")
         i_arg = i_arg + 1
         ldensity_file=.true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+     case("-phantom")
+        i_arg = i_arg + 1
+        lphantom_file=.true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
