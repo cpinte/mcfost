@@ -25,7 +25,7 @@ module dump_utils
  implicit none
  public :: open_dumpfile_w, open_dumpfile_r, get_error_text
  public :: tag,check_tag
- public :: skipblock
+ public :: skipblock,read_blockheader,skip_headerblock
  public :: get_dumpname
  public :: add_to_header,num_in_header,reset_header,extract
  public :: read_array_from_file
@@ -694,7 +694,7 @@ subroutine read_array_from_file(iunit,filename,tag,array,ierr)
              if (i==i_real) then
                 read(iunit, iostat=ierr) tagarr(1)
                 if (trim(tagarr(1))==trim(tag)) then
-                   read(iunit, iostat=ierr) array(1:number8(j))
+                   read(iunit, iostat=ierr) array(1:min(number8(j),size(array))
                    print*,'->',tagarr(1)
                 else
                    print*,'  ',tagarr(1)
