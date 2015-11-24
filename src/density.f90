@@ -421,6 +421,12 @@ subroutine define_dust_density()
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
+                 else if (ltilt) then
+                    if (izone==1) then
+                       z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
+                    else
+                       z0 = 0.0
+                    endif
                  else
                     z0 = 0.0
                  endif
