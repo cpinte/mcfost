@@ -80,12 +80,12 @@ subroutine alloc_ray_tracing()
 
   if (lsepar_pola) then
      if (l3D) then
-        allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),  &
-             tab_s33_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),&
-             tab_s34_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),&
-             tab_s12_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt),  &
-             tab_s33_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt), &
-             tab_s34_o_s11_ray_tracing(n_lambda,p_n_rad,p_nz,p_n_az,0:nang_scatt), &
+        allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),  &
+             tab_s33_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),&
+             tab_s34_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),&
+             tab_s12_o_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),  &
+             tab_s33_o_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), &
+             tab_s34_o_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), &
              stat=alloc_status)
      else
         allocate(tab_s12_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),  &
