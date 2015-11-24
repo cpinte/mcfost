@@ -111,7 +111,7 @@ module parametres
   integer :: n_cartes
   integer, parameter :: n_cartes_max = 4
 
-  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity
+  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file, lphantom_file
@@ -239,7 +239,7 @@ module disk
 
   real :: w0_sup, w0_inf
 
-  real :: z_warp
+  real :: z_warp, tilt_angle
 
   ! Pas d'integration initial dans chaque cellule pour integration dichotomique
   real, dimension(:), allocatable :: delta0 !0:n_rad
