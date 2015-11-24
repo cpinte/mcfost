@@ -25,6 +25,7 @@ endif
 
 BINARY = mcfost
 
+FFLAGS_R8 = -r8
 
 # Linux ou Mac x86, ifort 64 bits
 ifeq ($(COMPILO),ifort)
@@ -94,6 +95,7 @@ ifeq ($(COMPILO),gfortran32)
 FC_SER = gfortran -m32 -cpp
 FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
+FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
 DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
 #-g -C -ggdb -ftrace=full  -fimplicit-none
@@ -120,6 +122,7 @@ DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitiali
 #-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
 #-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
+FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
 
 MACH = #-march=athlon
 PREC =
@@ -193,6 +196,9 @@ modules.o : modules.f90
 # Fichier compile sans optimisation
 mem.o : mem.f90  modules.o
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
+
+io_phantom.o : io_phantom.f90
+	$(FF) $(FFLAGS) $(FFLAGS_R8) io_phantom.f90
 
 # defaut
 %.o : %.f90  modules.o
