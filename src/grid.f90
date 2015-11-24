@@ -549,7 +549,7 @@ subroutine define_grid4()
      volume(:) = volume(:) * 0.5 / real(n_az)
 
      do j=1,nz
-        z_grid(:,-j) = z_grid(:,j)
+        z_grid(:,-j) = -z_grid(:,j)
      enddo
   endif
 

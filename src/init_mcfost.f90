@@ -424,6 +424,21 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) z_warp
         i_arg= i_arg+1
+     case("-tilt")
+        if (.not.l3D) then
+           write(*,*) "WARNING : forcing 3D mode"
+           l3D=.true.
+        endif
+        write(*,*) "WARNING : tilt will only be applied to 1st zone"
+        ltilt=.true.
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : tit angle needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) tilt_angle
+        i_arg= i_arg+1
      case("-rs")
         lremove=.true.
         i_arg= i_arg+1
@@ -1190,6 +1205,7 @@ subroutine display_help()
   write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
+  write(*,*) "        : -tilt : <angle> [degrees]"
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
