@@ -402,7 +402,7 @@ module Voronoi_grid
   !----------------------------------------
 
   subroutine length_Voronoi(id,lambda,Stokes,cell_io,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-    !Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
+    ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
     ! C. Pinte
 
     integer, intent(in) :: id,lambda
