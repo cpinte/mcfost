@@ -1183,23 +1183,17 @@ subroutine density_phantom()
   use dump_utils, only : get_error_text
 
   integer, parameter :: iunit = 1
-  character(len=1) :: tag
-  integer :: ierr, i, ncells
+  integer :: ierr, ncells
   real(db), allocatable, dimension(:) :: x,y,z,rho,rhodust
 
   real :: grainsize,graindens
 
   integer, parameter :: npart = 100 ! we will need to read that from the file
 
-  real(db), dimension(:), allocatable :: phantom_array
 
   write(*,*) "Reading phantom density file: "//trim(density_file)
 
-  tag = "x"
-  ierr = 0
-
-  write(*,*) "Trying to read tag "//tag
-  call read_phantom_file(iunit,density_file,tag,x,y,z,rho,rhodust,ncells,ierr)
+  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ncells,ierr)
   write(*,*) "Done"
 
   if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)

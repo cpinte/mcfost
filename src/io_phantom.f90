@@ -7,10 +7,9 @@ module io_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ncells,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- character(len=*),      intent(in) :: tag
  real(db), intent(out), dimension(:), allocatable :: x,y,z,rhogas,rhodust
  integer, intent(out) :: ncells,ierr
  integer, parameter :: maxarraylengths = 12
@@ -27,18 +26,13 @@ subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr
  integer, allocatable, dimension(:) :: itype
  real(4), allocatable, dimension(:) :: tmp,dustfrac
  real(db), allocatable, dimension(:,:) :: xyzh
- real(db) :: xi,yi,zi,hi,rhoi
 
  logical :: got_h, got_dustfrac
-
-  write(*,*) "A--", trim(filename)
-
 
  ! open file for read
  call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
  if (ierr /= 0) return
 
- write(*,*) "A-"
  ! read nblocks from int header
  read(iunit,iostat=ierr) number
  nblocks = 1
@@ -54,11 +48,10 @@ subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr
     read(iunit,iostat=ierr)
  endif
 
- write(*,*) "A"
-
  call extract('nparttot',np,intarr,tagarr,number,ierr)
  call extract('ntypes',ntypes,intarr,tagarr,number,ierr)
  call extract('npartoftype',npartoftype(1:ntypes),intarr,tagarr,number,ierr)
+
  print*,' npart = ',np,' ntypes = ',ntypes
  print*,' npartoftype = ',npartoftype(1:ntypes)
 
@@ -79,7 +72,7 @@ subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr
     read(iunit,iostat=ierr) tagarr(1:number)
     read(iunit,iostat=ierr) realarr(1:number)
  endif
- print*,tagarr(1:number)
+ !print*,tagarr(1:number)
 
  ! skip rest of header
  do i=i_real+1,ndatatypes
@@ -162,46 +155,68 @@ subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr
 
  close(iunit)
 
- print*,' finished read'
- ! convert to dust and gas density
- j = 0
- if (got_h) then
-    do i=1,np
-       if (xyzh(4,i) > 0. .and. itype(i)==1)  j = j + 1
-    enddo
-    ncells = j
-    print*,' got NCELLS = ',ncells
-    allocate(x(ncells),y(ncells),z(ncells),rhogas(ncells),rhodust(ncells))
+ if (.not.got_dustfrac) then
+    dustfrac = 0.
+ endif
 
-    j = 0
-    do i=1,np
-       xi = xyzh(1,i)
-       yi = xyzh(2,i)
-       zi = xyzh(3,i)
-       hi = xyzh(4,i)
-       if (hi > 0. .and. itype(i)==1) then
-          j = j + 1
-          x(j) = xi
-          y(j) = yi
-          z(j) = zi
-          rhoi = massoftype(1)*(hfact/hi)**3
-          if (got_dustfrac) then
-             rhogas(j) = (1 - dustfrac(i))*rhoi
-             rhodust(j) = dustfrac(i)*rhoi
-          else
-             rhogas(j) = rhoi
-             rhodust(j) = 0.
-          endif
-       endif
-    enddo
+ if (got_h) then
+    call phantom2mcfost(np,xyzh,itype,dustfrac,ntypes,massoftype(1:ntypes),hfact,x,y,z,rhogas,rhodust,ncells)
  else
+    ncells = 0
     print*,' ERROR reading h from file'
  endif
- ncells = j
 
  deallocate(xyzh,itype,dustfrac,tmp)
 
 end subroutine read_phantom_file
+
+!*************************************************************************
+
+pure subroutine phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype,hfact,x,y,z,rhogas,rhodust,ncells)
+
+  integer, intent(in) :: np, ntypes
+  real(db), dimension(4,np), intent(in) :: xyzh
+  integer, dimension(np), intent(in) :: iphase
+  real(sl), dimension(np), intent(in) :: dustfrac
+  real(db), dimension(ntypes), intent(in) :: massoftype
+  real(db), intent(in) :: hfact
+
+  real(db), dimension(:), allocatable, intent(out) :: x,y,z,rhogas,rhodust
+  integer, intent(out) :: ncells
+
+  integer :: i,j,itypei
+  real(db) :: xi, yi, zi, hi, rhoi
+
+ ! convert to dust and gas density
+ j = 0
+ do i=1,np
+    if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
+ enddo
+ ncells = j
+ allocate(x(ncells),y(ncells),z(ncells),rhogas(ncells),rhodust(ncells))
+
+ j = 0
+ do i=1,np
+    xi = xyzh(1,i)
+    yi = xyzh(2,i)
+    zi = xyzh(3,i)
+    hi = xyzh(4,i)
+    itypei = abs(iphase(i))
+    if (hi > 0. .and. itypei==1) then
+       j = j + 1
+       x(j) = xi
+       y(j) = yi
+       z(j) = zi
+       rhoi = massoftype(itypei)*(hfact/hi)**3
+       rhogas(j) = (1 - dustfrac(i))*rhoi
+       rhodust(j) = dustfrac(i)*rhoi
+    endif
+ enddo
+ ncells = j
+
+ return
+
+end subroutine phantom_2_mcfost
 
 subroutine read_phantom_input_file(filename,iunit,grainsize,graindens,ierr)
   use infile_utils
