@@ -190,8 +190,8 @@ mcfost : $(OBJECTS) mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
 
 
-lib_mcfost.a : $(OBJECTS) phantom2mcfost.o
-	$(FF) $(FFLAGS) -fPIC -o ${@} ${<} $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+libmcfost.a : $(OBJECTS) phantom2mcfost.o
+	libtool -static -o ${@} $(OBJECTS) phantom2mcfost.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
