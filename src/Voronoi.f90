@@ -2,7 +2,7 @@ module Voronoi_grid
 
   use constantes
   use parametres
-  use utils, only : bubble_sort
+  use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
 
   implicit none
@@ -53,23 +53,20 @@ module Voronoi_grid
     id = 1
 
     n_walls = 6
-    write(*,*) "Reading ", n_walls, "walls"
+    write(*,*) "Finding ", n_walls, "walls"
 
 
     call init_Voronoi_walls()
+    allocate(Voronoi(n))
 
-    allocate(Voronoi(n)) !, id_list(n))
-
-
-
-    write(*,*) "Reading Voronoi :", n, "cells"
-
+    write(*,*) "Finding:", n, " Voronoi cells"
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
     do i=1, n
        read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours
        Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points
+       !write(*,*) "Voronoi id = ", Voronoi(i)%id
 
        if (i>1) then
           Voronoi(i)%first_neighbour = Voronoi(i-1)%last_neighbour + 1
@@ -86,7 +83,6 @@ module Voronoi_grid
     write(*,*)  "Voronoi volume =", sum(Voronoi%V)
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
-
 
 
     do i=1, n
@@ -110,7 +106,7 @@ module Voronoi_grid
     close(unit=1)
 
     do k=1, n_walls
-       write(*,*) "wall", k, wall(k)%n_neighbours, "voisins"
+       write(*,*) "wall", k, wall(k)%n_neighbours, "neighbours"
        !if (k==1) then
        !   do i=1,  wall(k)%n_neighbours
        !      write(*,*) i, wall(k)%neighbour_list(i)
@@ -119,22 +115,26 @@ module Voronoi_grid
     enddo
 
 
+    write(*,*) "Testing radiative transfer routines on Voronoi grid"
+
     ! TEST
-    x = -2.0 ; y = -2.0 ; z = -2.0 ;
+    x = -200.0 ; y = -200.0 ; z = -200.0 ;
     !u = 1.2 ; v = 1.0 ; w = 1.1 ;
-    u = 1.45 ; v = 1.2 ; w = 1.0 ;
+    !u = 1.45 ; v = 1.2 ; w = 1.0 ;
+
+    u = 1.0 ; v = 1.0 ; w = 1.0 ;
     norme = sqrt(u*u + v*v + w*w)
     u = u / norme ; v = v / norme ;  w = w / norme ;
 
     call move_to_Voronoi_grid(x,y,z, u,v,w, s, icell)
     x = x + s*u ; y = y + s*v ; z = z+s*w ! a mettre dans move ??
 
-     write(*,*) "icell", icell
+     write(*,*) "Packet is in cell", icell
     ! OK
 
 
     ! TEST
-    write(*,*) "testing length_Voronoi"
+    write(*,*) "Testing length_Voronoi"
     id = 1 ; lambda = 1 !TODO
     Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
 
@@ -150,16 +150,47 @@ module Voronoi_grid
        write(*,*) "icell", icell
        write(*,*) x, y, z
     else
-       write(*,*) "Do not reach model"
+       write(*,*) "Packet did not reach model volume"
     endif
 
     ! OK jusqu'ici
-
-    call test_emission()
+    !call test_emission()
 
     return
 
   end subroutine read_Voronoi
+
+!----------------------------------------
+
+  subroutine Voronoi_tesselation(n_cells, x,y,z)
+
+    integer, intent(in) :: n_cells
+    real(kind=db), dimension(n_cells), intent(in) :: x, y, z
+
+    character(len=512) :: cmd
+    integer :: i, syst_status
+
+    open(unit=1, file="particles.txt", status="replace")
+    do i=1, n_cells
+       write(unit=1,fmt="(i5,f10.3,f10.3,f10.3)") i, real(x(i)), real(y(i)), real(z(i))
+    enddo
+    close(unit=1)
+
+    ! Run voro++ command line for now
+    ! while I fix the c++/fortran interface and make all the tests
+    write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' -150 150 -150 150 -150 150 particles.txt ; mv particles.txt.vol Voronoi.txt"
+    call appel_syst(cmd,syst_status)
+    write(*,*) "Voronoi Tesselation done"
+
+    write(*,*) "TMP : filtering out 10 cells for safety, will do it better later"
+
+    call read_Voronoi(n_cells-10)
+
+    write(*,*) "OK"
+    stop
+
+  end subroutine Voronoi_tesselation
 
 !----------------------------------------
 
@@ -266,9 +297,9 @@ module Voronoi_grid
 
     integer :: iwall
 
-    real, parameter :: xmin = 0, xmax = 1
-    real, parameter :: ymin = 0, ymax = 1
-    real, parameter :: zmin = 0, zmax = 1
+    real, parameter :: xmin = -150, xmax = 150
+    real, parameter :: ymin = xmin, ymax = xmax
+    real, parameter :: zmin = xmin, zmax = xmax
 
     allocate(wall(n_walls))
 
@@ -297,9 +328,7 @@ module Voronoi_grid
     wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = zmin
     wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = zmax
 
-
     return
-
 
   end subroutine init_Voronoi_walls
 
@@ -321,15 +350,25 @@ module Voronoi_grid
     k(1) = u ; k(2) = v ; k(3) = w
 
     n(1) = wall(iwall)%x1 ; n(2) = wall(iwall)%x2 ;  n(3) = wall(iwall)%x3 ;
+
+    write(*,*) "D to wall #", iwall, n
     p = wall(iwall)%x4 * n  ! todo : verifier le signe
 
     den = dot_product(n, k) ! le signe depend du sens de propagation par rapport a la normale
+
+    write(*,*) "n", n
+    write(*,*) "k", k
+    write(*,*) "p", p
+    write(*,*) "abs(den)", abs(den)
+    write(*,*) "r", r
 
     if (abs(den) > 0) then
        distance_to_wall = dot_product(n, p-r) / den
     else
        distance_to_wall = huge(1.0)
     endif
+
+    write(*,*) "distance", distance_to_wall
 
     return
 
@@ -364,9 +403,13 @@ module Voronoi_grid
        else
           s_walls(iwall) = huge(1.0)
        endif
+
+       write(*,*) "Wall #", iwall, "l = ", s_walls(iwall)
     enddo
 
     order = bubble_sort(real(s_walls,kind=db))
+
+    write(*,*) ""
 
     ! Move to the closest plane & check the packet is in the model
     check_wall : do i = 1, n_walls
@@ -376,6 +419,8 @@ module Voronoi_grid
        x_test = x + l*u
        y_test = y + l*v
        z_test = z + l*w
+
+       write(*,*) "Wall #", iwall, "Packet Position=", x_test,y_test,z_test
 
        if (is_in_model(x_test,y_test,z_test)) then
           s = l ! distance to the closest wall
@@ -486,6 +531,11 @@ logical function is_in_model(x,y,z)
   real, intent(in) :: x,y,z
 
   is_in_model = .false.
+
+  write(*,*) "Wx",  wall(1)%x4, wall(2)%x4
+  write(*,*) "Wy",  wall(3)%x4, wall(4)%x4
+  write(*,*) "Wz",  wall(5)%x4, wall(6)%x4
+
   if ((x > wall(1)%x4).and.(x < wall(2)%x4)) then
      if ((y > wall(3)%x4).and.(y < wall(4)%x4)) then
         if ((z > wall(5)%x4).and.(z < wall(6)%x4)) then
@@ -568,12 +618,12 @@ end module Voronoi_grid
 
 !----------------------------------------
 
-program Voronoi
-
-  use Voronoi_grid
-
-  implicit none
-
-  call read_Voronoi(1000000)
-
-end program Voronoi
+!program Voronoi
+!
+!  use Voronoi_grid
+!
+!  implicit none
+!
+!  call read_Voronoi(1000000)
+!
+!end program Voronoi

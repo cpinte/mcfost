@@ -49,7 +49,6 @@ contains
     integer :: ncells
 
     mu_gas = mu
-
     ierr = 0
 
     call phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype(1:ntypes),hfact, &
@@ -59,10 +58,13 @@ contains
        return
     endif
 
+
+
     call setup_mcfost_Voronoi_grid()
 
+    Tdust = 2.73
 
-
+    return
 
   end subroutine run_mcfost_phantom
 
