@@ -694,7 +694,7 @@ subroutine read_array_from_file(iunit,filename,tag,array,ierr)
              if (i==i_real) then
                 read(iunit, iostat=ierr) tagarr(1)
                 if (trim(tagarr(1))==trim(tag)) then
-                   read(iunit, iostat=ierr) array(1:min(number8(j),size(array)))
+                   read(iunit, iostat=ierr) array(1:min(int(number8(j)),size(array)))
                    print*,'->',tagarr(1)
                 else
                    print*,'  ',tagarr(1)
