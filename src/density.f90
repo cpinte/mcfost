@@ -1179,33 +1179,30 @@ end subroutine init_opacity_wall
 
 subroutine density_phantom()
 
-  use dump_utils, only : read_array_from_file
+  use io_phantom, only : read_phantom_file
+  use dump_utils, only : get_error_text
 
   integer, parameter :: iunit = 1
   character(len=1) :: tag
-  integer :: ierr, i
+  integer :: ierr, i, ncells
+  real(db), allocatable, dimension(:) :: x,y,z,rho,rhodust
 
   integer, parameter :: npart = 100 ! we will need to read that from the file
 
-  real, dimension(:), allocatable :: phantom_array
-
-  allocate(phantom_array(npart))
+  real(db), dimension(:), allocatable :: phantom_array
 
   write(*,*) "Reading phantom density file: "//trim(density_file)
 
-  tag = "X"
+  tag = "x"
   ierr = 0
 
   write(*,*) "Trying to read tag "//tag
-  call read_array_from_file(iunit,density_file,tag, phantom_array,ierr)
+  call read_phantom_file(iunit,density_file,tag,x,y,z,rho,rhodust,ncells,ierr)
+  write(*,*) "Done"
 
-  write(*,*) "Error code =", ierr
+  if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)
 
-  do i=1, npart
-     write(*,*) i, phantom_array(i)
-  enddo
-
-  deallocate(phantom_array)
+  deallocate(x)
   stop
 
   return
