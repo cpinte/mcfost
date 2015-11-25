@@ -203,4 +203,19 @@ subroutine read_phantom_file(iunit,filename,tag,x,y,z,rhogas,rhodust,ncells,ierr
 
 end subroutine read_phantom_file
 
+subroutine read_phantom_input_file(filename,iunit,grainsize,graindens,ierr)
+  use infile_utils
+  integer, intent(in) :: iunit
+  character(len=*), intent(in) :: filename
+  real, intent(out) :: grainsize,graindens
+  integer,  intent(out) :: ierr
+  type(inopts), allocatable :: dbin(:)
+
+  call open_db_from_file(dbin,filename,iunit,ierr)
+  call read_inopt(graindens,'graindens',dbin,ierr)
+  call read_inopt(grainsize,'grainsize',dbin,ierr)
+  call close_db(dbin)
+
+end subroutine read_phantom_input_file
+
 end module io_phantom

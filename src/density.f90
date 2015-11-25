@@ -1179,13 +1179,15 @@ end subroutine init_opacity_wall
 
 subroutine density_phantom()
 
-  use io_phantom, only : read_phantom_file
+  use io_phantom, only : read_phantom_file, read_phantom_input_file
   use dump_utils, only : get_error_text
 
   integer, parameter :: iunit = 1
   character(len=1) :: tag
   integer :: ierr, i, ncells
   real(db), allocatable, dimension(:) :: x,y,z,rho,rhodust
+
+  real :: grainsize,graindens
 
   integer, parameter :: npart = 100 ! we will need to read that from the file
 
@@ -1201,6 +1203,9 @@ subroutine density_phantom()
   write(*,*) "Done"
 
   if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)
+
+  call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
+  write(*,*) grainsize,graindens
 
   deallocate(x)
   stop
