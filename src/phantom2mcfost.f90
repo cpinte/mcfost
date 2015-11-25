@@ -28,7 +28,8 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,xyzh, iphase, dustfrac, ntypes, massoftype, hfact, npoftype, Tdust, mu_gas, ierr)
+  subroutine run_mcfost_phantom(np,xyzh, iphase, dustfrac, ntypes, massoftype, hfact,umass, &
+       utime,udist, npoftype, Tdust, mu_gas, ierr)
 
     use io_phantom
 
@@ -37,7 +38,7 @@ contains
     integer, dimension(np), intent(in) :: iphase
     real(sl), dimension(np), intent(in) :: dustfrac
     real(db), dimension(ntypes), intent(in) ::massoftype
-    real(db), intent(in) :: hfact
+    real(db), intent(in) :: hfact, umass, utime, udist
     integer, dimension(ntypes), intent(in) :: npoftype
 
     real(db), dimension(np), intent(out) :: Tdust
@@ -51,7 +52,8 @@ contains
 
     ierr = 0
 
-    call phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype(1:ntypes),hfact, x,y,z,rhogas,rhodust,ncells)
+    call phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype(1:ntypes),hfact, &
+         umass,utime,udist, x,y,z,rhogas,rhodust,ncells)
     if (ncells <= 0) then
        ierr = 1
        return
