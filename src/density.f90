@@ -1181,6 +1181,7 @@ subroutine density_phantom()
 
   use io_phantom, only : read_phantom_file, read_phantom_input_file
   use dump_utils, only : get_error_text
+  use Voronoi_grid
 
   integer, parameter :: iunit = 1
   integer :: ierr, ncells
@@ -1196,12 +1197,20 @@ subroutine density_phantom()
   call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ncells,ierr)
   write(*,*) "Done"
 
+  write(*,*) "# Model size :"
+  write(*,*) "x =", minval(x), maxval(x)
+  write(*,*) "y =", minval(y), maxval(y)
+  write(*,*) "z =", minval(z), maxval(z)
+
   if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)
 
   call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
   write(*,*) grainsize,graindens
 
-  deallocate(x)
+  ! Trying to make the Voronoi tesselation on the particles
+  call Voronoi_tesselation(ncells, x,y,z)
+
+  deallocate(x,y,z,rho,rhodust)
   stop
 
   return
