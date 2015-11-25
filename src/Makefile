@@ -177,8 +177,7 @@ SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
 	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
 	dust.f90 molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
-	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90 \
-	mcfost.f90
+	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS = $(SOURCES:.f90=.o)
 
@@ -187,8 +186,12 @@ main : mcfost
 #*************************************************************
 # Code séquentiel et parallèle
 #*************************************************************
-mcfost : $(OBJECTS)
-	$(FF) $(FFLAGS_EXE) -o $(BINARY) $(OBJECTS) $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+mcfost : $(OBJECTS) mcfost.o
+	$(FF) $(FFLAGS_EXE) -o $(BINARY) $< $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+
+
+lib_mcfost.a : $(OBJECTS) phantom2mcfost.o
+	$(FF) $(FFLAGS) -fPIC -o $@ $< $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
