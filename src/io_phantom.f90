@@ -160,7 +160,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ncells,ierr)
  endif
 
  if (got_h) then
-    call phantom2mcfost(np,xyzh,itype,dustfrac,ntypes,massoftype(1:ntypes),hfact,x,y,z,rhogas,rhodust,ncells)
+    call phantom_2_mcfost(np,xyzh,itype,dustfrac,ntypes,massoftype(1:ntypes),hfact,x,y,z,rhogas,rhodust,ncells)
  else
     ncells = 0
     print*,' ERROR reading h from file'

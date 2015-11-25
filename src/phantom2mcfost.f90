@@ -1,6 +1,7 @@
 module phantom2mcfost
 
   use parametres
+  use constantes
 
   implicit none
 
@@ -27,7 +28,7 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,xyzh, iphase, dustfrac, ntypes, massoftype, hfact, npoftype, Tgas, ierr)
+  subroutine run_mcfost_phantom(np,xyzh, iphase, dustfrac, ntypes, massoftype, hfact, npoftype, Tdust, mu_gas, ierr)
 
     use io_phantom
 
@@ -36,13 +37,17 @@ contains
     integer, dimension(np), intent(in) :: iphase
     real(sl), dimension(np), intent(in) :: dustfrac
     real(db), dimension(ntypes), intent(in) ::massoftype
-
     real(db), intent(in) :: hfact
     integer, dimension(ntypes), intent(in) :: npoftype
+
+    real(db), dimension(np), intent(out) :: Tdust
     integer, intent(out) :: ierr
+    real(db), intent(out) :: mu_gas
 
     real(db), dimension(:), allocatable :: x,y,z,rhogas,rhodust
     integer :: ncells
+
+    mu_gas = mu
 
     ierr = 0
 

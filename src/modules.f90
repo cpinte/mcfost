@@ -674,7 +674,8 @@ module constantes
 
   real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
   real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g
-  real, parameter :: masse_mol_gaz = 2.3 * masseH ! en g,  2.3 selon Walker 2004
+  real, parameter :: mu = 2.3 ! en g,  2.3 selon Walker 2004
+  real, parameter :: masse_mol_gaz = mu * masseH
   real, parameter :: T_Cmb = 2.73
 
   ! Changements d'unites
