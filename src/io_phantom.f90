@@ -22,7 +22,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ncells,ierr)
  integer :: np,ntypes
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
- real(db) :: massoftype(maxtypes),realarr(maxphead),hfact
+ real(db) :: massoftype(maxtypes),realarr(maxphead),hfact,umass,utime,udist
  integer, allocatable, dimension(:) :: itype
  real(4), allocatable, dimension(:) :: tmp,dustfrac
  real(db), allocatable, dimension(:,:) :: xyzh
@@ -74,16 +74,25 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ncells,ierr)
  endif
  !print*,tagarr(1:number)
 
- ! skip rest of header
- do i=i_real+1,ndatatypes
-    call skip_headerblock(iunit,ierr)
- enddo
-
  ! extract info from real header
  call extract('massoftype',massoftype(1:ntypes),realarr,tagarr,number,ierr)
  call extract('hfact',hfact,realarr,tagarr,number,ierr)
  print*,' hfact = ',hfact
  print*,' massoftype = ',massoftype(1:ntypes)
+
+ ! skip real*4 header
+ call skip_headerblock(iunit,ierr)
+
+ ! read units from real*8 header
+ read(iunit,iostat=ierr) number
+ number = min(number,maxphead)
+ if (number > 0) then
+    read(iunit,iostat=ierr) tagarr(1:number)
+    read(iunit,iostat=ierr) realarr(1:number)
+ endif
+ call extract('umass',umass,realarr,tagarr,number,ierr)
+ call extract('utime',utime,realarr,tagarr,number,ierr)
+ call extract('udist',udist,realarr,tagarr,number,ierr)
 
  read (iunit, iostat=ierr) number
  if (ierr /= 0) return
@@ -160,7 +169,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ncells,ierr)
  endif
 
  if (got_h) then
-    call phantom_2_mcfost(np,xyzh,itype,dustfrac,ntypes,massoftype(1:ntypes),hfact,x,y,z,rhogas,rhodust,ncells)
+    call phantom_2_mcfost(np,xyzh,itype,dustfrac,ntypes,massoftype(1:ntypes),hfact,&
+         umass,utime,udist, x,y,z,rhogas,rhodust,ncells)
  else
     ncells = 0
     print*,' ERROR reading h from file'
@@ -172,20 +182,26 @@ end subroutine read_phantom_file
 
 !*************************************************************************
 
-pure subroutine phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype,hfact,x,y,z,rhogas,rhodust,ncells)
+pure subroutine phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype,hfact,umass,utime,udist, &
+     x,y,z,rhogas,rhodust,ncells)
+
+  use constantes, only : au_to_cm
 
   integer, intent(in) :: np, ntypes
   real(db), dimension(4,np), intent(in) :: xyzh
   integer, dimension(np), intent(in) :: iphase
   real(sl), dimension(np), intent(in) :: dustfrac
   real(db), dimension(ntypes), intent(in) :: massoftype
-  real(db), intent(in) :: hfact
+  real(db), intent(in) :: hfact, umass,utime,udist
 
   real(db), dimension(:), allocatable, intent(out) :: x,y,z,rhogas,rhodust
   integer, intent(out) :: ncells
 
   integer :: i,j,itypei
-  real(db) :: xi, yi, zi, hi, rhoi
+  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength
+
+  udens = umass/udist**3
+  ulength = udist/au_to_cm
 
  ! convert to dust and gas density
  j = 0
@@ -204,10 +220,10 @@ pure subroutine phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype,hfact
     itypei = abs(iphase(i))
     if (hi > 0. .and. itypei==1) then
        j = j + 1
-       x(j) = xi
-       y(j) = yi
-       z(j) = zi
-       rhoi = massoftype(itypei)*(hfact/hi)**3
+       x(j) = xi * ulength
+       y(j) = yi * ulength
+       z(j) = zi * ulength
+       rhoi = massoftype(itypei)*(hfact/hi)**3  * udens
        rhogas(j) = (1 - dustfrac(i))*rhoi
        rhodust(j) = dustfrac(i)*rhoi
     endif
