@@ -1,0 +1,9 @@
+*.mod
+*.o
+*~
+*/*~
+*/*/*~
+*.a
+src/sha.f90
+lib/include
+src/mcfost
