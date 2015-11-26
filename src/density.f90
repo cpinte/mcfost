@@ -1184,18 +1184,19 @@ subroutine density_phantom()
   use Voronoi_grid
 
   integer, parameter :: iunit = 1
-  integer :: ierr, ncells
-  real(db), allocatable, dimension(:) :: x,y,z,rho,rhodust
+  integer :: ierr, ncells, ndusttypes
+  real(db), allocatable, dimension(:) :: x,y,z,rho
+  real(db), allocatable, dimension(:,:) :: rhodust
 
   real :: grainsize,graindens
 
   integer, parameter :: npart = 100 ! we will need to read that from the file
-
+  integer :: i
 
   write(*,*) "Reading phantom density file: "//trim(density_file)
 
-  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ncells,ierr)
-  write(*,*) "Done"
+  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
+                         write(*,*) "Done"
 
   write(*,*) "# Model size :"
   write(*,*) "x =", minval(x), maxval(x)
@@ -1204,13 +1205,22 @@ subroutine density_phantom()
 
   if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)
 
-  call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-  write(*,*) grainsize,graindens
-
-  ! Trying to make the Voronoi tesselation on the particles
+  if (ndusttypes==1) then
+     call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
+     write(*,*) grainsize,graindens
+  endif
+  ! Make the Voronoi tesselation on the SPH particles
   call Voronoi_tesselation(ncells, x,y,z)
 
-  deallocate(x,y,z,rho,rhodust)
+
+  i = 1
+  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
+  write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
+  deallocate(x,y,z)
+
+  ! Fill up the density grid
+
+  deallocate(rho,rhodust)
   stop
 
   return

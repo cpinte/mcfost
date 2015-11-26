@@ -158,7 +158,6 @@ module Voronoi_grid
     endif
 
     write(*,*) "TEST DONE"
-    stop
 
     ! OK jusqu'ici
     !call test_emission()
@@ -179,7 +178,7 @@ module Voronoi_grid
 
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
-       write(unit=1,fmt="(i5,f10.3,f10.3,f10.3)") i, real(x(i)), real(y(i)), real(z(i))
+       write(unit=1,fmt="(i5,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
     enddo
     close(unit=1)
 
@@ -194,8 +193,8 @@ module Voronoi_grid
 
     call read_Voronoi(n_cells-10)
 
-    write(*,*) "OK"
-    stop
+    write(*,*) "Tesselation finished"
+    return
 
   end subroutine Voronoi_tesselation
 
