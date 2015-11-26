@@ -190,11 +190,12 @@ mcfost : $(OBJECTS) mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
 
 
-libmcfost.a : $(OBJECTS) phantom2mcfost.o
+libmcfost.a : checkmcfost $(OBJECTS) phantom2mcfost.o
 	libtool -static -o ${@} $(OBJECTS) phantom2mcfost.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
+	${MAKE} checkmcfost
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # Fichier compile sans optimisation
@@ -249,10 +250,10 @@ release : main
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
-	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	rm -rf web
+	rm -rf yorick web
 	git tag release
 
 
@@ -271,10 +272,10 @@ release_mac : main
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
-	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
-	rm -rf web
+	rm -rf yorick web
 
 release_utils :
 	tar czvf mcfost_utils.tgz -C../utils .
@@ -317,3 +318,17 @@ save :
 	git push phare
 	git push bitbucket
 	git push github
+	git push riri
+
+#*************************************************************
+# test
+#*************************************************************
+checkmcfost:
+   ifdef MCFOST_INSTALL
+	@echo "MCFOST directory is "$(MCFOST_INSTALL);
+   else
+	@echo; echo "ERROR: cannot find MCFOST installation directory - set this using MCFOST_INSTALL"; echo; ${MAKE} err
+   endif
+
+err:
+	$(error aborting);
