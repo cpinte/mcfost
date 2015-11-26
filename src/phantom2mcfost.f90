@@ -58,8 +58,6 @@ contains
        return
     endif
 
-
-
     call setup_mcfost_Voronoi_grid()
 
     Tdust = 2.73
@@ -71,8 +69,6 @@ contains
 !*************************************************************************
 
   subroutine setup_mcfost_Voronoi_grid()
-
-
 
     write(*,*) "MCFOST setup Voronoi"
 

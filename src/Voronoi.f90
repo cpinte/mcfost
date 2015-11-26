@@ -8,6 +8,7 @@ module Voronoi_grid
   implicit none
 
   integer, parameter :: max_wall_neighbours = 100000
+  real(kind=db), parameter :: prec = 1.e-6_db
 
   type Voronoi_cell
      real :: x, y, z, V
@@ -19,6 +20,11 @@ module Voronoi_grid
      real :: x1, x2, x3, x4, x5, x6, x7
      integer :: n_neighbours
      integer, dimension(max_wall_neighbours) :: neighbour_list ! Warning hard coded
+
+     ! Plane wall :
+     ! x1, x2, x3 : normal
+     ! x4 : displacement along the normal
+
   end type Voronoi_wall
 
 
@@ -116,8 +122,6 @@ module Voronoi_grid
 
 
     write(*,*) "Testing radiative transfer routines on Voronoi grid"
-
-    ! TEST
     x = -200.0 ; y = -200.0 ; z = -200.0 ;
     !u = 1.2 ; v = 1.0 ; w = 1.1 ;
     !u = 1.45 ; v = 1.2 ; w = 1.0 ;
@@ -127,31 +131,34 @@ module Voronoi_grid
     u = u / norme ; v = v / norme ;  w = w / norme ;
 
     call move_to_Voronoi_grid(x,y,z, u,v,w, s, icell)
+
     x = x + s*u ; y = y + s*v ; z = z+s*w ! a mettre dans move ??
 
-     write(*,*) "Packet is in cell", icell
-    ! OK
+    write(*,*) "Packet is entering volume in cell", icell
 
-
-    ! TEST
-    write(*,*) "Testing length_Voronoi"
     id = 1 ; lambda = 1 !TODO
     Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
 
     flag_star = .true.
     flag_direct_star = .true.
 
-    tau = 1 ;
+    tau = 500 ;
+
+    write(*,*) "Testing length_Voronoi with tau=", tau
 
     if (icell > 0) then
        call length_Voronoi(id,lambda,Stokes, icell,x,y,z, u,v,w, flag_star,flag_direct_star, tau, lvol,flag_sortie)
 
-       write(*,*) "lvol", lvol, flag_sortie
-       write(*,*) "icell", icell
-       write(*,*) x, y, z
+       write(*,*) "lvol=", lvol
+       write(*,*) "Did I exit ?", flag_sortie
+       write(*,*) "Last cell", icell
+       write(*,*) "Final position", x, y, z
     else
        write(*,*) "Packet did not reach model volume"
     endif
+
+    write(*,*) "TEST DONE"
+    stop
 
     ! OK jusqu'ici
     !call test_emission()
@@ -321,12 +328,12 @@ module Voronoi_grid
     ! j=5 ---> z = zmin
     ! j=6 ---> z = zmax
 
-    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = xmin
-    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = xmax
-    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = ymin
-    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = ymax
-    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = zmin
-    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = zmax
+    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = abs(xmin)
+    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = abs(xmax)
+    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = abs(ymin)
+    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = abs(ymax)
+    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = abs(zmin)
+    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = abs(zmax)
 
     return
 
@@ -351,24 +358,15 @@ module Voronoi_grid
 
     n(1) = wall(iwall)%x1 ; n(2) = wall(iwall)%x2 ;  n(3) = wall(iwall)%x3 ;
 
-    write(*,*) "D to wall #", iwall, n
-    p = wall(iwall)%x4 * n  ! todo : verifier le signe
+    p = wall(iwall)%x4 * n
 
     den = dot_product(n, k) ! le signe depend du sens de propagation par rapport a la normale
-
-    write(*,*) "n", n
-    write(*,*) "k", k
-    write(*,*) "p", p
-    write(*,*) "abs(den)", abs(den)
-    write(*,*) "r", r
 
     if (abs(den) > 0) then
        distance_to_wall = dot_product(n, p-r) / den
     else
        distance_to_wall = huge(1.0)
     endif
-
-    write(*,*) "distance", distance_to_wall
 
     return
 
@@ -399,28 +397,22 @@ module Voronoi_grid
 
        if (l >= 0) then
           intersect(iwall) = .true.
-          s_walls(iwall) = l
+          s_walls(iwall) = l * (1.0_db + prec)
        else
           s_walls(iwall) = huge(1.0)
        endif
-
-       write(*,*) "Wall #", iwall, "l = ", s_walls(iwall)
     enddo
 
     order = bubble_sort(real(s_walls,kind=db))
 
-    write(*,*) ""
-
     ! Move to the closest plane & check the packet is in the model
     check_wall : do i = 1, n_walls
        iwall = order(i)
-       l = s_walls(iwall) * (1.0_db + 1e-6_db)
+       l = s_walls(iwall)
 
        x_test = x + l*u
        y_test = y + l*v
        z_test = z + l*w
-
-       write(*,*) "Wall #", iwall, "Packet Position=", x_test,y_test,z_test
 
        if (is_in_model(x_test,y_test,z_test)) then
           s = l ! distance to the closest wall
@@ -483,6 +475,7 @@ module Voronoi_grid
 
     ! Boucle infinie sur les cellules
     do
+       !write(*,*) "I am in cell ", cell, "position", real(x), real(y), real(z)
        call cross_Voronoi_cell(cell, previous_cell, x,y,z, u,v,w, next_cell, l)
        opacite=1.0 !kappa(lambda,cell,1,1) ! TODO !!!
 
@@ -532,13 +525,9 @@ logical function is_in_model(x,y,z)
 
   is_in_model = .false.
 
-  write(*,*) "Wx",  wall(1)%x4, wall(2)%x4
-  write(*,*) "Wy",  wall(3)%x4, wall(4)%x4
-  write(*,*) "Wz",  wall(5)%x4, wall(6)%x4
-
-  if ((x > wall(1)%x4).and.(x < wall(2)%x4)) then
-     if ((y > wall(3)%x4).and.(y < wall(4)%x4)) then
-        if ((z > wall(5)%x4).and.(z < wall(6)%x4)) then
+  if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
+     if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
+        if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
            is_in_model = .true.
         endif
      endif
