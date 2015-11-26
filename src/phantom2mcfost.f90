@@ -28,31 +28,35 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,xyzh, iphase, dustfrac, ntypes, massoftype, hfact,umass, &
-       utime,udist, npoftype, Tdust, mu_gas, ierr)
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,npoftype,xyzh, iphase, grainsize, dustfrac, massoftype,&
+       xyzmh_ptmass,hfact,umass,utime,udist,graindens, Tdust, mu_gas, ierr)
 
     use io_phantom
 
-    integer, intent(in) :: np, ntypes
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes
     real(db), dimension(4,np), intent(in) :: xyzh
     integer, dimension(np), intent(in) :: iphase
-    real(sl), dimension(np), intent(in) :: dustfrac
-    real(db), dimension(ntypes), intent(in) ::massoftype
-    real(db), intent(in) :: hfact, umass, utime, udist
+    real(db), dimension(ndusttypes,np), intent(in) :: dustfrac
+    real(db), dimension(ndusttypes), intent(in) :: grainsize
+    real(db), dimension(ntypes), intent(in) :: massoftype
+    real(db), intent(in) :: hfact, umass, utime, udist, graindens
+    real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
 
     real(db), dimension(np), intent(out) :: Tdust
     integer, intent(out) :: ierr
     real(db), intent(out) :: mu_gas
 
-    real(db), dimension(:), allocatable :: x,y,z,rhogas,rhodust
+    real(db), dimension(:), allocatable :: x,y,z,rhogas
+    real(db), dimension(:,:), allocatable :: rhodust
     integer :: ncells
 
     mu_gas = mu
     ierr = 0
 
-    call phantom_2_mcfost(np,xyzh,iphase,dustfrac,ntypes,massoftype(1:ntypes),hfact, &
-         umass,utime,udist, x,y,z,rhogas,rhodust,ncells)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
+         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
+
     if (ncells <= 0) then
        ierr = 1
        return
