@@ -44,8 +44,9 @@ contains
     integer, dimension(ntypes), intent(in) :: npoftype
 
     real(db), dimension(np), intent(out) :: Tdust
-    integer, intent(out) :: ierr
     real(db), intent(out) :: mu_gas
+    integer, intent(out) :: ierr
+
 
     real(db), dimension(:), allocatable :: x,y,z,rhogas
     real(db), dimension(:,:), allocatable :: rhodust
@@ -75,6 +76,7 @@ contains
   subroutine setup_mcfost_Voronoi_grid()
 
     write(*,*) "MCFOST setup Voronoi"
+    return
 
   end subroutine setup_mcfost_Voronoi_grid
 

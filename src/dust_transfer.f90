@@ -462,13 +462,12 @@ subroutine transfert_poussiere()
      if (laffichage) call progress_bar(0)
 
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
-        if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star   tau midplane"
-        !call integ_tau(lambda)
-          tau=0.0
-          do i=1, n_rad
-             tau=tau+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
-          enddo
-        write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), tau
+        if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
+        tau=0.0 ;
+        do i=1, n_rad
+           tau=tau+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
+        enddo
+        write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
      ! Les pointeurs (meme les tab) doivent être privés !!! COPYIN
