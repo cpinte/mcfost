@@ -28,8 +28,8 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,npoftype,xyzh, iphase, grainsize, dustfrac, massoftype,&
-       xyzmh_ptmass,hfact,umass,utime,udist,graindens, Tdust, mu_gas, ierr)
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,npoftype,xyzh,iphase,grainsize,&
+       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,compute_Frad, Tdust, Frad,mu_gas,ierr)
 
     use io_phantom
 
@@ -42,8 +42,10 @@ contains
     real(db), intent(in) :: hfact, umass, utime, udist, graindens
     real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
+    logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
 
-    real(db), dimension(np), intent(out) :: Tdust
+    real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not db
+    real, dimension(3,ndusttypes,np), intent(out) :: Frad
     real(db), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
@@ -52,8 +54,9 @@ contains
     real(db), dimension(:,:), allocatable :: rhodust
     integer :: ncells
 
-    mu_gas = mu
     ierr = 0
+    mu_gas = mu ! Molecular weight
+    Frad = 0.
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
