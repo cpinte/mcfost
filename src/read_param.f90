@@ -169,22 +169,8 @@ contains
     read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -304,21 +290,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -640,22 +611,8 @@ contains
     read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -775,21 +732,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -1088,22 +1030,8 @@ contains
     read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size
     zoom = 1.0
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -1198,21 +1126,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -1505,22 +1418,8 @@ contains
     ! ----
     read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size, zoom
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -1633,21 +1532,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -1942,22 +1826,8 @@ contains
     ! ----
     read(1,*) line_buffer
     read(1,*) igridx, igridy, map_size, zoom
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2071,21 +1941,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -2382,22 +2237,8 @@ contains
     read(1,*)
     read(1,*)
     read(1,*) igridx, igridy, map_size, zoom
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2506,21 +2347,6 @@ contains
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -2805,22 +2631,8 @@ end subroutine read_para215
     ! ----
     read(1,*) line_buffer
     read(1,*) igridx, igridy, zoom
-    read(1,*,iostat=ios) N_thet, N_phi, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
-
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2941,21 +2753,6 @@ end subroutine read_para215
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -3239,21 +3036,8 @@ end subroutine read_para215
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
     read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -3368,21 +3152,6 @@ end subroutine read_para215
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity
@@ -3665,21 +3434,8 @@ end subroutine read_para215
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom, n_cartes
-    if (ios/=0) then
-       n_cartes=1
-    endif
+    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom
     maxigrid = max(igridx, igridy)
-
-    if (n_cartes > n_cartes_max) then
-       write(*,*) "Erreur : n_cartes >", n_cartes_max
-       stop
-    endif
-    allocate(igridx2(n_cartes-1), igridy2(n_cartes-1), maxigrid2(n_cartes-1))
-    do i=1, n_cartes-1
-       read(1,*) igridx2(i), igridy2(i)
-       maxigrid2(i) = max(igridx2(i), igridy2(i))
-    enddo
     read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -3794,21 +3550,6 @@ end subroutine read_para215
        deltapix_y = 1
     endif
     size_pix=maxigrid/(map_size)
-
-    allocate(deltapix_x2(n_cartes-1),deltapix_y2(n_cartes-1),size_pix2(n_cartes-1))
-    do i=1,n_cartes-1
-       if (igridx2(i) == igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1
-       else if (igridx2(i) > igridy2(i)) then
-          deltapix_x2(i) = 1
-          deltapix_y2(i) = 1 - (igridx2(i)/2) + (igridy2(i)/2)
-       else
-          deltapix_x2(i) = 1 - (igridy2(i)/2) + (igridx2(i)/2)
-          deltapix_y2(i) = 1
-       endif
-       size_pix2(i)=maxigrid2(i)/(map_size)
-    end do
 
     ! ------
     ! Cavity

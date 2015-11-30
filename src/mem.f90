@@ -915,31 +915,6 @@ subroutine alloc_dynamique()
         STOKEI_disk_scat = 0.0
      endif !lsepar
 
-     if (n_cartes > 1) then
-        allocate(STOKEI1(n_lambda,IGRIDX2(1),IGRIDY2(1),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error STOKEI1'
-           stop
-        endif
-        STOKEI1 = 0.0
-     endif
-     if (n_cartes > 2) then
-        allocate(STOKEI2(n_lambda,IGRIDX2(2),IGRIDY2(2),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error STOKEI1'
-           stop
-        endif
-        STOKEI2 = 0.0
-     endif
-     if (n_cartes > 3) then
-        allocate(STOKEI3(n_lambda,IGRIDX2(3),IGRIDY2(3),capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error STOKEI1'
-           stop
-        endif
-        STOKEI3 = 0.0
-     endif
-
   endif ! lmono0
 
   ! **************************************************
