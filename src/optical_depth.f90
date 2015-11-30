@@ -4622,5 +4622,4 @@ end subroutine define_proba_weight_emission
 
 !***********************************************************
 
-
 end module optical_depth
