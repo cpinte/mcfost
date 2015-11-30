@@ -90,10 +90,8 @@ module parametres
   ! Parametres des cartes
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
   integer ::  igridx, igridy, deltapix_x, deltapix_y, maxigrid
-  integer, dimension(:), allocatable ::  igridx2, igridy2, deltapix_x2, deltapix_y2, maxigrid2
   real :: angle_interet, zoom, size_pix, tau_seuil, wl_seuil
 
-  real, dimension(:), allocatable :: size_pix2
   real  :: cutoff = 7.0
 
   ! Résolution de la grille de densité
@@ -107,9 +105,6 @@ module parametres
   logical :: llinear_grid
 
   integer :: n_lambda2
-
-  integer :: n_cartes
-  integer, parameter :: n_cartes_max = 4
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
@@ -531,7 +526,6 @@ module resultats
   real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
   real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
   real, dimension(:,:,:,:,:), allocatable :: stoke_io ! x,y, theta, phi, type
-  real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI1, STOKEI2, STOKEI3, STOKEI4 !id,lambda,x,y,n_thet,n_phi
 
   real(kind=db), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
   real(kind=db), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
