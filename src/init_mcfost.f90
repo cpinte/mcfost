@@ -1164,7 +1164,7 @@ subroutine display_help()
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
 !  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
-  write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -mc : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) " "
