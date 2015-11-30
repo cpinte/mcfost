@@ -124,7 +124,6 @@ subroutine initialisation_mcfost()
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
   lread_Seb_Charnoz2 = .false.
-  lforce_1st_scatt = .false.
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
@@ -753,10 +752,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
-     case("-force_1st_scatt")
-        i_arg = i_arg+1
-        lforce_1st_scatt=.true.
-        write(*,*) "WARNING: forcing 1st scattering event when tau < 10"
      case("-old_grid")
         i_arg = i_arg+1
         lold_grid=.true.
@@ -988,12 +983,6 @@ subroutine initialisation_mcfost()
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
-     if (lforce_1st_scatt) then
-        write(*,*) "The [-force_1st_scatt] option is not relevant for SED calculation"
-        write(*,*) "It is therefore discarded here"
-        lforce_1st_scatt = .false.
-     endif
-
      if (lmono) then
         write(*,*) "Error : thermal equilibrium cannot be calculated with only 1 wavelength!"
         write(*,*) "      Set n_lambda to a value higher than 1 in parameter file"
@@ -1019,12 +1008,6 @@ subroutine initialisation_mcfost()
      write(*,*) "  for thermal equilibrium calculations"
      write(*,*) "- use the [-dust_prop] option to compute global dust properties"
      write(*,*) 'Exiting'
-     stop
-  endif
-
-  if ( (lforce_1st_scatt).and.(lscatt_ray_tracing) ) then
-     write(*,*) "ERROR: force_1st_scatt is not compatible with rt"
-     write(*,*) "Exiting"
      stop
   endif
 
@@ -1179,8 +1162,6 @@ subroutine display_help()
   write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
   write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
-  write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
-  write(*,*) "                             useful for optically thin disk in MC mode"
 !  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
   write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
