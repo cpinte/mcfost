@@ -1314,7 +1314,7 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, n_save
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
@@ -1327,10 +1327,6 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
 
   tau_tot=0.0_db
   nbr_cell = 0
-  n_save = 0
-
-  tab_length(id,:)=0.0_db
-
 
   a=u*u+v*v
 
@@ -1359,24 +1355,17 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
         ! Le photon sort du disque
-        n_cell_traversees(id) = n_save
         tau_tot_out=tau_tot
-        lmax=tab_length_tot(id,n_save)
+        lmax=ltot
         return
      elseif (zj0>nz) then
         ! Test sortie vericale
         if (abs(z0) > zmaxmax) then
-           n_cell_traversees(id) = n_save
            tau_tot_out=tau_tot
-           lmax=tab_length_tot(id,n_save)
+           lmax=ltot
            return
         endif
      endif ! Test sortie
-
-!     if (tau_tot > 100.0) then ! Ca sert plus a rien de continuer
-!        n_cell_traversees(id) = n_save
-!        return
-!     endif
 
      nbr_cell = nbr_cell + 1
 
@@ -1511,42 +1500,6 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
      ltot= ltot + l
      if (tau_tot < tiny_real) lmin=ltot
 
-     ! Sauvgarde pour length_deg2_reloaded
-     ! indice cellule
-     if (tau > tiny_real) then
-        n_save=n_save+1
-        tab_cell_r(id,n_save) = ri0
-        tab_cell_z(id,n_save) = zj0
-        ! position initiale dans cellule
-        tab_x0(id,n_save) = x0
-        tab_y0(id,n_save) = y0
-        tab_z0(id,n_save) = z0
-        ! tau a la fin de la cellule et l dans cellule
-        tab_tau(id,n_save) = tau_tot
-        tab_length(id,n_save) = l !! BUG avec les cellules à tau=0
-        tab_length_tot(id,n_save) = ltot
-
-!!$        if (lscatt_ray_tracing) then
-!!$           if (lstrat) then
-!!$              p_ri0 = ri0
-!!$              p_zj0 = zj0
-!!$           endif
-!!$
-!!$           xm = 0.5_db * (x0 + x1)
-!!$           ym = 0.5_db * (y0 + y1)
-!!$           zm = 0.5_db * (z0 + z1)
-!!$           call angles_scatt_ray_tracing2(xm,ym,zm,u,v,w)
-!!$
-!!$           do dir=1, 2
-!!$              do iscatt = 1, nang_ray_tracing
-!!$                 M = mueller_matrix_ray_tracing(lambda,p_ri0,p_zj0,iscatt,dir)
-!!$                 tab_I_scatt(:,iscatt,dir,n_save,id) =  l * matmul(Stokes(:),M(:,:))
-!!$              enddo
-!!$           enddo
-!!$        endif
-
-     endif
-
   enddo ! boucle infinie
 
   write(*,*) "BUG"
@@ -1573,7 +1526,7 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, n_save
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
 
   logical :: lcellule_non_vide
 
@@ -1591,9 +1544,6 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
 
   tau_tot=0.0_db
   nbr_cell = 0
-  n_save = 0
-
-  tab_length(id,:)=0.0_db
 
   a=u*u+v*v
 
@@ -1622,16 +1572,14 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
         ! Le photon sort du disque
-        n_cell_traversees(id) = n_save
         tau_tot_out=tau_tot
-        lmax=tab_length_tot(id,n_save)
+        lmax=ltot
         return
      elseif (abs(zj0) > nz) then
          ! Test sortie vericale
         if (abs(z0) > zmaxmax) then
-           n_cell_traversees(id) = n_save
            tau_tot_out=tau_tot
-           lmax=tab_length_tot(id,n_save)
+           lmax=ltot
            return
         endif
      endif ! Test sortie
@@ -1815,22 +1763,10 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
      if (z1 == 0.0_db) z1 = sign(prec_grille,w)
 
      tau=l*opacite ! opacite constante dans la cellule
-    ! Sauvgarde pour length_deg2_reloaded
-     ! indice cellule
-     if (tau > tiny_real) then
-        n_save=n_save+1
-        tab_cell_r(id,n_save) = ri0
-        tab_cell_z(id,n_save) = zj0
-        ! position initiale dans cellule
-        tab_x0(id,n_save) = x0
-        tab_y0(id,n_save) = y0
-        tab_z0(id,n_save) = z0
-        ! tau a la fin de la cellule et l dans cellule
-        tab_tau(id,n_save) = tau_tot
-        tab_length(id,n_save) = l !! BUG avec les cellules à tau=0
-        tab_length_tot(id,n_save) = ltot
-     endif
 
+     tau_tot = tau_tot + tau
+     ltot= ltot + l
+     if (tau_tot < tiny_real) lmin=ltot
 
   enddo ! boucle infinie
   write(*,*) "BUG"
@@ -1859,7 +1795,7 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
   real(kind=db) :: delta_vol, l, tau, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus, uv
-  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, n_save
+  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell
 
   logical :: lcellule_non_vide
 
@@ -1879,12 +1815,8 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   lmin=0.0_db
   ltot=0.0_db
   nbr_cell = 0
-  n_save = 0
-
-  tab_length(id,:)=0.0_db
 
   uv = sqrt(u*u + v*v)
-
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -1896,9 +1828,8 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
         ! Le photon sort du disque
-        n_cell_traversees(id) = n_save
         tau_tot_out=tau_tot
-        lmax=tab_length_tot(id,n_save)
+        lmax=ltot
         return
      endif ! Test sortie
 
@@ -2067,25 +1998,8 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
      tau=l*opacite ! opacite constante dans la cellule
 
      tau_tot = tau_tot + tau
-
      ltot= ltot + l
      if (tau_tot < tiny_real) lmin=ltot
-
-     ! Sauvgarde pour length_deg2_reloaded
-     ! indice cellule
-     if (tau > tiny_real) then
-        n_save=n_save+1
-        tab_cell_r(id,n_save) = ri0
-        tab_cell_z(id,n_save) = thetaj0
-        ! position initiale dans cellule
-        tab_x0(id,n_save) = x0
-        tab_y0(id,n_save) = y0
-        tab_z0(id,n_save) = z0
-        ! tau a la fin de la cellule et l dans cellule
-        tab_tau(id,n_save) = tau_tot
-        tab_length(id,n_save) = l !! BUG avec les cellules à tau=0
-        tab_length_tot(id,n_save) = ltot
-     endif
 
   enddo ! boucle infinie
 

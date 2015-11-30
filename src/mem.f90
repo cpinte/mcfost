@@ -40,51 +40,6 @@ subroutine alloc_dynamique()
   endif
   n_phot_envoyes = 0.0
 
-  !***************************************************
-  ! Tableaux relatifs a la propagation des paquets : othin ...
-  !***************************************************
-  allocate(n_cell_traversees(nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error n_cell_traversees'
-     stop
-  endif
-  n_cell_traversees = 0
-
-  allocate(tab_cell_r(nb_proc,n_cell_max), tab_cell_z(nb_proc,n_cell_max),  stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_cell_r'
-     stop
-  endif
-  tab_cell_r = 0 ;  tab_cell_z = 0
-
-
-  allocate(tab_length(nb_proc,n_cell_max), tab_tau(nb_proc,0:n_cell_max),&
-       tab_length_tot(nb_proc,0:n_cell_max), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_length'
-     stop
-  endif
-  tab_length = 0.0 ; tab_tau = 0.0 ; tab_length_tot=0.0
-
-
-  allocate(tab_x0(nb_proc,n_cell_max), tab_y0(nb_proc,n_cell_max), tab_z0(nb_proc,n_cell_max),stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_x0'
-     stop
-  endif
-  tab_x0 = 0.0 ; tab_y0 = 0.0 ; tab_z0 = 0.0
-
-  ! ... ou integration dichotomique
-  linteg_dic = .false.
-  if (linteg_dic) then
-     allocate(delta0(0:n_rad), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error delta0'
-        stop
-     endif
-     delta0 = 0.0
-  endif
-
 
   ! **************************************************
   ! Tableaux relatifs a la grille
@@ -1015,8 +970,6 @@ subroutine dealloc_em_th()
 
   deallocate(n_phot_envoyes)
 
-  !deallocate(n_cell_traversees,tab_cell_r,tab_cell_z,tab_length,tab_tau,tab_length_tot)
-  !deallocate(tab_x0,tab_y0,tab_z0)
 
   deallocate(tab_albedo,C_ext,C_sca,C_abs,C_abs_norm,tab_g) ! q_geo
 
