@@ -847,7 +847,7 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! Tableaux relatifs aux images
   ! **************************************************
-  if (lmono0) then
+  if (lmono0.and.loutput_mc) then
      allocate(STOKE_io(igridx,igridy,capt_debut:capt_fin,N_phi,N_type_flux), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error STOKE_io'

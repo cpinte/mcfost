@@ -15,38 +15,23 @@ module output
 
   contains
 
-subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt,capt)
+subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
 
   implicit none
 
   real(kind=db), intent(in) ::  xin,yin,zin, uin,vin,win
-  real(kind=db) ::  x1,y1,z1,u1,v1,w1
   integer, intent(in) :: id, lambda, ri0, zj0
   real(kind=db), dimension(4), intent(in)  :: stokin
   logical, intent(in) :: flag_star, flag_scatt
-  real(kind=db), dimension(4)  :: stok
-
   integer, intent(out) :: capt
+
+  real(kind=db), dimension(4)  :: stok
+  real(kind=db) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp
   integer :: c_phi, imap1, jmap1, imap2, jmap2
-  real(kind=db) :: xprim, yprim, zprim, ytmp, ztmp
 
   x1=xin ; y1=yin ; z1=zin
   u1=uin ; v1=vin ; w1=win
   stok=stokin
-
-
-  !* ------------ SECTION CAPTEURS------------------
-  !*
-  !*
-  !*     utilisation de la symetrie N-S, selon l'axe Z
-  !*     changement de Z1 -> -Z1 si W1<0
-  !*             et de W1 -> -W1 si W1<0
-  !*
-  !        if (W1 < 0.0) then
-  !           W1 = -W1
-  !           Z1 = -Z1
-  !           STOK(3,1) = -STOK(3,1)
-  !        endif
 
   !*     utilisation de la symetrie centrale
   if (w1 < 0.0) then
@@ -63,18 +48,29 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      endif
   endif
 
-
   !* Selection angle theta
   CAPT=int(( -1.0*W1 + 1.0 ) * N_thet) + 1
   if (CAPT == (N_thet+1)) then
      CAPT = N_thet
   endif
-!  return
+
+  ! Origine du paquet
+  if (lorigine) then
+     if (capt == capt_interet) then
+        if (ri0 == 0) then
+           star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
+        else
+           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
+        endif
+     endif
+  endif
+
+  ! If we do not keep the MC map, we do not care about the pixels, etc
+  if (lmono0 .and. .not.loutput_mc) return
 
   if (lonly_capt_interet) then
      if ((capt > capt_sup).or.(capt < capt_inf)) return
   endif
-
 
   if (l_sym_axiale) then ! symetrie axiale du systeme
      ! Utilisation de la symetrie Est-Ouest
@@ -105,18 +101,6 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   elseif (c_phi==0) then
      c_phi=1
   endif
-
-  ! Origine du paquet
-  if (lorigine) then
-     if (capt == capt_interet) then
-        if (ri0 == 0) then
-           star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
-        else
-           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
-        endif
-     endif
-  endif
-
 
   if (lmono0) then ! Creation carte
      !*****************************************************
