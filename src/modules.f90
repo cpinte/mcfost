@@ -34,7 +34,6 @@ module parametres
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
   real :: tau_dark_zone_obs = 100 ! idem que 1000 si 1500. ci-dessus
-  logical :: linteg_dic
   integer :: n_Stokes
 
   ! Nbre d'angles pour echantillonner la fct de phase
@@ -214,17 +213,8 @@ module disk
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
 
-  ! Tableau des longueurs de vol
-  integer :: n_cell_max
-  integer, dimension(:), allocatable :: n_cell_traversees !n_cpu
-  integer, dimension(:,:), allocatable :: tab_cell_r, tab_cell_z ! n_cpu, n_cellule
-  real(kind=db), dimension(:,:), allocatable :: tab_length, tab_tau, tab_length_tot ! n_cpu, n_cellule
-  real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
-
-
   ! Definition des regions = zones connectees
   logical :: lold_grid
-
 
   real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
@@ -235,9 +225,6 @@ module disk
   real :: w0_sup, w0_inf
 
   real :: z_warp, tilt_angle
-
-  ! Pas d'integration initial dans chaque cellule pour integration dichotomique
-  real, dimension(:), allocatable :: delta0 !0:n_rad
 
   ! Description analytique du puffed-up inner rim
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r

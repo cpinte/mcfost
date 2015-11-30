@@ -162,7 +162,7 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
@@ -604,7 +604,7 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
@@ -1023,7 +1023,7 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
@@ -1412,7 +1412,7 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
@@ -1819,7 +1819,6 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
 
     ! ----
     ! Maps
@@ -2230,7 +2229,7 @@ contains
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
+
     ! ----
     ! Maps
     ! ----
@@ -2624,7 +2623,6 @@ end subroutine read_para215
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
 
     ! ----
     ! Maps
@@ -3030,7 +3028,6 @@ end subroutine read_para215
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
 
     ! ----
     ! Maps
@@ -3428,7 +3425,6 @@ end subroutine read_para215
        write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
        n_az=1
     endif
-    n_cell_max = nz *n_rad
 
     ! ----
     ! Maps
