@@ -75,12 +75,11 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
+  real(kind=db) :: l, tau
   real(kind=db) :: correct_moins, correct_plus
   real(kind=db) :: phi_pos, phi_vol, xm, ym, zm, factor
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, p_ri0, p_zj0
+  integer :: ri0, zj0, ri1, zj1, nbr_cell, ri_old, zj_old, p_ri0, p_zj0
   integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in, tmp_k
 
   integer :: cell, next_cell, previous_cell
@@ -119,14 +118,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   ltot=0.0
   nbr_cell = 0
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0_db/a
-  else
-     inv_a=huge_real
-  endif
 
   if (abs(w) > tiny_real) then
      inv_w=1.0_db/w
@@ -365,12 +356,12 @@ subroutine cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,
   ! Variables to be sorted out
   integer :: ri0,zj0,k0
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
+  real(kind=db) :: x0, y0, z0, x1, y1, z1
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, zlim, extr, dotprod, opacite
+  real(kind=db) :: delta_vol, zlim, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
 
-  integer :: ri, zj, ri_old, zj_old, delta_rad, delta_zj, ri1, zj1
+  integer ::  delta_rad, delta_zj, ri1, zj1
 
 
   x0=xio;y0=yio;z0=zio
