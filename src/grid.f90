@@ -25,7 +25,6 @@ subroutine cylindrical2cell(i,j,k, icell)
   integer, intent(in) :: i,j,k
   integer, intent(out) :: icell
 
-
   icell = i + n_rad * ( j-1 + nz * (k-1))
 
   return
