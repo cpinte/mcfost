@@ -90,13 +90,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
 !  flag_direct_star = .false. ! Ok c'est moins bon edge-on :-)
 
-
-  if (LOG__) then
-     write(*,*) "*********************"
-     write(*,*) "IN DEG2"
-     write(*,*) "*********************"
-  endif
-
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
@@ -136,9 +129,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
 
-     if (LOG__) write(*,*) "CELL", ri0, zj0, x0, y0, z0, sqrt(x0**2+y0**2)
-     if (LOG__) write(*,*) "uvw", u,v,w
-
      ! Pour cas avec approximation de diffusion
      if (l_dark_zone(ri0,zj0,1)) then
         write(*,*) "DARKZONE", l_dark_zone(ri0,zj0,1)
@@ -171,31 +161,11 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         endif
      endif ! Test sortie
 
-     if (LOG__) then
-        write(*,*) "We are in cell", ri0, zj0, abs(z0), zmaxmax
-     endif
-
-     if (LOG__) write(*,*)
-     if (LOG__) write(*,*) ri0, zj0, 1, "-->", cell
 
      call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
      previous_cell = 0 ! unusued, just for Voronoi
-
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
-     if (LOG__) write(*,*) "Cross cell", cell, "newcell", next_cell, lcellule_non_vide, "l=", l, tau
      call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
-     if (LOG__) write(*,*) next_cell,  "-->", ri1, zj1, 1
-
-
-     ! OK : this version is working
-     ! call cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri_tmp, zj_tmp, l, tau)
-     !if (LOG__) then
-     !   if ((ri_tmp /= ri1).and.(zj_tmp /=zj1)) then
-     !      write(*,*) "ERROR : ", ri0, zj0
-     !      write(*,*) ri1, zj1, "should be", ri_tmp, zj_tmp
-     !      read(*,*)
-     !   endif
-     !endif
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol evntuellement
@@ -396,8 +366,6 @@ subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell,
   ! 3D cell indices
   call cell2cylindrical(cell, ri0,zj0,k0)
 
-  if (LOG__) write(*,*) "IN", cell, "-->", ri0, zj0, k0
-
   ! Detection interface
   r_2=x0*x0+y0*y0
   b=(x0*u+y0*v)*inv_a
@@ -528,7 +496,6 @@ subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell,
   tau = l*opacite ! opacite constante dans la cellule
 
   call cylindrical2cell(ri1,zj1,1, next_cell)
-  if (LOG__) write(*,*) "OUT", ri1, zj1, 1, "-->", next_cell
 
   return
 
