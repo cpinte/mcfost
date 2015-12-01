@@ -15,8 +15,6 @@ module parametres
 
   real :: para_version
 
-  logical, parameter :: LOG__ = 0 ! variable used for debugging
-
   ! Système
   integer :: nb_proc
   integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
