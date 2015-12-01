@@ -40,7 +40,7 @@ module Voronoi_grid
 
     integer, intent(in) :: n
 
-    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, ifirst
+    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot
 
     !integer, dimension(:), allocatable :: id_list
 
@@ -93,7 +93,8 @@ module Voronoi_grid
 
     do i=1, n
        ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
-       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, &
+            neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
@@ -185,7 +186,8 @@ module Voronoi_grid
     ! Run voro++ command line for now
     ! while I fix the c++/fortran interface and make all the tests
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' -150 150 -150 150 -150 150 particles.txt ; mv particles.txt.vol Voronoi.txt"
+    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' -150 150 -150 150 -150 150 particles.txt ; &
+mv particles.txt.vol Voronoi.txt"
     call appel_syst(cmd,syst_status)
     write(*,*) "Voronoi Tesselation done"
 
@@ -208,7 +210,7 @@ module Voronoi_grid
 
     real(kind=db) :: rand, rand2, rand3
     real :: x, y, z
-    integer :: icell, np_proc, i, id, k
+    integer :: icell, i, id, k
 
 
     nb_proc = 1 ; id = 1
@@ -545,8 +547,8 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   integer, intent(in) :: iwall
   real, intent(in) :: x, y, z
 
-  real :: dist2, dist2_min, i
-  integer :: icell, icell_min
+  real :: dist2, dist2_min
+  integer :: i, icell, icell_min
 
   dist2_min = huge(1.0)
   do i=1, wall(iwall)%n_neighbours

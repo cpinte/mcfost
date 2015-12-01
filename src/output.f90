@@ -347,7 +347,7 @@ subroutine write_stokes_fits()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, id
+  integer :: group,fpixel,nelements, id
 
   integer :: lambda=1
 
@@ -356,8 +356,6 @@ subroutine write_stokes_fits()
 
   real, dimension(n_lambda) :: n_photons_envoyes
   real :: facteur, pixel_scale_x, pixel_scale_y
-
-  real, dimension(:,:,:,:), allocatable :: tmp
 
   real :: o_star, frac_star, somme_disk
   real, dimension(n_rad, nz) :: o_disk
