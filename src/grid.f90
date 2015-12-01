@@ -25,7 +25,13 @@ subroutine cylindrical2cell(i,j,k, icell)
   integer, intent(in) :: i,j,k
   integer, intent(out) :: icell
 
-  icell = i + n_rad * ( j-1 + nz * (k-1))
+  if ((i==0).and.(j==0)) then
+     icell = 0
+  else if (j==nz+1) then
+     icell = -i
+  else
+     icell = i + n_rad * ( j-1 + nz * (k-1))
+  endif
 
   return
 
@@ -38,14 +44,24 @@ subroutine cell2cylindrical(icell, i,j,k)
   integer, intent(in) :: icell
   integer, intent(out) :: i,j,k
 
-  integer :: ij ! indice combine iet j, ie : i + (j-1) * n_rad
+  integer :: ij ! indice combine i et j, ie : i + (j-1) * n_rad
 
-  k = icell/nrz + 1 ; if (k > n_az) k=n_az
+  if (icell==0) then
+     i=0
+     j=0
+     k=1
+  else if (icell < 0) then
+     i = -icell
+     j = nz+1
+     k = 1
+  else
+     k = icell/nrz + 1 ; if (k > n_az) k=n_az
 
-  ij = icell - k*nrz
-  j = (ij)/n_rad + 1 ; if (j > nz) j=nz
+     ij = icell - (k-1)*nrz
+     j = ij/n_rad + 1 ; if (j > nz) j=nz
 
-  i = ij - j*nz
+     i = ij - (j-1)*n_rad
+  endif
 
   return
 
