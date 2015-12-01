@@ -15,7 +15,7 @@ module parametres
 
   real :: para_version
 
-  logical, parameter :: LOG__ = 1 ! variable used for debugging
+  logical, parameter :: LOG__ = 0 ! variable used for debugging
 
   ! Système
   integer :: nb_proc
@@ -454,6 +454,9 @@ module opacity
   real(kind=db), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
   real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
+
+  integer, dimension(:,:,:), allocatable :: cell_map
+  integer, dimension(:,:), allocatable :: cell_map_ijk
 
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext
