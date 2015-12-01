@@ -89,6 +89,14 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
 !  flag_direct_star = .false. ! Ok c'est moins bon edge-on :-)
 
+
+  if (LOG__) then
+     write(*,*) "*********************"
+     write(*,*) "IN DEG2"
+     write(*,*) "*********************"
+     read(*,*)
+  endif
+
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
@@ -141,6 +149,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
 
+     call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
+
      ! Pour cas avec approximation de diffusion
      if (l_dark_zone(ri0,zj0,1)) then
         ! On revoie le paquet dans l'autre sens
@@ -153,16 +163,41 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         return
      endif
 
+     lcellule_non_vide=.true.
+     if (ri0==0) lcellule_non_vide=.false.
 
-     call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term
-     previous_cell = 0 ! unusued
+     ! Test sortie
+     if (ri0>n_rad) then ! On est dans la derniere cellule
+        ! Le photon sort du disque
+        flag_sortie = .true.
+        return
+     elseif (zj0>nz) then
+        lcellule_non_vide=.false.
 
-     call cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,w, next_cell, l, lcellule_non_vide)
+        ! Test sortie vericale
+        if (abs(z0) > zmaxmax) then
+           flag_sortie = .true.
+           return
+        endif
+     endif ! Test sortie
+
+     if (LOG__) then
+        write(*,*) "We are in cell", ri0, zj0, abs(z0), zmaxmax
+        if (ri0==0) read(*,*)
+     endif
+
+     if (LOG__) write(*,*)
+     if (LOG__) write(*,*) ri0, zj0, 1, "-->", cell
+
+     previous_cell = 0 ! unusued, just for Voronoi
+     call cross_cylindrical_cell(lambda, cell, previous_cell, x1,y1,z1, u,v,w, next_cell, l, tau)
+
+     if (LOG__) write(*,*) "Cross cell", cell, "newcell", next_cell, lcellule_non_vide
 
      call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
 
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     tau=l*opacite ! opacite constante dans la cellule
+     if (LOG__) write(*,*) next_cell,  "-->", ri1, zj1, 1
+     !if (LOG__) read(*,*)
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol evntuellement
@@ -319,28 +354,31 @@ end subroutine length_deg2_cyl
 
 !********************************************************************
 
-subroutine cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,w, next_cell, l, lcellule_non_vide)
+subroutine cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,w, next_cell, l, tau)
 
   integer, intent(in) :: lambda, cell, previous_cell
   real(kind=db), intent(inout) :: xio,yio,zio
   real(kind=db), intent(inout) :: u,v,w ! Todo : check that
   integer, intent(out) :: next_cell
-  real(kind=db), intent(out) :: l
-  logical, intent(out) :: lcellule_non_vide
+  real(kind=db), intent(out) :: l, tau
 
   ! Variables to be sorted out
   integer :: ri0,zj0,k0
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, tau, zlim, extr, dotprod, opacite
+  real(kind=db) :: delta_vol, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
 
   integer :: ri, zj, ri_old, zj_old, delta_rad, delta_zj, ri1, zj1
 
-  lcellule_non_vide=.true.
 
-  ! Can be calculated outside
+  x0=xio;y0=yio;z0=zio
+
+  ! TODO: Can be calculated outside
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
   a=u*u+v*v
 
   if (a > tiny_real) then
@@ -354,17 +392,18 @@ subroutine cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,
   else
      inv_w=sign(huge_db,w) ! huge_real avant
   endif
-
+  ! End : TODO : Can be calculated outside
 
   ! 3D cell indices
   call cell2cylindrical(cell, ri0,zj0,k0)
+
+  if (LOG__) write(*,*) "IN", cell, "-->", ri0, zj0, k0
 
   ! Detection interface
   r_2=x0*x0+y0*y0
   b=(x0*u+y0*v)*inv_a
 
   if (ri0==0) then
-     lcellule_non_vide=.false.
      opacite=0.0_db
      ! Si on est avant le bord interne,  on passe forcement par rmin
      ! et on cherche forcement la racine positive (unique)
@@ -486,7 +525,11 @@ subroutine cross_cylindrical_cell(lambda, cell, previous_cell, xio,yio,zio, u,v,
   ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
   if (z1 == 0.0_db) z1 = prec_grille
 
+  ! Calcul longeur de vol et profondeur optique dans la cellule
+  tau=l*opacite ! opacite constante dans la cellule
+
   call cylindrical2cell(ri1,zj1,1, next_cell)
+  if (LOG__) write(*,*) "OUT", ri1, zj1, 1, "-->", next_cell
 
   return
 
