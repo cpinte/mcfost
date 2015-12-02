@@ -4625,7 +4625,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
   if (n_zones > 1) then
      do i=1, n_rad
-        icell = cylindrical2cell(i,1,1)
+        icell = cell_map(i,1,1)
         if (sum(densite_pouss(icell,:)) < tiny_real) then
            l_dark_zone(i,:,1) = .false.
         endif

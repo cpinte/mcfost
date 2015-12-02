@@ -13,7 +13,6 @@ module dust
   use coated_sphere
   use input
   use output
-  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -854,7 +853,7 @@ subroutine opacite(lambda)
            k_abs_tot = 0.0
            k_abs_RE = 0.0
            k_abs_RE_LTE = 0.0
-           icell = cylindrical2cell(i,j,pk)
+           icell = cell_map(i,j,pk)
            do  k=1,n_grains_tot
               density=densite_pouss(icell,k)
               kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + C_ext(lambda,k) * density
@@ -909,7 +908,7 @@ subroutine opacite(lambda)
      if (letape_th) then
         do i=1, n_rad
            do j=1, nz
-              icell = cylindrical2cell(i,j,1)
+              icell = cell_map(i,j,1)
               prob_kappa_abs_1grain(lambda,i,j,grain_RE_nLTE_start-1)=0.0
               do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
                  density=densite_pouss(icell,k)
@@ -955,13 +954,13 @@ subroutine opacite(lambda)
   !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
-  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop)
+  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
   !$omp do schedule(dynamic,1)
   do i=1, p_n_rad
      bz2 : do j=pj_start,p_nz
         if (j==0) cycle bz2
         do pk=1, p_n_az
-           icell = cylindrical2cell(i,j,pk)
+           icell = cell_map(i,j,pk)
            k_sca_tot=0.0
            k_ext_tot=0.0
 

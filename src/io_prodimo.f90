@@ -13,7 +13,6 @@ module ProDiMo
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use read_params
   use sha
-  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -838,7 +837,7 @@ contains
     !  Write the array to the FITS file.
     do ri=1, n_rad
        do zj=1,nz
-          icell = cylindrical2cell(ri,zj,1)
+          icell = cell_map(ri,zj,1)
           dens(ri,zj) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
@@ -870,7 +869,7 @@ contains
     opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
-          icell = cylindrical2cell(ri,zj,1)
+          icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
                 opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l) * facteur
@@ -901,7 +900,7 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
-          icell = cylindrical2cell(ri,zj,1)
+          icell = cell_map(ri,zj,1)
           N = sum(densite_pouss(icell,:),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
@@ -995,7 +994,7 @@ contains
        k=1 ! azimuth
        do ri=1, n_rad
           do zj=1,nz
-             icell = cylindrical2cell(ri,zj,k)
+             icell = cell_map(ri,zj,k)
              dens(ri,zj) = sum(densite_pouss(icell, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
           enddo
        enddo
@@ -1021,7 +1020,7 @@ contains
        opacite = 0.0
        do zj=1,nz
           do ri=1,n_rad
-             icell = cylindrical2cell(ri,zj,1)
+             icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
                    opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l)
@@ -1049,7 +1048,7 @@ contains
        TPAH_eq = 0.0
        do zj=1,nz
           do ri=1,n_rad
-             icell = cylindrical2cell(ri,zj,1)
+             icell = cell_map(ri,zj,1)
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
@@ -2029,7 +2028,7 @@ contains
     enddo
     do i=1, n_rad
        do j=1, nz
-          icell = cylindrical2cell(i,j,1)
+          icell = cell_map(i,j,1)
           tab_abundance(i,j,1) = tab_abundance(i,j,1) / densite_gaz(icell) ! conversion nbre en abondance
        enddo
     enddo

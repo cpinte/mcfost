@@ -215,7 +215,9 @@ subroutine equilibre_hydrostatique()
 
         ! Renormalisation
         fac = gas_dust * masse_rayon(i,k) / (volume(i) * somme) ! TODO : densite est en particule, non ???
-        densite_gaz(i,:,k) =  rho(:) * fac
+        do j = 1, nz
+           densite_gaz(cell_map(i,j,k)) =  rho(j) * fac
+        enddo
 
      enddo !i
   enddo !k
