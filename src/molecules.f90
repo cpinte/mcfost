@@ -388,7 +388,7 @@ subroutine init_molecular_disk(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i
+  integer :: i, j, k
 
   ldust_mol  = .true.
   lkeplerian = .true.
@@ -424,9 +424,15 @@ subroutine init_molecular_disk(imol)
      call read_abundance(imol)
   endif
 
-  lcompute_molRT(:,:,:) = (tab_abundance(:,:,:) > tiny_real) .and. &
-       (densite_gaz(:) > tiny_real) .and. (Tcin(:,:,:) > 1.)
-
+  do k=1, n_az
+     bz : do j=j_start, nz
+        if (j==0) cycle bz
+        do i=1, n_rad
+           lcompute_molRT(i,j,k) = (tab_abundance(i,j,k) > tiny_real) .and. &
+                (densite_gaz(cell_map(i,j,k)) > tiny_real) .and. (Tcin(i,j,k) > 1.)
+        enddo
+     enddo bz
+  enddo
 !  do i=1,n_rad
 !     do j=1, nz
 !       write(*,*) i, j, tab_abundance(i,j), lcompute_molRT(i,j)
@@ -705,7 +711,7 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, ri, zj, phik, p_lambda
+  integer :: iTrans, ri, zj, phik, p_lambda, icell
   real(kind=db) :: f, Jnu
   real :: T, wl, kap
 
@@ -752,7 +758,7 @@ subroutine init_dust_mol(imol)
            do ri=1,n_rad
               do zj=1,nz
                  !kappa_abs_eg(iTrans,ri,zj,1) =  kap * masse(ri,zj,1)/(volume(ri) * AU_to_cm**2)
-                 icell = cylindrical2cell(ri,zj,phik)
+                 icell = cell_map(ri,zj,phik)
                  kappa_abs_eg(iTrans,ri,zj,phik) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
                       gas_dust / cm_to_AU
               enddo
@@ -843,7 +849,7 @@ subroutine equilibre_LTE_mol()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,k,l) &
-  !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance,j_start)
+  !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance,j_start,cell_map)
   !$omp do
   do i=1, n_rad
      bz : do j=j_start, nz
@@ -860,8 +866,7 @@ subroutine equilibre_LTE_mol()
            ! read(*,*)
 
            ! Normalisation
-           icell = cylindrical2cell(i,j,k)
-           tab_nLevel(i,j,k,:) = densite_gaz(cell_map(i,j,k)) * tab_abundance(icell) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
+           tab_nLevel(i,j,k,:) = densite_gaz(cell_map(i,j,k)) * tab_abundance(i,j,k) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
         enddo !k
      enddo bz !j
   enddo!i
@@ -906,7 +911,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
 
   ! Matrice d'excitations/desexcitations collisionnelles
   Temp = Tcin(ri,zj,phik)
-  icell = cylindrical2cell(ri,zj,phik)
+  icell = cell_map(ri,zj,phik)
   nH2 = densite_gaz(icell) * cm_to_m**3
 
   ! Pour test
@@ -987,7 +992,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
      ! Resolution systeme matriciel par methode Gauss-Jordan
      call GaussSlv(A, B, nLevels)
 
-     icell = map_cell(ri,zj,phik)
+     icell = cell_map(ri,zj,phik)
      if (eq==1) then
         tab_nLevel(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(ri,zj,phik) * B(:)
      else

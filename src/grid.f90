@@ -367,7 +367,7 @@ subroutine define_grid4()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-  nrz = n_rad * (nz+1)
+  nrz = n_rad * nz
   n_cells = nrz * n_az
 
   call build_cylindrical_cell_mapping()
@@ -751,7 +751,7 @@ subroutine define_grid3()
 
   type(disk_zone_type) :: dz
 
-  nrz = n_rad * (nz+1)
+  nrz = n_rad * nz
   n_cells = nrz * n_az
 
   Rmax2=Rmax*Rmax

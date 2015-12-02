@@ -15,7 +15,6 @@ module dust_ray_tracing
   use prop_star
   use resultats
   use ray_tracing
-  use grid, only : cylindrical2cell
   !$ use omp_lib
 
   use scattering
@@ -909,7 +908,7 @@ subroutine calc_Ith(lambda)
            bz2 : do j=1,nz
               if (j==0) cycle bz2
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  do l=grain_RE_nLTE_start,grain_RE_nLTE_end
                     Temp=Temperature_1grain(i,j,l) ! WARNING : TODO : this does not work in 3D
                     cst_wl=cst_th/(Temp*wl)
@@ -929,7 +928,7 @@ subroutine calc_Ith(lambda)
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  do l=grain_nRE_start,grain_nRE_end
                     if (l_RE(i,j,l)) then ! le grain a une temperature
                        Temp=Temperature_1grain_nRE(i,j,l) ! WARNING : TODO : this does not work in 3D

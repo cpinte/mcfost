@@ -10,7 +10,6 @@ module output
   use molecular_emission
   use ray_tracing
   use utils
-  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -1162,7 +1161,7 @@ subroutine write_disk_struct()
      bz3 : do j=j_start,nz
         if (j==0) cycle bz3
         do i=1,n_rad
-           icell =  cylindrical2cell(i,j,k)
+           icell =  cell_map(i,j,k)
            dens(i,j,k) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
         enddo !i
      enddo bz3 !j
@@ -1222,7 +1221,7 @@ subroutine write_disk_struct()
      bz2 : do j=j_start,nz
         if (j==0) cycle bz2
         do i=1,n_rad
-           icell =  cylindrical2cell(i,j,k)
+           icell =  cell_map(i,j,k)
            dust_dens(i,j,k,:) = densite_pouss(icell,:) * m3_to_cm3
         enddo !i
      enddo bz2 !j
@@ -1279,7 +1278,7 @@ subroutine write_disk_struct()
      bz : do j=j_start,nz
         if (j==0) cycle bz
         do i=1,n_rad
-           icell =  cylindrical2cell(i,j,k)
+           icell =  cell_map(i,j,k)
            dens(i,j,k) = sum(densite_pouss(icell,:) * M_grain(:)) ! M_grain en g
         enddo !i
      enddo bz !j
@@ -2179,7 +2178,7 @@ subroutine taille_moyenne_grains()
   do j=1,nz
      do i=1,n_rad
         somme=0.0
-        icell = cylindrical2cell(i,j,1)
+        icell = cell_map(i,j,1)
         do l=1, n_grains_tot
            a_moyen(i,j) = a_moyen(i,j) + densite_pouss(icell,l) * r_grain(l)**2
            somme = somme + densite_pouss(icell,l)

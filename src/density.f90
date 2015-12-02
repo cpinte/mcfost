@@ -48,11 +48,7 @@ subroutine define_gas_density()
   real(kind=db), dimension(:,:,:), allocatable :: densite_gaz_tmp
 
 
-  if (l3D) then
-     allocate(densite_gaz_tmp(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(densite_gaz_tmp(n_rad,0:nz,1), stat=alloc_status)
-  endif
+  allocate(densite_gaz_tmp(n_cells), stat=alloc_status)
   densite_gaz_tmp = 0.0
   densite_gaz = 0.0 ;
 
@@ -140,7 +136,7 @@ subroutine define_gas_density()
                  else
                     density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
                  endif
-                 densite_gaz_tmp(i,j,k) = density
+                 densite_gaz_tmp(cell_map(i,j,k)) = density
 
               enddo !k
            enddo bz !j
@@ -150,10 +146,12 @@ subroutine define_gas_density()
               ! todo : only works for k = 1
               somme = 0.0
               bz2 : do j=min(1,j_start),nz
-                 somme = somme + densite_gaz_tmp(i,j,1) *  (z_lim(i,j+1) - z_lim(i,j))
+                 somme = somme + densite_gaz_tmp(cell_map(i,j,1)) *  (z_lim(i,j+1) - z_lim(i,j))
               enddo bz2
               if (somme > tiny_db) then
-                 densite_gaz_tmp(i,:,1) = densite_gaz_tmp(i,:,1) * Surface_density(i)/somme
+                 do j=min(1,j_start),nz
+                    densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i)/somme
+                 enddo ! j
               endif
            endif
         enddo ! i
@@ -183,7 +181,7 @@ subroutine define_gas_density()
               else
                  density = cst_gaz(izone) * rsph**(dz%surf)
               endif
-              densite_gaz_tmp(i,j,1) = density
+              densite_gaz_tmp(cell_map(i,j,1)) = density
            enddo !j
         enddo ! i
 
@@ -204,7 +202,7 @@ subroutine define_gas_density()
                       ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                       exp( - (abs(z)/h)**dz%vert_exponent)
               endif
-              densite_gaz_tmp(i,j,1) = density
+              densite_gaz_tmp(cell_map(i,j,1)) = density
            enddo !j
         enddo !i
 
@@ -220,7 +218,7 @@ subroutine define_gas_density()
         bz_gas_mass : do j=j_start,nz
            if (j==0) cycle bz_gas_mass
            do k=1,n_az
-              mass = mass + densite_gaz_tmp(i,j,k) *  masse_mol_gaz * volume(i)
+              mass = mass + densite_gaz_tmp(cell_map(i,j,k)) *  masse_mol_gaz * volume(i)
            enddo  !k
         enddo bz_gas_mass
      enddo !i
@@ -235,7 +233,8 @@ subroutine define_gas_density()
         do i=1,n_rad
            bz_gas_mass2 : do j=min(0,j_start),nz
               do k=1, n_az
-                 densite_gaz(i,j,k) = densite_gaz(i,j,k) + densite_gaz_tmp(i,j,k) * facteur
+                 icell = cell_map(i,j,k)
+                 densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
               enddo !k
            enddo bz_gas_mass2
         enddo ! i
@@ -253,7 +252,7 @@ subroutine define_gas_density()
         do j = 1, nz
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
            if (z_grid(i,j) > surface) then
-              densite_gaz(i,j,1) = 0.0_db
+              densite_gaz(cell_map(i,j,1) = 0.0_db
            endif
         enddo
      enddo
@@ -265,7 +264,8 @@ subroutine define_gas_density()
      bz_gas_mass3 : do j=j_start,nz
         if (j==0) cycle bz_gas_mass3
         do k=1, n_az
-           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+           icell = cell_map(i,j,k)
+           masse_gaz(icell) =  densite_gaz(icell) * facteur
         enddo !k
      enddo bz_gas_mass3
   enddo ! i
@@ -274,12 +274,18 @@ subroutine define_gas_density()
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
      do i=1, n_rad
-        if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
-           densite_gaz(i,:,:) = densite_gaz(i,:,:) *  correct_density_factor
-           masse_gaz(i,:,:) = masse_gaz(i,:,:) *  correct_density_factor
+        bz_gas_mass3 : do j=j_start,nz
+           if (j==0) cycle bz_gas_mass4
+           do k=1, n_az
+              if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
+                 icell = cell_map(i,j,k)
+                 densite_gaz(icell) = densite_gaz(icell) *  correct_density_factor
+                 masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
+              endif
+           enddo
         endif
      enddo
-  endif
+  end if
 
   return
 
@@ -388,7 +394,7 @@ subroutine define_dust_density()
      if (dz%geometry <= 2) then ! Disque
 
         do i=1, n_rad
-           rho0 = densite_gaz(i,0,1) ! midplane density (j=0)
+           rho0 = densite_gaz(cell_map(i,0,1)) ! midplane density (j=0)
 
            !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
            !write(*,*) "s_opt", rcyl, s_opt/1000.
@@ -544,7 +550,7 @@ subroutine define_dust_density()
 
            do i=1, n_rad
               lwarning = .true.
-              rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
+              rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
 
               rcyl = r_grid(i,1)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
@@ -619,7 +625,7 @@ subroutine define_dust_density()
            enddo !l
 
            do i=1, n_rad
-              rho0 = densite_gaz(i,0,1) ! pour dependance en R : pb en coord sperique
+              rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
               !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
               !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
 
@@ -1608,10 +1614,10 @@ subroutine densite_file()
   do k=1, n_az
      do j=j_start_file,nz
         if (j==0) then
-           densite_gaz(i,j,k) =0.0
+           densite_gaz(cell_map(i,j,k)) =0.0
         else
            do i=1, n_rad
-              densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+              densite_gaz(cell_map(i,j,k)) = sph_dens(i,j,k,1) ! gaz = plus petites particules
            enddo
         endif
      enddo
@@ -1623,7 +1629,7 @@ subroutine densite_file()
      bz_gas_mass : do j=j_start,nz
         if (j==0) cycle bz_gas_mass
         do k=1,n_az
-           mass = mass + densite_gaz(i,j,k) *  masse_mol_gaz * volume(i)
+           mass = mass + densite_gaz(cell_map(i,j,k)) *  masse_mol_gaz * volume(i)
         enddo  !k
      enddo bz_gas_mass
   enddo !i
@@ -1637,7 +1643,8 @@ subroutine densite_file()
         bz_gas_mass2 : do j=j_start,nz
            if (j==0) cycle bz_gas_mass2
            do k=1, n_az
-              densite_gaz(i,j,k) = densite_gaz(i,j,k) * facteur
+              icell = cell_map(i,j,k)
+              densite_gaz(icell) = densite_gaz(icell) * facteur
            enddo !k
         enddo bz_gas_mass2
      enddo ! i
@@ -1649,7 +1656,8 @@ subroutine densite_file()
      bz_gas_mass3 : do j=j_start,nz
         if (j==0) cycle bz_gas_mass3
         do k=1, n_az
-           masse_gaz(i,j,k) =  densite_gaz(i,j,k) * facteur
+           icell = cell_map(i,j,k)
+           masse_gaz(icell) =  densite_gaz(icell) * facteur
         enddo !k
      enddo bz_gas_mass3
   enddo ! i
