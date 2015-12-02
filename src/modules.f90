@@ -454,7 +454,7 @@ module opacity
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
   integer, dimension(:,:,:), allocatable :: cell_map
-  integer, dimension(:,:), allocatable :: cell_map_ijk
+  integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext

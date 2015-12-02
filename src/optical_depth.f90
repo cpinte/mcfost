@@ -162,10 +162,14 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif ! Test sortie
 
 
-     call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
+     !call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
+     cell = cell_map(ri0,zj0,1)
      previous_cell = 0 ! unusued, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
      call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
+
+
+     !call cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol evntuellement
@@ -495,7 +499,8 @@ subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell,
   ! Calcul longeur de vol et profondeur optique dans la cellule
   tau = l*opacite ! opacite constante dans la cellule
 
-  call cylindrical2cell(ri1,zj1,1, next_cell)
+  !call cylindrical2cell(ri1,zj1,1, next_cell)
+  next_cell =  cell_map(ri1,zj1,1)
 
   return
 

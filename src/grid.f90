@@ -35,7 +35,7 @@ subroutine build_cylindrical_cell_mapping()
   write(*,*) "NTOT", ntot
 
   allocate(cell_map(istart:iend,jstart:jend,kstart:kend))
-  allocate(cell_map_ijk(3,ntot))
+  allocate(cell_map_i(ntot), cell_map_j(ntot), cell_map_k(ntot))
 
   icell = 0
   do k=kstart, kend
@@ -49,9 +49,10 @@ subroutine build_cylindrical_cell_mapping()
               stop
            endif
 
-           cell_map_ijk(1,icell) = i
-           cell_map_ijk(2,icell) = j
-           cell_map_ijk(3,icell) = k
+           cell_map_i(icell) = i
+           cell_map_j(icell) = j
+           cell_map_k(icell) = k
+
            cell_map(i,j,k) = icell
         enddo
      enddo bz
@@ -64,30 +65,27 @@ end subroutine build_cylindrical_cell_mapping
 
 !******************************************************************************
 
-subroutine cylindrical2cell(i,j,k, icell)
-
-  integer, intent(in) :: i,j,k
-  integer, intent(out) :: icell
-
-  icell = cell_map(i,j,k)
-
-  return
-
-end subroutine cylindrical2cell
+!pure subroutine cylindrical2cell(i,j,k, icell)
+!
+!  integer, intent(in) :: i,j,k
+!  integer, intent(out) :: icell
+!
+!  icell = cell_map(i,j,k)
+!
+!  return
+!
+!end subroutine cylindrical2cell
 
 !******************************************************************************
 
-subroutine cell2cylindrical(icell, i,j,k)
+pure subroutine cell2cylindrical(icell, i,j,k)
 
   integer, intent(in) :: icell
   integer, intent(out) :: i,j,k
 
-  integer, dimension(3) :: ijk
-
-  ijk = cell_map_ijk(:,icell)
-  i = ijk(1)
-  j = ijk(2)
-  k = ijk(3)
+  i = cell_map_i(icell)
+  j = cell_map_j(icell)
+  k = cell_map_k(icell)
 
   return
 
@@ -163,7 +161,7 @@ subroutine test_convert()
      do j=1, nz+1
         do i=0, n_rad
 
-           call cylindrical2cell(i,j,k, icell)
+           icell = cell_map(i,j,k)
            write(*,*) "convert", i,j,k, "-->", icell
 
            call cell2cylindrical(icell, i2,j2,k2)
