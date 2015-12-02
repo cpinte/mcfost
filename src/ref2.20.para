@@ -16,8 +16,8 @@
   100 70 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
 
 #Maps
-  101 101 3000.           grid (nx,ny), size [AU]
-  10   1   1              MC : N_bin_incl, N_bin_az
+  101 101 700.           grid (nx,ny), size [AU]
+  1   1   1              MC : N_bin_incl, N_bin_az
   45.  45.  1  F          RT: imin, imax, n_incl, centered ?
   0    0.   1             RT: az_min, az_max, n_az angles
   140.0			  distance (pc)
