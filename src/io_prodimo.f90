@@ -864,7 +864,7 @@ contains
     ! C_ext = a² microns² -> 1e-8 cm²             \
     ! density en cm-3                      > reste facteur 149595.0
     ! longueur de vol en AU = 1.5e13 cm   /
-    facteur = AU_to_cm * mum_to_cm**2 
+    facteur = AU_to_cm * mum_to_cm**2
     opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
@@ -1349,7 +1349,6 @@ contains
     lsed = .false.
     lsed_complete = .false.
     lemission_mol = .true.
-    lfits = .false.
 
     ! on ne force plus depuis version 2 de l'interface
     !n_lambda = 39

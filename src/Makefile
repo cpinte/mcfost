@@ -25,6 +25,7 @@ endif
 
 BINARY = mcfost
 
+FFLAGS_R8 = -r8
 
 # Linux ou Mac x86, ifort 64 bits
 ifeq ($(COMPILO),ifort)
@@ -37,7 +38,7 @@ ifeq ($(ipo),yes)
 OPTS2 = $(OPTS) -ipo
 OPTS = $(OPTS2)
 endif
-DEBUG_OPTS = -check all  -C -g  -fpe0 -traceback -no-ftz # -no-ftz permet eviter bug dans conversion db -> sl
+DEBUG_OPTS = -check all  -C -g  -fpe0 -traceback -no-ftz  -warn uninitialized -warn unused -warn truncated_source # -no-ftz permet eviter bug dans conversion db -> sl
 
 PREC = #
 FFLAGS =-c $(PREC)
@@ -94,6 +95,7 @@ ifeq ($(COMPILO),gfortran32)
 FC_SER = gfortran -m32 -cpp
 FC_OMP = gfortran -m32 -cpp -fopenmp
 OPTS = -O3 -ffast-math  -funroll-loops
+FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
 DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
 #-g -C -ggdb -ftrace=full  -fimplicit-none
@@ -120,6 +122,7 @@ DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitiali
 #-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
 #-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
+FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
 
 MACH = #-march=athlon
 PREC =
@@ -170,11 +173,11 @@ endif
 
 SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 \
+	io_phantom_infiles.f90 io_phantom_utils.f90 io_phantom.f90 \
 	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
-	dust.f90 molecules.f90 grid.f90 optical_depth.f90 disk_physics.f90 \
+	dust.f90 molecules.f90 grid.f90 Voronoi.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
-	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90 \
-	mcfost.f90
+	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS = $(SOURCES:.f90=.o)
 
@@ -183,16 +186,24 @@ main : mcfost
 #*************************************************************
 # Code séquentiel et parallèle
 #*************************************************************
-mcfost : $(OBJECTS)
-	$(FF) $(FFLAGS_EXE) -o $(BINARY) $(OBJECTS) $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+mcfost : $(OBJECTS) mcfost.o
+	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+
+
+libmcfost.a : checkmcfost $(OBJECTS) phantom2mcfost.o
+	libtool -static -o ${@} $(OBJECTS) phantom2mcfost.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
+	${MAKE} checkmcfost
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
 # Fichier compile sans optimisation
 mem.o : mem.f90  modules.o
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
+
+io_phantom_utils.o : io_phantom_utils.f90
+	$(FF) $(FFLAGS) $(FFLAGS_R8) io_phantom_utils.f90
 
 # defaut
 %.o : %.f90  modules.o
@@ -212,8 +223,8 @@ endif
 mcfost2prodimo : mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
 
-voronoi : Voronoi.o
-	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
+#voronoi : Voronoi.o
+#	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
 
 #*************************************************************
 # Release
@@ -239,10 +250,10 @@ release : main
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
-	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	rm -rf web
+	rm -rf yorick web
 	git tag release
 
 
@@ -261,10 +272,10 @@ release_mac : main
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
-	mkdir yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
+	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
-	rm -rf web
+	rm -rf yorick web
 
 release_utils :
 	tar czvf mcfost_utils.tgz -C../utils .
@@ -307,3 +318,17 @@ save :
 	git push phare
 	git push bitbucket
 	git push github
+	git push riri
+
+#*************************************************************
+# test
+#*************************************************************
+checkmcfost:
+   ifdef MCFOST_INSTALL
+	@echo "MCFOST directory is "$(MCFOST_INSTALL);
+   else
+	@echo; echo "ERROR: cannot find MCFOST installation directory - set this using MCFOST_INSTALL"; echo; ${MAKE} err
+   endif
+
+err:
+	$(error aborting);

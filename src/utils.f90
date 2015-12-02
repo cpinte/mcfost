@@ -1414,4 +1414,30 @@ end function cross_product
 
 !************************************************************
 
+subroutine progress_bar(j)
+  ! progress bar with steps of 2%
+  ! j must be between 0 and 50
+
+  integer :: j,k
+  character(len=57)::bar="???% |                                                  |"
+
+  write(unit=bar(1:3),fmt="(i3)") 2*j
+  do k=1,j
+    bar(6+k:6+k)="="
+ enddo
+
+  ! print the progress bar.
+  write(unit=6,fmt="(a1,a57)",advance="no") char(13), bar
+  if (j/=50) then
+    flush(unit=6)
+  else
+    write(unit=6,fmt=*)
+  endif
+
+  return
+
+end subroutine progress_bar
+
+!************************************************************
+
 end module utils

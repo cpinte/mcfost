@@ -15,38 +15,23 @@ module output
 
   contains
 
-subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt,capt)
+subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
 
   implicit none
 
   real(kind=db), intent(in) ::  xin,yin,zin, uin,vin,win
-  real(kind=db) ::  x1,y1,z1,u1,v1,w1
   integer, intent(in) :: id, lambda, ri0, zj0
   real(kind=db), dimension(4), intent(in)  :: stokin
   logical, intent(in) :: flag_star, flag_scatt
-  real(kind=db), dimension(4)  :: stok
-
   integer, intent(out) :: capt
+
+  real(kind=db), dimension(4)  :: stok
+  real(kind=db) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp
   integer :: c_phi, imap1, jmap1, imap2, jmap2
-  real(kind=db) :: xprim, yprim, zprim, ytmp, ztmp
 
   x1=xin ; y1=yin ; z1=zin
   u1=uin ; v1=vin ; w1=win
   stok=stokin
-
-
-  !* ------------ SECTION CAPTEURS------------------
-  !*
-  !*
-  !*     utilisation de la symetrie N-S, selon l'axe Z
-  !*     changement de Z1 -> -Z1 si W1<0
-  !*             et de W1 -> -W1 si W1<0
-  !*
-  !        if (W1 < 0.0) then
-  !           W1 = -W1
-  !           Z1 = -Z1
-  !           STOK(3,1) = -STOK(3,1)
-  !        endif
 
   !*     utilisation de la symetrie centrale
   if (w1 < 0.0) then
@@ -63,18 +48,29 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
      endif
   endif
 
-
   !* Selection angle theta
   CAPT=int(( -1.0*W1 + 1.0 ) * N_thet) + 1
   if (CAPT == (N_thet+1)) then
      CAPT = N_thet
   endif
-!  return
+
+  ! Origine du paquet
+  if (lorigine) then
+     if (capt == capt_interet) then
+        if (ri0 == 0) then
+           star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
+        else
+           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
+        endif
+     endif
+  endif
+
+  ! If we do not keep the MC map, we do not care about the pixels, etc
+  if (lmono0 .and. .not.loutput_mc) return
 
   if (lonly_capt_interet) then
      if ((capt > capt_sup).or.(capt < capt_inf)) return
   endif
-
 
   if (l_sym_axiale) then ! symetrie axiale du systeme
      ! Utilisation de la symetrie Est-Ouest
@@ -105,18 +101,6 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   elseif (c_phi==0) then
      c_phi=1
   endif
-
-  ! Origine du paquet
-  if (lorigine) then
-     if (capt == capt_interet) then
-        if (ri0 == 0) then
-           star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
-        else
-           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
-        endif
-     endif
-  endif
-
 
   if (lmono0) then ! Creation carte
      !*****************************************************
@@ -294,132 +278,6 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
         endif !lsepar
      endif
 
-!!!!!!!!!!!!!!
-     !Warning : marche que sans rotation !!!
-     if (n_cartes > 1) then
-        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(1)) + deltapix_x2(1)
-        if (IMAP1 <= 0 ) return !cycle photon
-        if (IMAP1 > IGRIDX2(1))  return !cycle photon
-
-
-        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_y2(1)
-        if (JMAP1 <= 0) return !cycle photon
-        if (JMAP1 > IGRIDY2(1)) return !cycle photon
-
-        if (l_sym_ima) then
-           ! 1/2 photon
-           STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-
-           ! 1/2 photon symetrique
-          ! ytmp = - ytmp
-          ! yprim = ytmp * cos_disk - ztmp * sin_disk
-          ! zprim = ztmp * cos_disk + ytmp * sin_disk
-
-           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_x2(1)
-           if (IMAP2 <= 0 ) return !cycle photon
-           if (IMAP2 > IGRIDX2(1))  return !cycle photon
-
-
-           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(1))  + deltapix_y2(1)
-           if (JMAP2 <= 0) return !cycle photon
-           if (JMAP2 > IGRIDY2(1)) return !cycle photon
-
-           if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
-              ! on rajoute la 2eme moitie du photon
-              STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-           else ! symetrie
-              ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI1(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI1(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
-           endif
-        else
-           ! Pas de symetrie
-           STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI1(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
-        endif
-!!!
-     endif
-     if (n_cartes > 2) then
-        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(2)) + deltapix_x2(2)
-        if (IMAP1 <= 0 ) return !cycle photon
-        if (IMAP1 > IGRIDX2(2))  return !cycle photon
-
-
-        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_y2(2)
-        if (JMAP1 <= 0) return !cycle photon
-        if (JMAP1 > IGRIDY2(2)) return !cycle photon
-
-        if (l_sym_ima) then
-           ! 1/2 photon
-           STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-
-           ! 1/2 photon symetrique
-          ! ytmp = - ytmp
-          ! yprim = ytmp * cos_disk - ztmp * sin_disk
-          ! zprim = ztmp * cos_disk + ytmp * sin_disk
-
-           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_x2(2)
-           if (IMAP2 <= 0 ) return !cycle photon
-           if (IMAP2 > IGRIDX2(2))  return !cycle photon
-
-
-           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(2))  + deltapix_y2(2)
-           if (JMAP2 <= 0) return !cycle photon
-           if (JMAP2 > IGRIDY2(2)) return !cycle photon
-
-           if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
-              ! on rajoute la 2eme moitie du photon
-              STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-           else ! symetrie
-              ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI2(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI2(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
-           endif
-        else
-           ! Pas de symetrie
-           STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI2(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
-        endif
-
-     endif
-     if (n_cartes > 3) then
-        IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(3)) + deltapix_x2(3)
-        if (IMAP1 <= 0 ) return !cycle photon
-        if (IMAP1 > IGRIDX2(3))  return !cycle photon
-
-
-        JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_y2(3)
-        if (JMAP1 <= 0) return !cycle photon
-        if (JMAP1 > IGRIDY2(3)) return !cycle photon
-
-        if (l_sym_ima) then
-           ! 1/2 photon
-           STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-
-           ! 1/2 photon symetrique
-          ! ytmp = - ytmp
-          ! yprim = ytmp * cos_disk - ztmp * sin_disk
-          ! zprim = ztmp * cos_disk + ytmp * sin_disk
-
-           IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_x2(3)
-           if (IMAP2 <= 0 ) return !cycle photon
-           if (IMAP2 > IGRIDX2(3))  return !cycle photon
-
-
-           JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix2(3))  + deltapix_y2(3)
-           if (JMAP2 <= 0) return !cycle photon
-           if (JMAP2 > IGRIDY2(3)) return !cycle photon
-
-           if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
-              ! on rajoute la 2eme moitie du photon
-              STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
-           else ! symetrie
-              ! on rajoute la 2eme moitie du photon dansle pix oppose avec prop symetrie du vecteur de Stokes
-              STOKEI3(lambda,IMAP2,JMAP2,capt,c_phi,id) = STOKEI3(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
-           endif
-        else
-           ! Pas de symetrie
-           STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEI3(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
-        endif
-     endif !n_cartes
-
-!!!!!!!!!!!!!!
   else ! Creation sed
      sed(lambda,capt,c_phi,id) = sed(lambda,capt,c_phi,id) + stok(1)
      sed_q(lambda,capt,c_phi,id) = sed_q(lambda,capt,c_phi,id) + stok(2)
@@ -661,87 +519,6 @@ subroutine write_stokes_fits()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,stoke_io,status)
-
-  ! Cartes de differentes resolutions
-  if (n_cartes > 1) then
-     ! create new hdu
-     naxis=4
-     naxes(1)=igridx2(1)
-     naxes(2)=igridy2(1)
-
-     call FTCRHD(unit, status)
-
-     !  Write the required header keywords.
-     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-     ! le e signifie real*4
-     allocate(tmp(igridx2(1),igridy2(1),N_thet,N_phi), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tmp 1'
-        stop
-     endif
-     tmp = real(sum(stokei1(lambda,:,:,:,:,:),dim=5))
-     call ftppre(unit,group,fpixel,nelements,tmp,status)
-     deallocate(tmp)
-
-  endif
-  if (n_cartes > 2) then
-     ! create new hdu
-     call FTCRHD(unit, status)
-     naxis=4
-     naxes(1)=igridx2(2)
-     naxes(2)=igridy2(2)
-
-
-     !  Write the required header keywords.
-     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-     ! le e signifie real*4
-     allocate(tmp(igridx2(2),igridy2(2),N_thet,N_phi), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tmp 2'
-        stop
-     endif
-     tmp = real(sum(stokei2(lambda,:,:,:,:,:),dim=5))
-     call ftppre(unit,group,fpixel,nelements,tmp,status)
-     deallocate(tmp)
-
-  endif
-  if (n_cartes > 3) then
-     ! create new hdu
-     call FTCRHD(unit, status)
-     naxis=4
-     naxes(1)=igridx2(3)
-     naxes(2)=igridy2(3)
-
-
-     !  Write the required header keywords.
-     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-     !  Write the array to the FITS file.
-     group=1
-     fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-     ! le e signifie real*4
-     allocate(tmp(igridx2(3),igridy2(3),N_thet,N_phi), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tmp 3'
-        stop
-     endif
-     tmp = real(sum(stokei3(lambda,:,:,:,:,:),dim=5))
-     call ftppre(unit,group,fpixel,nelements,tmp,status)
-     deallocate(tmp)
-
-  endif
-
 
   ! Close the file and free the unit number.
   call ftclos(unit, status)

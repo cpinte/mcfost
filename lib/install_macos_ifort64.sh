@@ -1,6 +1,7 @@
 export CC=cc # cfitsio does not compile with icc
 export CFLAGS=-mmacosx-version-min=10.6
 
+rm -rf lib include
 mkdir lib
 mkdir include
 
@@ -12,8 +13,8 @@ tar xzvf sprng2.0b.tar.gz
 \cp -f macos/ifort64/make.IFORT sprng2.0/SRC
 cd sprng2.0
 make -B
-mv lib/libsprng.a ../lib
-mv include/*.h ../include
+\cp lib/libsprng.a ../lib
+\cp include/*.h ../include
 cd ..
 rm -rf sprng2.0
 
@@ -28,6 +29,16 @@ make
 cd ..
 rm -rf cfitsio
 
+# voro++
+tar xzvf voro++-0.4.6.tar.gz
+\cp -f  macos/ifort64/config.mk voro++-0.4.6
+cd voro++-0.4.6
+make
+\cp src/libvoro++.a ../lib
+\cp src/voro++.hh ../include
+cd ..
+rm -rf voro++-0.4.6
+
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
 cd nr
@@ -39,6 +50,7 @@ cd nr
 ./clean.com
 cd ..
 
-cp -r include $MCFOST_INSTALL
-mkdir $MCFOST_INSTALL/lib
-cp -r lib $MCFOST_INSTALL/lib/ifort
+mkdir -p $MCFOST_INSTALL/include
+\cp -r include/* $MCFOST_INSTALL/include
+mkdir -p $MCFOST_INSTALL/lib/ifort
+\cp -r lib/* $MCFOST_INSTALL/lib/ifort

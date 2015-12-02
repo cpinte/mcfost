@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.11"
+  character(8), parameter :: mcfost_release = "2.20.14"
   real, parameter :: required_utils_version = 2.208
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -34,7 +34,6 @@ module parametres
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
   real :: tau_dark_zone_obs = 100 ! idem que 1000 si 1500. ci-dessus
-  logical :: linteg_dic
   integer :: n_Stokes
 
   ! Nbre d'angles pour echantillonner la fct de phase
@@ -90,10 +89,8 @@ module parametres
   ! Parametres des cartes
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
   integer ::  igridx, igridy, deltapix_x, deltapix_y, maxigrid
-  integer, dimension(:), allocatable ::  igridx2, igridy2, deltapix_x2, deltapix_y2, maxigrid2
   real :: angle_interet, zoom, size_pix, tau_seuil, wl_seuil
 
-  real, dimension(:), allocatable :: size_pix2
   real  :: cutoff = 7.0
 
   ! Résolution de la grille de densité
@@ -108,17 +105,13 @@ module parametres
 
   integer :: n_lambda2
 
-  integer :: n_cartes
-  integer, parameter :: n_cartes_max = 4
-
-  logical :: letape_th, limg, lgap, lorigine, laggregate, l3D, lremove, lwarp, lcavity
-  logical :: lstrat_SPH, lno_strat_SPH, lstrat_SPH_bin, lno_strat_SPH_bin
+  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file, lphantom_file
   logical :: ldust_gas_ratio
-  logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lLaure_SED, lforce_T_Laure_SED
-  logical :: lspot, lforce_1st_scatt, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -129,15 +122,6 @@ module parametres
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
   logical :: lbenchmark_water1, lbenchmark_water2, lbenchmark_water3, lbenchmark_SHG, lMathis_field
   real :: Mathis_field
-
-  ! Disque de debris calcule par code dynamique
-  ! ldebris -> using a text file for input density table
-  ! lfits -> using a FITS file for input density table
-  ! Can't do both! This is checked within read_param
-  logical :: ldebris, lfits
-  character(len=512) :: debris_file, struct_fits_file
-
-  character(len=512) :: Laure_SED_filename
 
   ! Prodimo
   logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
@@ -229,17 +213,8 @@ module disk
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
 
-  ! Tableau des longueurs de vol
-  integer :: n_cell_max
-  integer, dimension(:), allocatable :: n_cell_traversees !n_cpu
-  integer, dimension(:,:), allocatable :: tab_cell_r, tab_cell_z ! n_cpu, n_cellule
-  real(kind=db), dimension(:,:), allocatable :: tab_length, tab_tau, tab_length_tot ! n_cpu, n_cellule
-  real, dimension(:,:), allocatable :: tab_x0, tab_y0, tab_z0 ! n_cpu, n_cellule
-
-
   ! Definition des regions = zones connectees
   logical :: lold_grid
-
 
   real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
@@ -249,10 +224,7 @@ module disk
 
   real :: w0_sup, w0_inf
 
-  real :: z_warp
-
-  ! Pas d'integration initial dans chaque cellule pour integration dichotomique
-  real, dimension(:), allocatable :: delta0 !0:n_rad
+  real :: z_warp, tilt_angle
 
   ! Description analytique du puffed-up inner rim
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
@@ -264,8 +236,8 @@ module disk
   ! Correction locale de la desnite (dans un anneau)
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
-  logical :: lgap_ELT
-  real :: r_gap_ELT, sigma_gap_ELT
+  logical :: lgap_Gaussian
+  real :: r_gap_Gaussian, sigma_gap_Gaussian
 
   ! Fichier de Gasp pour la structure du disque
   real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta
@@ -541,7 +513,6 @@ module resultats
   real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
   real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
   real, dimension(:,:,:,:,:), allocatable :: stoke_io ! x,y, theta, phi, type
-  real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI1, STOKEI2, STOKEI3, STOKEI4 !id,lambda,x,y,n_thet,n_phi
 
   real(kind=db), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
   real(kind=db), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
@@ -615,7 +586,7 @@ module em_th
   ! emissivite en unite qq (manque une cst mais travail en relatif)
   real(kind=db), dimension(:,:,:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
 
-  real, dimension(:,:,:), allocatable :: Temperature, Temperature_old, Temperature_Laure_SED !n_rad,nz,n_az
+  real, dimension(:,:,:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
   real, dimension(:,:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
   real, dimension(:,:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
   integer, dimension(:,:,:), allocatable :: Tpeak_old
@@ -684,7 +655,8 @@ module constantes
 
   real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
   real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g
-  real, parameter :: masse_mol_gaz = 2.3 * masseH ! en g,  2.3 selon Walker 2004
+  real, parameter :: mu = 2.3 ! en g,  2.3 selon Walker 2004
+  real, parameter :: masse_mol_gaz = mu * masseH
   real, parameter :: T_Cmb = 2.73
 
   ! Changements d'unites
