@@ -25,6 +25,9 @@ subroutine alloc_dynamique()
   integer ::  alloc_status
   real :: mem_size
 
+  nrz = n_rad * nz
+  n_cells = nrz * n_az
+
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error'
@@ -94,23 +97,14 @@ subroutine alloc_dynamique()
   endif
   zmax = 0.0 ; volume=0.0
 
-  if (l3D) then
-     allocate(masse(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(masse(n_rad,nz,1), stat=alloc_status)
-  endif
-
+  allocate(masse(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error masse'
      stop
   endif
   masse = 0.0
 
-  if (l3D) then
-     allocate(densite_pouss(n_rad,-nz-1:nz+1,n_az,n_grains_tot), stat=alloc_status)
-  else
-     allocate(densite_pouss(n_rad,nz+1,1,n_grains_tot), stat=alloc_status)
-  endif
+  allocate(densite_pouss(n_cells,n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_pouss'
      stop
@@ -949,11 +943,7 @@ subroutine alloc_dynamique()
 
   endif ! lemission_mol
 
-  if (l3D) then
-     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(densite_gaz(n_rad,0:nz,1), masse_gaz(n_rad,0:nz,1), stat=alloc_status)
-  endif
+  allocate(densite_gaz(n_cells), masse_gaz(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_gaz'
      stop

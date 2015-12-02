@@ -6,7 +6,7 @@ module benchmarks
   use opacity
   use em_th
   use molecular_emission
-
+  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -19,7 +19,7 @@ subroutine lect_section_eff()
 
   implicit none
 
-  integer :: i, j, lambda, l
+  integer :: i, j, lambda, l, icell
   real, dimension(61) :: qext, qsca
   real, dimension(0:61) :: tab_lambda_lim
 
@@ -56,8 +56,9 @@ subroutine lect_section_eff()
            ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
            ! density en cm-3                      > reste facteur 1.49595e17
            ! longueur de vol en AU = 1.5e13 cm   /
-           kappa(lambda,i,j,1)=densite_pouss(i,j,1,1) * qext(lambda) * 1.49595e17
-           kappa_abs_eg(lambda,i,j,1)=densite_pouss(i,j,1,1)*(qext(lambda)-qsca(lambda))*1.49595e17
+           icell = cylindrical2cell(i,j,1)
+           kappa(lambda,i,j,1)=densite_pouss(icell,1) * qext(lambda) * 1.49595e17
+           kappa_abs_eg(lambda,i,j,1)=densite_pouss(icell,1)*(qext(lambda)-qsca(lambda))*1.49595e17
         enddo !j
      enddo !i
   enddo !lambda

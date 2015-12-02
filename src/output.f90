@@ -10,6 +10,7 @@ module output
   use molecular_emission
   use ray_tracing
   use utils
+  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -1098,7 +1099,7 @@ subroutine write_disk_struct()
 
   implicit none
 
-  integer :: i, j, k
+  integer :: i, j, k, icell
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1159,8 +1160,15 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
-  dens =  densite_gaz(:,:,:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
-
+  do k=1,n_az
+     bz3 : do j=j_start,nz
+        if (j==0) cycle bz3
+        do i=1,n_rad
+           icell =  cylindrical2cell(i,j,k)
+           dens(i,j,k) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+        enddo !i
+     enddo bz3 !j
+  enddo !k
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -1211,7 +1219,16 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens = densite_pouss(:,:,:,:) * m3_to_cm3
+  dust_dens(:,:,:,:) = 0.0
+  do k=1,n_az
+     bz2 : do j=j_start,nz
+        if (j==0) cycle bz2
+        do i=1,n_rad
+           icell =  cylindrical2cell(i,j,k)
+           dust_dens(i,j,k,:) = densite_pouss(icell,:) * m3_to_cm3
+        enddo !i
+     enddo bz2 !j
+  enddo !k
   call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
   !  Close the file and free the unit number.
@@ -1264,7 +1281,8 @@ subroutine write_disk_struct()
      bz : do j=j_start,nz
         if (j==0) cycle bz
         do i=1,n_rad
-           dens(i,j,k) = sum(densite_pouss(i,j,k,:) * M_grain(:)) ! M_grain en g
+           icell =  cylindrical2cell(i,j,k)
+           dens(i,j,k) = sum(densite_pouss(icell,:) * M_grain(:)) ! M_grain en g
         enddo !i
      enddo bz !j
   enddo !k
@@ -2145,7 +2163,7 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=db) :: somme
-  integer ::  i, j, l
+  integer ::  i, j, l, icell
   real, dimension(n_rad,nz) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2163,9 +2181,10 @@ subroutine taille_moyenne_grains()
   do j=1,nz
      do i=1,n_rad
         somme=0.0
+        icell = cylindrical2cell(i,j,1)
         do l=1, n_grains_tot
-           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(i,j,1,l) * r_grain(l)**2
-           somme = somme + densite_pouss(i,j,1,l)
+           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(icell,l) * r_grain(l)**2
+           somme = somme + densite_pouss(icell,l)
         enddo
         a_moyen(i,j) = a_moyen(i,j) / somme
      enddo

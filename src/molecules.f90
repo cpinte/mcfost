@@ -5,7 +5,7 @@ module molecules
   use molecular_emission
   use opacity
   use prop_star
-
+  use grid
   use dust
   use mem
 
@@ -74,7 +74,8 @@ subroutine init_GG_Tau_mol()
      Tcin(i,:,:) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
   enddo
 
-  write(*,*) "Density @ 100 AU", real(densite_gaz(1,1,1) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
+
+  write(*,*) "Density @ 100 AU", real(densite_gaz(cell_map(1,1,1)) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
 
   return
 
@@ -121,7 +122,7 @@ subroutine init_benchmark_vanZadelhoff1()
 
   tab_abundance = abundance
 
-  write(*,*) "Density", real(densite_gaz(1,1,1) * (r_grid(1,1)**2 + z_grid(1,1)**2)/rmin**2)
+  write(*,*) "Density", real(densite_gaz(cell_map(1,1,1)) * (r_grid(1,1)**2 + z_grid(1,1)**2)/rmin**2)
 
   return
 
@@ -139,7 +140,7 @@ subroutine init_benchmark_vanzadelhoff2()
 
   integer, parameter :: n_lines = 50
 
-  integer :: i, j, ri, l
+  integer :: i, j, ri, l, icell, zj, k
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_T, tmp_v, tmp_vturb, log_tmp_r, log_tmp_nH2
 
   real :: junk, rayon, log_rayon, frac
@@ -184,7 +185,11 @@ subroutine init_benchmark_vanzadelhoff2()
 
      frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
 
-     densite_gaz(ri,:,:) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+     do zj=1, nz
+        k=1
+        icell = cell_map(ri,zj,k)
+        densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+     enddo
      Temperature(ri,:,:) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
      Tcin(ri,:,:) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
      vfield(ri,:) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
@@ -197,7 +202,7 @@ subroutine init_benchmark_vanzadelhoff2()
   v_turb = v_turb * 1.0e3
 
   ! Conversion part.m-3
-  densite_gaz(:,:,:) = densite_gaz(:,:,:) / (cm_to_m)**3
+  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
 
   linfall = .true.
   lkeplerian = .false.
@@ -281,7 +286,7 @@ subroutine init_benchmark_water3()
 
   integer, parameter :: n_lines = 100
 
-  integer :: i, j, ri, l
+  integer :: i, j, ri, l, zj, k
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
   real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
 
@@ -320,7 +325,10 @@ subroutine init_benchmark_water3()
 
 
      if (rayon < 2.0) then
-        densite_gaz(ri,:,:) = tmp_nH2(1)
+        do zj=1, nz
+           k=1
+           densite_gaz(cell_map(ri,zj,k)) = tmp_nH2(1)
+        enddo
         Tcin(ri,:,:) =  tmp_Tkin(1)
         Temperature(ri,:,:) = tmp_T(1)
      else
@@ -335,8 +343,10 @@ subroutine init_benchmark_water3()
         if (l > n_lines) l = n_lines
 
         frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
-
-        densite_gaz(ri,:,:) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+        do zj=1, nz
+           k=1
+           densite_gaz(cell_map(ri,zj,k)) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+        enddo
         Tcin(ri,:,:) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
         Temperature(ri,:,:) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
      endif
@@ -358,7 +368,7 @@ subroutine init_benchmark_water3()
   v_turb = v_turb * 1.0e3
 
   ! Conversion part.m-3
-  densite_gaz(:,:,:) = densite_gaz(:,:,:) / (cm_to_m)**3
+  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
 
   linfall = .true.
   lkeplerian = .false.
@@ -415,7 +425,7 @@ subroutine init_molecular_disk(imol)
   endif
 
   lcompute_molRT(:,:,:) = (tab_abundance(:,:,:) > tiny_real) .and. &
-       (densite_gaz(:,:,:) > tiny_real) .and. (Tcin(:,:,:) > 1.)
+       (densite_gaz(:) > tiny_real) .and. (Tcin(:,:,:) > 1.)
 
 !  do i=1,n_rad
 !     do j=1, nz
@@ -742,7 +752,8 @@ subroutine init_dust_mol(imol)
            do ri=1,n_rad
               do zj=1,nz
                  !kappa_abs_eg(iTrans,ri,zj,1) =  kap * masse(ri,zj,1)/(volume(ri) * AU_to_cm**2)
-                 kappa_abs_eg(iTrans,ri,zj,phik) =  kap * (densite_gaz(ri,zj,phik) * cm_to_m**3) * masse_mol_gaz / &
+                 icell = cylindrical2cell(ri,zj,phik)
+                 kappa_abs_eg(iTrans,ri,zj,phik) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
                       gas_dust / cm_to_AU
               enddo
            enddo
@@ -849,7 +860,8 @@ subroutine equilibre_LTE_mol()
            ! read(*,*)
 
            ! Normalisation
-           tab_nLevel(i,j,k,:) = densite_gaz(i,j,k) * tab_abundance(i,j,k) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
+           icell = cylindrical2cell(i,j,k)
+           tab_nLevel(i,j,k,:) = densite_gaz(cell_map(i,j,k)) * tab_abundance(icell) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
         enddo !k
      enddo bz !j
   enddo!i
@@ -883,7 +895,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   real(kind=db), dimension(nLevels) :: cTot
   real(kind=db) :: boltzFac, JJmol
   integer :: i, j, eq, n_eq
-  integer :: itrans, l, k, iPart
+  integer :: itrans, l, k, iPart, icell
   real(kind=db) :: collEx, colldeEx
 
   if (ldouble_RT) then
@@ -894,7 +906,8 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
 
   ! Matrice d'excitations/desexcitations collisionnelles
   Temp = Tcin(ri,zj,phik)
-  nH2 = densite_gaz(ri,zj,phik) * cm_to_m**3
+  icell = cylindrical2cell(ri,zj,phik)
+  nH2 = densite_gaz(icell) * cm_to_m**3
 
   ! Pour test
   Tdust = Temperature(ri,zj,phik)
@@ -974,10 +987,11 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
      ! Resolution systeme matriciel par methode Gauss-Jordan
      call GaussSlv(A, B, nLevels)
 
+     icell = map_cell(ri,zj,phik)
      if (eq==1) then
-        tab_nLevel(ri,zj,phik,:) = densite_gaz(ri,zj,phik) * tab_abundance(ri,zj,phik) * B(:)
+        tab_nLevel(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(ri,zj,phik) * B(:)
      else
-        tab_nLevel2(ri,zj,phik,:) = densite_gaz(ri,zj,phik) * tab_abundance(ri,zj,phik) * B(:)
+        tab_nLevel2(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(ri,zj,phik) * B(:)
      endif
 
   enddo !n_eq

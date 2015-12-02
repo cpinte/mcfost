@@ -101,6 +101,8 @@ module parametres
   integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
+  ! Nombre de cellules totale
+  integer :: n_cells, nrz
   logical :: llinear_grid
 
   integer :: n_lambda2
@@ -440,7 +442,7 @@ module opacity
   real(kind=db) :: zmaxmax
   real(kind=db), dimension(:), allocatable :: zmax !n_rad
   real(kind=db), dimension(:), allocatable :: volume !n_rad en AU^3
-  real(kind=db), dimension(:,:,:), allocatable :: masse  !en g !!! n_rad, nz, n_az
+  real(kind=db), dimension(:), allocatable :: masse  !en g ! n_cells
   real, dimension(:,:), allocatable :: dust_gas_ratio
   real(kind=db), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
   real(kind=db), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
@@ -460,7 +462,7 @@ module opacity
   real, dimension(:,:,:,:), allocatable :: prob_kappa_abs_1grain !n_lambda,n_rad,nz+1, 0:n_grains
   real(kind=db), dimension(:,:,:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: densite_pouss !n_rad,nz+1, (n_az), n_grains en part.cm-3
+  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_cells, n_grains en part.cm-3
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
 !  real, dimension(n_lambda,n_rad,nz+1,0:n_grains) :: probsizecumul
   real, dimension(:,:,:,:,:), allocatable :: probsizecumul !n_lambda,n_rad,nz+1,(n_az),)0:n_grains
@@ -777,7 +779,7 @@ module molecular_emission
   real(kind=db), dimension(:), allocatable :: tab_v ! n_speed
 
   ! densite_gaz gives the midplane density for j=0
-  real(kind=db), dimension(:,:,:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=db), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
   real(kind=db), dimension(:), allocatable :: Surface_density
 
   real(kind=db), dimension(:,:), allocatable :: ds
