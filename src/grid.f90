@@ -12,25 +12,21 @@ module grid
 
   implicit none
 
-  ! Nombre de cellules totale
-  integer :: n_cells, nrz
-
   contains
 
 !******************************************************************************
 
-subroutine cylindrical2cell(i,j,k, icell)
+function cylindrical2cell(i,j,k)  result(icell)
   ! icell is between 1 and n_rad * n_z * n_az
 
   integer, intent(in) :: i,j,k
-  integer, intent(out) :: icell
-
+  integer :: icell
 
   icell = i + n_rad * ( j-1 + nz * (k-1))
 
   return
 
-end subroutine cylindrical2cell
+end function cylindrical2cell
 
 !******************************************************************************
 
@@ -39,7 +35,7 @@ subroutine cell2cylindrical(icell, i,j,k)
   integer, intent(in) :: icell
   integer, intent(out) :: i,j,k
 
-  integer :: ij ! indice combine iet j, ie : i + (j-1) * n_rad
+  integer :: ij ! indice combine i et j, ie : i + (j-1) * n_rad
 
   k = icell/nrz + 1 ; if (k > n_az) k=n_az
 
@@ -225,14 +221,11 @@ subroutine define_grid4()
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  integer :: ir, iz, n_cells, n_rad_region, n_rad_in_region, n_empty, istart
+  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart
 
   type(disk_zone_type) :: dz
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
-
-  nrz = n_rad * nz
-  n_cells = nrz * n_az
 
   Rmax2 = Rmax*Rmax
 
@@ -261,7 +254,7 @@ subroutine define_grid4()
      n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
      n_rad_in_region = n_rad_in
 
-     n_cells = 0
+     n_cells_tmp = 0
 
      istart = 1
      tab_r(:) = 0.0_db
@@ -275,7 +268,7 @@ subroutine define_grid4()
 
 
         if (ir == n_regions) then
-           n_rad_region = n_rad - n_cells ! On prend toutes les celles restantes
+           n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
         endif
 
         ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
@@ -360,7 +353,7 @@ subroutine define_grid4()
         enddo
 
 
-        n_cells = istart+n_rad_region
+        n_cells_tmp = istart+n_rad_region
 
         ! Cellules vides
         if (ir < n_regions) then
@@ -375,11 +368,11 @@ subroutine define_grid4()
 
                  if (lprint) write(*,*) i, ir, tab_r(i)
               enddo
-              n_cells = n_cells + n_empty
+              n_cells_tmp = n_cells_tmp + n_empty
            endif
         endif
 
-        istart = n_cells+1
+        istart = n_cells_tmp+1
      enddo ! ir
 
   endif ! llinear_grid
@@ -614,7 +607,6 @@ subroutine define_grid3()
   type(disk_zone_type) :: dz
 
   nrz = n_rad * nz
-  n_cells = nrz * n_az
 
   Rmax2=Rmax*Rmax
 

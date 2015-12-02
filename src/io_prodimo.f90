@@ -13,6 +13,7 @@ module ProDiMo
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use read_params
   use sha
+  use grid, only : cylindrical2cell
 
   implicit none
 
@@ -406,7 +407,7 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion, k
+    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k
     integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme, Ttmp
@@ -837,7 +838,8 @@ contains
     !  Write the array to the FITS file.
     do ri=1, n_rad
        do zj=1,nz
-          dens(ri,zj) =  densite_gaz(ri,zj,1) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
+          icell = cylindrical2cell(ri,zj,1)
+          dens(ri,zj) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
@@ -868,10 +870,11 @@ contains
     opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
+          icell = cylindrical2cell(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(icell,l) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -898,12 +901,13 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
-          N = sum(densite_pouss(ri,zj,1,:),mask=mask_not_PAH)
+          icell = cylindrical2cell(ri,zj,1)
+          N = sum(densite_pouss(icell,:),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:),mask=mask_not_PAH) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2,mask=mask_not_PAH) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3,mask=mask_not_PAH) / N
+             N_grains(ri,zj,1) = sum(densite_pouss(icell,:) * r_grain(:),mask=mask_not_PAH) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(icell,:) * r_grain(:)**2,mask=mask_not_PAH) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(icell,:) * r_grain(:)**3,mask=mask_not_PAH) / N
           else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
@@ -991,7 +995,8 @@ contains
        k=1 ! azimuth
        do ri=1, n_rad
           do zj=1,nz
-             dens(ri,zj) = sum(densite_pouss(ri,zj,k, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             icell = cylindrical2cell(ri,zj,k)
+             dens(ri,zj) = sum(densite_pouss(icell, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
           enddo
        enddo
        call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1016,10 +1021,11 @@ contains
        opacite = 0.0
        do zj=1,nz
           do ri=1,n_rad
+             icell = cylindrical2cell(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(icell,l)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1043,6 +1049,7 @@ contains
        TPAH_eq = 0.0
        do zj=1,nz
           do ri=1,n_rad
+             icell = cylindrical2cell(ri,zj,1)
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
@@ -1050,8 +1057,8 @@ contains
                 else
                    Ttmp = temperature_1grain(ri,zj,l)
                 endif
-                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(ri,zj,1,l)
-                norme = norme + densite_pouss(ri,zj,1,l)
+                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(icell,l)
+                norme = norme + densite_pouss(icell,l)
              enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
           enddo ! ri
@@ -1658,7 +1665,7 @@ contains
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
     real :: sigma2, sigma2_m1, r_cyl
-    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status
+    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status, icell
 
     n_speed_rt = mol(imol)%n_speed_rt
 
@@ -2020,7 +2027,12 @@ contains
           endif
        enddo
     enddo
-    tab_abundance(:,:,:) = tab_abundance(:,:,:) / densite_gaz(:,:,:) ! conversion nbre en abondance
+    do i=1, n_rad
+       do j=1, nz
+          icell = cylindrical2cell(i,j,1)
+          tab_abundance(i,j,1) = tab_abundance(i,j,1) / densite_gaz(icell) ! conversion nbre en abondance
+       enddo
+    enddo
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
 
     Tcin(:,:,1) = Tgas

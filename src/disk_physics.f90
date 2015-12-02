@@ -132,7 +132,7 @@ subroutine sublimate_dust()
   ! C. Pinte
   ! 07/08/12
 
-  integer :: i, j, pk, k, ipop
+  integer :: i, j, pk, icell, k, ipop
   real :: mass
 
   write(*,*) "Sublimating dust"
@@ -140,6 +140,7 @@ subroutine sublimate_dust()
   do i=1,n_rad
      do j=1,nz
         do pk=1,n_az
+           icell = cylindrical2cell(i,j,pk)
 
            ! Cas LTE
            do k=1,n_grains_tot
@@ -147,7 +148,7 @@ subroutine sublimate_dust()
 
               if (.not.dust_pop(ipop)%is_PAH) then
                  if (Temperature(i,j,pk) > dust_pop(ipop)%T_sub) then
-                    densite_pouss(i,j,pk,k) = 0.0
+                    densite_pouss(icell,k) = 0.0
                  endif
               endif
            enddo
@@ -160,8 +161,9 @@ subroutine sublimate_dust()
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
+        icell = cylindrical2cell(i,j,1)
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(icell,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo

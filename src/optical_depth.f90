@@ -1202,7 +1202,7 @@ subroutine integ_tau(lambda)
   ! Ok si pas de sedimentation
   if (.not.lstrat) then
      if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1,1,1)/(volume(1)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1)/(volume(1)*AU_to_cm**3))/ &
              (kappa(lambda,1,1,1)/AU_to_cm))
      endif
   endif
@@ -1219,7 +1219,7 @@ subroutine integ_tau(lambda)
   ! Ok si pas de sedimentation
   if (.not.lstrat) then
      if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1,1,1)/(volume(1)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1)/(volume(1)*AU_to_cm**3))/ &
              (kappa(lambda,1,1,1)/AU_to_cm))
      endif
   endif
@@ -1236,7 +1236,7 @@ subroutine integ_tau(lambda)
 
   if (.not.lstrat) then
      if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(1,1,1)/(volume(1)*3.347929d39))/ &
+        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(1)/(volume(1)*3.347929d39))/ &
              (kappa(lambda,1,1,1)/1.49597870691e13))
      endif
   endif
@@ -4190,7 +4190,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: i, j, pk, n, id, ri, zj, phik
+  integer :: i, j, pk, icell, n, id, ri, zj, phik
   real(kind=db) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, d_r, phi, r0
 
@@ -4400,7 +4400,8 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
   if (n_zones > 1) then
      do i=1, n_rad
-        if (sum(densite_pouss(i,1,1,:)) < tiny_real) then
+        icell = cylindrical2cell(i,1,1)
+        if (sum(densite_pouss(icell,:)) < tiny_real) then
            l_dark_zone(i,:,1) = .false.
         endif
      enddo

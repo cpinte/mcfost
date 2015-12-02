@@ -15,6 +15,7 @@ module dust_ray_tracing
   use prop_star
   use resultats
   use ray_tracing
+  use grid, only : cylindrical2cell
   !$ use omp_lib
 
   use scattering
@@ -872,7 +873,7 @@ subroutine calc_Ith(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: i,j,k, l, T
+  integer :: i,j,k,icell, l, T
   real(kind=db) ::  Temp, cst_wl, wl, coeff_exp, cst_E
 
 
@@ -908,13 +909,14 @@ subroutine calc_Ith(lambda)
            bz2 : do j=1,nz
               if (j==0) cycle bz2
               do k=1, n_az
+                 icell = cylindrical2cell(i,j,k)
                  do l=grain_RE_nLTE_start,grain_RE_nLTE_end
                     Temp=Temperature_1grain(i,j,l) ! WARNING : TODO : this does not work in 3D
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < 500.0) then
                        coeff_exp=exp(cst_wl)
                        J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(lambda,l)*densite_pouss(i,j,k,l)
+                            C_abs_norm(lambda,l)*densite_pouss(icell,l)
                     endif
                  enddo
               enddo
@@ -927,6 +929,7 @@ subroutine calc_Ith(lambda)
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
               do k=1, n_az
+                 icell = cylindrical2cell(i,j,k)
                  do l=grain_nRE_start,grain_nRE_end
                     if (l_RE(i,j,l)) then ! le grain a une temperature
                        Temp=Temperature_1grain_nRE(i,j,l) ! WARNING : TODO : this does not work in 3D
@@ -934,7 +937,7 @@ subroutine calc_Ith(lambda)
                        if (cst_wl < 500.) then
                           coeff_exp=exp(cst_wl)
                           J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                               C_abs_norm(lambda,l)*densite_pouss(i,j,k,l)
+                               C_abs_norm(lambda,l)*densite_pouss(icell,l)
                        endif !cst_wl
                     else ! ! la grain a une proba de T
                        do T=1,n_T
@@ -943,7 +946,7 @@ subroutine calc_Ith(lambda)
                           if (cst_wl < 500.) then
                              coeff_exp=exp(cst_wl)
                              J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                                  C_abs_norm(lambda,l)*densite_pouss(i,j,k,l) * Proba_Temperature(T,i,j,l)
+                                  C_abs_norm(lambda,l)*densite_pouss(icell,l) * Proba_Temperature(T,i,j,l)
                           endif !cst_wl
                        enddo ! T
                     endif ! l_RE
