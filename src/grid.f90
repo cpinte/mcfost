@@ -210,7 +210,7 @@ end subroutine define_physical_zones
 
 subroutine define_grid4()
   ! Definit la grille du code
-  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
   ! et la variable Rmax2
   ! Version 4 gere les subdivisions pour les zones multiples
   ! C. Pinte
@@ -470,7 +470,6 @@ subroutine define_grid4()
 
         delta_z(i)=zmax(i)/real(nz)
         ! Pas d'integration = moitie + petite dimension cellule
-        if (linteg_dic) delta0(i) = 0.5*min(tab_r(i+1)-tab_r(i),delta_z(i))
         z_lim(i,nz+1)=zmax(i)
 
         do j=1,nz
@@ -481,8 +480,6 @@ subroutine define_grid4()
 
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
-
-     if (linteg_dic) delta0(0)=0.5*rmin
 
   else !lspherical
      izone=1
@@ -549,7 +546,7 @@ subroutine define_grid4()
      volume(:) = volume(:) * 0.5 / real(n_az)
 
      do j=1,nz
-        z_grid(:,-j) = z_grid(:,j)
+        z_grid(:,-j) = -z_grid(:,j)
      enddo
   endif
 
@@ -594,7 +591,7 @@ end subroutine define_grid4
 
 subroutine define_grid3()
 ! Definit la grille du code
-! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim et delta0
+! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
 ! et la variable Rmax2
 ! C. Pinte
 ! 27/04/05
@@ -865,7 +862,6 @@ subroutine define_grid3()
 
         delta_z(i)=zmax(i)/real(nz)
         ! Pas d'integration = moitie + petite dimension cellule
-        if (linteg_dic) delta0(i) = 0.5*min(tab_r(i+1)-tab_r(i),delta_z(i))
         z_lim(i,nz+1)=zmax(i)
 
         do j=1,nz
@@ -876,8 +872,6 @@ subroutine define_grid3()
 
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
-
-     if (linteg_dic) delta0(0)=0.5*rmin
 
   else !lspherical
      izone=1

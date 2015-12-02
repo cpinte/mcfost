@@ -1,0 +1,15 @@
+*.mod
+*.o
+*~
+*/*~
+*/*/*~
+*.a
+*.i90
+src/sha.f90
+lib/include
+src/mcfost
+utils/.last_update
+utils/Version
+
+#parameter files
+*.para

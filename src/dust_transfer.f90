@@ -46,7 +46,7 @@ subroutine transfert_poussiere()
   ! Parametres simu
   integer :: time, lambda_seuil, ymap0, xmap0, nbre_phot2
   integer :: ind_etape, first_etape_obs
-  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz
+  integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, nnfot1_cumul
 
   real :: n_phot_lim
   logical :: lpacket_alive, lintersect
@@ -59,7 +59,7 @@ subroutine transfert_poussiere()
   integer :: capt
 
   real(kind=db) :: x,y,z, u,v,w
-  real :: rand
+  real :: rand, tau
   integer :: i, ri, zj, phik
   logical :: flag_star, flag_scatt, flag_ISM
 
@@ -160,18 +160,8 @@ subroutine transfert_poussiere()
   !call densite_data_hd32297(para) ! grille redefinie dans routine
   if (ldensity_file) then
      call densite_file()
-  else if (lgap) then
-     call densite_data_gap
-  else if (lstrat_SPH) then
-     call densite_data_SPH_TTauri_2
-  else if (lstrat_SPH_bin) then
-     call densite_data_SPH_binaire
-  else if (lfits) then
-     call densite_fits
-  else if (ldebris) then
-     call densite_debris
-  else if (lLaure_SED) then
-     call densite_data_LAURE_SED()
+  else if (lphantom_file) then
+     call density_phantom()
   else if (lread_Seb_Charnoz) then
      call densite_Seb_Charnoz()
   else if (lread_Seb_Charnoz2) then
@@ -384,7 +374,6 @@ subroutine transfert_poussiere()
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
 
-
      if (letape_th) then ! Calcul des temperatures
         nbre_phot2 = nbre_photons_eq_th
         n_phot_lim = 1.0e30 ! on ne tue pas les paquets
@@ -468,8 +457,17 @@ subroutine transfert_poussiere()
         write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
      endif
 
+     if (letape_th) write(*,*) "Computing temperature structure ..."
+     if (lmono0)    write(*,*) "Computing MC radiation field ..."
+     if (laffichage) call progress_bar(0)
+
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
-        write(*,*) tab_lambda(lambda) ,frac_E_stars(lambda)
+        if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
+        tau=0.0 ;
+        do i=1, n_rad
+           tau=tau+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
+        enddo
+        write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
      ! Les pointeurs (meme les tab) doivent être privés !!! COPYIN
@@ -479,8 +477,8 @@ subroutine transfert_poussiere()
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
-     !$omp shared(nbre_phot2,lforce_1st_scatt,n_phot_envoyes) &
-     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda) &
+     !$omp shared(nbre_phot2,n_phot_envoyes,nb_proc) &
+     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda, nnfot1_cumul,ibar) &
      !$omp reduction(+:E_abs_nRE)
      if (letape_th) then
         p_nnfot2 => nnfot2
@@ -502,10 +500,10 @@ subroutine transfert_poussiere()
 
      id = 1 ! Pour code sequentiel
      !$ id = omp_get_thread_num() + 1
+     ibar=1 ;  nnfot1_cumul = 0
 
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
-        if (laffichage) write (*,*) nnfot1,'/',nbre_photons_loop, id
         p_nnfot2 = 0.0_db
         n_phot_envoyes_in_loop = 0.0_db
         photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_in_loop < n_phot_lim))
@@ -523,16 +521,8 @@ subroutine transfert_poussiere()
            call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
 
-           if (lintersect) then
-              ! Propagation du packet
-              if (lforce_1st_scatt) then
-                 call force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
-                 if (lpacket_alive) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
-                      flag_star,flag_ISM,flag_scatt,lpacket_alive)
-              else
-                 call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
-              endif
-           endif
+           ! Propagation du packet
+           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
@@ -540,6 +530,18 @@ subroutine transfert_poussiere()
               if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
            endif
         enddo photon !nnfot2
+
+        ! Progress bar
+        !$omp atomic
+        nnfot1_cumul = nnfot1_cumul+1
+        if (laffichage) then
+           if (real(nnfot1_cumul) > 0.02*ibar * real(nbre_photons_loop)) then
+              call progress_bar(ibar)
+              !$omp atomic
+              ibar = ibar+1
+           endif
+           if (nnfot1_cumul == nbre_photons_loop) call progress_bar(50)
+        endif
      enddo !nnfot1
      !$omp end do
      !$omp end parallel
@@ -629,7 +631,6 @@ subroutine transfert_poussiere()
         letape_th=.false. ! A priori, on a calcule la temperature
         if (lRE_LTE) then
            call Temp_finale()
-           if (lforce_T_Laure_SED)call force_T_Laure_SED()
            if (lreemission_stats) call reemission_stats()
         end if
         if (lRE_nLTE) then
@@ -979,7 +980,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
                  endif
               endif
            else ! fonction de phase HG
-              call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
+              call hg(tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1009,7 +1010,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! Nouveaux paramètres de Stokes
               if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
-              call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
+              call hg(tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1050,15 +1051,15 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         if (rand <= Proba_abs_RE_LTE(lambda,ri, zj, p_phik)) then
            ! Cas RE - LTE
            rand = sprng(stream(id))
-           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
+           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,lambda)
         else  if (rand <= Proba_abs_RE_LTE_p_nLTE(lambda,ri, zj, p_phik)) then
            ! Cas RE - nLTE
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
         else
            ! Cas nRE - qRE
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
+           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
         endif
 
         ! Nouvelle direction de vol : emission isotrope
@@ -1081,253 +1082,6 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   return
 
 end subroutine propagate_packet
-
-!***********************************************************
-
-subroutine force_1st_scatt(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_scatt,lpacket_alive)
-
-
-  integer, intent(in) :: id
-  integer, intent(inout) :: lambda, ri, zj, phik
-  real(kind=db), intent(inout) :: x,y,z,u,v,w
-  real(kind=db), dimension(4), intent(inout) :: stokes
-
-  logical, intent(inout) :: flag_star
-  logical, intent(out) :: flag_scatt, lpacket_alive
-
-  logical :: flag_sortie, flag_direct_star
-
-  integer :: p_ri, p_zj, p_phik, ri_save, zj_save, phik_save, taille_grain, itheta, capt
-  real :: tau_max, rand, rand2, tau, dvol
-  real(kind=db) :: frac_transmise, frac_diff, x_save, y_save, z_save, lmin, lmax, frac
-  real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  real(kind=db), dimension(4) :: Stokes_old
-
-
-  flag_scatt = .false.
-  flag_sortie = .false.
-  flag_direct_star = .false.
-  p_ri = 1 ; p_zj = 1 ; p_phik = 1
-
-  lpacket_alive=.true.
-
-  ! On teste si le photon (stellaire) peut rencontrer le disque
-  if (flag_star) then
-     flag_direct_star = .true.
-     if (1.0_db - w*w < cos_max2) return ! Pas de diffusion
-  endif
-
-  ! Cas optiquement mince : on force la premiere diffusion
-  call length_deg2_tot(id,lambda,stokes,ri,zj,x,y,z,u,v,w,tau_max,lmin,lmax)
-
-  if (tau_max < 10.) then
-     ! Sauvegarde énergie
-     Stokes_old(:) = Stokes(:)
-
-     ! fraction transmise
-     frac_transmise = exp(-tau_max)
-     Stokes(:) = frac_transmise * Stokes_old(:)
-     if (Stokes(1) > 1.0e-30) call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
-
-     ! tau_max=0.0 --> pas de diff
-     if (tau_max >  tiny_real) then
-        ! fraction diffusée
-        flag_scatt = .true.
-        frac_diff = 1.0_db-frac_transmise
-        if (frac_diff < 1.0e-6)  frac_diff = tau_max ! On fait un DL de l'exponentielle
-        Stokes(:) = frac_diff * Stokes_old(:)
-
-        rand = sprng(stream(id))
-        frac = frac_diff*rand
-        if (frac==1.0) then
-           tau=1.0e30
-        else if (frac > 1.0e-6) then
-           tau = -log(1.0_db-frac)
-        else ! on fait un DL pour ne pas avoir tau=0
-           tau = tau_max * rand
-        endif
-
-        ! Tout le paquet qui va diffuse continue jusqu'au point de diffusion
-        call length_deg2(id,lambda,Stokes_old,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
-
-        if (lstrat) then
-           p_ri=ri
-           p_zj=zj
-           if (l3D) p_phik = phik
-        endif
-
-
-        ! Le photon est-il encore dans la grille ?
-        if (flag_sortie) then
-           ! TODO : ce cas ne doit normalement pas arriver
-           ! TODO : il faut faire quelque chose ici
-           return ! Vie du photon terminee
-        endif
-
-        ! Sinon la vie du photon continue : il y a interaction
-        ! Diffusion ou absorption
-        flag_direct_star = .false.
-        if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
-           ! test zone noire
-           if (test_dark_zone(ri,zj,phik,x,y)) then ! on saute le photon
-              lpacket_alive = .false.
-              return
-           endif
-
-           ! Multiplication par albedo
-           Stokes(:)=Stokes(:)*tab_albedo_pos(lambda,p_ri,p_zj,p_phik)
-           if (Stokes(1) < tiny_real_x1e6)then ! on saute le photon
-              lpacket_alive = .false.
-              return
-           endif
-
-           ! Diffusion forcee: rand < albedo
-           rand = -1.0
-        else ! Choix absorption ou diffusion
-           rand = sprng(stream(id))
-        endif ! lmono
-
-        if (rand < tab_albedo_pos(lambda,p_ri,p_zj,p_phik)) then ! Diffusion
-           flag_scatt=.true.
-           flag_direct_star = .false.
-
-           if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
-              rand = sprng(stream(id))
-              taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
-              rand = sprng(stream(id))
-              rand2 = sprng(stream(id))
-              if (lmethod_aniso1) then ! fonction de phase de Mie
-                 call angle_diff_theta(lambda,taille_grain,rand,rand2,itheta,cospsi)
-                 if (lisotropic) then ! Diffusion isotrope
-                    itheta=1
-                    cospsi=2.0*rand-1.0
-                 endif
-                 rand = sprng(stream(id))
-                 !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
-                 PHI = PI * ( 2.0 * rand - 1.0 )
-                 ! direction de propagation apres diffusion
-                 call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-                 if (lsepar_pola) then
-                    ! Nouveaux paramètres de Stokes
-                    if (laggregate) then
-                       call new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                    else
-                       call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                    endif
-                 endif
-              else ! fonction de phase HG
-                 call hg(lambda, tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
-                 if (lisotropic) then ! Diffusion isotrope
-                    itheta=1
-                    cospsi=2.0*rand-1.0
-                 endif
-                 rand = sprng(stream(id))
-                 !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
-                 PHI = PI * ( 2.0 * rand - 1.0 )
-                 ! direction de propagation apres diffusion
-                 call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-                 ! Paramètres de Stokes non modifiés
-              endif
-
-           else ! methode 2 : diffusion sur la population de grains
-              rand = sprng(stream(id))
-              rand2= sprng(stream(id))
-              if (lmethod_aniso1) then ! fonction de phase de Mie
-                 call angle_diff_theta_pos(lambda,p_ri,p_zj, p_phik, rand, rand2, itheta, cospsi)
-                 if (lisotropic) then ! Diffusion isotrope
-                     itheta=1
-                     cospsi=2.0*rand-1.0
-                  endif
-                  rand = sprng(stream(id))
-                 ! call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
-                 PHI = PI * ( 2.0 * rand - 1.0 )
-                 ! direction de propagation apres diffusion
-                 call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-                 ! Nouveaux paramètres de Stokes
-                 if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
-              else ! fonction de phase HG
-                 call hg(lambda, tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
-                 if (lisotropic)  then ! Diffusion isotrope
-                    itheta=1
-                    cospsi=2.0*rand-1.0
-                 endif
-                 rand = sprng(stream(id))
-                 ! call angle_diff_phi(l,STOKES(1),STOKES(2),STOKES(3),itheta,rand,phi)
-                 phi = pi * ( 2.0 * rand - 1.0 )
-                 ! direction de propagation apres diffusion
-                 call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-                 ! Paramètres de Stokes non modifiés
-              endif
-           endif
-
-           ! Mise a jour direction de vol
-           u = u1 ; v = v1 ; w = w1
-
-        else ! Absorption
-           if (.not.lmono) then
-              ! fraction d'energie absorbee par les grains hors equilibre
-              E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0 - proba_abs_RE(lambda,ri, zj, p_phik))
-              ! Multiplication par proba abs sur grain en eq. radiatif
-              Stokes = Stokes * proba_abs_RE(lambda,ri, zj, p_phik)
-
-              if (Stokes(1) < tiny_real)  then ! on saute le photon
-                 lpacket_alive = .false.
-                 return
-              endif
-           endif
-
-           flag_star=.false.
-           flag_scatt=.false.
-           flag_direct_star = .false.
-           rand = sprng(stream(id))
-
-           ! Choix longueur d'onde
-           if (lRE_LTE) call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,Stokes(1),rand,lambda)
-           if (lRE_nLTE) then
-              rand2 = sprng(stream(id))
-              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,Stokes(1),rand,rand2,lambda)
-           endif
-
-           ! Nouvelle direction de vol : emission uniforme
-           rand = sprng(stream(id))
-           w = 2.0 * rand - 1.0
-           w02 =  1.0 - w*w
-           srw02 = sqrt (w02)
-           rand = sprng(stream(id))
-           argmt = pi * ( 2.0 * rand - 1.0 )
-           u = srw02 * cos(argmt)
-           v = srw02 * sin(argmt)
-
-           ! Emission non polarisée : remise à 0 des parametres de Stokes
-           Stokes(2)=0.0 ; Stokes(3)=0.0 ; Stokes(4)=0.0
-        endif ! tab_albedo_pos
-
-
-
-        if ((lscatt_ray_tracing).and.(flag_sortie)) then
-           ! On sauve
-           x_save = x ; y_save = y; z_save = z
-           ri_save = ri ; zj_save = zj ; phik_save = phik
-
-           ! Seule la fraction transmise contribue apres la diffusion
-           tau = 1.0e30 ! On integre jusqu'au bout
-           Stokes_old(:) = Stokes_old(:)*frac_transmise
-           call length_deg2(id,lambda,Stokes_old,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
-
-           ! On restaure
-           x = x_save ; y = y_save ; z = z_save
-           ri = ri_save ; zj = zj_save ; phik = phik_save
-           flag_sortie = .true.
-        endif
-     else ! tau_max = 0.
-        lpacket_alive = .false.  ! on a deja compter le paquet donc on le tue
-        return
-     endif
-  endif ! tau_max < 10
-
-  return
-
-end subroutine force_1st_scatt
 
 !***********************************************************
 
@@ -1683,9 +1437,9 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
            call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)  !BUG
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel
-             ! write(*,*) i,j,  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+             ! write(*,*) i,j,  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
               !write(*,*) "pixel"
-              Stokes(:) = Stokes(:) +  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+              Stokes(:) = Stokes(:) +  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
      enddo !i
@@ -1729,96 +1483,5 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
 end subroutine intensite_pixel_dust
 
 !***********************************************************
-
-!!$subroutine flux_ray_tracing(lambda,u,v,w)
-!!$  ! Creation de la carte d'emission de la poussiere
-!!$  ! par ray-tracing dans une direction donnee
-!!$  ! C. Pinte
-!!$  ! 24/01/08
-!!$
-!!$  implicit none
-!!$
-!!$  integer, intent(in) :: lambda
-!!$  real(kind=db), intent(in) :: u,v,w
-!!$
-!!$  real(kind=db) :: u0, v0, w0, r, x0, y0, z0, w02, phi, l, dA_surface, dA_tranche, dA, lmin, lmax
-!!$  real :: tau
-!!$  integer :: i, j, phi_RT, ri, zj, phik, id
-!!$  real(kind=db), dimension(4) :: Stokes
-!!$
-!!$  logical :: lintersect
-!!$
-!!$  integer, parameter :: n_phi_RT = 4
-!!$
-!!$  write(*,'(a16, $)') " Ray-tracing NEW ..."
-!!$
-!!$  Stokes(:) = 0.0_db
-!!$
-!!$  id = 1 ! TMP
-!!$
-!!$  u0 = -u ; v0 = -v ; w0 = -w
-!!$  w02 = sqrt(1.0_db - w*w)
-!!$
-!!$  ! position initiale hors modele (du cote de l'observateur)
-!!$  l = 10.*rout  ! on se met loin
-!!$
-!!$  ! Boucle sur les cellules
-!!$  do i=1, n_rad_RT
-!!$
-!!$
-!!$
-!!$     dA_surface = pi * dr2_grid(i)
-!!$     dA_tranche = deux_pi * r_grid(i,j) * delta_z(i)
-!!$     dA = dA_surface * w + dA_tranche * w02
-!!$     dA = 2.0_db * dA / real(n_phi_RT,kind=db)
-!!$
-!!$     dA = 1.0
-!!$
-!!$     do phi_RT = 1, n_phi_RT
-!!$
-!!$        phi = pi * real(phi_RT,kind=db) / real(n_phi_RT,kind=db)
-!!$
-!!$        ! Position physique dans le disque
-!!$        z0 = z_grid(i,j)
-!!$        r = r_grid(i,j)
-!!$        x0 = r * cos(phi)
-!!$        y0 = r * sin(phi)
-!!$
-!!$        ! Position de depart
-!!$        x0 = x0 + u * l  ;  y0 = y0 + v * l  ;  z0 = z0 + w * l
-!!$
-!!$        ! L'obs est en dehors de la grille
-!!$        ri = 2*n_rad ; zj=1 ; phik=1
-!!$
-!!$        call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,lintersect)
-!!$        if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-!!$           ! Flux recu dans le pixel
-!!$           Stokes(:) = Stokes(:) +  integ_ray_dust(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0) * dA
-!!$        endif
-!!$
-!!$     enddo ! phi_RT
-!!$  enddo ! i
-!!$
-!!$  ! Prise en compte de la surface
-!!$  Stokes_ray_tracing(lambda,1,1,:) = Stokes(:) * (1.0_db / (distance*pc_to_AU) )**2 * 2.0e-5
-!!$
-!!$  ! Ajout etoile
-!!$  i=0 ; j=1 ; x0=0.0_db ; y0=0.0_db ; z0=0.0_db
-!!$  Stokes = 0.0_db
-!!$  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,y0,u,v,w,tau,lmin,lmax)
-!!$
-!!$  Flux_etoile = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 * exp(-tau) &
-!!$       / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12  ! ????? TODO, c'est quoi 1.35 e-12
-!!$
-!!$  Stokes_ray_tracing(lambda,1,1,1) = Stokes_ray_tracing(lambda,1,1,1) + Flux_etoile
-!!$
-!!$  write(*,*) "Done"
-!!$
-!!$
-!!$  return
-!!$
-!!$end subroutine flux_ray_tracing
-!!$
-!!$!***********************************************************
 
 end module dust_transfer

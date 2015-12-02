@@ -64,7 +64,6 @@ subroutine initialisation_mcfost()
   ldust_gas_ratio = .false.
   lstop_after_init= .false.
   lwall=.false.
-  lgap=.false.
   lpah=.false.
   ln_zone=.false. ; n_zones=1
   limg=.false.
@@ -111,8 +110,8 @@ subroutine initialisation_mcfost()
   lscatt_ray_tracing2=.false.
   loutput_mc=.true.
   ldensity_file=.false.
+  lphantom_file=.false.
   lsigma_file = .false.
-  ldebris=.false.
   lweight_emission=.false.
   lprodimo=.false.
   lProDiMo_input_dir=.false.
@@ -120,16 +119,11 @@ subroutine initialisation_mcfost()
   lProDiMo2mcfost_test = .false.
   lforce_ProDiMo_PAH = .false.
   lforce_diff_approx = .false.
-  lstrat_SPH = .false. ; lno_strat_SPH=.true.
-  lstrat_SPH_bin = .false. ; lno_strat_SPH_bin=.true.
-  lgap_ELT=.false.
-  lLaure_SED=.false.
-  lforce_T_Laure_SED = .false.
+  lgap_Gaussian=.false.
   lspot = .false.
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
   lread_Seb_Charnoz2 = .false.
-  lforce_1st_scatt = .false.
   lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
@@ -327,13 +321,13 @@ subroutine initialisation_mcfost()
         limg=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -img. Error #1"
            stop
         endif
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -img. Error #2"
            stop
         endif
         i_arg = i_arg+1
@@ -342,19 +336,15 @@ subroutine initialisation_mcfost()
         lopacite_only=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -op. Error #1"
            stop
         endif
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) then
-           write(*,*) "Error : wavelength needed"
+           write(*,*) "Error : wavelength needed for -op. Error #2"
            stop
         endif
-        i_arg = i_arg+1
-     case("-gap")
-        lgap=.true.
-        write(*,*) "Gap"
         i_arg = i_arg+1
      case("-n-zone")
         ln_zone=.true.
@@ -434,6 +424,21 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) z_warp
         i_arg= i_arg+1
+     case("-tilt")
+        if (.not.l3D) then
+           write(*,*) "WARNING : forcing 3D mode"
+           l3D=.true.
+        endif
+        write(*,*) "WARNING : tilt will only be applied to 1st zone"
+        ltilt=.true.
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : tit angle needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) tilt_angle
+        i_arg= i_arg+1
      case("-rs")
         lremove=.true.
         i_arg= i_arg+1
@@ -451,22 +456,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
-     case("-strat_SPH")
-        lstrat_SPH=.true.
-        lno_strat_SPH=.false.
-        i_arg = i_arg+1
-     case("-no_strat_SPH")
-        lstrat_SPH=.true.
-        lno_strat_SPH=.true.
-        i_arg = i_arg+1
-     case("-strat_SPH_bin")
-        lstrat_SPH_bin=.true.
-        lno_strat_SPH_bin=.false.
-        i_arg = i_arg+1
-     case("-no_strat_SPH_bin")
-        lstrat_SPH_bin=.true.
-        lno_strat_SPH_bin=.true.
-        i_arg = i_arg+1
      case("-resol")
         lresol=.true.
         i_arg = i_arg+1
@@ -665,21 +654,18 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-phantom")
+        i_arg = i_arg + 1
+        lphantom_file=.true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1
         lsigma_file=.true.
         call get_command_argument(i_arg,s)
         sigma_file = s
         i_arg = i_arg + 1
-     case("-debris")
-        i_arg = i_arg+1
-        ldebris=.true.
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : debris disk structure file needed"
-           stop
-        endif
-        call get_command_argument(i_arg,debris_file)
-        i_arg = i_arg+1
      case("-dg_ratio")
         i_arg = i_arg+1
         ldust_gas_ratio = .true.
@@ -730,15 +716,15 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,sProDiMo_fPAH)
         i_arg = i_arg + 1
         read(sProDiMo_fPAH,*) ProDiMo_fPAH
-     case("-gap_ELT")
+     case("-gap")
         i_arg = i_arg+1
-        lgap_ELT=.true.
+        lgap_Gaussian=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
-        read(s,*) r_gap_ELT
+        read(s,*) r_gap_Gaussian
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
-        read(s,*) sigma_gap_ELT
+        read(s,*) sigma_gap_Gaussian
      case("-only_scatt")
         i_arg = i_arg+1
         lonly_scatt = .true.
@@ -751,17 +737,6 @@ subroutine initialisation_mcfost()
      case("-prodimo2mcfost")
         i_arg = i_arg+1
         lProDiMo2mcfost_test=.true.
-     case("-Laure_SED")
-        i_arg = i_arg+1
-        lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename)
-        i_arg = i_arg + 1
-     case("-Laure_SED_force_T")
-        i_arg = i_arg+1
-        lLaure_SED = .true.
-         call get_command_argument(i_arg,Laure_SED_filename)
-        i_arg = i_arg + 1
-        lforce_T_Laure_SED = .true.
      case("-spot")
         i_arg = i_arg+1
         lspot=.true.
@@ -777,10 +752,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
-     case("-force_1st_scatt")
-        i_arg = i_arg+1
-        lforce_1st_scatt=.true.
-        write(*,*) "WARNING: forcing 1st scattering event when tau < 10"
      case("-old_grid")
         i_arg = i_arg+1
         lold_grid=.true.
@@ -905,6 +876,7 @@ subroutine initialisation_mcfost()
 
   if (lno_T) ltemp = .false.
 
+
   write(*,*) 'Input file read successfully'
 
 
@@ -1011,12 +983,6 @@ subroutine initialisation_mcfost()
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
-     if (lforce_1st_scatt) then
-        write(*,*) "The [-force_1st_scatt] option is not relevant for SED calculation"
-        write(*,*) "It is therefore discarded here"
-        lforce_1st_scatt = .false.
-     endif
-
      if (lmono) then
         write(*,*) "Error : thermal equilibrium cannot be calculated with only 1 wavelength!"
         write(*,*) "      Set n_lambda to a value higher than 1 in parameter file"
@@ -1042,12 +1008,6 @@ subroutine initialisation_mcfost()
      write(*,*) "  for thermal equilibrium calculations"
      write(*,*) "- use the [-dust_prop] option to compute global dust properties"
      write(*,*) 'Exiting'
-     stop
-  endif
-
-  if ( (lforce_1st_scatt).and.(lscatt_ray_tracing) ) then
-     write(*,*) "ERROR: force_1st_scatt is not compatible with rt"
-     write(*,*) "Exiting"
      stop
   endif
 
@@ -1082,8 +1042,6 @@ subroutine initialisation_mcfost()
 !     igridx = 1
 !     igridy = 1
 !  endif
-
-  if (lstrat_SPH) lstrat=.true.
 
   if (lemission_mol) then
      do imol=1,n_molecules
@@ -1204,11 +1162,9 @@ subroutine display_help()
   write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
   write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
-  write(*,*) "        : -force_1st_scatt : uses forced scattering in image calculation;"
-  write(*,*) "                             useful for optically thin disk in MC mode"
 !  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
 !  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
-  write(*,*) "        : -mc  : keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -mc : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) " "
@@ -1237,8 +1193,7 @@ subroutine display_help()
   write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
-  write(*,*) "        : -strat_SPH"
-  write(*,*) "        : -no_strat_SPH"
+  write(*,*) "        : -tilt : <angle> [degrees]"
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
@@ -1248,11 +1203,8 @@ subroutine display_help()
   write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
-  write(*,*) "        : -debris <debris_disk_structure_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
-  write(*,*) "        : -gap_ELT <R> <sigma>"
-  write(*,*) "        : -Laure_SED <file>"
-  write(*,*) "        : -Laure_SED_force_T <file>"
+  write(*,*) "        : -gap <R> <sigma>"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"
