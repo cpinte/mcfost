@@ -36,7 +36,9 @@ subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,f
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-   if (lcylindrical) then
+  !call test_convert()
+
+  if (lcylindrical) then
      if (l3D) then
         call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
      else
@@ -75,13 +77,14 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
+  real(kind=db) :: l, tau
   real(kind=db) :: correct_moins, correct_plus
   real(kind=db) :: phi_pos, phi_vol, xm, ym, zm, factor
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, p_ri0, p_zj0
-  integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in
+  integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
+  integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in, tmp_k, ri_tmp, zj_tmp
+
+  integer :: cell, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
@@ -103,20 +106,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   ri1=ri
   zj1=zj
 
-  ! Cas sans strat
-  p_ri0=1
-  p_zj0=1
-
   ltot=0.0
-  nbr_cell = 0
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0_db/a
-  else
-     inv_a=huge_real
-  endif
 
   if (abs(w) > tiny_real) then
      inv_w=1.0_db/w
@@ -141,6 +131,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      ! Pour cas avec approximation de diffusion
      if (l_dark_zone(ri0,zj0,1)) then
+        write(*,*) "DARKZONE", l_dark_zone(ri0,zj0,1)
+        stop
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         inv_w = -inv_w
@@ -152,6 +144,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      lcellule_non_vide=.true.
+     if (ri0==0) lcellule_non_vide=.false.
+
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
         ! Le photon sort du disque
@@ -167,137 +161,15 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         endif
      endif ! Test sortie
 
-     nbr_cell = nbr_cell + 1
 
-     ! Detection interface
-     r_2=x0*x0+y0*y0
-     b=(x0*u+y0*v)*inv_a
-
-     if (ri0==0) then
-        lcellule_non_vide=.false.
-        opacite=0.0_db
-        ! Si on est avant le bord interne,  on passe forcement par rmin
-        ! et on cherche forcement la racine positive (unique)
-        c=(r_2-r_lim_2(0))*inv_a
-        delta=b*b-c
-        rac=sqrt(delta)
-        s = (-b+rac) * correct_plus
-        t=huge_real
-        delta_rad=1
-     else
-        opacite=kappa(lambda,ri0,zj0,1)
-        ! 1) position interface radiale
-        ! on avance ou recule en r ? -> produit scalaire
-        dotprod=u*x0+v*y0  ! ~ b
-        if (dotprod < 0.0_db) then
-           ! on recule : on cherche rayon inférieur
-           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
-           delta=b*b-c
-           if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
-              ! on cherche le rayon supérieur
-              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-              delta_rad=1
-           else
-              delta_rad=-1
-           endif
-        else
-           ! on avance : on cherche le rayon supérieur
-           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-           delta_rad=1
-        endif !dotprod
-        rac=sqrt(delta)
-        s=(-b-rac) * correct_plus
-        if (s < 0.0_db) then
-           s=(-b+rac) * correct_plus
-        else if (s==0.0_db) then
-           s=prec_grille
-        endif
+     !call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
+     cell = cell_map(ri0,zj0,1)
+     previous_cell = 0 ! unusued, just for Voronoi
+     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
 
 
-        ! 2) position interface verticale
-        ! on monte ou on descend par rapport au plan équatorial ?
-        dotprod=w*z0
-        if (dotprod == 0.0_db) then
-           t=1.0e10
-        else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 if (z0 > 0.0_db) then
-                    zlim=1.0e10
-                 else
-                    zlim=-1.0e10
-                 endif
-              else
-                 if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
-                 else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
-                 endif
-                 delta_zj=1
-              endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
-                 else
-                    zlim=z_lim(ri0,2)*correct_moins
-                 endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
-                 else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
-                 endif
-                 delta_zj=-1
-              endif !(zj0==1)
-           endif ! monte ou descend
-           t=(zlim-z0)*inv_w
-           ! correct pb precision
-           if (t < 0.0_db) t=prec_grille
-        endif !dotprod=0.0
-     endif ! ri0==0
-
-
-     ! 3) interface en r ou z ?
-     if (s < t) then ! r
-        l=s
-        delta_vol=s
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0+delta_rad
-        if ((ri1<1).or.(ri1>n_rad)) then
-           zj1=zj0
-        else
-           zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
-           if (zj1>nz) zj1=nz+1
-        endif
-     else ! z
-        l=t
-        delta_vol=t
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        zj1=zj0+delta_zj
-     endif
-
-     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-     if (z1 == 0.0_db) z1 = prec_grille
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     tau=l*opacite ! opacite constante dans la cellule
+     !call cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol evntuellement
@@ -453,6 +325,359 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 end subroutine length_deg2_cyl
 
 !********************************************************************
+
+subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+!subroutine cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
+
+  integer, intent(in) :: lambda, cell, previous_cell
+  real(kind=db), intent(in) :: x0,y0,z0
+  real(kind=db), intent(in) :: u,v,w ! Todo : check that
+
+
+  real(kind=db), intent(out) :: x1, y1, z1
+  integer, intent(out) :: next_cell
+  real(kind=db), intent(out) :: l, tau
+
+  ! Variables to be sorted out
+  integer :: ri0,zj0,k0
+
+  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
+  real(kind=db) :: delta_vol, zlim, dotprod, opacite
+  real(kind=db) :: correct_moins, correct_plus
+
+  integer ::  delta_rad, delta_zj, ri1, zj1
+
+
+  ! TODO: Can be calculated outside
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
+  a=u*u+v*v
+
+  if (a > tiny_real) then
+     inv_a=1.0_db/a
+  else
+     inv_a=huge_real
+  endif
+
+  if (abs(w) > tiny_real) then
+     inv_w=1.0_db/w
+  else
+     inv_w=sign(huge_db,w) ! huge_real avant
+  endif
+  ! End : TODO : Can be calculated outside
+
+  ! 3D cell indices
+  call cell2cylindrical(cell, ri0,zj0,k0)
+
+  ! Detection interface
+  r_2=x0*x0+y0*y0
+  b=(x0*u+y0*v)*inv_a
+
+  if (ri0==0) then
+     opacite=0.0_db
+     ! Si on est avant le bord interne,  on passe forcement par rmin
+     ! et on cherche forcement la racine positive (unique)
+     c=(r_2-r_lim_2(0))*inv_a
+     delta=b*b-c
+     rac=sqrt(delta)
+     s = (-b+rac) * correct_plus
+     t=huge_real
+     delta_rad=1
+  else
+     opacite=kappa(lambda,ri0,zj0,1)
+     ! 1) position interface radiale
+     ! on avance ou recule en r ? -> produit scalaire
+     dotprod=u*x0+v*y0  ! ~ b
+     if (dotprod < 0.0_db) then
+        ! on recule : on cherche rayon inférieur
+        c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
+        delta=b*b-c
+        if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
+           ! on cherche le rayon supérieur
+           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+           delta_rad=1
+        else
+           delta_rad=-1
+        endif
+     else
+        ! on avance : on cherche le rayon supérieur
+        c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+        delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+        delta_rad=1
+     endif !dotprod
+     rac=sqrt(delta)
+     s=(-b-rac) * correct_plus
+     if (s < 0.0_db) then
+        s=(-b+rac) * correct_plus
+     else if (s==0.0_db) then
+        s=prec_grille
+     endif
+
+
+     ! 2) position interface verticale
+     ! on monte ou on descend par rapport au plan équatorial ?
+     dotprod=w*z0
+     if (dotprod == 0.0_db) then
+        t=1.0e10
+     else
+        if (dotprod > 0.0_db) then
+           ! on monte
+           if (zj0==nz+1) then
+              delta_zj=0
+              if (z0 > 0.0_db) then
+                 zlim=1.0e10
+              else
+                 zlim=-1.0e10
+              endif
+           else
+              if (z0 > 0.0) then
+                 zlim=z_lim(ri0,zj0+1)*correct_plus
+              else
+                 zlim=-z_lim(ri0,zj0+1)*correct_plus
+              endif
+              delta_zj=1
+           endif
+        else
+           ! on descend
+           if (zj0==1) then
+              ! on traverse le plan eq donc on va remonter
+              ! et z va changer de signe
+              delta_zj=1
+              if (z0 > 0.0_db) then
+                 zlim=-z_lim(ri0,2)*correct_moins
+              else
+                 zlim=z_lim(ri0,2)*correct_moins
+              endif
+           else !(zj0==1)
+              ! on ne traverse pas z=0.
+              if (z0 > 0.0_db) then
+                 zlim=z_lim(ri0,zj0)*correct_moins
+              else
+                 zlim=-z_lim(ri0,zj0)*correct_moins
+              endif
+              delta_zj=-1
+           endif !(zj0==1)
+        endif ! monte ou descend
+        t=(zlim-z0)*inv_w
+        ! correct pb precision
+        if (t < 0.0_db) t=prec_grille
+     endif !dotprod=0.0
+  endif ! ri0==0
+
+
+  ! 3) interface en r ou z ?
+  if (s < t) then ! r
+     l=s
+     delta_vol=s
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0+delta_rad
+     if ((ri1<1).or.(ri1>n_rad)) then
+        zj1=zj0
+     else
+        zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+        if (zj1>nz) zj1=nz+1
+     endif
+  else ! z
+     l=t
+     delta_vol=t
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0
+     zj1=zj0+delta_zj
+  endif
+
+  ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+  if (z1 == 0.0_db) z1 = prec_grille
+
+  ! Calcul longeur de vol et profondeur optique dans la cellule
+  tau = l*opacite ! opacite constante dans la cellule
+
+  !call cylindrical2cell(ri1,zj1,1, next_cell)
+  next_cell =  cell_map(ri1,zj1,1)
+
+  return
+
+end subroutine cross_cylindrical_cell
+
+!********************************************************************
+
+subroutine cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
+
+  integer, intent(in) :: lambda, ri0, zj0
+  real(kind=db), intent(in) :: x0,y0,z0
+  real(kind=db), intent(in) :: u,v,w ! Todo : check that
+  real(kind=db), intent(out) :: x1,y1,z1 ! Todo : check that
+
+  integer, intent(out) :: ri1, zj1
+  real(kind=db), intent(out) :: l, tau
+
+  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
+  real(kind=db) :: delta_vol, zlim, dotprod, opacite
+  real(kind=db) :: correct_moins, correct_plus
+
+  integer ::  delta_rad, delta_zj
+
+  ! TODO: Can be calculated outside
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
+  a=u*u+v*v
+
+  if (a > tiny_real) then
+     inv_a=1.0_db/a
+  else
+     inv_a=huge_real
+  endif
+
+  if (abs(w) > tiny_real) then
+     inv_w=1.0_db/w
+  else
+     inv_w=sign(huge_db,w) ! huge_real avant
+  endif
+  ! End : TODO : Can be calculated outside
+
+
+  ! Detection interface
+  r_2=x0*x0+y0*y0
+  b=(x0*u+y0*v)*inv_a
+
+  if (ri0==0) then
+     opacite=0.0_db
+     ! Si on est avant le bord interne,  on passe forcement par rmin
+     ! et on cherche forcement la racine positive (unique)
+     c=(r_2-r_lim_2(0))*inv_a
+     delta=b*b-c
+     rac=sqrt(delta)
+     s = (-b+rac) * correct_plus
+     t=huge_real
+     delta_rad=1
+  else
+     opacite=kappa(lambda,ri0,zj0,1)
+     ! 1) position interface radiale
+     ! on avance ou recule en r ? -> produit scalaire
+     dotprod=u*x0+v*y0  ! ~ b
+     if (dotprod < 0.0_db) then
+        ! on recule : on cherche rayon inférieur
+        c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
+        delta=b*b-c
+        if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
+           ! on cherche le rayon supérieur
+           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+           delta_rad=1
+        else
+           delta_rad=-1
+        endif
+     else
+        ! on avance : on cherche le rayon supérieur
+        c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+        delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+        delta_rad=1
+     endif !dotprod
+     rac=sqrt(delta)
+     s=(-b-rac) * correct_plus
+     if (s < 0.0_db) then
+        s=(-b+rac) * correct_plus
+     else if (s==0.0_db) then
+        s=prec_grille
+     endif
+
+
+     ! 2) position interface verticale
+     ! on monte ou on descend par rapport au plan équatorial ?
+     dotprod=w*z0
+     if (dotprod == 0.0_db) then
+        t=1.0e10
+     else
+        if (dotprod > 0.0_db) then
+           ! on monte
+           if (zj0==nz+1) then
+              delta_zj=0
+              if (z0 > 0.0_db) then
+                 zlim=1.0e10
+              else
+                 zlim=-1.0e10
+              endif
+           else
+              if (z0 > 0.0) then
+                 zlim=z_lim(ri0,zj0+1)*correct_plus
+              else
+                 zlim=-z_lim(ri0,zj0+1)*correct_plus
+              endif
+              delta_zj=1
+           endif
+        else
+           ! on descend
+           if (zj0==1) then
+              ! on traverse le plan eq donc on va remonter
+              ! et z va changer de signe
+              delta_zj=1
+              if (z0 > 0.0_db) then
+                 zlim=-z_lim(ri0,2)*correct_moins
+              else
+                 zlim=z_lim(ri0,2)*correct_moins
+              endif
+           else !(zj0==1)
+              ! on ne traverse pas z=0.
+              if (z0 > 0.0_db) then
+                 zlim=z_lim(ri0,zj0)*correct_moins
+              else
+                 zlim=-z_lim(ri0,zj0)*correct_moins
+              endif
+              delta_zj=-1
+           endif !(zj0==1)
+        endif ! monte ou descend
+        t=(zlim-z0)*inv_w
+        ! correct pb precision
+        if (t < 0.0_db) t=prec_grille
+     endif !dotprod=0.0
+  endif ! ri0==0
+
+
+  ! 3) interface en r ou z ?
+  if (s < t) then ! r
+     l=s
+     delta_vol=s
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0+delta_rad
+     if ((ri1<1).or.(ri1>n_rad)) then
+        zj1=zj0
+     else
+        zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+        if (zj1>nz) zj1=nz+1
+     endif
+  else ! z
+     l=t
+     delta_vol=t
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0
+     zj1=zj0+delta_zj
+  endif
+
+  ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+  if (z1 == 0.0_db) z1 = prec_grille
+
+  ! Calcul longeur de vol et profondeur optique dans la cellule
+  tau = l*opacite ! opacite constante dans la cellule
+
+  return
+
+end subroutine cross_cylindrical_cell_tmp
+
+!*************************************************************************************
 
 subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules

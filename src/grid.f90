@@ -14,41 +14,181 @@ module grid
 
   contains
 
-!******************************************************************************
+subroutine build_cylindrical_cell_mapping()
 
-function cylindrical2cell(i,j,k)  result(icell)
-  ! icell is between 1 and n_rad * n_z * n_az
+  integer :: i,j,k,istart,iend,jstart,jend,kstart,kend,icell, ntot
 
-  integer, intent(in) :: i,j,k
-  integer :: icell
+  istart = 0
+  iend = n_rad + 1
 
-  icell = i + n_rad * ( j-1 + nz * (k-1))
+  jstart = min(1,j_start)-1
+  jend = nz+1
+
+  kstart=1
+  kend = n_az
+
+  ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
+
+  write(*,*) "NTOT", ntot
+
+  allocate(cell_map(istart:iend,jstart:jend,kstart:kend))
+  allocate(cell_map_i(ntot), cell_map_j(ntot), cell_map_k(ntot))
+
+  icell = 0
+  do k=kstart, kend
+     bz : do j=jstart, jend
+        do i=istart, iend
+
+           icell = icell+1
+           if (icell > ntot) then
+              write(*,*) "ERROR : there is an issue in the cell mapping"
+              write(*,*) "Exiting"
+              stop
+           endif
+
+           cell_map_i(icell) = i
+           cell_map_j(icell) = j
+           cell_map_k(icell) = k
+
+           cell_map(i,j,k) = icell
+        enddo
+     enddo bz
+  enddo
 
   return
 
-end function cylindrical2cell
+end subroutine build_cylindrical_cell_mapping
+
 
 !******************************************************************************
 
-subroutine cell2cylindrical(icell, i,j,k)
+!pure subroutine cylindrical2cell(i,j,k, icell)
+!
+!  integer, intent(in) :: i,j,k
+!  integer, intent(out) :: icell
+!
+!  icell = cell_map(i,j,k)
+!
+!  return
+!
+!end subroutine cylindrical2cell
+
+!******************************************************************************
+
+pure subroutine cell2cylindrical(icell, i,j,k)
 
   integer, intent(in) :: icell
   integer, intent(out) :: i,j,k
 
-  integer :: ij ! indice combine i et j, ie : i + (j-1) * n_rad
-
-  k = icell/nrz + 1 ; if (k > n_az) k=n_az
-
-  ij = icell - k*nrz
-  j = (ij)/n_rad + 1 ; if (j > nz) j=nz
-
-  i = ij - j*nz
+  i = cell_map_i(icell)
+  j = cell_map_j(icell)
+  k = cell_map_k(icell)
 
   return
 
 end subroutine cell2cylindrical
 
 !******************************************************************************
+
+subroutine cylindrical2cell_old(i,j,k, icell)
+  ! icell is between 1 and n_rad * (n_z+1) * n_az
+
+  integer, intent(in) :: i,j,k
+  integer, intent(out) :: icell
+
+  if ((i==0).and.(j==0)) then
+     icell = 0
+  else if (j>nz+1) then
+     icell = -i
+  else
+     icell = i + n_rad * ( j-1 + nz * (k-1))
+  endif
+
+  return
+
+end subroutine cylindrical2cell_old
+
+!******************************************************************************
+
+subroutine cell2cylindrical_old(icell, i,j,k)
+
+  integer, intent(in) :: icell
+  integer, intent(out) :: i,j,k
+
+  integer :: ij ! indice combine i et j, ie : i + (j-1) * n_rad
+
+  if (icell==0) then
+     i=0
+     j=0
+     k=1
+  else if (icell < 0) then
+     i = -icell
+     j = nz+2
+     k = 1
+  else
+     k = (icell-1)/nrz + 1 ; if (k > n_az) k=n_az
+
+     ij = icell - (k-1)*nrz
+     j = (ij-1)/n_rad + 1 ; if (j > nz+1) j=nz+1
+
+     i = ij - (j-1)*n_rad
+
+     !write(*,*) "TEST ij", ij,  ij/n_rad
+     !write(*,*) "i,j", i, j
+  endif
+
+  return
+
+end subroutine cell2cylindrical_old
+
+!******************************************************************************
+
+
+subroutine test_convert()
+
+  integer :: i, j, k, icell
+  integer :: i2,j2,k2
+
+
+  write(*,*)
+  write(*,*) "TEST CONVERT"
+
+   do k=1, n_az
+     do j=1, nz+1
+        do i=0, n_rad
+
+           icell = cell_map(i,j,k)
+           write(*,*) "convert", i,j,k, "-->", icell
+
+           call cell2cylindrical(icell, i2,j2,k2)
+           if (i>0) then
+              if ((i/=i2).or.(j/=j2).or.(k2/=k)) then
+                 write(*,*) "PB test convert"
+                 write(*,*) i,j,k, "-->", icell
+                 write(*,*) icell, "-->", i2,j2,k2
+                 stop
+              endif
+           else
+              if ((i/=i2)) then ! seul i est defini ds la cas 0
+                 write(*,*) "PB test convert"
+                 write(*,*) i,j,k, "-->", icell
+                 write(*,*) icell, "-->", i2,j2,k2
+                 stop
+              endif
+           endif
+        enddo
+     enddo
+  enddo
+
+  write(*,*) "DONE"
+  stop
+  return
+
+
+end subroutine test_convert
+
+!******************************************************************************
+
 
  subroutine order_zones()
    ! Order the various zones according to their Rin
@@ -226,6 +366,11 @@ subroutine define_grid4()
   type(disk_zone_type) :: dz
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+  nrz = n_rad * (nz+1)
+  n_cells = nrz * n_az
+
+  call build_cylindrical_cell_mapping()
 
   Rmax2 = Rmax*Rmax
 
@@ -606,7 +751,8 @@ subroutine define_grid3()
 
   type(disk_zone_type) :: dz
 
-  nrz = n_rad * nz
+  nrz = n_rad * (nz+1)
+  n_cells = nrz * n_az
 
   Rmax2=Rmax*Rmax
 

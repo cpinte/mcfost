@@ -455,6 +455,9 @@ module opacity
   real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
+  integer, dimension(:,:,:), allocatable :: cell_map
+  integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
+
   real, dimension(:,:,:,:), allocatable :: amax_reel !n_lambda,n_rad,nz+1, (n_az)
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa ! kappa_ext
   real(kind=db), dimension(:,:,:,:), allocatable :: kappa_abs_eg, kappa_sca, kappa_abs_RE !n_lambda,n_rad,nz+1, (n_az)
