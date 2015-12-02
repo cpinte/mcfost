@@ -522,7 +522,8 @@ subroutine transfert_poussiere()
            lpacket_alive = .true.
 
            ! Propagation du packet
-           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
+                flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
