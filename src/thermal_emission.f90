@@ -615,7 +615,7 @@ subroutine Temp_finale_nLTE()
 
   implicit none
 
-  integer :: T_int, T1, T2
+  integer :: T_int, T1, T2, icell
   real(kind=db) :: Temp, Temp1, Temp2, frac, log_frac_E_abs, J_absorbe
 
   integer :: i,j, k, lambda
@@ -649,15 +649,16 @@ subroutine Temp_finale_nLTE()
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(i,j,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac) &
+  !$omp private(i,j,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
   !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,lstrat,n_lambda,kappa_abs_eg) &
   !$omp shared(prob_kappa_abs_1grain,xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
-  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
+  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0,cell_map)
   !$omp do schedule(dynamic,10)
   do i=1,n_rad
      do j=1,nz
+        icell = cell_map(i,j,1)
         do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-           if (densite_pouss(i,j,1,k) > tiny_db) then
+           if (densite_pouss(icell,k) > tiny_db) then
               J_absorbe=0.0
               do lambda=1, n_lambda
                  !J_absorbe =  J_absorbe + kappa_abs_1grain(lambda,i,j,k)  * sum(xJ_abs(lambda,i,j,:))
@@ -830,7 +831,7 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
-     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE)
+     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE,cell_map)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
@@ -842,7 +843,7 @@ subroutine Temp_nRE(lconverged)
            if (l_dark_zone(i,j,1)) then
               l_RE(i,j,:) = .true.
            else
-              if (densite_pouss(i,j,1,l) > tiny_db) then
+              if (densite_pouss(cell_map(i,j,1),l) > tiny_db) then
                  ! Champ de radiation
                  Int_k_lambda_Jlambda=0.0
                  do lambda=1, n_lambda
@@ -959,7 +960,7 @@ subroutine Temp_nRE(lconverged)
                     ! Impossible de definir proba de temperature
                     t_cool = 1.0 ; t_abs = 0.0
                     write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(i,j,1,l)), real(Temperature_1grain_nRE(i,j,l))
+                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), real(Temperature_1grain_nRE(i,j,l))
                     write(*,*) "Exiting"
                     stop
                  endif
@@ -1281,7 +1282,7 @@ subroutine update_proba_abs_nRE()
   ! puis P_LTE = P_LTE_old * k_RE_old / k_RE_new et P_abs_RE = k_RE_new / k_RE_old * P_abs_RE_old
 
   real(kind=db) :: correct, correct_m1,  kappa_abs_RE_new,  kappa_abs_RE_old, delta_kappa_abs_qRE
-  integer :: i,j, l, k, lambda
+  integer :: i,j, l, k, lambda, icell
   logical :: lall_grains_eq
 
   write(*,*) "Setting grains at qRE and updating nRE pobabilities"
@@ -1293,9 +1294,10 @@ subroutine update_proba_abs_nRE()
         do i=1,n_rad
            delta_kappa_abs_qRE = 0.0_db
            lall_grains_eq = .true.
+           icell = cell_map(i,j,k)
            do l=grain_nRE_start,grain_nRE_end
               if (lchange_nRE(i,j,l)) then ! 1 grain a change de status a cette iteration
-                 delta_kappa_abs_qRE =  C_abs_norm(lambda,l) * densite_pouss(i,j,k,l)
+                 delta_kappa_abs_qRE =  C_abs_norm(lambda,l) * densite_pouss(icell,l)
               else
                  if (.not.l_RE(i,j,l)) lall_grains_eq = .true. ! il reste des grains qui ne sont pas a l'equilibre
               endif
@@ -1349,7 +1351,7 @@ subroutine emission_nRE()
 
   implicit none
 
-  integer :: i, j, k, T, l, lambda, n_max, alloc_status
+  integer :: i, j, k, T, l, lambda, n_max, alloc_status, icell
   real :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn
   real(kind=db) :: E_emise, frac_E_abs_nRE, Delta_E
   real(kind=db), dimension(:), allocatable :: E_cell, E_cell_old
@@ -1401,23 +1403,24 @@ subroutine emission_nRE()
      ! Emission par cellule des PAHs
 
      !$omp parallel default(none) &
-     !$omp private(i,j,l,k,E_emise,Temp,cst_wl,T) &
+     !$omp private(i,j,l,k,E_emise,Temp,cst_wl,T,icell) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end,n_max) &
      !$omp shared(n_rad,nz,l_RE, Temperature_1grain_nRE,n_T,C_abs_norm,densite_pouss,volume,tab_Temp,Proba_Temperature) &
-     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE)
+     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,cell_map)
      !$omp do
      do i=1,n_rad
         do j=1,nz
            ! Combinaison des 2 indices pour dichotomie
            l=j+nz*(i-1)
            E_emise = 0.0
+           icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
               if (l_RE(i,j,k)) then ! le grain a une temperature
                  if (lchange_nRE(i,j,k)) then ! la grain passe en qRE a cette iteration : il faut le compter
                     Temp = Temperature_1grain_nRE(i,j,k)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)* &
+                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
                             volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
                     endif
                  endif ! le grain etait en qRE avant, il est traite en re-emission immediate
@@ -1426,7 +1429,7 @@ subroutine emission_nRE()
                     temp=tab_Temp(T)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)* &
+                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
                             volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k) &
                             * delta_wl
                     endif !cst_wl
@@ -1488,7 +1491,7 @@ subroutine init_emissivite_nRE()
   implicit none
 
 
-  integer :: lambda, i, j, k
+  integer :: lambda, i, j, k, icell
   real(kind=db) :: E_emise, facteur, cst_wl, wl
   real :: Temp, cst_wl_max, delta_wl
 
@@ -1510,8 +1513,9 @@ subroutine init_emissivite_nRE()
 
         do j=1,nz
            E_emise = 0.0_db
+           icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
-              E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)* facteur !* Proba_Temperature = 1 pour Tmin
+              E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* facteur !* Proba_Temperature = 1 pour Tmin
            enddo !k
            Emissivite_nRE_old(lambda,i,j,1) = E_emise
         enddo !j
@@ -1542,7 +1546,7 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i, j, pk, jj, k, n_max, l, T, alloc_status
+  integer :: i, j, pk, jj, k, n_max, l, T, alloc_status, icell
   real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
   real(kind=db) :: delta_T
   real(kind=db), dimension(:), allocatable :: E_cell, E_cell_corrected
@@ -1613,6 +1617,7 @@ subroutine repartition_energie(lambda)
            ! Combinaison des 2 indices pour dichotomie
            l=j+nz*(i-1)
            E_emise = 0.0
+           icell = cell_map(i,j,1)
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
               Temp=Temperature_1grain(i,j,k)
               if (Temp < tiny_real) then
@@ -1621,11 +1626,11 @@ subroutine repartition_energie(lambda)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (i==1) then
-                       Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
+                       Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                        E_emise = E_emise + Ener * frac
                     else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                       E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
+                       E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
                  endif !cst_wl
               endif ! Temp==0.0
@@ -1654,18 +1659,19 @@ subroutine repartition_energie(lambda)
            ! Combinaison des 2 indices pour dichotomie
            l=j+nz*(i-1)
            E_emise = 0.0
+           icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
               if (l_RE(i,j,k)) then ! le grain a une temperature
                  temp=Temperature_1grain_nRE(i,j,k)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (i==1) then
-                       Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)*volume(i)/((wl**5)* &
+                       Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(i)/((wl**5)* &
                             (exp(cst_wl)-1.0))
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                        E_emise = E_emise + Ener * frac
                     else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)* &
+                       E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
                             volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
                  endif !cst_wl
@@ -1675,12 +1681,12 @@ subroutine repartition_energie(lambda)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
                        if (i==1) then
-                          Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)*volume(i)/((wl**5)* &
+                          Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(i)/((wl**5)* &
                                (exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k)
                           frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                           E_emise = E_emise + Ener * frac
                        else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                          E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(i,j,1,k)* &
+                          E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
                                volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k)
                        endif
                     endif !cst_wl

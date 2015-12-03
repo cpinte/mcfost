@@ -111,7 +111,6 @@ module parametres
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file, lphantom_file
-  logical :: ldust_gas_ratio
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
 
@@ -443,7 +442,6 @@ module opacity
   real(kind=db), dimension(:), allocatable :: zmax !n_rad
   real(kind=db), dimension(:), allocatable :: volume !n_rad en AU^3
   real(kind=db), dimension(:), allocatable :: masse  !en g ! n_cells
-  real, dimension(:,:), allocatable :: dust_gas_ratio
   real(kind=db), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
   real(kind=db), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
   real(kind=db), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
@@ -783,6 +781,7 @@ module molecular_emission
 
   ! densite_gaz gives the midplane density for j=0
   real(kind=db), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=db), dimension(:), allocatable :: densite_gaz_midplane
   real(kind=db), dimension(:), allocatable :: Surface_density
 
   real(kind=db), dimension(:,:), allocatable :: ds

@@ -943,12 +943,12 @@ subroutine alloc_dynamique()
 
   endif ! lemission_mol
 
-  allocate(densite_gaz(n_cells), masse_gaz(n_cells), stat=alloc_status)
+  allocate(densite_gaz(n_cells), densite_gaz_midplane(n_rad), masse_gaz(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_gaz'
      stop
   endif
-  densite_gaz = 0.0 ; masse_gaz = 0.0
+  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
   return
 

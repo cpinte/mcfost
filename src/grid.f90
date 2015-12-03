@@ -16,27 +16,44 @@ module grid
 
 subroutine build_cylindrical_cell_mapping()
 
-  integer :: i,j,k,istart,iend,jstart,jend,kstart,kend,icell, ntot
+  integer :: i,j,k,icell, ntot, ntot2
+  integer :: istart,iend,jstart,jend,kstart,kend, istart2,iend2,jstart2,jend2,kstart2,kend2
 
-  istart = 0
-  iend = n_rad + 1
+  istart = 1
+  iend = n_rad
 
-  jstart = min(1,j_start)-1
-  jend = nz+1
+  jstart = j_start
+  jend = nz
 
   kstart=1
   kend = n_az
 
   ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
+  if (ntot /= n_cells) then
+     write(*,*) "ERROR in 'build_cylindrical_cell_mapping'"
+     write(*,*) "The number of cells is not matching :"
+     write(*,*) "ntot=", ntot, "should be", n_cells
+     write(*,*) "Exiting"
+  endif
 
-  write(*,*) "NTOT", ntot
+  istart2 = 0
+  iend2 = n_rad + 1
 
-  allocate(cell_map(istart:iend,jstart:jend,kstart:kend))
-  allocate(cell_map_i(ntot), cell_map_j(ntot), cell_map_k(ntot))
+  jstart2 = min(1,j_start)-1
+  jend2 = nz+1
 
+  kstart2=1
+  kend2 = n_az
+
+  ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2 +1) * (kend2 - kstart2 + 1)
+  allocate(cell_map(istart2:iend2,jstart2:jend2,kstart2:kend2))
+  allocate(cell_map_i(ntot2), cell_map_j(ntot2), cell_map_k(ntot2))
+
+  ! Actual cells
   icell = 0
   do k=kstart, kend
      bz : do j=jstart, jend
+        if (j==0) cycle bz
         do i=istart, iend
 
            icell = icell+1
@@ -54,6 +71,69 @@ subroutine build_cylindrical_cell_mapping()
         enddo
      enddo bz
   enddo
+
+  if (icell /= ntot) then
+     write(*,*) "Something went wrong in the calle mapping"
+     write(*,*) "I am missing some real cells"
+     write(*,*) icell, ntot
+     write(*,*)
+     stop
+  endif
+
+
+  ! Virtual cell indices for when the packets are just around the grid
+
+  ! Cases j=0 and j=nz+1
+  do j = jstart2, jend2, jend2 - jstart2
+     do k=kstart, kend
+        do i=istart2, iend2
+
+           icell = icell+1
+           if (icell > ntot2) then
+              write(*,*) "ERROR : there is an issue in the cell mapping"
+              write(*,*) "Exiting"
+              stop
+           endif
+
+           cell_map_i(icell) = i
+           cell_map_j(icell) = j
+           cell_map_k(icell) = k
+
+           cell_map(i,j,k) = icell
+        enddo
+     enddo
+  enddo
+
+  ! Cases i=0 and i=n_rad+1 (except j=0 and j=nz+1 done above)
+  do i=istart2,iend2, iend2-istart2
+     do k=kstart, kend
+        bz2 : do j = jstart, jend
+           if (j==0) cycle bz2
+           icell = icell+1
+           if (icell > ntot2) then
+              write(*,*) "ERROR : there is an issue in the cell mapping"
+              write(*,*) "Extra cells:", icell, ntot2
+              write(*,*) i,j,k
+              write(*,*) "Exiting"
+              stop
+           endif
+
+           cell_map_i(icell) = i
+           cell_map_j(icell) = j
+           cell_map_k(icell) = k
+
+           cell_map(i,j,k) = icell
+        enddo bz2
+     enddo
+  enddo
+
+  if (icell /= ntot2) then
+     write(*,*) "Something went wrong in the calle mapping"
+     write(*,*) "I am missing some virtual cells"
+     write(*,*) icell, ntot2
+     write(*,*)
+     stop
+  endif
 
   return
 

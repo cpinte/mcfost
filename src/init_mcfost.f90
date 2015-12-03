@@ -61,7 +61,6 @@ subroutine initialisation_mcfost()
 
   ldisk_struct = .false.
   ldust_prop = .false.
-  ldust_gas_ratio = .false.
   lstop_after_init= .false.
   lwall=.false.
   lpah=.false.
@@ -666,9 +665,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         sigma_file = s
         i_arg = i_arg + 1
-     case("-dg_ratio")
-        i_arg = i_arg+1
-        ldust_gas_ratio = .true.
      case("-weight_emission")
         i_arg = i_arg+1
         lweight_emission=.true.
