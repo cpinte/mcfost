@@ -281,12 +281,8 @@ subroutine alloc_dynamique()
      kappa_abs_RE=0.0
   endif
 
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
-          stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,p_nz,1), tab_g_pos(n_lambda,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+
+  allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
      stop
@@ -1111,12 +1107,7 @@ subroutine realloc_dust_mol()
      kappa_abs_RE=0.0
   endif
 
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
-          stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,p_nz,1), tab_g_pos(n_lambda,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+  allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos (realloc)'
      stop
@@ -1382,28 +1373,13 @@ subroutine realloc_step2()
   tab_g = 0
 
 
-  deallocate(tab_albedo_pos)
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az), stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda2,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+  deallocate(tab_albedo_pos,tab_g_pos)
+  allocate(tab_albedo_pos(p_n_cells,n_lambda2), tab_g_pos(p_n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos'
+     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
      stop
   endif
   tab_albedo_pos = 0
-
-  deallocate(tab_g_pos)
-  if (l3D) then
-     allocate(tab_g_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az), stat=alloc_status)
-  else
-     allocate(tab_g_pos(n_lambda2,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_g_pos'
-     stop
-  endif
   tab_g_pos = 0
 
   deallocate(tab_s11)

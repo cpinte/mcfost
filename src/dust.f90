@@ -963,7 +963,7 @@ subroutine opacite(lambda)
               density=densite_pouss(icell,k)
               k_sca_tot = k_sca_tot + C_sca(lambda,k) * density
               k_ext_tot = k_ext_tot + C_ext(lambda,k) * density
-              tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk) + C_sca(lambda,k) * density * tab_g(lambda,k)
+              tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(lambda,k) * density * tab_g(lambda,k)
               !somme = somme + C_sca(lambda,k)*density
 
               if (scattering_method == 2) then
@@ -987,8 +987,8 @@ subroutine opacite(lambda)
               endif !scattering_method
            enddo !k
 
-           if (k_ext_tot > tiny_real) tab_albedo_pos(lambda,i,j,pk) = k_sca_tot/k_ext_tot
-           if (k_sca_tot > tiny_real) tab_g_pos(lambda,i,j,pk) = tab_g_pos(lambda,i,j,pk)/k_sca_tot
+           if (k_ext_tot > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/k_ext_tot
+           if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
 
 
            if (lcompute_obs.and.lscatt_ray_tracing) then
@@ -1031,7 +1031,7 @@ subroutine opacite(lambda)
                  endif
 
               else ! aniso_method = 2 --> HG
-                 gsca = tab_g_pos(lambda,i,j,pk)
+                 gsca = tab_g_pos(icell,lambda)
                  tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_ray_tracing(lambda,i,j,pk,:) / (k_sca_tot * deux_pi)
               endif
 
@@ -1111,7 +1111,7 @@ subroutine opacite(lambda)
               endif !scattering_method
 
            else !densite_pouss = 0.0
-              tab_albedo_pos(lambda,i,j,pk)=0.0
+              tab_albedo_pos(icell,lambda)=0.0
               if (scattering_method ==2) then
                  ! Propriétés optiques des cellules
                  prob_s11_pos(lambda,i,j,pk,:)=1.0
@@ -1177,8 +1177,8 @@ subroutine opacite(lambda)
 
      icell = cell_map(1,1,1)
      kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
-     albedo_lambda=tab_albedo_pos(:,1,1,1)
-     g_lambda=tab_g_pos(:,1,1,1)
+     albedo_lambda=tab_albedo_pos(icell,:)
+     g_lambda=tab_g_pos(icell,:)
 
      call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
      call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))

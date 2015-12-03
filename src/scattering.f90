@@ -1359,7 +1359,7 @@ integer function seuil_n_dif(lambda)
   integer, parameter :: seuil_n = 15
 
 
-  albedo = maxval(tab_albedo_pos(lambda,:,:,:))
+  albedo = maxval(tab_albedo_pos(:,lambda))
 
   n = floor(log(seuil)/log(albedo))+1
 
