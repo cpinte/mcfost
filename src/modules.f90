@@ -374,7 +374,7 @@ module grains
   real, dimension(:,:,:,:,:), allocatable :: tab_mueller !n_lambda,n_grains,4,4,180
 
   ! Parametres de diffusion des cellules
-  real, dimension(:,:,:,:), allocatable :: tab_albedo_pos, tab_g_pos !n_lambda,n_rad,nz+1, (n_az)
+  real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos !n_cells,n_lambda
   real, dimension(:,:,:,:,:), allocatable :: tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos !n_lambda,n_rad,nz+1,(n_az), 180
 
   character(len=512) :: aggregate_file, mueller_aggregate_file

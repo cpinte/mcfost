@@ -60,7 +60,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand, tau
-  integer :: i, ri, zj, phik
+  integer :: i, ri, zj, phik, icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -177,8 +177,9 @@ subroutine transfert_poussiere()
 
      write(*,*) ""
      write(*,*) "Dust properties in cell (1,1,1): "
-     write(*,*) "g             ", tab_g_pos(1,1,1,1)
-     write(*,*) "albedo        ", tab_albedo_pos(1,1,1,1)
+     icell = cell_map(1,1,1)
+     write(*,*) "g             ", tab_g_pos(icell,1)
+     write(*,*) "albedo        ", tab_albedo_pos(icell,1)
      if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(1,1,1,1,:)/tab_s11_pos(1,1,1,1,:))
 
      if (lopacite_only) stop
@@ -845,7 +846,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_ri, p_zj, p_phik, taille_grain, itheta, icell
+  integer :: p_ri, p_zj, p_phik, p_icell, taille_grain, itheta, icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -853,7 +854,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.
-  p_ri = 1 ; p_zj = 1 ; p_phik = 1
+  p_ri = 1 ; p_zj = 1 ; p_phik = 1 ; p_icell = 1
 
   lpacket_alive=.true.
 
@@ -899,6 +900,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         p_ri=ri
         p_zj=zj
         if (l3D) p_phik = phik
+        p_icell = icell
      endif
 
      ! Sinon la vie du photon continue : il y a interaction
@@ -912,7 +914,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         endif
 
         ! Multiplication par albedo
-        Stokes(:)=Stokes(:)*tab_albedo_pos(lambda,p_ri,p_zj,p_phik)
+        Stokes(:)=Stokes(:)*tab_albedo_pos(p_icell,lambda)
         if (Stokes(1) < tiny_real_x1e6)then ! on saute le photon
            lpacket_alive = .false.
            return
@@ -924,7 +926,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         rand = sprng(stream(id))
      endif ! lmono
 
-     if (rand < tab_albedo_pos(lambda,p_ri,p_zj,p_phik)) then ! Diffusion
+     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Diffusion
         flag_scatt=.true.
         flag_direct_star = .false.
 
@@ -983,7 +985,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! Nouveaux paramètres de Stokes
               if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
-              call hg(tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
+              call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0

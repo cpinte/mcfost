@@ -44,7 +44,7 @@ subroutine lect_section_eff()
 
   ! Propriétés optiques des cellules
   do lambda=1,n_lambda
-     tab_albedo_pos(lambda,:,:,:)=qsca(lambda)/qext(lambda)
+     tab_albedo_pos(:,lambda)=qsca(lambda)/qext(lambda)
      tab_s11_pos(lambda,:,:,:,:)=1.0
      tab_s12_pos(lambda,:,:,:,:)=0.0
      tab_s33_pos(lambda,:,:,:,:)=0.0
