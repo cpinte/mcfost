@@ -789,11 +789,6 @@ subroutine opacite(lambda)
   real(kind=db) ::  density, proba, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
   logical :: lcompute_obs
 
-  ! Pour spline
-!  real, dimension(1:n_prob) :: xa,ya,y2
-!  real :: delta_prob1, delta_probn, yp1, ypn
-!  real :: yp_p1, yp_m1, ypp
-
   real :: somme, gsca
 
   logical :: ldens0
@@ -949,9 +944,9 @@ subroutine opacite(lambda)
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
-  !$omp shared(tab_albedo_pos,prob_s11_pos,valeur_prob,amax_reel,somme) &
+  !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
   !$omp private(i,j,k,icell,pk,density,k_min,proba,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
-  !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,ech_prob,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
+  !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
@@ -1111,45 +1106,10 @@ subroutine opacite(lambda)
                        probsizecumul(lambda,i,j,pk,k)= probsizecumul(lambda,i,j,pk,k)/ &
                             probsizecumul(lambda,i,j,pk,n_grains_tot)
                     enddo !k
-                    ech_prob(lambda,i,j,pk,0) = 1
-                    ech_prob(lambda,i,j,pk,n_prob+1)=n_grains_tot
-                    k_min = 1
-                    ! Cas particulier proba inf
-                    ech_proba_inf : do k=1, n_grains_tot
-                       if (probsizecumul(lambda,i,j,pk,k) >= proba_resol) then
-                          k_min = k
-                          ech_prob(lambda,i,j,pk,1) = k
-                          valeur_prob(lambda,i,j,pk,1)=probsizecumul(lambda,i,j,pk,k)
-                          exit ech_proba_inf
-                       endif
-                    enddo ech_proba_inf
-                    ! cas general
-                    do l=2,n_prob-1
-                       proba =  real(l-1)/real(n_prob-1)
-                       echantillonage : do k=k_min, n_grains_tot
-                          if (probsizecumul(lambda,i,j,pk,k) >= proba) then
-                             k_min = k
-                             ech_prob(lambda,i,j,pk,l) = k
-                             valeur_prob(lambda,i,j,pk,l)=probsizecumul(lambda,i,j,pk,k)
-                             exit echantillonage
-                          end if
-                       end do echantillonage
-                    enddo !l
-                    ! Cas particulier proba sup
-                    ech_proba_sup : do k=k_min, n_grains_tot
-                       if (probsizecumul(lambda,i,j,pk,k) >= (1.0-proba_resol)) then
-                          k_min = k
-                          ech_prob(lambda,i,j,pk,n_prob) = k
-                          valeur_prob(lambda,i,j,pk,n_prob)=probsizecumul(lambda,i,j,pk,k)
-                          exit  ech_proba_sup
-                       endif
-                    enddo ech_proba_sup
                     ! Cas particulier proba=1.0
                     ech_proba1 : do k=k_min, n_grains_tot
                        if ((1.0 - probsizecumul(lambda,i,j,pk,k)) <  1.e-6) then
                           amax_reel(lambda,i,j,pk) = k
-                          ech_prob(lambda,i,j,pk,n_prob+1) = k
-                          valeur_prob(lambda,i,j,pk,n_prob+1) = 1.0
                           exit  ech_proba1
                        endif
                     enddo  ech_proba1 !k
@@ -1161,9 +1121,6 @@ subroutine opacite(lambda)
                     do  k=1,n_grains_tot
                        probsizecumul(lambda,i,j,pk,k) = 1.0
                     enddo !k
-                    do l=0,n_prob+1
-                       ech_prob(lambda,i,j,pk,l) = 1
-                    enddo
                  endif
               endif !scattering_method
 
@@ -1183,8 +1140,6 @@ subroutine opacite(lambda)
               else !scattering_method
                  probsizecumul(lambda,i,j,pk,:)=1.0
                  probsizecumul(lambda,i,j,pk,0)=0.0
-                 ech_prob(lambda,i,j,pk,:) = 1
-                 valeur_prob(lambda,i,j,pk,:) = 1.0
               endif ! scattering_method
 
            endif !densite_pouss = 0.0
@@ -1221,76 +1176,6 @@ subroutine opacite(lambda)
      endif
   endif
 
-!  write(*,*) "lambda", tab_lambda(lambda), tab_g_pos(lambda,1,1,1)
-!  write(*,*) tab_s11_ray_tracing(lambda,1,1,:)
-
-!!$! Spline
-!!$  do i=1,n_rad
-!!$     do j=1,nz
-!!$        do l=1,n_prob
-!!$           xa(l)=valeur_prob(lambda,i,j,l) ! Proba
-!!$           ya(l)=real(ech_prob(lambda,i,j,l)) ! Taille du grain
-!!$        enddo !l
-!!$        k=ya(1)
-!!$        delta_prob1 = probsizecumul(lambda,i,j,k+1) - probsizecumul(lambda,i,j,k)
-!!$        k=ya(n_prob)
-!!$        delta_probn = probsizecumul(lambda,i,j,k) - probsizecumul(lambda,i,j,k-1)
-!!$ !       write(*,*) probsizecumul(lambda,i,j,n_grains_tot-1), probsizecumul(lambda,i,j,n_grains_tot)
-!!$ !       read(*,*)
-!!$
-!!$        if (delta_prob1 > 0.0) then
-!!$           yp1=1.0/delta_prob1 ! 1.0 = 2-1
-!!$!           yp1=(ya(2)-ya(1))/(xa(2)-xa(1))
-!!$        else
-!!$           yp1=1.e30
-!!$        endif
-!!$        if (delta_probn > 0.0) then
-!!$           ypn=1.0/delta_probn ! 1.0 = n_grains_tot -(n_grains_tot -1)
-!!$!           ypn=(ya(n_prob)-ya(n_prob-1))/(xa(n_prob)-xa(n_prob-1))
-!!$        else
-!!$           ypn=1.e30
-!!$        endif
-!!$
-!!$
-!!$!        read(*,*)
-!!$!        write(*,*) i,j,yp1,ypn
-!!$!        read(*,*)
-!!$
-!!$!        write(*,*) 'SPLINE'
-!!$        call spline(xa,ya,yp1,ypn,y2)
-
-!!!!!!!!!!!!!!!
-!!$        ! Calcul derivees a la main !CA BUGGG
-!!$        do l=1,n_prob
-!!$        ! derivee 1 y'=dk/dproba avec dk=1 k indice taille du grain
-!!$           k=ya(l)
-!!$!           yp_p1 = 1.0/(probsizecumul(lambda,i,j,k+1)-probsizecumul(lambda,i,j,k))
-!!$!           yp_m1 = 1.0/(probsizecumul(lambda,i,j,k)-probsizecumul(lambda,i,j,k-1))
-!!$
-!!$        ! derivee 2
-!!$           ypp = 1.0/(probsizecumul(lambda,i,j,k+2)-probsizecumul(lambda,i,j,k-2))
-!!$!           write(*,*) l, xa(l), ya(l), y2(l), ypp
-!!$           y2(l)=ypp
-!!$        enddo !l
-!        read(*,*)
-
-!!!!!!!!!!!!!!!
-
-!!$!        write(*,*) 'SPLINE'
-!!$
-!!$        do l=1,n_prob
-!!$           xspline(lambda,i,j,l)=y2(l)
-!!$        enddo !l
-!!$     enddo !j
-!!$  enddo !i
-
-!  write(*,*) "test"
-!  write(*,*) tab_s11_pos(1,1,143), tab_s12_pos(1,1,143), tab_s33_pos(1,1,143), tab_s34_pos(1,1,143)
-
-! write(*,*) tab_lambda(lambda), kappa(lambda, 1, 40,1) !, kappa_abs_eg(lambda, 1, 1,1), densite_pouss(1,1,1,1)
-
-!  write(*,*) sum(densite_pouss),   C_abs(lambda,1), r_grain(1)
-!  stop
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
      write(*,*) "Writing dust properties"

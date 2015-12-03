@@ -354,34 +354,6 @@ subroutine alloc_dynamique()
      endif
      probsizecumul = 0
 
-     if (l3D) then
-        allocate(ech_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(ech_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error ech_prob'
-        stop
-     endif
-     ech_prob = 0
-
-     if (l3D) then
-        allocate(valeur_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(valeur_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error valeur_prob'
-        stop
-     endif
-     valeur_prob = 0
-
-     allocate(xspline(n_lambda,p_n_rad,p_nz,0:n_prob+1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xspline'
-        stop
-     endif
-     xspline = 0
   endif ! method
 
 
@@ -982,7 +954,7 @@ subroutine dealloc_em_th()
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
   else ! prop par grains
-     deallocate(probsizecumul,ech_prob,valeur_prob,xspline)
+     deallocate(probsizecumul)
   endif ! method
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
@@ -1149,28 +1121,6 @@ subroutine realloc_dust_mol()
   tab_albedo_pos = 0
   tab_g_pos = 0.0
 
-  if (l3D) then
-     allocate(ech_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-  else
-     allocate(ech_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error ech_prob (realloc)'
-     stop
-  endif
-  ech_prob = 0
-
-  if (l3D) then
-     allocate(valeur_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-  else
-     allocate(valeur_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error valeur_prob (realloc)'
-     stop
-  endif
-  valeur_prob = 0
-
   allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre_etoile'
@@ -1208,7 +1158,6 @@ subroutine clean_mem_dust_mol()
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
   deallocate(tab_albedo_pos, tab_g_pos)
-  deallocate(ech_prob,valeur_prob)
 
   return
 
@@ -1579,29 +1528,6 @@ subroutine realloc_step2()
      endif
      probsizecumul = 0
 
-     deallocate(ech_prob)
-     if (l3D) then
-        allocate(ech_prob(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(ech_prob(n_lambda2,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error ech_prob'
-        stop
-     endif
-     ech_prob = 0
-
-     deallocate(valeur_prob)
-     if (l3D) then
-        allocate(valeur_prob(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(valeur_prob(n_lambda2,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error valeur_prob'
-        stop
-     endif
-     valeur_prob = 0
   endif ! method
 
   deallocate(amax_reel, kappa, kappa_abs_eg)

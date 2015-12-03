@@ -1155,7 +1155,7 @@ subroutine densite_eqdiff()
      !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss) &
      !$omp private(j,k,z,icell) &
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,rho,correct_strat, delta_z,cell_map)
+     !$omp shared(zmax,kappa,probsizecumul,nbre_grains,cst_pous,rho,correct_strat, delta_z,cell_map)
      !$omp do schedule(dynamic,10)
      do j=1,nz
         icell = cell_map(i,j,1)
