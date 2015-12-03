@@ -218,7 +218,7 @@ subroutine init_reemission()
         enddo bz !j
      enddo !i
 
-     if (lstrat) then ! Calcul dans toutes les cellules
+     if (lvariable_dust) then ! Calcul dans toutes les cellules
         do i=1,p_n_rad
            bz2 : do j=pj_start, p_nz
               if (j==0) cycle bz2
@@ -259,7 +259,7 @@ subroutine init_reemission()
            enddo !l
         endif
 
-     endif !lstrat
+     endif !lvariable_dust
 
      if (lRE_nLTE) then
         ! produit par opacite (abs seule) massique d'une seule taille de grain
@@ -551,7 +551,7 @@ subroutine Temp_finale()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,pk,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac) &
-  !$omp shared(J_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,lstrat,T_min,n_T,j_start,n_az)
+  !$omp shared(J_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,T_min,n_T,j_start,n_az)
   !$omp do schedule(dynamic,10)
   do i=1,n_rad
      bz : do j=j_start,nz
@@ -654,7 +654,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,lstrat,n_lambda,kappa_abs_eg) &
+  !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,n_lambda,kappa_abs_eg) &
   !$omp shared(prob_kappa_abs_1grain,xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0,cell_map)
   !$omp do schedule(dynamic,10)

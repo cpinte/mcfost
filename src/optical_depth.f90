@@ -984,7 +984,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
 !!$
 !!$           ! TODO : ca calcule plein de fois a meme chose si pas de strat et meme direction
 !!$           ! D'ou l'interet de la separation dans mcfost3 !!!
-!!$           if (lstrat) then
+!!$           if (lvariable_dust) then
 !!$              p_ri0 = ri0
 !!$              p_thetaj0 = thetaj0
 !!$           endif
@@ -1442,7 +1442,7 @@ subroutine integ_tau(lambda)
   write(*,*) 'Integ tau dans plan eq. = ', norme
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
-  if (.not.lstrat) then
+  if (.not.lvariable_dust) then
      icell = cell_map(1,1,1)
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
@@ -1461,7 +1461,7 @@ subroutine integ_tau(lambda)
   write(*,*) 'Integ tau vert = ', norme
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
-  if (.not.lstrat) then
+  if (.not.lvariable_dust) then
      icell = cell_map(1,1,1)
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
@@ -1479,7 +1479,7 @@ subroutine integ_tau(lambda)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
-  if (.not.lstrat) then
+  if (.not.lvariable_dust) then
      icell = cell_map(1,1,1)
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &

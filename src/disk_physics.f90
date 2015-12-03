@@ -23,7 +23,7 @@ subroutine compute_othin_sublimation_radius()
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
 
 
-  !  if (lstrat) then
+  !  if (lvariable_dust) then
   !     write(*,*) "Sublimation radius calculation not implemented"
   !     write(*,*) "in case of statification"
   !     stop

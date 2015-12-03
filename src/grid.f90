@@ -448,13 +448,6 @@ subroutine define_grid()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-  nrz = n_rad * nz
-  if (l3D) then
-     n_cells = 2*nrz*n_az
-  else
-     n_cells = nrz
-  endif
-
   call build_cylindrical_cell_mapping()
 
   Rmax2 = Rmax*Rmax

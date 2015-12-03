@@ -362,7 +362,7 @@ subroutine define_dust_density()
 
   do  l=1,n_grains_tot
      ! Correction stratification
-     if (lstrat.and.(settling_type == 1)) then
+     if (lvariable_dust.and.(settling_type == 1)) then
         ! loi de puissance
         a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
@@ -436,7 +436,7 @@ subroutine define_dust_density()
                  ! Densite de la poussiere
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                     ! Settling a la Dubrulle
-                    if (lstrat.and.(settling_type == 2)) then
+                    if (lvariable_dust.and.(settling_type == 2)) then
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
                        if (rho0 > tiny_db) then
@@ -491,7 +491,7 @@ subroutine define_dust_density()
            endif
 
 
-           if (lstrat.and.(settling_type == 2)) then
+           if (lvariable_dust.and.(settling_type == 2)) then
               if (lspherical) then
                  write(*,*) "ERROR: settling following Dubrulle's prescription is only"
                  write(*,*) "implemented on a cylindrical grid so far"
@@ -531,7 +531,7 @@ subroutine define_dust_density()
 
         enddo ! i
 
-        if (lstrat.and.(settling_type == 3)) then
+        if (lvariable_dust.and.(settling_type == 3)) then
            ! Si strat a la Seb. Fromang : on ecrase le tableau de densite
            ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
 
@@ -1042,7 +1042,7 @@ subroutine densite_eqdiff()
      endif
 
     ! Resolution eq_diff pour stratification
-     if (lstrat) then
+     if (lvariable_dust) then
         eps = 1.e-2
         pas_z = delta_z(i)
         do k=1, n_grains_tot
@@ -1077,9 +1077,9 @@ subroutine densite_eqdiff()
               correct_strat(k,j) = correct_strat(k,j)*correct
            enddo
         enddo !k
-     else!lstrat
+     else!lvariable_dust
         correct_strat = 1.0
-     endif!lstrat
+     endif!lvariable_dust
 
      ! Calcul opacite et probabilite de diffusion
      do j=1,nz
@@ -1526,7 +1526,7 @@ subroutine densite_file()
      enddo !k
   enddo ! icell
 
-  if (lstrat) then
+  if (lvariable_dust) then
      write(*,*) "Differential spatial distribution"
      l=1
      do k=1,n_grains_tot
@@ -1576,7 +1576,7 @@ subroutine densite_file()
            enddo ! j
         enddo ! i
      enddo ! k
-  endif  !lstrat
+  endif  !lvariable_dust
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot

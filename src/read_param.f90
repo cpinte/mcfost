@@ -210,9 +210,9 @@ contains
     read(1,*) line_buffer
     read(1,*) settling_type, exp_strat, a_strat
     if (settling_type == 0) then
-       lstrat = .false.
+       lvariable_dust = .false.
     else
-       lstrat = .true.
+       lvariable_dust = .true.
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
@@ -228,9 +228,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -255,7 +255,7 @@ contains
        if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
           write(*,*) "WARNING : debris disk, setting settling to 0"
           settling_type=0
-          lstrat = .false.
+          lvariable_dust = .false.
        endif
 
        read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
@@ -652,9 +652,9 @@ contains
     read(1,*) line_buffer
     read(1,*) settling_type, exp_strat, a_strat
     if (settling_type == 0) then
-       lstrat = .false.
+       lvariable_dust = .false.
     else
-       lstrat = .true.
+       lvariable_dust = .true.
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
@@ -670,9 +670,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -697,7 +697,7 @@ contains
        if ((disk_zone(j)%geometry == 4).and.(settling_type > 0)) then
           write(*,*) "WARNING : debris disk, setting settling to 0"
           settling_type=0
-          lstrat = .false.
+          lvariable_dust = .false.
        endif
 
        read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
@@ -1071,9 +1071,9 @@ contains
     read(1,*) line_buffer
     read(1,*) settling_type, exp_strat, a_strat
     if (settling_type == 0) then
-       lstrat = .false.
+       lvariable_dust = .false.
     else
-       lstrat = .true.
+       lvariable_dust = .true.
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
@@ -1088,9 +1088,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
 
     ! Allocation des variables pour disque a une zone
@@ -1459,9 +1459,9 @@ contains
     read(1,*) line_buffer
     read(1,*) settling_type, exp_strat, a_strat
     if (settling_type == 0) then
-       lstrat = .false.
+       lvariable_dust = .false.
     else
-       lstrat = .true.
+       lvariable_dust = .true.
     endif
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
@@ -1474,9 +1474,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -1866,9 +1866,9 @@ contains
     read(1,*) line_buffer
     read(1,*) settling_type, exp_strat, a_strat
     if (settling_type == 0) then
-       lstrat = .false.
+       lvariable_dust = .false.
     else
-       lstrat = .true.
+       lvariable_dust = .true.
     endif
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
@@ -1881,9 +1881,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -2275,7 +2275,7 @@ contains
     ! Dust global properties
     ! ----------------------
     read(1,*) line_buffer
-    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*) lvariable_dust, exp_strat, a_strat
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lchauff_int, alpha
@@ -2287,9 +2287,9 @@ contains
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -2669,7 +2669,7 @@ end subroutine read_para215
     ! ----------------------
     read(1,*) line_buffer
     read(1,*) gas_dust
-    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*) lvariable_dust, exp_strat, a_strat
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lchauff_int, alpha
@@ -2681,9 +2681,9 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -3072,7 +3072,7 @@ end subroutine read_para215
     ! ----------------------
     read(1,*) line_buffer
     read(1,*) gas_dust
-    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*) lvariable_dust, exp_strat, a_strat
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lchauff_int, alpha
@@ -3084,9 +3084,9 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
@@ -3469,7 +3469,7 @@ end subroutine read_para215
     ! ----------------------
     read(1,*) line_buffer
     read(1,*) gas_dust
-    read(1,*) lstrat, exp_strat, a_strat
+    read(1,*) lvariable_dust, exp_strat, a_strat
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lchauff_int, alpha
@@ -3481,9 +3481,9 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) n_zones
     if (n_zones > 1) then
-       lstrat=.true. ; exp_strat=0.
+       lvariable_dust=.true. ; exp_strat=0.
        write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
+       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)

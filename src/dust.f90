@@ -802,7 +802,7 @@ subroutine opacite(lambda)
   ! on la met à nbre_grains et on effacera apres
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
-  if (.not.lstrat) then
+  if (.not.lvariable_dust) then
      icell = cell_map(1,1,1)
      if (maxval(densite_pouss(icell,:)) < tiny_real) then
         ldens0 = .true.
