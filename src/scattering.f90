@@ -820,7 +820,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
 
   ! Cas particulier prob=1.0
   if ((1.0-prob) < 1.e-6) then
-     grainsize=amax_reel(lambda,ri,zj,phik)
+     grainsize=amax_reel(cell_map(ri,zj,phik),lambda)
      return
   endif
 

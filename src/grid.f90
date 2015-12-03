@@ -435,9 +435,10 @@ subroutine define_grid()
   real, parameter :: pi = 3.1415926535
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
-  integer :: i,j,k, izone, ii, ii_min, ii_max
+  integer :: i,j,k, izone, ii, ii_min, ii_max, icell
 
   !tab en cylindrique ou spherique suivant grille
+  real(kind=db), dimension(n_rad) :: V
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
@@ -449,7 +450,7 @@ subroutine define_grid()
 
   nrz = n_rad * nz
   if (l3D) then
-     n_cells = 2*nrz * n_az
+     n_cells = 2*nrz*n_az
   else
      n_cells = nrz
   endif
@@ -679,16 +680,13 @@ subroutine define_grid()
 
      do i=1, n_rad
         if ((tab_r2(i+1)-tab_r2(i)) > 1.0e-6*tab_r2(i)) then
-           volume(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
+           V(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
            dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
         else
            rcyl = r_grid(i,1)
-           volume(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
+           V(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
            dr2_grid(i) = 2.0_db * rcyl*(tab_r(i+1)-tab_r(i))
         endif
-        ! Conversion en cm**3
-        ! 1 AU = 1.49597870691e13 cm
-        !     volume(i)=volume(i)*3.347929e39
 
         delta_z(i)=zmax(i)/real(nz)
         ! Pas d'integration = moitie + petite dimension cellule
@@ -745,9 +743,9 @@ subroutine define_grid()
         endif
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
-           volume(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
+           V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
         else
-           volume(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
+           V(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
         endif
      enddo
 
@@ -765,7 +763,7 @@ subroutine define_grid()
         endif
      enddo !pk
 
-     volume(:) = volume(:) * 0.5 / real(n_az)
+     V(:) = V(:) * 0.5 / real(n_az)
 
      do j=1,nz
         z_grid(:,-j) = -z_grid(:,j)
@@ -804,6 +802,13 @@ subroutine define_grid()
 !        stop
 !     endif
 !  enddo
+
+
+  ! Volume array
+  do icell=1, n_cells
+     i = cell_map_i(icell)
+     volume(icell) = V(i)
+  enddo
 
   return
 
@@ -1095,7 +1100,7 @@ end subroutine init_lambda2
 !**********************************************************************
 
 subroutine select_cellule(lambda,aleat,ri,zj, phik)
-! Sélection de la cellule qui va émettre le photon
+  ! Sélection de la cellule qui va émettre le photon
 ! C. Pinte
 ! 04/02/05
 ! Modif 3D 10/06/05

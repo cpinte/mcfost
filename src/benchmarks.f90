@@ -49,22 +49,15 @@ subroutine lect_section_eff()
      tab_s12_pos(lambda,:,:,:,:)=0.0
      tab_s33_pos(lambda,:,:,:,:)=0.0
      tab_s34_pos(lambda,:,:,:,:)=0.0
-     do i=1,n_rad
-        do j=1,nz
-           ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-           ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
-           ! density en cm-3                      > reste facteur 1.49595e17
-           ! longueur de vol en AU = 1.5e13 cm   /
-           icell = cell_map(i,j,1)
-           kappa(lambda,i,j,1)=densite_pouss(icell,1) * qext(lambda) * 1.49595e17
-           kappa_abs_eg(lambda,i,j,1)=densite_pouss(icell,1)*(qext(lambda)-qsca(lambda))*1.49595e17
-        enddo !j
-     enddo !i
+     do icell=1, n_cells
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
+        ! density en cm-3                      > reste facteur 1.49595e17
+        ! longueur de vol en AU = 1.5e13 cm   /
+        kappa(icell,lambda)=densite_pouss(icell,1) * qext(lambda) * 1.49595e17
+        kappa_abs_eg(icell,lambda)=densite_pouss(icell,1)*(qext(lambda)-qsca(lambda))*1.49595e17
+     enddo !icell
   enddo !lambda
-
-
-  kappa(:,:,nz+1,:)=0.0
-  kappa_abs_eg(:,:,nz+1,:)=0.0
 
   tab_g_pos=0.0
   proba_abs_RE = 1.0

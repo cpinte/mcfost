@@ -803,9 +803,10 @@ subroutine opacite(lambda)
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
   if (.not.lstrat) then
-     if (maxval(densite_pouss(1,:)) < tiny_real) then
+     icell = cell_map(1,1,1)
+     if (maxval(densite_pouss(icell,:)) < tiny_real) then
         ldens0 = .true.
-        densite_pouss(1,:) = nbre_grains(:)
+        densite_pouss(icell,:) = nbre_grains(:)
      endif
   endif
 
@@ -833,22 +834,23 @@ subroutine opacite(lambda)
      bz : do j=j_start,nz
         if (j==0) cycle bz
         do pk=1, n_az
-           kappa(lambda,i,j,pk) = 0.0
+           icell = cell_map(i,j,pk) ! NEWTODO: check pk and make a loop on icell
+           kappa(icell,lambda) = 0.0
            k_abs_tot = 0.0
            k_abs_RE = 0.0
            k_abs_RE_LTE = 0.0
-           icell = cell_map(i,j,pk)
+
            do  k=1,n_grains_tot
               density=densite_pouss(icell,k)
-              kappa(lambda,i,j,pk) = kappa(lambda,i,j,pk) + C_ext(lambda,k) * density
+              kappa(icell,lambda) = kappa(icell,lambda) + C_ext(lambda,k) * density
               k_abs_tot = k_abs_tot + C_abs(lambda,k) * density
            enddo !k
 
            if (lRE_LTE) then
-              kappa_abs_eg(lambda,i,j,pk) = 0.0
+              kappa_abs_eg(icell,lambda) = 0.0
               do k=grain_RE_LTE_start,grain_RE_LTE_end
                  density=densite_pouss(icell,k)
-                 kappa_abs_eg(lambda,i,j,pk) =  kappa_abs_eg(lambda,i,j,pk) + C_abs(lambda,k) * density
+                 kappa_abs_eg(icell,lambda) =  kappa_abs_eg(icell,lambda) + C_abs(lambda,k) * density
                  k_abs_RE_LTE = k_abs_RE_LTE + C_abs(lambda,k) * density ! todo : idem kappa_abs_eg, I can save this calculation
                  k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
               enddo
@@ -862,30 +864,25 @@ subroutine opacite(lambda)
            endif
 
            if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
-              kappa_sca(lambda,i,j,pk) = 0.0
+              kappa_sca(icell,lambda) = 0.0
               do k=1,n_grains_tot
                  density=densite_pouss(icell,k)
-                 kappa_sca(lambda,i,j,pk) = kappa_sca(lambda,i,j,pk) + C_sca(lambda,k) * density
+                 kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(lambda,k) * density
               enddo
            endif
 
            if (letape_th) then
               if (lnRE.and.(k_abs_tot > tiny_db)) then
-                 kappa_abs_RE(lambda,i,j,pk) =  k_abs_RE
-                 proba_abs_RE(lambda,i,j,pk) = k_abs_RE/k_abs_tot
+                 kappa_abs_RE(icell,lambda) =  k_abs_RE
+                 proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
               endif
 
-              if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(lambda,i,j,pk) = k_abs_RE_LTE/k_abs_RE
-              if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(lambda,i,j,pk) = 1.0 ! so far, might be updated if nRE --> qRE grains
+              if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(icell,lambda) = k_abs_RE_LTE/k_abs_RE
+              if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
            endif ! letape_th
         enddo !pk
      enddo bz !j
   enddo !i
-
-  if (letape_th) then
-     if (lnRE) proba_abs_RE(lambda,:,nz+1,:) = proba_abs_RE(lambda,:,nz,:)
-     if (lRE_nLTE) proba_abs_RE_LTE_p_nLTE(lambda,:,nz+1,:) = proba_abs_RE_LTE_p_nLTE(lambda,:,nz,:)
-  endif
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE) then
@@ -916,10 +913,10 @@ subroutine opacite(lambda)
   ! fact =  pi * a * a * 149595.0
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
-  kappa(lambda,:,:,:) = kappa(lambda,:,:,:) * fact
-  if (lRE_LTE) kappa_abs_eg(lambda,:,:,:) = kappa_abs_eg(lambda,:,:,:) * fact
-  if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) kappa_sca(lambda,:,:,:) = kappa_sca(lambda,:,:,:) * fact
-  if ((letape_th).and.lnRE) kappa_abs_RE(lambda,:,:,:) =  kappa_abs_RE(lambda,:,:,:) * fact
+  kappa(:,lambda) = kappa(:,lambda) * fact
+  if (lRE_LTE) kappa_abs_eg(:,lambda) = kappa_abs_eg(:,lambda) * fact
+  if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) kappa_sca(:,lambda) = kappa_sca(:,lambda) * fact
+  if ((letape_th).and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
 
 
   if (lscatt_ray_tracing) then
@@ -944,7 +941,7 @@ subroutine opacite(lambda)
      bz2 : do j=pj_start,p_nz
         if (j==0) cycle bz2
         do pk=1, p_n_az
-           icell = cell_map(i,j,pk)
+           icell = cell_map(i,j,pk) ! NEWTODO : icell loop, check pointers
            k_sca_tot=0.0
            k_ext_tot=0.0
 
@@ -1098,7 +1095,7 @@ subroutine opacite(lambda)
                     ! Cas particulier proba=1.0
                     ech_proba1 : do k=k_min, n_grains_tot
                        if ((1.0 - ksca_CDF(lambda,i,j,pk,k)) <  1.e-6) then
-                          amax_reel(lambda,i,j,pk) = k
+                          amax_reel(icell,lambda) = k
                           exit  ech_proba1
                        endif
                     enddo  ech_proba1 !k
@@ -1152,19 +1149,19 @@ subroutine opacite(lambda)
 
   ! On remet la densite à zéro si besoin
   if (ldens0) then
-     densite_pouss(1,:) = 0.0_db
-     kappa(lambda,1,1,1) = 0.0_db
+     icell = cell_map(1,1,1)
+     densite_pouss(icell,:) = 0.0_db
+     kappa(icell,lambda) = 0.0_db
      if (lRE_LTE) then
-        kappa_abs_eg(lambda,1,1,1) = 0.0_db
+        kappa_abs_eg(icell,lambda) = 0.0_db
      endif
      if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
-        kappa_sca(lambda,1,1,1) = 0.0_db
+        kappa_sca(icell,lambda) = 0.0_db
      endif
      if (lnRE) then
         prob_kappa_abs_1grain(lambda,1,1,:) = 0.0
      endif
   endif
-
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
      write(*,*) "Writing dust properties"
@@ -1178,7 +1175,8 @@ subroutine opacite(lambda)
      allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
      allocate(kappa_grain(n_lambda,n_grains_tot))
 
-     kappa_lambda=real((kappa(:,1,1,1)/AU_to_cm)/(masse(1)/(volume(1)*AU_to_cm**3))) ! cm^2/g
+     icell = cell_map(1,1,1)
+     kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
      albedo_lambda=tab_albedo_pos(:,1,1,1)
      g_lambda=tab_g_pos(:,1,1,1)
 

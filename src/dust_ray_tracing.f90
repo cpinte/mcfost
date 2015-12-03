@@ -64,12 +64,11 @@ subroutine alloc_ray_tracing()
      nang_ray_tracing = 1 ;
   endif
 
+  allocate(kappa_sca(n_cells,n_lambda))
   if (l3D) then
-     allocate(kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
+     allocate(tab_s11_ray_tracing(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt),stat=alloc_status)
   else
-     allocate(kappa_sca(n_lambda,n_rad,nz+1,1), &
-          tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
+     allocate(tab_s11_ray_tracing(n_lambda,p_n_rad,p_nz,1,0:nang_scatt),stat=alloc_status)
   endif
   if (alloc_status > 0) then
      Write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
@@ -685,7 +684,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   integer, intent(in) :: lambda, ibin, iaz
 
-  integer :: i,j, k, itype, iRT
+  integer :: i,j, k, itype, iRT, icell
   real(kind=db) :: facteur, energie_photon, n_photons_envoyes
   real(kind=db), dimension(n_az_rt,0:1) :: norme
   real(kind=db) :: norme_3D
@@ -727,25 +726,25 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
            if (j==0) cycle bz_3D
            do i=1,n_rad
               facteur = energie_photon / volume(i)
-
-              if (kappa(lambda,i,j,k) > tiny_db) then
+              icell = cell_map(i,j,k)
+              if (kappa(icell,lambda) > tiny_db) then
                  ! TODO : pb de pola
                  do itype=1,N_type_flux
                     norme_3D = sum(xN_scatt(ibin,iaz,i,j,k,1,:)) / max(sum(xsin_scatt(ibin,iaz,i,j,k,1,:)),tiny_db)
 
-                    I_scatt(itype,k,:) = sum(xI_scatt(itype,iRT,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(lambda,i,j,k)
+                    I_scatt(itype,k,:) = sum(xI_scatt(itype,iRT,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(icell,lambda)
                  enddo ! itype
 
-                 eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(lambda,i,j,k)
+                 eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(icell,lambda)
 
                  if (lsepar_pola) then
-                    eps_dust1(2:4,i,j,k,:) =  I_scatt(2:4,k,:) / kappa(lambda,i,j,k)
+                    eps_dust1(2:4,i,j,k,:) =  I_scatt(2:4,k,:) / kappa(icell,lambda)
                  endif
 
                  if (lsepar_contrib) then
-                    eps_dust1(n_Stokes+2,i,j,k,:) =    I_scatt(n_Stokes+2,k,:) / kappa(lambda,i,j,k)
-                    eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(i,j,k) / kappa(lambda,i,j,k)
-                    eps_dust1(n_Stokes+4,i,j,k,:) =    I_scatt(n_Stokes+4,k,:) / kappa(lambda,i,j,k)
+                    eps_dust1(n_Stokes+2,i,j,k,:) =    I_scatt(n_Stokes+2,k,:) / kappa(icell,lambda)
+                    eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(i,j,k) / kappa(icell,lambda)
+                    eps_dust1(n_Stokes+4,i,j,k,:) =    I_scatt(n_Stokes+4,k,:) / kappa(icell,lambda)
                  endif ! lsepar_contrib
               else
                  eps_dust1(:,i,j,k,:) = 0.0_db
@@ -759,18 +758,19 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
         do i=1,n_rad
            facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
            ! TODO : les lignes suivantes sont tres chers en OpenMP
-           if (kappa(lambda,i,j,1) > tiny_db) then
+           icell = cell_map(i,j,1)
+           if (kappa(icell,lambda) > tiny_db) then
               ! TODO : pb de pola
               do itype=1,N_type_flux
                  norme = sum(xN_scatt(ibin,iaz,i,j,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,iaz,i,j,:,:,:),dim=3),tiny_db)
-                 I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(lambda,i,j,1)
+                 I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(icell,lambda)
               enddo ! itype
 
-              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
+              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,1) ) / kappa(icell,lambda)
               if (lsepar_contrib) then
-                 eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(lambda,i,j,1)
-                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j,1) / kappa(lambda,i,j,1)
-                 eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(lambda,i,j,1)
+                 eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(icell,lambda)
+                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j,1) / kappa(icell,lambda)
+                 eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(icell,lambda)
               endif ! lsepar_contrib
            else
               eps_dust1(:,i,j,:,:) = 0.0_db
@@ -809,7 +809,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
 
   integer, intent(in) :: lambda, ibin
-  integer :: i,j, iscatt, dir
+  integer :: i,j, iscatt, dir, icell
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
@@ -830,25 +830,26 @@ subroutine init_dust_source_fct2(lambda,ibin)
   ! Fouction source, indices : pola, iscatt, dir, i, j
   do j=1,nz
      do i=1,n_rad
-        if (kappa(lambda,i,j,1) > tiny_db) then
+        icell = cell_map(i,j,1)
+        if (kappa(icell,lambda) > tiny_db) then
            ! Boucle sur les directions de ray-tracing
            do dir=0,1
               do iscatt = 1, nang_ray_tracing
-                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j,1) ) / kappa(lambda,i,j,1)
+                 eps_dust2(1,iscatt,dir,i,j) =  ( sum(I_sca2(1,iscatt,dir,i,j,:))  +  J_th(i,j,1) ) / kappa(icell,lambda)
 
                  if (lsepar_pola) then
-                    eps_dust2(2:4,iscatt,dir,i,j) =  sum(I_sca2(2:4,iscatt,dir,i,j,:),dim=2)  / kappa(lambda,i,j,1)
+                    eps_dust2(2:4,iscatt,dir,i,j) =  sum(I_sca2(2:4,iscatt,dir,i,j,:),dim=2)  / kappa(icell,lambda)
                  endif
 
                  if (lsepar_contrib) then
-                    eps_dust2(n_Stokes+2,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+2,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
-                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j,1) / kappa(lambda,i,j,1)
-                    eps_dust2(n_Stokes+4,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+4,iscatt,dir,i,j,:)) / kappa(lambda,i,j,1)
+                    eps_dust2(n_Stokes+2,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+2,iscatt,dir,i,j,:)) / kappa(icell,lambda)
+                    eps_dust2(n_Stokes+3,iscatt,dir,i,j) =    J_th(i,j,1) / kappa(icell,lambda)
+                    eps_dust2(n_Stokes+4,iscatt,dir,i,j) =    sum(I_sca2(n_Stokes+4,iscatt,dir,i,j,:)) / kappa(icell,lambda)
                  endif ! lsepar_contrib
               enddo ! iscatt
 
               do iscatt = 1, nang_ray_tracing_star
-                 eps_dust2_star(:,iscatt,dir,i,j) = eps_dust2_star(:,iscatt,dir,i,j) / kappa(lambda,i,j,1)
+                 eps_dust2_star(:,iscatt,dir,i,j) = eps_dust2_star(:,iscatt,dir,i,j) / kappa(icell,lambda)
               enddo ! iscatt
            enddo ! dir
         else
@@ -889,11 +890,12 @@ subroutine calc_Ith(lambda)
            bz : do j=j_start,nz
               if (j==0) cycle bz
               do k=1, n_az
+                 icell = cell_map(i,j,k)
                  Temp=Temperature(i,j,k) ! que LTE pour le moment
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < 500.0) then
                     coeff_exp=exp(cst_wl)
-                    J_th(i,j,k) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(lambda,i,j,k) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
+                    J_th(i,j,k) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
                  else
                     J_th(i,j,k) = 0.0_db
                  endif
@@ -977,7 +979,7 @@ subroutine calc_Isca2_new(lambda,ibin)
   real(kind=db), dimension(n_rad,nz) :: Inu_max
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
-  integer :: k, alloc_status, i1, i2, correct_w
+  integer :: k, alloc_status, i1, i2, correct_w, icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
   real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
@@ -1319,8 +1321,9 @@ subroutine calc_Isca2_new(lambda,ibin)
   ! Boucle sur les cellules
   do ri=1, n_rad
      do zj=1,nz
+        icell = cell_map(ri,zj,1)
         facteur = energie_photon / volume(ri)
-        I_sca2(:,:,:,ri,zj,:) =  I_sca2(:,:,:,ri,zj,:) *  facteur * kappa_sca(lambda,ri,zj,1)
+        I_sca2(:,:,:,ri,zj,:) =  I_sca2(:,:,:,ri,zj,:) *  facteur * kappa_sca(icell,lambda)
      enddo
   enddo
 
@@ -1344,7 +1347,7 @@ subroutine calc_Isca2_star(lambda,ibin)
   real(kind=db), dimension(n_rad,nz) :: Inu
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
-  integer :: k
+  integer :: k, icell
   real :: s11, s12, s33, s34, cos_scatt
   real(kind=db) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
 
@@ -1536,8 +1539,9 @@ subroutine calc_Isca2_star(lambda,ibin)
   ! Boucle sur les cellules
   do ri=1, n_rad
      do zj=1,nz
+        icell = cell_map(ri,zj,1)
         facteur = energie_photon / volume(ri)
-        eps_dust2_star(:,:,:,ri,zj) =  eps_dust2_star(:,:,:,ri,zj) *  facteur * kappa_sca(lambda,ri,zj,1)
+        eps_dust2_star(:,:,:,ri,zj) =  eps_dust2_star(:,:,:,ri,zj) *  facteur * kappa_sca(icell,lambda)
      enddo
   enddo
 

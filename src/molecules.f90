@@ -755,19 +755,15 @@ subroutine init_dust_mol(imol)
 
            ! Multiplication par densite
            ! AU_to_cm**2 car on veut kappa_abs_eg en AU-1
-           do ri=1,n_rad
-              do zj=1,nz
-                 !kappa_abs_eg(iTrans,ri,zj,1) =  kap * masse(ri,zj,1)/(volume(ri) * AU_to_cm**2)
-                 icell = cell_map(ri,zj,phik)
-                 kappa_abs_eg(iTrans,ri,zj,phik) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
-                      gas_dust / cm_to_AU
-              enddo
+           do icell=1,n_cells
+              kappa_abs_eg(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
+                   gas_dust / cm_to_AU
            enddo
 
         enddo ! iTrans
 
         ! Pas de scattering
-        kappa(:,:,:,:) = kappa_abs_eg(:,:,:,:)
+        kappa(:,:) = kappa_abs_eg(:,:)
 
      else ! cas par defaut
         call init_indices_optiques()
@@ -805,6 +801,7 @@ subroutine init_dust_mol(imol)
            bz : do zj=j_start,nz
               if (zj==0) cycle bz
               do phik=1, n_az
+                 icell = cell_map(ri,zj,phik)
                  ! Interpolation champ de radiation en longeur d'onde
                  if (lProDiMo2mcfost) then
                     Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
@@ -814,7 +811,7 @@ subroutine init_dust_mol(imol)
 
                  T = Temperature(ri,zj,phik)
                  ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-                 emissivite_dust(iTrans,ri,zj,phik) = kappa_abs_eg(iTrans,ri,zj,phik) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+                 emissivite_dust(icell,iTrans) = kappa_abs_eg(icell,iTrans) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
               enddo ! phik
            enddo bz ! zj
         enddo ! ri
@@ -1087,7 +1084,9 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
   real(kind=db) :: somme, J
 
-  integer :: iTrans, iray
+  integer :: iTrans, iray, icell
+
+  icell = cell_map(ri,zj,phik)
 
   Jmol(:,id) = 0.0_db
 
@@ -1096,11 +1095,11 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
      J = 0.0_db
      do iray=1, n_rayons
         P(:) =  Doppler_P_x_freq(:,iray,id)
-        opacite(:) = kappa_mol_o_freq(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
+        opacite(:) = kappa_mol_o_freq(ri,zj,phik,iTrans) * P(:) + kappa(icell,iTrans)
         etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
         Snu(:) = ( emissivite_mol_o_freq(ri,zj,phik,iTrans) * P(:) + &
-             emissivite_dust(iTrans,ri,zj,phik) ) / (opacite(:) + 1.0e-30_db)
+             emissivite_dust(iTrans,icell) ) / (opacite(:) + 1.0e-30_db)
 
         J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:))
         somme = somme + sum(P(:))
@@ -1118,10 +1117,10 @@ subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
      do iray=1, n_rayons
         do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
            P(:) =  Doppler_P_x_freq(:,iray,id)
-           opacite(:) = kappa_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + kappa(iTrans,ri,zj,phik)
+           opacite(:) = kappa_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + kappa(icell,iTrans)
            etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
-           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + emissivite_dust(iTrans,ri,zj,phik) ) &
+           Snu(:) = ( emissivite_mol_o_freq2(ri,zj,phik,iTrans) * P(:) + emissivite_dust(icell,iTrans) ) &
                 / (opacite(:) + 1.0e-30_db)
            J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) &
                 * P(:)) / sum(P(:))
