@@ -37,7 +37,7 @@ subroutine define_gas_density()
 
   implicit none
 
-  integer :: i,j, k, izone, alloc_status
+  integer :: i,j, k, izone, alloc_status, icell
   real(kind=db), dimension(n_zones) :: cst_gaz
   real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
 
@@ -45,11 +45,11 @@ subroutine define_gas_density()
 
   ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=db), dimension(:,:,:), allocatable :: densite_gaz_tmp
+  real(kind=db), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
 
 
-  allocate(densite_gaz_tmp(n_cells), stat=alloc_status)
-  densite_gaz_tmp = 0.0
+  allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad), stat=alloc_status)
+  densite_gaz_tmp = 0.0 ; densite_gaz_midplane_tmp = 0.0
   densite_gaz = 0.0 ;
 
 
@@ -89,7 +89,7 @@ subroutine define_gas_density()
               ! On calcule la densite au milieu de la cellule
               if (j==0) then
                  rcyl = r_grid(i,1)
-                 z = 0.0_db
+                 z = 0.0_db ! utilisation indice 0 pour desnite plan median
               else
                  rcyl = r_grid(i,j)
                  z = z_grid(i,j)
@@ -136,7 +136,11 @@ subroutine define_gas_density()
                  else
                     density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
                  endif
-                 densite_gaz_tmp(cell_map(i,j,k)) = density
+                 if (j>0) then
+                    densite_gaz_tmp(cell_map(i,j,k)) = density
+                 else
+                    densite_gaz_midplane_tmp(i) = density
+                 endif
 
               enddo !k
            enddo bz !j
@@ -152,6 +156,7 @@ subroutine define_gas_density()
                  do j=min(1,j_start),nz
                     densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i)/somme
                  enddo ! j
+                 densite_gaz_midplane_tmp(i) = densite_gaz_midplane_tmp(i) * Surface_density(i)/somme
               endif
            endif
         enddo ! i
@@ -231,11 +236,12 @@ subroutine define_gas_density()
 
         ! Somme sur les zones pour densite finale
         do i=1,n_rad
-           bz_gas_mass2 : do j=min(0,j_start),nz
+           bz_gas_mass2 : do j=min(1,j_start),nz
               do k=1, n_az
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
               enddo !k
+              densite_gaz_midplane(i) = densite_gaz_midplane_tmp(i) + densite_gaz_midplane_tmp(i) * facteur
            enddo bz_gas_mass2
         enddo ! i
      endif
@@ -252,7 +258,7 @@ subroutine define_gas_density()
         do j = 1, nz
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
            if (z_grid(i,j) > surface) then
-              densite_gaz(cell_map(i,j,1) = 0.0_db
+              densite_gaz(cell_map(i,j,1)) = 0.0_db
            endif
         enddo
      enddo
@@ -274,7 +280,7 @@ subroutine define_gas_density()
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
      do i=1, n_rad
-        bz_gas_mass3 : do j=j_start,nz
+        bz_gas_mass4 : do j=j_start,nz
            if (j==0) cycle bz_gas_mass4
            do k=1, n_az
               if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
@@ -283,7 +289,7 @@ subroutine define_gas_density()
                  masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
               endif
            enddo
-        endif
+        enddo bz_gas_mass4
      enddo
   end if
 
@@ -394,7 +400,7 @@ subroutine define_dust_density()
      if (dz%geometry <= 2) then ! Disque
 
         do i=1, n_rad
-           rho0 = densite_gaz(cell_map(i,0,1)) ! midplane density (j=0)
+           rho0 = densite_gaz_midplane(i) ! midplane density (j=0)
 
            !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
            !write(*,*) "s_opt", rcyl, s_opt/1000.
@@ -423,7 +429,7 @@ subroutine define_dust_density()
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
 
                  phi = phi_grid(k)
                  ! Warp analytique
@@ -484,12 +490,12 @@ subroutine define_dust_density()
               do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                  somme = 0.0
                  do j=min(1,j_start),nz
-                    icell = cylindrical2cell(i,j,1)
+                    icell = cell_map(i,j,1)
                     somme = somme + densite_pouss(icell,l)  *  (z_lim(i,j+1) - z_lim(i,j))
                  enddo ! j
                  if (somme > tiny_db) then
                     do j=min(1,j_start),nz
-                       icell = cylindrical2cell(i,j,1)
+                       icell = cell_map(i,j,1)
                        densite_pouss(icell,l) = densite_pouss(icell,l)  * Surface_density(i)/somme * nbre_grains(l)
                     enddo ! j
                  endif
@@ -512,13 +518,13 @@ subroutine define_dust_density()
                     norme = 0.0
                     do j=j_start,nz
                        if (j==0) cycle
-                       icell = cylindrical2cell(i,j,1)
+                       icell = cell_map(i,j,1)
                        norme = norme + densite_pouss(icell,l)
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
                     if (norme < 1.0e-200_db) then
-                       icell = cylindrical2cell(i,1,1)
+                       icell = cell_map(i,1,1)
                        densite_pouss(icell,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -528,7 +534,7 @@ subroutine define_dust_density()
 
                     do j=j_start,nz
                        if (j==0) cycle
-                       icell = cylindrical2cell(i,j,1)
+                       icell = cell_map(i,j,1)
                        if (norme > tiny_db) densite_pouss(icell,l) = densite_pouss(icell,l) / norme * rho0 * nbre_grains(l)
                     enddo !j
                  enddo ! l
@@ -563,7 +569,7 @@ subroutine define_dust_density()
 
                     do j=j_start,nz ! dependence en z uniquement ici !!!!
                        if (j==0) cycle
-                        icell = cylindrical2cell(i,j,1)
+                        icell = cell_map(i,j,1)
 
                        !calculate h & z/h
                        z = z_grid(i,j)
@@ -580,13 +586,13 @@ subroutine define_dust_density()
                     norme = 0.0
                     do j=j_start,nz
                        if (j==0) cycle
-                       icell = cylindrical2cell(i,j,1)
+                       icell = cell_map(i,j,1)
                        norme = norme + densite_pouss(icell,l)
                     enddo !j
 
                     ! Si tous les grains sont sedimentes, on les met dans le plan median
                     if (norme < 1e-200_db) then
-                       icell = cylindrical2cell(i,1,1)
+                       icell = cell_map(i,1,1)
                        densite_pouss(icell,l)  = 1.0_db
                        norme = 1.0_db
 
@@ -600,7 +606,7 @@ subroutine define_dust_density()
 
                     do j=j_start,nz
                        if (j==0) cycle
-                       icell = cylindrical2cell(i,j,1)
+                       icell = cell_map(i,j,1)
                        if (norme > tiny_db) densite_pouss(icell,l) = densite_pouss(icell,l) / norme * rho0 * nbre_grains(l)
                     enddo !j
 
@@ -617,7 +623,7 @@ subroutine define_dust_density()
                  do j=j_start,nz
                     if (j==0) cycle
                     do k=1, n_az
-                       icell = cylindrical2cell(i,j,k)
+                       icell = cell_map(i,j,k)
                        N_tot(l) = N_tot(l) + densite_pouss(icell,l) * volume(i)
                     enddo ! k
                  enddo ! j
@@ -649,7 +655,7 @@ subroutine define_dust_density()
                     do j=j_start,nz
                        if (j==0) cycle
                        do k=1, n_az
-                          icell = cylindrical2cell(i,j,k)
+                          icell = cell_map(i,j,k)
                           densite_pouss(icell,l) = 0.0
                        enddo !k
                     enddo !j
@@ -663,7 +669,7 @@ subroutine define_dust_density()
                  do j=j_start,nz
                     if (j==0) cycle
                     do k=1, n_az
-                       icell = cylindrical2cell(i,j,k)
+                       icell = cell_map(i,j,k)
                        N_tot2(l) = N_tot2(l) + densite_pouss(icell,l) * volume(i)
                     enddo !k
                  enddo !j
@@ -682,7 +688,7 @@ subroutine define_dust_density()
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
            do j=1,nz
-              icell = cylindrical2cell(i,j,1)
+              icell = cell_map(i,j,1)
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
@@ -707,7 +713,7 @@ subroutine define_dust_density()
         k=1  ! 2D seulement pour le moment
         do i=1, n_rad
            do j=1,nz
-              icell = cylindrical2cell(i,j,k)
+              icell = cell_map(i,j,k)
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
@@ -742,7 +748,7 @@ subroutine define_dust_density()
   if (lcavity) then
      do i=1, n_rad
         do j = 1, nz
-           icell = cylindrical2cell(i,j,1)
+           icell = cell_map(i,j,1)
            surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
            if (z_grid(i,j) > surface) then
               densite_pouss(icell,:) = 0.0_db
@@ -756,7 +762,7 @@ subroutine define_dust_density()
         do j=j_start,nz
            if (j==0) cycle
            do k=1, n_az
-              icell = cylindrical2cell(i,j,k)
+              icell = cell_map(i,j,k)
               densite_pouss(icell,:) = densite_pouss(icell,:) * &
                    (1.0 - exp(-0.5 * ((r_grid(i,1) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
            enddo ! k
@@ -768,7 +774,7 @@ subroutine define_dust_density()
   search_not_empty : do l=1,n_grains_tot
      do j=1,nz
         do i=1,n_rad
-           icell = cylindrical2cell(i,j,1)
+           icell = cell_map(i,j,1)
            if (densite_pouss(icell,l) > 0.0_db) then
               ri_not_empty = i
               zj_not_empty = j
@@ -795,7 +801,7 @@ subroutine define_dust_density()
               if (j==0) cycle bz2
 
               do k=1,n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  do l=dp%ind_debut,dp%ind_fin
                     mass=mass + densite_pouss(icell,l) * M_grain(l) * volume(i)
                  enddo !l
@@ -816,7 +822,7 @@ subroutine define_dust_density()
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
               do k=1, n_az
-                 icell = cylindrical2cell(icell)
+                 icell = cell_map(i,j,k)
                  do l=dp%ind_debut,dp%ind_fin
                     densite_pouss(icell,l) = densite_pouss(icell,l) * facteur
                     masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
@@ -831,16 +837,6 @@ subroutine define_dust_density()
   masse(:) = masse(:) * AU3_to_cm3
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
 
-  if (ldust_gas_ratio) then
-     allocate(dust_gas_ratio(n_rad,nz))
-     dust_gas_ratio = masse(1) / masse_gaz(:,:,1)
-
-     write(*,*) "Writing dust_gas_ratio"
-     call cfitsWrite("dust_gas_ratio.fits.gz",dust_gas_ratio,shape(dust_gas_ratio))
-     write(*,*) "Done"
-     stop
-  endif
-
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
      do i=1, n_rad
@@ -848,7 +844,7 @@ subroutine define_dust_density()
            do j=j_start,nz
               if (j==0) cycle
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  densite_pouss(icell,:) = densite_pouss(icell,:) * correct_density_factor
                  masse(icell) = masse(icell) *  correct_density_factor
               enddo !k
@@ -874,7 +870,7 @@ subroutine define_density_wall3D()
   ! sur le disque
   ! C. Pinte  25/01/2011
 
-  integer :: pop, i, j, k, l, izone, alloc_status, n_cells
+  integer :: pop, i, j, k, l, izone, alloc_status, n_cells, icell
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
@@ -922,7 +918,7 @@ subroutine define_density_wall3D()
               z = z_grid(i,j)
 
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  phi = phi_grid(k)
 
                  do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
@@ -968,7 +964,7 @@ subroutine define_density_wall3D()
               if (j==0) cycle bz2
 
               do k=1,n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  do l=dp%ind_debut,dp%ind_fin
                     mass=mass + density_wall(icell,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
                  enddo !l
@@ -983,7 +979,7 @@ subroutine define_density_wall3D()
            bz3 : do j=j_start,nz
               if (j==0) cycle bz3
               do k=1, n_az
-                 icell = cylindrical2cell(i,j,k)
+                 icell = cell_map(i,j,k)
                  do l=dp%ind_debut,dp%ind_fin
                     density_wall(icell,l) = density_wall(icell,l) * facteur
                     masse_wall(icell) = masse_wall(icell) + density_wall(icell,l) * M_grain(l) * volume(i)
@@ -1020,7 +1016,7 @@ subroutine densite_eqdiff()
   real, parameter :: G = 6.672e-8
   real, parameter :: gas_dust = 100
 
-  integer :: i,j, k, jj
+  integer :: i,j, k, jj, icell
   real :: cst, cst_pous, cst_gaz, M_star
   real :: fact_exp, c_sound, coeff_grav, omega, D0, eps, pas_z, somme1, somme2, correct,test
 
@@ -1158,11 +1154,11 @@ subroutine densite_eqdiff()
      !$omp default(none) &
      !$omp shared(i,rcyl,nz,n_grains_tot) &
      !$omp shared(amax_reel,densite_pouss) &
-     !$omp private(j,k,z) &
-     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,rho,correct_strat, delta_z)
+     !$omp private(j,k,z,icell) &
+     !$omp shared(zmax,kappa,probsizecumul,ech_prob,nbre_grains,cst_pous,rho,correct_strat, delta_z,cell_map)
      !$omp do schedule(dynamic,10)
      do j=1,nz
-        icell = cylindrical2cell(i,j,1)
+        icell = cell_map(i,j,1)
         do  k=1,n_grains_tot
            densite_pouss(icell,k) = nbre_grains(k) * correct_strat(k,j) * rho(j)
         enddo !k
@@ -1171,59 +1167,11 @@ subroutine densite_eqdiff()
      !$omp end parallel
   enddo !i
 
-
-  ! Normalisation : on a 1 grain de chaque taille dans le disque
-  do k=1,n_grains_tot
-     somme=0.0
-     do i=1,n_rad
-        do j=1,nz
-           icell = cylindrical2cell(i,j,1)
-           if (densite_pouss(icell,k) < 0.0) then
-              write(*,*) i,j,k
-              read(*,*)
-           endif
-           somme=somme+densite_pouss(icell,k)*volume(i)
-        enddo
-     enddo
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)
-  enddo
-
-  ! Normalisation : on a 1 grain en tout dans le disque
-  do k=1,n_grains_tot
-     densite_pouss(:,:,1,k) = (densite_pouss(:,:,1,k)/somme)*nbre_grains(k)
-  enddo
-
-  ! Normalisation : Calcul masse totale
-  mass = 0.0
-  do i=1,n_rad
-     do j=1,nz
-        icell = cylindrical2cell(i,j,1)
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(icell,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
-        enddo
-     enddo
-  enddo
-  mass =  mass/Msun_to_g
-  densite_pouss(:,:) = densite_pouss(:,:) * diskmass/mass
-
-  ! Verif
-!  masse = 0.0
-!  do i=1,n_rad
-!     do j=1,nz
-!        do k=1,n_grains_tot
-!           masse=masse + densite_pouss(i,j,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
-!        enddo
-!     enddo
-!  enddo
-!  masse =  masse/Msun_to_g
-!  write(*,*) "masse totale =", masse
-
-
 !***************
 ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   do i=1,n_rad
      do  k=1,n_grains_tot
-        densite_pouss(i,nz+1,1,k) = densite_pouss(i,nz,1,k)
+        densite_pouss(cell_map(i,nz+1,1),k) = densite_pouss(cell_map(i,nz,1),k)
      enddo !k
   enddo !i
 
@@ -1353,7 +1301,7 @@ subroutine densite_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, j_start_file
+  integer :: k, l, i, n_a, read_n_a, j_start_file, icell, phik
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
 
@@ -1362,6 +1310,7 @@ subroutine densite_file()
 
   real(kind=db), dimension(:,:,:,:), allocatable :: sph_dens_db
   real(kind=db), dimension(:), allocatable :: a_sph_db
+  real(kind=db) :: f
 
   type(disk_zone_type) :: dz
 
@@ -1667,37 +1616,51 @@ subroutine densite_file()
      l=1
      do k=1,n_grains_tot
         if (r_grain(k) < a_sph(1)) then  ! Petits grains
-           if (l3D_file) then
-              densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
-           else
-              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-           endif
+           do phik=1, n_az
+              do j=j_start,nz
+                 if (j==0) cycle
+                 do i=1, n_rad
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,1)
+                 enddo ! phik
+              enddo ! j
+           enddo ! i
         else if (r_grain(k) > a_sph(n_a)) then ! Gros grains
-           if (l3D_file) then
-              densite_pouss(:,:,:,k) = sph_dens(:,:,:,n_a)
-           else
-              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,n_a)
-           endif
+
+           do phik=1, n_az
+              do j=j_start,nz
+                 if (j==0) cycle
+                 do i=1, n_rad
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,n_a)
+                 enddo ! phik
+              enddo ! j
+           enddo ! i
         else  ! Autres grains : interpolation
            if (r_grain(k) > a_sph(l+1)) l = l+1
-           if (l3D_file) then
-              densite_pouss(:,:,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
-                ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
-           else
-              densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,l) + (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l)) * &
-                ( sph_dens(:,:,:,l+1) -  sph_dens(:,:,:,l) )
-           endif
+           f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+
+           do phik=1, n_az
+              do j=j_start,nz
+                 if (j==0) cycle
+                 do i=1, n_rad
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,l) + f * &
+                         ( sph_dens(i,j,phik,l+1) -  sph_dens(i,j,phik,l) )
+                 enddo ! phik
+              enddo ! j
+           enddo ! i
         endif
      enddo
   else ! Tous les grains suivent le gas
      write(*,*) "Constant spatial distribution"
      do k=1,n_grains_tot
-        if (l3D_file) then
-           densite_pouss(:,:,:,k) = sph_dens(:,:,:,1)
-        else
-           densite_pouss(:,1:nz,:,k) = sph_dens(:,:,:,1)
-        endif
-     enddo
+        do phik=1, n_az
+           do j=j_start,nz
+              if (j==0) cycle
+              do i=1, n_rad
+                 densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,1)
+              enddo ! phik
+           enddo ! j
+        enddo ! i
+     enddo ! k
   endif  !lstrat
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
@@ -1707,28 +1670,27 @@ subroutine densite_file()
         do j=j_start,nz
            if (j==0) cycle
            do k=1,n_az
-              if (densite_pouss(i,j,k,l) <= 0.0) densite_pouss(i,j,k,l) = tiny_db
-              somme=somme+densite_pouss(i,j,k,l)*volume(i)
+              icell = cell_map(i,j,k)
+              if (densite_pouss(icell,l) <= 0.0) densite_pouss(icell,l) = tiny_db
+              somme=somme+densite_pouss(icell,l)*volume(i)
            enddo !k
         enddo !j
      enddo !i
-     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)
+     densite_pouss(:,l) = (densite_pouss(:,l)/somme)
   enddo !l
 
-
-  ! TODO : changer la distribution des grains
 
 
   ! Normalisation : on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
-     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)*nbre_grains(l)
+     densite_pouss(:,l) = (densite_pouss(:,l)/somme)*nbre_grains(l)
   enddo
 
   search_not_empty : do l=1,n_grains_tot
      do k=1,n_az
         do j=1,nz
            do i=1,n_rad
-              if (densite_pouss(i,j,k,l) > 0.0_db) then
+              if (densite_pouss(cell_map(i,j,k),l) > 0.0_db) then
                  ri_not_empty = i
                  zj_not_empty = j
                  phik_not_empty = k
@@ -1747,13 +1709,13 @@ subroutine densite_file()
         if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
-              mass=mass + densite_pouss(i,j,k,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
+              mass=mass + densite_pouss(cell_map(i,j,k),l) * M_grain(l) * (volume(i) * AU3_to_cm3)
            enddo !l
         enddo !k
      enddo !j
   enddo !i
   mass =  mass/Msun_to_g
-  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
+  densite_pouss(:,:) = densite_pouss(:,:) * diskmass/mass
 
   do i=1,n_rad
      !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
@@ -1761,13 +1723,14 @@ subroutine densite_file()
         if (j==0) cycle
         do k=1,n_az
            do l=1,n_grains_tot
-              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
+              icell = cell_map(i,j,k)
+              masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
            enddo !l
         enddo !k
      enddo !j
   enddo ! i
 
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
+  masse(:) = masse(:) * AU3_to_cm3
 
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
@@ -1895,7 +1858,7 @@ subroutine densite_Seb_Charnoz()
   real(kind=db) :: Rmin_mcfost, Dr_mcfost, Zmin_mcfost, Dz_mcfost
 
   real(kind=db) :: Somme
-  integer :: ii, jj, i, j, k, l
+  integer :: ii, jj, i, j, k, l, icell
 
   write(*,*) "***********************************************"
   write(*,*) "Reading results from Sebastien Charnoz ..."
@@ -1936,7 +1899,7 @@ subroutine densite_Seb_Charnoz()
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
 
 
-        densite_pouss(i,j,1,:) = density_Seb(:) / (volume(i)*AU3_to_cm3) ! comversion en densite volumique
+        densite_pouss(cell_map(i,j,1),:) = density_Seb(:) / (volume(i)*AU3_to_cm3) ! comversion en densite volumique
         Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
      enddo ! j
   enddo !i
@@ -1945,7 +1908,7 @@ subroutine densite_Seb_Charnoz()
   search_not_empty : do l=1,n_grains_tot
      do j=1,nz
         do i=1,n_rad
-           if (densite_pouss(i,j,1,l) > 0.0_db) then
+           if (densite_pouss(cell_map(i,j,1),l) > 0.0_db) then
               ri_not_empty = i
               zj_not_empty = j
               phik_not_empty = 1
@@ -1960,7 +1923,7 @@ subroutine densite_Seb_Charnoz()
   ! les methodes de chauffages etc, ne changent pas
 
   do k=1, n_grains_tot
-     N_grains(k) = sum(densite_pouss(:,:,1,k))
+     N_grains(k) = sum(densite_pouss(:,k))
   enddo
   nbre_grains(:) = N_grains(:)/sum(N_grains(:))
 
@@ -1970,13 +1933,14 @@ subroutine densite_Seb_Charnoz()
         if (j==0) cycle bz
         do k=1, n_az
            do l=1,n_grains_tot
-              masse(i,j,k) = masse(i,j,k) + densite_pouss(i,j,k,l) * M_grain(l) * volume(i)
+              icell = cell_map(i,j,k)
+              masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
            enddo !l
         enddo !k
      enddo bz
   enddo ! i
 
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3 * 1600./3500 ! TMP
+  masse(:) = masse(:) * AU3_to_cm3 * 1600./3500 ! TMP
 
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
 
@@ -1996,7 +1960,7 @@ subroutine densite_Seb_Charnoz2()
   integer, dimension(2) :: naxes
   logical :: anynull
 
-  integer :: k, l, i
+  integer :: k, l, i, icell
   real(kind=db) :: somme, somme2
 
   real, dimension(n_rad,nz) :: dens
@@ -2064,7 +2028,11 @@ subroutine densite_Seb_Charnoz2()
   ! Tous les grains suivent le gas
   ! dens est la densite volumique de poussiere en SI. kg/m^3
   do k=1,n_grains_tot
-     densite_pouss(:,1:nz,1,k) = dens(:,:)
+     do i=1, n_rad
+        do j=1,nz
+           densite_pouss(cell_map(i,j,1),k) = dens(i,j)
+        enddo
+     enddo
   enddo
 
   ! kg/m^3  ---> part/cm^3
@@ -2075,7 +2043,7 @@ subroutine densite_Seb_Charnoz2()
 
 
   do l=1,n_grains_tot
-     densite_pouss(:,:,:,l) = densite_pouss(:,:,:,l)*nbre_grains(l)
+     densite_pouss(:,l) = densite_pouss(:,l)*nbre_grains(l)
   enddo
 
 !
@@ -2100,7 +2068,7 @@ subroutine densite_Seb_Charnoz2()
      do k=1,n_az
         do j=1,nz
            do i=1,n_rad
-              if (densite_pouss(i,j,k,l) > 0.0_db) then
+              if (densite_pouss(cell_map(i,j,k),l) > 0.0_db) then
                  ri_not_empty = i
                  zj_not_empty = j
                  phik_not_empty = k
@@ -2128,12 +2096,13 @@ subroutine densite_Seb_Charnoz2()
   do i=1,n_rad
      do j=1,nz
         do l=1,n_grains_tot
-           masse(i,j,1) = masse(i,j,1) + densite_pouss(i,j,1,l) * M_grain(l) * volume(i)
+           icell = cell_map(i,j,1)
+           masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
         enddo !l
      enddo !j
   enddo ! i
 
-  masse(:,:,:) = masse(:,:,:) * AU3_to_cm3
+  masse(:) = masse(:) * AU3_to_cm3
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   write(*,*) "Density from Seb. Charnoz set up OK"
@@ -2159,7 +2128,7 @@ subroutine remove_specie()
            do k=1,n_grains_tot
               if (grain(k)%pop==specie_removed) then
                  if (Temperature(i,j,pk) > T_rm) then
-                    densite_pouss(i,j,pk,k) = 0.0
+                    densite_pouss(cell_map(i,j,pk),k) = 0.0
                  endif
               endif
            enddo
@@ -2171,7 +2140,7 @@ subroutine remove_specie()
   do i=1,n_rad
      do j=1,nz
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(cell_map(i,j,1),k) * M_grain(k) * (volume(i) * AU3_to_cm3)
         enddo
      enddo
   enddo
