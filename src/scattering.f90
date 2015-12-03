@@ -1207,7 +1207,7 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
   real(kind=db) :: v1pi, v1pj, v1pk
-  integer :: i
+  integer :: i, icell
   real(kind=db), dimension(4,4) :: ROP, RPO, XMUL
   real(kind=db), dimension(4) :: C, D
 
@@ -1296,13 +1296,14 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
 
   XMUL=0.0
-  XMUL(1,1) = tab_s11_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s11_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  icell = cell_map(ri,zj,phik)
+  XMUL(1,1) = tab_s11_pos(icell,itheta,lambda) * frac +  tab_s11_pos(icell,itheta-1,lambda) * frac_m1
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s12_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(1,2) = tab_s12_pos(icell,itheta,lambda) * frac +  tab_s12_pos(icell,itheta-1,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s33_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(3,3) = tab_s33_pos(icell,itheta,lambda) * frac +  tab_s33_pos(icell,itheta-1,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_pos(lambda,ri,zj,phik,itheta)* frac -  tab_s34_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(3,4) = -tab_s34_pos(icell,itheta,lambda)* frac -  tab_s34_pos(icell,itheta-1,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
 
   ! -------- CALCUL DE LA POLARISATION ---------
@@ -1512,14 +1513,16 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
   integer, intent(out) :: itheta
   real(kind=db), intent(out) :: cospsi
 
-  integer :: k, kmin, kmax
+  integer :: k, kmin, kmax, icell
 
   kmin=0
   kmax=180
   k=(kmin+kmax)/2
 
+  icell = cell_map(ri,zj,phik)
+
   do while ((kmax-kmin) > 1)
-     if (prob_s11_pos(lambda,ri,zj,phik,k) < aleat) then
+     if (prob_s11_pos(icell,k,lambda) < aleat) then
         kmin = k
      else
         kmax = k

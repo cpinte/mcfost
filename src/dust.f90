@@ -821,11 +821,11 @@ subroutine opacite(lambda)
   endif
 
   if (scattering_method == 2) then
-     tab_s11_pos(lambda,:,:,:,:)=0.0
+     tab_s11_pos(:,:,lambda)=0.0
      if (lsepar_pola) then
-        tab_s12_pos(lambda,:,:,:,:)=0.0
-        tab_s33_pos(lambda,:,:,:,:)=0.0
-        tab_s34_pos(lambda,:,:,:,:)=0.0
+        tab_s12_pos(:,:,lambda)=0.0
+        tab_s33_pos(:,:,lambda)=0.0
+        tab_s34_pos(:,:,lambda)=0.0
      endif
   endif
 
@@ -947,11 +947,11 @@ subroutine opacite(lambda)
 
            if (scattering_method == 2) then
               if (aniso_method==1) then
-                 tab_s11_pos(lambda,i,j,pk,:) = 0.
+                 tab_s11_pos(icell,:,lambda) = 0.
                  if (lsepar_pola) then
-                    tab_s12_pos(lambda,i,j,pk,:) = 0.
-                    tab_s33_pos(lambda,i,j,pk,:) = 0.
-                    tab_s34_pos(lambda,i,j,pk,:) = 0.
+                    tab_s12_pos(icell,:,lambda) = 0.
+                    tab_s33_pos(icell,:,lambda) = 0.
+                    tab_s34_pos(icell,:,lambda) = 0.
                  endif
               endif
            else
@@ -971,11 +971,11 @@ subroutine opacite(lambda)
                     ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
                     ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
                     ! tab_s11_pos soit normalisee a k_sca_tot
-                    tab_s11_pos(lambda,i,j,pk,:) = tab_s11_pos(lambda,i,j,pk,:) + tab_s11(lambda,k,:) * S_grain(k) * density
+                    tab_s11_pos(icell,:,lambda) = tab_s11_pos(icell,:,lambda) + tab_s11(lambda,k,:) * S_grain(k) * density
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:) = tab_s12_pos(lambda,i,j,pk,:) + tab_s12(lambda,k,:) * S_grain(k) * density
-                       tab_s33_pos(lambda,i,j,pk,:) = tab_s33_pos(lambda,i,j,pk,:) + tab_s33(lambda,k,:) * S_grain(k) * density
-                       tab_s34_pos(lambda,i,j,pk,:) = tab_s34_pos(lambda,i,j,pk,:) + tab_s34(lambda,k,:) * S_grain(k) * density
+                       tab_s12_pos(icell,:,lambda) = tab_s12_pos(icell,:,lambda) + tab_s12(lambda,k,:) * S_grain(k) * density
+                       tab_s33_pos(icell,:,lambda) = tab_s33_pos(icell,:,lambda) + tab_s33(lambda,k,:) * S_grain(k) * density
+                       tab_s34_pos(icell,:,lambda) = tab_s34_pos(icell,:,lambda) + tab_s34(lambda,k,:) * S_grain(k) * density
                     endif
                  endif !aniso_method
               else
@@ -1002,15 +1002,15 @@ subroutine opacite(lambda)
                  if (abs(k_sca_tot) > 0.0_db) then
                     norme = deg_to_rad / (k_sca_tot * deux_pi) ! TODO: bizarre je ne sais pas d'ou vient le deg_to_rad
 
-                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(lambda,i,j,pk,:) * norme
+                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(icell,:,lambda) * norme
                     if (lsepar_pola) then
                        ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
                        ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(lambda,i,j,pk,:) * norme
-                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(lambda,i,j,pk,:) * norme
-                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(lambda,i,j,pk,:) * norme
+                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(icell,:,lambda) * norme
+                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(icell,:,lambda) * norme
+                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(icell,:,lambda) * norme
                     endif
                  else
                     tab_s11_ray_tracing(lambda,i,j,pk,:) =  0.0_db
@@ -1043,46 +1043,46 @@ subroutine opacite(lambda)
               if (scattering_method==2) then ! scattering matrix per cell
                  if (aniso_method==1) then
                     ! Propriétés optiques des cellules
-                    prob_s11_pos(lambda,i,j,pk,0)=0.0
+                    prob_s11_pos(icell,0,lambda)=0.0
                     dtheta = pi/real(nang_scatt)
 
                     do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
                        theta = real(l)*dtheta
-                       prob_s11_pos(lambda,i,j,pk,l)=prob_s11_pos(lambda,i,j,pk,l-1)+ &
-                            tab_s11_pos(lambda,i,j,pk,l)*sin(theta)*dtheta
+                       prob_s11_pos(icell,l,lambda)=prob_s11_pos(icell,l-1,lambda)+ &
+                            tab_s11_pos(icell,l,lambda)*sin(theta)*dtheta
                     enddo
 
                     ! tab_s11_pos est calculee telle que la normalisation soit: k_sca_tot
-                    prob_s11_pos(lambda,i,j,pk,1:nang_scatt) = prob_s11_pos(lambda,i,j,pk,1:nang_scatt) + &
-                         k_sca_tot - prob_s11_pos(lambda,i,j,pk,nang_scatt)
+                    prob_s11_pos(icell,1:nang_scatt,lambda) = prob_s11_pos(icell,1:nang_scatt,lambda) + &
+                         k_sca_tot - prob_s11_pos(icell,nang_scatt,lambda)
 
                     ! Normalisation de la proba cumulee a 1
-                    prob_s11_pos(lambda,i,j,pk,:)=prob_s11_pos(lambda,i,j,pk,:)/k_sca_tot
+                    prob_s11_pos(icell,:,lambda)=prob_s11_pos(icell,:,lambda)/k_sca_tot
 
                     ! TODO : normaliser les s11 en sortie des matrices de Mueller
 
 
                     ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
                     do l=0,180
-                       if (tab_s11_pos(lambda,i,j,pk,l) > tiny_real) then ! NEW TEST STRAT LAURE
-                          norme=1.0/tab_s11_pos(lambda,i,j,pk,l)
+                       if (tab_s11_pos(icell,l,lambda) > tiny_real) then ! NEW TEST STRAT LAURE
+                          norme=1.0/tab_s11_pos(icell,l,lambda)
                           if (.not.ldust_prop) then
-                             tab_s11_pos(lambda,i,j,pk,l)= 1.0 !tab_s11_pos(lambda,i,j,pk,l)*norme
+                             tab_s11_pos(icell,l,lambda)= 1.0 !tab_s11_pos(lambda,i,j,pk,l)*norme
                           endif
                           if (lsepar_pola) then
-                             tab_s12_pos(lambda,i,j,pk,l)=tab_s12_pos(lambda,i,j,pk,l)*norme
-                             tab_s33_pos(lambda,i,j,pk,l)=tab_s33_pos(lambda,i,j,pk,l)*norme
-                             tab_s34_pos(lambda,i,j,pk,l)=tab_s34_pos(lambda,i,j,pk,l)*norme
+                             tab_s12_pos(icell,l,lambda)=tab_s12_pos(icell,l,lambda)*norme
+                             tab_s33_pos(icell,l,lambda)=tab_s33_pos(icell,l,lambda)*norme
+                             tab_s34_pos(icell,l,lambda)=tab_s34_pos(icell,l,lambda)*norme
                           endif
                        endif
                     enddo
 
                  else !aniso_method == 2 : HG
-                    tab_s11_pos(lambda,i,j,pk,:) = 1.0
+                    tab_s11_pos(icell,:,lambda) = 1.0
                     if (lsepar_pola) then
-                       tab_s12_pos(lambda,i,j,pk,:)=0.0
-                       tab_s33_pos(lambda,i,j,pk,:)=0.0
-                       tab_s34_pos(lambda,i,j,pk,:)=0.0
+                       tab_s12_pos(icell,:,lambda)=0.0
+                       tab_s33_pos(icell,:,lambda)=0.0
+                       tab_s34_pos(icell,:,lambda)=0.0
                     endif
                  endif !aniso_method
 
@@ -1114,14 +1114,14 @@ subroutine opacite(lambda)
               tab_albedo_pos(icell,lambda)=0.0
               if (scattering_method ==2) then
                  ! Propriétés optiques des cellules
-                 prob_s11_pos(lambda,i,j,pk,:)=1.0
-                 prob_s11_pos(lambda,i,j,pk,0)=0.0
+                 prob_s11_pos(icell,:,lambda)=1.0
+                 prob_s11_pos(icell,0,lambda)=0.0
                  ! Normalisation (idem que dans mueller)
-                 tab_s11_pos(lambda,i,j,pk,:)=1.0
+                 tab_s11_pos(icell,:,lambda)=1.0
                  if (lsepar_pola) then
-                    tab_s12_pos(lambda,i,j,pk,:)=0.0
-                    tab_s33_pos(lambda,i,j,pk,:)=0.0
-                    tab_s34_pos(lambda,i,j,pk,:)=0.0
+                    tab_s12_pos(icell,:,lambda)=0.0
+                    tab_s33_pos(icell,:,lambda)=0.0
+                    tab_s34_pos(icell,:,lambda)=0.0
                  endif
               else !scattering_method
                  ksca_CDF(lambda,i,j,pk,:)=1.0
@@ -1190,11 +1190,11 @@ subroutine opacite(lambda)
      enddo
      call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
-     S11_lambda_theta(:,:)= tab_s11_pos(:,1,1,1,:)
+     S11_lambda_theta(:,:)= tab_s11_pos(icell,:,:)
      call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
      if (lsepar_pola) then
-        pol_lambda_theta(:,:)=-tab_s12_pos(:,1,1,1,:) ! Deja normalise par S11
+        pol_lambda_theta(:,:)=-tab_s12_pos(icell,:,:) ! Deja normalise par S11
         call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
      endif
 

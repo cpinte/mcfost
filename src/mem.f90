@@ -296,12 +296,7 @@ subroutine alloc_dynamique()
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
      p_n_lambda = n_lambda ! was 1 : changed to save dust properties
-
-     if (l3D) then
-        allocate(tab_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(tab_s11_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(tab_s11_pos(p_n_cells, 0:nang_scatt, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
@@ -309,45 +304,20 @@ subroutine alloc_dynamique()
      tab_s11_pos = 0
 
      if (lsepar_pola) then
-        if (l3D) then
-           allocate(tab_s12_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s12_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
+        allocate(tab_s12_pos(p_n_cells, 0:nang_scatt, n_lambda), &
+             tab_s33_pos(p_n_cells, 0:nang_scatt, n_lambda), &
+             tab_s34_pos(p_n_cells, 0:nang_scatt, n_lambda), &
+             stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_pos'
            stop
         endif
         tab_s12_pos = 0
-
-        if (l3D) then
-           allocate(tab_s33_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s33_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s33_pos'
-           stop
-        endif
         tab_s33_pos = 0
-
-        if (l3D) then
-           allocate(tab_s34_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s34_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s34_pos'
-           stop
-        endif
         tab_s34_pos = 0
      endif
 
-     if (l3D) then
-        allocate(prob_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(prob_s11_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(prob_s11_pos(p_n_cells,0:nang_scatt, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
@@ -1372,7 +1342,6 @@ subroutine realloc_step2()
   endif
   tab_g = 0
 
-
   deallocate(tab_albedo_pos,tab_g_pos)
   allocate(tab_albedo_pos(p_n_cells,n_lambda2), tab_g_pos(p_n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1434,11 +1403,7 @@ subroutine realloc_step2()
 
   if (scattering_method == 2) then
      deallocate(tab_s11_pos)
-     if (l3D) then
-        allocate(tab_s11_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(tab_s11_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(tab_s11_pos(p_n_cells,0:nang_scatt,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
@@ -1446,49 +1411,22 @@ subroutine realloc_step2()
      tab_s11_pos = 0
 
      if (lsepar_pola) then
-        deallocate(tab_s12_pos)
-        if (l3D) then
-           allocate(tab_s12_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s12_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
+        deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
+        allocate(tab_s12_pos(p_n_cells,0:nang_scatt,n_lambda2), &
+             tab_s33_pos(p_n_cells,0:nang_scatt,n_lambda2), &
+             tab_s34_pos(p_n_cells,0:nang_scatt,n_lambda2), &
+             stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_pos'
            stop
         endif
         tab_s12_pos = 0
-
-        deallocate(tab_s33_pos)
-        if (l3D) then
-           allocate(tab_s33_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s33_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s33_pos'
-           stop
-        endif
         tab_s33_pos = 0
-
-        deallocate(tab_s34_pos)
-        if (l3D) then
-           allocate(tab_s34_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s34_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s34_pos'
-           stop
-        endif
         tab_s34_pos = 0
      endif
 
      deallocate(prob_s11_pos)
-     if (l3D) then
-        allocate(prob_s11_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(prob_s11_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(prob_s11_pos(p_n_cells,0:nang_scatt,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
