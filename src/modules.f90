@@ -465,9 +465,9 @@ module opacity
 
   real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_cells, n_grains en part.cm-3
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
-!  real, dimension(n_lambda,n_rad,nz+1,0:n_grains) :: probsizecumul
-  real, dimension(:,:,:,:,:), allocatable :: probsizecumul !n_lambda,n_rad,nz+1,(n_az),)0:n_grains
-  !* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
+
+  real, dimension(:,:,:,:,:), allocatable :: ksca_CDF !n_lambda,n_rad,nz+1,(n_az),)0:n_grains
+  !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
   !* certaine taille de grain. Ce tableau est utilise pour le tirage
   !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
   !* en compte le nombre de grains en meme temps que leur probabilite

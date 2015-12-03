@@ -816,7 +816,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   real :: prob
   integer :: kmin, kmax, k
 
-  prob = aleat  ! probsizecumul(lambda,ri,zj,n_grains_tot) est normalise a 1.0
+  prob = aleat  ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
 
   ! Cas particulier prob=1.0
   if ((1.0-prob) < 1.e-6) then
@@ -829,8 +829,8 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   kmax = n_grains_tot
   k=(kmin + kmax)/2
 
-  do while (probsizecumul(lambda,ri,zj,phik,k) /= prob)
-     if (probsizecumul(lambda,ri,zj,phik,k) < prob) then
+  do while (ksca_CDF(lambda,ri,zj,phik,k) /= prob)
+     if (ksca_CDF(lambda,ri,zj,phik,k) < prob) then
         kmin = k
      else
         kmax = k
@@ -844,8 +844,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   k=kmax
 
   grainsize = k
-
-!  write(*,*) k, probsizecumul(lambda,ri,zj,k), probsizecumul(lambda,ri,zj,k+1)
+  return
 
 end function grainsize
 

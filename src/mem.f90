@@ -344,15 +344,15 @@ subroutine alloc_dynamique()
      p_n_lambda = n_lambda
 
      if (l3D) then
-        allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
+        allocate(ksca_CDF(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
      else
-        allocate(probsizecumul(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
+        allocate(ksca_CDF(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
      endif
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error probsizecumul'
+        write(*,*) 'Allocation error ksca_CDF'
         stop
      endif
-     probsizecumul = 0
+     ksca_CDF = 0
 
   endif ! method
 
@@ -954,7 +954,7 @@ subroutine dealloc_em_th()
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
   else ! prop par grains
-     deallocate(probsizecumul)
+     deallocate(ksca_CDF)
   endif ! method
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
@@ -1066,15 +1066,15 @@ subroutine realloc_dust_mol()
 
   ! TODO : cette partie prend bcp de memoire
   if (l3D) then
-     allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
+     allocate(ksca_CDF(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
   else
-     allocate(probsizecumul(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
+     allocate(ksca_CDF(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
   endif
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error probsizecumul (realloc)'
+     write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
   endif
-  probsizecumul = 0
+  ksca_CDF = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
   if (l3D) then
@@ -1152,7 +1152,7 @@ subroutine clean_mem_dust_mol()
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
-  deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
+  deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,ksca_CDF)
   deallocate(kappa_abs_eg,amax_reel)
   deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
@@ -1516,17 +1516,17 @@ subroutine realloc_step2()
      endif
      prob_s11_pos = 0
   else
-     deallocate(probsizecumul)
+     deallocate(ksca_CDF)
      if (l3D) then
-        allocate(probsizecumul(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
+        allocate(ksca_CDF(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
      else
-        allocate(probsizecumul(n_lambda2,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
+        allocate(ksca_CDF(n_lambda2,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
      endif
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error probsizecumul'
+        write(*,*) 'Allocation error ksca_CDF'
         stop
      endif
-     probsizecumul = 0
+     ksca_CDF = 0
 
   endif ! method
 
