@@ -772,7 +772,7 @@ end subroutine read_saved_dust_prop
 !******************************************************************************
 
 subroutine opacite(lambda)
-! Calcule la table d'opacite et probsizecumul
+! Calcule la table d'opacite et ksca_CDF
 ! Inclus stratification empirique
 ! Utilise les resultats des routine densite et prop_grains
 ! Doit etre utilise juste apres prop_grain : lambda ne doit pas changer entre 2
@@ -818,17 +818,6 @@ subroutine opacite(lambda)
         lcompute_obs = .not.letape_th
      endif
   endif
-
-!***************
-! Calcul proba cumulee en dessous d'une taille de grains
-! et opacite pour chaque position
-!
-!* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
-!* certaine taille de grain. Ce tableau est utilise pour le tirage
-!* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
-!* en compte le nombre de grains en meme temps que leur probabilite
-!* individuelle de diffuser (donnee par qsca*pi*a**2).
-
 
   if (scattering_method == 2) then
      tab_s11_pos(lambda,:,:,:,:)=0.0
@@ -946,7 +935,7 @@ subroutine opacite(lambda)
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
   !$omp private(i,j,k,icell,pk,density,k_min,proba,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
-  !$omp shared(zmax,kappa,kappa_abs_eg,probsizecumul,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
+  !$omp shared(zmax,kappa,kappa_abs_eg,ksca_CDF,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
@@ -969,7 +958,7 @@ subroutine opacite(lambda)
                  endif
               endif
            else
-              probsizecumul(lambda,i,j,pk,0)=0.0
+              ksca_CDF(lambda,i,j,pk,0)=0.0
            endif
 
            somme=0.0
@@ -995,9 +984,9 @@ subroutine opacite(lambda)
               else
                  ! Au choix suivant que l'on considère un albedo par cellule ou par grain
                  ! albedo par cellule :
-                 probsizecumul(lambda,i,j,pk,k) = probsizecumul(lambda,i,j,pk,k-1) + C_sca(lambda,k)*density
+                 ksca_CDF(lambda,i,j,pk,k) = ksca_CDF(lambda,i,j,pk,k-1) + C_sca(lambda,k)*density
                  ! albedo par grains :
-                 !              probsizecumul(lambda,i,j,k) = probsizecumul(lambda,i,j,k-1) + C_ext(lambda,k)*density
+                 !              ksca_CDF(lambda,i,j,k) = ksca_CDF(lambda,i,j,k-1) + C_ext(lambda,k)*density
               endif !scattering_method
            enddo !k
 
@@ -1101,14 +1090,14 @@ subroutine opacite(lambda)
                  endif !aniso_method
 
               else !scattering_method == 1 : choix taille du grain diffuseur
-                 if  (probsizecumul(lambda,i,j,pk,n_grains_tot) > tiny_real) then
+                 if  (ksca_CDF(lambda,i,j,pk,n_grains_tot) > tiny_real) then
                     do k=1, n_grains_tot
-                       probsizecumul(lambda,i,j,pk,k)= probsizecumul(lambda,i,j,pk,k)/ &
-                            probsizecumul(lambda,i,j,pk,n_grains_tot)
+                       ksca_CDF(lambda,i,j,pk,k)= ksca_CDF(lambda,i,j,pk,k)/ &
+                            ksca_CDF(lambda,i,j,pk,n_grains_tot)
                     enddo !k
                     ! Cas particulier proba=1.0
                     ech_proba1 : do k=k_min, n_grains_tot
-                       if ((1.0 - probsizecumul(lambda,i,j,pk,k)) <  1.e-6) then
+                       if ((1.0 - ksca_CDF(lambda,i,j,pk,k)) <  1.e-6) then
                           amax_reel(lambda,i,j,pk) = k
                           exit  ech_proba1
                        endif
@@ -1119,7 +1108,7 @@ subroutine opacite(lambda)
                     ! rq : en pratique, la densite est trop faible pour qu'il y ait
                     ! une diffusion a cet endroit.
                     do  k=1,n_grains_tot
-                       probsizecumul(lambda,i,j,pk,k) = 1.0
+                       ksca_CDF(lambda,i,j,pk,k) = 1.0
                     enddo !k
                  endif
               endif !scattering_method
@@ -1138,8 +1127,8 @@ subroutine opacite(lambda)
                     tab_s34_pos(lambda,i,j,pk,:)=0.0
                  endif
               else !scattering_method
-                 probsizecumul(lambda,i,j,pk,:)=1.0
-                 probsizecumul(lambda,i,j,pk,0)=0.0
+                 ksca_CDF(lambda,i,j,pk,:)=1.0
+                 ksca_CDF(lambda,i,j,pk,0)=0.0
               endif ! scattering_method
 
            endif !densite_pouss = 0.0

@@ -1061,18 +1061,7 @@ subroutine densite_eqdiff()
   coeff_grav = sum(etoile(:)%M) * Msun_to_g/AU3_to_cm3
 
 
-!***************
-! Calcul proba cumulee en dessous d'une taille de grains
-! et opacite pour chaque position
-!
-!* probsizecumul(i) represente la probabilite cumulee en-dessous d'une
-!* certaine taille de grain. Ce tableau est utilise pour le tirage
-!* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
-!* en compte le nombre de grains en meme temps que leur probabilite
-!* individuelle de diffuser (donnee par qsca*pi*a**2).
-
   do i=1, n_rad
-!     rcyl = i*1.0/real(resol)
      ! On calcule la densite au milieu de la cellule
      rcyl = sqrt((r_lim(i) * r_lim(i-1)))
      fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
@@ -1137,34 +1126,18 @@ subroutine densite_eqdiff()
            do j=1,nz
               correct_strat(k,j) = correct_strat(k,j)*correct
            enddo
-!           if ((rcyl > 10.0).and.(r_grain(k)>0.1)) then
-!              do j=1,nz
-!                 write(*,*) z(j)/rcyl,  correct_strat(k,j)
-!              enddo
-!              stop
-!           endif
         enddo !k
      else!lstrat
         correct_strat = 1.0
      endif!lstrat
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
      ! Calcul opacite et probabilite de diffusion
-     !$omp parallel &
-     !$omp default(none) &
-     !$omp shared(i,rcyl,nz,n_grains_tot) &
-     !$omp shared(amax_reel,densite_pouss) &
-     !$omp private(j,k,z,icell) &
-     !$omp shared(zmax,kappa,probsizecumul,nbre_grains,cst_pous,rho,correct_strat, delta_z,cell_map)
-     !$omp do schedule(dynamic,10)
      do j=1,nz
         icell = cell_map(i,j,1)
         do  k=1,n_grains_tot
            densite_pouss(icell,k) = nbre_grains(k) * correct_strat(k,j) * rho(j)
         enddo !k
      enddo !j
-     !$omp enddo
-     !$omp end parallel
   enddo !i
 
 !***************
