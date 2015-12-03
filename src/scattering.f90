@@ -824,24 +824,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
      return
   endif
 
-! Prediction (plus rapide : donne des meilleurs valeurs initiales pour la dichotomie)
-  ! 2 cas particulier ou l'echantollonage n'est plus lineaire
-!!$  if (prob < proba_resol) then
-!!$     kmin = 1
-!!$     kmax = ech_prob(lambda,ri,zj,1)
-!!$  else if (prob > (1.0-proba_resol)) then
-!!$     kmin = max(ech_prob(lambda,ri,zj,n_prob)-1,1)
-!!$     kmax = amax_reel(lambda,ri,zj)
-!!$  else
-!!$     p = int(prob*real(n_prob-1)) + 1
-!!$     kmin = max(ech_prob(lambda,ri,zj,p)-1,1) ! pour eviter de tomber sur l'indice 0
-!!$     kmax = ech_prob(lambda,ri,zj,p+1)
-!!$  endif
-
-!  write(*,*) 'grainsize', aleat
-!  write(*,*) kmin, kmax
-
-! dichotomie
+  ! dichotomie
   kmin = 0
   kmax = n_grains_tot
   k=(kmin + kmax)/2

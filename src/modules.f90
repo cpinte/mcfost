@@ -473,17 +473,6 @@ module opacity
   !* en compte le nombre de grains en meme temps que leur probabilite
   !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
-  integer, parameter :: n_prob = 3
-  ! proba_resol doit etre inferieur a 1/n_prob
-  real, parameter :: proba_resol = 0.1/n_prob
-  ! 0. et 1., proba_resol , 1.-proba_resol + n_prob-2 valeurs echantillonees regulierement
-!  integer, dimension(n_lambda,n_rad,nz+1,0:n_prob+1) :: ech_prob
-!  real, dimension(n_lambda,n_rad,nz+1,0:n_prob+1) :: valeur_prob, xspline
-
-  integer, dimension(:,:,:,:,:), allocatable :: ech_prob !n_lambda,n_rad,nz+1,0:n_prob+1
-  real, dimension(:,:,:,:,:), allocatable :: valeur_prob !n_lambda,n_rad,nz+1,(n_az),0:n_prob+1
-  real, dimension(:,:,:,:), allocatable :: xspline !n_lambda,n_rad,nz+1,0:n_prob+1
-
   logical :: l_is_dark_zone
   logical, dimension(:,:,:), allocatable :: l_dark_zone !0:n_rad+1,0:nz+1, n_az
   real, dimension(:,:), allocatable :: r_in_opacite, r_in_opacite2 !nz+1, (n_az)

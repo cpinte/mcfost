@@ -73,7 +73,7 @@ subroutine build_cylindrical_cell_mapping()
   enddo
 
   if (icell /= ntot) then
-     write(*,*) "Something went wrong in the calle mapping"
+     write(*,*) "Something went wrong in the call mapping"
      write(*,*) "I am missing some real cells"
      write(*,*) icell, ntot
      write(*,*)
@@ -128,7 +128,7 @@ subroutine build_cylindrical_cell_mapping()
   enddo
 
   if (icell /= ntot2) then
-     write(*,*) "Something went wrong in the calle mapping"
+     write(*,*) "Something went wrong in the cell mapping"
      write(*,*) "I am missing some virtual cells"
      write(*,*) icell, ntot2
      write(*,*)
