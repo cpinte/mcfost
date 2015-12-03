@@ -147,13 +147,9 @@ subroutine transfert_poussiere()
 
   call taille_grains()
 
-  if (lold_grid) then
-     call define_grid3()
-  else
-     call order_zones()
-     call define_physical_zones()
-     call define_grid4()
-  endif
+  call order_zones()
+  call define_physical_zones()
+  call define_grid()
 
   if (lProDiMo) call setup_ProDiMo()
 
@@ -283,7 +279,7 @@ subroutine transfert_poussiere()
 
            if (ldust_sublimation)  then
               call compute_othin_sublimation_radius()
-              call define_grid4()
+              call define_grid()
               call define_dust_density()
 
               do lambda=1,n_lambda

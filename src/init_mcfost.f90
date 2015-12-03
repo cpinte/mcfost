@@ -123,7 +123,6 @@ subroutine initialisation_mcfost()
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
   lread_Seb_Charnoz2 = .false.
-  lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
   lcorrect_Tgas = .false.
@@ -748,9 +747,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
-     case("-old_grid")
-        i_arg = i_arg+1
-        lold_grid=.true.
      case("-only_top")
         i_arg = i_arg+1
         lonly_top=.true.
