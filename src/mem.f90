@@ -296,7 +296,7 @@ subroutine alloc_dynamique()
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
      p_n_lambda = n_lambda ! was 1 : changed to save dust properties
-     allocate(tab_s11_pos(p_n_cells, 0:nang_scatt, n_lambda), stat=alloc_status)
+     allocate(tab_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
@@ -304,9 +304,9 @@ subroutine alloc_dynamique()
      tab_s11_pos = 0
 
      if (lsepar_pola) then
-        allocate(tab_s12_pos(p_n_cells, 0:nang_scatt, n_lambda), &
-             tab_s33_pos(p_n_cells, 0:nang_scatt, n_lambda), &
-             tab_s34_pos(p_n_cells, 0:nang_scatt, n_lambda), &
+        allocate(tab_s12_pos(0:nang_scatt, p_n_cells, n_lambda), &
+             tab_s33_pos(0:nang_scatt, p_n_cells, n_lambda), &
+             tab_s34_pos(0:nang_scatt, p_n_cells, n_lambda), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_pos'
@@ -317,7 +317,7 @@ subroutine alloc_dynamique()
         tab_s34_pos = 0
      endif
 
-     allocate(prob_s11_pos(p_n_cells,0:nang_scatt, n_lambda), stat=alloc_status)
+     allocate(prob_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
@@ -1403,7 +1403,7 @@ subroutine realloc_step2()
 
   if (scattering_method == 2) then
      deallocate(tab_s11_pos)
-     allocate(tab_s11_pos(p_n_cells,0:nang_scatt,n_lambda2), stat=alloc_status)
+     allocate(tab_s11_pos(0:nang_scatt,p_n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
@@ -1412,9 +1412,9 @@ subroutine realloc_step2()
 
      if (lsepar_pola) then
         deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
-        allocate(tab_s12_pos(p_n_cells,0:nang_scatt,n_lambda2), &
-             tab_s33_pos(p_n_cells,0:nang_scatt,n_lambda2), &
-             tab_s34_pos(p_n_cells,0:nang_scatt,n_lambda2), &
+        allocate(tab_s12_pos(0:nang_scatt,p_n_cells,n_lambda2), &
+             tab_s33_pos(0:nang_scatt,p_n_cells,n_lambda2), &
+             tab_s34_pos(0:nang_scatt,p_n_cells,n_lambda2), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_pos'
@@ -1426,7 +1426,7 @@ subroutine realloc_step2()
      endif
 
      deallocate(prob_s11_pos)
-     allocate(prob_s11_pos(p_n_cells,0:nang_scatt,n_lambda2), stat=alloc_status)
+     allocate(prob_s11_pos(0:nang_scatt,p_n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop

@@ -1297,13 +1297,13 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   XMUL=0.0
   icell = cell_map(ri,zj,phik)
-  XMUL(1,1) = tab_s11_pos(icell,itheta,lambda) * frac +  tab_s11_pos(icell,itheta-1,lambda) * frac_m1
+  XMUL(1,1) = tab_s11_pos(theta,icell,ilambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(icell,itheta,lambda) * frac +  tab_s12_pos(icell,itheta-1,lambda) * frac_m1
+  XMUL(1,2) = tab_s12_pos(theta,icell,ilambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(icell,itheta,lambda) * frac +  tab_s33_pos(icell,itheta-1,lambda) * frac_m1
+  XMUL(3,3) = tab_s33_pos(theta,icell,ilambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_pos(icell,itheta,lambda)* frac -  tab_s34_pos(icell,itheta-1,lambda) * frac_m1
+  XMUL(3,4) = -tab_s34_pos(itheta,icell,lambda)* frac -  tab_s34_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
 
   ! -------- CALCUL DE LA POLARISATION ---------
@@ -1522,7 +1522,7 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
   icell = cell_map(ri,zj,phik)
 
   do while ((kmax-kmin) > 1)
-     if (prob_s11_pos(icell,k,lambda) < aleat) then
+     if (prob_s11_pos(k,icell,lambda) < aleat) then
         kmin = k
      else
         kmax = k
