@@ -1527,7 +1527,6 @@ subroutine realloc_step2()
         stop
      endif
      ksca_CDF = 0
-
   endif ! method
 
   deallocate(amax_reel, kappa, kappa_abs_eg)
