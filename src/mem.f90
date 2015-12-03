@@ -26,7 +26,35 @@ subroutine alloc_dynamique()
   real :: mem_size
 
   nrz = n_rad * nz
-  n_cells = nrz * n_az
+  if (l3D) then
+     n_cells = 2*nrz*n_az
+  else
+     n_cells = nrz
+  endif
+
+  if (lvariable_dust) then
+     p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
+  else
+     p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
+  endif
+
+  if (l3D) then
+     j_start = -nz
+     if (lvariable_dust) then
+        p_n_az = n_az
+     else
+        p_n_az = 1
+     endif
+  else
+     j_start = 1
+     p_n_az = 1
+  endif
+
+  if ((p_nz /= 1).and.l3D) then
+     pj_start = -nz
+  else
+     pj_start = 1
+  endif
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then

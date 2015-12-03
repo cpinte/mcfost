@@ -82,7 +82,7 @@ subroutine transfert_poussiere()
 
   ! parametrage methode de diffusion
   if (scattering_method == 0) then
-     if ((lstrat).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
+     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
         scattering_method = 1
      else
         scattering_method = 2
@@ -96,31 +96,6 @@ subroutine transfert_poussiere()
  else
      lambda0=1
      p_lambda => lambda ! was lambda0 : changed to save dust properties
-  endif
-
-
-  if (lstrat) then
-     p_n_rad=n_rad ; p_nz = nz
-  else
-     p_n_rad=1 ;  p_nz=1
-  endif
-
-  if (l3D) then
-     j_start = -nz
-     if (lstrat) then
-        p_n_az = n_az
-     else
-        p_n_az = 1
-     endif
-  else
-     j_start = 1
-     p_n_az = 1
-  endif
-
-  if ((p_nz /= 1).and.l3D) then
-     pj_start = -nz
-  else
-     pj_start = 1
   endif
 
 
@@ -920,7 +895,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
 
-     if (lstrat) then ! TODO : pointeurs, alloue dans openMP ????
+     if (lvariable_dust) then ! TODO : pointeurs, alloue dans openMP ????
         p_ri=ri
         p_zj=zj
         if (l3D) p_phik = phik

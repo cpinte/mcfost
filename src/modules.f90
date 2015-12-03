@@ -43,8 +43,8 @@ module parametres
   integer :: n_lambda
   logical :: lmono0, lmono
 
-  ! lstrat = true si on prend en compte la stratification
-  logical :: lstrat, lmigration, lhydrostatic, ldust_sublimation
+  ! lvariable_dust = true si les proprites de la poussiere sont variables dans chaque cellule
+  logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
   logical :: lRE_LTE, lRE_nLTE, lnRE, loutput_J, loutput_UV_field, lxJ_abs, lxJ_abs2
@@ -102,7 +102,7 @@ module parametres
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
-  integer :: n_cells, nrz
+  integer :: n_cells, nrz, p_n_cells
   logical :: llinear_grid
 
   integer :: n_lambda2

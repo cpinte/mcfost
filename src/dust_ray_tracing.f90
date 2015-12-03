@@ -524,7 +524,7 @@ subroutine calc_xI_scatt(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
   real(kind=db) :: flux
   integer :: ibin, iaz, iRT, it, p_ri, p_zj, p_phik
 
-  if (lstrat) then
+  if (lvariable_dust) then
      p_ri = ri
      p_zj = zj
      if (l3D) then
@@ -598,7 +598,7 @@ subroutine calc_xI_scatt_pola(id,lambda,ri,zj,phik,psup,l,stokes,flag_star)
 
   M = 0.0_db
 
-  if (lstrat) then
+  if (lvariable_dust) then
      p_ri = ri
      p_zj = zj
      if (l3D) then
@@ -1069,7 +1069,7 @@ subroutine calc_Isca2_new(lambda,ibin)
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp shared(lstrat,Inu,I_sca2,n_rad,nz,tab_s11_ray_tracing,uv0,w0,n_Stokes) &
+  !$omp shared(lvariable_dust,Inu,I_sca2,n_rad,nz,tab_s11_ray_tracing,uv0,w0,n_Stokes) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing) &
   !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
@@ -1077,7 +1077,7 @@ subroutine calc_Isca2_new(lambda,ibin)
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S)
   id = 1 ! pour code sequentiel
 
-  if (lstrat) then
+  if (lvariable_dust) then
      allocate(sum_s11(n_rad,nz),s11(n_rad,nz), stat=alloc_status)
   else
      allocate(sum_s11(1,1),s11(1,1), stat=alloc_status)
@@ -1090,7 +1090,7 @@ subroutine calc_Isca2_new(lambda,ibin)
   s11 = 0.0
 
   if (lsepar_pola) then
-     if (lstrat) then
+     if (lvariable_dust) then
         allocate(s12(n_rad,nz),s33(n_rad,nz),s34(n_rad,nz), stat=alloc_status)
      else
         allocate(s12(1,1),s33(1,1),s34(1,1), stat=alloc_status)
@@ -1151,7 +1151,7 @@ subroutine calc_Isca2_new(lambda,ibin)
 
                     sum_sin = sum_sin + sin_scatt
 
-                    if (lstrat) then
+                    if (lvariable_dust) then
                        do ri=1,n_rad
                           do zj=1,nz
                              sum_s11(ri,zj) = sum_s11(ri,zj) + tab_s11_ray_tracing(lambda,ri,zj,1,k) * sin_scatt
@@ -1225,7 +1225,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                  RPO(3,3) = cosw
                  ROP(3,3) = cosw
 
-                 if (lstrat) then
+                 if (lvariable_dust) then
                     do ri=1,n_rad
                        do zj=1,nz
                           s12(ri,zj) = s11(ri,zj) * tab_s12_o_s11_ray_tracing(lambda,ri,zj,1,k)
@@ -1237,7 +1237,7 @@ subroutine calc_Isca2_new(lambda,ibin)
                     s12(1,1) = s11(1,1) * tab_s12_o_s11_ray_tracing(lambda,1,1,1,k)
                     s33(1,1) = s11(1,1) * tab_s33_o_s11_ray_tracing(lambda,1,1,1,k)
                     s34(1,1) = s11(1,1) * tab_s34_o_s11_ray_tracing(lambda,1,1,1,k)
-                 endif ! lstrat
+                 endif ! lvariable_dust
               endif ! lsepar_pola
 
               !write(*,*) "s12"
@@ -1246,7 +1246,7 @@ subroutine calc_Isca2_new(lambda,ibin)
               p_ri = 1 ; p_zj =1
               do ri=1, n_rad
                  do zj=1,nz
-                    if (lstrat) then
+                    if (lvariable_dust) then
                        p_ri = ri
                        p_zj = zj
                     endif
@@ -1417,7 +1417,7 @@ subroutine calc_Isca2_star(lambda,ibin)
         ! cos_scatt_ray_tracing correspondants
         call angles_scatt_rt2(id,ibin,x,y,z,u,v,w,.true.)
 
-        if (lstrat) then
+        if (lvariable_dust) then
            p_ri = ri
            p_zj = zj
         endif

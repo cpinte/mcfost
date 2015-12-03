@@ -895,10 +895,10 @@ subroutine initialisation_mcfost()
         !limg=.false.
         !lmono=.false.
         !lmono0=.false.
-        lstrat=.false.
+        lvariable_dust=.false.
         scattering_method=2
      else
-        if (lstrat) then
+        if (lvariable_dust) then
            write(*,*) "Cannot use +dust_prop when settling is on"
            write(*,*) "Please use -dust_prop instead"
            write(*,*) "This will compute the dust properties of the complete"
@@ -921,8 +921,8 @@ subroutine initialisation_mcfost()
   endif
 
   if (ln_zone) then
-     !lstrat=.true.
-     write(*,*) "WARNING: lstrat is not set automatically to TRUE !!!!!!!!!"
+     !lvariable_dust=.true.
+     write(*,*) "WARNING: lvariable_dust is not set automatically to TRUE !!!!!!!!!"
 
      if (exp_strat > 1.0e-6) then
         write(*,*) "!!!  WARNING  !!!"
@@ -932,7 +932,7 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if (lread_Seb_Charnoz) lstrat = .true.
+  if (lread_Seb_Charnoz) lvariable_dust = .true.
 
 
   if (lonly_scatt) l_em_disk_image=.false.
