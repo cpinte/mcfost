@@ -90,7 +90,7 @@ subroutine alloc_dynamique()
   tan_theta_lim = 0.0
   tan_phi_lim = 0.0
 
-  allocate(zmax(n_rad),volume(n_rad), stat=alloc_status)
+  allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error zmax, volume'
      stop
@@ -237,21 +237,10 @@ subroutine alloc_dynamique()
 
 
   ! Tableaux relatifs aux prop optiques des cellules
-  if (l3D) then
-     allocate(amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az),  stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_eg(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1),  stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-  endif
+  allocate(amax_reel(n_cells,n_lambda), kappa(n_cells,n_lambda),kappa_abs_eg(n_cells,n_lambda), stat=alloc_status)
+  allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
+  if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+  if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
@@ -1077,25 +1066,11 @@ subroutine realloc_dust_mol()
   ksca_CDF = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  if (l3D) then
-     allocate(kappa(n_lambda,n_rad,-nz-1:nz+1,n_az),kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          emissivite_dust(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(kappa(n_lambda,n_rad,nz+1,1),kappa_abs_eg(n_lambda,n_rad,nz+1,1), &
-          kappa_sca(n_lambda,n_rad,nz+1,1), &
-          emissivite_dust(n_lambda,n_rad,nz+1,1), &
-          amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_RE(n_lambda,n_rad,nz+1,1),stat=alloc_status)
-  endif
+  allocate(kappa(n_cells,n_lambda),kappa_abs_eg(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), &
+          emissivite_dust(n_cells,n_lambda), amax_reel(n_cells,n_lambda), stat=alloc_status)
+  allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
+  if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+  if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa (realloc)'
      stop
@@ -1533,24 +1508,13 @@ subroutine realloc_step2()
   deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  if (l3D) then
-     allocate(amax_reel(n_lambda2,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda2,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_eg(n_lambda2,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(amax_reel(n_lambda2,n_rad,nz+1,1), kappa(n_lambda2,n_rad,nz+1,1), &
-          kappa_abs_eg(n_lambda2,n_rad,nz+1,1), stat=alloc_status)
-    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-  endif
+  allocate(amax_reel(n_cells,n_lambda2), kappa(n_cells,n_lambda2), &
+       kappa_abs_eg(n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
   amax_reel = 0.0 ; kappa=0.0 ; kappa_abs_eg=0.0 ;
-  !if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
-  !if (lnRE)  proba_abs_RE=0.0
 
 
   if (lorigine) then

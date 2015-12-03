@@ -118,7 +118,7 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: i,j,pk,k,lambda,t, pop
+  integer :: i,j,pk,k,lambda,t, pop, icell
   real(kind=db) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
@@ -165,6 +165,8 @@ subroutine init_reemission()
         bz : do j=j_start, nz
            if (j==0) cycle bz
            do pk=1, n_az
+              icell = cell_map(i,j,pk)! NEWTODO
+
               integ=0.0
 
               do lambda=1, n_lambda
@@ -172,7 +174,7 @@ subroutine init_reemission()
                  ! volume en AU3     >  pas de cst pour avoir frac_E_em en SI
                  ! B en SI (cst_E)  /
                  ! R*-2 en AU-2    /   --> dans cst_E
-                 integ = integ + kappa_abs_eg(lambda,i,j,pk)* volume(i) * B(lambda)
+                 integ = integ + kappa_abs_eg(icell,lambda)* volume(i) * B(lambda)
                  !              write(*,*) i,j,lambda,integ, kappa_abs(lambda,i,j),volume(i), B(lambda)
                  !              read(*,*)
 
@@ -221,10 +223,11 @@ subroutine init_reemission()
            bz2 : do j=pj_start, p_nz
               if (j==0) cycle bz2
               do pk=1, p_n_az
+                 icell = cell_map(i,j,pk) ! NEWTODO
                  integ3(0) = 0.0
                  do lambda=1, n_lambda
                     ! Pas besoin de cst , ni du volume (normalisation a 1)
-                    integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(lambda,i,j,pk) * dB_dT(lambda)
+                    integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(icell,lambda) * dB_dT(lambda)
                  enddo !l
 
                  ! Normalisation a 1
@@ -241,10 +244,11 @@ subroutine init_reemission()
         i=ri_not_empty
         j=zj_not_empty
         pk=phik_not_empty
+        icell = cell_map(i,j,pk)
         integ3(0) = 0.0
         do lambda=1, n_lambda
            ! Pas besoin de cst , ni du volume (normalisation a 1)
-           integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(lambda,i,j,pk) * dB_dT(lambda)
+           integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(icell,lambda) * dB_dT(lambda)
         enddo !l
 
         ! Normalisation a 1
@@ -1294,7 +1298,7 @@ subroutine update_proba_abs_nRE()
         do i=1,n_rad
            delta_kappa_abs_qRE = 0.0_db
            lall_grains_eq = .true.
-           icell = cell_map(i,j,k)
+           icell = cell_map(i,j,k) !NEWTODO
            do l=grain_nRE_start,grain_nRE_end
               if (lchange_nRE(i,j,l)) then ! 1 grain a change de status a cette iteration
                  delta_kappa_abs_qRE =  C_abs_norm(lambda,l) * densite_pouss(icell,l)
@@ -1304,9 +1308,9 @@ subroutine update_proba_abs_nRE()
            enddo !l
 
            if (delta_kappa_abs_qRE > tiny_db) then ! au moins 1 grain a change de status, on met a jour les differentes probabilites
-              kappa_abs_RE_old = kappa_abs_RE(lambda,i,j,k)
-              kappa_abs_RE_new = kappa_abs_RE(lambda,i,j,k) + delta_kappa_abs_qRE
-              kappa_abs_RE(lambda,i,j,k) = kappa_abs_RE_new
+              kappa_abs_RE_old = kappa_abs_RE(icell,lambda)
+              kappa_abs_RE_new = kappa_abs_RE(icell,lambda) + delta_kappa_abs_qRE
+              kappa_abs_RE(icell,lambda) = kappa_abs_RE_new
 
               if (kappa_abs_RE_old < tiny_db) then
                  write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
@@ -1317,14 +1321,14 @@ subroutine update_proba_abs_nRE()
 
                  ! Proba d'abs sur un grain en equilibre (pour reemission immediate)
                  if (lall_grains_eq) then
-                    proba_abs_RE(lambda,i,j,k) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
+                    proba_abs_RE(icell,lambda) = 1.0_db ! 1 ecrit en dur pour eviter erreur d'arrondis
                  else
-                    proba_abs_RE(lambda,i,j,k) = proba_abs_RE(lambda,i,j,k) * correct
+                    proba_abs_RE(icell,lambda) = proba_abs_RE(icell,lambda) * correct
                  endif
 
                  ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
-                 Proba_abs_RE_LTE(lambda,i,j,k) =  Proba_abs_RE_LTE(lambda,i,j,k) * correct_m1
-                 Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) =  Proba_abs_RE_LTE_p_nLTE(lambda,i,j,k) * correct_m1
+                 Proba_abs_RE_LTE(icell,lambda) =  Proba_abs_RE_LTE(icell,lambda) * correct_m1
+                 Proba_abs_RE_LTE_p_nLTE(icell,lambda) =  Proba_abs_RE_LTE_p_nLTE(icell,lambda) * correct_m1
 
                  ! Todo : update proba_abs_1grain
               endif
@@ -1585,10 +1589,10 @@ subroutine repartition_energie(lambda)
               endif
            endif
            do pk=1, n_az
+              icell = cell_map(i,j,pk) ! NEWTODO : l vs icell
               if (l3D) then
                  ! Combinaison des 3 indices pour dichotomie
                  l= pk+n_az*(jj+2*nz*(i-1)-1)
-
               else
                  ! Combinaison des 2 indices pour dichotomie
                  l= j+nz*(i-1)
@@ -1601,7 +1605,7 @@ subroutine repartition_energie(lambda)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
-                       E_cell(l) =  4.0*kappa_abs_eg(lambda,i,j,pk)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
+                       E_cell(l) = 4.0*kappa_abs_eg(icell,lambda)*volume(i)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
                  endif !cst_wl
               endif ! Temp==0.0

@@ -461,7 +461,7 @@ subroutine transfert_poussiere()
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
         tau=0.0 ;
         do i=1, n_rad
-           tau=tau+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
+           tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
         enddo
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
@@ -870,7 +870,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_ri, p_zj, p_phik, taille_grain, itheta
+  integer :: p_ri, p_zj, p_phik, taille_grain, itheta, icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -915,6 +915,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         write(*,*) "PB z", ri, zj, abs(z)
         zj=nz
      endif
+     icell = cell_map(ri,zj,phik)
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
@@ -1027,9 +1028,9 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      else ! Absorption
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
-           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(lambda,ri, zj, p_phik))
+           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(icell,lambda))
            ! Multiplication par proba abs sur grain en eq. radiatif
-           Stokes = Stokes * proba_abs_RE(lambda,ri, zj, p_phik)
+           Stokes = Stokes * proba_abs_RE(icell,lambda)
 
            if (Stokes(1) < tiny_real)  then ! on saute le photon
               lpacket_alive = .false.
@@ -1045,11 +1046,11 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         ! Choix longueur d'onde
         rand = sprng(stream(id))
         !write(*,*) rand, Proba_abs_RE_LTE(lambda,ri, zj, p_phik)
-        if (rand <= Proba_abs_RE_LTE(lambda,ri, zj, p_phik)) then
+        if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
            ! Cas RE - LTE
            rand = sprng(stream(id))
            call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,lambda)
-        else  if (rand <= Proba_abs_RE_LTE_p_nLTE(lambda,ri, zj, p_phik)) then
+        else  if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
            ! Cas RE - nLTE
            rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
            call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)

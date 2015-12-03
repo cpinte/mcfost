@@ -17,7 +17,7 @@ subroutine compute_othin_sublimation_radius()
 
   real(kind=db) :: E_dust, E_etoile
   real :: cst, wl, delta_wl
-  integer :: lambda, i
+  integer :: lambda, i, icell
   real(kind=db) :: sublimation_radius, coeff_exp, cst_wl
 
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
@@ -35,6 +35,8 @@ subroutine compute_othin_sublimation_radius()
   cst=cst_th/dust_pop(1)%T_sub
   cst=cst_th/1500.
 
+  icell = cell_map(1,1,1)
+
   do lambda=1, n_lambda
      ! longueur d'onde en metre
      wl = tab_lambda(lambda)*1.e-6
@@ -42,7 +44,7 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_dust = E_dust + 4.0 * sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0)) *delta_wl
+        E_dust = E_dust + 4.0 * kappa_abs_eg(icell,lambda)/((wl**5)*(coeff_exp-1.0)) *delta_wl
      endif
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
@@ -58,7 +60,7 @@ subroutine compute_othin_sublimation_radius()
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
 !        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl
-        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
+        E_etoile = E_etoile + kappa_abs_eg(icell,lambda) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
 
 
        ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)

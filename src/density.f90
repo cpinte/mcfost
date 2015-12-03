@@ -219,14 +219,9 @@ subroutine define_gas_density()
 
      ! Calcul de la masse de gaz de la zone
      mass = 0.
-     do i=1,n_rad
-        bz_gas_mass : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass
-           do k=1,n_az
-              mass = mass + densite_gaz_tmp(cell_map(i,j,k)) *  masse_mol_gaz * volume(i)
-           enddo  !k
-        enddo bz_gas_mass
-     enddo !i
+     do icell = 1, n_cells
+        mass = mass + densite_gaz_tmp(icell) *  masse_mol_gaz * volume(icell)
+     enddo
      mass =  mass * AU3_to_m3 * g_to_Msun
 
      ! Normalisation
@@ -265,16 +260,9 @@ subroutine define_gas_density()
   endif
 
   ! Tableau de masse de gaz
-  do i=1,n_rad
-     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
-     bz_gas_mass3 : do j=j_start,nz
-        if (j==0) cycle bz_gas_mass3
-        do k=1, n_az
-           icell = cell_map(i,j,k)
-           masse_gaz(icell) =  densite_gaz(icell) * facteur
-        enddo !k
-     enddo bz_gas_mass3
-  enddo ! i
+  do icell=1,n_cells
+     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+  enddo
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   if (lcorrect_density) then
@@ -619,15 +607,9 @@ subroutine define_dust_density()
         if (lmigration) then
            ! distribution en taille de grains avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do i=1,n_rad
-                 do j=j_start,nz
-                    if (j==0) cycle
-                    do k=1, n_az
-                       icell = cell_map(i,j,k)
-                       N_tot(l) = N_tot(l) + densite_pouss(icell,l) * volume(i)
-                    enddo ! k
-                 enddo ! j
-              enddo ! i
+              do icell=1,n_cells
+                 N_tot(l) = N_tot(l) + densite_pouss(icell,l) * volume(icell)
+              enddo ! icell
            enddo !l
 
            do i=1, n_rad
@@ -665,14 +647,8 @@ subroutine define_dust_density()
 
            ! distribution en taille de grains apres la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do i=1,n_rad
-                 do j=j_start,nz
-                    if (j==0) cycle
-                    do k=1, n_az
-                       icell = cell_map(i,j,k)
-                       N_tot2(l) = N_tot2(l) + densite_pouss(icell,l) * volume(i)
-                    enddo !k
-                 enddo !j
+              do icell=1,n_cells
+                 N_tot2(l) = N_tot2(l) + densite_pouss(icell,l) * volume(icell)
               enddo ! i
            enddo ! l
 
@@ -796,18 +772,11 @@ subroutine define_dust_density()
         dp => dust_pop(pop)
         mass = 0.0
 
-        do i=1,n_rad
-           bz2 : do j=j_start,nz
-              if (j==0) cycle bz2
-
-              do k=1,n_az
-                 icell = cell_map(i,j,k)
-                 do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + densite_pouss(icell,l) * M_grain(l) * volume(i)
-                 enddo !l
-              enddo !k
-           enddo bz2
-        enddo !i
+        do icell=1,n_cells
+           do l=dp%ind_debut,dp%ind_fin
+              mass=mass + densite_pouss(icell,l) * M_grain(l) * volume(icell)
+           enddo !l
+        enddo !icell
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
         if (mass < tiny_db) then
@@ -818,18 +787,12 @@ subroutine define_dust_density()
 
         facteur = dp%masse / mass
 
-        do i=1,n_rad
-           bz3 : do j=j_start,nz
-              if (j==0) cycle bz3
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 do l=dp%ind_debut,dp%ind_fin
-                    densite_pouss(icell,l) = densite_pouss(icell,l) * facteur
-                    masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
-                 enddo !l
-              enddo !k
-           enddo bz3
-        enddo ! i
+        do icell=1,n_cells
+           do l=dp%ind_debut,dp%ind_fin
+              densite_pouss(icell,l) = densite_pouss(icell,l) * facteur
+              masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(icell)
+           enddo !l
+        enddo ! icell
 
      endif ! test wall
   enddo ! pop
@@ -959,34 +922,21 @@ subroutine define_density_wall3D()
         dp => dust_pop(pop)
         mass = 0.0
 
-        do i=1,n_rad
-           bz2 : do j=j_start,nz
-              if (j==0) cycle bz2
-
-              do k=1,n_az
-                 icell = cell_map(i,j,k)
-                 do l=dp%ind_debut,dp%ind_fin
-                    mass=mass + density_wall(icell,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
-                 enddo !l
-              enddo !k
-           enddo bz2
-        enddo !i
+        do icell=1,n_cells
+           do l=dp%ind_debut,dp%ind_fin
+              mass=mass + density_wall(icell,l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+           enddo !l
+        enddo !icell
         mass =  mass*g_to_Msun
 
         facteur = dp%masse / mass
 
-        do i=1,n_rad
-           bz3 : do j=j_start,nz
-              if (j==0) cycle bz3
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 do l=dp%ind_debut,dp%ind_fin
-                    density_wall(icell,l) = density_wall(icell,l) * facteur
-                    masse_wall(icell) = masse_wall(icell) + density_wall(icell,l) * M_grain(l) * volume(i)
-                 enddo !l
-              enddo !k
-           enddo bz3
-        enddo ! i
+        do icell=1,n_cells
+           do l=dp%ind_debut,dp%ind_fin
+              density_wall(icell,l) = density_wall(icell,l) * facteur
+              masse_wall(icell) = masse_wall(icell) + density_wall(icell,l) * M_grain(l) * volume(icell)
+           enddo !l
+        enddo ! icell
 
      endif ! zone = wall
   enddo ! pop
@@ -1547,14 +1497,11 @@ subroutine densite_file()
 
   ! Calcul de la masse de gaz de la zone
   mass = 0.
-  do i=1,n_rad
-     bz_gas_mass : do j=j_start,nz
-        if (j==0) cycle bz_gas_mass
-        do k=1,n_az
-           mass = mass + densite_gaz(cell_map(i,j,k)) *  masse_mol_gaz * volume(i)
-        enddo  !k
-     enddo bz_gas_mass
-  enddo !i
+  do icell=1,n_cells
+     do k=1,n_az
+        mass = mass + densite_gaz(cell_map(i,j,k)) *  masse_mol_gaz * volume(icell)
+     enddo  !k
+  enddo !icell
   mass =  mass * AU3_to_m3 * g_to_Msun
 
   ! Normalisation
@@ -1573,16 +1520,11 @@ subroutine densite_file()
   endif
 
   ! Tableau de masse de gaz
-  do i=1,n_rad
-     facteur = masse_mol_gaz * volume(i) * AU3_to_m3
-     bz_gas_mass3 : do j=j_start,nz
-        if (j==0) cycle bz_gas_mass3
-        do k=1, n_az
-           icell = cell_map(i,j,k)
-           masse_gaz(icell) =  densite_gaz(icell) * facteur
-        enddo !k
-     enddo bz_gas_mass3
-  enddo ! i
+  do icell=1,n_cells
+     do k=1, n_az
+        masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+     enddo !k
+  enddo ! icell
 
   if (lstrat) then
      write(*,*) "Differential spatial distribution"
@@ -1639,19 +1581,13 @@ subroutine densite_file()
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot
      somme=0.0
-     do i=1,n_rad
-        do j=j_start,nz
-           if (j==0) cycle
-           do k=1,n_az
-              icell = cell_map(i,j,k)
-              if (densite_pouss(icell,l) <= 0.0) densite_pouss(icell,l) = tiny_db
-              somme=somme+densite_pouss(icell,l)*volume(i)
-           enddo !k
-        enddo !j
-     enddo !i
+
+     do icell=1,n_cells
+        if (densite_pouss(icell,l) <= 0.0) densite_pouss(icell,l) = tiny_db
+        somme=somme+densite_pouss(icell,l)*volume(icell)
+     enddo !icell
      densite_pouss(:,l) = (densite_pouss(:,l)/somme)
   enddo !l
-
 
 
   ! Normalisation : on a 1 grain en tout dans le disque
@@ -1677,32 +1613,19 @@ subroutine densite_file()
 
   ! Normalisation : Calcul masse totale
   mass = 0.0
-  do i=1,n_rad
-     do j=j_start,nz
-        if (j==0) cycle
-        do k=1,n_az
-           do l=1,n_grains_tot
-              mass=mass + densite_pouss(cell_map(i,j,k),l) * M_grain(l) * (volume(i) * AU3_to_cm3)
-           enddo !l
-        enddo !k
-     enddo !j
-  enddo !i
+  do icell=1,n_cells
+     do l=1,n_grains_tot
+        mass=mass + densite_pouss(icell,l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+     enddo !l
+  enddo !icell
   mass =  mass/Msun_to_g
   densite_pouss(:,:) = densite_pouss(:,:) * diskmass/mass
 
-  do i=1,n_rad
-     !write(*,*) i, r_grid(i,1), sum(densite_pouss(i,:,:,3))
-     do j=j_start,nz
-        if (j==0) cycle
-        do k=1,n_az
-           do l=1,n_grains_tot
-              icell = cell_map(i,j,k)
-              masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
-           enddo !l
-        enddo !k
-     enddo !j
-  enddo ! i
-
+  do icell=1,n_cells
+     do l=1,n_grains_tot
+        masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(icell)
+     enddo !l
+  enddo ! icell
   masse(:) = masse(:) * AU3_to_cm3
 
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
@@ -1871,8 +1794,8 @@ subroutine densite_Seb_Charnoz()
         if (is_diff(Zmin,Zmin_mcfost)) write(*,*) "Pb Z cell", i,j, Zmin, Zmin_mcfost
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
 
-
-        densite_pouss(cell_map(i,j,1),:) = density_Seb(:) / (volume(i)*AU3_to_cm3) ! comversion en densite volumique
+        icell = cell_map(i,j,1)
+        densite_pouss(icell,:) = density_Seb(:) / (volume(icell)*AU3_to_cm3) ! comversion en densite volumique
         Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
      enddo ! j
   enddo !i
@@ -1901,17 +1824,11 @@ subroutine densite_Seb_Charnoz()
   nbre_grains(:) = N_grains(:)/sum(N_grains(:))
 
 
-  do i=1,n_rad
-     bz : do j=j_start,nz
-        if (j==0) cycle bz
-        do k=1, n_az
-           do l=1,n_grains_tot
-              icell = cell_map(i,j,k)
-              masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
-           enddo !l
-        enddo !k
-     enddo bz
-  enddo ! i
+  do icell=1,n_cells
+     do l=1,n_grains_tot
+        masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(icell)
+     enddo !l
+  enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3 * 1600./3500 ! TMP
 
@@ -2066,14 +1983,11 @@ subroutine densite_Seb_Charnoz2()
 
   write(*,*) "Done"
 
-  do i=1,n_rad
-     do j=1,nz
-        do l=1,n_grains_tot
-           icell = cell_map(i,j,1)
-           masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(i)
-        enddo !l
-     enddo !j
-  enddo ! i
+  do icell=1,n_cells
+     do l=1,n_grains_tot
+        masse(icell) = masse(icell) + densite_pouss(icell,l) * M_grain(l) * volume(icell)
+     enddo !l
+  enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3
 
@@ -2090,7 +2004,7 @@ subroutine remove_specie()
 
   implicit none
 
-  integer :: i, j, pk, k
+  integer :: i, j, pk, k, icell
   real :: mass
 
   write(*,*) "Removing specie", specie_removed, "where T >", T_rm
@@ -2101,7 +2015,8 @@ subroutine remove_specie()
            do k=1,n_grains_tot
               if (grain(k)%pop==specie_removed) then
                  if (Temperature(i,j,pk) > T_rm) then
-                    densite_pouss(cell_map(i,j,pk),k) = 0.0
+                    icell = cell_map(i,j,pk)
+                    densite_pouss(icell,k) = 0.0
                  endif
               endif
            enddo
@@ -2110,11 +2025,9 @@ subroutine remove_specie()
   enddo
 
   mass = 0.0
-  do i=1,n_rad
-     do j=1,nz
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(cell_map(i,j,1),k) * M_grain(k) * (volume(i) * AU3_to_cm3)
-        enddo
+  do icell=1,n_cells
+     do k=1,n_grains_tot
+        mass=mass + densite_pouss(cell_map(i,j,1),k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
      enddo
   enddo
   mass =  mass/Msun_to_g
