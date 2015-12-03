@@ -850,50 +850,6 @@ end function grainsize
 
 !*******************************************************************
 
-subroutine MULMAT (M, N, K, A, B, C)
-!*******************************************************************
-!       subroutine MULMAT pour multiplier deux matrices.
-!
-!       format: call mulmat (m,n,k,a,b,c)
-!
-!               A = import matrix (M*N)
-!               B = import matrix (N*K)
-!               C = export matrix (M*K)
-!
-!      	        sum = temporary storage
-!
-!       Francois Menard, Heidelberg, 5 october 1990
-!
-! Inutilise : remplace par la fonction intrinseque matmul plus efficace (C. Pinte)
-!*******************************************************************
-
-  implicit none
-
-  integer, intent(in) :: m,n,k
-  real(kind=db), dimension(m,n), intent(in) :: a
-  real(kind=db), dimension(n,k), intent(in) :: b
-  real(kind=db), dimension(m,k), intent(out) :: c
-
-  integer :: r,s,i
-  real(kind=db) :: sum
-!
-!       pour chaque rangee R et colonne S, calculer le produit du vecteur
-!       rangee avec le vecteur colonne
-!
-  do  r = 1,m
-     do  s = 1,k
-        sum = 0.0
-        do  i = 1,n
-           sum = sum + a(r,i) * b(i,s)
-        enddo   !i
-        c(r,s) = sum
-     enddo   !s
-  enddo   !r
-  return
-end subroutine MULMAT
-
-!*****************************************************
-
 subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !***********************************************************
 !--------CALCUL LES QUATRES PARAMETRES DE STOKES------------
@@ -1052,16 +1008,12 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 
   stok_I0 = stok(1)
 !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-!  call MULMAT (4,4,1,ROP,STOK,C)
-
   C=matmul(ROP,STOK)
 ! LE RESULTAT EST C(4,1)
 
-!  call MULMAT (4,4,1,XMUL,C,D)
   D=matmul(XMUL,C)
 ! LE RESULTAT EST D(4,1)
 
-!  call MULMAT (4,4,1,RPO,D,STOK)
   stok=matmul(RPO,D)
 
 ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
@@ -1213,15 +1165,12 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
 
   stok_I0 = stok(1,1)
 !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-!  call MULMAT (4,4,1,ROP,STOK,C)
   C=matmul(ROP,STOK)
 ! LE RESULTAT EST C(4,1)
 
-!  call MULMAT (4,4,1,XMUL,C,D)
   D=matmul(XMUL,C)
 ! LE RESULTAT EST D(4,1)
 
-!  call MULMAT (4,4,1,RPO,D,STOK)
   stok=matmul(RPO,D)
 
 ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
@@ -1360,22 +1309,17 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   stok_I0 = stok(1)
   !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  call MULMAT (4,4,1,ROP,STOK,C)
   !  C=matmul(ROP,STOK)
   C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
   C(1)=stok(1)
   C(4)=stok(4)
-
-
   ! LE RESULTAT EST C(4,1)
 
-  !  call MULMAT (4,4,1,XMUL,C,D)
   ! LE RESULTAT EST D(4,1)
   !  D=matmul(XMUL,C)
   D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
   D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
 
-  !  call MULMAT (4,4,1,RPO,D,STOK)
   !  stok=matmul(RPO,D)
   stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
   stok(1)=D(1)
