@@ -725,8 +725,9 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
         bz_3D : do j=j_start,nz
            if (j==0) cycle bz_3D
            do i=1,n_rad
-              facteur = energie_photon / volume(i)
               icell = cell_map(i,j,k)
+              facteur = energie_photon / volume(icell)
+
               if (kappa(icell,lambda) > tiny_db) then
                  ! TODO : pb de pola
                  do itype=1,N_type_flux
@@ -756,9 +757,9 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   else ! .not.l3D
      do j=1,nz
         do i=1,n_rad
-           facteur = energie_photon / volume(i) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
-           ! TODO : les lignes suivantes sont tres chers en OpenMP
            icell = cell_map(i,j,1)
+           facteur = energie_photon / volume(icell) * n_az_rt * 2 ! n_az_rt * 2 car subdivision virtuelle des cellules
+           ! TODO : les lignes suivantes sont tres chers en OpenMP
            if (kappa(icell,lambda) > tiny_db) then
               ! TODO : pb de pola
               do itype=1,N_type_flux

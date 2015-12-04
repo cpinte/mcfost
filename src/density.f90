@@ -1936,24 +1936,6 @@ subroutine densite_Seb_Charnoz2()
      densite_pouss(:,l) = densite_pouss(:,l)*nbre_grains(l)
   enddo
 
-!
-!  ! Normalisation : on a 1 grain de chaque taille dans le disque
-!  do l=1,n_grains_tot
-!     somme=0.0
-!     do i=1,n_rad
-!        do j=1,nz
-!           if (densite_pouss(i,j,1,l) <= 0.0) densite_pouss(i,j,1,l) = 1.0e-30
-!           somme=somme+densite_pouss(i,j,1,l)*volume(i)
-!        enddo !j
-!     enddo !i
-!     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)
-!  enddo !l
-!
-!  ! Normalisation : on a 1 grain en tout dans le disque
-!  do l=1,n_grains_tot
-!     densite_pouss(:,:,:,l) = (densite_pouss(:,:,:,l)/somme)*nbre_grains(l)
-!  enddo
-
   search_not_empty : do l=1,n_grains_tot
      do k=1,n_az
         do j=1,nz
@@ -1968,18 +1950,6 @@ subroutine densite_Seb_Charnoz2()
         enddo !j
      enddo !k
   enddo search_not_empty
-
-!  ! Normalisation : Calcul masse totale
-!  mass = 0.0
-!  do i=1,n_rad
-!     do j=1,nz
-!        do l=1,n_grains_tot
-!           mass=mass + densite_pouss(i,j,1,l) * M_grain(l) * (volume(i) * AU3_to_cm3)
-!        enddo !l
-!     enddo !j
-!  enddo !i
-!  mass =  mass/Msun_to_g
-!  densite_pouss(:,:,:,:) = densite_pouss(:,:,:,:) * diskmass/mass
 
   write(*,*) "Done"
 
