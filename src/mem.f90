@@ -539,7 +539,7 @@ subroutine alloc_dynamique()
      endif
      xT_ech = 2
 
-     allocate(prob_delta_T(n_T,n_cells,n_lambda), stat=alloc_status)
+     allocate(prob_delta_T(n_T,p_n_cells,n_lambda), stat=alloc_status)
      mem_size = n_cells * n_T * n_lambda * 4. / 1024.**2
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_delta_T'
