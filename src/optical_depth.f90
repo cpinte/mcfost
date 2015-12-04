@@ -131,8 +131,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      ! Pour cas avec approximation de diffusion
      if (l_dark_zone(ri0,zj0,1)) then
-        write(*,*) "DARKZONE", l_dark_zone(ri0,zj0,1)
-        stop
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         inv_w = -inv_w
