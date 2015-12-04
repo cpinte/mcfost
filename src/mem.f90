@@ -326,11 +326,7 @@ subroutine alloc_dynamique()
   else ! prop par grains
      p_n_lambda = n_lambda
 
-     if (l3D) then
-        allocate(ksca_CDF(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-     else
-        allocate(ksca_CDF(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-     endif
+     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
@@ -1048,11 +1044,7 @@ subroutine realloc_dust_mol()
   tab_s34 = 0
 
   ! TODO : cette partie prend bcp de memoire
-  if (l3D) then
-     allocate(ksca_CDF(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-  else
-     allocate(ksca_CDF(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-  endif
+  allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
@@ -1434,11 +1426,7 @@ subroutine realloc_step2()
      prob_s11_pos = 0
   else
      deallocate(ksca_CDF)
-     if (l3D) then
-        allocate(ksca_CDF(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-     else
-        allocate(ksca_CDF(n_lambda2,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-     endif
+     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
