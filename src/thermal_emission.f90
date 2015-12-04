@@ -230,8 +230,8 @@ subroutine init_reemission()
 
         ! Normalisation a 1
         if (integ3(n_lambda) > tiny(0.0_db)) then
+           icell = cell_map(1,1,1) ! When lvariable is off --> values stored in 1st cell
            do lambda=1, n_lambda
-              !      write(*,*) i,j,T,lambda, integ3(lambda), integ3(n_lambda)
               prob_delta_T(T,icell,lambda) = integ3(lambda)/integ3(n_lambda)
            enddo !l
         endif
@@ -328,7 +328,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   real, intent(in) ::  aleat
   integer, intent(out) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, icell
+  integer :: l, l1, l2, T_int, T1, T2, icell, p_icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   ! Absorption d'un photon : on ajoute son energie dans la cellule
@@ -337,6 +337,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   !log_frac_E_abs=log(E_abs*n_phot_L_tot + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
   icell = cell_map(ri,zj,phik)
+  p_icell = cell_map(pri,pzj,pphik)
 
   nbre_reemission(ri,zj,phik,id) = nbre_reemission(ri,zj,phik,id) + 1.0_db
 
@@ -381,7 +382,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   l=(l1+l2)/2
 
   do while((l2-l1) > 1)
-     proba=frac_T1*prob_delta_T(T1,icell,l)+frac_T2*prob_delta_T(T2,icell,l)
+     proba=frac_T1*prob_delta_T(T1,p_icell,l)+frac_T2*prob_delta_T(T2,p_icell,l)
      if(aleat > proba) then
         l1=l
      else
