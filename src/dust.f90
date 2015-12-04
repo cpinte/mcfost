@@ -1041,7 +1041,7 @@ subroutine opacite(lambda)
               if (scattering_method==2) then ! scattering matrix per cell
                  if (aniso_method==1) then
                     ! Propriétés optiques des cellules
-                    prob_s11_pos(icell,0,lambda)=0.0
+                    prob_s11_pos(0,icell,lambda)=0.0
                     dtheta = pi/real(nang_scatt)
 
                     do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0

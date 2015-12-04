@@ -360,7 +360,7 @@ subroutine alloc_dynamique()
   endif
   tab_s33 = 0
 
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34'
      stop

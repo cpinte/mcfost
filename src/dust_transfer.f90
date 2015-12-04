@@ -851,6 +851,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
 
   logical :: flag_direct_star, flag_sortie
 
+  icell = cell_map(ri,zj,phik)
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.

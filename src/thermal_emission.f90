@@ -359,6 +359,8 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   !E_abs=sum(xE_abs(ri,zj,phik,:))
   !log_frac_E_abs=log(E_abs*n_phot_L_tot + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
+  icell = cell_map(ri,zj,phik)
+
   nbre_reemission(ri,zj,phik,id) = nbre_reemission(ri,zj,phik,id) + 1.0_db
 
   J_abs=sum(xKJ_abs(ri,zj,phik,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
@@ -431,6 +433,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
+  icell = cell_map(ri,zj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
@@ -1168,6 +1171,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
+  icell = cell_map(ri,zj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
