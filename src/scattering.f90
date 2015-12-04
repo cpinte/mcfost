@@ -814,13 +814,14 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   integer, intent(in) :: lambda, ri, zj, phik
   real, intent(in) :: aleat
   real :: prob
-  integer :: kmin, kmax, k
+  integer :: kmin, kmax, k, icell
 
   prob = aleat  ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
+  icell = cell_map(ri,zj,phik)
 
   ! Cas particulier prob=1.0
   if ((1.0-prob) < 1.e-6) then
-     grainsize=amax_reel(cell_map(ri,zj,phik),lambda)
+     grainsize=amax_reel(icell,lambda)
      return
   endif
 
@@ -829,8 +830,8 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   kmax = n_grains_tot
   k=(kmin + kmax)/2
 
-  do while (ksca_CDF(lambda,ri,zj,phik,k) /= prob)
-     if (ksca_CDF(lambda,ri,zj,phik,k) < prob) then
+  do while (ksca_CDF(k,icell,lambda) /= prob)
+     if (ksca_CDF(k,icell,lambda) < prob) then
         kmin = k
      else
         kmax = k

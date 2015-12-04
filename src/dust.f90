@@ -955,7 +955,7 @@ subroutine opacite(lambda)
                  endif
               endif
            else
-              ksca_CDF(lambda,i,j,pk,0)=0.0
+              ksca_CDF(0,icell,lambda)=0.0
            endif
 
            somme=0.0
@@ -981,9 +981,7 @@ subroutine opacite(lambda)
               else
                  ! Au choix suivant que l'on considère un albedo par cellule ou par grain
                  ! albedo par cellule :
-                 ksca_CDF(lambda,i,j,pk,k) = ksca_CDF(lambda,i,j,pk,k-1) + C_sca(lambda,k)*density
-                 ! albedo par grains :
-                 !              ksca_CDF(lambda,i,j,k) = ksca_CDF(lambda,i,j,k-1) + C_ext(lambda,k)*density
+                 ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(lambda,k)*density
               endif !scattering_method
            enddo !k
 
@@ -1087,14 +1085,11 @@ subroutine opacite(lambda)
                  endif !aniso_method
 
               else !scattering_method == 1 : choix taille du grain diffuseur
-                 if  (ksca_CDF(lambda,i,j,pk,n_grains_tot) > tiny_real) then
-                    do k=1, n_grains_tot
-                       ksca_CDF(lambda,i,j,pk,k)= ksca_CDF(lambda,i,j,pk,k)/ &
-                            ksca_CDF(lambda,i,j,pk,n_grains_tot)
-                    enddo !k
+                 if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
+                    ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
                     ! Cas particulier proba=1.0
                     ech_proba1 : do k=k_min, n_grains_tot
-                       if ((1.0 - ksca_CDF(lambda,i,j,pk,k)) <  1.e-6) then
+                       if ((1.0 - ksca_CDF(k,icell,lambda)) <  1.e-6) then
                           amax_reel(icell,lambda) = k
                           exit  ech_proba1
                        endif
@@ -1104,9 +1099,7 @@ subroutine opacite(lambda)
                     ! dans ce cas, on decide qu'il n'y a que les plus petits grains
                     ! rq : en pratique, la densite est trop faible pour qu'il y ait
                     ! une diffusion a cet endroit.
-                    do  k=1,n_grains_tot
-                       ksca_CDF(lambda,i,j,pk,k) = 1.0
-                    enddo !k
+                    ksca_CDF(:,icell,lambda) = 1.0
                  endif
               endif !scattering_method
 
@@ -1124,8 +1117,8 @@ subroutine opacite(lambda)
                     tab_s34_pos(:,icell,lambda)=0.0
                  endif
               else !scattering_method
-                 ksca_CDF(lambda,i,j,pk,:)=1.0
-                 ksca_CDF(lambda,i,j,pk,0)=0.0
+                 ksca_CDF(:,icell,lambda)=1.0
+                 ksca_CDF(0,icell,lambda)=0.0
               endif ! scattering_method
 
            endif !densite_pouss = 0.0
