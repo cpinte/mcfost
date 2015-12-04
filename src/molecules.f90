@@ -65,17 +65,20 @@ subroutine init_GG_Tau_mol()
 
   implicit none
 
-  integer :: i
+  integer :: i, j, icell
 
   ldust_mol = .true.
 
   do i=1,n_rad
-     Temperature(i,:,:) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
-     Tcin(i,:,:) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
+     do j=1,nz
+        icell = cell_map(i,j,1)
+        Temperature(icell) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
+        Tcin(icell) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
+     enddo
   enddo
 
-
-  write(*,*) "Density @ 100 AU", real(densite_gaz(cell_map(1,1,1)) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
+  icell = cell_map(1,1,1)
+  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
 
   return
 
@@ -87,12 +90,15 @@ subroutine init_HH_30_mol()
 
   implicit none
 
-  integer :: i
+  integer :: i, j, icell
 
   ldust_mol = .true.
 
   do i=1,n_rad
-     Temperature(i,:,:) = 12.0 * (r_grid(i,1)/100.)**(-0.55)
+     do j=1,nz
+        icell = cell_map(i,j,1)
+        Temperature(icell) = 12.0 * (r_grid(i,1)/100.)**(-0.55)
+     enddo
      vfield(i,:) = 2.0 * (r_grid(i,1)/100.)**(-0.55)
   enddo
 
@@ -189,12 +195,12 @@ subroutine init_benchmark_vanzadelhoff2()
         k=1
         icell = cell_map(ri,zj,k)
         densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+        Temperature(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
+        Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
      enddo
-     Temperature(ri,:,:) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
-     Tcin(ri,:,:) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
+
      vfield(ri,:) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
      v_turb(ri,:,:) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
-
   enddo
 
   ! Conversion vitesses en m.s-1
@@ -225,7 +231,7 @@ subroutine init_benchmark_water1()
   ldust_mol = .false.
 
   densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
-  Tcin(:,:,:) = 40.
+  Tcin = 40.
   vfield = 0.0
   v_turb = 0.0
 
@@ -256,7 +262,7 @@ subroutine init_benchmark_water2()
   ldust_mol = .false.
 
   densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
-  Tcin(:,:,:) = 40.
+  Tcin = 40.
   v_turb = 0.0
 
   do i=1, n_rad
@@ -286,7 +292,7 @@ subroutine init_benchmark_water3()
 
   integer, parameter :: n_lines = 100
 
-  integer :: i, j, ri, l, zj, k
+  integer :: i, j, ri, l, zj, k, icell
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
   real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
 
@@ -327,10 +333,12 @@ subroutine init_benchmark_water3()
      if (rayon < 2.0) then
         do zj=1, nz
            k=1
-           densite_gaz(cell_map(ri,zj,k)) = tmp_nH2(1)
+           icell = cell_map(ri,zj,k)
+           densite_gaz(icell) = tmp_nH2(1)
+           Temperature(icell) = tmp_T(1)
+           Tcin(icell) =  tmp_Tkin(1)
         enddo
-        Tcin(ri,:,:) =  tmp_Tkin(1)
-        Temperature(ri,:,:) = tmp_T(1)
+
      else
         l=2
         ! rayon est entre tmp_r(l-1) et tmp_r(l)
@@ -345,10 +353,12 @@ subroutine init_benchmark_water3()
         frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
         do zj=1, nz
            k=1
-           densite_gaz(cell_map(ri,zj,k)) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+           icell = cell_map(ri,zj,k)
+           densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+           Temperature(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
+           Tcin(icell) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
         enddo
-        Tcin(ri,:,:) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
-        Temperature(ri,:,:) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
+
      endif
 
      if (rayon < 5.95) then
@@ -388,7 +398,7 @@ subroutine init_molecular_disk(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i, j, k
+  integer :: i, j, k, icell
 
   ldust_mol  = .true.
   lkeplerian = .true.
@@ -397,9 +407,9 @@ subroutine init_molecular_disk(imol)
   ! Temperature gaz = poussiere
   if (lcorrect_Tgas) then
      write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:,:,:) = Temperature(:,:,:)  * correct_Tgas
+     Tcin(:) = Temperature(:)  * correct_Tgas
   else
-     Tcin(:,:,:) = Temperature(:,:,:)
+     Tcin(:) = Temperature(:)
   endif
 
   ! En m.s-1
@@ -424,20 +434,10 @@ subroutine init_molecular_disk(imol)
      call read_abundance(imol)
   endif
 
-  do k=1, n_az
-     bz : do j=j_start, nz
-        if (j==0) cycle bz
-        do i=1, n_rad
-           lcompute_molRT(i,j,k) = (tab_abundance(i,j,k) > tiny_real) .and. &
-                (densite_gaz(cell_map(i,j,k)) > tiny_real) .and. (Tcin(i,j,k) > 1.)
-        enddo
-     enddo bz
+  do icell=1, n_cells
+     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
+          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
   enddo
-!  do i=1,n_rad
-!     do j=1, nz
-!       write(*,*) i, j, tab_abundance(i,j), lcompute_molRT(i,j)
-!     enddo
-!  enddo
 
   return
 
@@ -456,7 +456,7 @@ subroutine init_Doppler_profiles(imol)
   integer, intent(in) :: imol
 
   real(kind=db) :: sigma2, sigma2_m1, vmax
-  integer :: i, j, k, iv, n_speed
+  integer :: i, j, k, iv, n_speed, icell
 
   n_speed = mol(imol)%n_speed_rt
 
@@ -464,10 +464,11 @@ subroutine init_Doppler_profiles(imol)
      bz : do j=j_start, nz
         if (j==0) cycle bz
         do i=1, n_rad
+           icell = cell_map(i,j,k)
            ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
            ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
            ! Consistent avec benchmark
-           sigma2 =  2.0_db * (kb*Tcin(i,j,k) / (masse_mol* g_to_kg)) + v_turb(i,j,k)**2
+           sigma2 =  2.0_db * (kb*Tcin(icell) / (masse_mol* g_to_kg)) + v_turb(i,j,k)**2
            v_line(i,j,k) = sqrt(sigma2)
 
            !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
@@ -809,7 +810,7 @@ subroutine init_dust_mol(imol)
                     Jnu = 0.0 ! todo : pour prendre en compte scattering
                  endif
 
-                 T = Temperature(ri,zj,phik)
+                 T = Temperature(icell)
                  ! On ne fait que du scattering isotropique dans les raies pour le moment ...
                  emissivite_dust(icell,iTrans) = kappa_abs_eg(icell,iTrans) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
               enddo ! phik
@@ -841,29 +842,30 @@ subroutine equilibre_LTE_mol()
 
   implicit none
 
-  integer :: i,j, k, l
+  integer :: i,j, k, l, icell
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(i,j,k,l) &
+  !$omp private(i,j,k,l,icell) &
   !$omp shared(n_rad,nz,n_az,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance,j_start,cell_map)
   !$omp do
   do i=1, n_rad
      bz : do j=j_start, nz
         if (j==0) cycle bz
         do k=1, n_az
+           icell = cell_map(i,j,k)
            tab_nLevel(i,j,k,1) = 1.0
            do l=2, nLevels
               ! Utilisation de la temperature de la poussiere comme temperature LTE
               tab_nLevel(i,j,k,l) = tab_nLevel(i,j,k,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
-                   exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,k)))
+                   exp(- hp * Transfreq(l-1)/ (kb*Tcin(icell)))
            enddo
            ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
            ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Temperature(i,j,1)))
            ! read(*,*)
 
            ! Normalisation
-           tab_nLevel(i,j,k,:) = densite_gaz(cell_map(i,j,k)) * tab_abundance(i,j,k) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
+           tab_nLevel(i,j,k,:) = densite_gaz(icell) * tab_abundance(icell) * tab_nLevel(i,j,k,:)  / sum(tab_nLevel(i,j,k,:))
         enddo !k
      enddo bz !j
   enddo!i
@@ -907,12 +909,12 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   endif
 
   ! Matrice d'excitations/desexcitations collisionnelles
-  Temp = Tcin(ri,zj,phik)
   icell = cell_map(ri,zj,phik)
+  Temp = Tcin(icell)
   nH2 = densite_gaz(icell) * cm_to_m**3
 
   ! Pour test
-  Tdust = Temperature(ri,zj,phik)
+  Tdust = Temperature(icell)
 
   C = 0._db
   do iPart = 1, nCollPart
@@ -991,9 +993,9 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
 
      icell = cell_map(ri,zj,phik)
      if (eq==1) then
-        tab_nLevel(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(ri,zj,phik) * B(:)
+        tab_nLevel(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(icell) * B(:)
      else
-        tab_nLevel2(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(ri,zj,phik) * B(:)
+        tab_nLevel2(ri,zj,phik,:) = densite_gaz(icell) * tab_abundance(icell) * B(:)
      endif
 
   enddo !n_eq
@@ -1243,7 +1245,7 @@ subroutine freeze_out()
 
   implicit none
 
-  integer :: i, j, k
+  integer :: i, j, k, icell
 
   write (*,*) "Freezing out of molecules"
 
@@ -1251,7 +1253,8 @@ subroutine freeze_out()
      bz : do j=j_start, nz
         if (j==0) cycle bz
         do i=1, n_rad
-           if (Temperature(i,j,k) < T_freeze_out)  tab_abundance(i,j,k) = 0.
+           icell = cell_map(i,j,k)
+           if (Temperature(icell) < T_freeze_out)  tab_abundance(icell) = 0.
         enddo
      enddo bz
   enddo

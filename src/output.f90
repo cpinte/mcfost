@@ -1805,7 +1805,7 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: i, j, l
+  integer :: i, j, l, icell
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements
@@ -1868,7 +1868,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature(:,1:nz,1),status)
+        call ftppre(unit,group,fpixel,nelements,temperature,status)
      endif
 
      !  Close the file and free the unit number.
@@ -1995,8 +1995,9 @@ subroutine ecriture_temperature(iTemperature)
      ! le j signifie integer
      do i=1, n_rad
         do j=1,nz
+           icell = cell_map(i,j,1)
            do l=grain_nRE_start, grain_nRE_end
-              if (l_RE(i,j,l)) then
+              if (l_RE(l,icell)) then
                  tmp(i,j,l) = 1
               else
                  tmp(i,j,l) = 0

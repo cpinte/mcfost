@@ -233,7 +233,7 @@ subroutine init_reemission()
                  ! Normalisation a 1
                  if (integ3(n_lambda) > tiny(0.0_db)) then
                     do lambda=1, n_lambda
-                       prob_delta_T(i,j,pk,T,lambda) = integ3(lambda)/integ3(n_lambda)
+                       prob_delta_T(T,icell,lambda) = integ3(lambda)/integ3(n_lambda)
                     enddo !l
                  endif
               enddo !pk
@@ -255,7 +255,7 @@ subroutine init_reemission()
         if (integ3(n_lambda) > tiny(0.0_db)) then
            do lambda=1, n_lambda
               !      write(*,*) i,j,T,lambda, integ3(lambda), integ3(n_lambda)
-              prob_delta_T(1,1,1,T,lambda) = integ3(lambda)/integ3(n_lambda)
+              prob_delta_T(T,icell,lambda) = integ3(lambda)/integ3(n_lambda)
            enddo !l
         endif
 
@@ -351,7 +351,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   real, intent(in) ::  aleat
   integer, intent(out) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2
+  integer :: l, l1, l2, T_int, T1, T2, icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   ! Absorption d'un photon : on ajoute son energie dans la cellule
@@ -369,7 +369,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   endif
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
-  T_int=maxval(xT_ech(:,ri,zj,phik))
+  T_int=maxval(xT_ech(icell,:))
 
   ! On incremente eventuellement la zone de temperature
   do while((log_frac_E_em(ri,zj,phik,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -377,7 +377,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   enddo  ! limite max
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech(id,ri,zj,phik)=T_int
+  xT_ech(icell,id)=T_int
 
   ! Interpolation lineaire entre energies emises pour des
   ! temperatures echantillonees voisines
@@ -402,7 +402,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   l=(l1+l2)/2
 
   do while((l2-l1) > 1)
-     proba=frac_T1*prob_delta_T(pri,pzj,pphik,T1,l)+frac_T2*prob_delta_T(pri,pzj,pphik,T2,l)
+     proba=frac_T1*prob_delta_T(T1,icell,l)+frac_T2*prob_delta_T(T2,icell,l)
      if(aleat > proba) then
         l1=l
      else
@@ -428,7 +428,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   lambda0=lambda
@@ -465,7 +465,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(ri) )
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
-  T_int=maxval(xT_ech_1grain(:,ri,zj,k))
+  T_int=maxval(xT_ech_1grain(k,icell,:))
 
   ! On incremente eventuellement la zone de temperature
   do while((log_frac_E_em_1grain(k,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -473,7 +473,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   enddo  ! LIMITE MAX
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech_1grain(id,ri,zj,k)=T_int
+  xT_ech_1grain(k,icell,id)=T_int
 
   ! Interpolation lineaire entre energies emises pour des
   ! temperatures echantillonees voisines
@@ -526,7 +526,7 @@ subroutine Temp_finale()
 
   real(kind=db), dimension(:,:,:), allocatable :: J_abs
 
-  integer :: i,j, pk
+  integer :: i,j, pk, icell
 
   if (l3D) then
      allocate(J_abs(n_rad,-nz:nz,n_az), stat=alloc_status)
@@ -550,24 +550,25 @@ subroutine Temp_finale()
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(i,j,pk,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac) &
-  !$omp shared(J_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,T_min,n_T,j_start,n_az)
+  !$omp private(i,j,pk,log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
+  !$omp shared(J_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_rad,nz,T_min,n_T,j_start,n_az,cell_map)
   !$omp do schedule(dynamic,10)
   do i=1,n_rad
      bz : do j=j_start,nz
         if (j==0) cycle bz
         do pk=1, n_az
+           icell = cell_map(i,j,pk)
            if (J_abs(i,j,pk) < tiny_db) then
-              Temperature(i,j,pk) = T_min
+              Temperature(icell) = T_min
            else
               log_frac_E_abs=log(J_abs(i,j,pk))
               if (log_frac_E_abs <  log_frac_E_em(i,j,pk,1)) then
-                 Temperature(i,j,pk) = T_min
+                 Temperature(icell) = T_min
               else
                  ! Temperature echantillonee juste sup. a la temperature de la cellule
                  !          xT_int(:)=xT_ech(:,i,j)
                  !          T_int=maxval(xT_int)
-                 T_int=maxval(xT_ech(:,i,j,pk))
+                 T_int=maxval(xT_ech(icell,:))
 
                  ! On incremente eventuellement la zone de temperature
                  do while((log_frac_E_em(i,j,pk,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -584,7 +585,7 @@ subroutine Temp_finale()
                  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
                  ! Save
-                 Temperature(i,j,pk)=Temp
+                 Temperature(icell)=Temp
               endif
            endif
         enddo !pk
@@ -673,18 +674,18 @@ subroutine Temp_finale_nLTE()
               !J_absorbe = J_absorbe*n_phot_L_tot/(densite_pouss(i,j,1,k)*volume(i))
               J_absorbe = J_absorbe*n_phot_L_tot/volume(i)
               if (J_absorbe < tiny_db) then
-                 Temperature_1grain(i,j,k) = T_min
+                 Temperature_1grain(k,icell) = T_min
               else
                  log_frac_E_abs=log(J_absorbe)
 
                  if (log_frac_E_abs <  log_frac_E_em_1grain(k,1)) then
-                    Temperature_1grain(i,j,k) = T_min
+                    Temperature_1grain(k,icell) = T_min
                  else
 
                     ! Temperature echantillonee juste sup. a la temperature de la cellule
                     !          xT_int(:)=xT_ech(:,i,j)
                     !          T_int=maxval(xT_int)
-                    T_int=maxval(xT_ech_1grain(:,i,j,k))
+                    T_int=maxval(xT_ech_1grain(k,icell,:))
 
                     ! On incremente eventuellement la zone de temperature
                     do while((log_frac_E_em_1grain(k,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -701,11 +702,11 @@ subroutine Temp_finale_nLTE()
                     Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
                     ! Save
-                    Temperature_1grain(i,j,k)=Temp!J_abs(i,j)
+                    Temperature_1grain(k,icell)=Temp!J_abs(i,j)
                  endif
               endif
            else
-              Temperature_1grain(i,j,k)=0.0
+              Temperature_1grain(k,icell)=0.0
            endif
         enddo!k
      enddo !j
@@ -748,7 +749,7 @@ subroutine Temp_nRE(lconverged)
 
   real(kind=db) :: delta_T, kJnu_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
-  integer :: l, i, j, T, T1, T2, lambda, alloc_status, id, T_int
+  integer :: l, i, j, T, T1, T2, lambda, alloc_status, id, T_int, icell
 
   integer, parameter :: n_cooling_time = 100
   real :: E_max
@@ -829,7 +830,7 @@ subroutine Temp_nRE(lconverged)
      !$omp default(none) &
      !$omp private(i,j,Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
-     !$omp private(frac,T1,Temp1,Temp2,T_int,log_frac_E_abs) &
+     !$omp private(frac,T1,Temp1,Temp2,T_int,log_frac_E_abs,icell) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_rad, nz, C_abs_norm_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
@@ -843,9 +844,9 @@ subroutine Temp_nRE(lconverged)
      do i=n_rad, 1, -1
         !$ id = omp_get_thread_num() + 1
         do j=1,nz
-
+           icell = cell_map(i,j,1)
            if (l_dark_zone(i,j,1)) then
-              l_RE(i,j,:) = .true.
+              l_RE(:,icell) = .true.
            else
               if (densite_pouss(cell_map(i,j,1),l) > tiny_db) then
                  ! Champ de radiation
@@ -936,12 +937,12 @@ subroutine Temp_nRE(lconverged)
 
                  ! Calcul Temperature equilibre
                  if (Int_k_lambda_Jlambda < tiny_real) then
-                    Temperature_1grain_nRE(i,j,l) = T_min
+                    Temperature_1grain_nRE(l,icell) = T_min
                  else
                     log_frac_E_abs=log(Int_k_lambda_Jlambda)
 
                     if (log_frac_E_abs <  log_frac_E_em_1grain_nRE(l,1)) then
-                       Temperature_1grain_nRE(i,j,l) = T_min
+                       Temperature_1grain_nRE(l,icell) = T_min
                     else
                        T_int=2
                        do while((log_frac_E_em_1grain_nRE(l,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -956,15 +957,15 @@ subroutine Temp_nRE(lconverged)
                        Temp1=tab_Temp(T1)
                        frac=(log_frac_E_abs-log_frac_E_em_1grain_nRE(l,T1))/&
                             (log_frac_E_em_1grain_nRE(l,T2)-log_frac_E_em_1grain_nRE(l,T1))
-                       Temperature_1grain_nRE(i,j,l)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
+                       Temperature_1grain_nRE(l,icell)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
                     endif
                  endif
 
-                 if (Temperature_1grain_nRE(i,j,l) > T_max) then
+                 if (Temperature_1grain_nRE(l,icell) > T_max) then
                     ! Impossible de definir proba de temperature
                     t_cool = 1.0 ; t_abs = 0.0
                     write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), real(Temperature_1grain_nRE(i,j,l))
+                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), real(Temperature_1grain_nRE(l,icell))
                     write(*,*) "Exiting"
                     stop
                  endif
@@ -979,7 +980,7 @@ subroutine Temp_nRE(lconverged)
                  !t_cool = 0.0
 
                  if (t_cool < t_abs) then !  calcul proba temperature
-                    l_RE(i,j,l) = .false.
+                    l_RE(l,icell) = .false.
                     ! heating terms : select lower triangle
                     ! Afi with with f > i
                     do T=1,n_T
@@ -1035,16 +1036,16 @@ subroutine Temp_nRE(lconverged)
                     X(:,id)=X(:,id)/sum(X(:,id))
 
                     do T=1, n_T ! boucle car passage tableau double -> simple bug avec ifort
-                       Proba_Temperature(T,i,j,l) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
+                       Proba_Temperature(T,l,icell) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
                     enddo
 
                  else  ! test : t_cool > t_abs : on est a a l'equilibre
 
-                    if (.not.l_RE(i,j,l)) then ! on n'etait pas a l'equilibre a l'iteration precedente
-                       l_RE(i,j,l) = .true.
-                       lchange_nRE(i,j,l) = .true.
+                    if (.not.l_RE(l,icell)) then ! on n'etait pas a l'equilibre a l'iteration precedente
+                       l_RE(l,icell) = .true.
+                       lchange_nRE(l,icell) = .true.
                     else
-                       lchange_nRE(i,j,l) = .false. ! on etait deja a l'equilibre
+                       lchange_nRE(l,icell) = .false. ! on etait deja a l'equilibre
                     endif
 
                  endif ! test : t_cool vs t_abs
@@ -1063,104 +1064,86 @@ subroutine Temp_nRE(lconverged)
   lconverged = .true.
   ! Verification convergence sur la temperature
   if (lRE_LTE) then
-     do i=1, n_rad
-        do j=1, nz
-           delta_T = Temperature(i,j,1) - Temperature_old(i,j,1)
-           if (delta_T > precision * Temperature_old(i,j,1)) then
-              lconverged = .false.
-           endif
-        enddo
+     do icell=1,n_cells
+        delta_T = Temperature(icell) - Temperature_old(icell)
+        if (delta_T > precision * Temperature_old(icell)) lconverged = .false.
      enddo
      Temperature_old = Temperature
   endif
 
   if (lRE_nLTE) then
-     do i=1, n_rad
-        do j=1, nz
-           do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-              delta_T = Temperature_1grain(i,j,l) - Temperature_1grain_old(i,j,l)
-              if (delta_T > precision * Temperature_1grain_old(i,j,l)) then
-                 lconverged = .false.
-              endif
-           enddo
+     do icell=1, n_cells
+        do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+           delta_T = Temperature_1grain(l,icell) - Temperature_1grain_old(l,icell)
+           if (delta_T > precision * Temperature_1grain_old(l,icell)) lconverged = .false.
         enddo
      enddo
      Temperature_1grain_old = Temperature_1grain
   endif
 
-  do i=1, n_rad
-     do j=1, nz
-        do l=grain_nRE_start, grain_nRE_end
-           if (l_RE(i,j,l)) then
-              delta_T = Temperature_1grain_nRE(i,j,l) - Temperature_1grain_nRE_old(i,j,l)
-              if (delta_T > precision * Temperature_1grain_nRE_old(i,j,l)) then
-                 lconverged = .false.
+  do icell=1, n_cells
+     do l=grain_nRE_start, grain_nRE_end
+        if (l_RE(l,icell)) then
+           delta_T = Temperature_1grain_nRE(l,icell) - Temperature_1grain_nRE_old(l,icell)
+           if (delta_T > precision * Temperature_1grain_nRE_old(l,icell)) lconverged = .false.
+           Temperature_1grain_nRE_old(l,icell) =  Temperature_1grain_nRE(l,icell)
+        else
+           Tpeak = 1
+           maxP =  Proba_Temperature(1,l,icell)
+           do T=2, n_T
+              if (Proba_Temperature(T,l,icell) > maxP) then
+                 maxP=Proba_Temperature(T,l,icell)
+                 Tpeak=T
               endif
-              Temperature_1grain_nRE_old(i,j,l) =  Temperature_1grain_nRE(i,j,l)
-           else
-              Tpeak = 1
-              maxP =  Proba_Temperature(1,i,j,l)
-              do T=2, n_T
-                 if (Proba_Temperature(T,i,j,l) > maxP) then
-                    maxP=Proba_Temperature(T,i,j,l)
-                    Tpeak=T
-                 endif
-              enddo
+           enddo
 
-              if (Tpeak /= Tpeak_old(i,j,l)) then
-                 lconverged=.false.
-              endif
+           if (Tpeak /= Tpeak_old(l,icell)) lconverged=.false.
 
-              if ( abs(maxP-maxP_old(i,j,l)) > precision * maxP_old(i,j,l) ) then
-                 lconverged=.false.
-              endif
+           if ( abs(maxP-maxP_old(l,icell)) > precision * maxP_old(l,icell) ) lconverged=.false.
 
-              Tpeak_old(i,j,l) = Tpeak
-              maxP_old(i,j,l) = maxP
-           endif
-        enddo !l
-     enddo !j
-  enddo !i
+           Tpeak_old(l,icell) = Tpeak
+           maxP_old(l,icell) = maxP
+        endif
+     enddo !l
+  enddo !icell
 
 
   if (lbenchmark_SHG) then ! renormalisation des proba, probleme en transfert complet ...
      do l=grain_nRE_start,grain_nRE_end ! TEST pour 1 taille de grains
-        do i=1, n_rad
-           do j=1, nz
-              somme1=0.0
-              somme2=0.0
-              !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
-              do lambda=1, n_lambda
-                 somme1 = somme1 + C_abs_norm(lambda,l)  * lambda_Jlambda(lambda,1)
-                 wl = tab_lambda(lambda)*1.0e-6
-                 delta_wl = tab_delta_lambda(lambda)*1.0e-6
-                 if (l_RE(i,j,l)) then
-                    Temp = Temperature_1grain_nRE(i,j,l)
+        do icell=1, n_cells
+           somme1=0.0
+           somme2=0.0
+           !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
+           do lambda=1, n_lambda
+              somme1 = somme1 + C_abs_norm(lambda,l)  * lambda_Jlambda(lambda,1)
+              wl = tab_lambda(lambda)*1.0e-6
+              delta_wl = tab_delta_lambda(lambda)*1.0e-6
+              if (l_RE(l,icell)) then
+                 Temp = Temperature_1grain_nRE(l,icell)
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.) then
+                    somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                 endif
+              else
+                 do T=1, n_T
+                    Temp = tab_Temp(T)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < 500.) then
-                       somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                    endif
-                 else
-                    do T=1, n_T
-                       Temp = tab_Temp(T)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < 500.) then
-                          somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
-                               Proba_Temperature(T,i,j,l)
-                       endif !cst_wl
-                    enddo
-                 endif
-              enddo ! lambda
-              !somme1=somme1 *n_phot_L_tot/volume(i)
-              !somme1 = Int_k_lambda_Jlambda  ! pas defini openmp
-
-              somme2=somme2*2.0*hp*c_light**2
-              !write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
-              if (somme2 > tiny_db) then
-                 Proba_Temperature(:,i,j,l)  = Proba_Temperature(:,i,j,l) * real(somme1/somme2)
+                       somme2 = somme2 + C_abs_norm(lambda,l)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
+                            Proba_Temperature(T,l,icell)
+                    endif !cst_wl
+                 enddo
               endif
-           enddo !j
-        enddo !i
+           enddo ! lambda
+           !somme1=somme1 *n_phot_L_tot/volume(i)
+           !somme1 = Int_k_lambda_Jlambda  ! pas defini openmp
+
+           somme2=somme2*2.0*hp*c_light**2
+           !write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
+           if (somme2 > tiny_db) then
+              Proba_Temperature(:,l,icell)  = Proba_Temperature(:,l,icell) * real(somme1/somme2)
+           endif
+        enddo !icell
      enddo ! l
   endif ! lbenchmark_SHG
 
@@ -1182,7 +1165,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   lambda0=lambda
@@ -1218,7 +1201,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(ri) )
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
-  T_int=maxval(xT_ech_1grain_nRE(:,ri,zj,k))
+  T_int=maxval(xT_ech_1grain_nRE(k,icell,:))
 
   ! On incremente eventuellement la zone de temperature
   do while((log_frac_E_em_1grain_nRE(k,T_int) < log_frac_E_abs).and.(T_int < n_T))
@@ -1226,7 +1209,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   enddo  ! LIMITE MAX
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech_1grain_nRE(id,ri,zj,k)=T_int
+  xT_ech_1grain_nRE(k,icell,id)=T_int
 
   ! Interpolation lineaire entre energies emises pour des
   ! temperatures echantillonees voisines
@@ -1300,10 +1283,10 @@ subroutine update_proba_abs_nRE()
            lall_grains_eq = .true.
            icell = cell_map(i,j,k) !NEWTODO
            do l=grain_nRE_start,grain_nRE_end
-              if (lchange_nRE(i,j,l)) then ! 1 grain a change de status a cette iteration
+              if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
                  delta_kappa_abs_qRE =  C_abs_norm(lambda,l) * densite_pouss(icell,l)
               else
-                 if (.not.l_RE(i,j,l)) lall_grains_eq = .true. ! il reste des grains qui ne sont pas a l'equilibre
+                 if (.not.l_RE(l,icell)) lall_grains_eq = .true. ! il reste des grains qui ne sont pas a l'equilibre
               endif
            enddo !l
 
@@ -1419,9 +1402,9 @@ subroutine emission_nRE()
            E_emise = 0.0
            icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
-              if (l_RE(i,j,k)) then ! le grain a une temperature
-                 if (lchange_nRE(i,j,k)) then ! la grain passe en qRE a cette iteration : il faut le compter
-                    Temp = Temperature_1grain_nRE(i,j,k)
+              if (l_RE(k,icell)) then ! le grain a une temperature
+                 if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
+                    Temp = Temperature_1grain_nRE(k,icell)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
                        E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
@@ -1434,7 +1417,7 @@ subroutine emission_nRE()
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
                        E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
-                            volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k) &
+                            volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell) &
                             * delta_wl
                     endif !cst_wl
                  enddo !T
@@ -1598,7 +1581,7 @@ subroutine repartition_energie(lambda)
                  l= j+nz*(i-1)
               endif
 
-              Temp=Temperature(i,j,pk)
+              Temp=Temperature(icell)
               if (Temp < tiny_real) then
                  ! prob_E_cell(lambda,k) =  prob_E_cell(lambda,k-1)
               else
@@ -1623,7 +1606,7 @@ subroutine repartition_energie(lambda)
            E_emise = 0.0
            icell = cell_map(i,j,1)
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Temperature_1grain(i,j,k)
+              Temp=Temperature_1grain(k,icell)
               if (Temp < tiny_real) then
                  !E_emise = E_emise + 0.0
               else
@@ -1665,8 +1648,8 @@ subroutine repartition_energie(lambda)
            E_emise = 0.0
            icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
-              if (l_RE(i,j,k)) then ! le grain a une temperature
-                 temp=Temperature_1grain_nRE(i,j,k)
+              if (l_RE(k,icell)) then ! le grain a une temperature
+                 temp=Temperature_1grain_nRE(k,icell)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (i==1) then
@@ -1686,12 +1669,12 @@ subroutine repartition_energie(lambda)
                     if (cst_wl < cst_wl_max) then
                        if (i==1) then
                           Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(i)/((wl**5)* &
-                               (exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k)
+                               (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                           frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                           E_emise = E_emise + Ener * frac
                        else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
                           E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
-                               volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,i,j,k)
+                               volume(i)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                        endif
                     endif !cst_wl
                  enddo !T

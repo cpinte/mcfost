@@ -149,7 +149,7 @@ subroutine sublimate_dust()
               ipop = grain(k)%pop
 
               if (.not.dust_pop(ipop)%is_PAH) then
-                 if (Temperature(i,j,pk) > dust_pop(ipop)%T_sub) then
+                 if (Temperature(icell) > dust_pop(ipop)%T_sub) then
                     densite_pouss(icell,k) = 0.0
                  endif
               endif
@@ -190,7 +190,7 @@ subroutine equilibre_hydrostatique()
 
   real, dimension(nz) :: rho, ln_rho
   real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
-  integer :: i,j, k
+  integer :: i,j, k, icell, icell_m1
 
   real, parameter :: gas_dust = 100
 
@@ -207,18 +207,21 @@ subroutine equilibre_hydrostatique()
         dz_m1 = 1.0/dz
         somme = rho(1)
         do j = 2, nz
-           dTdz = (Temperature(i,j,k)-Temperature(i,j-1,k)) * dz_m1
+           icell = cell_map(i,j,k)
+           icell_m1 = cell_map(i,j-1,k)
+           dTdz = (Temperature(icell)-Temperature(icell_m1)) * dz_m1
            fac1 = cst * z_grid(i,j)/ (r_grid(i,j)**3)
-           fac2 = -1.0 * (dTdz + fac1) / Temperature(i,j,k)
+           fac2 = -1.0 * (dTdz + fac1) / Temperature(icell)
            ln_rho(j) = ln_rho(j-1) + fac2 * dz
            rho(j) = exp(ln_rho(j))
            somme = somme + rho(j)
         enddo !j
 
         ! Renormalisation
-        fac = gas_dust * masse_rayon(i,k) / (volume(i) * somme) ! TODO : densite est en particule, non ???
         do j = 1, nz
-           densite_gaz(cell_map(i,j,k)) =  rho(j) * fac
+           icell = cell_map(i,j,k)
+           fac = gas_dust * masse_rayon(i,k) / (volume(icell) * somme) ! TODO : densite est en particule, non ???
+           densite_gaz(icell) =  rho(j) * fac
         enddo
 
      enddo !i

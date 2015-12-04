@@ -633,7 +633,7 @@ contains
     !endif
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,Temperature(:,:,1),status)
+    call ftppre(unit,group,fpixel,nelements,Temperature,status)
 
     !------------------------------------------------------------------------------
     ! HDU 3 : Longueurs d'onde
@@ -1052,9 +1052,9 @@ contains
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
-                   Ttmp = temperature_1grain_nRE(ri,zj,l)
+                   Ttmp = temperature_1grain_nRE(l,icell)
                 else
-                   Ttmp = temperature_1grain(ri,zj,l)
+                   Ttmp = temperature_1grain(l,icell)
                 endif
                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(icell,l)
                 norme = norme + densite_pouss(icell,l)
@@ -1092,8 +1092,9 @@ contains
        if (lPAH_nRE) then
           do ri=1, n_rad
              do zj=1,nz
+                icell = cell_map(ri,zj,1)
                 do l=grain_nRE_start, grain_nRE_end
-                   if (l_RE(ri,zj,l)) then
+                   if (l_RE(l,icell)) then
                       is_eq(ri,zj,1) = 1
                    else
                       is_eq(ri,zj,1) = 0
@@ -1141,13 +1142,17 @@ contains
           !  Write the required header keywords.
           call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-          do i=1, n_rad
-             if (tab_region(i) > 0) then
-                P_TPAH(:,i,:,1) = Proba_Temperature(:,i,:,tab_region(i))
-             else
-                P_TPAH(:,i,:,1) = 0.0
-             endif
-          enddo
+          ! Trick to moved pack all the grain on index 1 using grain index = tab_region(ri)
+          do ri=1, n_rad
+             do zj=1, nz
+                icell = cell_map(ri,zj,1)
+                if (tab_region(i) > 0) then
+                   P_TPAH(:,ri,zj,1) = Proba_Temperature(:,tab_region(ri),icell)
+                else
+                   P_TPAH(:,ri,zj,1) = 0.0
+                endif
+             enddo ! j
+          enddo ! j
 
            ! le e signifie real*4
           call ftppre(unit,group,fpixel,nelements,P_TPAH,status)
@@ -2000,41 +2005,38 @@ contains
 
     ! Niveaux et populations
     write(*,*) "Setting ProDiMo abundances, population levels and Tgas"
-    tab_abundance(:,:,:) = 0.0
+    tab_abundance(:) = 0.0
     tab_nLevel(:,:,:,:) = 0.0
     do i=1, n_rad
        do j=1, nz
+          icell =cell_map(i,j,1)
           if (lCII) then
              tab_nLevel(i,j,1,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
-             tab_abundance(i,j,1) = nCII(i,j)
+             tab_abundance(icell) = nCII(i,j)
           endif
           if (lOI) then
              tab_nLevel(i,j,1,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
-             tab_abundance(i,j,1) = nOI(i,j)
+             tab_abundance(icell) = nOI(i,j)
           endif
           if (lCO) then
              tab_nLevel(i,j,1,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
-             tab_abundance(i,j,1) = nCO(i,j)
+             tab_abundance(icell) = nCO(i,j)
           endif
           if (loH2O) then
              tab_nLevel(i,j,1,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
-             tab_abundance(i,j,1) = noH2O(i,j)
+             tab_abundance(icell) = noH2O(i,j)
           endif
           if (lpH2O) then
              tab_nLevel(i,j,1,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
-             tab_abundance(i,j,1) = npH2O(i,j)
+             tab_abundance(icell) = npH2O(i,j)
           endif
+          Tcin(icell) = Tgas(i,j)
        enddo
     enddo
-    do i=1, n_rad
-       do j=1, nz
-          icell = cell_map(i,j,1)
-          tab_abundance(i,j,1) = tab_abundance(i,j,1) / densite_gaz(icell) ! conversion nbre en abondance
-       enddo
+    do icell=1, n_cells
+       tab_abundance(icell) = tab_abundance(icell) / densite_gaz(icell) ! conversion nbre en abondance
     enddo
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
-
-    Tcin(:,:,1) = Tgas
 
 
 

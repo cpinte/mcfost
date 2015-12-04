@@ -2004,30 +2004,23 @@ subroutine remove_specie()
 
   implicit none
 
-  integer :: i, j, pk, k, icell
+  integer :: k, icell
   real :: mass
 
   write(*,*) "Removing specie", specie_removed, "where T >", T_rm
 
-  do i=1,n_rad
-     do j=1,nz
-        do pk=1,n_az
-           do k=1,n_grains_tot
-              if (grain(k)%pop==specie_removed) then
-                 if (Temperature(i,j,pk) > T_rm) then
-                    icell = cell_map(i,j,pk)
-                    densite_pouss(icell,k) = 0.0
-                 endif
-              endif
-           enddo
-        enddo
+  do icell=1,n_cells
+     do k=1,n_grains_tot
+        if (grain(k)%pop==specie_removed) then
+           if (Temperature(icell) > T_rm) densite_pouss(icell,k) = 0.0
+        endif
      enddo
   enddo
 
   mass = 0.0
   do icell=1,n_cells
      do k=1,n_grains_tot
-        mass=mass + densite_pouss(cell_map(i,j,1),k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
+        mass=mass + densite_pouss(icell,k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
      enddo
   enddo
   mass =  mass/Msun_to_g

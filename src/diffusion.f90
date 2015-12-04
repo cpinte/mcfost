@@ -87,7 +87,7 @@ subroutine setDiffusion_coeff0(i)
   do k=1,n_az
      do j=1,nz
         icell = cell_map(i,j,k)
-        Temp=Temperature(i,j,k)
+        Temp=Temperature(icell)
         cst=cst_th/Temp
         somme=0.0_db
         do lambda=1, n_lambda
@@ -130,7 +130,14 @@ subroutine Temperature_to_DensE(ri)
 
   integer, intent(in) :: ri
 
-  DensE(ri,1:nz,:) =  Temperature(ri,:,:)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+  integer :: j, k, icell
+
+  do j=1,nz
+     do k=1,n_az
+        icell = cell_map(ri,j,k)
+        DensE(ri,j,k) =  Temperature(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+     enddo
+  enddo
 
   ! Condition limite : pas de flux au niveau du plan median
   DensE(ri,0,:) = DensE(ri,1,:)
@@ -157,7 +164,7 @@ subroutine DensE_to_temperature()
   do k=1,n_az
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1,zj_sup_dark_zone(i,1) + delta_cell_dark_zone
-           Temperature(i,j,k) = DensE(i,j,k)**0.25
+           Temperature(cell_map(i,j,k)) = DensE(i,j,k)**0.25
         enddo !j
      enddo !j
   enddo !k
@@ -179,7 +186,7 @@ subroutine clean_temperature()
   do k=1,n_az
      do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
         do j=1,zj_sup_dark_zone(i,1)
-           Temperature(i,j,k) = T_min
+           Temperature(cell_map(i,j,k)) = T_min
         enddo !j
      enddo !j
   enddo !k
@@ -200,7 +207,7 @@ subroutine Temp_approx_diffusion()
 
   implicit none
 
-  real, dimension(n_rad,nz,1) :: Temp0
+  real, dimension(n_cells) :: Temp0
   real :: max_delta_E_r, stabilite, precision
   integer :: n_iter, i
   logical :: lconverged
@@ -598,13 +605,14 @@ end subroutine iter_Temp_approx_diffusion_vertical
 
 subroutine diffusion_approx_nLTE_nRE()
 
-  integer :: i,j,k
+  integer :: i,j,k, icell
 
   if (lRE_nLTE) then
      do k=1,n_az
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
-              Temperature_1grain(i,j,:) = Temperature(i,j,k)
+              icell = cell_map(i,j,k)
+              Temperature_1grain(:,icell) = Temperature(icell)
            enddo !j
         enddo !j
      enddo !k
@@ -614,8 +622,9 @@ subroutine diffusion_approx_nLTE_nRE()
       do k=1,n_az
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
-              Temperature_1grain_nRE(i,j,:) = Temperature(i,j,k)
-              l_RE(i,j,:) = .true.
+              icell = cell_map(i,j,k)
+              Temperature_1grain_nRE(icell,:) = Temperature(icell)
+              l_RE(:,icell) = .true.
            enddo !j
         enddo !j
      enddo !k
