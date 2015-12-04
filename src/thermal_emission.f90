@@ -181,14 +181,14 @@ subroutine init_reemission()
               ! Le coeff qui va bien
               integ = integ*cst_E
               if (integ > tiny_db) then
-                 log_frac_E_em(i,j,pk,T)=log(integ)
+                 log_frac_E_em(T,icell)=log(integ)
               else
-                 log_frac_E_em(i,j,pk,T)=-1000.
+                 log_frac_E_em(T,icell)=-1000.
               endif
 
               if (T==1) then
                  do lambda=1, n_lambda
-                    J0(lambda,i,j,pk) =  volume(icell) * B(lambda) * cst_E
+                    J0(icell,lambda) =  volume(icell) * B(lambda) * cst_E
                  enddo
               endif
            enddo !pk
@@ -339,11 +339,11 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   icell = cell_map(ri,zj,phik)
   p_icell = cell_map(pri,pzj,pphik)
 
-  nbre_reemission(ri,zj,phik,id) = nbre_reemission(ri,zj,phik,id) + 1.0_db
+  nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_db
 
-  J_abs=sum(xKJ_abs(ri,zj,phik,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
+  J_abs=sum(xKJ_abs(icell,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
   if (J_abs > 0.) then
-     log_frac_E_abs=log(J_abs*n_phot_L_tot + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+     log_frac_E_abs=log(J_abs*n_phot_L_tot + E0(icell)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
   else
      log_frac_E_abs = -300
   endif
@@ -352,7 +352,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   T_int=maxval(xT_ech(icell,:))
 
   ! On incremente eventuellement la zone de temperature
-  do while((log_frac_E_em(ri,zj,phik,T_int) < log_frac_E_abs).and.(T_int < n_T))
+  do while((log_frac_E_em(T_int,icell) < log_frac_E_abs).and.(T_int < n_T))
      T_int=T_int+1
   enddo  ! limite max
 
@@ -366,7 +366,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   T1=T_int-1
   Temp1=tab_Temp(T1)
 
-  frac=(log_frac_E_abs-log_frac_E_em(ri,zj,phik,T1))/(log_frac_E_em(ri,zj,phik,T2)-log_frac_E_em(ri,zj,phik,T1))
+  frac=(log_frac_E_abs-log_frac_E_em(T1,icell))/(log_frac_E_em(T2,icell)-log_frac_E_em(T1,icell))
   Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
   !**********************************************************************
@@ -430,20 +430,14 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   k=kmax
 
 
-  ! Absorption d'un photon : on ajoute son energie dans la cellule
-!  xE_abs(ri,zj,id) = xE_abs(ri,zj,id) + E
-!  xE_abs_1grain(ri,zj,k,id) = xE_abs_1grain(ri,zj,k,id) + E
-!  E_abs=sum(xE_abs_1grain(ri,zj,k,:))
-!  frac_E_abs=E_abs/(nbre_photons_tot*densite_pouss(ri,zj,k)*volume(ri))
-
   ! Mean intensity
   ! Somme sur differents processeurs
   J_abs=0.0
   do ilambda=1, n_lambda
-     J_abs =  J_abs + C_abs_norm(ilambda,k)  * (sum(xJ_abs(ilambda,ri,zj,:)) + J0(ilambda,ri,zj,1))
-  enddo ! ilambda
+     J_abs =  J_abs + C_abs_norm(ilambda,k)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,ilambda))
+  enddo ! lambda
  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
-  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(ri) )
+  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(icell) )
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
   T_int=maxval(xT_ech_1grain(k,icell,:))
@@ -505,15 +499,11 @@ subroutine Temp_finale()
   integer :: T_int, T1, T2, alloc_status
   real :: Temp, Temp1, Temp2, frac, log_frac_E_abs
 
-  real(kind=db), dimension(:,:,:), allocatable :: J_abs
+  real(kind=db), dimension(:), allocatable :: J_abs
 
   integer :: i,j, pk, icell
 
-  if (l3D) then
-     allocate(J_abs(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(J_abs(n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(J_abs(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_abs in Temp_finale'
      stop
@@ -523,10 +513,11 @@ subroutine Temp_finale()
   ! Utilisation temperature precedente
 
   ! Somme sur differents processeurs
-  do pk=1, n_az ! boucle pour eviter des problemes d'allocation memoire en 3D
-     J_abs(:,:,pk)=sum(xKJ_abs(:,:,pk,:),dim=3)
-  enddo
-  J_abs(:,:,:)= J_abs(:,:,:)*n_phot_L_tot + E0(:,:,:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+  !do pk=1, n_az ! boucle pour eviter des problemes d'allocation memoire en 3D
+  !   J_abs(:,:,pk)=sum(xKJ_abs(:,:,pk,:),dim=3)
+  !enddo
+  J_abs(:) = sum(xKJ_abs(:,:),dim=2)
+  J_abs(:)= J_abs(:)*n_phot_L_tot + E0(:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
 
   !$omp parallel &
@@ -539,11 +530,11 @@ subroutine Temp_finale()
         if (j==0) cycle bz
         do pk=1, n_az
            icell = cell_map(i,j,pk)
-           if (J_abs(i,j,pk) < tiny_db) then
+           if (J_abs(icell) < tiny_db) then
               Temperature(icell) = T_min
            else
-              log_frac_E_abs=log(J_abs(i,j,pk))
-              if (log_frac_E_abs <  log_frac_E_em(i,j,pk,1)) then
+              log_frac_E_abs=log(J_abs(icell))
+              if (log_frac_E_abs <  log_frac_E_em(1,icell)) then
                  Temperature(icell) = T_min
               else
                  ! Temperature echantillonee juste sup. a la temperature de la cellule
@@ -552,7 +543,7 @@ subroutine Temp_finale()
                  T_int=maxval(xT_ech(icell,:))
 
                  ! On incremente eventuellement la zone de temperature
-                 do while((log_frac_E_em(i,j,pk,T_int) < log_frac_E_abs).and.(T_int < n_T))
+                 do while((log_frac_E_em(T_int,icell) < log_frac_E_abs).and.(T_int < n_T))
                     T_int=T_int+1
                  enddo  ! LIMITE MAX
 
@@ -562,7 +553,7 @@ subroutine Temp_finale()
                  Temp2=tab_Temp(T2)
                  T1=T_int-1
                  Temp1=tab_Temp(T1)
-                 frac=(log_frac_E_abs-log_frac_E_em(i,j,pk,T1))/(log_frac_E_em(i,j,pk,T2)-log_frac_E_em(i,j,pk,T1))
+                 frac=(log_frac_E_abs-log_frac_E_em(T1,icell))/(log_frac_E_em(T2,icell)-log_frac_E_em(T1,icell))
                  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
                  ! Save
@@ -624,7 +615,7 @@ subroutine Temp_finale_nLTE()
               J_absorbe=0.0
               do lambda=1, n_lambda
                  !J_absorbe =  J_absorbe + kappa_abs_1grain(lambda,i,j,k)  * sum(xJ_abs(lambda,i,j,:))
-                 J_absorbe =  J_absorbe + C_abs_norm(lambda,k)  * (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1))
+                 J_absorbe =  J_absorbe + C_abs_norm(lambda,k)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
               enddo ! lambda
 
               ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
@@ -658,7 +649,7 @@ subroutine Temp_finale_nLTE()
                     Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
                     ! Save
-                    Temperature_1grain(k,icell)=Temp!J_abs(i,j)
+                    Temperature_1grain(k,icell)=Temp
                  endif
               endif
            else
@@ -809,7 +800,7 @@ subroutine Temp_nRE(lconverged)
                  Int_k_lambda_Jlambda=0.0
                  do lambda=1, n_lambda
                     ! conversion lambda et delta_lambda de micron -> m
-                    lambda_Jlambda(lambda,id) = (sum(xJ_abs(lambda,i,j,:)) + J0(lambda,i,j,1))
+                    lambda_Jlambda(lambda,id) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
                     Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
                     kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
                  enddo ! lambda
@@ -1140,20 +1131,14 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   enddo   ! while
   k=kmax
 
-  ! Absorption d'un photon : on ajoute son energie dans la cellule
-!  xE_abs(ri,zj,id) = xE_abs(ri,zj,id) + E
-!  xE_abs_1grain(ri,zj,k,id) = xE_abs_1grain(ri,zj,k,id) + E
-!  E_abs=sum(xE_abs_1grain(ri,zj,k,:))
-!  frac_E_abs=E_abs/(nbre_photons_tot*densite_pouss(ri,zj,k)*volume(ri))
-
   ! Mean intensity
   ! Somme sur differents processeurs
   J_abs=0.0
   do ilambda=1, n_lambda
-     J_abs =  J_abs + C_abs_norm(ilambda,k)  * (sum(xJ_abs(ilambda,ri,zj,:)) + J0(ilambda,ri,zj,1))
+     J_abs =  J_abs + C_abs_norm(ilambda,k)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,lambda))
   enddo ! ilambda
  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
-  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(ri) )
+  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(icell))
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
   T_int=maxval(xT_ech_1grain_nRE(k,icell,:))
@@ -1716,7 +1701,7 @@ subroutine chauffage_interne()
   implicit none
 
   ! Energie venant de l'equilibre avec nuage à T_min
-  E0(:,:,:) = exp(log_frac_E_em(:,:,:,1))
+  E0(:) = exp(log_frac_E_em(1,:))
 
 !!$  ! Energie venant du chauffage visqueux
 !!$  do i=1,n_rad

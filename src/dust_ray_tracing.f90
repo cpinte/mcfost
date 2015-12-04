@@ -1323,7 +1323,7 @@ subroutine calc_Isca2_new(lambda,ibin)
   do ri=1, n_rad
      do zj=1,nz
         icell = cell_map(ri,zj,1)
-        facteur = energie_photon / volume(ri)
+        facteur = energie_photon / volume(icell)
         I_sca2(:,:,:,ri,zj,:) =  I_sca2(:,:,:,ri,zj,:) *  facteur * kappa_sca(icell,lambda)
      enddo
   enddo
@@ -1541,7 +1541,7 @@ subroutine calc_Isca2_star(lambda,ibin)
   do ri=1, n_rad
      do zj=1,nz
         icell = cell_map(ri,zj,1)
-        facteur = energie_photon / volume(ri)
+        facteur = energie_photon / volume(icell)
         eps_dust2_star(:,:,:,ri,zj) =  eps_dust2_star(:,:,:,ri,zj) *  facteur * kappa_sca(icell,lambda)
      enddo
   enddo

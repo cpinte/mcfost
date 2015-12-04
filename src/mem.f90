@@ -486,11 +486,7 @@ subroutine alloc_dynamique()
      endif
      tab_Temp = 0.0
 
-     if (l3D) then
-        allocate(log_frac_E_em(n_rad,-nz:nz,n_az,n_T), stat=alloc_status)
-     else
-        allocate(log_frac_E_em(n_rad,nz,1,n_T), stat=alloc_status)
-     endif
+     allocate(log_frac_E_em(n_T,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error log_frac_E_em'
         stop
@@ -505,26 +501,16 @@ subroutine alloc_dynamique()
      DensE = 0.0 ; DensE_m1 = 0.0
 
 
-     if (l3D) then
-        allocate(xKJ_abs(n_rad,-nz:nz,n_az,nb_proc), &
-             xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,-nz:nz,n_az,nb_proc),&
-             stat=alloc_status)
-     else
-        allocate(xKJ_abs(n_rad,nz,1,nb_proc),  &
-             xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,nz,1,nb_proc), &
-             stat=alloc_status)
-     endif
+     allocate(xKJ_abs(n_cells,nb_proc), nbre_reemission(n_cells,nb_proc),&
+             xJ_abs(n_cells,n_lambda,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xKJ_abs'
         stop
      endif
      xKJ_abs = 0.0 ; xJ_abs=0.0 ; nbre_reemission = 0.0
 
-     if (l3D) then
-        allocate(E0(n_rad,-nz:nz,n_az), J0(n_lambda,n_rad,-nz:nz,n_az),  stat=alloc_status)
-     else
-        allocate(E0(n_rad,nz,1),J0(n_lambda,n_rad,nz,1),  stat=alloc_status)
-     endif
+
+     allocate(E0(n_cells), J0(n_cells,n_lambda),  stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error E0'
         stop
@@ -1112,7 +1098,7 @@ subroutine realloc_step2()
   endif
 
   if (lProDiMo) then
-     allocate(xJ_abs(n_lambda2,n_rad,nz,nb_proc), stat=alloc_status)
+     allocate(xJ_abs(n_cells,n_lambda2,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xJ_abs in realloc_step2'
         stop

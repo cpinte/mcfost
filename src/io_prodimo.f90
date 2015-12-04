@@ -173,7 +173,7 @@ contains
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
 
-    allocate(xN_abs(n_lambda2,n_rad,nz,nb_proc),  stat=alloc_status)
+    allocate(xN_abs(n_cells,n_lambda2,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error xN_abs'
        stop
@@ -310,23 +310,8 @@ contains
     ! avant de calculer le champ ISM
 
     integer, intent(in) :: lambda
-    integer :: ri, zj
+    integer :: ri, zj, phik, icell
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur
-
-    ! Step1
-    ! 1/4pi est inclus dans n_phot_l_tot
-    !    J_ProDiMo(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
-    !
-    !    do ri=1, n_rad
-    !       J_ProDiMo(:,ri,:) = J_ProDiMo(:,ri,:) / volume(ri)
-    !    enddo
-    !
-    !    ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
-    !    ! J en W.m-2 (lambda.F_lambda)
-    !    ! teste OK par rapport a fct bb de yorick
-    !    do lambda=1, n_lambda
-    !       J_ProDiMo(lambda,:,:) = J_ProDiMo(lambda,:,:) * tab_lambda(lambda) / tab_delta_lambda(lambda)
-    !    enddo
 
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
@@ -334,15 +319,18 @@ contains
          * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
 
     do ri=1, n_rad
-       do zj=1,nz
-          facteur = energie_photon / volume(ri)
-          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
-          N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(lambda,ri,zj,:))
+       do zj=j_start,nz
+          if (zj==0) cycle
+          phik=1
+          icell = cell_map(ri,zj,phik)
+          facteur = energie_photon / volume(icell)
+          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
+          N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(icell,lambda,:))
        enddo
     enddo
 
-    xJ_abs(lambda,:,:,:) = 0.0
-    xN_abs(lambda,:,:,:) = 0.0
+    xJ_abs(:,lambda,:) = 0.0
+    xN_abs(:,lambda,:) = 0.0
 
     return
 
@@ -776,8 +764,9 @@ contains
 
        do ri=1, n_rad
           do zj=1,nz
-             facteur = energie_photon / volume(ri)
-             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
+             icell = cell_map(ri,zj,1)
+             facteur = energie_photon / volume(icell)
+             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
           enddo
        enddo
     enddo ! lambda
@@ -812,7 +801,8 @@ contains
     ! Inversion de l'ordre des dimensions et somaation
     do zj=1,nz
        do ri=1, n_rad
-          J_io(ri,zj,:) = sum(xN_abs(:,ri,zj,:), dim=2)
+          icell = cell_map(ri,zj,1)
+          J_io(ri,zj,:) = sum(xN_abs(icell,:,:), dim=2)
        enddo
     enddo
 

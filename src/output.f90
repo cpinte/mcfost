@@ -1041,9 +1041,9 @@ subroutine reemission_stats()
   character(len = 512) :: filename
   logical :: simple, extend
 
-  real, dimension(n_rad,nz) :: N_reemission
+  real, dimension(n_cells) :: N_reemission
 
-  N_reemission = sum(nbre_reemission(:,:,1,:),dim=3)
+  N_reemission = sum(nbre_reemission(:,:),dim=2)
 
   filename = trim(data_dir)//"/reemission_stats.fits.gz"
 
@@ -1058,9 +1058,8 @@ subroutine reemission_stats()
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  naxis=1
+  naxes(1)=n_cells
 
   extend=.true.
 
@@ -1616,7 +1615,7 @@ subroutine ecriture_J()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj
+  integer :: group,fpixel,nelements, lambda, ri, zj, phik, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1627,10 +1626,13 @@ subroutine ecriture_J()
   filename = trim(data_dir)//"/J.fits.gz"
 
   ! 1/4pi est inclus dans n_phot_l_tot
-  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
-
   do ri=1, n_rad
-     J(:,ri,:) = J(:,ri,:) / volume(ri)
+     do zj=j_start,nz
+        if (zj==0) cycle
+        phik=1
+        icell = cell_map(ri,zj,phik)
+        J(:,ri,zj) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
+     enddo
   enddo
 
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
@@ -1701,7 +1703,7 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, l
+  integer :: group,fpixel,nelements, lambda, ri, zj, l, phik, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1720,10 +1722,14 @@ subroutine ecriture_UV_field()
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
   ! 1/4pi est inclus dans n_phot_l_tot
-  J(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
-
+  ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
-     J(:,ri,:) = J(:,ri,:) / volume(ri)
+     do zj=j_start,nz
+        if (zj==0) cycle
+        phik=1
+        icell = cell_map(ri,zj,phik)
+        J(:,ri,zj) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
+     enddo
   enddo
 
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
