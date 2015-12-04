@@ -343,21 +343,21 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! tableaux relatifs aux prop optiques des grains
   ! **************************************************
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11'
      stop
   endif
   tab_s11 = 0
 
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12'
      stop
   endif
   tab_s12 = 0
 
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33'
      stop
@@ -372,7 +372,7 @@ subroutine alloc_dynamique()
   tab_s34 = 0
 
   if (laggregate) then
-     allocate(tab_mueller(p_n_lambda,n_grains_tot,4,4,0:nang_scatt), stat=alloc_status)
+     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_mueller'
         stop
@@ -1019,28 +1019,28 @@ subroutine realloc_dust_mol()
   endif
   prob_s11 = 0
 
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11 (realloc)'
      stop
   endif
   tab_s11 = 0
 
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12 (realloc)'
      stop
   endif
   tab_s12 = 0
 
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33 (realloc)'
      stop
   endif
   tab_s33 = 0
 
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34 (realloc)'
      stop
@@ -1352,7 +1352,7 @@ subroutine realloc_step2()
   tab_g_pos = 0
 
   deallocate(tab_s11)
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11'
      stop
@@ -1360,7 +1360,7 @@ subroutine realloc_step2()
   tab_s11 = 0
 
   deallocate(tab_s12)
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12'
      stop
@@ -1368,7 +1368,7 @@ subroutine realloc_step2()
   tab_s12 = 0
 
   deallocate(tab_s33)
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33'
      stop
@@ -1376,7 +1376,7 @@ subroutine realloc_step2()
   tab_s33 = 0
 
   deallocate(tab_s34)
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34'
      stop
@@ -1385,7 +1385,7 @@ subroutine realloc_step2()
 
   if (laggregate) then
      deallocate(tab_mueller)
-     allocate(tab_mueller(n_lambda2,n_grains_tot,4,4,0:nang_scatt), stat=alloc_status)
+     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_mueller'
         stop
