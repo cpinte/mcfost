@@ -430,11 +430,7 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! Tableaux de temperature
   ! **************************************************
-  if (l3D) then
-     allocate(Temperature(n_rad,-nz:nz,n_az), Temperature_old(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(Temperature(n_rad,nz,1), Temperature_old(n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(Temperature(n_cells), Temperature_old(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Temperature'
      stop
@@ -443,7 +439,7 @@ subroutine alloc_dynamique()
 
 
   if (lRE_nLTE) then
-     allocate(Temperature_1grain(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Temperature_1grain'
         stop
@@ -461,8 +457,8 @@ subroutine alloc_dynamique()
         tab_Temp = 0.0
      endif
 
-     allocate(Proba_Temperature(n_T,n_rad,nz,grain_nRE_start:grain_nRE_end), &
-          Temperature_1grain_nRE(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,n_cells), &
+          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Proba_Temperature'
         stop
@@ -470,7 +466,7 @@ subroutine alloc_dynamique()
      Proba_Temperature=0.0
      Temperature_1grain_nRE=0.0
 
-     allocate(l_RE(n_rad,nz,grain_nRE_start:grain_nRE_end), lchange_nRE(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     allocate(l_RE(grain_nRE_start:grain_nRE_end,n_cells), lchange_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error l_RE'
         stop
@@ -536,24 +532,15 @@ subroutine alloc_dynamique()
      E0 = 0.0
      J0 = 0.0
 
-     if (l3D) then
-        allocate(xT_ech(nb_proc,n_rad,-nz:nz,n_az), stat=alloc_status)
-     else
-        allocate(xT_ech(nb_proc,n_rad,nz,1), stat=alloc_status)
-     endif
+     allocate(xT_ech(n_cells,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xT_ech'
         stop
      endif
      xT_ech = 2
 
-     if (l3D) then
-        allocate(prob_delta_T(p_n_rad,-p_nz:p_nz,p_n_az,n_T,n_lambda), stat=alloc_status)
-        mem_size = real(p_n_rad) * 2. * real(p_nz) * real(p_n_az) * n_T * n_lambda * 4 / 1024.**2
-     else
-        allocate(prob_delta_T(p_n_rad,p_nz,1,n_T,n_lambda), stat=alloc_status)
-        mem_size = real(p_n_rad) * real(p_nz) * n_T * n_lambda * 4 / 1024.**2
-     endif
+     allocate(prob_delta_T(n_T,n_cells,n_lambda), stat=alloc_status)
+     mem_size = n_cells * n_T * n_lambda * 4. / 1024.**2
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_delta_T'
         stop
@@ -584,7 +571,7 @@ subroutine alloc_dynamique()
         endif
         log_frac_E_em_1grain=0.0
 
-        allocate(xT_ech_1grain(nb_proc,n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain'
            stop
@@ -603,15 +590,15 @@ subroutine alloc_dynamique()
         frac_E_em_1grain_nRE=0.0
         log_frac_E_em_1grain_nRE=0.0
 
-        allocate(Temperature_1grain_nRE_old(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Proba_Temperature'
            stop
         endif
         Temperature_1grain_nRE_old =0.0
 
-        allocate(Tpeak_old(n_rad,nz,grain_nRE_start:grain_nRE_end), &
-             maxP_old(n_rad,nz,grain_nRE_start:grain_nRE_end), &
+        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,n_cells), &
+             maxP_old(grain_nRE_start:grain_nRE_end,n_cells), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Tpeak'
@@ -620,7 +607,7 @@ subroutine alloc_dynamique()
         Tpeak_old=0
         maxP_old=0.
 
-        allocate(xT_ech_1grain_nRE(nb_proc,n_rad,nz,grain_nRE_start:grain_nRE_end),stat=alloc_status)
+        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain_nRE'
            stop
@@ -635,7 +622,7 @@ subroutine alloc_dynamique()
         prob_delta_T_1grain_nRE=0.0
 
         if (lRE_nlTE) then
-           allocate(Temperature_1grain_old(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error Temperature_old'
               stop
@@ -821,25 +808,14 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs a l'emission moleculaire
   ! **************************************************
   if (lemission_mol) then
-     if (l3D) then
-        allocate(tab_abundance(n_rad,-nz:nz,n_az), Tcin(n_rad,-nz:nz,n_az), lcompute_molRT(n_rad,-nz:nz,n_az), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tcin & tab_abundance'
-           stop
-        endif
-        tab_abundance = 0.0
-        lcompute_molRT = .true.
-        Tcin=0.0
-     else
-        allocate(tab_abundance(n_rad,nz,1), Tcin(n_rad,nz,1), lcompute_molRT(n_rad,nz,1), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tcin & tab_abundance'
-           stop
-        endif
-        tab_abundance = 0.0
-        lcompute_molRT = .true.
-        Tcin=0.0
+     allocate(tab_abundance(n_cells), Tcin(n_cells), lcompute_molRT(n_cells), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error Tcin & tab_abundance'
+        stop
      endif
+     tab_abundance = 0.0
+     lcompute_molRT = .true.
+     Tcin=0.0
 
      allocate(vfield(n_rad,nz), stat=alloc_status)
      if (alloc_status > 0) then

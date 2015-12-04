@@ -555,7 +555,7 @@ module em_th
   ! Probabilite cumulee en lambda d'emissivite de la poussiere
   ! avec correction de temperature (dB/dT)
   ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
-  real, dimension(:,:,:,:,:), allocatable :: prob_delta_T !n_rad,nz+1,(n_az),0:n_T,n_lambda
+  real, dimension(:,:,:), allocatable :: prob_delta_T ! 0:n_T,n_cells,n_lambda
   real, dimension(:,:,:), allocatable :: prob_delta_T_1grain !n_grains,0:n_T,n_lambda
   real, dimension(:,:,:), allocatable :: prob_delta_T_1grain_nRE !n_grains,0:n_T,n_lambda
 
@@ -567,19 +567,20 @@ module em_th
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
   real(kind=db), dimension(:,:,:,:), allocatable :: xJ_abs !id, n_lambda, n_rad, nz
   real, dimension(:,:,:,:), allocatable :: xN_abs !id, n_lambda, n_rad, nz
-  integer, dimension(:,:,:,:), allocatable :: xT_ech !id, n_rad, nz, n_az
-  integer, dimension(:,:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE !id, n_rad, nz, n_grains
+
+  integer, dimension(:,:), allocatable :: xT_ech ! n_cells, id
+  integer, dimension(:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE ! n_grains, n_cells, id
 
   real(kind=db) :: E_abs_nRE, E_abs_nREm1
   ! emissivite en unite qq (manque une cst mais travail en relatif)
   real(kind=db), dimension(:,:,:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
 
-  real, dimension(:,:,:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
-  real, dimension(:,:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
-  real, dimension(:,:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
-  integer, dimension(:,:,:), allocatable :: Tpeak_old
-  real, dimension(:,:,:,:), allocatable :: Proba_Temperature !n_T, n_rad,nz, n_grains
-  logical, dimension(:,:,:), allocatable :: l_RE, lchange_nRE ! n_rad, nz, n_grains
+  real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
+  real, dimension(:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
+  real, dimension(:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
+  integer, dimension(:,:), allocatable :: Tpeak_old
+  real, dimension(:,:,:), allocatable :: Proba_Temperature !n_T, n_cells,, n_grains
+  logical, dimension(:,:), allocatable :: l_RE, lchange_nRE ! n_grains, n_cells
   real :: nbre_photons_tot, n_phot_L_tot,  n_phot_L_tot0
 
 
@@ -746,7 +747,7 @@ module molecular_emission
   integer, dimension(:,:), pointer :: iCollUpper, iCollLower
   real, dimension(:,:,:), pointer :: collRates
 
-  real, dimension(:,:,:), allocatable :: Tcin ! Temperature cinetique
+  real, dimension(:), allocatable :: Tcin ! Temperature cinetique
   real :: correct_Tgas
   logical :: lcorrect_Tgas
 
@@ -784,8 +785,8 @@ module molecular_emission
   real(kind=db), dimension(:,:,:), allocatable :: tab_dnu_o_freq ! n_rad, nz, n_az
   real(kind=db), dimension(:,:,:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_rad, nz, n_az
 
-  real, dimension(:,:,:), allocatable :: tab_abundance
-  logical, dimension(:,:,:), allocatable :: lcompute_molRT
+  real, dimension(:), allocatable :: tab_abundance ! n_cells
+  logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
 
   logical ::  lfreeze_out
   real :: T_freeze_out
