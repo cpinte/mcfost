@@ -371,7 +371,7 @@ module grains
   !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
   ! aggregats
-  real, dimension(:,:,:,:,:), allocatable :: tab_mueller !n_lambda,n_grains,4,4,180
+  real, dimension(:,:,:,:,:), allocatable :: tab_mueller !4,4, 180, n_grains,n_lambda
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos ! n_cells,n_lambda

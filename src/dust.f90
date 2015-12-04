@@ -655,7 +655,7 @@ subroutine prop_grains(lambda, p_lambda)
   !--    dtheta = pi/real(nang_scatt)
   !--    do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
   !--       theta = real(j)*dtheta
-  !--       norme =  norme +   tab_s11(lambda,k,j)*sin(theta)*dtheta
+  !--       norme =  norme +   tab_s11(j,k,lambda)*sin(theta)*dtheta
   !--    enddo
   !--    qsca= C_sca(lambda,k)/S_grain(k)
   !--    write(*,*) "Verif phase function (a<<lambda) : ", tab_lambda(lambda), r_grain(k), norme/qsca, qsca
@@ -971,11 +971,11 @@ subroutine opacite(lambda)
                     ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
                     ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
                     ! tab_s11_pos soit normalisee a k_sca_tot
-                    tab_s11_pos(:,icell,lambda) = tab_s11_pos(:,icell,lambda) + tab_s11(lambda,k,:) * S_grain(k) * density
+                    tab_s11_pos(:,icell,lambda) = tab_s11_pos(:,icell,lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
                     if (lsepar_pola) then
-                       tab_s12_pos(:,icell,lambda) = tab_s12_pos(:,icell,lambda) + tab_s12(lambda,k,:) * S_grain(k) * density
-                       tab_s33_pos(:,icell,lambda) = tab_s33_pos(:,icell,lambda) + tab_s33(lambda,k,:) * S_grain(k) * density
-                       tab_s34_pos(:,icell,lambda) = tab_s34_pos(:,icell,lambda) + tab_s34(lambda,k,:) * S_grain(k) * density
+                       tab_s12_pos(:,icell,lambda) = tab_s12_pos(:,icell,lambda) + tab_s12(:,k,lambda) * S_grain(k) * density
+                       tab_s33_pos(:,icell,lambda) = tab_s33_pos(:,icell,lambda) + tab_s33(:,k,lambda) * S_grain(k) * density
+                       tab_s34_pos(:,icell,lambda) = tab_s34_pos(:,icell,lambda) + tab_s34(:,k,lambda) * S_grain(k) * density
                     endif
                  endif !aniso_method
               else

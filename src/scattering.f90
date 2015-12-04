@@ -370,10 +370,10 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
            norme = 0.5 * x**2
         endif
 
-        tab_s11(lambda,taille_grain,j) = s11(j) / norme
-        tab_s12(lambda,taille_grain,j) = s12(j) / norme
-        tab_s33(lambda,taille_grain,j) = s33(j) / norme
-        tab_s34(lambda,taille_grain,j) = s34(j) / norme
+        tab_s11(j,taille_grain,lambda) = s11(j) / norme
+        tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s33(j,taille_grain,lambda) = s33(j) / norme
+        tab_s34(j,taille_grain,lambda) = s34(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -541,7 +541,7 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
         mueller(:,:,j) = mueller(:,:,j) / norme
      endif
 
-     tab_mueller(lambda,taille_grain,:,:,j) = mueller(:,:,j)
+     tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
   enddo
 
   gsca = assym
@@ -724,10 +724,10 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
            endif
         endif
 
-        tab_s11(lambda,taille_grain,j) = s11(j) / norme
-        tab_s12(lambda,taille_grain,j) = s12(j) / norme
-        tab_s33(lambda,taille_grain,j) = s33(j) / norme
-        tab_s34(lambda,taille_grain,j) = s34(j) / norme
+        tab_s11(j,taille_grain,lambda) = s11(j) / norme
+        tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s33(j,taille_grain,lambda) = s33(j) / norme
+        tab_s34(j,taille_grain,lambda) = s34(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -987,14 +987,14 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !     MATRICE DE MUELLER
 !     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  XMUL(1,1) = tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(2,2) = tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(1,2) = tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(2,1) = tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(3,3) = tab_s33(lambda,taille_grain,itheta) * frac + tab_s33(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(4,4) = tab_s33(lambda,taille_grain,itheta) * frac + tab_s33(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(3,4) = -tab_s34(lambda,taille_grain,itheta)* frac - tab_s34(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(4,3) = tab_s34(lambda,taille_grain,itheta) * frac + tab_s34(lambda,taille_grain,itheta-1) * frac_m1
+  XMUL(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(2,2) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(2,1) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(4,4) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(4,3) = tab_s34(itheta,taille_grain,lambda) * frac + tab_s34(itheta-1,taille_grain,lambda) * frac_m1
   XMUL(1,3) = 0.0
   XMUL(1,4) = 0.0
   XMUL(2,3) = 0.0
@@ -1023,9 +1023,9 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
 
-!  norme=tab_albedo(l)*tab_s11(lambda,taille_grain,itheta)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(lambda,taille_grain,itheta), stok_I0, stok(1,1)
-  norme=(tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1) &
+!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
+!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
+  norme=(tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1) &
        * (stok_I0/stok(1))
   do i=1,4
      stok(i)=stok(i)*norme
@@ -1158,7 +1158,7 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   ROP(4,3) = 0.0
 
 !     MATRICE DE MUELLER
-  xmul(:,:) = tab_mueller(lambda,taille_grain,:,:,itheta) * frac + tab_mueller(lambda,taille_grain,:,:,itheta-1) * frac_m1
+  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
 
 
 ! -------- CALCUL DE LA POLARISATION ---------
@@ -1180,9 +1180,9 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
 
-!  norme=tab_albedo(l)*tab_s11(lambda,taille_grain,itheta)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(lambda,taille_grain,itheta), stok_I0, stok(1,1)
-  norme=(tab_mueller(lambda,taille_grain,1,1,itheta)*frac + tab_mueller(lambda,taille_grain,1,1,itheta-1)*frac_m1 ) &
+!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
+!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
+  norme=(tab_mueller(1,1,itheta,taille_grain,lambda)*frac + tab_mueller(1,1,itheta-1,taille_grain,lambda)*frac_m1 ) &
   * (stok_I0/stok(1,1))
   do i=1,4
      stok(i,1)=stok(i,1)*norme
@@ -1297,11 +1297,11 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   XMUL=0.0
   icell = cell_map(ri,zj,phik)
-  XMUL(1,1) = tab_s11_pos(theta,icell,ilambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,1) = tab_s11_pos(itheta,icell,lambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(theta,icell,ilambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,2) = tab_s12_pos(itheta,icell,lambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(theta,icell,ilambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(3,3) = tab_s33_pos(itheta,icell,lambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
   XMUL(3,4) = -tab_s34_pos(itheta,icell,lambda)* frac -  tab_s34_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
@@ -1592,8 +1592,8 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
   p=Ip/I
 
   ! polarisabilite
-  pp= (tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1) &
-  / (tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1)
+  pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
+  / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
 
   ppp=p*pp
 !  write(*,*) p,pp,ppp
