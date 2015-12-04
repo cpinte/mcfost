@@ -18,7 +18,7 @@ subroutine lect_section_eff()
 
   implicit none
 
-  integer :: i, j, lambda, l, icell
+  integer :: lambda, l, icell
   real, dimension(61) :: qext, qsca
   real, dimension(0:61) :: tab_lambda_lim
 
