@@ -135,6 +135,13 @@ subroutine build_cylindrical_cell_mapping()
      stop
   endif
 
+  if (cell_map(1,1,1) /= 1) then
+     write(*,*) "ERROR : mapping of cell (1,1,1) is not 1"
+     write(*,*) "MCFOST will crash"
+     write(*,*) "Exiting"
+     stop
+  endif
+
   return
 
 end subroutine build_cylindrical_cell_mapping
