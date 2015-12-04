@@ -548,7 +548,7 @@ module em_th
 
   ! fraction d'energie reemise sur energie etoile
   ! (Opacite moyenne de Planck * coeff)
-  real, dimension(:,:,:,:), allocatable :: log_frac_E_em !n_rad,nz+1,(n_az),0:n_T
+  real, dimension(:,:), allocatable :: log_frac_E_em ! 0:n_T, n_cells
   real, dimension(:,:), allocatable :: log_frac_E_em_1grain  !n_grains,0:n_T
   real, dimension(:,:), allocatable :: frac_E_em_1grain_nRE, log_frac_E_em_1grain_nRE !n_grains,0:n_T
 
@@ -561,12 +561,12 @@ module em_th
 
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
-  real(kind=db), dimension(:,:,:,:), allocatable :: xKJ_abs, nbre_reemission !n_rad, nz, n_az, id
-  real(kind=db), dimension(:,:,:), allocatable :: E0 !n_rad, nz, n_az
-  real(kind=db), dimension(:,:,:,:), allocatable :: J0 !n_lambda, n_rad, nz, n_az
+  real(kind=db), dimension(:,:), allocatable :: xKJ_abs, nbre_reemission ! n_cells, id
+  real(kind=db), dimension(:), allocatable :: E0 ! n_cells
+  real(kind=db), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
-  real(kind=db), dimension(:,:,:,:), allocatable :: xJ_abs !id, n_lambda, n_rad, nz
-  real, dimension(:,:,:,:), allocatable :: xN_abs !id, n_lambda, n_rad, nz
+  real(kind=db), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
+  real, dimension(:,:,:), allocatable :: xN_abs ! n_cells, n_lambda, nb_proc
 
   integer, dimension(:,:), allocatable :: xT_ech ! n_cells, id
   integer, dimension(:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE ! n_grains, n_cells, id

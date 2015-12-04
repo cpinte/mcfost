@@ -184,15 +184,15 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      ! Stockage des champs de radiation
      if (lcellule_non_vide) then
         if (letape_th) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(icell0,lambda) &
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) &
                 * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
 
         else
            if (lProDiMo) then
-              xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+              xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
               ! Pour statistique: nbre de paquet contribuant a intensite specifique
-              xN_abs(lambda,ri0,zj0,id) = xN_abs(lambda,ri0,zj0,id) + 1.0
+              xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
            endif ! lProDiMo
 
            if (lscatt_ray_tracing1) then
@@ -963,32 +963,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      ! Stokage des champs de radiation
      if (lcellule_non_vide) then
         if (letape_th) then
-           if (lRE_LTE) xKJ_abs(ri0,thetaj0,1,id) = xKJ_abs(ri0,thetaj0,1,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,thetaj0,id) = xJ_abs(lambda,ri0,thetaj0,id) + l * Stokes(1)
-!!$        else if (lscatt_ray_tracing1) then
-!!$           xm = 0.5_db * (x0 + x1)
-!!$           ym = 0.5_db * (y0 + y1)
-!!$           zm = 0.5_db * (z0 + z1)
-!!$
-!!$           phi_pos = atan2(ym,xm)
-!!$           phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-!!$           if (phi_k > n_az_rt) phi_k=1
-!!$
-!!$           if (zm > 0.0_db) then
-!!$              psup = 1
-!!$           else
-!!$              psup = 0
-!!$           endif
-!!$
-!!$           ! TODO : ca calcule plein de fois a meme chose si pas de strat et meme direction
-!!$           ! D'ou l'interet de la separation dans mcfost3 !!!
-!!$           if (lvariable_dust) then
-!!$              p_ri0 = ri0
-!!$              p_thetaj0 = thetaj0
-!!$           endif
-!!$           xI_scatt(:,ri0,thetaj0,phi_k,psup,id) = xI_scatt(:,ri0,thetaj0,phi_k,psup,id) +   &
-!!$                l * new_stokes_ray_tracing1(id,lambda,p_ri0,p_thetaj0,u,v,w,stokes(:))
-
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
+           if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         else if (lscatt_ray_tracing2) then
            if (flag_direct_star) then
               xI_star(ri0,thetaj0,id) = xI_star(ri0,thetaj0,id) + l * Stokes(1)
@@ -1367,8 +1343,8 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         l = l*extr/tau ! on rescale l pour que tau=extr
         ltot=ltot+l
         if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
+           if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         endif !l_abs
         flag_sortie = .false.
         xio=x0+l*u
@@ -1382,9 +1358,9 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
         if (lcellule_non_vide) then
            if (letape_th) then
-              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + &
+              if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + &
                    kappa_abs_eg(icell0,lambda) * l * Stokes(1)
-              if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+              if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
            else ! letape_th
               if (lscatt_ray_tracing1) then
                  xm = 0.5_db * (x0 + x1)
@@ -3693,8 +3669,8 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         l = l*extr/tau ! on rescale l pour que tau=extr
         ltot=ltot+l
         if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
+           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         endif !l_abs
         flag_sortie = .false.
         xio=x0+l*u
@@ -3722,8 +3698,8 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         extr=extr-tau
         ltot=ltot+l
         if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) * l * Stokes(1)
+           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         endif !l_abs
      endif ! tau > extr
 

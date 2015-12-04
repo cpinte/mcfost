@@ -398,7 +398,7 @@ subroutine init_molecular_disk(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i, j, k, icell
+  integer :: i, icell
 
   ldust_mol  = .true.
   lkeplerian = .true.

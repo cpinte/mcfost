@@ -94,7 +94,6 @@ subroutine initialisation_mcfost()
   lpuffed_rim = .false.
   lopacity_wall = .false.
   lno_backup = .false.
-  loutput_J = .false.
   loutput_UV_field = .false.
   laverage_grain_size = .false.
   llinear_grid=.false.
@@ -489,9 +488,6 @@ subroutine initialisation_mcfost()
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
-     case("-output_J")
-        loutput_J=.true.
-        i_arg = i_arg+1
      case("-output_UV_field")
         loutput_UV_field=.true.
         i_arg = i_arg+1
