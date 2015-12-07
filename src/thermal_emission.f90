@@ -496,18 +496,12 @@ subroutine Temp_finale()
 
   implicit none
 
-  integer :: T_int, T1, T2, alloc_status
+  integer :: T_int, T1, T2
   real :: Temp, Temp1, Temp2, frac, log_frac_E_abs
 
-  real(kind=db), dimension(:), allocatable :: J_abs
+  real(kind=db), dimension(n_cells) :: J_abs
 
   integer :: i,j, pk, icell
-
-  allocate(J_abs(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error J_abs in Temp_finale'
-     stop
-  endif
 
   ! Calcul de la temperature de la cellule et stokage energie recue + T
   ! Utilisation temperature precedente
@@ -575,8 +569,6 @@ subroutine Temp_finale()
   else
      write(*,*) "Max. temperature = ", maxval(Temperature)
   endif
-
-  deallocate(J_abs)
 
   return
 
@@ -912,7 +904,8 @@ subroutine Temp_nRE(lconverged)
                     ! Impossible de definir proba de temperature
                     t_cool = 1.0 ; t_abs = 0.0
                     write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), real(Temperature_1grain_nRE(l,icell))
+                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), &
+                         real(Temperature_1grain_nRE(l,icell))
                     write(*,*) "Exiting"
                     stop
                  endif
@@ -1278,10 +1271,10 @@ subroutine emission_nRE()
 
   implicit none
 
-  integer :: i, j, k, T, l, lambda, n_max, alloc_status, icell
+  integer :: i, j, k, T, lambda, icell
   real :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn
   real(kind=db) :: E_emise, frac_E_abs_nRE, Delta_E
-  real(kind=db), dimension(:), allocatable :: E_cell, E_cell_old
+  real(kind=db), dimension(n_cells) :: E_cell, E_cell_old
 
   ! proba emission en fct lambda puis pour chaque lambda proba en fct position
   ! proba differentielle en fonction proba emission precedente
@@ -1309,18 +1302,6 @@ subroutine emission_nRE()
   ! Repartion spatiale energie
   cst_wl_max = log(huge_real)-1.0e-4
 
-  if (l3D) then
-     n_max = n_rad*2*nz*n_az
-  else
-     n_max = n_rad*nz
-  endif
-
-  allocate(E_cell(n_max), E_cell_old(n_max), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error'
-     stop
-  endif
-
   spectre_emission_cumul(0) = 0.0
   do lambda=1, n_lambda
      wl = tab_lambda(lambda)*1.e-6
@@ -1330,17 +1311,16 @@ subroutine emission_nRE()
      ! Emission par cellule des PAHs
 
      !$omp parallel default(none) &
-     !$omp private(i,j,l,k,E_emise,Temp,cst_wl,T,icell) &
-     !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end,n_max) &
+     !$omp private(i,j,k,E_emise,Temp,cst_wl,T,icell) &
+     !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
      !$omp shared(n_rad,nz,l_RE, Temperature_1grain_nRE,n_T,C_abs_norm,densite_pouss,volume,tab_Temp,Proba_Temperature) &
      !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,cell_map)
      !$omp do
      do i=1,n_rad
         do j=1,nz
-           ! Combinaison des 2 indices pour dichotomie
-           l=j+nz*(i-1)
            E_emise = 0.0
            icell = cell_map(i,j,1)
+
            do k=grain_nRE_start,grain_nRE_end
               if (l_RE(k,icell)) then ! le grain a une temperature
                  if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
@@ -1363,36 +1343,37 @@ subroutine emission_nRE()
                  enddo !T
               endif
            enddo !k
-           E_cell(l) =   E_emise
+           E_cell(icell) =   E_emise
            ! Recup et mise a jour de l'ancienne emmissivite
-           E_cell_old(l) = Emissivite_nRE_old(lambda,i,j,1)
-           if (E_cell(l) >   E_cell_old(l)) then
-              Emissivite_nRE_old(lambda,i,j,1) = E_emise
+           E_cell_old(icell) = Emissivite_nRE_old(icell,lambda)
+           if (E_cell(icell) >   E_cell_old(icell)) then
+              Emissivite_nRE_old(icell,lambda) = E_emise
            else ! Test en cas de pb d'arrondis
               ! On ne met pas a jour
-              E_cell(l) = E_cell_old(l)
+              E_cell(icell) = E_cell_old(icell)
            endif
         enddo !j
      enddo !i
      !$omp end do
      !$omp end parallel
 
+     stop
 
-     prob_E_cell(lambda,0)=0.0
-     do l=1, n_max
-        Delta_E = E_cell(l) - E_cell_old(l)
-        prob_E_cell(lambda,l) = prob_E_cell(lambda,l-1) + Delta_E
+     prob_E_cell(0,lambda)=0.0
+     do icell=1, n_cells
+        Delta_E = E_cell(icell) - E_cell_old(icell)
+        prob_E_cell(icell,lambda) = prob_E_cell(icell-1,lambda) + Delta_E
      enddo
 
-     spectre_emission_cumul(lambda) =  spectre_emission_cumul(lambda-1) + prob_E_cell(lambda,n_max)
+     spectre_emission_cumul(lambda) =  spectre_emission_cumul(lambda-1) + prob_E_cell(n_cells,lambda)
 
      ! Les etoiles ont deja emis
      frac_E_stars(lambda) = 0.0
 
-     if (prob_E_cell(lambda,n_max) > tiny_real) then
-        prob_E_cell(lambda,:)=prob_E_cell(lambda,:)/prob_E_cell(lambda,n_max)
+     if (prob_E_cell(n_cells,lambda) > tiny_real) then
+        prob_E_cell(:,lambda)=prob_E_cell(lambda,:)/prob_E_cell(n_cells,lambda)
      else
-        prob_E_cell(lambda,:)=0.0
+        prob_E_cell(:,lambda)=0.0
      endif
   enddo ! lambda
 
@@ -1401,8 +1382,6 @@ subroutine emission_nRE()
   do lambda=1,n_lambda
      spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
   enddo
-
-  deallocate(E_cell, E_cell_old)
 
   return
 
@@ -1444,7 +1423,7 @@ subroutine init_emissivite_nRE()
            do k=grain_nRE_start,grain_nRE_end
               E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* facteur !* Proba_Temperature = 1 pour Tmin
            enddo !k
-           Emissivite_nRE_old(lambda,i,j,1) = E_emise
+           Emissivite_nRE_old(icell,lambda) = E_emise
         enddo !j
      enddo !i
 
@@ -1473,10 +1452,10 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i, j, pk, jj, k, n_max, l, T, alloc_status, icell
+  integer :: i, j, pk, jj, k, T, icell
   real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
   real(kind=db) :: delta_T
-  real(kind=db), dimension(:), allocatable :: E_cell, E_cell_corrected
+  real(kind=db), dimension(n_cells) :: E_cell, E_cell_corrected
 
   cst_wl_max = log(huge_real)-1.0e-4
 
@@ -1485,50 +1464,23 @@ subroutine repartition_energie(lambda)
   ! Emission totale des etoiles
   E_star = E_stars(lambda)
 
-  if (l3D) then
-     n_max = n_rad*2*nz*n_az
-  else
-     n_max = n_rad*nz
-  endif
-
-  allocate(E_cell(n_max), E_cell_corrected(n_max), stat=alloc_status)
-   if (alloc_status > 0) then
-     write(*,*) 'Allocation error'
-     stop
-  endif
-  E_cell=0.0
-  E_cell_corrected=0.0
+  E_cell(:) = 0.0_db
 
   ! Cas LTE
   if (lRE_LTE) then
      do i=1,n_rad
         bz : do j=j_start,nz
            if (j==0) cycle bz
-           if (l3D) then
-              if (j < 0) then
-                 jj = j + nz + 1
-              else
-                 jj = j + nz
-              endif
-           endif
            do pk=1, n_az
-              icell = cell_map(i,j,pk) ! NEWTODO : l vs icell
-              if (l3D) then
-                 ! Combinaison des 3 indices pour dichotomie
-                 l= pk+n_az*(jj+2*nz*(i-1)-1)
-              else
-                 ! Combinaison des 2 indices pour dichotomie
-                 l= j+nz*(i-1)
-              endif
-
+              icell = cell_map(i,j,pk)
               Temp=Temperature(icell)
               if (Temp < tiny_real) then
-                 ! prob_E_cell(lambda,k) =  prob_E_cell(lambda,k-1)
+                ! E_cell(icell) = 0.0_db
               else
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
-                       E_cell(l) = 4.0*kappa_abs_eg(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                       E_cell(icell) = 4.0*kappa_abs_eg(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
                  endif !cst_wl
               endif ! Temp==0.0
@@ -1537,12 +1489,13 @@ subroutine repartition_energie(lambda)
      enddo !i
   endif
 
+  !write(*,*) E_cell
+
+
   ! Cas nLTE
   if (lRE_nLTE) then
      do i=1,n_rad
         do j=1,nz
-           ! Combinaison des 2 indices pour dichotomie
-           l=j+nz*(i-1)
            E_emise = 0.0
            icell = cell_map(i,j,1)
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
@@ -1557,12 +1510,13 @@ subroutine repartition_energie(lambda)
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                        E_emise = E_emise + Ener * frac
                     else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                       E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                       E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
+                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                     endif
                  endif !cst_wl
               endif ! Temp==0.0
            enddo !k
-           E_cell(l) = E_cell(l) + E_emise
+           E_cell(icell) = E_cell(icell) + E_emise
         enddo !j
      enddo !i
   endif
@@ -1583,8 +1537,6 @@ subroutine repartition_energie(lambda)
 
      do i=1,n_rad
         do j=1,nz
-           ! Combinaison des 2 indices pour dichotomie
-           l=j+nz*(i-1)
            E_emise = 0.0
            icell = cell_map(i,j,1)
            do k=grain_nRE_start,grain_nRE_end
@@ -1620,34 +1572,16 @@ subroutine repartition_energie(lambda)
                  enddo !T
               endif ! l_RE
            enddo !k
-           E_cell(l) =  E_cell(l) + E_emise
+           E_cell(icell) =  E_cell(icell) + E_emise
         enddo !j
      enddo !i
 
   endif
 
+
   if (lweight_emission) then
-     do i=1,n_rad
-        bz2 : do j=j_start,nz
-           if (j==0) cycle bz2
-           if (l3D) then
-              if (j < 0) then
-                 jj = j + nz + 1
-              else
-                 jj = j + nz
-              endif
-           endif
-           do pk=1, n_az
-              if (l3D) then
-                 ! Combinaison des 3 indices pour dichotomie
-                 l= pk+n_az*(jj+2*nz*(i-1)-1)
-              else
-                 ! Combinaison des 2 indices pour dichotomie
-                 l= j+nz*(i-1)
-              endif
-              E_cell_corrected(l) = E_cell(l) * weight_proba_emission(i,j)
-           enddo !pk
-        enddo bz2
+     do icell=1,n_cells
+        E_cell_corrected(icell) = E_cell(icell) * weight_proba_emission(icell)
      enddo
   else ! no weight_emission
      E_cell_corrected(:) = E_cell(:)
@@ -1671,20 +1605,20 @@ subroutine repartition_energie(lambda)
   endif
 
   ! Distribution (spatiale) cumulee d'energie
-  prob_E_cell(lambda,0)=0.0
-  do l=1, n_max
-     prob_E_cell(lambda,l) = prob_E_cell(lambda,l-1) + E_cell_corrected(l)
+  prob_E_cell(0,lambda)=0.0
+  do icell=1, n_cells
+     prob_E_cell(icell,lambda) = prob_E_cell(icell-1,lambda) + E_cell_corrected(icell)
   enddo
 
   ! Normalisation du facteur de correction
   if (lweight_emission) then
-     correct_E_emission = correct_E_emission * prob_E_cell(lambda,n_max) / E_disk(lambda)
+     correct_E_emission = correct_E_emission * prob_E_cell(n_cells,lambda) / E_disk(lambda)
   endif
 
-  if (prob_E_cell(lambda,n_max) > tiny_real) then
-     prob_E_cell(lambda,:)=prob_E_cell(lambda,:)/prob_E_cell(lambda,n_max)
+  if (prob_E_cell(n_cells,lambda) > tiny_real) then
+     prob_E_cell(:,lambda)=prob_E_cell(:,lambda)/prob_E_cell(n_cells,lambda)
   else
-     prob_E_cell(lambda,:)=0.0
+     prob_E_cell(:,lambda)=0.0
   endif
 
   return

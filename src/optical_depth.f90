@@ -4735,7 +4735,7 @@ subroutine define_proba_weight_emission(lambda)
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
   real :: tau
-  integer :: i, j, n, id, ri, zj
+  integer :: i, j, n, id, ri, zj, icell
   integer, parameter :: nbre_angle = 101
 
   tau_min(:,:) = 1.e30 ;
@@ -4767,12 +4767,13 @@ subroutine define_proba_weight_emission(lambda)
 
   do i=1,n_rad
      do j=1,nz
-        weight_proba_emission(i,j) =  exp(-tau_min(i,j))
+        icell = cell_map(i,j,1)
+        weight_proba_emission(icell) =  exp(-tau_min(i,j))
      enddo
   enddo
 
   ! correct_E_emission sera normalise dans repartition energie
-  correct_E_emission(:,:) = 1.0_db / weight_proba_emission
+  correct_E_emission(:) = 1.0_db / weight_proba_emission(:)
 
   return
 
