@@ -573,7 +573,7 @@ module em_th
 
   real(kind=db) :: E_abs_nRE, E_abs_nREm1
   ! emissivite en unite qq (manque une cst mais travail en relatif)
-  real(kind=db), dimension(:,:,:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
+  real(kind=db), dimension(:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
 
   real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
   real, dimension(:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
@@ -589,7 +589,7 @@ module em_th
   real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
   ! Biais de l'emission vers la surface du disque
-  real, dimension(:,:), allocatable :: weight_proba_emission, correct_E_emission
+  real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
 
   ! Suppresion de grains
   integer :: specie_removed

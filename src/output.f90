@@ -940,8 +940,9 @@ subroutine calc_optical_depth_map(lambda)
         do j=1, nz
            i=1 ; optical_depth_map(i,j,k,1) = kappa(cell_map(i,j,k),lambda)* 0.5 * (r_lim(i)-r_lim(i-1))
            do i=2, n_rad
-              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + 0.5 * kappa(cell_map(i-1,j,k),lambda)*(r_lim(i-1)-r_lim(i-2)) &
-                   + 0.5 * kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
+              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + &
+                   0.5 * kappa(cell_map(i-1,j,k),lambda)*(r_lim(i-1)-r_lim(i-2)) + &
+                   0.5 * kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
            enddo
         enddo
      enddo
@@ -951,8 +952,9 @@ subroutine calc_optical_depth_map(lambda)
         do k=1, n_az
            j=nz ; optical_depth_map(i,j,k,2) = kappa(cell_map(i,j,k),lambda)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
            do j=nz-1,1,-1
-              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + 0.5 * kappa(cell_map(i,j+1,k),lambda)*(z_lim(i,j+2)-z_lim(i,j+1)) &
-                   + 0.5 * kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
+              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + &
+                   0.5 * kappa(cell_map(i,j+1,k),lambda)*(z_lim(i,j+2)-z_lim(i,j+1)) + &
+                   0.5 * kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
            enddo
         enddo
      enddo

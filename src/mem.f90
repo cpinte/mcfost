@@ -394,11 +394,7 @@ subroutine alloc_dynamique()
   l_emission_pah = .false.
 
 
-  if (l3D) then
-     allocate(prob_E_cell(n_lambda,0:n_rad*2*nz*n_az), stat=alloc_status)
-  else
-     allocate(prob_E_cell(n_lambda,0:n_rad*nz), stat=alloc_status)
-  endif
+  allocate(prob_E_cell(0:n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_cell'
      stop
@@ -406,7 +402,7 @@ subroutine alloc_dynamique()
   prob_E_cell = 0.0
 
   if (lweight_emission) then
-     allocate(weight_proba_emission(n_rad,nz), correct_E_emission(n_rad,nz), stat=alloc_status)
+     allocate(weight_proba_emission(n_cells), correct_E_emission(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_E_cell'
         stop
@@ -620,7 +616,7 @@ subroutine alloc_dynamique()
   endif ! lTemp
 
   if (lnRE) then
-     allocate(Emissivite_nRE_old(n_lambda,n_rad,nz,1), stat=alloc_status)
+     allocate(Emissivite_nRE_old(n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Proba_Temperature'
         stop
@@ -1209,11 +1205,7 @@ subroutine realloc_step2()
   n_phot_envoyes = 0.0
 
   deallocate(prob_E_cell)
-  if (l3D) then
-     allocate(prob_E_cell(n_lambda2,0:n_rad*2*nz*n_az), stat=alloc_status)
-  else
-     allocate(prob_E_cell(n_lambda2,0:n_rad*nz), stat=alloc_status)
-  endif
+  allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_cell'
      stop

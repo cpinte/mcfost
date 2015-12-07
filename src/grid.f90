@@ -1110,21 +1110,16 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
   integer, intent(in) :: lambda
   real, intent(in) :: aleat
   integer, intent(out) :: ri,zj, phik
-  integer :: k, k2, kmin, kmax, nz2
+  integer :: k, kmin, kmax
 
 
   ! Dichotomie
   kmin=0
-  if (l3D) then
-     nz2=2*nz
-     kmax=n_rad*nz2*n_az
-  else
-     kmax=n_rad*nz
-  endif
+  kmax=n_cells
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
-     if (prob_E_cell(lambda,k) < aleat) then
+     if (prob_E_cell(k,lambda) < aleat) then
         kmin = k
      else
         kmax = k
@@ -1133,24 +1128,9 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
    enddo   ! while
    k=kmax
 
-   if (l3D) then
-      ! Reconstruction indices 3D (et 2D)
-      phik = mod(k,n_az)
-      if (phik==0) phik=n_az
-      k2=(k-phik)/n_az + 1
-      zj=mod(k2,nz2)
-      if (zj==0) zj=nz2
-      ri=1+(k2-zj)/nz2
-      ! recentrage par rapport à 0
-      zj = zj -nz
-      if (zj <= 0) zj = zj -1
-   else
-      ! Reconstruction indices 2D
-      phik=1
-      zj=mod(k,nz)
-      if (zj==0) zj=nz
-      ri=1+(k-zj)/nz
-   endif
+   ri = cell_map_i(k)
+   zj = cell_map_j(k)
+   phik = cell_map_k(k)
 
    return
 

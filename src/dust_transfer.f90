@@ -722,7 +722,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
   ! Proprietes du packet
   logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
-  integer :: i_star
+  integer :: i_star, icell
 
   real(kind=db) :: w02, srw02
   real :: argmt
@@ -816,7 +816,10 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      ! Parametres de stokes : lumière non polarisée
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
-     if (lweight_emission) Stokes(1) = Stokes(1) * correct_E_emission(ri,zj)
+     if (lweight_emission) then
+        icell = cell_map(ri,zj,1)
+        Stokes(1) = Stokes(1) * correct_E_emission(icell)
+     endif
   else ! Emission ISM
      flag_star=.false.
      flag_ISM=.true.
@@ -892,6 +895,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         write(*,*) "PB z", ri, zj, abs(z)
         zj=nz
      endif
+
      icell = cell_map(ri,zj,phik)
 
      ! Le photon est-il encore dans la grille ?
@@ -903,6 +907,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         if (l3D) p_phik = phik
         p_icell = icell
      endif
+
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -926,6 +931,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      else ! Choix absorption ou diffusion
         rand = sprng(stream(id))
      endif ! lmono
+
 
      if (rand < tab_albedo_pos(p_icell,lambda)) then ! Diffusion
         flag_scatt=.true.
@@ -1004,6 +1010,8 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
+
+
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
            E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(icell,lambda))
@@ -1023,7 +1031,6 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
 
         ! Choix longueur d'onde
         rand = sprng(stream(id))
-        !write(*,*) rand, Proba_abs_RE_LTE(lambda,ri, zj, p_phik)
         if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
            ! Cas RE - LTE
            rand = sprng(stream(id))
