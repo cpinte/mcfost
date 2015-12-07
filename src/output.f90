@@ -2076,7 +2076,7 @@ subroutine ecriture_Tex(imol)
 
   integer, intent(in) :: imol
 
-  integer :: i, j, iTrans, iUp, iLow, k
+  integer :: i, j, iTrans, iUp, iLow, k, icell
   real(kind=db) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2105,8 +2105,9 @@ subroutine ecriture_Tex(imol)
 
      do j=1, nz
         do i=1, n_rad
-           nUp = tab_nLevel(i,j,k,iUp)
-           nLow =  tab_nLevel(i,j,k,iLow)
+           icell = cell_map(i,j,1)
+           nUp = tab_nLevel(icell,iUp)
+           nLow =  tab_nLevel(icell,iLow)
            if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
               Tex(i,j,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
            endif
@@ -2410,12 +2411,12 @@ subroutine ecriture_pops(imol)
   integer, intent(in) :: imol
 
   character(len=512) :: filename
-  integer :: status,unit,blocksize,bitpix,naxis
+  integer :: status,unit,blocksize,bitpix,naxis, i,j,icell
   integer, dimension(3) :: naxes
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  real, dimension(n_rad,nz,1,nLevels) :: tab_nLevel_io ! pas en 3D
+  real, dimension(n_rad,nz,nLevels) :: tab_nLevel_io ! pas en 3D
 
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 
@@ -2445,7 +2446,12 @@ subroutine ecriture_pops(imol)
   fpixel=1
   nelements=naxes(1)*naxes(2)*naxes(3)
 
-  tab_nLevel_io = tab_nLevel
+  do i=1, n_rad
+     do j=1, nz
+        icell = cell_map(i,j,1)
+        tab_nLevel_io(i,j,:) = tab_nLevel(icell,:)
+     enddo
+  enddo
   call ftppre(unit,group,fpixel,nelements,tab_nLevel_io,status)
 
   !  Close the file and free the unit number.

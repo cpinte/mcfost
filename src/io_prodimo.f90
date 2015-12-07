@@ -1996,28 +1996,28 @@ contains
     ! Niveaux et populations
     write(*,*) "Setting ProDiMo abundances, population levels and Tgas"
     tab_abundance(:) = 0.0
-    tab_nLevel(:,:,:,:) = 0.0
+    tab_nLevel(:,:) = 0.0
     do i=1, n_rad
        do j=1, nz
           icell =cell_map(i,j,1)
           if (lCII) then
-             tab_nLevel(i,j,1,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
+             tab_nLevel(icell,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
              tab_abundance(icell) = nCII(i,j)
           endif
           if (lOI) then
-             tab_nLevel(i,j,1,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
+             tab_nLevel(icell,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
              tab_abundance(icell) = nOI(i,j)
           endif
           if (lCO) then
-             tab_nLevel(i,j,1,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
+             tab_nLevel(icell,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
              tab_abundance(icell) = nCO(i,j)
           endif
           if (loH2O) then
-             tab_nLevel(i,j,1,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
+             tab_nLevel(icell,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
              tab_abundance(icell) = noH2O(i,j)
           endif
           if (lpH2O) then
-             tab_nLevel(i,j,1,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
+             tab_nLevel(icell,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
              tab_abundance(icell) = npH2O(i,j)
           endif
           Tcin(icell) = Tgas(i,j)
@@ -2080,7 +2080,8 @@ contains
        do j=1, nz
           r_cyl = sqrt(r_grid(i,j)**2 + z_grid(i,j)**2)
 !          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
-          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(i,j) * AU_to_m)**2 /  (r_cyl * AU_to_m)**3 )
+          icell = cell_map(i,j,1)
+          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(i,j) * AU_to_m)**2 /  (r_cyl * AU_to_m)**3 )
        enddo
     enddo
 
@@ -2092,7 +2093,8 @@ contains
           if (lCO) sigma2 =  dvCO(i,j)**2
           if (loH2O) sigma2 =  dvoH2O(i,j)**2
           if (lpH2O) sigma2 =  dvpH2O(i,j)**2
-          v_line(i,j,1) = sqrt(sigma2)
+          icell = cell_map(i,j,1)
+          v_line(icell) = sqrt(sigma2)
 
           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
           if (sigma2 <=0.) then
@@ -2101,10 +2103,10 @@ contains
           endif
 
           sigma2_m1 = 1.0_db / sigma2
-          sigma2_phiProf_m1(i,j,1) = sigma2_m1
+          sigma2_phiProf_m1(icell) = sigma2_m1
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-          norme_phiProf_m1(i,j,1) = c_light / sqrt(pi * sigma2)
+          norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
 
 !----          ! Echantillonage du profil de vitesse dans la cellule
 !----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
