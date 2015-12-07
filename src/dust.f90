@@ -1000,40 +1000,40 @@ subroutine opacite(lambda)
                  if (abs(k_sca_tot) > 0.0_db) then
                     norme = deg_to_rad / (k_sca_tot * deux_pi) ! TODO: bizarre je ne sais pas d'ou vient le deg_to_rad
 
-                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_pos(:,icell,lambda) * norme
+                    tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_pos(:,icell,lambda) * norme
                     if (lsepar_pola) then
                        ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
                        ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
                        ! le signe de la matrice de Mueller
                        ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  - tab_s12_pos(:,icell,lambda) * norme
-                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  - tab_s33_pos(:,icell,lambda) * norme
-                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  - tab_s34_pos(:,icell,lambda) * norme
+                       tab_s12_ray_tracing(:,icell,lambda) =  - tab_s12_pos(:,icell,lambda) * norme
+                       tab_s33_ray_tracing(:,icell,lambda) =  - tab_s33_pos(:,icell,lambda) * norme
+                       tab_s34_ray_tracing(:,icell,lambda) =  - tab_s34_pos(:,icell,lambda) * norme
                     endif
                  else
-                    tab_s11_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                    tab_s11_ray_tracing(:,icell,lambda) =  0.0_db
                     if (lsepar_pola) then
-                       tab_s12_ray_tracing(lambda,i,j,pk,:) =  0.0_db
-                       tab_s33_ray_tracing(lambda,i,j,pk,:) =  0.0_db
-                       tab_s34_ray_tracing(lambda,i,j,pk,:) =  0.0_db
+                       tab_s12_ray_tracing(:,icell,lambda) =  0.0_db
+                       tab_s33_ray_tracing(:,icell,lambda) =  0.0_db
+                       tab_s34_ray_tracing(:,icell,lambda) =  0.0_db
                     endif
                  endif ! norme
 
                  if (lsepar_pola) then
-                    tab_s12_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s12_ray_tracing(lambda,i,j,pk,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
-                    tab_s33_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s33_ray_tracing(lambda,i,j,pk,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
-                    tab_s34_o_s11_ray_tracing(lambda,i,j,pk,:) = tab_s34_ray_tracing(lambda,i,j,pk,:) / &
-                         max(tab_s11_ray_tracing(lambda,i,j,pk,:),tiny_real)
+                    tab_s12_o_s11_ray_tracing(:,icell,lambda) = tab_s12_ray_tracing(:,icell,lambda) / &
+                         max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
+                    tab_s33_o_s11_ray_tracing(:,icell,lambda) = tab_s33_ray_tracing(:,icell,lambda) / &
+                         max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
+                    tab_s34_o_s11_ray_tracing(:,icell,lambda) = tab_s34_ray_tracing(:,icell,lambda) / &
+                         max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
                  endif
 
               else ! aniso_method = 2 --> HG
                  gsca = tab_g_pos(icell,lambda)
-                 tab_s11_ray_tracing(lambda,i,j,pk,:) =  tab_s11_ray_tracing(lambda,i,j,pk,:) / (k_sca_tot * deux_pi)
+                 tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
               endif
 
-              if (lisotropic) tab_s11_ray_tracing(lambda,i,j,pk,:) = 1.0 / (4.* nang_scatt)
+              if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
            endif !lscatt_ray_tracing
 
            if (sum(densite_pouss(icell,:)) > tiny_real) then
