@@ -355,7 +355,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
                  ! Echantillonage uniforme du profil de raie
                  if (lfixed_rays) then
-                    tab_speed(:,id) = tab_deltaV(:,ri,zj,phik)
+                    tab_speed(:,id) = tab_deltaV(:,icell)
                  endif
 
                  if (lcompute_molRT(icell)) then
@@ -412,7 +412,7 @@ subroutine NLTE_mol_line_transfer(imol)
                        if (lnotfixed_Rays) then
                           do iv=ispeed(1),ispeed(2)
                              !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
-                             rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(ri,zj,phik)
+                             rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(icell)
                           enddo
                        endif
 
@@ -425,7 +425,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
                     ! Resolution de l'equilibre statistique
                     n_iter_loc = 0
-                    pop(:,id) = tab_nLevel(ri,zj,phik,:)
+                    pop(:,id) = tab_nLevel(icell,:)
                     lconverged_loc = .false.
                     ! Boucle pour converger le champ local et les populations
                     ! avec champ externe fixe
@@ -439,7 +439,7 @@ subroutine NLTE_mol_line_transfer(imol)
                        call J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)  ! inclus les boucles sur Transition
 
                        call equilibre_rad_mol_loc(id,ri,zj,phik)
-                       pop(:,id) = tab_nLevel(ri,zj,phik,:)
+                       pop(:,id) = tab_nLevel(icell,:)
 
                        ! Critere de convergence locale
                        diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
@@ -470,8 +470,8 @@ subroutine NLTE_mol_line_transfer(imol)
            do zj=1,nz
               icell = cell_map(ri,zj,phik)
               if (lcompute_molRT(icell)) then
-                 diff = maxval( abs( tab_nLevel(ri,zj,phik,1:n_level_comp) - tab_nLevel_old(ri,zj,phik,1:n_level_comp) ) / &
-                      tab_nLevel_old(ri,zj,phik,1:n_level_comp) + 1e-300_db)
+                 diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
+                      tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
 
              !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
               !        tab_nLevel_old(ri,zj,1:n_level_comp)
@@ -508,7 +508,7 @@ subroutine NLTE_mol_line_transfer(imol)
            endif
         endif
 
-        write(*,*) "STAT", minval(tab_nLevel(:,:,:,1:n_level_comp)), maxval(tab_nLevel(:,:,:,1:n_level_comp))
+        write(*,*) "STAT", minval(tab_nLevel(:,1:n_level_comp)), maxval(tab_nLevel(:,1:n_level_comp))
         call integ_tau_mol(imol)
 
      enddo ! while : convergence totale

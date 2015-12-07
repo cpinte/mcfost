@@ -799,56 +799,33 @@ subroutine alloc_dynamique()
      lcompute_molRT = .true.
      Tcin=0.0
 
-     allocate(vfield(n_rad,nz), stat=alloc_status)
+     allocate(vfield(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error vfield'
         stop
      endif
      vfield=0.0 !; vx=0.0 ; vy=0.0
 
-     if (l3D) then
-        allocate(v_turb(n_rad, -nz:nz,n_az), v_line(n_rad, -nz:nz,n_az), deltaVmax(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(v_turb(n_cells), v_line(n_cells), deltaVmax(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sigma2'
         stop
      endif
      v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
 
-     allocate(tab_dnu_o_freq(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(tab_dnu_o_freq(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_dnu'
         stop
      endif
      tab_dnu_o_freq=0.0
 
-     allocate(norme_phiProf_m1(n_rad,-nz:nz,n_az), sigma2_phiProf_m1(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(norme_phiProf_m1(n_cells), sigma2_phiProf_m1(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error norme_phiProf_m1'
         stop
      endif
      norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
-  else
-     allocate(v_turb(n_rad,nz,1), v_line(n_rad,nz,1), deltaVmax(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error sigma2'
-        stop
-     endif
-     v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
-
-     allocate(tab_dnu_o_freq(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_dnu'
-        stop
-     endif
-     tab_dnu_o_freq=0.0
-
-     allocate(norme_phiProf_m1(n_rad,nz,1), sigma2_phiProf_m1(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error norme_phiProf_m1'
-        stop
-     endif
-     norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
-  endif !l3D
 
   endif ! lemission_mol
 
@@ -1428,55 +1405,29 @@ subroutine alloc_emission_mol(imol)
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
-  if (l3D) then
-     allocate(kappa_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), &
-          stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_mol_o_freq'
-        stop
-     endif
-     kappa_mol_o_freq=0.0
-     emissivite_mol_o_freq = 0.0
-
-     allocate(tab_nLevel(n_rad,-nz:nz,n_az,nLevels), tab_nLevel_old(n_rad,-nz:nz,n_az,nLevels), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_nLevel'
-        stop
-     endif
-     tab_nLevel = 0.0
-     tab_nLevel_old = 0.0
-
-     allocate(maser_map(n_rad,-nz:nz,n_az,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error maser_map'
-        stop
-     endif
-     maser_map = 0.0
-
-  else
-     allocate(kappa_mol_o_freq(n_rad,nz+1,1,nTrans_tot), emissivite_mol_o_freq(n_rad,nz+1,1,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_mol_o_freq'
-        stop
-     endif
-     kappa_mol_o_freq=0.0
-     emissivite_mol_o_freq = 0.0
-
-     allocate(tab_nLevel(n_rad,nz,1,nLevels), tab_nLevel_old(n_rad,nz,1,nLevels), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_nLevel'
-        stop
-     endif
-     tab_nLevel = 0.0
-     tab_nLevel_old = 0.0
-
-     allocate(maser_map(n_rad,nz,1,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error maser_map'
-        stop
-     endif
-     maser_map = 0.0
+  allocate(kappa_mol_o_freq(n_cells,nTrans_tot), emissivite_mol_o_freq(n_cells,nTrans_tot), &
+       stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error kappa_mol_o_freq'
+     stop
   endif
+  kappa_mol_o_freq=0.0
+  emissivite_mol_o_freq = 0.0
+
+  allocate(tab_nLevel(n_cells,nLevels), tab_nLevel_old(n_cells,nLevels), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_nLevel'
+     stop
+  endif
+  tab_nLevel = 0.0
+  tab_nLevel_old = 0.0
+
+  allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error maser_map'
+     stop
+  endif
+  maser_map = 0.0
 
   allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1485,11 +1436,7 @@ subroutine alloc_emission_mol(imol)
   endif
   tab_v=0.0
 
-  if (l3D) then
-     allocate(tab_deltaV(-n_speed:n_speed,n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(tab_deltaV(-n_speed:n_speed,n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(tab_deltaV(-n_speed:n_speed,n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_deltaV'
      stop
@@ -1511,38 +1458,21 @@ subroutine alloc_emission_mol(imol)
    Jmol = 0.0_db
 
   if (ldouble_RT) then
-     if (l3D) then
-        allocate(kappa_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot),&
-             stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_mol2'
-           stop
-        endif
-        kappa_mol_o_freq2=0.0
-        emissivite_mol_o_freq2=0.0
-
-        allocate(tab_nLevel2(n_rad,-nz:nz,n_az,nLevels), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_nLevel2'
-           stop
-        endif
-        tab_nLevel2 = 0.0
-     else
-        allocate(kappa_mol_o_freq2(n_rad,nz+1,1,nTrans_tot), emissivite_mol_o_freq2(n_rad,nz+1,1,nTrans_tot), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_mol2'
-           stop
-        endif
-        kappa_mol_o_freq2=0.0
-        emissivite_mol_o_freq2=0.0
-
-        allocate(tab_nLevel2(n_rad,nz,1,nLevels), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_nLevel2'
-           stop
-        endif
-        tab_nLevel2 = 0.0
+     allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
+          stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa_mol2'
+        stop
      endif
+     kappa_mol_o_freq2=0.0
+     emissivite_mol_o_freq2=0.0
+
+     allocate(tab_nLevel2(n_cells,nLevels), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tab_nLevel2'
+        stop
+     endif
+     tab_nLevel2 = 0.0
 
      allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
