@@ -731,6 +731,18 @@ subroutine initialisation_mcfost()
      case("-spot")
         i_arg = i_arg+1
         lspot=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) T_spot
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) surf_fraction_spot
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) theta_spot
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) phi_spot
      case("-Seb_C")
         i_arg = i_arg+1
         lSeb_Charnoz=.true.
@@ -1062,6 +1074,19 @@ subroutine initialisation_mcfost()
      lsed_complete = .true.
   endif
 
+  if (lspot) then
+     if (lscatt_ray_tracing) then
+        write(*,*) "ERROR : stellar spots are not implemented in ray-tracing mode yet"
+        write(*,*) "Exiting"
+        stop
+     endif
+     if (etoile(1)%fUV > 0.) then
+        write(*,*) "ERROR : stellar spots are not implemented if the star has a fUV"
+        write(*,*) "Exiting"
+        stop
+     endif
+     write(*,*) "Spot will be applied on star #1"
+  endif
 
   if (lpara) then
      if (nb_proc==1) then
@@ -1197,6 +1222,9 @@ subroutine display_help()
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
+  write(*,*) " "
+  write(*,*) " Options related to star properties"
+  write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"

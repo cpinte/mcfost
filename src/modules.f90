@@ -300,6 +300,9 @@ module prop_star
   real, dimension(:), allocatable :: E_ISM
   real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
 
+  ! Spot
+  real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
+
 end module prop_star
 
 !********************************************************************

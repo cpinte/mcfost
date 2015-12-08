@@ -727,11 +727,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
   real(kind=db) :: w02, srw02
   real :: argmt
 
-  ! Spot
-  real, parameter :: T_spot = 9000.
-  real, parameter :: surf_fraction_spot = 0.07
-  real, parameter :: theta_spot = 25.
-  real, parameter :: phi_spot = 0.
   real :: hc_lk, correct_spot, cos_thet_spot, x_spot, y_spot, z_spot
 
 
@@ -768,11 +763,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
         !write(*,*) "*******************"
         ! Pas tres malin ca, ca fait les calculs a chaque paquet
 
-        !  Rapport des intensites point chaud / etoile
-        hc_lk = hp * c_light / (tab_lambda(lambda)*1e-6 * kb)
-        correct_spot = (exp(hc_lk/etoile(1)%T) - 1)/(exp(hc_lk/T_spot) - 1)
-        !write (*,*) hc_lk
-
         ! Position
         z_spot = cos(theta_spot/180.*pi)
         x_spot = sin(theta_spot/180.*pi) * cos(phi_spot/180.*pi)
@@ -783,10 +773,14 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
 
         ! Si le photon est dans le spot, on corrige l'intensite
         ! On multiplis par r_star car x0, y0, et z0 ont ete multiplies par r_star
+        !write(*,*) "test"
         if (x_spot*x0+y_spot*y0+z_spot*z0  > cos_thet_spot * etoile(1)%r) then
-           Stokes(1) = Stokes(1) * correct_spot
-        else
-           Stokes(1) = Stokes(1) * 1e-20
+           !  Rapport des intensites point chaud / etoile
+           hc_lk = hp * c_light / (tab_lambda(lambda)*1e-6 * kb)
+           correct_spot = (exp(hc_lk/etoile(1)%T) - 1)/(exp(hc_lk/T_spot) - 1)
+
+           ! Correction energy packet
+           Stokes(:) = Stokes(:) * correct_spot
         endif
      endif ! lspot
 
