@@ -646,7 +646,6 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   integer :: itype, iRT, icell
   real(kind=db) :: facteur, energie_photon, n_photons_envoyes
   real(kind=db), dimension(n_az_rt,0:1) :: norme
-  real(kind=db) :: norme_3D
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
   iRT = RT2d_to_RT1d(ibin, iaz)
@@ -719,7 +718,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
 
   integer, intent(in) :: lambda, ibin
-  integer :: i,j, iscatt, dir, icell
+  integer :: iscatt, dir, icell
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
@@ -782,7 +781,6 @@ subroutine calc_Jth(lambda)
   integer, intent(in) :: lambda
   integer :: icell, l, T
   real(kind=db) ::  Temp, cst_wl, wl, coeff_exp, cst_E
-
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
