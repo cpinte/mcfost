@@ -630,28 +630,28 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
         zm = 0.5_db * (z0 + z1)
 
         phi_pos = atan2(ym,xm)
-        phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
+        phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
         if (phi_k > n_az_rt) phi_k=n_az_rt
 
         if (zm > 0.0_db) then
            psup = 1
         else
-           psup = 0
+           psup = 2
         endif
 
-        ! Les indices sont 4, RT_ibin
         if (lsepar_pola) then
-           ! call calc_new_stokes_rt1_pola(id,lambda,p_ri0,p_zj0,Stokes(:))
-           ! xI_scatt(:,:,ri0,zj0,phi_k,psup,id) =  xI_scatt(:,:,ri0,zj0,phi_k,psup,id) + &
-           ! l * new_stokes_rt1(:,:,id)
-           write(*,*) "ERROR: implementation of polarizarion mode is not finished"
-           write(*,*) "       in the ray-tracing mode 1  2D"
-           write(*,*) "       Exiting."
-           stop
+           if (id==1) then
+              write(*,*)
+              write(*,*) "ERROR: polarizarion mode is not implemented"
+              write(*,*) "in ray-tracing mode 1 and 2D geometry."
+              write(*,*) "Use ray-tracing mode 2 instead."
+              write(*,*) "Exiting."
+              stop
+           endif
         else
            ! ralentit d'un facteur 5 le calcul de SED
            ! facteur limitant
-           call calc_xI_scatt(id,lambda,ri0,zj0,phi_k,psup,l,Stokes(1),flag_star)
+           call calc_xI_scatt(id,lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
         endif
 
      else if (lscatt_ray_tracing2) then
@@ -1381,9 +1381,9 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
                  ! TODO : RT : clean the 0 in the indices
                  if (lsepar_pola) then
-                    call calc_xI_scatt_pola(id,lambda,ri0,zj0,phik0,1,l,Stokes(:),flag_star) ! psup=1 in 3D
+                    call calc_xI_scatt_pola(id,lambda,icell0,1,1,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
                  else
-                    call calc_xI_scatt(id,lambda,ri0,zj0,phik0,1,l,Stokes(1),flag_star) ! psup=1 in 3D
+                    call calc_xI_scatt(id,lambda,icell0,1,1,l,Stokes(1),flag_star) ! phik & psup=1 in 3D
                  endif
               endif
 
