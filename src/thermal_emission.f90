@@ -1452,7 +1452,7 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i, j, pk, jj, k, T, icell
+  integer :: i, j, pk, k, T, icell
   real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
   real(kind=db) :: delta_T
   real(kind=db), dimension(n_cells) :: E_cell, E_cell_corrected

@@ -624,17 +624,6 @@ subroutine alloc_dynamique()
      Emissivite_nRE_old = 0.0
   endif
 
-
-
- ! if (lProDiMo) then
- !    allocate(J_prodimo(n_lambda,n_rad,nz),stat=alloc_status)
- !    if (alloc_status > 0) then
- !       write(*,*) 'Allocation error J_prodimo'
- !       stop
- !    endif
- !    J_prodimo = 0.
- ! endif
-
   ! **************************************************
   ! Tableaux relatifs aux SEDs
   ! **************************************************

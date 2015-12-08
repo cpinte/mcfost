@@ -786,7 +786,7 @@ subroutine opacite(lambda)
   real, parameter :: G = 6.672e-8
 
   integer :: i,j,pk,icell, k, l, k_min, thetaj
-  real(kind=db) ::  density, proba, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
+  real(kind=db) ::  density, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
   logical :: lcompute_obs
 
   real :: somme, gsca
@@ -931,7 +931,7 @@ subroutine opacite(lambda)
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
-  !$omp private(i,j,k,icell,pk,density,k_min,proba,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
+  !$omp private(i,j,k,icell,pk,density,k_min,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
   !$omp shared(zmax,kappa,kappa_abs_eg,ksca_CDF,p_n_rad,p_nz,p_n_az,j_start,pj_start) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &

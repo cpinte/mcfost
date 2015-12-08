@@ -80,9 +80,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
   real(kind=db) :: l, tau
   real(kind=db) :: correct_moins, correct_plus
-  real(kind=db) :: phi_pos, phi_vol, xm, ym, zm, factor
+  real(kind=db) :: phi_vol, factor
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
-  integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in, tmp_k, ri_tmp, zj_tmp
+  integer :: ri_in, zj_in, tmp_k
 
   integer :: icell0, next_cell, previous_cell
 
@@ -606,7 +606,7 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
 
 
   real(kind=db) :: xm,ym,zm, phi_pos, phi_vol
-  integer :: phik_k, psup, phi_I, theta_I, phi_k
+  integer :: psup, phi_I, theta_I, phi_k
 
   integer :: ri0, zj0, k0
 
