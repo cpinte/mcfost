@@ -855,7 +855,7 @@ module ray_tracing
   real, dimension(0:nang_scatt) :: tab_cos_scatt
 
   ! intensite specifique
-  real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
+  real, dimension(:), allocatable :: J_th ! n_cells
 
   ! methode RT 1 : saving scattered specific intensity (SED + image 3D)
   ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7

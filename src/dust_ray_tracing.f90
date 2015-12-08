@@ -106,11 +106,7 @@ subroutine alloc_ray_tracing()
   endif
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
-  if (l3D) then
-     allocate(J_th(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(J_th(n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(J_th(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
      stop
@@ -683,7 +679,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   eps_dust1(:,:,:,:,:) = 0.0_db
 
   ! Contribution emission thermique directe
-  call calc_Ith(lambda)
+  call calc_Jth(lambda)
   !unpolarized_Stokes = 0. ;   unpolarized_Stokes(1) = 1.
 
   ! TODO : la taille de eps_dust1 est le facteur limitant pour le temps de calcul
@@ -724,7 +720,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
                     I_scatt(itype,k,:) = sum(xI_scatt(itype,iRT,i,j,k,1,:)) * norme_3D  * facteur * kappa_sca(icell,lambda)
                  enddo ! itype
 
-                 eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(i,j,k) ) / kappa(icell,lambda)
+                 eps_dust1(1,i,j,k,:) =  (  I_scatt(1,k,:) +  J_th(icell) ) / kappa(icell,lambda)
 
                  if (lsepar_pola) then
                     eps_dust1(2:4,i,j,k,:) =  I_scatt(2:4,k,:) / kappa(icell,lambda)
@@ -732,7 +728,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
                  if (lsepar_contrib) then
                     eps_dust1(n_Stokes+2,i,j,k,:) =    I_scatt(n_Stokes+2,k,:) / kappa(icell,lambda)
-                    eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(i,j,k) / kappa(icell,lambda)
+                    eps_dust1(n_Stokes+3,i,j,k,:) =    J_th(icell) / kappa(icell,lambda)
                     eps_dust1(n_Stokes+4,i,j,k,:) =    I_scatt(n_Stokes+4,k,:) / kappa(icell,lambda)
                  endif ! lsepar_contrib
               else
@@ -755,10 +751,10 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
                  I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,i,j,:,:,:),dim=3) * norme  * facteur * kappa_sca(icell,lambda)
               enddo ! itype
 
-              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(i,j,1) ) / kappa(icell,lambda)
+              eps_dust1(1,i,j,:,:) =  (  I_scatt(1,:,:) +  J_th(icell) ) / kappa(icell,lambda)
               if (lsepar_contrib) then
                  eps_dust1(n_Stokes+2,i,j,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(icell,lambda)
-                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(i,j,1) / kappa(icell,lambda)
+                 eps_dust1(n_Stokes+3,i,j,:,:) =    J_th(icell) / kappa(icell,lambda)
                  eps_dust1(n_Stokes+4,i,j,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(icell,lambda)
               endif ! lsepar_contrib
            else
@@ -808,13 +804,13 @@ subroutine init_dust_source_fct2(lambda,ibin)
   eps_dust2 = 0.0_db
 
   ! Ajout du champ de radiation stellaire diffuse 1 seule fois
-  call calc_Isca2_star(lambda, ibin)
+  call calc_Isca_rt2_star(lambda, ibin)
 
   ! Contribution lumiere diffusee (y compris multiple et thermique diffusee)
-  call calc_Isca2_new(lambda, ibin)
+  call calc_Isca_rt2(lambda, ibin)
 
   ! Contribution emission thermique directe
-  call calc_Ith(lambda)
+  call calc_Jth(lambda)
 
   ! Fouction source, indices : pola, iscatt, dir, i, j
   do icell=1, n_cells
@@ -822,7 +818,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
         ! Boucle sur les directions de ray-tracing
         do dir=0,1
            do iscatt = 1, nang_ray_tracing
-              eps_dust2(1,iscatt,dir,icell) =  ( sum(I_sca2(1,iscatt,dir,icell,:))  +  J_th(i,j,1) ) / kappa(icell,lambda)
+              eps_dust2(1,iscatt,dir,icell) =  ( sum(I_sca2(1,iscatt,dir,icell,:))  +  J_th(icell) ) / kappa(icell,lambda)
 
               if (lsepar_pola) then
                  eps_dust2(2:4,iscatt,dir,icell) =  sum(I_sca2(2:4,iscatt,dir,icell,:),dim=2)  / kappa(icell,lambda)
@@ -830,7 +826,7 @@ subroutine init_dust_source_fct2(lambda,ibin)
 
               if (lsepar_contrib) then
                  eps_dust2(n_Stokes+2,iscatt,dir,icell) =    sum(I_sca2(n_Stokes+2,iscatt,dir,icell,:)) / kappa(icell,lambda)
-                 eps_dust2(n_Stokes+3,iscatt,dir,icell) =    J_th(i,j,1) / kappa(icell,lambda)
+                 eps_dust2(n_Stokes+3,iscatt,dir,icell) =    J_th(icell) / kappa(icell,lambda)
                  eps_dust2(n_Stokes+4,iscatt,dir,icell) =    sum(I_sca2(n_Stokes+4,iscatt,dir,icell,:)) / kappa(icell,lambda)
               endif ! lsepar_contrib
            enddo ! iscatt
@@ -853,7 +849,7 @@ end subroutine init_dust_source_fct2
 
 !***********************************************************
 
-subroutine calc_Ith(lambda)
+subroutine calc_Jth(lambda)
   ! calcul emissivite thermique
   ! C. Pinte
   ! 25/09/08
@@ -866,92 +862,74 @@ subroutine calc_Ith(lambda)
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
-  J_th(:,:,:) = 0.0
+  J_th(:) = 0.0
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
      if (lRE_LTE) then
         cst_E=2.0*hp*c_light**2
-        do i=1,n_rad
-           bz : do j=j_start,nz
-              if (j==0) cycle bz
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 Temp=Temperature(icell) ! que LTE pour le moment
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < 500.0) then
-                    coeff_exp=exp(cst_wl)
-                    J_th(i,j,k) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
-                 else
-                    J_th(i,j,k) = 0.0_db
-                 endif
-              enddo ! k
-           enddo bz ! j
-        enddo ! i
+        do icell=1, n_cells
+           Temp=Temperature(icell) ! que LTE pour le moment
+           cst_wl=cst_th/(Temp*wl)
+           if (cst_wl < 500.0) then
+              coeff_exp=exp(cst_wl)
+              J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
+           else
+              J_th(icell) = 0.0_db
+           endif
+        enddo ! icell
      endif !lRE_LTE
 
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
-        do i=1,n_rad
-           bz2 : do j=1,nz
-              if (j==0) cycle bz2
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-                    Temp=Temperature_1grain(icell,l) ! WARNING : TODO : this does not work in 3D
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < 500.0) then
-                       coeff_exp=exp(cst_wl)
-                       J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(lambda,l)*densite_pouss(icell,l)
-                    endif
-                 enddo
-              enddo
-           enddo bz2
-        enddo
+        do icell=1,n_cells
+           do l=grain_RE_nLTE_start,grain_RE_nLTE_end
+              Temp=Temperature_1grain(icell,l) ! WARNING : TODO : this does not work in 3D
+              cst_wl=cst_th/(Temp*wl)
+              if (cst_wl < 500.0) then
+                 coeff_exp=exp(cst_wl)
+                 J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                      C_abs_norm(lambda,l)*densite_pouss(icell,l)
+              endif
+           enddo ! l
+        enddo ! icell
      endif !lRE_nLTE
 
      if (lnRE) then
-        do i=1,n_rad
-           bz3 : do j=j_start,nz
-              if (j==0) cycle bz3
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 do l=grain_nRE_start,grain_nRE_end
-                    if (l_RE(l,icell)) then ! le grain a une temperature
-                       Temp=Temperature_1grain_nRE(icell,l) ! WARNING : TODO : this does not work in 3D
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < 500.) then
-                          coeff_exp=exp(cst_wl)
-                          J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                               C_abs_norm(lambda,l)*densite_pouss(icell,l)
-                       endif !cst_wl
-                    else ! ! la grain a une proba de T
-                       do T=1,n_T
-                          temp=tab_Temp(T)
-                          cst_wl=cst_th/(Temp*wl)
-                          if (cst_wl < 500.) then
-                             coeff_exp=exp(cst_wl)
-                             J_th(i,j,k) = J_th(i,j,k) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                                  C_abs_norm(lambda,l)*densite_pouss(icell,l) * Proba_Temperature(T,l,icell)
-                          endif !cst_wl
-                       enddo ! T
-                    endif ! l_RE
-                 enddo ! l
-              enddo !k
-           enddo bz3 ! j
-        enddo ! i
+        do icell=1,n_cells
+           do l=grain_nRE_start,grain_nRE_end
+              if (l_RE(l,icell)) then ! le grain a une temperature
+                 Temp=Temperature_1grain_nRE(icell,l) ! WARNING : TODO : this does not work in 3D
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < 500.) then
+                    coeff_exp=exp(cst_wl)
+                    J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                         C_abs_norm(lambda,l)*densite_pouss(icell,l)
+                 endif !cst_wl
+              else ! ! la grain a une proba de T
+                 do T=1,n_T
+                    temp=tab_Temp(T)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < 500.) then
+                       coeff_exp=exp(cst_wl)
+                       J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                            C_abs_norm(lambda,l)*densite_pouss(icell,l) * Proba_Temperature(T,l,icell)
+                    endif !cst_wl
+                 enddo ! T
+              endif ! l_RE
+           enddo ! l
+        enddo ! icell
      endif !lnRE
 
   endif ! lsed or lemission_disk
 
   return
 
-end subroutine calc_Ith
+end subroutine calc_Jth
 
 !***********************************************************
 
-subroutine calc_Isca2_new(lambda,ibin)
+subroutine calc_Isca_rt2(lambda,ibin)
   ! Version acceleree
 
   integer, intent(in) :: lambda, ibin
@@ -1289,11 +1267,11 @@ subroutine calc_Isca2_new(lambda,ibin)
   deallocate(Inu)
   return
 
-end subroutine calc_Isca2_new
+end subroutine calc_Isca_rt2
 
 !***********************************************************
 
-subroutine calc_Isca2_star(lambda,ibin)
+subroutine calc_Isca_rt2_star(lambda,ibin)
   ! Version acceleree !TMP
   ! Routine liee a la precedente
 
@@ -1494,7 +1472,7 @@ subroutine calc_Isca2_star(lambda,ibin)
 
   return
 
-end subroutine calc_Isca2_star
+end subroutine calc_Isca_rt2_star
 
 !***********************************************************
 
