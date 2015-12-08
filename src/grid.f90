@@ -147,8 +147,8 @@ subroutine build_cylindrical_cell_mapping()
   endif
 
   if (cell_map(1,1,1) /= 1) then
-     write(*,*) "ERROR : mapping of cell (1,1,1) is not 1"
-     write(*,*) "MCFOST will crash"
+     write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
+     write(*,*) "MCFOST might crash"
      !write(*,*) "Exiting"
      !stop
   endif
