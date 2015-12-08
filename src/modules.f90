@@ -859,13 +859,13 @@ module ray_tracing
 
   ! methode RT 1 : saving scattered specific intensity (SED + image 3D)
   ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
-  integer :: n_az_rt
-  real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
-  real, dimension(:,:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
+  integer :: n_az_rt, n_theta_rt
+  real, dimension(:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
+  real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
   integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
   real(kind=db), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=db), dimension(:,:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_rad, nz, n_az_rt,0:1
+  real(kind=db), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
 
   ! methode RT 2 : saving specific intensity (image 2D)
   real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus
