@@ -181,7 +181,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, flag_star, flag_direct_star)
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
      if (lstop) then
@@ -597,11 +597,11 @@ end subroutine cross_cylindrical_cell_tmp
 
 !*************************************************************************************
 
-subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
 
   integer, intent(in) :: id,lambda,icell0
   real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db) :: l, x0,y0,z0, x1,y1,z1
+  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, w
   logical, intent(in) :: flag_star, flag_direct_star
 
 
@@ -680,13 +680,13 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
            endif
            if (theta_I > n_theta_I) theta_I = n_theta_I
 
-           xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
+           I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
 
            if (lsepar_contrib) then
               if (flag_star) then
-                 xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+                 I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
               else
-                 xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
+                 I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
               endif
            endif ! lsepar_contrib
 
@@ -1007,13 +1007,13 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
               endif
               if (theta_I > n_theta_I) theta_I = n_theta_I
 
-              xI(1:n_Stokes,theta_I,phi_I,ri0,thetaj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1:n_Stokes)
+              I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
 
               if (lsepar_contrib) then
                  if (flag_star) then
-                    xI(n_Stokes+2,theta_I,phi_I,ri0,thetaj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1)
+                    I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
                  else
-                    xI(n_Stokes+4,theta_I,phi_I,ri0,thetaj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1)
+                    I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
                  endif
               endif ! lsepar_contrib
 
@@ -1047,7 +1047,6 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
               stop
            endif
         endif
-
 
       !  if (lmono) then
       !     write(*,*) "xio", real(xio),real(yio),real(zio)
