@@ -591,8 +591,8 @@ subroutine calc_xI_scatt_pola(id,lambda,icell,phik,psup,l,stokes,flag_star)
         RPO(2,2) = -cosw
         ROP(2,2) = cosw
         RPO(2,3) = -sinw
-        ROP(2,3) = -1.0_db * sinw
-        RPO(3,2) = -1.0_db * sinw
+        ROP(2,3) = -sinw
+        RPO(3,2) = -sinw
         ROP(3,2) = sinw
         RPO(3,3) = cosw
         ROP(3,3) = cosw
@@ -611,6 +611,7 @@ subroutine calc_xI_scatt_pola(id,lambda,icell,phik,psup,l,stokes,flag_star)
         S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
         S(1)=D(1)
         S(4)=D(4)
+        S(3)=-S(3)
 
         iRT = RT2d_to_RT1d(ibin, iaz)
         xI_scatt(1:4,iRT,icell,phik,psup,id) =  xI_scatt(1:4,iRT,icell,phik,psup,id) + l * S(:)

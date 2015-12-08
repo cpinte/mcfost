@@ -640,14 +640,7 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
         endif
 
         if (lsepar_pola) then
-           if (id==1) then
-              write(*,*)
-              write(*,*) "ERROR: polarizarion mode is not implemented"
-              write(*,*) "in ray-tracing mode 1 and 2D geometry."
-              write(*,*) "Use ray-tracing mode 2 instead."
-              write(*,*) "Exiting."
-              stop
-           endif
+           call calc_xI_scatt_pola(id,lambda,icell0,phi_k,psup,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
         else
            ! ralentit d'un facteur 5 le calcul de SED
            ! facteur limitant
