@@ -684,7 +684,7 @@ subroutine transfert_poussiere()
            if (lscatt_ray_tracing1) then
               xI_scatt = 0.0_db
            else
-              I_spec = 0.0_db ; xI_star = 0.0_db
+              I_spec = 0.0_db ; I_spec_star = 0.0_db
            endif
         endif
 

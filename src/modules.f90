@@ -869,12 +869,12 @@ module ray_tracing
 
   ! methode RT 2 : saving specific intensity (image 2D)
   real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus
-  real, dimension(:,:,:), allocatable :: xI_star ! nrad, nz, ncpus
+  real, dimension(:,:), allocatable :: I_spec_star ! n_cells, ncpus
 
   ! Fonction source: Ok en simple
   real, dimension(:,:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_cells, ncpus
   real, dimension(:,:,:,:), allocatable ::  eps_dust2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
-  real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
+  real, dimension(:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
   real, dimension(:,:), allocatable :: stars_map ! nx, ny

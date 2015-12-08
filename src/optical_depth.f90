@@ -656,7 +656,7 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
 
      else if (lscatt_ray_tracing2) then
         if (flag_direct_star) then
-           xI_star(ri0,zj0,id) = xI_star(ri0,zj0,id) + l * Stokes(1)
+           I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
         else
            xm = 0.5_db * (x0 + x1)
            ym = 0.5_db * (y0 + y1)
@@ -982,7 +982,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
            if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         else if (lscatt_ray_tracing2) then
            if (flag_direct_star) then
-              xI_star(ri0,thetaj0,id) = xI_star(ri0,thetaj0,id) + l * Stokes(1)
+              I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
            else
               xm = 0.5_db * (x0 + x1)
               ym = 0.5_db * (y0 + y1)
