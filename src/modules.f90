@@ -867,7 +867,7 @@ module ray_tracing
 
   ! methode RT 2
   real, dimension(:,:,:,:,:,:), allocatable :: xI ! 4, n_theta_I, n_phi_I, nrad, nz, ncpus
-  real, dimension(:,:,:), allocatable :: xI_star, xw_star, xl_star ! nrad, nz, ncpus
+  real, dimension(:,:,:), allocatable :: xI_star ! nrad, nz, ncpus
 
   ! Fonction source: Ok en simple
   real, dimension(:,:,:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz, ncpus

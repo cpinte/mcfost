@@ -180,9 +180,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         ltot=ltot+l
      endif
 
-
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
      if (lstop) then
@@ -598,11 +597,11 @@ end subroutine cross_cylindrical_cell_tmp
 
 !*************************************************************************************
 
-subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, flag_star, flag_direct_star)
 
   integer, intent(in) :: id,lambda,icell0
   real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, w
+  real(kind=db) :: l, x0,y0,z0, x1,y1,z1
   logical, intent(in) :: flag_star, flag_direct_star
 
 
@@ -658,8 +657,6 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
      else if (lscatt_ray_tracing2) then
         if (flag_direct_star) then
            xI_star(ri0,zj0,id) = xI_star(ri0,zj0,id) + l * Stokes(1)
-           xw_star(ri0,zj0,id) = xw_star(ri0,zj0,id) + l * abs(w)
-           !     xl_star(ri0,zj0,id) = xl_star(ri0,zj0,id) + l
         else
            xm = 0.5_db * (x0 + x1)
            ym = 0.5_db * (y0 + y1)
@@ -986,8 +983,6 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         else if (lscatt_ray_tracing2) then
            if (flag_direct_star) then
               xI_star(ri0,thetaj0,id) = xI_star(ri0,thetaj0,id) + l * Stokes(1)
-              xw_star(ri0,thetaj0,id) = xw_star(ri0,thetaj0,id) + l * abs(w)
-              !     xl_star(ri0,thetaj0,id) = xl_star(ri0,thetaj0,id) + l
            else
               xm = 0.5_db * (x0 + x1)
               ym = 0.5_db * (y0 + y1)
