@@ -2,8 +2,8 @@
 ! large g
 ! optimization memoire (ie, dimension 1 de eps_dust1)
 
-! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode pour SED --> pour 3D
-! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode pour image 2D
+! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode prefere pour SED et pour 3D
+! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode preferee pour image 2D
 
 module dust_ray_tracing
 
@@ -177,12 +177,12 @@ subroutine alloc_ray_tracing()
      cos_omega_rt1 = 0.5
 
   else !rt 2
-     allocate(xI_star(n_rad,nz,nb_proc), xw_star(n_rad,nz,nb_proc), xl_star(n_rad,nz,nb_proc), stat=alloc_status)
+     allocate(xI_star(n_rad,nz,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xI_star'
         stop
      endif
-     xI_star = 0.0_db ;  xw_star = 0.0_db ; xl_star = 0.0_db
+     xI_star = 0.0_db
 
      allocate(eps_dust2(N_type_flux,nang_ray_tracing,0:1,n_rad,nz), &
           I_sca2(N_type_flux,nang_ray_tracing,0:1,n_rad,nz,nb_proc), stat=alloc_status)
@@ -248,7 +248,7 @@ subroutine dealloc_ray_tracing()
   if (lscatt_ray_tracing1) then
      deallocate(xI_scatt,I_scatt, xsin_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
   else
-     deallocate(xI_star,xw_star,xl_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,xI)
+     deallocate(xI_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,xI)
   endif
   deallocate(tab_RT_incl,tab_RT_az,tab_uv_rt,tab_u_rt,tab_v_rt,tab_w_rt)
 
@@ -1397,15 +1397,6 @@ subroutine calc_Isca2_star(lambda,ibin)
         u = x / norme
         v = 0.0_db
         w = z / norme
-
-        !! Ca change quasi rien : rassurant !!!!!
-!        if (stokes(1) > 0.0_db) then
-!           w = sum(xw_star(ri,zj,:)) / stokes(1)
-!           u = sqrt(1.0_db - w*w)
-!           v = 0.0_db
-!        else
-!           cycle
-!        endif
 
         ! cos_scatt_ray_tracing correspondants
         call angles_scatt_rt2(id,ibin,x,y,z,u,v,w,.true.)
