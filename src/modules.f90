@@ -820,7 +820,8 @@ end module molecular_emission
 
 module ray_tracing
 
-  use grains
+  use parametres, only : db
+  use grains, only : nang_scatt
 
   implicit none
   save
@@ -856,7 +857,8 @@ module ray_tracing
   ! intensite specifique
   real, dimension(:,:,:), allocatable :: J_th ! n_rad, nz, n_az
 
-  ! methode RT 1 : todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
+  ! methode RT 1 : saving scattered specific intensity (SED + image 3D)
+  ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
   integer :: n_az_rt
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
   real, dimension(:,:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_rad, nz, n_az_rt, 2, ncpus
@@ -865,12 +867,12 @@ module ray_tracing
   real(kind=db), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
   real(kind=db), dimension(:,:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_rad, nz, n_az_rt,0:1
 
-  ! methode RT 2
-  real, dimension(:,:,:,:,:,:), allocatable :: xI ! 4, n_theta_I, n_phi_I, nrad, nz, ncpus
+  ! methode RT 2 : saving specific intensity (image 2D)
+  real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus
   real, dimension(:,:,:), allocatable :: xI_star ! nrad, nz, ncpus
 
   ! Fonction source: Ok en simple
-  real, dimension(:,:,:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz, ncpus
+  real, dimension(:,:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_cells, ncpus
   real, dimension(:,:,:,:,:), allocatable ::  eps_dust2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
   real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
