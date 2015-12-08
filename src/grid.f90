@@ -28,12 +28,19 @@ subroutine build_cylindrical_cell_mapping()
   kstart=1
   kend = n_az
 
-  ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
+  if (j_start < 0) then
+     ntot = (iend - istart + 1) * (jend - jstart) * (kend - kstart + 1)
+  else
+     ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
+  endif
+
+  write(*,*) ntot, n_cells
   if (ntot /= n_cells) then
      write(*,*) "ERROR in 'build_cylindrical_cell_mapping'"
      write(*,*) "The number of cells is not matching :"
      write(*,*) "ntot=", ntot, "should be", n_cells
-     write(*,*) "Exiting"
+     write(*,*) "Exiting."
+     stop
   endif
 
   istart2 = 0
@@ -45,7 +52,11 @@ subroutine build_cylindrical_cell_mapping()
   kstart2=1
   kend2 = n_az
 
-  ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2 +1) * (kend2 - kstart2 + 1)
+  if (jstart2 < 0) then
+     ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2) * (kend2 - kstart2 + 1)
+  else
+     ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2 +1) * (kend2 - kstart2 + 1)
+  endif
   allocate(cell_map(istart2:iend2,jstart2:jend2,kstart2:kend2))
   allocate(cell_map_i(ntot2), cell_map_j(ntot2), cell_map_k(ntot2))
 
@@ -138,8 +149,8 @@ subroutine build_cylindrical_cell_mapping()
   if (cell_map(1,1,1) /= 1) then
      write(*,*) "ERROR : mapping of cell (1,1,1) is not 1"
      write(*,*) "MCFOST will crash"
-     write(*,*) "Exiting"
-     stop
+     !write(*,*) "Exiting"
+     !stop
   endif
 
   return
