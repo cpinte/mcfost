@@ -63,10 +63,8 @@ subroutine build_cylindrical_cell_mapping()
   ! Actual cells
   icell = 0
   do k=kstart, kend
-     bz : do j=jstart, jend
-        if (j==0) cycle bz
-        do i=istart, iend
-
+     do i=istart, iend
+        bz : do j=1, jend
            icell = icell+1
            if (icell > ntot) then
               write(*,*) "ERROR : there is an issue in the cell mapping"
@@ -79,8 +77,26 @@ subroutine build_cylindrical_cell_mapping()
            cell_map_k(icell) = k
 
            cell_map(i,j,k) = icell
-        enddo
-     enddo bz
+        enddo bz
+
+        if (l3D) then
+           do j=j_start, -1
+
+              icell = icell+1
+              if (icell > ntot) then
+                 write(*,*) "ERROR : there is an issue in the cell mapping"
+                 write(*,*) "Exiting"
+                 stop
+              endif
+
+              cell_map_i(icell) = i
+              cell_map_j(icell) = j
+              cell_map_k(icell) = k
+
+              cell_map(i,j,k) = icell
+           enddo
+        endif
+     enddo
   enddo
 
   if (icell /= ntot) then
