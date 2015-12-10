@@ -280,7 +280,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  ncells = j
 
 
- allocate(etoile(nptmass))
+! allocate(etoile(nptmass))
  do i=1,nptmass
     etoile(i)%x = xyzmh_ptmass(1,i) * ulength
     etoile(i)%y = xyzmh_ptmass(2,i) * ulength
