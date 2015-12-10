@@ -232,6 +232,7 @@ subroutine define_gas_density()
         ! Somme sur les zones pour densite finale
         do i=1,n_rad
            bz_gas_mass2 : do j=min(1,j_start),nz
+              if (j==0) cycle
               do k=1, n_az
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
@@ -1194,7 +1195,52 @@ subroutine density_phantom()
   write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
   deallocate(x,y,z)
 
+  !- N_part: total number of particles
+  !  - r_in: disk inner edge in AU
+  !  - r_out: disk outer edge in AU
+  !  - p: surface density exponent, Sigma=Sigma_0*(r/r_0)^(-p), p>0
+  !  - q: temperature exponent, T=T_0*(r/r_0)^(-q), q>0
+  !  - m_star: star mass in solar masses
+  !  - m_disk: disk mass in solar masses (99% gas + 1% dust)
+  !  - H_0: disk scale height at 100 AU, in AU
+  !  - rho_d: dust density in g.cm^-3
+  !  - flag_ggrowth: T with grain growth, F without
+  !
+  !
+  !    N_part lines containing:
+  !  - x,y,z: coordinates of each particle in AU
+  !  - h: smoothing length of each particle in AU
+  !  - s: grain size of each particle in µm
+  !
+  !  Without grain growth: 2 lines containing:
+  !  - n_sizes: number of grain sizes
+  !  - (s(i),i=1,n_sizes): grain sizes in µm
+  !  OR
+  !  With grain growth: 1 line containing:
+  !  - s_min,s_max: smallest and largest grain size in µm
+
+  open(unit=1,file="SPH_phantom.txt",status="new")
+  write(1,*) ncells
+  write(1,*) minval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
+  write(1,*) maxval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
+  write(1,*) 1 ! p
+  write(1,*) 0.5 ! q
+  write(1,*) 1.0 ! mstar
+  write(1,*) 1.e-3 !mdisk
+  write(1,*) 10 ! h0
+  write(1,*) 3.5 ! rhod
+  write(1,*) .false.
+  !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+
+  do i=1,ncells
+     write(1,*) Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, 1.0, 1.0
+  enddo
+
+  write(1,*) 1
+  write(1,*) 1.0
+  close(unit=1)
   ! Fill up the density grid
+
 
   deallocate(rho,rhodust)
   stop

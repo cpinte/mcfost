@@ -32,6 +32,8 @@ subroutine alloc_dynamique()
      n_cells = nrz
   endif
 
+  write(*,*) "Using", n_cells, "cells"
+
   if (lvariable_dust) then
      p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
   else
