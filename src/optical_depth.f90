@@ -601,7 +601,7 @@ end subroutine cross_cylindrical_cell_tmp
 
 !*************************************************************************************
 
-subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
   integer, intent(in) :: id,lambda,icell0
   real(kind=db), dimension(4), intent(in) :: Stokes
@@ -1053,7 +1053,6 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
       !     write(*,*) "xio", real(xio),real(yio),real(zio)
       !     write(*,*), "r", ri0, thetaj0, ri,thetaj
       !  endif
-
         icell = cell_map(ri,thetaj,1)
         if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet

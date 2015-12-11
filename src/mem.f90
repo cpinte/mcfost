@@ -525,7 +525,7 @@ subroutine alloc_dynamique()
      if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
 
      if (lRE_nLTE) then
-        allocate(prob_kappa_abs_1grain(n_lambda,n_rad,nz+1,grain_RE_nLTE_start-1:grain_RE_nLTE_end),stat=alloc_status)
+        allocate(prob_kappa_abs_1grain(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kappa_abs_1grain'
            stop
