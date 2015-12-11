@@ -1196,7 +1196,8 @@ subroutine density_phantom()
   write(*,*) "Reading phantom density file: "//trim(density_file)
 
   call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
-                         write(*,*) "Done"
+  write(*,*) "Done"
+
   if (ierr /=0) then
      write(*,*) "Error code =", ierr,  get_error_text(ierr)
      stop
