@@ -405,7 +405,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   k=(kmin+kmax)/2
 
   do while((kmax-kmin) > 1)
-     if (prob_kappa_abs_1grain(lambda0,pri,pzj,k) < aleat1) then
+     if (prob_kappa_abs_1grain(k,icell,lambda0) < aleat1) then
         kmin = k
      else
         kmax = k
@@ -739,7 +739,7 @@ subroutine Temp_nRE(lconverged)
 
      !$omp parallel &
      !$omp default(none) &
-     !$omp private(i,j,Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
+     !$omp private(Int_k_lambda_Jlambda, lambda, wl, wl_mum, T, T2) &
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,log_frac_E_abs,icell) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
@@ -1072,10 +1072,11 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell, p_icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   icell = cell_map(ri,zj,1)
+  p_icell = cell_map(pri,pzj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
@@ -1084,7 +1085,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   k=(kmin+kmax)/2
 
   do while((kmax-kmin) > 1)
-     if (prob_kappa_abs_1grain(lambda0,pri,pzj,k) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
+     if (prob_kappa_abs_1grain(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
         kmin = k
      else
         kmax = k
