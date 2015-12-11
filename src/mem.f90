@@ -146,13 +146,8 @@ subroutine alloc_dynamique()
      Surface_density = 0.0_db
   endif
 
-  if (l3D) then
-     allocate(l_dark_zone(0:n_rad+1,-nz-1:nz+1,n_az), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
+  allocate(l_dark_zone(n_cells), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
-  else
-     allocate(l_dark_zone(0:n_rad+1,0:nz+1,1), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
-          zj_sup_dark_zone(n_rad,n_az), stat=alloc_status)
-  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error l_dark_zone'
      stop

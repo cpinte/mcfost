@@ -473,7 +473,7 @@ module opacity
   !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
   logical :: l_is_dark_zone
-  logical, dimension(:,:,:), allocatable :: l_dark_zone !0:n_rad+1,0:nz+1, n_az
+  logical, dimension(:), allocatable :: l_dark_zone !0:n_rad+1,0:nz+1, n_az
   real, dimension(:,:), allocatable :: r_in_opacite, r_in_opacite2 !nz+1, (n_az)
   integer, parameter :: delta_cell_dark_zone=3
 
