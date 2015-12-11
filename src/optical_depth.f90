@@ -132,15 +132,17 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      icell0 = cell_map(ri0,zj0,1)
 
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(icell0)) then
-        ! On revoie le paquet dans l'autre sens
-        u = -u ; v = -v ; w=-w
-        inv_w = -inv_w
-        ! et on le renvoie au point de depart
-        ri = ri_old ; zj = zj_old
-        xio = x_old ; yio = y_old ; zio = z_old
-        flag_sortie= .false.
-        return
+     if (icell0 <= n_cells) then
+        if (l_dark_zone(icell0)) then
+           ! On revoie le paquet dans l'autre sens
+           u = -u ; v = -v ; w=-w
+           inv_w = -inv_w
+           ! et on le renvoie au point de depart
+           ri = ri_old ; zj = zj_old
+           xio = x_old ; yio = y_old ; zio = z_old
+           flag_sortie= .false.
+           return
+        endif
      endif
 
      lcellule_non_vide=.true.
@@ -182,7 +184,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
      if (lstop) then
@@ -599,11 +601,11 @@ end subroutine cross_cylindrical_cell_tmp
 
 !*************************************************************************************
 
-subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, w, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
   integer, intent(in) :: id,lambda,icell0
   real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, w
+  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, u,v,w
   logical, intent(in) :: flag_star, flag_direct_star
 
 
@@ -612,8 +614,11 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
 
   integer :: ri0, zj0, k0
 
+
  ! 3D cell indices : TMP
   call cell2cylindrical(icell0, ri0,zj0,k0)
+
+  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_eg(icell0,lambda) &
@@ -4544,6 +4549,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   if (.not.l3D) then
      cell : do i=max(ri_in_dark_zone(1),2), ri_out_dark_zone(1)
         do j=zj_sup_dark_zone(i,1),1,-1
+           icell = cell_map(i,j,1)
            do n=1,nbre_angle
               id=1
               ! position et direction vol
@@ -4671,8 +4677,8 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
   do i=1, n_regions
      do j=1,nz
-        l_dark_zone(cell_map(regions(i)%iRmin,:,1)) = .false.
-        l_dark_zone(cell_map(regions(i)%iRmax,:,1)) = .false.
+        l_dark_zone(cell_map(regions(i)%iRmin,j,1)) = .false.
+        l_dark_zone(cell_map(regions(i)%iRmax,j,1)) = .false.
      enddo
   enddo
 
