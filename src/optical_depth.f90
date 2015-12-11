@@ -84,7 +84,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
   integer :: ri_in, zj_in, tmp_k
 
-  integer :: icell0, next_cell, previous_cell
+  integer :: icell0, next_cell, previous_cell, icell
 
   logical :: lcellule_non_vide, lstop
 
@@ -129,8 +129,10 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
 
+     icell0 = cell_map(ri0,zj0,1)
+
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,zj0,1)) then
+     if (l_dark_zone(icell0)) then
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         inv_w = -inv_w
@@ -161,7 +163,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
 
      !call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
-     icell0 = cell_map(ri0,zj0,1)
      previous_cell = 0 ! unusued, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
      call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
@@ -208,7 +209,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
            endif
         endif
 
-        if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
+        icell = cell_map(ri,zj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (zj < zj0) then
               zj = zj0
@@ -719,7 +721,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
   real(kind=db) :: correct_moins, correct_plus, uv, precision
   real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
   integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
-  integer :: theta_I, phi_I, thetaj_old, ri_old
+  integer :: theta_I, phi_I, thetaj_old, ri_old, icell
   logical :: lcellule_non_vide, lstop
 
   real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
@@ -768,8 +770,10 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      ri0=ri1;thetaj0=thetaj1
      x0=x1;y0=y1;z0=z1
 
+     icell0 = cell_map(ri0,thetaj0,1)
+
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,thetaj0,1)) then
+     if (l_dark_zone(icell0)) then
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         ! et on le renvoie au point de depart
@@ -806,7 +810,6 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         t=huge_real
         delta_rad=1
      else
-        icell0 = cell_map(ri0,thetaj0,1)
         if (icell0 > n_cells) then
            opacite = 0.0_db
         else
@@ -1046,7 +1049,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
       !     write(*,*), "r", ri0, thetaj0, ri,thetaj
       !  endif
 
-        if (l_dark_zone(ri,thetaj,1)) then ! Petit test de securite
+        icell = cell_map(ri,thetaj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (thetaj < thetaj0) then
               thetaj = thetaj0
@@ -3452,7 +3456,7 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0, icell
 
   logical :: lcellule_non_vide
 
@@ -3496,8 +3500,10 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
      ri0=ri1;zj0=zj1
      x0=x1;y0=y1;z0=z1
 
+     icell0 = cell_map(ri0,zj0,1)
+
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,zj0,1)) then
+     if (l_dark_zone(icell0)) then
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         inv_w = -inv_w
@@ -3538,7 +3544,6 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         t=huge_real
         delta_rad=1
      else
-        icell0 = cell_map(ri0,zj0,1)
         if (icell0 > n_cells) then
            opacite = 0.0_db
         else
@@ -3681,7 +3686,9 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         yio=y0+l*v
         zio=z0+l*w
         call indice_cellule(xio,yio,zio,ri,zj)
-        if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
+
+        icell = cell_map(ri,zj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (zj < zj0) then
               zj = zj0
@@ -4437,7 +4444,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: i, j, pk, n, id, ri, zj, phik, icell
+  integer :: i, j, pk, n, id, ri, zj, phik, icell, jj
   real(kind=db) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, d_r, phi, r0
 
@@ -4508,7 +4515,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
 
   l_is_dark_zone = .false.
-  l_dark_zone(:,:,:) = .false.
+  l_dark_zone(:) = .false.
 
   ! Cas premiere cellule
   r_in_opacite(:,:) = r_lim(1) ! bord externe de la premiere cellule
@@ -4555,7 +4562,10 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
               call length_deg2(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
-                 l_dark_zone(i,1:j,1) = .true.
+                 do jj=1,j
+                    icell = cell_map(i,jj,1)
+                    l_dark_zone(icell) = .true.
+                 enddo
                  l_is_dark_zone = .true.
                  ! on passe a la cellule suivante
                  cycle cell
@@ -4588,7 +4598,10 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
-                    l_dark_zone(i,1:j,pk) = .true.
+                    do jj=1,j
+                       icell = cell_map(i,jj,pk)
+                       l_dark_zone(icell) = .true.
+                    enddo
                     ! on passe a la cellule suivante
                     cycle cell_3D
                  endif
@@ -4618,7 +4631,10 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
-                    l_dark_zone(i,j:-1,pk) = .true.
+                    do jj=1,-1
+                       icell = cell_map(i,j,pk)
+                       l_dark_zone(icell) = .true.
+                    enddo
                     l_is_dark_zone=.true.
                     ! on passe a la cellule suivante
                     cycle cell_3D_2
@@ -4648,17 +4664,16 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
 
   if (n_zones > 1) then
-     do i=1, n_rad
-        icell = cell_map(i,1,1)
-        if (sum(densite_pouss(icell,:)) < tiny_real) then
-           l_dark_zone(i,:,1) = .false.
-        endif
+     do icell=1, n_cells
+        if (sum(densite_pouss(icell,:)) < tiny_real) l_dark_zone(icell) = .false.
      enddo
   endif
 
   do i=1, n_regions
-     l_dark_zone(regions(i)%iRmin,:,1) = .false.
-     l_dark_zone(regions(i)%iRmax,:,1) = .false.
+     do j=1,nz
+        l_dark_zone(cell_map(regions(i)%iRmin,:,1)) = .false.
+        l_dark_zone(cell_map(regions(i)%iRmax,:,1)) = .false.
+     enddo
   enddo
 
 !  write(*,*) l_dark_zone(:,nz,1)
@@ -4689,7 +4704,7 @@ subroutine no_dark_zone()
   r_in_opacite(:,:) = r_lim(1)
   r_in_opacite2(:,:) = r_lim_2(1)
 
-  l_dark_zone(:,:,:)=.false.
+  l_dark_zone(:)=.false.
 
   return
 
@@ -4707,6 +4722,7 @@ logical function test_dark_zone(ri,zj,phik,x,y)
   integer, intent(in) :: ri, zj, phik
   real(kind=db), intent(in) :: x, y
 
+  integer :: icell
 
   if (ri==1) then
      if (x*x+y*y > r_in_opacite2(zj,phik)) then
@@ -4715,7 +4731,8 @@ logical function test_dark_zone(ri,zj,phik,x,y)
         test_dark_zone = .false.
      endif
   else
-     test_dark_zone = l_dark_zone(ri,zj,phik)
+     icell = cell_map(ri,zj,phik)
+     test_dark_zone = l_dark_zone(icell)
   endif
 
 

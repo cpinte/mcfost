@@ -743,7 +743,7 @@ subroutine Temp_nRE(lconverged)
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,log_frac_E_abs,icell) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
-     !$omp shared(n_rad, nz, C_abs_norm_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
+     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
@@ -752,219 +752,216 @@ subroutine Temp_nRE(lconverged)
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
-     do i=n_rad, 1, -1
+     do i=n_cells, 1, -1
         !$ id = omp_get_thread_num() + 1
-        do j=1,nz
-           icell = cell_map(i,j,1)
-           if (l_dark_zone(i,j,1)) then
-              l_RE(:,icell) = .true.
-           else
-              if (densite_pouss(cell_map(i,j,1),l) > tiny_db) then
-                 ! Champ de radiation
-                 Int_k_lambda_Jlambda=0.0
-                 do lambda=1, n_lambda
-                    ! conversion lambda et delta_lambda de micron -> m
-                    lambda_Jlambda(lambda,id) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
-                    Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
-                    kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-                 enddo ! lambda
+        if (l_dark_zone(icell)) then
+           l_RE(:,icell) = .true.
+        else
+           if (densite_pouss(icell,l) > tiny_db) then
+              ! Champ de radiation
+              Int_k_lambda_Jlambda=0.0
+              do lambda=1, n_lambda
+                 ! conversion lambda et delta_lambda de micron -> m
+                 lambda_Jlambda(lambda,id) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
+                 Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
+                 kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+              enddo ! lambda
 
-                 lambda_Jlambda(:,id) =  lambda_Jlambda(:,id)*n_phot_L_tot * (1.0/volume(icell))
-                 Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*n_phot_L_tot * (1.0/volume(icell))
-                 kJnu(:,id) = kJnu(:,id)*n_phot_L_tot * (1.0/volume(icell))
+              lambda_Jlambda(:,id) =  lambda_Jlambda(:,id)*n_phot_L_tot * (1.0/volume(icell))
+              Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*n_phot_L_tot * (1.0/volume(icell))
+              kJnu(:,id) = kJnu(:,id)*n_phot_L_tot * (1.0/volume(icell))
 
-                 if (lbenchmark_SHG) then ! Adding TRUST radiation field
-                    Int_k_lambda_Jlambda = 0.0
-                    if (lMathis_field) then
-                       id = 1
-                       do lambda=1, n_lambda
-                          wl_mum =  tab_lambda(lambda)
-                          wl = tab_lambda(lambda) * 1e-6
+              if (lbenchmark_SHG) then ! Adding TRUST radiation field
+                 Int_k_lambda_Jlambda = 0.0
+                 if (lMathis_field) then
+                    id = 1
+                    do lambda=1, n_lambda
+                       wl_mum =  tab_lambda(lambda)
+                       wl = tab_lambda(lambda) * 1e-6
 
-                          if (wl_mum < 0.0912) then
-                             lambda_Jlambda(lambda,id) = 0.0_db
-                          else if (wl_mum < 0.110) then
-                             lambda_Jlambda(lambda,id) = 3069 * wl_mum**3.4172
-                          else if (wl_mum <  0.134) then
-                             lambda_Jlambda(lambda,id) = 1.627
-                          else if (wl_mum <  0.250) then
-                             lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**(-1.6678)
-                          else
-                             lambda_Jlambda(lambda,id) = 1e-14 * Blambda_db(wl,7500.) &
-                                  + 1e-13 * Blambda_db(wl,4000.) &
-                                  + 4e-13 * Blambda_db(wl,3000.)
-                          endif
-                          lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1.3e-2
-
-                          Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
-                          kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-                       enddo ! lambda
-                    else ! BB field
-                       do lambda=1, n_lambda
-                          wl = tab_lambda(lambda)*1e-6
-                          lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
-
-                          Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
-                          kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
-                       enddo ! lambda
-                    endif ! lMathis
-                 endif ! End adding TRUST radiation field
-
-                 ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
-
-                 ! time interval for photon absorption
-                 t_abs = sum(C_abs_norm(:,l)*lambda_Jlambda(:,id)*tab_lambda(:)) * 1.0e-6/c_light
-                 t_abs = hp/(4.*pi*t_abs)
-
-                 ! mean absorbed photon energy
-                 mean_abs_E = t_abs * 4*pi * Int_k_lambda_Jlambda ! D01 eq 46
-                 mean_abs_nu = mean_abs_E/hp
-
-                 ! Inversion rapide Energie en temperature
-                 ! On prend energie juste en dessus energie moyenne -> t_cool un peu trop court
-                 kTu = kb * tab_Temp(1)
-                 search : do T=2, n_T
-                    if (nu_bin(T) > mean_abs_nu) then
-                       kTu = kb * tab_Temp(T)
-                       exit search
-                    endif
-                 enddo search
-
-                 ! radiative cooling time at mean photon energy
-                 t_cool = 0.0
-                 if (T <= n_T) then
-                    integ : do T=1, n_cooling_time
-                       if (en(T) > mean_abs_E) exit integ
-                       if (en(T)/kTu < 500.) then
-                          t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+                       if (wl_mum < 0.0912) then
+                          lambda_Jlambda(lambda,id) = 0.0_db
+                       else if (wl_mum < 0.110) then
+                          lambda_Jlambda(lambda,id) = 3069 * wl_mum**3.4172
+                       else if (wl_mum <  0.134) then
+                          lambda_Jlambda(lambda,id) = 1.627
+                       else if (wl_mum <  0.250) then
+                          lambda_Jlambda(lambda,id) = 0.0566 * wl_mum**(-1.6678)
+                       else
+                          lambda_Jlambda(lambda,id) = 1e-14 * Blambda_db(wl,7500.) &
+                               + 1e-13 * Blambda_db(wl,4000.) &
+                               + 4e-13 * Blambda_db(wl,3000.)
                        endif
-                    enddo integ
-                    if (t_cool > tiny_db) then
-                       t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
-                    else
-                       t_cool = huge_real
-                    endif
-                 endif
+                       lambda_Jlambda(lambda,id) = lambda_Jlambda(lambda,id)* wl * Mathis_field * 1.3e-2
 
-                 ! Calcul Temperature equilibre
-                 if (Int_k_lambda_Jlambda < tiny_real) then
+                       Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
+                       kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+                    enddo ! lambda
+                 else ! BB field
+                    do lambda=1, n_lambda
+                       wl = tab_lambda(lambda)*1e-6
+                       lambda_Jlambda(lambda,id) = (Blambda_db(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
+
+                       Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(lambda,l) * lambda_Jlambda(lambda,id)
+                       kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
+                    enddo ! lambda
+                 endif ! lMathis
+              endif ! End adding TRUST radiation field
+
+              ! decide whether we really need to use this model, instead of calculating the equilibrium temperature
+
+              ! time interval for photon absorption
+              t_abs = sum(C_abs_norm(:,l)*lambda_Jlambda(:,id)*tab_lambda(:)) * 1.0e-6/c_light
+              t_abs = hp/(4.*pi*t_abs)
+
+              ! mean absorbed photon energy
+              mean_abs_E = t_abs * 4*pi * Int_k_lambda_Jlambda ! D01 eq 46
+              mean_abs_nu = mean_abs_E/hp
+
+              ! Inversion rapide Energie en temperature
+              ! On prend energie juste en dessus energie moyenne -> t_cool un peu trop court
+              kTu = kb * tab_Temp(1)
+              search : do T=2, n_T
+                 if (nu_bin(T) > mean_abs_nu) then
+                    kTu = kb * tab_Temp(T)
+                    exit search
+                 endif
+              enddo search
+
+              ! radiative cooling time at mean photon energy
+              t_cool = 0.0
+              if (T <= n_T) then
+                 integ : do T=1, n_cooling_time
+                    if (en(T) > mean_abs_E) exit integ
+                    if (en(T)/kTu < 500.) then
+                       t_cool = t_cool + en(T)**3 * Cabs(T)/(exp(en(T)/kTu)-1.0_db) * delta_en(T)
+                    endif
+                 enddo integ
+                 if (t_cool > tiny_db) then
+                    t_cool = cst_t_cool*mean_abs_E/t_cool * 1.0e-4
+                 else
+                    t_cool = huge_real
+                 endif
+              endif
+
+              ! Calcul Temperature equilibre
+              if (Int_k_lambda_Jlambda < tiny_real) then
+                 Temperature_1grain_nRE(l,icell) = T_min
+              else
+                 log_frac_E_abs=log(Int_k_lambda_Jlambda)
+
+                 if (log_frac_E_abs <  log_frac_E_em_1grain_nRE(l,1)) then
                     Temperature_1grain_nRE(l,icell) = T_min
                  else
-                    log_frac_E_abs=log(Int_k_lambda_Jlambda)
+                    T_int=2
+                    do while((log_frac_E_em_1grain_nRE(l,T_int) < log_frac_E_abs).and.(T_int < n_T))
+                       T_int=T_int+1
+                    enddo  ! LIMITE MAX
 
-                    if (log_frac_E_abs <  log_frac_E_em_1grain_nRE(l,1)) then
-                       Temperature_1grain_nRE(l,icell) = T_min
-                    else
-                       T_int=2
-                       do while((log_frac_E_em_1grain_nRE(l,T_int) < log_frac_E_abs).and.(T_int < n_T))
-                          T_int=T_int+1
-                       enddo  ! LIMITE MAX
-
-                       ! Interpolation lineaire entre energies emises pour des
-                       ! temperatures echantillonees voisines
-                       T2=T_int
-                       Temp2=tab_Temp(T2)
-                       T1=T_int-1
-                       Temp1=tab_Temp(T1)
-                       frac=(log_frac_E_abs-log_frac_E_em_1grain_nRE(l,T1))/&
-                            (log_frac_E_em_1grain_nRE(l,T2)-log_frac_E_em_1grain_nRE(l,T1))
-                       Temperature_1grain_nRE(l,icell)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
-                    endif
+                    ! Interpolation lineaire entre energies emises pour des
+                    ! temperatures echantillonees voisines
+                    T2=T_int
+                    Temp2=tab_Temp(T2)
+                    T1=T_int-1
+                    Temp1=tab_Temp(T1)
+                    frac=(log_frac_E_abs-log_frac_E_em_1grain_nRE(l,T1))/&
+                         (log_frac_E_em_1grain_nRE(l,T2)-log_frac_E_em_1grain_nRE(l,T1))
+                    Temperature_1grain_nRE(l,icell)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
                  endif
+              endif
 
-                 if (Temperature_1grain_nRE(l,icell) > T_max) then
-                    ! Impossible de definir proba de temperature
-                    t_cool = 1.0 ; t_abs = 0.0
-                    write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                    write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(densite_pouss(icell,l)), &
-                         real(Temperature_1grain_nRE(l,icell))
-                    write(*,*) "Exiting"
-                    stop
-                 endif
+              if (Temperature_1grain_nRE(l,icell) > T_max) then
+                 ! Impossible de definir proba de temperature
+                 t_cool = 1.0 ; t_abs = 0.0
+                 write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
+                 write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(densite_pouss(icell,l)), &
+                      real(Temperature_1grain_nRE(l,icell))
+                 write(*,*) "Exiting"
+                 stop
+              endif
 
-                 ! Forcing equilibrium or no equilibrium
-                 if (lforce_PAH_equilibrium) then
-                    t_cool=1.0 ; t_abs = 0.0
-                 else if (lforce_PAH_out_equilibrium) then
-                    t_cool = 0.0 ; t_abs = 1.0
-                 endif
+              ! Forcing equilibrium or no equilibrium
+              if (lforce_PAH_equilibrium) then
+                 t_cool=1.0 ; t_abs = 0.0
+              else if (lforce_PAH_out_equilibrium) then
+                 t_cool = 0.0 ; t_abs = 1.0
+              endif
 
-                 !t_cool = 0.0
+              !t_cool = 0.0
 
-                 if (t_cool < t_abs) then !  calcul proba temperature
-                    l_RE(l,icell) = .false.
-                    ! heating terms : select lower triangle
-                    ! Afi with with f > i
-                    do T=1,n_T
-                       do T2=1,T-1
-                          ! Tres largement plus stable en interpolation lineaire que log !!!
-                          ! Ca fait n'importe quoi en log en cas de flux faible
-                          !KJ_abs_interp = exp(interp(log(kJnu(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
-                          !A(T,T2,id) = 0.5 * KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
-                          kJnu_interp = interp(kJnu(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
-                          A(T,T2,id) = kJnu_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
-                       end do
+              if (t_cool < t_abs) then !  calcul proba temperature
+                 l_RE(l,icell) = .false.
+                 ! heating terms : select lower triangle
+                 ! Afi with with f > i
+                 do T=1,n_T
+                    do T2=1,T-1
+                       ! Tres largement plus stable en interpolation lineaire que log !!!
+                       ! Ca fait n'importe quoi en log en cas de flux faible
+                       !KJ_abs_interp = exp(interp(log(kJnu(:,id)), log(tab_nu), log(nu_bin(T) - nu_bin(T2))))
+                       !A(T,T2,id) = 0.5 * KJ_abs_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
+                       kJnu_interp = interp(kJnu(:,id), tab_nu, nu_bin(T) - nu_bin(T2))
+                       A(T,T2,id) = kJnu_interp * delta_nu_bin(T)/ (nu_bin(T) - nu_bin(T2))
                     end do
+                 end do
 
-                    !! diagonal terms
-                    !do T=1,n_T
-                    !   A(T,T,id) = -sum(A(T,:,id)) ! sum along k direction (diag. should be zero initially)
-                    !enddo
+                 !! diagonal terms
+                 !do T=1,n_T
+                 !   A(T,T,id) = -sum(A(T,:,id)) ! sum along k direction (diag. should be zero initially)
+                 !enddo
 
-                    !! compute probabilities P(T) using iterative formulation of GD89
+                 !! compute probabilities P(T) using iterative formulation of GD89
 
-                    !! compute B array
-                    B(:,:,id) = 0.
-                    B(n_T,1:n_T-1,id) = A(n_T,1:n_T-1,id)
-                    do T=n_T-1,1,-1
-                       do T2=1,T-1
-                          B(T,T2,id) = A(T,T2,id) + B(T+1,T2,id)
-                       enddo
+                 !! compute B array
+                 B(:,:,id) = 0.
+                 B(n_T,1:n_T-1,id) = A(n_T,1:n_T-1,id)
+                 do T=n_T-1,1,-1
+                    do T2=1,T-1
+                       B(T,T2,id) = A(T,T2,id) + B(T+1,T2,id)
                     enddo
+                 enddo
 
-                    !! compute P array
-                    X(1,id) = 1.e-250_db
-                    do T=2, n_T
-                       if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
-                       if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
-                       X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db)
-                       if (A(T-1, T,id) < tiny_db) then
-                          write(*,*) l, T, id, "normalization error"
-                          stop
-                       endif
-
-                    enddo
-
-
-                    !X(1,id) = 1.e-250_db
-                    !do T=2, n_T
-                    !   if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
-                    !   if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
-                    !   X(T,id) =  abs(sum(A(1:T-1,T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db))
-                    !enddo
-
-                    !! Normalisation
-                    X(1,id) = X(2,id)
-                    X(:,id)=X(:,id)/sum(X(:,id))
-
-                    do T=1, n_T ! boucle car passage tableau double -> simple bug avec ifort
-                       Proba_Temperature(T,l,icell) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
-                    enddo
-
-                 else  ! test : t_cool > t_abs : on est a a l'equilibre
-
-                    if (.not.l_RE(l,icell)) then ! on n'etait pas a l'equilibre a l'iteration precedente
-                       l_RE(l,icell) = .true.
-                       lchange_nRE(l,icell) = .true.
-                    else
-                       lchange_nRE(l,icell) = .false. ! on etait deja a l'equilibre
+                 !! compute P array
+                 X(1,id) = 1.e-250_db
+                 do T=2, n_T
+                    if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
+                    if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
+                    X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db)
+                    if (A(T-1, T,id) < tiny_db) then
+                       write(*,*) l, T, id, "normalization error"
+                       stop
                     endif
 
-                 endif ! test : t_cool vs t_abs
-              endif ! densite_pouss > 0.
-           endif ! l_dark_zone
-        enddo !j
-     enddo !i
+                 enddo
+
+
+                 !X(1,id) = 1.e-250_db
+                 !do T=2, n_T
+                 !   if (X(T-1,id) <  1.e-300_db) X(T-1,id) = 1.e-300_db
+                 !   if (X(T-1,id) >  1.e250_db) X(1:T-1,id) = X(1:T-1,id) * 1.0e-50_db ! permet de stabiliser en cas d'erreur d'arrondis
+                 !   X(T,id) =  abs(sum(A(1:T-1,T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_db))
+                 !enddo
+
+                 !! Normalisation
+                 X(1,id) = X(2,id)
+                 X(:,id)=X(:,id)/sum(X(:,id))
+
+                 do T=1, n_T ! boucle car passage tableau double -> simple bug avec ifort
+                    Proba_Temperature(T,l,icell) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
+                 enddo
+
+              else  ! test : t_cool > t_abs : on est a a l'equilibre
+
+                 if (.not.l_RE(l,icell)) then ! on n'etait pas a l'equilibre a l'iteration precedente
+                    l_RE(l,icell) = .true.
+                    lchange_nRE(l,icell) = .true.
+                 else
+                    lchange_nRE(l,icell) = .false. ! on etait deja a l'equilibre
+                 endif
+
+              endif ! test : t_cool vs t_abs
+           endif ! densite_pouss > 0.
+        endif ! l_dark_zone
+     enddo !icell
      !$omp end do
      !$omp end parallel
   enddo !l
