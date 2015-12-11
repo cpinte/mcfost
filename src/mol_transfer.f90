@@ -365,9 +365,9 @@ subroutine NLTE_mol_line_transfer(imol)
 
                        if (etape==1) then
                           ! Position = milieu de la cellule
-                          x0 = r_grid(ri,zj)
+                          x0 = r_grid(icell)
                           y0 = 0.0_db
-                          z0 = z_grid(ri,zj)
+                          z0 = z_grid(icell)
 
                           if (lkeplerian) then
                              ! Direction verticale

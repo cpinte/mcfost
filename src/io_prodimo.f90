@@ -580,9 +580,10 @@ contains
 
     !  Write the array to the FITS file.
     do ri=1, n_rad
-       grid(ri,:,1) = r_grid(ri,:)
        do zj=1,nz
-          grid(ri,zj,2) = z_grid(ri,zj)
+          icell = cell_map(ri,zj,1)
+          grid(ri,:,1) = r_grid(icell)
+          grid(ri,zj,2) = z_grid(icell)
        enddo
     enddo
 
@@ -928,7 +929,8 @@ contains
        which_region = 0
        do iRegion=1,n_regions
           do i=1, n_rad
-             if ( (r_grid(i,1) > regions(iRegion)%Rmin).and.(r_grid(i,1) < regions(iRegion)%Rmax) ) which_region(i) = iRegion
+             icell = cell_map(i,1,1)
+             if ( (r_grid(icell) > regions(iRegion)%Rmin).and.(r_grid(icell) < regions(iRegion)%Rmax) ) which_region(i) = iRegion
           enddo !i
        enddo ! iRegion
        call ftpprj(unit,group,fpixel,nelements,which_region,status)
@@ -1658,7 +1660,7 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, sigma2_m1, r_cyl
+    real :: sigma2, sigma2_m1, r_sph
     integer :: i,j, ri, zj, n_speed_rt, l, keyword_status, icell
 
     n_speed_rt = mol(imol)%n_speed_rt
@@ -1814,15 +1816,16 @@ contains
        ! Verification grille
        do ri=1,n_rad
           do zj=1,nz
-             if (abs(r_grid(ri,zj) - grid(ri,zj,1)) > 1e-5 * r_grid(ri,zj)) then
+             icell = cell_map(ri,zj,1)
+             if (abs(r_grid(icell) - grid(ri,zj,1)) > 1e-5 * r_grid(icell)) then
                 write(*,*) "ERROR R. Exiting."
-                write(*,*) ri, "MCFOST=", r_grid(ri,zj), "ProDiMo=", grid(ri,zj,1)
+                write(*,*) ri, "MCFOST=", r_grid(icell), "ProDiMo=", grid(ri,zj,1)
                 !stop
              endif
 
-             if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then
+             if (abs(z_grid(icell) - grid(ri,zj,2)) > 1e-5 * z_grid(icell)) then
                 write(*,*) "ERROR Z. Exiting."
-                write(*,*) ri, zj, z_grid(ri,zj), grid(ri,zj,2)
+                write(*,*) ri, zj, z_grid(icell), grid(ri,zj,2)
                 !stop
              endif
           enddo
@@ -2078,10 +2081,10 @@ contains
     ! Vitesse keplerienne
     do i=1, n_rad
        do j=1, nz
-          r_cyl = sqrt(r_grid(i,j)**2 + z_grid(i,j)**2)
-!          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
           icell = cell_map(i,j,1)
-          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(i,j) * AU_to_m)**2 /  (r_cyl * AU_to_m)**3 )
+          r_sph = sqrt(r_grid(icell)**2 + z_grid(icell)**2)
+          !          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
+          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
        enddo
     enddo
 

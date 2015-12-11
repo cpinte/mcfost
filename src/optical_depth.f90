@@ -3403,14 +3403,15 @@ subroutine integ_tau_mol(imol)
   write(*,*) "tau_dust=", norme1
 
   loop_r : do i=1,n_rad
-     if (r_grid(i,1) > 100.0) then
+     icell = cell_map(i,1,1)
+     if (r_grid(icell) > 100.0) then
         norme=0.0
         loop_z : do j=nz, 1, -1
            icell = cell_map(i,j,1)
            P(:) = phiProf(icell,ispeed,tab_speed)
            norme=norme+kappa_mol_o_freq(icell,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
            if (norme > 1.0) then
-              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(i,j), "AU"
+              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(icell), "AU"
               exit loop_z
            endif
         enddo loop_z
@@ -4540,9 +4541,9 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
               id=1
               ! position et direction vol
               angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-              x0=r_grid(i,j) !x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
+              x0=r_grid(icell) !x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
               y0=0.0
-              z0=z_grid(i,j) !z0=0.99999*z_lim(i,j+1)
+              z0=z_grid(icell) !z0=0.99999*z_lim(i,j+1)
               u0=cos(angle)
               v0=0.0
               w0=sin(angle)
@@ -4567,14 +4568,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
         phi = 2*pi * (real(pk)-0.5)/real(n_az)
         cell_3D : do i=max(ri_in_dark_zone(pk),2), ri_out_dark_zone(pk)
            do j=zj_sup_dark_zone(i,pk),1,-1
+              icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
                  ! position et direction vol
                  angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(i,j)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
-                 z0=z_grid(i,j)!z0.99999*z_lim(i,j+1)
+                 z0=z_grid(icell)!z0.99999*z_lim(i,j+1)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
@@ -4596,14 +4598,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
         cell_3D_2 : do i=max(ri_in_dark_zone(pk),2), ri_out_dark_zone(pk)
            do j=zj_inf_dark_zone(i,pk),-1
+              icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
                  ! position et direction vol
                  angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(i,j)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
-                 z0=-z_grid(i,j)!-0.99999*z_lim(i,abs(j)+1)
+                 z0=-z_grid(icell)!-0.99999*z_lim(i,abs(j)+1)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)

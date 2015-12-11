@@ -85,11 +85,7 @@ subroutine alloc_dynamique()
   endif
   r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
 
-  if (l3D) then
-     allocate(r_grid(n_rad,-nz:nz), z_grid(n_rad,-nz:nz), phi_grid(n_az), stat=alloc_status)
-  else
-     allocate(r_grid(n_rad,nz), z_grid(n_rad,nz), phi_grid(n_az), stat=alloc_status)
-  endif
+  allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error r_lim'
      stop

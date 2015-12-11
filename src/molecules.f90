@@ -65,20 +65,17 @@ subroutine init_GG_Tau_mol()
 
   implicit none
 
-  integer :: i, j, icell
+  integer :: icell
 
   ldust_mol = .true.
 
-  do i=1,n_rad
-     do j=1,nz
-        icell = cell_map(i,j,1)
-        Temperature(icell) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
-        Tcin(icell) = 30.0 * (r_grid(i,1)/100.)**(-0.5)
-     enddo
+  do icell=1,n_cells
+     Temperature(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
+     Tcin(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
   enddo
 
   icell = cell_map(1,1,1)
-  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(1,1)**2 + z_grid(1,1)) / 100.)**2.75)
+  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
 
   return
 
@@ -90,16 +87,13 @@ subroutine init_HH_30_mol()
 
   implicit none
 
-  integer :: i, j, icell
+  integer :: icell
 
   ldust_mol = .true.
 
-  do i=1,n_rad
-     do j=1,nz
-        icell = cell_map(i,j,1)
-        Temperature(icell) = 12.0 * (r_grid(i,1)/100.)**(-0.55)
-        vfield(icell) = 2.0 * (r_grid(i,1)/100.)**(-0.55)
-     enddo
+  do icell=1,n_cells
+     Temperature(icell) = 12.0 * (r_grid(icell)/100.)**(-0.55)
+     vfield(icell) = 2.0 * (r_grid(icell)/100.)**(-0.55)
   enddo
 
   v_turb = 230.
@@ -128,7 +122,8 @@ subroutine init_benchmark_vanZadelhoff1()
 
   tab_abundance = abundance
 
-  write(*,*) "Density", real(densite_gaz(cell_map(1,1,1)) * (r_grid(1,1)**2 + z_grid(1,1)**2)/rmin**2)
+  write(*,*) "Density", real(densite_gaz(cell_map(1,1,1)) * &
+       (r_grid(cell_map(1,1,1))**2 + z_grid(cell_map(1,1,1))**2)/rmin**2)
 
   return
 
@@ -176,7 +171,8 @@ subroutine init_benchmark_vanzadelhoff2()
 
   do ri=1, n_rad
      ! Recherche rayon dans def bench
-     rayon = sqrt(r_grid(ri,1)**2+z_grid(ri,1)**2)
+     icell = cell_map(ri,1,1)
+     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
      log_rayon = log(rayon)
 
      l=2
@@ -256,7 +252,7 @@ subroutine init_benchmark_water2()
 
   implicit none
 
-  integer :: i, j, icell
+  integer :: icell
 
   ldust_mol = .false.
 
@@ -264,11 +260,8 @@ subroutine init_benchmark_water2()
   Tcin = 40.
   v_turb = 0.0
 
-  do i=1, n_rad
-     do j=1,nz
-        icell = cell_map(i,j,1)
-        vfield(icell) = 1e5 * sqrt(r_grid(i,1)**2 + z_grid(i,1)**2) * AU_to_pc
-     enddo
+  do icell=1, n_cells
+     vfield(icell) = 1e5 * sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_pc
   enddo
 
   linfall = .true.
@@ -328,7 +321,8 @@ subroutine init_benchmark_water3()
 
   do ri=1, n_rad
      ! Recherche rayon dans def bench
-     rayon = sqrt(r_grid(ri,1)**2+z_grid(ri,1)**2)
+     icell = cell_map(ri,1,1)
+     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
      log_rayon = log(rayon)
 
 
@@ -400,7 +394,7 @@ subroutine init_molecular_disk(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i, j, icell
+  integer :: icell
 
   ldust_mol  = .true.
   lkeplerian = .true.
@@ -415,18 +409,9 @@ subroutine init_molecular_disk(imol)
   endif
 
   ! En m.s-1
-  do i=1, n_rad
-     do j=1,nz
-        icell = cell_map(i,j,1)
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,1) * AU_to_m) )
-     enddo
+  do icell=1, n_cells
+     vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
   enddo
-
-!  do j=1, nz
-!     do i=1, n_rad
-!        vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (sqrt(r_grid(i,j)**2 + r_grid(i,j)**2) * AU_to_m) )
-!     enddo
-!  enddo
 
   v_turb = vitesse_turb
 

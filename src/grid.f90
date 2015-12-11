@@ -476,22 +476,36 @@ subroutine define_grid()
   real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart
+  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
+
+  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
+  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
   call build_cylindrical_cell_mapping()
+
+  if (l3D) then
+     allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
+  else
+     allocate(r_grid_tmp(n_rad,nz), z_grid_tmp(n_rad,nz), phi_grid_tmp(n_az), stat=alloc_status)
+  endif
+
 
   Rmax2 = Rmax*Rmax
 
   if (grid_type == 1) then
      lcylindrical = .true.
      lspherical = .false.
-  else
+  else if (grid_type == 2) then
      lcylindrical = .false.
      lspherical = .true.
+  else
+     write(*,*) "Unknown grid type"
+     write(*,*) "Exiting"
+     stop
   endif
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
@@ -505,7 +519,6 @@ subroutine define_grid()
      enddo
 
   else
-
      ! Definition du nombre de chaques cellules
      n_empty = 3
      n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
@@ -516,13 +529,14 @@ subroutine define_grid()
      istart = 1
      tab_r(:) = 0.0_db
      do ir=1, n_regions
-        if (lprint) write(*,*) "**********************"
-        if (lprint) write(*,*) "New region", ir
-        if (lprint) write(*,*) "istart", istart, n_rad_in_region, n_rad_in
-        if (lprint) write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
+        if (lprint) then
+           write(*,*) "**********************"
+           write(*,*) "New region", ir
+           write(*,*) "istart", istart, n_rad_in_region, n_rad_in
+           write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
+        endif
 
         regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
-
 
         if (ir == n_regions) then
            n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
@@ -609,7 +623,6 @@ subroutine define_grid()
            if (lprint) write(*,*) i, ir, tab_r(i)
         enddo
 
-
         n_cells_tmp = istart+n_rad_region
 
         ! Cellules vides
@@ -657,8 +670,7 @@ subroutine define_grid()
 
      do i=1, n_rad
         rcyl = 0.5*(r_lim(i) +r_lim(i-1))
-        r_grid(i,:) = rcyl!sqrt(r_lim(i) +r_lim(i-1)))
-
+        r_grid_tmp(i,:) = rcyl!sqrt(r_lim(i) +r_lim(i-1)))
 
         ! Estimation du zmax proprement
         ! Recherche de l'echelle de hauteur max des zones pertinentes au rayon donne
@@ -674,7 +686,7 @@ subroutine define_grid()
      enddo ! i
 
      do i=1, n_rad
-        ! Interpolation pour les cellules ou H n'est pas defini
+        ! Interpolation pour les cellules ou H n'est pas defini (ie entre les zones)
         if (zmax(i) < tiny_real)  then
            search_min: do ii = i-1, 1, -1
               if (zmax(ii) > tiny_real) then
@@ -691,26 +703,18 @@ subroutine define_grid()
            enddo search_max !ii
 
            ! Interpolation lineaire en log(r)
-           rcyl = r_grid(i,1) ; rcyl_min =  r_grid(ii_min,1)  ; rcyl_max =  r_grid(ii_max,1)
+           rcyl = r_grid_tmp(i,1) ; rcyl_min =  r_grid_tmp(ii_min,1)  ; rcyl_max =  r_grid_tmp(ii_max,1)
            frac = (log(rcyl) - log(rcyl_min)) / (log(rcyl_max) - log(rcyl_min))
            zmax(i) = exp(log(zmax(ii_max)) * frac + log(zmax(ii_min)) * (1.0 - frac))
         endif ! zmax(i) < tiny_real
      enddo !i
-
-     ! Version basique et initiale : prend la premiere zone pour determiner echelle de hauteur
-     !do i=1, n_rad
-     !   rcyl = r_grid(i,1)
-     !   dz=disk_zone(1)
-     !   zmax(i) = cutoff * dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-     !enddo !i
-
 
      do i=1, n_rad
         if ((tab_r2(i+1)-tab_r2(i)) > 1.0e-6*tab_r2(i)) then
            V(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
            dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
         else
-           rcyl = r_grid(i,1)
+           rcyl = r_grid_tmp(i,1)
            V(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
            dr2_grid(i) = 2.0_db * rcyl*(tab_r(i+1)-tab_r(i))
         endif
@@ -721,7 +725,7 @@ subroutine define_grid()
 
         do j=1,nz
            z_lim(i,j) = (real(j,kind=db)-1.0_db)*delta_z(i)
-           z_grid(i,j) = (real(j,kind=db)-0.5_db)*delta_z(i)
+           z_grid_tmp(i,j) = (real(j,kind=db)-0.5_db)*delta_z(i)
         enddo
      enddo
 
@@ -748,10 +752,7 @@ subroutine define_grid()
         w_lim(j) = w
         tan_theta_lim(j) = w / sqrt(1.0_db - w*w)
         theta_lim(j) = atan(tan_theta_lim(j))
- !       write(*,*) "tan_theta_lim", j, w, tan_theta_lim(j)
      enddo
-  !   stop
-
 
      do i=1, n_rad
         !rsph = 0.5*(r_lim(i) +r_lim(i-1))
@@ -760,8 +761,8 @@ subroutine define_grid()
         do j=1,nz
            w = (real(j,kind=db)-0.5_db)/real(nz,kind=db)
            uv = sqrt(1.0_db - w*w)
-           r_grid(i,j)=rsph * uv
-           z_grid(i,j)=rsph * w
+           r_grid_tmp(i,j)=rsph * uv
+           z_grid_tmp(i,j)=rsph * w
         enddo
 
         if (rsph > dz%Rmax) then
@@ -781,8 +782,8 @@ subroutine define_grid()
   ! Version 3D
   if (l3D) then
      do k=1, n_az
-        phi_grid(k) = 2.0*pi*real(k)/real(n_az)
-        phi = phi_grid(k)
+        phi_grid_tmp(k) = 2.0*pi*real(k)/real(n_az)
+        phi = phi_grid_tmp(k)
         if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
            tan_phi_lim(k) = 1.0d300
         else
@@ -793,9 +794,31 @@ subroutine define_grid()
      V(:) = V(:) * 0.5 / real(n_az)
 
      do j=1,nz
-        z_grid(:,-j) = -z_grid(:,j)
+        z_grid_tmp(:,-j) = -z_grid_tmp(:,j)
      enddo
   endif
+
+  ! Determine the zone for each cell
+  do ir = 1, n_regions
+     do i=1, n_rad
+        if ((r_grid_tmp(i,1) >  regions(ir)%Rmin).and.(r_grid_tmp(i,1) <  regions(ir)%Rmax)) then
+           tab_region(i) = ir
+        endif
+     enddo
+  enddo
+
+  ! Volume and cell arrays with 1D index
+  do icell=1, n_cells
+     i = cell_map_i(icell)
+     j = cell_map_j(icell)
+     k = cell_map_k(icell)
+     volume(icell) = V(i)
+
+     r_grid(icell) = r_grid_tmp(i,j)
+     z_grid(icell) = z_grid_tmp(i,j)
+     phi_grid(icell) = phi_grid_tmp(k)
+  enddo
+
 
   ! Pour Sebastien Charnoz
   if (lSeb_Charnoz) then
@@ -812,30 +835,7 @@ subroutine define_grid()
      stop
   endif ! lSeb_Charnoz
 
-
-  ! Determine the zone for each cell
-  do ir = 1, n_regions
-     do i=1, n_rad
-        if ((r_grid(i,1) >  regions(ir)%Rmin).and.(r_grid(i,1) <  regions(ir)%Rmax)) then
-           tab_region(i) = ir
-        endif
-     enddo
-  enddo
-
-  ! Just a check
-!  do i=1, n_rad
-!     if (tab_region(i) == 0) then ! must be 0 in a gap
-!        write(*,*) "ERROR in tab_region array", i, r_grid(i,1)
-!        stop
-!     endif
-!  enddo
-
-
-  ! Volume array
-  do icell=1, n_cells
-     i = cell_map_i(icell)
-     volume(icell) = V(i)
-  enddo
+  deallocate(r_grid_tmp,z_grid_tmp,phi_grid_tmp)
 
   return
 
