@@ -660,7 +660,7 @@ subroutine Temp_nRE(lconverged)
 
   real(kind=db) :: delta_T, kJnu_interp, t_cool, t_abs, mean_abs_E, kTu, mean_abs_nu, cst_t_cool, Int_k_lambda_Jlambda
 
-  integer :: l, i, j, T, T1, T2, lambda, alloc_status, id, T_int, icell
+  integer :: l, T, T1, T2, lambda, alloc_status, id, T_int, icell
 
   integer, parameter :: n_cooling_time = 100
   real :: E_max
@@ -752,7 +752,7 @@ subroutine Temp_nRE(lconverged)
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
      !$omp do schedule(dynamic,1)
-     do i=n_cells, 1, -1
+     do icell=n_cells, 1, -1
         !$ id = omp_get_thread_num() + 1
         if (l_dark_zone(icell)) then
            l_RE(:,icell) = .true.
@@ -1404,7 +1404,7 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i, j, pk, k, T, icell
+  integer :: i,j, k, T, icell
   real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
   real(kind=db) :: delta_T
   real(kind=db), dimension(n_cells) :: E_cell, E_cell_corrected
@@ -1420,57 +1420,47 @@ subroutine repartition_energie(lambda)
 
   ! Cas LTE
   if (lRE_LTE) then
-     do i=1,n_rad
-        bz : do j=j_start,nz
-           if (j==0) cycle bz
-           do pk=1, n_az
-              icell = cell_map(i,j,pk)
-              Temp=Temperature(icell)
-              if (Temp < tiny_real) then
-                ! E_cell(icell) = 0.0_db
-              else
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < cst_wl_max) then
-                    if (.not.test_dark_zone(i,j,pk,0.0_db,0.0_db)) then
-                       E_cell(icell) = 4.0*kappa_abs_eg(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                    endif
-                 endif !cst_wl
-              endif ! Temp==0.0
-           enddo !pk
-        enddo bz !j
+     do icell=1, n_cells
+        Temp=Temperature(icell)
+        if (Temp < tiny_real) then
+           ! E_cell(icell) = 0.0_db
+        else
+           cst_wl=cst_th/(Temp*wl)
+           if (cst_wl < cst_wl_max) then
+              if (.not.l_dark_zone(icell)) then
+                 E_cell(icell) = 4.0*kappa_abs_eg(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+              endif
+           endif !cst_wl
+        endif ! Temp==0.0
      enddo !i
   endif
 
-  !write(*,*) E_cell
-
-
   ! Cas nLTE
   if (lRE_nLTE) then
-     do i=1,n_rad
-        do j=1,nz
-           E_emise = 0.0
-           icell = cell_map(i,j,1)
-           do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Temperature_1grain(k,icell)
-              if (Temp < tiny_real) then
-                 !E_emise = E_emise + 0.0
-              else
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < cst_wl_max) then
-                    if (i==1) then
-                       Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                       frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
-                       E_emise = E_emise + Ener * frac
-                    else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                       E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                    endif
-                 endif !cst_wl
-              endif ! Temp==0.0
-           enddo !k
-           E_cell(icell) = E_cell(icell) + E_emise
-        enddo !j
-     enddo !i
+     do icell=1,n_cells
+        E_emise = 0.0
+        do k=grain_RE_nLTE_start,grain_RE_nLTE_end
+           Temp=Temperature_1grain(k,icell)
+           if (Temp < tiny_real) then
+              !E_emise = E_emise + 0.0
+           else
+              cst_wl=cst_th/(Temp*wl)
+              if (cst_wl < cst_wl_max) then
+                 i = cell_map_i(icell)
+                 if (i==1) then
+                    j=cell_map_j(icell)
+                    Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                    frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
+                    E_emise = E_emise + Ener * frac
+                 else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
+                    E_emise = E_emise +   4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
+                         volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 endif
+              endif !cst_wl
+           endif ! Temp==0.0
+        enddo !k
+        E_cell(icell) = E_cell(icell) + E_emise
+     enddo !icell
   endif
 
   ! Cas nRE
@@ -1487,46 +1477,43 @@ subroutine repartition_energie(lambda)
      endif
 
 
-     do i=1,n_rad
-        do j=1,nz
-           E_emise = 0.0
-           icell = cell_map(i,j,1)
-           do k=grain_nRE_start,grain_nRE_end
-              if (l_RE(k,icell)) then ! le grain a une temperature
-                 temp=Temperature_1grain_nRE(k,icell)
+     do icell=1,n_cells
+        E_emise = 0.0
+        do k=grain_nRE_start,grain_nRE_end
+           if (l_RE(k,icell)) then ! le grain a une temperature
+              temp=Temperature_1grain_nRE(k,icell)
+              cst_wl=cst_th/(Temp*wl)
+              if (cst_wl < cst_wl_max) then
+                 if (i==1) then
+                    Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)* &
+                         (exp(cst_wl)-1.0))
+                    frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
+                    E_emise = E_emise + Ener * frac
+                 else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
+                    E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
+                         volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 endif
+              endif !cst_wl
+           else ! la grain a une proba de T
+              do T=1,n_T
+                 temp=tab_Temp(T)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     if (i==1) then
                        Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)* &
-                            (exp(cst_wl)-1.0))
+                            (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                        E_emise = E_emise + Ener * frac
                     else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
                        E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                     endif
                  endif !cst_wl
-              else ! la grain a une proba de T
-                 do T=1,n_T
-                    temp=tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < cst_wl_max) then
-                       if (i==1) then
-                          Ener = 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)*volume(icell)/((wl**5)* &
-                               (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
-                          frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
-                          E_emise = E_emise + Ener * frac
-                       else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
-                          E_emise = E_emise + 4.0*C_abs_norm(lambda,k)*densite_pouss(icell,k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
-                       endif
-                    endif !cst_wl
-                 enddo !T
-              endif ! l_RE
-           enddo !k
-           E_cell(icell) =  E_cell(icell) + E_emise
-        enddo !j
-     enddo !i
+              enddo !T
+           endif ! l_RE
+        enddo !k
+        E_cell(icell) =  E_cell(icell) + E_emise
+     enddo !icell
 
   endif
 
