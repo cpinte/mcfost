@@ -1160,13 +1160,14 @@ subroutine density_phantom()
 
   call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
                          write(*,*) "Done"
-
+  if (ierr /=0) then
+     write(*,*) "Error code =", ierr,  get_error_text(ierr)
+     stop
+  endif
   write(*,*) "# Model size :"
   write(*,*) "x =", minval(x), maxval(x)
   write(*,*) "y =", minval(y), maxval(y)
   write(*,*) "z =", minval(z), maxval(z)
-
-  if (ierr /=0) write(*,*) "Error code =", ierr,  get_error_text(ierr)
 
   if (ndusttypes==1) then
      call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)

@@ -186,8 +186,9 @@ module Voronoi_grid
     ! Run voro++ command line for now
     ! while I fix the c++/fortran interface and make all the tests
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' -150 150 -150 150 -150 150 particles.txt ; &
-mv particles.txt.vol Voronoi.txt"
+    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' &
+         -150 150 -150 150 -150 150 particles.txt ; &
+         mv particles.txt.vol Voronoi.txt"
     call appel_syst(cmd,syst_status)
     write(*,*) "Voronoi Tesselation done"
 
@@ -548,7 +549,7 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   real, intent(in) :: x, y, z
 
   real :: dist2, dist2_min
-  integer :: i, icell, icell_min
+  integer :: icell, icell_min, i
 
   dist2_min = huge(1.0)
   do i=1, wall(iwall)%n_neighbours
