@@ -39,6 +39,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  endif
  print "(1x,a)",trim(fileid)
 
+ if (fileid(2:2)=='T') then
+    tagged = .true.
+ else
+    tagged = .false.
+ endif
  call read_header(iunit,hdr,tagged,ierr)
  if (.not.tagged) then
     write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
