@@ -876,7 +876,7 @@ subroutine Temp_nRE(lconverged)
                     ! Impossible de definir proba de temperature
                     t_cool = 1.0 ; t_abs = 0.0
                     write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                    write(*,*) "cell", i, "R=", real(r_grid(i,1)), real(densite_pouss(cell_map(i,j,1),l)), &
+                    write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(densite_pouss(icell,l)), &
                          real(Temperature_1grain_nRE(l,icell))
                     write(*,*) "Exiting"
                     stop

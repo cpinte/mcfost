@@ -1256,9 +1256,9 @@ subroutine calc_Isca_rt2_star(lambda,ibin)
         if (stokes(1) < 1.e-30_db) cycle
 
         ! Direction de vol
-        x = r_grid(ri,zj) ! doit juste etre non nul
+        x = r_grid(icell) ! doit juste etre non nul
         y = 0.0_db
-        z = z_grid(ri,zj) ! sert a rien
+        z = z_grid(icell) ! sert a rien
 
         norme = sqrt(x**2 + z**2)
         u = x / norme
@@ -1456,7 +1456,7 @@ function dust_source_fct(ri,zj,phik, x,y,z)
      ! Pour interpolations spatiales
      r = sqrt(x*x + y*y)
 
-     if (r > r_grid(ri,zj)) then
+     if (r > r_grid(icell)) then
         ri1 = ri
         ri2 = ri + 1
      else
@@ -1464,7 +1464,7 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         ri2 = ri
      endif
 
-     if (abs(z) > z_grid(ri,zj)) then
+     if (abs(z) > z_grid(icell)) then
         zj1 = zj
         zj2 = zj + 1
      else
@@ -1479,7 +1479,8 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         ri1 = 1
         frac_r = 0._db
      else
-        frac_r = (log(r_grid(ri2,zj)) - log(r)) / (log(r_grid(ri2,zj)) - log(r_grid(ri1,zj)))
+        frac_r = (log(r_grid(cell_map(ri2,zj,1))) - log(r)) / &
+             (log(r_grid(cell_map(ri2,zj,1))) - log(r_grid(cell_map(ri1,zj,1))))
      endif
 
      if (zj2 > nz) then
@@ -1489,7 +1490,8 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         zj1 = 1
         frac_z = 1.0_db
      else
-        frac_z = (z_grid(ri,zj2) - abs(z)) / (z_grid(ri,zj2) - z_grid(ri,zj1))
+        frac_z = (z_grid(cell_map(ri,zj2,1)) - abs(z)) / &
+             (z_grid(cell_map(ri,zj2,1)) - z_grid(cell_map(ri,zj1,1)))
      endif
 
      ! Ok si je decommente les 2

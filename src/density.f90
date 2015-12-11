@@ -88,11 +88,13 @@ subroutine define_gas_density()
 
               ! On calcule la densite au milieu de la cellule
               if (j==0) then
-                 rcyl = r_grid(i,1)
-                 z = 0.0_db ! utilisation indice 0 pour desnite plan median
+                 icell = cell_map(i,1,1)
+                 rcyl = r_grid(icell)
+                 z = 0.0_db ! utilisation indice 0 pour densite plan median
               else
-                 rcyl = r_grid(i,j)
-                 z = z_grid(i,j)
+                 icell = cell_map(i,j,1)
+                 rcyl = r_grid(icell)
+                 z = z_grid(icell)
               endif
 
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
@@ -137,7 +139,7 @@ subroutine define_gas_density()
                     density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
                  endif
                  if (j>0) then
-                    densite_gaz_tmp(cell_map(i,j,k)) = density
+                    densite_gaz_tmp(icell) = density
                  else
                     densite_gaz_midplane_tmp(i) = density
                  endif
@@ -167,11 +169,13 @@ subroutine define_gas_density()
            do j=0,nz
               ! On calcule la densite au milieu de la cellule
               if (j==0) then
-                 rcyl = r_grid(i,1)
+                 icell = cell_map(i,1,1)
+                 rcyl = r_grid(icell)
                  z = 0.0_db
               else
-                 rcyl = r_grid(i,j)
-                 z = z_grid(i,j)
+                 icell = cell_map(i,j,1)
+                 rcyl = r_grid(icell)
+                 z = z_grid(icell)
               endif
               rsph = sqrt(rcyl**2+z**2)
 
@@ -186,7 +190,12 @@ subroutine define_gas_density()
               else
                  density = cst_gaz(izone) * rsph**(dz%surf)
               endif
-              densite_gaz_tmp(cell_map(i,j,1)) = density
+
+              if (j>0) then
+                 densite_gaz_tmp(icell) = density
+              else
+                 densite_gaz_midplane_tmp(i) = density
+              endif
            enddo !j
         enddo ! i
 
@@ -194,8 +203,9 @@ subroutine define_gas_density()
         k=1
         do i=1, n_rad
            do j=1,nz
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              icell = cell_map(i,j,1)
+              rcyl = r_grid(icell)
+              z = z_grid(icell)
 
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               if (rcyl > dz%rmax) then
@@ -207,7 +217,7 @@ subroutine define_gas_density()
                       ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                       exp( - (abs(z)/h)**dz%vert_exponent)
               endif
-              densite_gaz_tmp(cell_map(i,j,1)) = density
+              densite_gaz_tmp(icell) = density
            enddo !j
         enddo !i
 
@@ -250,13 +260,11 @@ subroutine define_gas_density()
         write(*,*) "ERROR"
         stop
      endif
-     do i=1, n_rad
-        do j = 1, nz
-           surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
-           if (z_grid(i,j) > surface) then
-              densite_gaz(cell_map(i,j,1)) = 0.0_db
-           endif
-        enddo
+     do i=1, n_cells
+        surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
+        if (z_grid(icell) > surface) then
+           densite_gaz(icell) = 0.0_db
+        endif
      enddo
   endif
 
@@ -268,17 +276,11 @@ subroutine define_gas_density()
 
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
-     do i=1, n_rad
-        bz_gas_mass4 : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass4
-           do k=1, n_az
-              if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
-                 icell = cell_map(i,j,k)
-                 densite_gaz(icell) = densite_gaz(icell) *  correct_density_factor
-                 masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
-              endif
-           enddo
-        enddo bz_gas_mass4
+     do icell=1, n_cells
+        if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
+           densite_gaz(icell) = densite_gaz(icell) *  correct_density_factor
+           masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
+        endif
      enddo
   end if
 
@@ -397,9 +399,10 @@ subroutine define_dust_density()
            bz : do j=j_start,nz
               if (j==0) cycle bz
 
+              icell = cell_map(i,j,1)
               ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              rcyl = r_grid(icell)
+              z = z_grid(icell)
 
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
@@ -546,8 +549,8 @@ subroutine define_dust_density()
            do i=1, n_rad
               lwarning = .true.
               rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
-
-              rcyl = r_grid(i,1)
+              icell = cell_map(i,1,1)
+              rcyl = r_grid(icell)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
               if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
@@ -561,7 +564,7 @@ subroutine define_dust_density()
                         icell = cell_map(i,j,1)
 
                        !calculate h & z/h
-                       z = z_grid(i,j)
+                       z = z_grid(icell)
                        Ztilde=z/H
 
                        ! Fit Gaussien du profile de densite
@@ -617,8 +620,8 @@ subroutine define_dust_density()
               rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
               !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
               !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
-
-              rcyl = r_grid(i,1)
+              icell = cell_map(i,1,1)
+              rcyl = r_grid(icell)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
               s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
@@ -667,8 +670,8 @@ subroutine define_dust_density()
            do j=1,nz
               icell = cell_map(i,j,1)
               ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              rcyl = r_grid(icell)
+              z = z_grid(icell)
               rsph = sqrt(rcyl**2+z**2)
 
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
@@ -692,8 +695,8 @@ subroutine define_dust_density()
            do j=1,nz
               icell = cell_map(i,j,k)
               ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+              rcyl = r_grid(icell)
+              z = z_grid(icell)
 
               h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
 
@@ -723,30 +726,20 @@ subroutine define_dust_density()
 
   ! Ajout cavite vide
   if (lcavity) then
-     do i=1, n_rad
-        do j = 1, nz
-           icell = cell_map(i,j,1)
-           surface = cavity%sclht * (r_grid(i,j) / cavity%rref)**cavity%exp_beta
-           if (z_grid(i,j) > surface) then
-              densite_pouss(icell,:) = 0.0_db
-           endif
-        enddo
+     do icell=1,n_cells
+        surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
+        if (z_grid(icell) > surface) then
+           densite_pouss(icell,:) = 0.0_db
+        endif
      enddo
   endif
 
   if (lgap_Gaussian) then
-     do i=1, n_rad
-        do j=j_start,nz
-           if (j==0) cycle
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              densite_pouss(icell,:) = densite_pouss(icell,:) * &
-                   (1.0 - exp(-0.5 * ((r_grid(i,1) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
-           enddo ! k
-        enddo !j
+     do icell=1, n_cells
+        densite_pouss(icell,:) = densite_pouss(icell,:) * &
+             (1.0 - exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
      enddo
   endif
-
 
   search_not_empty : do l=1,n_grains_tot
      do j=1,nz
@@ -804,7 +797,8 @@ subroutine define_dust_density()
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
      do i=1, n_rad
-        if ((r_grid(i,1) >= correct_density_Rin).and.(r_grid(i,1) <= correct_density_Rout)) then
+        icell = cell_map(i,1,1)
+        if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
            do j=j_start,nz
               if (j==0) cycle
               do k=1, n_az
@@ -873,41 +867,33 @@ subroutine define_density_wall3D()
         write(*,*) "h_wall =", real(h_wall)
 
 
-        do i=1, n_rad
-           bz : do j=j_start,nz
-              if (j==0) cycle bz
+        do icell=1, n_cells
+           ! On calcule la densite au milieu de la cellule
+           rcyl = r_grid(icell)
+           z = z_grid(icell)
+           phi = phi_grid(icell)
 
-              ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(i,j)
-              z = z_grid(i,j)
+           do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+              if (rcyl > dz%rmax) then
+                 density = 0.0
+              else if (rcyl < dz%rin) then
+                 density = 0.0
+              else
+                 density = nbre_grains(l) ! densite constante dans le mur
+              endif
 
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 phi = phi_grid(k)
+              ! Variation de hauteur du mur en cos(phi/2)
+              hh = h_wall * (1.+cos(phi+pi))/2.
 
-                 do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    if (rcyl > dz%rmax) then
-                       density = 0.0
-                    else if (rcyl < dz%rin) then
-                       density = 0.0
-                    else
-                       density = nbre_grains(l) ! densite constante dans le mur
-                    endif
+              if ((z > 0.).and.(z < hh)) then
+                 density_wall(icell,l) = density
+                 !if (density > 0.) write(*,*) i,j, k, l, density_wall(i,j,k,l)
+              else
+                 density_wall(icell,l) = 0.0
+              endif
+           enddo ! l
 
-                    ! Variation de hauteur du mur en cos(phi/2)
-                    hh = h_wall * (1.+cos(phi+pi))/2.
-
-                    if ((z > 0.).and.(z < hh)) then
-                       density_wall(icell,l) = density
-                       !if (density > 0.) write(*,*) i,j, k, l, density_wall(i,j,k,l)
-                    else
-                       density_wall(icell,l) = 0.0
-                    endif
-                 enddo ! l
-
-              enddo !k
-           enddo bz !j
-        enddo !i
+        enddo !icell
 
      endif ! wall
   enddo ! pop

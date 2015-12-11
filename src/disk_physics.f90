@@ -210,7 +210,7 @@ subroutine equilibre_hydrostatique()
            icell = cell_map(i,j,k)
            icell_m1 = cell_map(i,j-1,k)
            dTdz = (Temperature(icell)-Temperature(icell_m1)) * dz_m1
-           fac1 = cst * z_grid(i,j)/ (r_grid(i,j)**3)
+           fac1 = cst * z_grid(icell)/ (r_grid(icell)**3)
            fac2 = -1.0 * (dTdz + fac1) / Temperature(icell)
            ln_rho(j) = ln_rho(j-1) + fac2 * dz
            rho(j) = exp(ln_rho(j))

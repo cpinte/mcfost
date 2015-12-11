@@ -445,7 +445,7 @@ module opacity
   real(kind=db), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
   real(kind=db), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
   real(kind=db), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
-  real(kind=db), dimension(:,:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
+  real(kind=db), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
   real(kind=db), dimension(:), allocatable :: phi_grid
   real(kind=db), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
   real(kind=db), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
