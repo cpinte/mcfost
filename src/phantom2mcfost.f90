@@ -35,7 +35,7 @@ contains
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes
     real(db), dimension(4,np), intent(in) :: xyzh
-    integer, dimension(np), intent(in) :: iphase
+    integer(kind=1), dimension(np), intent(in) :: iphase
     real(db), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(db), dimension(ndusttypes), intent(in) :: grainsize
     real(db), dimension(ntypes), intent(in) :: massoftype
