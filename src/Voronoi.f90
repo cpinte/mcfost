@@ -548,8 +548,8 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   integer, intent(in) :: iwall
   real, intent(in) :: x, y, z
 
-  real :: dist2, dist2_min, i
-  integer :: icell, icell_min
+  real :: dist2, dist2_min
+  integer :: icell, icell_min, i
 
   dist2_min = huge(1.0)
   do i=1, wall(iwall)%n_neighbours

@@ -47,6 +47,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  call read_header(iunit,hdr,tagged,ierr)
  if (.not.tagged) then
     write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
+    ierr = 1000
     return
  endif
  !print*,hdr%inttags(:)
