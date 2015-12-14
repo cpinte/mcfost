@@ -179,7 +179,7 @@ module Voronoi_grid
 
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
-       write(unit=1,fmt="(i5,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
+       write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
     enddo
     close(unit=1)
 
@@ -192,9 +192,9 @@ module Voronoi_grid
     call appel_syst(cmd,syst_status)
     write(*,*) "Voronoi Tesselation done"
 
-    write(*,*) "TMP : filtering out 10 cells for safety, will do it better later"
+    write(*,*) "TMP : filtering out 5000 cells for safety, will do it better later"
 
-    call read_Voronoi(n_cells-10)
+    call read_Voronoi(n_cells-5000)
 
     write(*,*) "Tesselation finished"
     return
