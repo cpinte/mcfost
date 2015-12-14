@@ -274,7 +274,6 @@ subroutine alloc_dynamique()
      kappa_abs_RE=0.0
   endif
 
-
   allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
@@ -289,12 +288,27 @@ subroutine alloc_dynamique()
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
      p_n_lambda = n_lambda ! was 1 : changed to save dust properties
+
+     if (lsepar_pola) then
+        mem_size = 5 * nang_scatt * p_n_cells * n_lambda * 4. / 1024.**2
+     else
+        mem_size = 2 * nang_scatt * p_n_cells * n_lambda * 4. / 1024.**2
+     endif
+     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering matrices"
+
      allocate(tab_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
      endif
      tab_s11_pos = 0
+
+     allocate(prob_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error prob_s11_pos'
+        stop
+     endif
+     prob_s11_pos = 0
 
      if (lsepar_pola) then
         allocate(tab_s12_pos(0:nang_scatt, p_n_cells, n_lambda), &
@@ -309,25 +323,18 @@ subroutine alloc_dynamique()
         tab_s33_pos = 0
         tab_s34_pos = 0
      endif
-
-     allocate(prob_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error prob_s11_pos'
-        stop
-     endif
-     prob_s11_pos = 0
-  else ! prop par grains
+  else ! scattering method==1 --> prop par grains
      p_n_lambda = n_lambda
 
      allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
+     mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**2
+     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
      endif
      ksca_CDF = 0
-
   endif ! method
-
 
   ! **************************************************
   ! tableaux relatifs aux prop optiques des grains
@@ -516,13 +523,14 @@ subroutine alloc_dynamique()
 
      allocate(prob_delta_T(n_T,p_n_cells,n_lambda), stat=alloc_status)
      mem_size = n_cells * n_T * n_lambda * 4. / 1024.**2
+     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_delta_T'
         stop
      endif
      prob_delta_T = 0
 
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
+
 
      if (lRE_nLTE) then
         allocate(prob_kappa_abs_1grain(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
@@ -962,6 +970,8 @@ subroutine realloc_dust_mol()
 
   ! TODO : cette partie prend bcp de memoire
   allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
+  mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**2
+  if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
   if (alloc_status > 0) then
      write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
@@ -1340,6 +1350,8 @@ subroutine realloc_step2()
   else
      deallocate(ksca_CDF)
      allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda2), stat=alloc_status)
+     mem_size = n_grains_tot * p_n_cells * n_lambda2 * 4. / 1024.**2
+     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
