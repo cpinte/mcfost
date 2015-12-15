@@ -1250,7 +1250,7 @@ subroutine densite_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, j_start_file
+  integer :: k, l, i, n_a, read_n_a, jj
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
 
@@ -1503,18 +1503,18 @@ subroutine densite_file()
   ! Densite du gaz : gaz = plus petites particules
   dz = disk_zone(1)
   !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
-  if (l3D_file) then
-     j_start_file=-nz
-  else
-     j_start_file=1
-  endif
   do k=1, n_az
-     do j=j_start_file,nz
+     do j=j_start,nz
+        if (l3D_file) then
+           jj = j
+        else
+           jj = abs(j)
+        endif
         if (j==0) then
            densite_gaz(i,j,k) =0.0
         else
            do i=1, n_rad
-              densite_gaz(i,j,k) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+              densite_gaz(i,j,k) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
            enddo
         endif
      enddo
@@ -1594,6 +1594,12 @@ subroutine densite_file()
         endif
      enddo
   endif  !lstrat
+
+  if (.not.l3D_file) then
+     do j=1,nz
+        densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
+     enddo
+  endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   do l=1,n_grains_tot
