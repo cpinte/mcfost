@@ -1405,10 +1405,10 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i,j, k, T, icell
+  integer :: i,j, k, T, icell, alloc_status
   real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
   real(kind=db) :: delta_T
-  real(kind=db), dimension(n_cells) :: E_cell, E_cell_corrected
+  real(kind=db), dimension(:), allocatable :: E_cell, E_cell_corrected
 
   cst_wl_max = log(huge_real)-1.0e-4
 
@@ -1417,7 +1417,14 @@ subroutine repartition_energie(lambda)
   ! Emission totale des etoiles
   E_star = E_stars(lambda)
 
+  allocate(E_cell(n_cells), E_cell_corrected(n_cells), stat = alloc_status)
+  if (alloc_status /= 0) then
+     write(*,*) "Allocation error in repartition_energie"
+     write(*,*) "Exiting"
+     stop
+  endif
   E_cell(:) = 0.0_db
+  E_cell_corrected(:) = 0.0_db
 
   ! Cas LTE
   if (lRE_LTE) then
@@ -1560,6 +1567,8 @@ subroutine repartition_energie(lambda)
   else
      prob_E_cell(:,lambda)=0.0
   endif
+
+  deallocate(E_cell,E_cell_corrected)
 
   return
 
