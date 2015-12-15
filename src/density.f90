@@ -1258,7 +1258,7 @@ subroutine densite_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, j_start_file, icell, phik
+  integer :: k, l, i, n_a, read_n_a, jj, icell, phik
   real(kind=db) :: somme, mass, facteur
   real :: a, tmp
 
@@ -1314,8 +1314,10 @@ subroutine densite_file()
   if (naxes(2) == 2*nz+1) then
      l3D_file = .true.
   else
+     write(*,*) "The density file only has > 0 z, making it symmetric"
      l3D_file = .false.
   endif
+
 
   if (l3D_file) then
      allocate(sph_dens(n_rad,-nz:nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
@@ -1501,18 +1503,18 @@ subroutine densite_file()
   ! Densite du gaz : gaz = plus petites particules
   dz = disk_zone(1)
   !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
-  if (l3D_file) then
-     j_start_file=-nz
-  else
-     j_start_file=1
-  endif
   do k=1, n_az
-     do j=j_start_file,nz
+     do j=j_start,nz
+        if (l3D_file) then
+           jj = j
+        else
+           jj = abs(j)
+        endif
         if (j==0) then
-           densite_gaz(cell_map(i,j,k)) =0.0
+           !densite_gaz(cell_map(i,j,k)) =0.0
         else
            do i=1, n_rad
-              densite_gaz(cell_map(i,j,k)) = sph_dens(i,j,k,1) ! gaz = plus petites particules
+              densite_gaz(cell_map(i,j,k)) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
            enddo
         endif
      enddo
@@ -1549,8 +1551,13 @@ subroutine densite_file()
            do phik=1, n_az
               do j=j_start,nz
                  if (j==0) cycle
+                 if (l3D_file) then
+                    jj = j
+                 else
+                    jj = abs(j)
+                 endif
                  do i=1, n_rad
-                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,1)
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,jj,phik,1)
                  enddo ! phik
               enddo ! j
            enddo ! i
@@ -1558,9 +1565,14 @@ subroutine densite_file()
 
            do phik=1, n_az
               do j=j_start,nz
+                 if (l3D_file) then
+                    jj = j
+                 else
+                    jj = abs(j)
+                 endif
                  if (j==0) cycle
                  do i=1, n_rad
-                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,n_a)
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,jj,phik,n_a)
                  enddo ! phik
               enddo ! j
            enddo ! i
@@ -1571,9 +1583,14 @@ subroutine densite_file()
            do phik=1, n_az
               do j=j_start,nz
                  if (j==0) cycle
+                 if (l3D_file) then
+                    jj = j
+                 else
+                    jj = abs(j)
+                 endif
                  do i=1, n_rad
-                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,l) + f * &
-                         ( sph_dens(i,j,phik,l+1) -  sph_dens(i,j,phik,l) )
+                    densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,jj,phik,l) + f * &
+                         ( sph_dens(i,jj,phik,l+1) -  sph_dens(i,jj,phik,l) )
                  enddo ! phik
               enddo ! j
            enddo ! i
@@ -1585,8 +1602,13 @@ subroutine densite_file()
         do phik=1, n_az
            do j=j_start,nz
               if (j==0) cycle
+              if (l3D_file) then
+                 jj = j
+              else
+                 jj = abs(j)
+              endif
               do i=1, n_rad
-                 densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,j,phik,1)
+                 densite_pouss(cell_map(i,j,phik),k) = sph_dens(i,jj,phik,1)
               enddo ! phik
            enddo ! j
         enddo ! i
