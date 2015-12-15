@@ -828,7 +828,7 @@ subroutine define_density_wall3D()
   ! sur le disque
   ! C. Pinte  25/01/2011
 
-  integer :: pop, i, j, k, l, izone, alloc_status, n_cells, icell
+  integer :: pop, l, izone, alloc_status, n_cells, icell
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
@@ -1351,37 +1351,26 @@ subroutine densite_file()
   sph_dens = sph_dens/maxval(sph_dens) ! normalization avant d'ajouter une constante
   sph_dens = max(sph_dens,1e10*tiny_real)
 
-  ! Lecture des tailles de grains (en microns)
-!  if (n_a > 99999) then
-!     write(*,*) "ERROR : max 99999 grain sizes at the moment"
-!     write(*,*) "code must be updated if you need more"
-!     write(*,*) "Exiting."
-!     stop
-!  endif
-!
-!  do i=1,n_a
-!     write(s,'(i5)') i ; call ftgkye(unit,'grain_size_'//trim(ADJUSTL(s)),tmp,comment,stat)
-!     a_sph(i) = tmp ! cannot read directly into an array element
-!     write(*,*) i, a_sph(i), "microns"
-!  enddo
-
   if (n_a > 1) then
 
      read_n_a = 0
      call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
+
+     write(*,*) "read_n_a", read_n_a
 
      !---------------------------------------------------------
      ! HDU 2 : grain sizes
      !---------------------------------------------------------
      !  move to next hdu
      call ftmrhd(unit,1,hdutype,status)
-
+     nfound=1
      ! Check dimensions
      call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
      if (nfound /= 1) then
         write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
         write(*,*) 'HDU 2 has', nfound, 'dimensions.'
         write(*,*) 'Exiting.'
+        write(*,*)
         stop
      endif
      if ((naxes(1) /= n_a)) then
@@ -1532,9 +1521,7 @@ subroutine densite_file()
   ! Calcul de la masse de gaz de la zone
   mass = 0.
   do icell=1,n_cells
-     do k=1,n_az
-        mass = mass + densite_gaz(cell_map(i,j,k)) *  masse_mol_gaz * volume(icell)
-     enddo  !k
+     mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
   enddo !icell
   mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -1542,15 +1529,9 @@ subroutine densite_file()
   if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
      facteur = dz%diskmass * dz%gas_to_dust / mass
      ! Somme sur les zones pour densite finale
-     do i=1,n_rad
-        bz_gas_mass2 : do j=j_start,nz
-           if (j==0) cycle bz_gas_mass2
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              densite_gaz(icell) = densite_gaz(icell) * facteur
-           enddo !k
-        enddo bz_gas_mass2
-     enddo ! i
+     do icell=1,n_cells
+        densite_gaz(icell) = densite_gaz(icell) * facteur
+     enddo ! icell
   endif
 
   ! Tableau de masse de gaz
