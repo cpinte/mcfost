@@ -184,7 +184,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
      if (lstop) then

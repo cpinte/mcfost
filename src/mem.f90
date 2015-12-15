@@ -290,12 +290,11 @@ subroutine alloc_dynamique()
      p_n_lambda = n_lambda ! was 1 : changed to save dust properties
 
      if (lsepar_pola) then
-        mem_size = 5 * nang_scatt * p_n_cells * n_lambda * 4. / 1024.**2
+        mem_size = (5. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**2
      else
-        mem_size = 2 * nang_scatt * p_n_cells * n_lambda * 4. / 1024.**2
+        mem_size = (2. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**2
      endif
      if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering matrices"
-
      allocate(tab_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
@@ -327,7 +326,7 @@ subroutine alloc_dynamique()
      p_n_lambda = n_lambda
 
      allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
-     mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**2
+     mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**2
      if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
@@ -521,9 +520,10 @@ subroutine alloc_dynamique()
      endif
      xT_ech = 2
 
-     allocate(prob_delta_T(n_T,p_n_cells,n_lambda), stat=alloc_status)
-     mem_size = n_cells * n_T * n_lambda * 4. / 1024.**2
+     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**2
      if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
+     allocate(prob_delta_T(n_T,p_n_cells,n_lambda), stat=alloc_status)
+
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_delta_T'
         stop
@@ -905,7 +905,7 @@ end subroutine dealloc_em_th
 
 subroutine realloc_dust_mol()
 
-  integer :: alloc_status
+  integer :: alloc_status, mem_size
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
        tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
@@ -1050,7 +1050,7 @@ end subroutine clean_mem_dust_mol
 
 subroutine realloc_step2()
 
-  integer :: alloc_status
+  integer :: alloc_status, mem_size
 
   p_n_lambda = n_lambda2 ! Plus de pointeur a 1 depuis que l'on sauvegarde les proprietes optiques
 
