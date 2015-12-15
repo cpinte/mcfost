@@ -541,11 +541,11 @@ subroutine transfert_poussiere()
               !$omp atomic
               ibar = ibar+1
            endif
-           if (nnfot1_cumul == nbre_photons_loop) call progress_bar(50)
         endif
      enddo !nnfot1
      !$omp end do
      !$omp end parallel
+     if (laffichage) call progress_bar(50)
 
 
      ! Champ de radiation interstellaire
