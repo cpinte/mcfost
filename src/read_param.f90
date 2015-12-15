@@ -219,7 +219,7 @@ contains
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
-    T_min= 1.0 ; T_max=3000. ; n_T=300
+    T_min= 1.0 ; T_max=3000. ; n_T=100
     if (lchange_Tmax_PAH) T_max = Tmax_PAH
 
     ! ---------------
@@ -661,7 +661,7 @@ contains
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lhydrostatic
     read(1,*) lchauff_int, alpha
-    T_min= 1.0 ; T_max=3000. ; n_T=300
+    T_min= 1.0 ; T_max=3000. ; n_T=100
     if (lchange_Tmax_PAH) T_max = Tmax_PAH
 
     ! ---------------
