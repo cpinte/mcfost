@@ -610,20 +610,20 @@ subroutine prop_grains(lambda, p_lambda)
            endif
            !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
-        tab_albedo(lambda,k)=qsca/qext
-        tab_g(lambda,k) = gsca
+        tab_albedo(k,lambda)=qsca/qext
+        tab_g(k,lambda) = gsca
 
         ! section efficace
-        C_ext(lambda,k) = qext * S_grain(k)
-        C_sca(lambda,k) = qsca * S_grain(k)
-        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k)
+        C_ext(k,lambda) = qext * S_grain(k)
+        C_sca(k,lambda) = qsca * S_grain(k)
+        C_abs(k,lambda) = C_ext(k,lambda) - C_sca(k,lambda)
 
         ! Normalisation des opacites pour etre en AU^-1 pour fichier thermal_emission.f90
         ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
         ! a² microns² -> 1e-8 cm²             \
         ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0
         ! longueur de vol en AU = 1.5e13 cm   /
-        C_abs_norm(lambda,k) = C_abs(lambda,k) * AU_to_cm * mum_to_cm**2
+        C_abs_norm(k,lambda) = C_abs(k,lambda) * AU_to_cm * mum_to_cm**2
      endif ! is_opacity_file
   enddo !k
   !$omp enddo
@@ -639,13 +639,13 @@ subroutine prop_grains(lambda, p_lambda)
         x = 2.0 * pi * a / wavel
         call Mueller_opacity_file(p_lambda,k, qext,qsca,gsca)
 
-        tab_albedo(lambda,k)=qsca/qext
-        tab_g(lambda,k) = gsca
+        tab_albedo(k,lambda)=qsca/qext
+        tab_g(k,lambda) = gsca
 
-        C_ext(lambda,k) = qext * S_grain(k)
-        C_sca(lambda,k) = qsca * S_grain(k)
-        C_abs(lambda,k) = C_ext(lambda,k) - C_sca(lambda,k)
-        C_abs_norm(lambda,k) = C_abs(lambda,k) * AU_to_cm * mum_to_cm**2
+        C_ext(k,lambda) = qext * S_grain(k)
+        C_sca(k,lambda) = qsca * S_grain(k)
+        C_abs(k,lambda) = C_ext(k,lambda) - C_sca(k,lambda)
+        C_abs_norm(k,lambda) = C_abs(k,lambda) * AU_to_cm * mum_to_cm**2
      endif ! is_opacity_file
   enddo !k
 
@@ -838,8 +838,8 @@ subroutine opacite(lambda)
 
      do  k=1,n_grains_tot
         density=densite_pouss(k,icell)
-        kappa(icell,lambda) = kappa(icell,lambda) + C_ext(lambda,k) * density
-        k_abs_tot = k_abs_tot + C_abs(lambda,k) * density
+        kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
+        k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
 
      low_mem_scattering = .true.
@@ -847,7 +847,7 @@ subroutine opacite(lambda)
         kappa_sca(icell,lambda) = 0.0
         do k=1,n_grains_tot
            density=densite_pouss(k,icell)
-           kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(lambda,k) * density
+           kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
         enddo
      endif
 
@@ -855,16 +855,16 @@ subroutine opacite(lambda)
         kappa_abs_eg(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end
            density=densite_pouss(k,icell)
-           kappa_abs_eg(icell,lambda) =  kappa_abs_eg(icell,lambda) + C_abs(lambda,k) * density
-           k_abs_RE_LTE = k_abs_RE_LTE + C_abs(lambda,k) * density ! todo : idem kappa_abs_eg, I can save this calculation
-           k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
+           kappa_abs_eg(icell,lambda) =  kappa_abs_eg(icell,lambda) + C_abs(k,lambda) * density
+           k_abs_RE_LTE = k_abs_RE_LTE + C_abs(k,lambda) * density ! todo : idem kappa_abs_eg, I can save this calculation
+           k_abs_RE = k_abs_RE + C_abs(k,lambda) * density
         enddo
      endif
 
      if (lRE_nLTE) then
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            density=densite_pouss(k,icell)
-           k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
+           k_abs_RE = k_abs_RE + C_abs(k,lambda) * density
         enddo
      endif
 
@@ -887,7 +887,7 @@ subroutine opacite(lambda)
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
               density=densite_pouss(k,icell)
               prob_kappa_abs_1grain(k,icell,lambda)=prob_kappa_abs_1grain(k-1,icell,lambda) + &
-                   C_abs(lambda,k) * density
+                   C_abs(k,lambda) * density
            enddo !k
            if (prob_kappa_abs_1grain(grain_RE_nLTE_end,icell,lambda) > tiny_real) then
               prob_kappa_abs_1grain(:,icell,lambda) =  prob_kappa_abs_1grain(:,icell,lambda)/&
@@ -949,9 +949,9 @@ subroutine opacite(lambda)
      somme=0.0
      do  k=1,n_grains_tot
         density=densite_pouss(k,icell)
-        k_sca_tot = k_sca_tot + C_sca(lambda,k) * density
-        k_ext_tot = k_ext_tot + C_ext(lambda,k) * density
-        tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(lambda,k) * density * tab_g(lambda,k)
+        k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
+        k_ext_tot = k_ext_tot + C_ext(k,lambda) * density
+        tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
         !somme = somme + C_sca(lambda,k)*density
 
         if (scattering_method == 2) then
@@ -969,7 +969,7 @@ subroutine opacite(lambda)
         else
            ! Au choix suivant que l'on considère un albedo par cellule ou par grain
            ! albedo par cellule :
-           ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(lambda,k)*density
+           ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda)*density
         endif !scattering_method
      enddo !k
 
@@ -1165,7 +1165,7 @@ subroutine opacite(lambda)
      call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
 
      do l=1, n_lambda
-        kappa_grain(l,:) = C_abs(l,:) * mum_to_cm**2 / M_grain(:) ! cm^2/g
+        kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
      enddo
      call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 

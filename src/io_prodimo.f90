@@ -863,8 +863,8 @@ contains
           icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(l,icell) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(l,icell) * facteur
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -1015,8 +1015,8 @@ contains
              icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(l,icell)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(l,icell)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
