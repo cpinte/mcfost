@@ -933,7 +933,9 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
 
         if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
            rand = sprng(stream(id))
-           taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
+           !taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
+           taille_grain = select_scattering_grain(lambda,p_icell, rand) ! ok, not too bad, not much smaller
+
            rand = sprng(stream(id))
            rand2 = sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie

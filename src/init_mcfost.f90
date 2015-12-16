@@ -1264,7 +1264,6 @@ subroutine display_disclaimer()
 
   write(*,*) "*******************************************"
   write(*,*) "*          MCFOST DISCLAIMER              *"
-  !write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
   write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
   write(*,*) "*                                         *"
   write(*,*) "* MCFOST is available on a collaborative  *"
@@ -1289,7 +1288,6 @@ subroutine display_disclaimer()
         open(unit=1,file=trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"
-        !write(*,*) "* This screen will not appear again       *"
      else
         write(*,*) "* Exiting MCFOST                          *"
         write(*,*) "*******************************************"

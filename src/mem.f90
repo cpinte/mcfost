@@ -258,7 +258,8 @@ subroutine alloc_dynamique()
 
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(amax_reel(n_cells,n_lambda), kappa(n_cells,n_lambda),kappa_abs_eg(n_cells,n_lambda), stat=alloc_status)
+  allocate(amax_reel(n_cells,n_lambda), kappa(n_cells,n_lambda),  kappa_sca(n_cells,n_lambda), &
+       kappa_abs_eg(n_cells,n_lambda), stat=alloc_status)
   allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
   if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
   if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
@@ -325,14 +326,22 @@ subroutine alloc_dynamique()
   else ! scattering method==1 --> prop par grains
      p_n_lambda = n_lambda
 
-     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
-     mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**2
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error ksca_CDF'
-        stop
+     mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**3
+     if (mem_size < max_mem) then
+        low_mem_scattering = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+
+        allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
+
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error ksca_CDF'
+           stop
+        endif
+        ksca_CDF = 0
+     else ! Array is to big, we will recompute on the fly
+        low_mem_scattering = .false.
+        write(*,*) "WARNING : using low memory mode for scattering properties"
      endif
-     ksca_CDF = 0
   endif ! method
 
   ! **************************************************

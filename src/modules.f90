@@ -25,6 +25,9 @@ module parametres
   integer :: indice_etape, etape_i, etape_f
   integer :: time_begin, time_end, time_tick, time_max
 
+  real, parameter :: max_mem = 4. ! GBytes
+  logical :: low_mem_scattering
+
   ! Nombre de photons lances
   logical :: ldust_transfer
   integer :: nbre_photons_loop, nbre_photons_eq_th, nbre_photons_lambda, nbre_photons_image, nbre_photons_spectre
@@ -147,18 +150,6 @@ module disk
   save
 
   real :: distance ! Distance du disque en pc
-
-!* Parametres du disque
-!* --------------------
-!*
-!* toutes les distances sont donnees en AU et la masse du disque
-!* en masse solaire
-!*     exp_beta.......... exposant decrivant le "flaring"
-!*     surf.......... exposant de la distribution SURFACIQUE de densite
-!*     rin, rout..... limites interne et externe du disque
-!*     rref.......... rayon de reference ("r0")
-!*     sclht......... echelle de hauteur a r0 ("h0")
-!*
   real(kind=db) :: map_size
 
   ! Disque decrit en une ou n zones
@@ -268,19 +259,6 @@ module prop_star
   save
 
   integer :: n_etoiles
-
-! Parametres de l'etoile
-!  real, parameter :: r_etoile = 0.0086333333 ! 1.85*R_soleil
-!  real, parameter :: r_etoile = 0.00466666666 ! R_soleil
-!  real, parameter :: T_etoile = 4000.
-!  real, parameter :: M_etoile = 0.5
-
-! Parametres du point chaud
-  ! rayon projete du spot
-!  real, parameter :: r_spot = 0.00*r_etoile
-!  real, parameter :: T_spot = 8000.
-!  real, parameter :: theta_spot = 20.*pi/180.
-!  real, parameter :: phi_spot = 0.*pi/180.
 
   type star_type
      real :: r, T, M, fUV, slope_UV
@@ -457,8 +435,9 @@ module opacity
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
   real, dimension(:,:), allocatable :: amax_reel !n_cells, n_lambda
-  real(kind=db), dimension(:,:), allocatable :: kappa, kappa_abs_eg, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
-  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE !n_cells, n_lambda
+  real(kind=db), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
+  real, dimension(:,:), allocatable :: kappa_abs_eg, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
+  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: prob_kappa_abs_1grain ! 0:n_grains, n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 

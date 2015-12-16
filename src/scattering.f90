@@ -796,10 +796,6 @@ end subroutine cdapres
 
 integer function grainsize(lambda,aleat,ri,zj,phik)
 !-----------------------------------------------------
-!  tirage aleatoire de la taille du grain qui diffuse
-!  selon la distribution de Mathis, Rumpl et Nordsieck
-!  (1997): n(a)= a^-aexp, entre amin et amax.
-!
 !  Nouvelle version : janvier 04
 !  la dichotomie se fait en comparant les indices
 !  et non plus en utilisant la taille du pas
@@ -816,7 +812,7 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   real :: prob
   integer :: kmin, kmax, k, icell
 
-  prob = aleat  ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
+  prob = aleat ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
   icell = cell_map(ri,zj,phik)
 
   ! Cas particulier prob=1.0
@@ -848,6 +844,51 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   return
 
 end function grainsize
+
+
+!***************************************************
+
+integer function select_scattering_grain(lambda,icell, aleat) result(k)
+  ! This routine will select randomly the scattering grain
+  ! from the CDF of ksca
+  ! Because we cannot store all the CDF for all cells
+  ! (n_grains x ncells x n_lambda)
+  ! The CDF is recomputed on the fly here
+  ! The normalization is saved via kappa_sca, so we do not need to compute
+  ! all the CDF
+
+  implicit none
+
+  integer, intent(in) :: lambda, icell
+  real, intent(in) :: aleat
+  real :: prob, CDF, fact
+
+  ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
+  fact =  kappa_sca(icell,lambda) !AU_to_cm * mum_to_cm**2
+
+  if (aleat < 0.5) then ! We start from first grain
+     prob = aleat * fact
+     CDF = 0.0
+     do k=1, n_grains_tot
+        CDF = CDF + C_sca(lambda,k) * densite_pouss(icell,k)
+      !  write(*,*) k, CDF
+        if (CDF > prob) exit
+     enddo
+
+     !write(*,*) "ALEAT", aleat, prob, kappa_sca(icell,lambda)
+
+  else ! We start from the end of the grain size distribution
+     prob = (1.0-aleat) * fact
+     CDF = 0.0
+     do k=n_grains_tot, 1, -1
+        CDF = CDF + C_sca(lambda,k) * densite_pouss(icell,k)
+        if (CDF > prob) exit
+     enddo
+  endif
+
+  return
+
+end function select_scattering_grain
 
 !*******************************************************************
 

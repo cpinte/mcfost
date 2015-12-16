@@ -842,6 +842,15 @@ subroutine opacite(lambda)
         k_abs_tot = k_abs_tot + C_abs(lambda,k) * density
      enddo !k
 
+     low_mem_scattering = .true.
+     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost.or.low_mem_scattering) then
+        kappa_sca(icell,lambda) = 0.0
+        do k=1,n_grains_tot
+           density=densite_pouss(icell,k)
+           kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(lambda,k) * density
+        enddo
+     endif
+
      if (lRE_LTE) then
         kappa_abs_eg(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end
@@ -856,14 +865,6 @@ subroutine opacite(lambda)
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            density=densite_pouss(icell,k)
            k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
-        enddo
-     endif
-
-     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
-        kappa_sca(icell,lambda) = 0.0
-        do k=1,n_grains_tot
-           density=densite_pouss(icell,k)
-           kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(lambda,k) * density
         enddo
      endif
 
