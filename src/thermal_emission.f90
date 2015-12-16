@@ -152,7 +152,6 @@ subroutine init_reemission()
            ! Les formules prennent en compte le * lambda de l'integ log
            ! edit : non, mais delta_wl
            B(lambda) = 1.0/((wl**5)*(coeff_exp-1.0))*delta_wl
-           !        write(*,*) lambda, wl, B(lambda)
            dB_dT(lambda) = B(lambda)*cst_wl*coeff_exp/(coeff_exp-1.0) !/Temp * temp a cause de dT mais ca change rien en pratique
         else
            B(lambda)=0.0
