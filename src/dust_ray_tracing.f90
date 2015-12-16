@@ -813,7 +813,7 @@ subroutine calc_Jth(lambda)
               if (cst_wl < 500.0) then
                  coeff_exp=exp(cst_wl)
                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                      C_abs_norm(lambda,l)*densite_pouss(icell,l)
+                      C_abs_norm(lambda,l)*densite_pouss(l,icell)
               endif
            enddo ! l
         enddo ! icell
@@ -828,7 +828,7 @@ subroutine calc_Jth(lambda)
                  if (cst_wl < 500.) then
                     coeff_exp=exp(cst_wl)
                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         C_abs_norm(lambda,l)*densite_pouss(icell,l)
+                         C_abs_norm(lambda,l)*densite_pouss(l,icell)
                  endif !cst_wl
               else ! ! la grain a une proba de T
                  do T=1,n_T
@@ -837,7 +837,7 @@ subroutine calc_Jth(lambda)
                     if (cst_wl < 500.) then
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(lambda,l)*densite_pouss(icell,l) * Proba_Temperature(T,l,icell)
+                            C_abs_norm(lambda,l)*densite_pouss(l,icell) * Proba_Temperature(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE

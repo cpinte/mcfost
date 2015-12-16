@@ -4671,7 +4671,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
   if (n_zones > 1) then
      do icell=1, n_cells
-        if (sum(densite_pouss(icell,:)) < tiny_real) l_dark_zone(icell) = .false.
+        if (sum(densite_pouss(:,icell)) < tiny_real) l_dark_zone(icell) = .false.
      enddo
   endif
 

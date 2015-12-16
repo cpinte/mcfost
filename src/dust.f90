@@ -804,9 +804,9 @@ subroutine opacite(lambda)
   ldens0 = .false.
   if (.not.lvariable_dust) then
      icell = cell_map(1,1,1)
-     if (maxval(densite_pouss(icell,:)) < tiny_real) then
+     if (maxval(densite_pouss(:,icell)) < tiny_real) then
         ldens0 = .true.
-        densite_pouss(icell,:) = nbre_grains(:)
+        densite_pouss(:,icell) = nbre_grains(:)
      endif
   endif
 
@@ -837,7 +837,7 @@ subroutine opacite(lambda)
      k_abs_RE_LTE = 0.0
 
      do  k=1,n_grains_tot
-        density=densite_pouss(icell,k)
+        density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(lambda,k) * density
         k_abs_tot = k_abs_tot + C_abs(lambda,k) * density
      enddo !k
@@ -846,7 +846,7 @@ subroutine opacite(lambda)
      if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost.or.low_mem_scattering) then
         kappa_sca(icell,lambda) = 0.0
         do k=1,n_grains_tot
-           density=densite_pouss(icell,k)
+           density=densite_pouss(k,icell)
            kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(lambda,k) * density
         enddo
      endif
@@ -854,7 +854,7 @@ subroutine opacite(lambda)
      if (lRE_LTE) then
         kappa_abs_eg(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end
-           density=densite_pouss(icell,k)
+           density=densite_pouss(k,icell)
            kappa_abs_eg(icell,lambda) =  kappa_abs_eg(icell,lambda) + C_abs(lambda,k) * density
            k_abs_RE_LTE = k_abs_RE_LTE + C_abs(lambda,k) * density ! todo : idem kappa_abs_eg, I can save this calculation
            k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
@@ -863,7 +863,7 @@ subroutine opacite(lambda)
 
      if (lRE_nLTE) then
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-           density=densite_pouss(icell,k)
+           density=densite_pouss(k,icell)
            k_abs_RE = k_abs_RE + C_abs(lambda,k) * density
         enddo
      endif
@@ -885,7 +885,7 @@ subroutine opacite(lambda)
         do icell=1, n_cells
            prob_kappa_abs_1grain(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
-              density=densite_pouss(icell,k)
+              density=densite_pouss(k,icell)
               prob_kappa_abs_1grain(k,icell,lambda)=prob_kappa_abs_1grain(k-1,icell,lambda) + &
                    C_abs(lambda,k) * density
            enddo !k
@@ -948,7 +948,7 @@ subroutine opacite(lambda)
 
      somme=0.0
      do  k=1,n_grains_tot
-        density=densite_pouss(icell,k)
+        density=densite_pouss(k,icell)
         k_sca_tot = k_sca_tot + C_sca(lambda,k) * density
         k_ext_tot = k_ext_tot + C_ext(lambda,k) * density
         tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(lambda,k) * density * tab_g(lambda,k)
@@ -1024,7 +1024,7 @@ subroutine opacite(lambda)
         if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
      endif !lscatt_ray_tracing
 
-     if (sum(densite_pouss(icell,:)) > tiny_real) then
+     if (sum(densite_pouss(:,icell)) > tiny_real) then
 
         if (scattering_method==2) then ! scattering matrix per cell
            if (aniso_method==1) then
@@ -1129,7 +1129,7 @@ subroutine opacite(lambda)
   ! On remet la densite à zéro si besoin
   if (ldens0) then
      icell = cell_map(1,1,1)
-     densite_pouss(icell,:) = 0.0_db
+     densite_pouss(:,icell) = 0.0_db
      kappa(icell,lambda) = 0.0_db
      if (lRE_LTE) then
         kappa_abs_eg(icell,lambda) = 0.0_db

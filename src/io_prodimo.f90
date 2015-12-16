@@ -863,8 +863,8 @@ contains
           icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(icell,l) * facteur
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(l,icell) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(l,icell) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -892,12 +892,12 @@ contains
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
           icell = cell_map(ri,zj,1)
-          N = sum(densite_pouss(icell,:),mask=mask_not_PAH)
+          N = sum(densite_pouss(:,icell),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(icell,:) * r_grain(:),mask=mask_not_PAH) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(icell,:) * r_grain(:)**2,mask=mask_not_PAH) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(icell,:) * r_grain(:)**3,mask=mask_not_PAH) / N
+             N_grains(ri,zj,1) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
           else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
@@ -987,7 +987,7 @@ contains
        do ri=1, n_rad
           do zj=1,nz
              icell = cell_map(ri,zj,k)
-             dens(ri,zj) = sum(densite_pouss(icell, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             dens(ri,zj) = sum(densite_pouss(iPAH_start:iPAH_end, icell) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
           enddo
        enddo
        call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1015,8 +1015,8 @@ contains
              icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(icell,l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(icell,l)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(l,icell)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(l,icell)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1048,8 +1048,8 @@ contains
                 else
                    Ttmp = temperature_1grain(l,icell)
                 endif
-                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(icell,l)
-                norme = norme + densite_pouss(icell,l)
+                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(l,icell)
+                norme = norme + densite_pouss(l,icell)
              enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
           enddo ! ri

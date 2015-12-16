@@ -441,7 +441,7 @@ module opacity
   real, dimension(:,:,:), allocatable :: prob_kappa_abs_1grain ! 0:n_grains, n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
-  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_cells, n_grains en part.cm-3
+  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda

@@ -130,7 +130,7 @@ subroutine alloc_dynamique()
   endif
   masse = 0.0
 
-  allocate(densite_pouss(n_cells,n_grains_tot), stat=alloc_status)
+  allocate(densite_pouss(n_grains_tot,n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_pouss'
      stop
