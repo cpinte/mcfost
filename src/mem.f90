@@ -190,8 +190,8 @@ subroutine alloc_dynamique()
   endif
   tab_albedo = 0
 
-  allocate(C_ext(n_lambda,n_grains_tot), C_sca(n_lambda,n_grains_tot), &
-       C_abs(n_lambda,n_grains_tot), C_abs_norm(n_lambda,n_grains_tot), stat=alloc_status) !  C_geo(n_grains_tot)
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda), C_abs_norm(n_grains_tot,n_lambda), stat=alloc_status) !  C_geo(n_grains_tot)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error q_ext'
      stop
@@ -199,7 +199,7 @@ subroutine alloc_dynamique()
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm =0
 
 
-  allocate(tab_g(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_g(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_g'
      stop
@@ -933,8 +933,8 @@ subroutine realloc_dust_mol()
   endif
   tab_albedo = 0
 
-  allocate(C_ext(n_lambda,n_grains_tot), C_sca(n_lambda,n_grains_tot), &
-       C_abs(n_lambda,n_grains_tot),  C_abs_norm(n_lambda,n_grains_tot), tab_g(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda),  C_abs_norm(n_grains_tot,n_lambda), tab_g(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_ext (realloc)'
      stop
@@ -1235,7 +1235,7 @@ subroutine realloc_step2()
   tab_albedo = 0
 
   deallocate(C_ext)
-  allocate(C_ext(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_ext(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_ext'
      stop
@@ -1243,7 +1243,7 @@ subroutine realloc_step2()
   C_ext = 0
 
   deallocate(C_sca)
-  allocate(C_sca(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_sca(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_sca'
      stop
@@ -1251,7 +1251,7 @@ subroutine realloc_step2()
   C_sca = 0
 
   deallocate(C_abs,C_abs_norm)
-  allocate(C_abs(n_lambda2,n_grains_tot), C_abs_norm(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_abs(n_grains_tot,n_lambda2), C_abs_norm(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_abs'
      stop
@@ -1259,7 +1259,7 @@ subroutine realloc_step2()
   C_abs = 0 ; C_abs_norm = 0
 
   deallocate(tab_g)
-  allocate(tab_g(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(tab_g(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_g'
      stop

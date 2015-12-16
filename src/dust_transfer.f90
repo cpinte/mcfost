@@ -958,7 +958,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
                  endif
               endif
            else ! fonction de phase HG
-              call hg(tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
+              call hg(tab_g(taille_grain,lambda),rand, itheta, COSPSI) !HG
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
