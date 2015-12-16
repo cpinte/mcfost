@@ -150,7 +150,7 @@ subroutine sublimate_dust()
 
               if (.not.dust_pop(ipop)%is_PAH) then
                  if (Temperature(icell) > dust_pop(ipop)%T_sub) then
-                    densite_pouss(icell,k) = 0.0
+                    densite_pouss(k,icell) = 0.0
                  endif
               endif
            enddo
@@ -165,7 +165,7 @@ subroutine sublimate_dust()
      do j=1,nz
         icell = cell_map(i,j,1)
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(icell,k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
+           mass=mass + densite_pouss(k,icell) * M_grain(k) * (volume(icell) * AU3_to_cm3)
         enddo
      enddo
   enddo

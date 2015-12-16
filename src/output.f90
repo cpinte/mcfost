@@ -1223,7 +1223,7 @@ subroutine write_disk_struct()
         if (j==0) cycle bz2
         do i=1,n_rad
            icell =  cell_map(i,j,k)
-           dust_dens(i,j,k,:) = densite_pouss(icell,:) * m3_to_cm3
+           dust_dens(i,j,k,:) = densite_pouss(:,icell) * m3_to_cm3
         enddo !i
      enddo bz2 !j
   enddo !k
@@ -1280,7 +1280,7 @@ subroutine write_disk_struct()
         if (j==0) cycle bz
         do i=1,n_rad
            icell =  cell_map(i,j,k)
-           dens(i,j,k) = sum(densite_pouss(icell,:) * M_grain(:)) ! M_grain en g
+           dens(i,j,k) = sum(densite_pouss(:,icell) * M_grain(:)) ! M_grain en g
         enddo !i
      enddo bz !j
   enddo !k
@@ -2190,8 +2190,8 @@ subroutine taille_moyenne_grains()
         somme=0.0
         icell = cell_map(i,j,1)
         do l=1, n_grains_tot
-           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(icell,l) * r_grain(l)**2
-           somme = somme + densite_pouss(icell,l)
+           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(l,icell) * r_grain(l)**2
+           somme = somme + densite_pouss(l,icell)
         enddo
         a_moyen(i,j) = a_moyen(i,j) / somme
      enddo

@@ -870,8 +870,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
      prob = aleat * fact
      CDF = 0.0
      do k=1, n_grains_tot
-        CDF = CDF + C_sca(lambda,k) * densite_pouss(icell,k)
-      !  write(*,*) k, CDF
+        CDF = CDF + C_sca(lambda,k) * densite_pouss(k,icell)
         if (CDF > prob) exit
      enddo
 
@@ -881,7 +880,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
      prob = (1.0-aleat) * fact
      CDF = 0.0
      do k=n_grains_tot, 1, -1
-        CDF = CDF + C_sca(lambda,k) * densite_pouss(icell,k)
+        CDF = CDF + C_sca(lambda,k) * densite_pouss(k,icell)
         if (CDF > prob) exit
      enddo
   endif
