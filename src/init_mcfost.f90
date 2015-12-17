@@ -1243,6 +1243,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
+  write(*,*) "        : -limb_darkening <filename>"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"

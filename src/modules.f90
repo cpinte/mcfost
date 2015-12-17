@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.15"
+  character(8), parameter :: mcfost_release = "2.20.16"
   real, parameter :: required_utils_version = 2.208
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -893,7 +893,7 @@ module ray_tracing
   real, dimension(:,:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
-  real, dimension(:,:), allocatable :: stars_map ! nx, ny
+  real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
 

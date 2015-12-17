@@ -958,10 +958,13 @@ subroutine read_limb_darkening_file(lambda)
   enddo
 
   limb_darkening(:) = frac * Imu(:,i) + (1.0 - frac) * Imu(:,i+1)
-  pola_limb_darkening(:) = frac * Q_o_Imu(:,i) + (1.0 - frac) * Q_o_Imu(:,i+1)
+  pola_limb_darkening(:) = -(frac * Q_o_Imu(:,i) + (1.0 - frac) * Q_o_Imu(:,i+1))
 
   ! Normalizing limb_darkening
   limb_darkening(:) =  limb_darkening(:) / limb_darkening(lb_n_mu)
+
+  write(*,*) "Maximum limb darkening = ", limb_darkening(1)
+  write(*,*) "Maximum pola limb darkening = ", pola_limb_darkening(1)
 
   return
 
