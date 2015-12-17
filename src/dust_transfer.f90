@@ -194,6 +194,9 @@ subroutine transfert_poussiere()
         endif
      endif
      call repartition_energie_etoiles()
+
+     if (llimb_darkening) call read_limb_darkening_file(1)
+
      call prop_grains(1,1)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
@@ -1264,14 +1267,16 @@ end subroutine dust_map
 subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! Make a ray-traced map of the stars
 
+  use utils, only : interp
+
   integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
-  integer, parameter :: n_ray_star_SED = 1000
+  integer, parameter :: n_ray_star_SED = 10000
 
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
-  real :: rand, rand2, tau, pix_size
+  real :: rand, rand2, tau, pix_size, LimbDarkening
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, ri, zj, phik, iray, istar, i,j
   logical :: in_map
@@ -1302,6 +1307,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   endif
 
   in_map = .true. ! for SED
+  LimbDarkening = 1.0
   do istar=1, n_etoiles
      map_1star = 0.0 ;
 
@@ -1327,7 +1333,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         y = srw02 * sin(argmt)
 
         cos_thet = abs(x*u + y*v + z*w) ;
-        !cos_thet = 1.0_db ;
+
+        if (llimb_darkening) LimbDarkening = interp(limb_darkening, mu_limb_darkening, real(cos_thet))
 
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
         x1 = etoile(istar)%x + x * etoile(istar)%r
@@ -1357,8 +1364,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
            call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
         endif
 
-        if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
-        norme = norme + cos_thet
+        if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet * LimbDarkening
+        norme = norme + cos_thet * LimbDarkening
      enddo
 
      ! Normalizing map
