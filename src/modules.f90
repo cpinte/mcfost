@@ -305,6 +305,12 @@ module prop_star
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
 
+
+  ! Limb darkening
+  logical :: llimb_darkening
+  character(len=512) :: limb_darkening_file
+  real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
+
 end module prop_star
 
 !********************************************************************
@@ -685,6 +691,8 @@ module constantes
   real(kind=db), parameter :: m_to_mum = 1.0e6_db
   real(kind=db), parameter :: mum_to_cm = 1.0e-4_db
   real(kind=db), parameter :: cm_to_mum = 1.0e4_db
+
+  real(kind=db), parameter :: A_to_mum = 1.0e-4_db
 
   real(kind=db), parameter :: m_to_cm = 1.0e2_db
   real(kind=db), parameter :: m3_to_cm3 = m_to_cm**3

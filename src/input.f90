@@ -896,4 +896,76 @@ end subroutine init_tab_Temp
 
 !***************************************************
 
+subroutine read_limb_darkening_file(lambda)
+
+  use prop_star
+
+  integer, intent(in) :: lambda
+
+  integer, parameter :: lb_n_wl = 20, lb_n_mu = 159
+  real, dimension(lb_n_mu, lb_n_wl) :: Imu, Q_o_Imu
+  real, dimension(lb_n_wl) :: lb_wavelength
+  real, dimension(lb_n_mu) :: tmp
+
+  real :: frac
+  integer :: i, alloc_status
+
+
+  allocate(limb_darkening(lb_n_mu), pola_limb_darkening(lb_n_mu), mu_limb_darkening(lb_n_mu), stat=alloc_status)
+  if (alloc_status /= 0) then
+     write(*,*) "Allocation error in limb_darkening"
+     write(*,*) "Exiting"
+     stop
+  endif
+
+  write(*,*) "Reading limb darkening & stellar polarisation file: "//trim(limb_darkening_file)
+
+  open(unit=1,file=limb_darkening_file)
+  ! line 1 : skipping header line
+  read(1,*)
+
+  ! line 2 : reading 20 wavelengths & converting to mum
+  read(1,*) lb_wavelength ! the wavelengths are from long to short
+  lb_wavelength = lb_wavelength * A_to_mum
+
+  if ( (tab_lambda(lambda) > lb_wavelength(1)).or.(tab_lambda(lambda) < lb_wavelength(lb_n_wl)) ) then
+     write(*,*) "ERROR : wavelength is outside limb darkening wavelength range"
+     write(*,*) "valod values are between", lb_wavelength(lb_n_wl), "and", lb_wavelength(1), "mum"
+     write(*,*) "Exiting"
+     stop
+  endif
+
+  ! line 3 : sKipping Flux line
+  read(1,*)
+
+  ! line 4 : reading 159 mu values
+  read(1,*) mu_limb_darkening
+
+  ! line 5 : skipping the theta values
+  read(1,*)
+
+  do i=1, lb_n_wl
+     read(1,*) tmp ; Imu(:,i) = tmp(:)
+     read(1,*) ! skipping Q
+     read(1,*) tmp ; Q_o_Imu(:,i) = tmp(:)
+  enddo
+
+  do i= lb_n_wl-1, 1, -1
+     if (lb_wavelength(i) > tab_lambda(lambda)) then
+        frac = (tab_lambda(lambda) - lb_wavelength(i+1)) / (lb_wavelength(i) - lb_wavelength(i+1))
+        exit
+     endif
+  enddo
+
+  limb_darkening(:) = frac * Imu(:,i) + (1.0 - frac) * Imu(:,i+1)
+  pola_limb_darkening(:) = frac * Q_o_Imu(:,i) + (1.0 - frac) * Q_o_Imu(:,i+1)
+
+  ! Normalizing limb_darkening
+  limb_darkening(:) =  limb_darkening(:) / limb_darkening(lb_n_mu)
+
+  return
+
+end subroutine read_limb_darkening_file
+
+
 end module input
