@@ -197,7 +197,7 @@ subroutine init_reemission()
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_db)) then
               do lambda=1, n_lambda
-                 prob_delta_T(T,icell,lambda) = integ3(lambda)/integ3(n_lambda)
+                 kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
               enddo !l
            endif
         enddo !icell
@@ -217,7 +217,7 @@ subroutine init_reemission()
         if (integ3(n_lambda) > tiny(0.0_db)) then
            icell = cell_map(1,1,1) ! When lvariable is off --> values stored in 1st cell
            do lambda=1, n_lambda
-              prob_delta_T(T,icell,lambda) = integ3(lambda)/integ3(n_lambda)
+              kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
            enddo !l
         endif
      endif !lvariable_dust
@@ -248,7 +248,7 @@ subroutine init_reemission()
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_db)) then
               do lambda=1, n_lambda
-                 prob_delta_T_1grain(k,T,lambda) = integ3(lambda)/integ3(n_lambda)
+                 kdB_dT_1grain_nLTE_CDF(lambda,k,T) = integ3(lambda)/integ3(n_lambda)
               enddo !l
            endif
         enddo !k
@@ -283,7 +283,7 @@ subroutine init_reemission()
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_db)) then
               do lambda=1, n_lambda
-                 prob_delta_T_1grain_nRE(k,T,lambda) = integ3(lambda)/integ3(n_lambda)
+                 kdB_dT_1grain_nRE_CDF(lambda,k,T) = integ3(lambda)/integ3(n_lambda)
               enddo !l
            endif
         enddo !k
@@ -366,7 +366,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   l=(l1+l2)/2
 
   do while((l2-l1) > 1)
-     proba=frac_T1*prob_delta_T(T1,p_icell,l)+frac_T2*prob_delta_T(T2,p_icell,l)
+     proba=frac_T1*kdB_dT_CDF(l,T1,p_icell)+frac_T2*kdB_dT_CDF(l,T2,p_icell)
      if(aleat > proba) then
         l1=l
      else
@@ -413,7 +413,6 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   enddo   ! while
   k=kmax
 
-
   ! Mean intensity
   ! Somme sur differents processeurs
   J_abs=0.0
@@ -450,13 +449,12 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   frac_T2=(Temp-Temp1)/(Temp2-Temp1)
   frac_T1=1.0-frac_T2
 
-
   l1=0
   l2=n_lambda
   l=(l1+l2)/2
 
   do while((l2-l1) > 1)
-     proba=frac_T1*prob_delta_T_1grain(k,T1,l)+frac_T2*prob_delta_T_1grain(k,T2,l)
+     proba=frac_T1*kdB_dT_1grain_nLTE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_nLTE_CDF(l,k,T2)
      if(aleat2 > proba) then
         l1=l
      else
@@ -1133,7 +1131,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   l=(l1+l2)/2
 
   do while((l2-l1) > 1)
-     proba=frac_T1*prob_delta_T_1grain_nRE(k,T1,l)+frac_T2*prob_delta_T_1grain_nRE(k,T2,l)
+     proba=frac_T1*kdB_dT_1grain_nRE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_nRE_CDF(l,k,T2)
      if(aleat2 > proba) then
         l1=l
      else

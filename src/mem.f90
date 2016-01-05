@@ -531,13 +531,13 @@ subroutine alloc_dynamique()
 
      mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**2
      if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
-     allocate(prob_delta_T(n_T,p_n_cells,n_lambda), stat=alloc_status)
+     allocate(kdB_dT_CDF(n_lambda,n_T,p_n_cells), stat=alloc_status)
 
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error prob_delta_T'
+        write(*,*) 'Allocation error kdB_dT_CDF'
         stop
      endif
-     prob_delta_T = 0
+     kdB_dT_CDF = 0
 
 
 
@@ -549,12 +549,12 @@ subroutine alloc_dynamique()
         endif
         prob_kappa_abs_1grain=0.0
 
-        allocate(prob_delta_T_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T,n_lambda),stat=alloc_status)
+        allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error prob_delta_T_1grain'
+           write(*,*) 'Allocation error kdB_dT_1grain_nLTE_CDF'
            stop
         endif
-        prob_delta_T_1grain=0.0
+        kdB_dT_1grain_nLTE_CDF=0.0
 
         allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
@@ -606,12 +606,12 @@ subroutine alloc_dynamique()
         endif
         xT_ech_1grain_nRE = 2
 
-        allocate(prob_delta_T_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T,n_lambda),stat=alloc_status)
+        allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error prob_delta_T_1grain_nRE'
+           write(*,*) 'Allocation error kdB_dT_1grain_nRE_CDF'
            stop
         endif
-        prob_delta_T_1grain_nRE=0.0
+        kdB_dT_1grain_nRE_CDF=0.0
 
         if (lRE_nlTE) then
            allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
@@ -882,17 +882,17 @@ subroutine dealloc_em_th()
         deallocate(log_frac_E_em)
         deallocate(DensE, DensE_m1, Dcoeff)
         deallocate(xKJ_abs,xJ_abs,nbre_reemission)
-        deallocate(E0,J0,xT_ech,prob_delta_T)
+        deallocate(E0,J0,xT_ech,kdB_dT_CDF)
      endif
 
      if (lRE_nLTE) then
-        deallocate(prob_kappa_abs_1grain,prob_delta_T_1grain,log_frac_E_em_1grain)
+        deallocate(prob_kappa_abs_1grain,kdB_dT_1grain_nLTE_CDF,log_frac_E_em_1grain)
         deallocate(xT_ech_1grain)
      endif
 
      if (lnRE) then
         deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE)
-        deallocate(Temperature_1grain_nRE_old,prob_delta_T_1grain_nRE,xT_ech_1grain_nRE)
+        deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
         deallocate(Emissivite_nRE_old)
         deallocate(Tpeak_old)
         if (lRE_nlTE) deallocate(Temperature_1grain_old)
@@ -1065,10 +1065,10 @@ subroutine realloc_step2()
 
   ! Liberation memoire
   if (ltemp) then
-     if (lRE_LTE)  deallocate(prob_delta_T, log_frac_E_em, xT_ech)
-     if (lRE_nLTE) deallocate(prob_kappa_abs_1grain, prob_delta_T_1grain, log_frac_E_em_1grain,xT_ech_1grain)
+     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_frac_E_em, xT_ech)
+     if (lRE_nLTE) deallocate(prob_kappa_abs_1grain, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
      deallocate(xJ_abs, xKJ_abs, nbre_reemission)
-     if (lnRE) deallocate(prob_delta_T_1grain_nRE,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
+     if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
   endif
 
   if (lProDiMo) then
