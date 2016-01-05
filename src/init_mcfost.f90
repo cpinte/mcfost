@@ -136,6 +136,7 @@ subroutine initialisation_mcfost()
   lchange_Tmax_PAH=.false.
   lno_T = .false.
   lISM_heating = .false.
+  llimb_darkening = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -837,6 +838,11 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) n_T_opt
         i_arg = i_arg + 1
+     case("-limb_darkening")
+        i_arg = i_arg + 1
+        llimb_darkening = .true.
+        call get_command_argument(i_arg,limb_darkening_file)
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1225,6 +1231,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
+  write(*,*) "        : -limb_darkening <filename>"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"

@@ -165,6 +165,9 @@ subroutine transfert_poussiere()
         endif
      endif
      call repartition_energie_etoiles()
+
+     if (llimb_darkening) call read_limb_darkening_file(1)
+
      call prop_grains(1,1)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
@@ -1229,9 +1232,12 @@ subroutine dust_map(lambda,ibin,iaz)
   call compute_stars_map(lambda, iaz, u, v, w)
 
   id = 1
-  Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map
+  Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
   if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) + stars_map
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) + stars_map(:,:,1)
+  endif
+  if (lsepar_pola.and.llimb_darkening) then
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) + stars_map(:,:,2:3)
   endif
 
   if (lmono0) write(*,*) "Done"
@@ -1245,24 +1251,34 @@ end subroutine dust_map
 subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! Make a ray-traced map of the stars
 
+  use utils, only : interp
+
   integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
-  integer, parameter :: n_ray_star_SED = 1000
+  integer, parameter :: n_ray_star_SED = 10000
 
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
-  real :: rand, rand2, tau, pix_size
+  real :: rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
-  integer :: id, ri, zj, phik, iray, istar, i,j
-  logical :: in_map
+  integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center
+  logical :: in_map, lpola
 
-  real, dimension(:,:), allocatable :: map_1star
+  real, dimension(:,:), allocatable :: map_1star, Q_1star, U_1star
 
   stars_map = 0.0 ;
   id = 1 ;
 
+  x_center = igridx/2 + 1
+  y_center = igridy/2 + 1
+
   allocate(map_1star(igridx,igridy))
+  lpola = .false.
+  if (lsepar_pola.and.llimb_darkening) then
+     lpola = .true.
+     allocate(Q_1star(igridx,igridy), U_1star(igridx,igridy))
+  endif
 
   ! Energie
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
@@ -1283,9 +1299,13 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   endif
 
   in_map = .true. ! for SED
+  LimbDarkening = 1.0
   do istar=1, n_etoiles
-     map_1star = 0.0 ;
-
+     map_1star = 0.0
+     if (lpola) then
+        Q_1star = 0.0
+        U_1star = 0.0
+     endif
      ! Etoile ponctuelle
      !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
      !  Stokes = 0.0_db
@@ -1308,8 +1328,13 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         y = srw02 * sin(argmt)
 
         cos_thet = abs(x*u + y*v + z*w) ;
-        !cos_thet = 1.0_db ;
 
+        if (llimb_darkening) then
+           LimbDarkening = interp(limb_darkening, mu_limb_darkening, real(cos_thet))
+           if (lsepar_pola) then
+              Pola_LimbDarkening = interp(pola_limb_darkening, mu_limb_darkening, real(cos_thet))
+           endif
+        endif
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
         x1 = etoile(istar)%x + x * etoile(istar)%r
         y1 = etoile(istar)%y + y * etoile(istar)%r
@@ -1338,15 +1363,37 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
            call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
         endif
 
-        if (in_map) map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet
-        norme = norme + cos_thet
+        if (in_map) then
+           map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet * LimbDarkening
+           if (lpola) then ! Average polarisation in the pixel
+              P = exp(-tau) * cos_thet * LimbDarkening * Pola_LimbDarkening
+
+              ! Todo : this is temporary, only works for a star centered
+              ! to be fixed : phi needs to be calculated properly
+              phi = atan2((j-y_center)*1.0,(i-x_center)*1.0)
+
+              Q_1star(i,j) = Q_1star(i,j) + P * cos(2*phi)
+              U_1star(i,j) = U_1star(i,j) + P * sin(2*phi)
+           endif
+        endif
+
+        norme = norme + cos_thet * LimbDarkening
      enddo
+
 
      ! Normalizing map
      map_1star(:,:) = map_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
-
      ! Adding all the stars
-     stars_map(:,:) = stars_map(:,:) + map_1star(:,:)
+     stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:)
+     if (lpola) then
+        ! Normalizing maps
+        Q_1star(:,:) = Q_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
+        U_1star(:,:) = U_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
+        ! Adding all the stars
+        stars_map(:,:,2) = stars_map(:,:,2) + Q_1star(:,:)
+        stars_map(:,:,3) = stars_map(:,:,3) + U_1star(:,:)
+     endif
+
   enddo ! n_stars
 
   return
