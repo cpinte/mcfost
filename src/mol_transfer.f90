@@ -716,9 +716,9 @@ subroutine emission_line_map(imol,ibin,iaz)
      call compute_stars_map(lambda,ibin, u, v, w)
 
      do iv =  -n_speed_rt, n_speed_rt
-        spectre(:,:,iv,lambda,ibin,iaz) = spectre(:,:,iv,lambda,ibin,iaz) + stars_map(:,:)
+        spectre(:,:,iv,lambda,ibin,iaz) = spectre(:,:,iv,lambda,ibin,iaz) + stars_map(:,:,1)
      enddo
-     continu(:,:,lambda,ibin,iaz) = continu(:,:,lambda,ibin,iaz) + stars_map(:,:)
+     continu(:,:,lambda,ibin,iaz) = continu(:,:,lambda,ibin,iaz) + stars_map(:,:,1)
   enddo
 
   return

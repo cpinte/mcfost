@@ -7,8 +7,8 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.15"
-  real, parameter :: required_utils_version = 2.208
+  character(8), parameter :: mcfost_release = "2.20.17"
+  real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
@@ -280,6 +280,12 @@ module prop_star
 
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
+
+
+  ! Limb darkening
+  logical :: llimb_darkening
+  character(len=512) :: limb_darkening_file
+  real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
 
 end module prop_star
 
@@ -653,6 +659,8 @@ module constantes
   real(kind=db), parameter :: mum_to_cm = 1.0e-4_db
   real(kind=db), parameter :: cm_to_mum = 1.0e4_db
 
+  real(kind=db), parameter :: A_to_mum = 1.0e-4_db
+
   real(kind=db), parameter :: m_to_cm = 1.0e2_db
   real(kind=db), parameter :: m3_to_cm3 = m_to_cm**3
   real(kind=db), parameter :: cm_to_m = 1.0e-2_db
@@ -855,7 +863,7 @@ module ray_tracing
   real, dimension(:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
-  real, dimension(:,:), allocatable :: stars_map ! nx, ny
+  real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
 
