@@ -291,11 +291,11 @@ subroutine alloc_dynamique()
      p_n_lambda = n_lambda ! was 1 : changed to save dust properties
 
      if (lsepar_pola) then
-        mem_size = (5. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**2
+        mem_size = (5. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**3
      else
-        mem_size = (2. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**2
+        mem_size = (2. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**3
      endif
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering matrices"
+     if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering matrices"
      allocate(tab_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
@@ -339,7 +339,7 @@ subroutine alloc_dynamique()
         endif
         ksca_CDF = 0
      else ! Array is to big, we will recompute on the fly
-        low_mem_scattering = .false.
+        low_mem_scattering = .true.
         write(*,*) "WARNING : using low memory mode for scattering properties"
      endif
   endif ! method
@@ -529,19 +529,32 @@ subroutine alloc_dynamique()
      endif
      xT_ech = 2
 
-     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**2
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
-     allocate(kdB_dT_CDF(n_lambda,n_T,p_n_cells), stat=alloc_status)
+     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**3
 
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kdB_dT_CDF'
-        stop
+     if (mem_size < max_mem) then
+        low_mem_th_emission = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
+        allocate(kdB_dT_CDF(n_lambda,n_T,p_n_cells), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_CDF'
+           stop
+        endif
+        kdB_dT_CDF = 0
+
+     else
+        low_mem_th_emission = .true.
+        write(*,*) "WARNING : using low memory mode for scattering properties"
+        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
+           stop
+        endif
+        kdB_dT_1grain_LTE_CDF = 0
      endif
-     kdB_dT_CDF = 0
-
 
 
      if (lRE_nLTE) then
+        ! newTODO : this is a big array too
         allocate(prob_kappa_abs_1grain(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kappa_abs_1grain'
@@ -979,8 +992,8 @@ subroutine realloc_dust_mol()
 
   ! TODO : cette partie prend bcp de memoire
   allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
-  mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**2
-  if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
+  mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**3
+  if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
   if (alloc_status > 0) then
      write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
@@ -1359,8 +1372,8 @@ subroutine realloc_step2()
   else
      deallocate(ksca_CDF)
      allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda2), stat=alloc_status)
-     mem_size = n_grains_tot * p_n_cells * n_lambda2 * 4. / 1024.**2
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for scattering probability"
+     mem_size = n_grains_tot * p_n_cells * n_lambda2 * 4. / 1024.**3
+     if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
