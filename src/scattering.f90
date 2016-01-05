@@ -845,7 +845,6 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
 
 end function grainsize
 
-
 !***************************************************
 
 integer function select_scattering_grain(lambda,icell, aleat) result(k)

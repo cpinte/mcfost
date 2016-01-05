@@ -537,9 +537,8 @@ module em_th
   ! Probabilite cumulee en lambda d'emissivite de la poussiere
   ! avec correction de temperature (dB/dT)
   ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
-  real, dimension(:,:,:), allocatable :: prob_delta_T ! 0:n_T,n_cells,n_lambda
-  real, dimension(:,:,:), allocatable :: prob_delta_T_1grain !n_grains,0:n_T,n_lambda
-  real, dimension(:,:,:), allocatable :: prob_delta_T_1grain_nRE !n_grains,0:n_T,n_lambda
+  real, dimension(:,:,:), allocatable :: kdB_dT_CDF ! 0:n_T,n_cells,n_lambda
+  real, dimension(:,:,:), allocatable :: kdB_dT_1grain_LTE_CDF, kdB_dT_1grain_nLTE_CDF, kdB_dT_1grain_nRE_CDF ! n_grains,0:n_T,n_lambda
 
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
