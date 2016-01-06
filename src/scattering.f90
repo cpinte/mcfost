@@ -860,13 +860,13 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
 
   integer, intent(in) :: lambda, icell
   real, intent(in) :: aleat
-  real :: prob, CDF, fact
+  real :: prob, CDF, norm
 
   ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
-  fact =  kappa_sca(icell,lambda) !AU_to_cm * mum_to_cm**2
+  norm =  kappa_sca(icell,lambda) !AU_to_cm * mum_to_cm**2
 
   if (aleat < 0.5) then ! We start from first grain
-     prob = aleat * fact
+     prob = aleat * norm
      CDF = 0.0
      do k=1, n_grains_tot
         CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
@@ -876,7 +876,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
      !write(*,*) "ALEAT", aleat, prob, kappa_sca(icell,lambda)
 
   else ! We start from the end of the grain size distribution
-     prob = (1.0-aleat) * fact
+     prob = (1.0-aleat) * norm
      CDF = 0.0
      do k=n_grains_tot, 1, -1
         CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
