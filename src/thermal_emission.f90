@@ -1610,4 +1610,55 @@ end subroutine chauffage_interne
 
 !**********************************************************************
 
+integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(k)
+  ! This routine will select randomly the scattering grain
+  ! from the CDF of kabs
+  ! Because we cannot store all the CDF for all cells
+  ! (n_grains x ncells x n_lambda)
+  ! The CDF is recomputed on the fly here
+  ! The normalization is saved via kappa_abs, so we do not need to compute
+  ! all the CDF
+
+  implicit none
+
+  integer, intent(in) :: lambda, icell, heating_method
+  real, intent(in) :: aleat
+  real :: prob, CDF, norm
+  integer :: kstart, kend
+
+  ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
+  if (heating_method == 1) then
+     norm =  kappa_abs_LTE(icell,lambda)
+     kstart = grain_RE_LTE_start ; kend = grain_RE_LTE_end
+  else if (heating_method == 2) then
+     norm =  kappa_abs_nLTE(icell,lambda)
+     kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
+  else
+     write(*,*) "ERROR in select_absorbing_grain"
+     write(*,*) "Exiting"
+  endif
+
+  if (aleat < 0.5) then ! We start from first grain
+     prob = aleat * norm
+     CDF = 0.0
+     do k=kstart, kend
+        CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+        if (CDF > prob) exit
+     enddo
+
+  else ! We start from the end of the grain size distribution
+     prob = (1.0-aleat) * norm
+     CDF = 0.0
+     do k=kend, kstart, -1
+        CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+        if (CDF > prob) exit
+     enddo
+  endif
+
+  return
+
+end function select_absorbing_grain
+
+!**********************************************************************
+
 end module thermal_emission
