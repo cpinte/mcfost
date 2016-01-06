@@ -404,7 +404,7 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   k=(kmin+kmax)/2
 
   do while((kmax-kmin) > 1)
-     if (prob_kappa_abs_1grain(k,icell,lambda0) < aleat1) then
+     if (kabs_nLTE_CDF(k,icell,lambda0) < aleat1) then
         kmin = k
      else
         kmax = k
@@ -572,7 +572,7 @@ subroutine Temp_finale_nLTE()
   !$omp default(none) &
   !$omp private(log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
   !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_eg) &
-  !$omp shared(prob_kappa_abs_1grain,xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
+  !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0,cell_map)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
@@ -1082,7 +1082,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   k=(kmin+kmax)/2
 
   do while((kmax-kmin) > 1)
-     if (prob_kappa_abs_1grain(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
+     if (kabs_nRE_CDF(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
         kmin = k
      else
         kmax = k
