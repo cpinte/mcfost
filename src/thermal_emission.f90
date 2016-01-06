@@ -168,7 +168,7 @@ subroutine init_reemission()
            ! volume en AU3     >  pas de cst pour avoir frac_E_em en SI
            ! B en SI (cst_E)  /
            ! R*-2 en AU-2    /   --> dans cst_E
-           integ = integ + kappa_abs_eg(icell,lambda)* volume(icell) * B(lambda)
+           integ = integ + kappa_abs_LTE(icell,lambda)* volume(icell) * B(lambda)
         enddo !lambda
 
         ! Le coeff qui va bien
@@ -191,7 +191,7 @@ subroutine init_reemission()
            integ3(0) = 0.0
            do lambda=1, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(icell,lambda) * dB_dT(lambda)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
            enddo !l
 
            ! Normalisation a 1
@@ -210,7 +210,7 @@ subroutine init_reemission()
         integ3(0) = 0.0
         do lambda=1, n_lambda
            ! Pas besoin de cst , ni du volume (normalisation a 1)
-           integ3(lambda) = integ3(lambda-1) + kappa_abs_eg(icell,lambda) * dB_dT(lambda)
+           integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
         enddo !l
 
         ! Normalisation a 1
@@ -571,7 +571,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_eg) &
+  !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0,cell_map)
   !$omp do schedule(dynamic,10)
@@ -1433,7 +1433,7 @@ subroutine repartition_energie(lambda)
            cst_wl=cst_th/(Temp*wl)
            if (cst_wl < cst_wl_max) then
               if (.not.l_dark_zone(icell)) then
-                 E_cell(icell) = 4.0*kappa_abs_eg(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 E_cell(icell) = 4.0*kappa_abs_LTE(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
               endif
            endif !cst_wl
         endif ! Temp==0.0

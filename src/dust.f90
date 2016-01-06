@@ -793,7 +793,7 @@ subroutine opacite(lambda)
 
   logical :: ldens0
 
-  real(kind=db) :: k_abs_RE_LTE, k_abs_RE, k_abs_tot, angle
+  real(kind=db) :: k_abs_RE, k_abs_tot, angle
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
@@ -832,49 +832,43 @@ subroutine opacite(lambda)
   ! Calcul opacite et probabilite de diffusion
   do icell=1, n_cells
      kappa(icell,lambda) = 0.0
+     kappa_sca(icell,lambda) = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
-     k_abs_RE_LTE = 0.0
 
      do  k=1,n_grains_tot
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
+        kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
+
         k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
 
-     low_mem_scattering = .true.
-     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost.or.low_mem_scattering) then
-        kappa_sca(icell,lambda) = 0.0
-        do k=1,n_grains_tot
-           density=densite_pouss(k,icell)
-           kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
-        enddo
-     endif
-
      if (lRE_LTE) then
-        kappa_abs_eg(icell,lambda) = 0.0
+        kappa_abs_LTE(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end
            density=densite_pouss(k,icell)
-           kappa_abs_eg(icell,lambda) =  kappa_abs_eg(icell,lambda) + C_abs(k,lambda) * density
-           k_abs_RE_LTE = k_abs_RE_LTE + C_abs(k,lambda) * density ! todo : idem kappa_abs_eg, I can save this calculation
-           k_abs_RE = k_abs_RE + C_abs(k,lambda) * density
+           kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * density
         enddo
+        k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
      endif
 
      if (lRE_nLTE) then
+        kappa_abs_nLTE(icell,lambda) = 0.0
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            density=densite_pouss(k,icell)
-           k_abs_RE = k_abs_RE + C_abs(k,lambda) * density
+           kappa_abs_nLTE(icell,lambda) = 0.0
         enddo
+        k_abs_RE = k_abs_RE + kappa_abs_nLTE(icell,lambda)
      endif
 
      if (letape_th) then
         if (lnRE.and.(k_abs_tot > tiny_db)) then
-           kappa_abs_RE(icell,lambda) =  k_abs_RE
+           kappa_abs_RE(icell,lambda) = k_abs_RE
            proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
         endif
 
-        if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(icell,lambda) = k_abs_RE_LTE/k_abs_RE
+        if (k_abs_RE > tiny_db) Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
      endif ! letape_th
   enddo !icell
@@ -906,10 +900,10 @@ subroutine opacite(lambda)
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
   kappa(:,lambda) = kappa(:,lambda) * fact
-  if (lRE_LTE) kappa_abs_eg(:,lambda) = kappa_abs_eg(:,lambda) * fact
-  if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) kappa_sca(:,lambda) = kappa_sca(:,lambda) * fact
-  if ((letape_th).and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
-
+  kappa_sca(:,lambda) = kappa_sca(:,lambda) * fact
+  if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
+  if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
+  if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
 
   if (lscatt_ray_tracing) then
      do thetaj=0,nang_scatt
@@ -924,7 +918,7 @@ subroutine opacite(lambda)
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
   !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
-  !$omp shared(zmax,kappa,kappa_abs_eg,ksca_CDF,p_n_cells) &
+  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
@@ -1116,13 +1110,13 @@ subroutine opacite(lambda)
 
   ! Supression scattering
   if (lno_scattering) then
-     kappa = kappa_abs_eg
+     kappa = kappa_abs_LTE
      tab_albedo_pos = 0.0_db
   endif
 
   ! scattering = abs
   if (lqsca_equal_qabs) then
-     kappa = 2.0_db * kappa_abs_eg
+     kappa = 2.0_db * kappa_abs_LTE
      tab_albedo_pos = 0.5_db
   endif
 
@@ -1132,7 +1126,7 @@ subroutine opacite(lambda)
      densite_pouss(:,icell) = 0.0_db
      kappa(icell,lambda) = 0.0_db
      if (lRE_LTE) then
-        kappa_abs_eg(icell,lambda) = 0.0_db
+        kappa_abs_LTE(icell,lambda) = 0.0_db
      endif
      if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
         kappa_sca(icell,lambda) = 0.0_db

@@ -55,7 +55,7 @@ subroutine lect_section_eff()
         ! density en cm-3                      > reste facteur 1.49595e17
         ! longueur de vol en AU = 1.5e13 cm   /
         kappa(icell,lambda)=densite_pouss(1,icell) * qext(lambda) * 1.49595e17
-        kappa_abs_eg(icell,lambda)=densite_pouss(1,icell)*(qext(lambda)-qsca(lambda))*1.49595e17
+        kappa_abs_LTE(icell,lambda)=densite_pouss(1,icell)*(qext(lambda)-qsca(lambda))*1.49595e17
      enddo !icell
   enddo !lambda
 
