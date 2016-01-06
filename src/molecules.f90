@@ -742,16 +742,16 @@ subroutine init_dust_mol(imol)
            endif
 
            ! Multiplication par densite
-           ! AU_to_cm**2 car on veut kappa_abs_eg en AU-1
+           ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
            do icell=1,n_cells
-              kappa_abs_eg(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
+              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
                    gas_dust / cm_to_AU
            enddo
 
         enddo ! iTrans
 
         ! Pas de scattering
-        kappa(:,:) = kappa_abs_eg(:,:)
+        kappa(:,:) = kappa_abs_LTE(:,:)
 
      else ! cas par defaut
         call init_indices_optiques()
@@ -799,7 +799,7 @@ subroutine init_dust_mol(imol)
 
                  T = Temperature(icell)
                  ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-                 emissivite_dust(icell,iTrans) = kappa_abs_eg(icell,iTrans) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+                 emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
               enddo ! phik
            enddo bz ! zj
         enddo ! ri

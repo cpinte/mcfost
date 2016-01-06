@@ -801,7 +801,7 @@ subroutine calc_Jth(lambda)
            cst_wl=cst_th/(Temp*wl)
            if (cst_wl < 500.0) then
               coeff_exp=exp(cst_wl)
-              J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_eg(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
+              J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_LTE(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
            else
               J_th(icell) = 0.0_db
            endif

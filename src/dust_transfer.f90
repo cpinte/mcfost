@@ -1234,10 +1234,12 @@ subroutine dust_map(lambda,ibin,iaz)
   id = 1
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
   if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) + stars_map(:,:,1)
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) &
+          + stars_map(:,:,1)
   endif
   if (lsepar_pola.and.llimb_darkening) then
-     Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) + stars_map(:,:,2:3)
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) &
+          + stars_map(:,:,2:3)
   endif
 
   if (lmono0) write(*,*) "Done"
