@@ -26,7 +26,7 @@ module parametres
   integer :: time_begin, time_end, time_tick, time_max
 
   real, parameter :: max_mem = 4. ! GBytes
-  logical :: low_mem_scattering
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE
 
   ! Nombre de photons lances
   logical :: ldust_transfer
@@ -444,7 +444,7 @@ module opacity
   real(kind=db), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_eg, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
-  real, dimension(:,:,:), allocatable :: prob_kappa_abs_1grain ! 0:n_grains, n_cells, n_lambda
+  real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
   real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3

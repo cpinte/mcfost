@@ -883,15 +883,15 @@ subroutine opacite(lambda)
   if (lRE_nLTE) then
      if (letape_th) then
         do icell=1, n_cells
-           prob_kappa_abs_1grain(grain_RE_nLTE_start-1,icell,lambda)=0.0
+           kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
               density=densite_pouss(k,icell)
-              prob_kappa_abs_1grain(k,icell,lambda)=prob_kappa_abs_1grain(k-1,icell,lambda) + &
+              kabs_nLTE_CDF(k,icell,lambda)=kabs_nLTE_CDF(k-1,icell,lambda) + &
                    C_abs(k,lambda) * density
            enddo !k
-           if (prob_kappa_abs_1grain(grain_RE_nLTE_end,icell,lambda) > tiny_real) then
-              prob_kappa_abs_1grain(:,icell,lambda) =  prob_kappa_abs_1grain(:,icell,lambda)/&
-                   prob_kappa_abs_1grain(grain_RE_nLTE_end,icell,lambda)
+           if (kabs_nLTE_CDF(grain_RE_nLTE_end,icell,lambda) > tiny_real) then
+              kabs_nLTE_CDF(:,icell,lambda) =  kabs_nLTE_CDF(:,icell,lambda)/&
+                   kabs_nLTE_CDF(grain_RE_nLTE_end,icell,lambda)
            endif
         enddo !icell
      endif !.not.lmono
@@ -1137,8 +1137,8 @@ subroutine opacite(lambda)
      if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
         kappa_sca(icell,lambda) = 0.0_db
      endif
-     if (lnRE) then
-        prob_kappa_abs_1grain(:,cell_map(1,1,1),lambda) = 0.0
+     if (lRE_nLTE) then
+        kabs_nLTE_CDF(:,icell,lambda) = 0.0
      endif
   endif
 

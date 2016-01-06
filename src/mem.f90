@@ -338,7 +338,7 @@ subroutine alloc_dynamique()
            stop
         endif
         ksca_CDF = 0
-     else ! Array is to big, we will recompute on the fly
+     else ! Array is to big, we will recompute ksca_CDF on the fly
         low_mem_scattering = .true.
         write(*,*) "WARNING : using low memory mode for scattering properties"
      endif
@@ -544,7 +544,7 @@ subroutine alloc_dynamique()
      else
         low_mem_th_emission = .true.
         write(*,*) "WARNING : using low memory mode for scattering properties"
-        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T)
+        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
            stop
@@ -554,13 +554,21 @@ subroutine alloc_dynamique()
 
 
      if (lRE_nLTE) then
-        ! newTODO : this is a big array too
-        allocate(prob_kappa_abs_1grain(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_abs_1grain'
-           stop
+
+        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_n_cells * n_lambda * 4. / 1024.**3
+        if (mem_size < max_mem) then
+           low_mem_th_emission_nLTE = .false.
+           if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
+           if (alloc_status > 0) then
+              write(*,*) 'Allocation error kabs_nLTE_CDF'
+              stop
+           endif
+           kabs_nLTE_CDF = 0.0
+        else
+           low_mem_th_emission_nLTE = .true.
+           write(*,*) "WARNING : using low memory mode for nLTE thermal emission"
         endif
-        prob_kappa_abs_1grain=0.0
 
         allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
@@ -899,7 +907,7 @@ subroutine dealloc_em_th()
      endif
 
      if (lRE_nLTE) then
-        deallocate(prob_kappa_abs_1grain,kdB_dT_1grain_nLTE_CDF,log_frac_E_em_1grain)
+        deallocate(kabs_nLTE_CDF,kdB_dT_1grain_nLTE_CDF,log_frac_E_em_1grain)
         deallocate(xT_ech_1grain)
      endif
 
@@ -1079,7 +1087,7 @@ subroutine realloc_step2()
   ! Liberation memoire
   if (ltemp) then
      if (lRE_LTE)  deallocate(kdB_dT_CDF, log_frac_E_em, xT_ech)
-     if (lRE_nLTE) deallocate(prob_kappa_abs_1grain, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
+     if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
      deallocate(xJ_abs, xKJ_abs, nbre_reemission)
      if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
   endif
