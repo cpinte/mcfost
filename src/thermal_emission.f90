@@ -302,17 +302,17 @@ end subroutine init_reemission
 
 !********************************************************************
 
-subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
+subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
   integer, intent(in) :: id,ri,zj,phik,pri,pzj, pphik
-  real, intent(in) ::  aleat
-  integer, intent(out) :: lambda
+  real, intent(in) ::  aleat1, aleat2
+  integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, icell, p_icell
+  integer :: l, l1, l2, T_int, T1, T2, icell, p_icell, k, heating_method
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   ! Absorption d'un photon : on ajoute son energie dans la cellule
@@ -356,24 +356,43 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat,lambda)
   !**********************************************************************
   ! Choix de la longeur d'onde de reemission
   ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
-!  write(*,*) Temp2, Temp1
-!   write(*,*) "t1", Temp2, Temp1
   frac_T2=(Temp-Temp1)/(Temp2-Temp1)
   frac_T1=1.0-frac_T2
+
+
 
   l1=0
   l2=n_lambda
   l=(l1+l2)/2
 
-  do while((l2-l1) > 1)
-     proba=frac_T1*kdB_dT_CDF(l,T1,p_icell)+frac_T2*kdB_dT_CDF(l,T2,p_icell)
-     if(aleat > proba) then
-        l1=l
-     else
-        l2=l
-     endif
-     l=(l1+l2)/2
-  enddo
+  if (low_mem_th_emission) then
+     ! Select absorbing grain
+     heating_method = 1 ! LTE
+     k = select_absorbing_grain(lambda,icell, aleat1, heating_method)
+
+     ! Select wavelength
+     do while((l2-l1) > 1)
+        proba=frac_T1*kdB_dT_1grain_LTE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_LTE_CDF(l,k,T2)
+        if(aleat2 > proba) then
+           l1=l
+        else
+           l2=l
+        endif
+        l=(l1+l2)/2
+     enddo
+  else
+     ! Select wavelength
+     do while((l2-l1) > 1)
+        proba=frac_T1*kdB_dT_CDF(l,T1,p_icell)+frac_T2*kdB_dT_CDF(l,T2,p_icell)
+        if(aleat2 > proba) then
+           l1=l
+        else
+           l2=l
+        endif
+        l=(l1+l2)/2
+     enddo
+  endif
+
   lambda=l+1
 
   return
@@ -1072,6 +1091,11 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell, p_icell
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
+  write(*,*) "ERROR, kabs_nRE_CDF not defined yet"
+  write(*,*) "Contact Christophe"
+  write(*,*) "Exiting"
+  stop
+
   icell = cell_map(ri,zj,1)
   p_icell = cell_map(pri,pzj,1)
   lambda0=lambda
@@ -1083,6 +1107,7 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
 
   do while((kmax-kmin) > 1)
      if (kabs_nRE_CDF(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
+
         kmin = k
      else
         kmax = k
