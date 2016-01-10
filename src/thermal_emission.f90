@@ -411,26 +411,32 @@ subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell, heating_method
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   icell = cell_map(ri,zj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
-  kmin=grain_RE_nLTE_start
-  kmax=grain_RE_nLTE_end
-  k=(kmin+kmax)/2
+  if (low_mem_th_emission_nLTE) then
+     ! Select absorbing grain
+     heating_method = 2 ! nLTE
+     k = select_absorbing_grain(lambda0,icell, aleat1, heating_method)
+  else
+     kmin=grain_RE_nLTE_start
+     kmax=grain_RE_nLTE_end
+     k=(kmin+kmax)/2
 
-  do while((kmax-kmin) > 1)
-     if (kabs_nLTE_CDF(k,icell,lambda0) < aleat1) then
-        kmin = k
-     else
-        kmax = k
-     endif
-     k = (kmin + kmax)/2
-  enddo   ! while
-  k=kmax
+     do while((kmax-kmin) > 1)
+        if (kabs_nLTE_CDF(k,icell,lambda0) < aleat1) then
+           kmin = k
+        else
+           kmax = k
+        endif
+        k = (kmin + kmax)/2
+     enddo   ! while
+     k=kmax
+  endif
 
   ! Mean intensity
   ! Somme sur differents processeurs
