@@ -548,7 +548,7 @@ subroutine define_dust_density()
 
            do i=1, n_rad
               lwarning = .true.
-              rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
+              rho0 = densite_gaz_midplane(i) ! pour dependance en R : pb en coord sperique
               icell = cell_map(i,1,1)
               rcyl = r_grid(icell)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
