@@ -1596,9 +1596,11 @@ subroutine densite_file()
   endif  !lstrat
 
   if (.not.l3D_file) then
-     do j=1,nz
-        densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
-     enddo
+     if (l3D) then
+        do j=1,nz
+           densite_pouss(:,-j,:,:) = densite_pouss(:,j,:,:)
+        enddo
+     endif
   endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
