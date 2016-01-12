@@ -1620,7 +1620,7 @@ subroutine densite_file()
      somme=0.0
 
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
+        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)
