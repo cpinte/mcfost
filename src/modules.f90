@@ -440,7 +440,6 @@ module opacity
   integer, dimension(:,:,:), allocatable :: cell_map
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
-  real, dimension(:,:), allocatable :: amax_reel !n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_LTE, kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE

@@ -815,12 +815,6 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   prob = aleat ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
   icell = cell_map(ri,zj,phik)
 
-  ! Cas particulier prob=1.0
-  if ((1.0-prob) < 1.e-6) then
-     grainsize=amax_reel(icell,lambda)
-     return
-  endif
-
   ! dichotomie
   kmin = 0
   kmax = n_grains_tot
