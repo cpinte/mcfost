@@ -183,7 +183,7 @@ subroutine alloc_dynamique()
   nbre_grains = 0.0   ; r_core=0.0
   r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
-  allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo'
      stop
@@ -545,7 +545,7 @@ subroutine alloc_dynamique()
 
      else
         low_mem_th_emission = .true.
-        write(*,*) "WARNING : using low memory mode for scattering properties"
+        write(*,*) "WARNING : using low memory mode for thermal emission"
         allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
@@ -950,7 +950,7 @@ subroutine realloc_dust_mol()
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda= 0.0 ;
   tab_amu1=0.0 ; tab_amu2=0.0 ; tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
-  allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo (realloc)'
      stop
@@ -1254,7 +1254,7 @@ subroutine realloc_step2()
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(tab_albedo)
-  allocate(tab_albedo(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo'
      stop

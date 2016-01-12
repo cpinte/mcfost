@@ -847,8 +847,7 @@ subroutine opacite(lambda)
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end
-           density=densite_pouss(k,icell)
-           kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * density
+           kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
         k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
      endif
@@ -901,6 +900,7 @@ subroutine opacite(lambda)
   fact = AU_to_cm * mum_to_cm**2
   kappa(:,lambda) = kappa(:,lambda) * fact
   kappa_sca(:,lambda) = kappa_sca(:,lambda) * fact
+
   if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
   if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
   if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
@@ -919,7 +919,7 @@ subroutine opacite(lambda)
   !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
   !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
-  !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic) &
+  !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
   !$omp do schedule(dynamic,1)
@@ -937,7 +937,7 @@ subroutine opacite(lambda)
            endif
         endif
      else
-        ksca_CDF(0,icell,lambda)=0.0
+        if (.not.low_mem_scattering) ksca_CDF(0,icell,lambda)=0.0
      endif
 
      somme=0.0
@@ -963,7 +963,9 @@ subroutine opacite(lambda)
         else
            ! Au choix suivant que l'on considère un albedo par cellule ou par grain
            ! albedo par cellule :
-           ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda)*density
+           if (.not.low_mem_scattering) then
+              ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda)*density
+           endif
         endif !scattering_method
      enddo !k
 
@@ -1067,22 +1069,24 @@ subroutine opacite(lambda)
            endif !aniso_method
 
         else !scattering_method == 1 : choix taille du grain diffuseur
-           if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
-              ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
-              ! Cas particulier proba=1.0
-              ech_proba1 : do k=1, n_grains_tot
-                 if ((1.0 - ksca_CDF(k,icell,lambda)) <  1.e-6) then
-                    amax_reel(icell,lambda) = k
-                    exit  ech_proba1
-                 endif
-              enddo  ech_proba1 !k
-           else
-              ! a la surface, on peut avoir une proba de 0.0 partout
-              ! dans ce cas, on decide qu'il n'y a que les plus petits grains
-              ! rq : en pratique, la densite est trop faible pour qu'il y ait
-              ! une diffusion a cet endroit.
-              ksca_CDF(:,icell,lambda) = 1.0
-           endif
+           if (.not.low_mem_scattering) then
+              if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
+                 ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
+                 ! Cas particulier proba=1.0
+                 ech_proba1 : do k=1, n_grains_tot
+                    if ((1.0 - ksca_CDF(k,icell,lambda)) <  1.e-6) then
+                       amax_reel(icell,lambda) = k
+                       exit  ech_proba1
+                    endif
+                 enddo  ech_proba1 !k
+              else
+                 ! a la surface, on peut avoir une proba de 0.0 partout
+                 ! dans ce cas, on decide qu'il n'y a que les plus petits grains
+                 ! rq : en pratique, la densite est trop faible pour qu'il y ait
+                 ! une diffusion a cet endroit.
+                 ksca_CDF(:,icell,lambda) = 1.0
+              endif
+           endif ! low_mem_scattering
         endif !scattering_method
 
      else !densite_pouss = 0.0
@@ -1099,8 +1103,10 @@ subroutine opacite(lambda)
               tab_s34_pos(:,icell,lambda)=0.0
            endif
         else !scattering_method
-           ksca_CDF(:,icell,lambda)=1.0
-           ksca_CDF(0,icell,lambda)=0.0
+           if (.not.low_mem_scattering) then
+              ksca_CDF(:,icell,lambda)=1.0
+              ksca_CDF(0,icell,lambda)=0.0
+           endif
         endif ! scattering_method
 
      endif !densite_pouss = 0.0

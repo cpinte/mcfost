@@ -187,20 +187,36 @@ subroutine init_reemission()
      enddo !icell
 
      if (lvariable_dust) then ! Calcul dans toutes les cellules
-        do icell=1,p_n_cells
-           integ3(0) = 0.0
-           do lambda=1, n_lambda
-              ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
-           enddo !l
-
-           ! Normalisation a 1
-           if (integ3(n_lambda) > tiny(0.0_db)) then
-              do lambda=1, n_lambda
-                 kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
+        if (low_mem_th_emission) then
+           do k=grain_RE_LTE_start,grain_RE_LTE_end
+              integ3(1) = 0.0
+              do lambda=2, n_lambda
+                 ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
+                 integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
               enddo !l
-           endif
-        enddo !icell
+              ! Normalisation a 1
+              if (integ3(n_lambda) > tiny(0.0_db)) then
+                 do lambda=1, n_lambda
+                    kdB_dT_1grain_LTE_CDF(lambda,k,T) = integ3(lambda)/integ3(n_lambda)
+                 enddo !l
+              endif
+           enddo !k
+        else  ! low_mem_th_emission
+           do icell=1,p_n_cells
+              integ3(0) = 0.0
+              do lambda=1, n_lambda
+                 ! Pas besoin de cst , ni du volume (normalisation a 1)
+                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
+              enddo !l
+
+              ! Normalisation a 1
+              if (integ3(n_lambda) > tiny(0.0_db)) then
+                 do lambda=1, n_lambda
+                    kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
+                 enddo !l
+              endif
+           enddo !icell
+        endif ! low_mem_th_emission
      else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
         ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
         i=ri_not_empty
@@ -1659,10 +1675,10 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
 
   ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
   if (heating_method == 1) then
-     norm =  kappa_abs_LTE(icell,lambda)
+     norm =  kappa_abs_LTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_LTE_start ; kend = grain_RE_LTE_end
   else if (heating_method == 2) then
-     norm =  kappa_abs_nLTE(icell,lambda)
+     norm =  kappa_abs_nLTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
      write(*,*) "ERROR in select_absorbing_grain"
@@ -1676,7 +1692,6 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
         CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
         if (CDF > prob) exit
      enddo
-
   else ! We start from the end of the grain size distribution
      prob = (1.0-aleat) * norm
      CDF = 0.0
