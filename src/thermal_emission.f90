@@ -339,7 +339,7 @@ subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat1,aleat2,lambda)
   icell = cell_map(ri,zj,phik)
   p_icell = cell_map(pri,pzj,pphik)
 
-  nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_db
+  if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_db
 
   J_abs=sum(xKJ_abs(icell,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
   if (J_abs > 0.) then
