@@ -916,7 +916,7 @@ subroutine opacite(lambda)
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
-  !$omp shared(tab_albedo_pos,prob_s11_pos,amax_reel,somme) &
+  !$omp shared(tab_albedo_pos,prob_s11_pos,somme) &
   !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
@@ -1072,13 +1072,6 @@ subroutine opacite(lambda)
            if (.not.low_mem_scattering) then
               if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
                  ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
-                 ! Cas particulier proba=1.0
-                 ech_proba1 : do k=1, n_grains_tot
-                    if ((1.0 - ksca_CDF(k,icell,lambda)) <  1.e-6) then
-                       amax_reel(icell,lambda) = k
-                       exit  ech_proba1
-                    endif
-                 enddo  ech_proba1 !k
               else
                  ! a la surface, on peut avoir une proba de 0.0 partout
                  ! dans ce cas, on decide qu'il n'y a que les plus petits grains
