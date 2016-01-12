@@ -256,9 +256,6 @@ subroutine alloc_dynamique()
   endif
   tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
-  write(*,*) "test09"
-  read(*,*)
-
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
