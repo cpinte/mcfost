@@ -179,7 +179,7 @@ subroutine init_reemission()
            log_frac_E_em(T,icell)=-1000.
         endif
 
-        if (T==1) then
+        if (lRE_nLTE.and.(T==1)) then
            do lambda=1, n_lambda
               J0(icell,lambda) =  volume(icell) * B(lambda) * cst_E
            enddo
