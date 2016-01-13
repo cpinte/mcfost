@@ -32,7 +32,11 @@ subroutine alloc_dynamique()
      n_cells = nrz
   endif
 
-  write(*,*) "Using", n_cells, "cells"
+  if (n_cells < 1e6) then
+     write(*,*) "Using", n_cells, "cells"
+  else
+     write(*,*) "Using", real(n_cells)/1e6, "millions cell"
+  endif
 
   if (lvariable_dust) then
      p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
