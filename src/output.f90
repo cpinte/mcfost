@@ -1847,7 +1847,7 @@ subroutine ecriture_temperature(iTemperature)
      if (l3D) then
         naxis=3
         naxes(1)=n_rad
-        naxes(2)=2*nz+1
+        naxes(2)=2*nz
         naxes(3)=n_az
 
         !  Write the required header keywords.
@@ -1860,7 +1860,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)*naxes(3)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature,status)
+        call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
      else
         naxis=2
         naxes(1)=n_rad
@@ -1876,7 +1876,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature,status)
+        call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
      endif
 
      !  Close the file and free the unit number.
