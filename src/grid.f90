@@ -34,7 +34,6 @@ subroutine build_cylindrical_cell_mapping()
      ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
   endif
 
-  write(*,*) ntot, n_cells
   if (ntot /= n_cells) then
      write(*,*) "ERROR in 'build_cylindrical_cell_mapping'"
      write(*,*) "The number of cells is not matching :"
