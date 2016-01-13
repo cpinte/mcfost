@@ -73,7 +73,6 @@ subroutine alloc_dynamique()
   endif
   n_phot_envoyes = 0.0
 
-
   ! **************************************************
   ! Tableaux relatifs a la grille
   ! **************************************************
@@ -170,7 +169,6 @@ subroutine alloc_dynamique()
   endif
   r_in_opacite=0.0 ; r_in_opacite2=0.0
 
-
   ! **************************************************
   ! Tableaux relatifs aux grains
   ! **************************************************
@@ -205,7 +203,6 @@ subroutine alloc_dynamique()
      stop
   endif
   tab_g = 0
-
 
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
@@ -258,7 +255,7 @@ subroutine alloc_dynamique()
 
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
+  allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
   allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
   if (lRE_nLTE)  allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
   if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
@@ -284,12 +281,11 @@ subroutine alloc_dynamique()
   tab_albedo_pos = 0
   tab_g_pos = 0.0
 
-
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
-     p_n_lambda = n_lambda ! was 1 : changed to save dust properties
+     p_n_lambda = n_lambda ! was 1 : changed to save dust properties with +dust_prop
 
      if (lsepar_pola) then
         mem_size = (5. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**3
@@ -431,7 +427,6 @@ subroutine alloc_dynamique()
      star_origin = 0.0
   endif
 
-
   ! **************************************************
   ! Tableaux de temperature
   ! **************************************************
@@ -479,7 +474,6 @@ subroutine alloc_dynamique()
      l_RE=.false. ; lchange_nRE = .false.
   endif
 
-
   ! **************************************************
   ! Tableaux relatifs au *calcul* de la temperature
   ! **************************************************
@@ -505,23 +499,23 @@ subroutine alloc_dynamique()
      endif
      DensE = 0.0 ; DensE_m1 = 0.0
 
-
-     allocate(xKJ_abs(n_cells,nb_proc), nbre_reemission(n_cells,nb_proc),&
-             xJ_abs(n_cells,n_lambda,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xKJ_abs'
-        stop
+     if (lRE_LTE) then
+        allocate(xKJ_abs(n_cells,nb_proc), E0(n_cells), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xKJ_abs'
+           stop
+        endif
+        xKJ_abs = 0.0 ; E0 = 0.0
      endif
-     xKJ_abs = 0.0 ; xJ_abs=0.0 ; nbre_reemission = 0.0
 
-
-     allocate(E0(n_cells), J0(n_cells,n_lambda),  stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error E0'
-        stop
+     if (lRE_nLTE) then
+        allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status) ! BIG array
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xJ_abs'
+           stop
+        endif
+        xJ_abs=0.0 ; J0 = 0.0
      endif
-     E0 = 0.0
-     J0 = 0.0
 
      allocate(xT_ech(n_cells,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
@@ -530,8 +524,16 @@ subroutine alloc_dynamique()
      endif
      xT_ech = 2
 
-     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**3
+     if (lreemission_stats) then
+        allocate(nbre_reemission(n_cells,nb_proc), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error nbre_reemission'
+           stop
+        endif
+        nbre_reemission = 0.0
+     endif
 
+     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**3
      if (mem_size < max_mem) then
         low_mem_th_emission = .false.
         if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
@@ -541,7 +543,6 @@ subroutine alloc_dynamique()
            stop
         endif
         kdB_dT_CDF = 0
-
      else
         low_mem_th_emission = .true.
         write(*,*) "WARNING : using low memory mode for thermal emission"
@@ -552,7 +553,6 @@ subroutine alloc_dynamique()
         endif
         kdB_dT_1grain_LTE_CDF = 0
      endif
-
 
      if (lRE_nLTE) then
 
