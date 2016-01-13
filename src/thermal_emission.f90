@@ -519,34 +519,33 @@ subroutine Temp_finale()
 
   implicit none
 
-  integer :: T_int, T1, T2
+  real, dimension(n_cells) :: KJ_abs
   real :: Temp, Temp1, Temp2, frac, log_frac_E_abs
-
-  real(kind=db), dimension(n_cells) :: J_abs
-
-  integer :: icell
+  integer :: T_int, T1, T2, icell, i
 
   ! Calcul de la temperature de la cellule et stokage energie recue + T
   ! Utilisation temperature precedente
 
   ! Somme sur differents processeurs
-  !do pk=1, n_az ! boucle pour eviter des problemes d'allocation memoire en 3D
-  !   J_abs(:,:,pk)=sum(xKJ_abs(:,:,pk,:),dim=3)
-  !enddo
-  J_abs(:) = sum(xKJ_abs(:,:),dim=2)
-  J_abs(:)= J_abs(:)*n_phot_L_tot + E0(:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+  ! boucle pour eviter des problemes d'allocation memoire en 3D
+  !KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
+  KJ_abs(:) = 0.0
+  do i=1,nb_proc
+     KJ_abs(:) = KJ_abs(:) + xKJ_abs(:,i)
+  enddo
 
+  KJ_abs(:)= KJ_abs(:)*n_phot_L_tot + E0(:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,T_min,n_T)
+  !$omp shared(KJ_abs,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,T_min,n_T)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
-     if (J_abs(icell) < tiny_db) then
+     if (KJ_abs(icell) < tiny_real) then
         Temperature(icell) = T_min
      else
-        log_frac_E_abs=log(J_abs(icell))
+        log_frac_E_abs=log(KJ_abs(icell))
         if (log_frac_E_abs <  log_frac_E_em(1,icell)) then
            Temperature(icell) = T_min
         else
