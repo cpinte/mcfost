@@ -337,7 +337,7 @@ subroutine alloc_dynamique()
         ksca_CDF = 0
      else ! Array is to big, we will recompute ksca_CDF on the fly
         low_mem_scattering = .true.
-        write(*,*) "WARNING : using low memory mode for scattering properties"
+        write(*,*) "Using low memory mode for scattering properties"
      endif
   endif ! method
 
@@ -545,7 +545,7 @@ subroutine alloc_dynamique()
         kdB_dT_CDF = 0
      else
         low_mem_th_emission = .true.
-        write(*,*) "WARNING : using low memory mode for thermal emission"
+        write(*,*) "Using low memory mode for thermal emission"
         allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
@@ -568,7 +568,7 @@ subroutine alloc_dynamique()
            kabs_nLTE_CDF = 0.0
         else
            low_mem_th_emission_nLTE = .true.
-           write(*,*) "WARNING : using low memory mode for nLTE thermal emission"
+           write(*,*) "Using low memory mode for nLTE thermal emission"
         endif
 
         allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
