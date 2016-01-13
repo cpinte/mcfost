@@ -277,12 +277,18 @@ subroutine alloc_dynamique()
      kappa_abs_RE=0.0
   endif
 
-  allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+  allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
+     write(*,*) 'Allocation error tab_albedo_pos'
      stop
   endif
   tab_albedo_pos = 0
+
+  allocate(tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_albedo_pos'
+     stop
+  endif
   tab_g_pos = 0.0
 
   ! **************************************************

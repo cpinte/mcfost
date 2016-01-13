@@ -62,8 +62,10 @@ subroutine build_cylindrical_cell_mapping()
   ! Actual cells
   icell = 0
   do k=kstart, kend
-     do i=istart, iend
-        bz : do j=1, jend
+     bz : do j=j_start, jend
+        if (j==0) cycle bz
+          do i=istart, iend
+
            icell = icell+1
            if (icell > ntot) then
               write(*,*) "ERROR : there is an issue in the cell mapping"
@@ -76,26 +78,8 @@ subroutine build_cylindrical_cell_mapping()
            cell_map_k(icell) = k
 
            cell_map(i,j,k) = icell
-        enddo bz
-
-        if (l3D) then
-           do j=j_start, -1
-
-              icell = icell+1
-              if (icell > ntot) then
-                 write(*,*) "ERROR : there is an issue in the cell mapping"
-                 write(*,*) "Exiting"
-                 stop
-              endif
-
-              cell_map_i(icell) = i
-              cell_map_j(icell) = j
-              cell_map_k(icell) = k
-
-              cell_map(i,j,k) = icell
-           enddo
-        endif
-     enddo
+        enddo
+     enddo bz
   enddo
 
   if (icell /= ntot) then
@@ -110,8 +94,8 @@ subroutine build_cylindrical_cell_mapping()
   ! Virtual cell indices for when the packets are just around the grid
 
   ! Cases j=0 and j=nz+1
-  do j = jstart2, jend2, jend2 - jstart2
-     do k=kstart, kend
+  do k=kstart, kend
+     do j = jstart2, jend2, jend2 - jstart2
         do i=istart2, iend2
 
            icell = icell+1
@@ -131,10 +115,11 @@ subroutine build_cylindrical_cell_mapping()
   enddo
 
   ! Cases i=0 and i=n_rad+1 (except j=0 and j=nz+1 done above)
-  do i=istart2,iend2, iend2-istart2
-     do k=kstart, kend
-        bz2 : do j = jstart, jend
-           if (j==0) cycle bz2
+  do k=kstart, kend
+     bz2 : do j = jstart, jend
+        if (j==0) cycle bz2
+        do i=istart2,iend2, iend2-istart2
+
            icell = icell+1
            if (icell > ntot2) then
               write(*,*) "ERROR : there is an issue in the cell mapping"
@@ -149,8 +134,8 @@ subroutine build_cylindrical_cell_mapping()
            cell_map_k(icell) = k
 
            cell_map(i,j,k) = icell
-        enddo bz2
-     enddo
+        enddo
+     enddo bz2
   enddo
 
   if (icell /= ntot2) then
@@ -163,6 +148,7 @@ subroutine build_cylindrical_cell_mapping()
 
   if (cell_map(1,1,1) /= 1) then
      write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
+     write(*,*) "(1,1,1) --->", cell_map(1,1,1)
      write(*,*) "MCFOST might crash"
      !write(*,*) "Exiting"
      !stop
