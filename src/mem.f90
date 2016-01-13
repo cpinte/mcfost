@@ -62,6 +62,19 @@ subroutine alloc_dynamique()
      pj_start = 1
   endif
 
+
+  ! parametrage methode de diffusion
+  if (scattering_method == 0) then
+     if ((lvariable_dust).and.(.not.lmono)) then
+        scattering_method = 1
+     else
+        scattering_method = 2
+     endif
+  endif
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
+
+
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error'
@@ -1098,6 +1111,17 @@ subroutine realloc_step2()
   integer :: alloc_status, mem_size
 
   p_n_lambda = n_lambda2 ! Plus de pointeur a 1 depuis que l'on sauvegarde les proprietes optiques
+
+  ! parametrage methode de diffusion
+  if (scattering_method == 0) then
+     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
+        scattering_method = 1
+     else
+        scattering_method = 2
+     endif
+  endif
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
 
   ! Liberation memoire
   if (ltemp) then
