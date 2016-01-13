@@ -69,7 +69,6 @@ subroutine alloc_ray_tracing()
      nang_ray_tracing = 1 ;
   endif
 
-  allocate(kappa_sca(n_cells,n_lambda))
   allocate(tab_s11_ray_tracing(0:nang_scatt,n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      Write(*,*) 'Allocation error kappa_sca, tab_s11_ray_tracing'
