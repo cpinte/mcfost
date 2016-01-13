@@ -80,16 +80,11 @@ subroutine transfert_poussiere()
   ! Nbre iteration grains hors equilibre
   n_iter = 0
 
-  ! parametrage methode de diffusion
-  if (scattering_method == 0) then
-     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
-        scattering_method = 1
-     else
-        scattering_method = 2
-     endif
-  endif
-  write(*,fmt='(" Using scattering method ",i1)') scattering_method
-  lscattering_method1 = (scattering_method==1)
+
+
+  ! Allocation dynamique
+  call alloc_dynamique()
+
   if (lscattering_method1) then
      lambda = 1
      p_lambda => lambda
@@ -97,10 +92,6 @@ subroutine transfert_poussiere()
      lambda0=1
      p_lambda => lambda ! was lambda0 : changed to save dust properties
   endif
-
-
-  ! Allocation dynamique
-  call alloc_dynamique()
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -383,6 +374,11 @@ subroutine transfert_poussiere()
 
         if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! Changement des lambda
            call init_lambda2()
+           if (lscattering_method1) then
+              lambda = 1  ; p_lambda => lambda
+           else
+              lambda0 = 1 ; p_lambda => lambda ! was lambda0 : changed to save dust properties
+           endif
            call init_indices_optiques()
 
            call repartition_energie_etoiles()

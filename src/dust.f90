@@ -920,7 +920,7 @@ subroutine opacite(lambda)
   !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing) &
+  !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing,letape_th) &
   !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
@@ -973,7 +973,7 @@ subroutine opacite(lambda)
      if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
 
 
-     if (lcompute_obs.and.lscatt_ray_tracing) then
+     if (.not.letape_th.and.lcompute_obs.and.lscatt_ray_tracing) then
         if (scattering_method == 1) then !  choix taille du grain diffuseur + matrice Mueller par grain
            write(*,*) "ERROR: ray-tracing is incompatible with scattering method 1"
            stop
