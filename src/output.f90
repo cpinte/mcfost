@@ -1108,14 +1108,15 @@ subroutine write_disk_struct()
 
   real, dimension(:,:,:), allocatable :: dens
   real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
-  real, dimension(n_rad) :: vol
+  real(kind=db), dimension(:,:,:), allocatable :: vol
   real(kind=db), dimension(:,:,:,:), allocatable :: grid
 
 
+
   if (l3D) then
-     allocate(dens(n_rad,-nz:nz,n_az), dust_dens(n_rad,-nz:nz,n_az,n_grains_tot), stat = alloc_status)
+     allocate(dens(n_rad,-nz:nz,n_az), vol(n_rad,-nz:nz,n_az), dust_dens(n_rad,-nz:nz,n_az,n_grains_tot), stat = alloc_status)
   else
-     allocate(dens(n_rad,nz,1),dust_dens(n_rad,nz,1,n_grains_tot), stat = alloc_status)
+     allocate(dens(n_rad,nz,1), vol(n_rad,nz,1), dust_dens(n_rad,nz,1,n_grains_tot), stat = alloc_status)
   endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error density tables for fits file'
@@ -1485,11 +1486,17 @@ subroutine write_disk_struct()
   !  Initialize parameters about the FITS image
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
-  bitpix=-32
+  bitpix=-64
   extend=.true.
+  group=1
+  fpixel=1
 
-  naxis=1
-  naxes(1)=n_rad
+  naxis=3
+  naxes(1) = n_rad
+  naxes(2) = nz
+  if (l3D) naxes(2)=2*nz+1
+  naxes(3) = n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1499,14 +1506,19 @@ subroutine write_disk_struct()
   call ftpkys(unit,'UNIT',"AU^3",' ',status)
 
   !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)
+  !  dens =  densite_pouss
+  ! le d signifie real*8
+  vol = 0.0
 
-  ! conversion en simple precision
-  vol = volume !* (AU_to_cm)**3
-
- ! le e signifie real*4
+  do k=1,n_az
+     bz_vol : do j=j_start,nz
+        if (j==0) cycle bz_vol
+        do i=1,n_rad
+           icell =  cell_map(i,j,k)
+           vol(i,j,k) = volume(icell)
+        enddo !i
+     enddo bz_vol !j
+  enddo !k
   call ftppre(unit,group,fpixel,nelements,vol,status)
 
   !  Close the file and free the unit number.
