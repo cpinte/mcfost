@@ -146,13 +146,13 @@ subroutine build_cylindrical_cell_mapping()
      stop
   endif
 
-  if (cell_map(1,1,1) /= 1) then
-     write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
-     write(*,*) "(1,1,1) --->", cell_map(1,1,1)
-     write(*,*) "MCFOST might crash"
-     !write(*,*) "Exiting"
-     !stop
-  endif
+  !if (cell_map(1,1,1) /= 1) then
+  !   write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
+  !   write(*,*) "(1,1,1) --->", cell_map(1,1,1)
+  !   write(*,*) "MCFOST might crash"
+  !   !write(*,*) "Exiting"
+  !   !stop
+  !endif
 
   return
 
