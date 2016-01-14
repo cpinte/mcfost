@@ -479,19 +479,23 @@ subroutine define_dust_density()
            if ((lSigma_file).and.(izone==1)) then
               ! Normalisation pour densite de surface dans fichier
               ! todo : only works for k = 1
-              do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 somme = 0.0
-                 do j=min(1,j_start),nz
-                    icell = cell_map(i,j,1)
-                    somme = somme + densite_pouss(l,icell)  *  (z_lim(i,j+1) - z_lim(i,j))
-                 enddo ! j
-                 if (somme > tiny_db) then
-                    do j=min(1,j_start),nz
-                       icell = cell_map(i,j,1)
-                       densite_pouss(l,icell) = densite_pouss(l,icell)  * Surface_density(i)/somme * nbre_grains(l)
+              do k=1,n_az
+                 do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    somme = 0.0
+                    do j=j_start,nz
+                       if (j==0) cycle
+                       icell = cell_map(i,j,k)
+                       somme = somme + densite_pouss(l,icell)  *  (z_lim(i,j+1) - z_lim(i,j))
                     enddo ! j
-                 endif
-              enddo ! l
+                    if (somme > tiny_db) then
+                       do j=j_start,nz
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
+                          densite_pouss(l,icell) = densite_pouss(l,icell)  * Surface_density(i)/somme * nbre_grains(l)
+                       enddo ! j
+                    endif
+                 enddo ! l
+              enddo ! k
            endif
 
 
@@ -505,31 +509,33 @@ subroutine define_dust_density()
 
               if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
                  ! Renormalisation pour  les cas ou il y a peu de resolution en z
-                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    ! normalization en z
-                    norme = 0.0
-                    do j=j_start,nz
-                       if (j==0) cycle
-                       icell = cell_map(i,j,1)
-                       norme = norme + densite_pouss(l,icell)
-                    enddo !j
+                 do k=1, n_az
+                    do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                       ! normalization en z
+                       norme = 0.0
+                       do j=j_start,nz
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
+                          norme = norme + densite_pouss(l,icell)
+                       enddo !j
 
-                    ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < 1.0e-200_db) then
-                       icell = cell_map(i,1,1)
-                       densite_pouss(l,icell)  = 1.0_db
-                       norme = 1.0_db
+                       ! Si tous les grains sont sedimentes, on les met dans le plan median
+                       if (norme < 1.0e-200_db) then
+                          icell = cell_map(i,1,k)
+                          densite_pouss(l,icell)  = 1.0_db
+                          norme = 1.0_db
 
-                       write(*,*) "WARNING: Vertical settling unresolved for"
-                       write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
-                    endif
+                          write(*,*) "WARNING: Vertical settling unresolved for"
+                          write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                       endif
 
-                    do j=j_start,nz
-                       if (j==0) cycle
-                       icell = cell_map(i,j,1)
-                       if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
-                    enddo !j
-                 enddo ! l
+                       do j=j_start,nz
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
+                          if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
+                       enddo !j
+                    enddo ! l
+                 enddo ! k
               endif ! test r
            endif ! settling==2
 
@@ -554,55 +560,58 @@ subroutine define_dust_density()
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
               if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
-                 ! Renormalisation pour  les cas ou il y a peu de resolution en z
-                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    !calculate omega_tau in the disk midplane
-                    OmegaTau = omega_tau(rho0,H,l)
+                 do k=1, n_az
 
-                    do j=j_start,nz ! dependence en z uniquement ici !!!!
-                       if (j==0) cycle
-                        icell = cell_map(i,j,1)
+                    ! Renormalisation pour  les cas ou il y a peu de resolution en z
+                    do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                       !calculate omega_tau in the disk midplane
+                       OmegaTau = omega_tau(rho0,H,l)
 
-                       !calculate h & z/h
-                       z = z_grid(icell)
-                       Ztilde=z/H
+                       do j=j_start,nz ! dependence en z uniquement ici !!!!
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
 
-                       ! Fit Gaussien du profile de densite
-                       !densite_pouss(l,icell)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
+                          !calculate h & z/h
+                          z = z_grid(icell)
+                          Ztilde=z/H
 
-                       ! Coefficient de diffusion constant
-                       densite_pouss(l,icell)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
-                    enddo!j
+                          ! Fit Gaussien du profile de densite
+                          !densite_pouss(l,icell)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
 
-                    ! normalization en z
-                    norme = 0.0
-                    do j=j_start,nz
-                       if (j==0) cycle
-                       icell = cell_map(i,j,1)
-                       norme = norme + densite_pouss(l,icell)
-                    enddo !j
+                          ! Coefficient de diffusion constant
+                          densite_pouss(l,icell)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                       enddo!j
 
-                    ! Si tous les grains sont sedimentes, on les met dans le plan median
-                    if (norme < 1e-200_db) then
-                       icell = cell_map(i,1,1)
-                       densite_pouss(l,icell)  = 1.0_db
-                       norme = 1.0_db
+                       ! normalization en z
+                       norme = 0.0
+                       do j=j_start,nz
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
+                          norme = norme + densite_pouss(l,icell)
+                       enddo !j
 
-                       if (lwarning) then
-                          write(*,*)
-                          write(*,*) "WARNING : Vertical settling unresolved for"
-                          write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
-                          lwarning = .false. ! on ne fait un warning qu'1 fois par rayon
+                       ! Si tous les grains sont sedimentes, on les met dans le plan median
+                       if (norme < 1e-200_db) then
+                          icell = cell_map(i,1,1)
+                          densite_pouss(l,icell)  = 1.0_db
+                          norme = 1.0_db
+
+                          if (lwarning) then
+                             write(*,*)
+                             write(*,*) "WARNING : Vertical settling unresolved for"
+                             write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                             lwarning = .false. ! on ne fait un warning qu'1 fois par rayon
+                          endif
                        endif
-                    endif
 
-                    do j=j_start,nz
-                       if (j==0) cycle
-                       icell = cell_map(i,j,1)
-                       if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
-                    enddo !j
+                       do j=j_start,nz
+                          if (j==0) cycle
+                          icell = cell_map(i,j,k)
+                          if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
+                       enddo !j
 
-                 enddo ! l
+                    enddo ! l
+                 enddo ! k
               endif ! test r
            enddo ! i
         endif ! Settling Fromang
@@ -617,36 +626,36 @@ subroutine define_dust_density()
            enddo !l
 
            do i=1, n_rad
-              rho0 = densite_gaz(cell_map(i,0,1)) ! pour dependance en R : pb en coord sperique
-              !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
-              !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
-              icell = cell_map(i,1,1)
-              rcyl = r_grid(icell)
-              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-              s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+              do k=1, n_az
+                 rho0 = densite_gaz(cell_map(i,1,k)) ! pour dependance en R : pb en coord sperique
+                 !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
+                 !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+                 icell = cell_map(i,1,k)
+                 rcyl = r_grid(icell)
+                 H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+                 s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
-              write(*,*) "r=", rcyl, "a_migration =", s_opt
+                 write(*,*) "r=", rcyl, "a_migration =", s_opt
 
-              if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
-                 write(*,*)
-                 write(*,*) "WARNING: a_migration = ", s_opt
-                 write(*,*) "is smaller than amin for dust pop #", pop
-                 write(*,*) "MCFOST will exit with an error as there are no smaller grains"
-                 if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
-                 lwarning = .false.
-              endif
+                 if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
+                    write(*,*)
+                    write(*,*) "WARNING: a_migration = ", s_opt
+                    write(*,*) "is smaller than amin for dust pop #", pop
+                    write(*,*) "MCFOST will exit with an error as there are no smaller grains"
+                    if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
+                    lwarning = .false.
+                 endif
 
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 if (r_grain(l) > s_opt) then ! grains plus gros que taille optimale de migration
-                    do j=j_start,nz
-                       if (j==0) cycle
-                       do k=1, n_az
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    if (r_grain(l) > s_opt) then ! grains plus gros que taille optimale de migration
+                       do j=j_start,nz
+                          if (j==0) cycle
                           icell = cell_map(i,j,k)
                           densite_pouss(l,icell) = 0.0
-                       enddo !k
-                    enddo !j
-                 endif
-              enddo ! l
+                       enddo !j
+                    endif
+                 enddo ! l
+              enddo ! k
            enddo !i
 
            ! distribution en taille de grains apres la migration
@@ -668,57 +677,61 @@ subroutine define_dust_density()
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
            do j=1,nz
-              icell = cell_map(i,j,1)
-              ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(icell)
-              z = z_grid(icell)
-              rsph = sqrt(rcyl**2+z**2)
+              do k=1, n_az
+                 icell = cell_map(i,j,k)
+                 ! On calcule la densite au milieu de la cellule
+                 rcyl = r_grid(icell)
+                 z = z_grid(icell)
+                 rsph = sqrt(rcyl**2+z**2)
 
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 if (rsph > dz%rmax) then
-                    density = 0.0
-                 else if (rsph < dz%rmin) then
-                    density = 0.0
-                 else if (rsph < dz%rin) then
-                    density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-                 else
-                    density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
-                 endif
-                 densite_pouss(l,icell) = density
-              enddo !l
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    if (rsph > dz%rmax) then
+                       density = 0.0
+                    else if (rsph < dz%rmin) then
+                       density = 0.0
+                    else if (rsph < dz%rin) then
+                       density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+                    else
+                       density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
+                    endif
+                    densite_pouss(l,icell) = density
+                 enddo !l
+
+              enddo ! k
            enddo !j
         enddo ! i
 
      else if (dz%geometry == 4) then ! disque de debris
-        k=1  ! 2D seulement pour le moment
         do i=1, n_rad
            do j=1,nz
-              icell = cell_map(i,j,k)
-              ! On calcule la densite au milieu de la cellule
-              rcyl = r_grid(icell)
-              z = z_grid(icell)
+              do k=1, n_az
+                 icell = cell_map(i,j,k)
+                 ! On calcule la densite au milieu de la cellule
+                 rcyl = r_grid(icell)
+                 z = z_grid(icell)
 
-              h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
+                 h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
 
-              !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
-              !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
+                 !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
+                 !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
 
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 if (rcyl > dz%rmax) then
-                    density = 0.0
-                 else if (rcyl < dz%rmin) then
-                    density = 0.0
-                 else
-                    density = nbre_grains(l) * cst_pous(pop) * &
-                         ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
-                         exp( - (abs(z)/h)**dz%vert_exponent)
-                 endif
-                 densite_pouss(l,icell) = density
-              enddo ! l
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    if (rcyl > dz%rmax) then
+                       density = 0.0
+                    else if (rcyl < dz%rmin) then
+                       density = 0.0
+                    else
+                       density = nbre_grains(l) * cst_pous(pop) * &
+                            ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                            exp( - (abs(z)/h)**dz%vert_exponent)
+                    endif
+                    densite_pouss(l,icell) = density
+                 enddo ! l
 
 
-           enddo
-        enddo
+              enddo !k
+           enddo !j
+        enddo !i
 
      endif ! dz%geometry
 
@@ -744,17 +757,18 @@ subroutine define_dust_density()
   search_not_empty : do l=1,n_grains_tot
      do j=1,nz
         do i=1,n_rad
-           icell = cell_map(i,j,1)
-           if (densite_pouss(l,icell) > 0.0_db) then
-              ri_not_empty = i
-              zj_not_empty = j
-              phik_not_empty = 1
-              exit search_not_empty
-           endif
+           do k=1, n_az
+              icell = cell_map(i,j,k)
+              if (densite_pouss(l,icell) > 0.0_db) then
+                 ri_not_empty = i
+                 zj_not_empty = j
+                 phik_not_empty = 1
+                 exit search_not_empty
+              endif
+           enddo
         enddo
      enddo
   enddo search_not_empty
-
 
 
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
