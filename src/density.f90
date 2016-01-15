@@ -86,41 +86,40 @@ subroutine define_gas_density()
            bz : do j=min(0,j_start),nz
               !if (j==0) cycle bz
 
-              ! On calcule la densite au milieu de la cellule
-              if (j==0) then
-                 icell = cell_map(i,1,1)
-                 rcyl = r_grid(icell)
-                 z = 0.0_db ! utilisation indice 0 pour densite plan median
-              else
-                 icell = cell_map(i,j,1)
-                 rcyl = r_grid(icell)
-                 z = z_grid(icell)
-              endif
-
-              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-
-              ! Puffed-up rim analytique
-              if (lpuffed_rim) then
-                 puffed = 1.0 + (puffed_rim_h - 1.0) / (exp((rcyl - puffed_rim_r)/puffed_rim_delta_r) + 1.0)
-              else
-                 puffed = 1.0
-              endif
-
-              if (dz%geometry == 1) then ! power-law
-                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
-              else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
-                 if (dz%rc < tiny_db) then
-                    write(*,*) "ERROR : tappered-edge structure with Rc = 0."
-                    write(*,*) "Exiting"
-                    stop
-                 endif
-                 fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
-              endif
-              coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
-
               do k=1, n_az
-                 icell = cell_map(i,j,k)
+                 ! On calcule la densite au milieu de la cellule
+                 if (j==0) then
+                    icell = cell_map(i,1,k)
+                    rcyl = r_grid(icell)
+                    z = 0.0_db ! utilisation indice 0 pour densite plan median
+                 else
+                    icell = cell_map(i,j,k)
+                    rcyl = r_grid(icell)
+                    z = z_grid(icell)
+                 endif
                  phi = phi_grid(icell)
+
+                 H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+
+                 ! Puffed-up rim analytique
+                 if (lpuffed_rim) then
+                    puffed = 1.0 + (puffed_rim_h - 1.0) / (exp((rcyl - puffed_rim_r)/puffed_rim_delta_r) + 1.0)
+                 else
+                    puffed = 1.0
+                 endif
+
+                 if (dz%geometry == 1) then ! power-law
+                    fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
+                 else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
+                    if (dz%rc < tiny_db) then
+                       write(*,*) "ERROR : tappered-edge structure with Rc = 0."
+                       write(*,*) "Exiting"
+                       stop
+                    endif
+                    fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
+                 endif
+                 coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
+
 
                  ! Warp analytique
                  if (lwarp) then
