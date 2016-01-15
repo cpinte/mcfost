@@ -1872,7 +1872,7 @@ subroutine ecriture_temperature(iTemperature)
         nelements=naxes(1)*naxes(2)*naxes(3)
 
         ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
+        call ftppre(unit,group,fpixel,nelements,temperature,status)
      else
         naxis=2
         naxes(1)=n_rad
