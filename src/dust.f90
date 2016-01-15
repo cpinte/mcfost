@@ -554,7 +554,6 @@ subroutine prop_grains(lambda, p_lambda)
   implicit none
 
   integer, intent(in) :: lambda, p_lambda
-  real, parameter :: pi = 3.1415926535
   real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat
   integer :: k, pop
 
@@ -782,8 +781,6 @@ subroutine opacite(lambda)
   implicit none
 
   integer, intent(in) :: lambda
-
-  real, parameter :: G = 6.672e-8
 
   integer :: icell, k, l, thetaj
   real(kind=db) ::  density, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
