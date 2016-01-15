@@ -164,7 +164,6 @@ subroutine define_gas_density()
            endif
         enddo ! i
 
-
      else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
         do i=1, n_rad
            do j=0,nz
