@@ -563,12 +563,12 @@ subroutine lect_Temperature()
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
-        if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz+1).or.(naxes(3) /= n_az)) then
+        if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
            write(*,*) "Error : Temperature.fits.gz does not have the"
            write(*,*) "right dimensions. Exiting."
            write(*,*) "# fits file,   required"
            write(*,*) naxes(1), n_rad
-           write(*,*) naxes(2), 2*nz+1
+           write(*,*) naxes(2), 2*nz
            write(*,*) naxes(3), n_az
 
            stop
