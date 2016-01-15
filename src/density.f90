@@ -119,7 +119,9 @@ subroutine define_gas_density()
               coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
 
               do k=1, n_az
-                 phi = phi_grid(k)
+                 icell = cell_map(i,j,k)
+                 phi = phi_grid(icell)
+
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
@@ -422,8 +424,8 @@ subroutine define_dust_density()
 
               do k=1, n_az
                  icell = cell_map(i,j,k)
+                 phi = phi_grid(icell)
 
-                 phi = phi_grid(k)
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)

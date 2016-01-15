@@ -431,7 +431,7 @@ subroutine initialisation_mcfost()
         ltilt=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : tit angle needed"
+           write(*,*) "Error : tilt angle needed"
            stop
         endif
         call get_command_argument(i_arg,s)

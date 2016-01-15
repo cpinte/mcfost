@@ -774,7 +774,7 @@ subroutine define_grid()
         else
            tan_phi_lim(k) = tan(phi)
         endif
-     enddo !pk
+     enddo !k
 
      V(:) = V(:) * 0.5 / real(n_az)
 
