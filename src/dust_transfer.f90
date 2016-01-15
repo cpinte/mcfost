@@ -1025,20 +1025,27 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         flag_ISM=.false.
 
         ! Choix longueur d'onde
-        rand = sprng(stream(id))
-        if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
-           ! Cas RE - LTE
-           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+        if (lonly_LTE) then
            call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,rand2,lambda)
-        else  if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
-           ! Cas RE - nLTE
-           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+        else if (lonly_NLTE) then
            call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
         else
-           ! Cas nRE - qRE
-           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
-        endif
+           ! We need to select which type of dust grain will re-emit
+           rand = sprng(stream(id))
+           if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
+              ! Cas RE - LTE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,rand2,lambda)
+           else if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
+              ! Cas RE - nLTE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+           else
+              ! Cas nRE - qRE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+           endif
+        endif ! only_LTE
 
         ! Nouvelle direction de vol : emission isotrope
         rand = sprng(stream(id))

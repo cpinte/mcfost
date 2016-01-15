@@ -44,6 +44,11 @@ subroutine alloc_dynamique()
      p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
   endif
 
+  lonly_LTE = .false.
+  lonly_nLTE = .false.
+  if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
+  if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
+
   if (l3D) then
      j_start = -nz
      if (lvariable_dust) then
@@ -73,6 +78,7 @@ subroutine alloc_dynamique()
   endif
   write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
+
 
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
@@ -273,21 +279,24 @@ subroutine alloc_dynamique()
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
-  allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
-  if (lRE_nLTE)  allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
-  if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
-  if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa'
-     stop
-  endif
-  kappa=0.0 ; kappa_abs_LTE=0.0
-  proba_abs_RE_LTE=0.0
-  if (lRE_nLTE) kappa_abs_nLTE=0.0
-  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
-  if (lnRE)  then
-     proba_abs_RE=0.0
-     kappa_abs_RE=0.0
+
+  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
+     allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
+     if (lRE_nLTE)  allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa'
+        stop
+     endif
+     kappa=0.0 ; kappa_abs_LTE=0.0
+     proba_abs_RE_LTE=0.0
+     if (lRE_nLTE) kappa_abs_nLTE=0.0
+     if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+     if (lnRE)  then
+        proba_abs_RE=0.0
+        kappa_abs_RE=0.0
+     endif
   endif
 
   allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
@@ -1035,22 +1044,24 @@ subroutine realloc_dust_mol()
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), &
-          emissivite_dust(n_cells,n_lambda), stat=alloc_status)
-  allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
-  if (lRE_nLTE) allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
-  if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
-  if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa (realloc)'
-     stop
-  endif
+       emissivite_dust(n_cells,n_lambda), stat=alloc_status)
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
-  proba_abs_RE_LTE=0.0
-  if (lRE_nLTE) kappa_abs_nLTE = 0.0
-  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
-  if (lnRE)  then
-     proba_abs_RE=0.0
-     kappa_abs_RE=0.0
+  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
+     allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE) allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa (realloc)'
+        stop
+     endif
+     proba_abs_RE_LTE=0.0
+     if (lRE_nLTE) kappa_abs_nLTE = 0.0
+     if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+     if (lnRE)  then
+        proba_abs_RE=0.0
+        kappa_abs_RE=0.0
+     endif
   endif
 
   allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
@@ -1094,10 +1105,12 @@ subroutine clean_mem_dust_mol()
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
   deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,ksca_CDF)
   deallocate(kappa_abs_LTE)
-  deallocate(proba_abs_RE_LTE)
-  if (lRE_nLTE) deallocate(kappa_abs_nLTE)
-  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
-  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  if (allocated(proba_abs_RE_LTE)) then
+     deallocate(proba_abs_RE_LTE)
+     if (lRE_nLTE) deallocate(kappa_abs_nLTE)
+     if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+     if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  endif
   deallocate(tab_albedo_pos, tab_g_pos)
 
   return
