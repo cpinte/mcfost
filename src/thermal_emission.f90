@@ -617,7 +617,7 @@ subroutine Temp_finale_nLTE()
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-        if (densite_pouss(icell,k) > tiny_db) then
+        if (densite_pouss(k,icell) > tiny_db) then
            J_absorbe=0.0
            do lambda=1, n_lambda
               J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
@@ -1626,8 +1626,9 @@ subroutine chauffage_interne()
 
   implicit none
 
-  ! Energie venant de l'equilibre avec nuage à T_min
-  E0(:) = exp(log_frac_E_em(1,:))
+  if (lRE_LTE) then
+     ! Energie venant de l'equilibre avec nuage à T_min
+     E0(:) = exp(log_frac_E_em(1,:))
 
 !!$  ! Energie venant du chauffage visqueux
 !!$  do i=1,n_rad
@@ -1647,8 +1648,9 @@ subroutine chauffage_interne()
 !!$     stop
 !!$  endif
 
-  ! Energie emise aux differente longueurs d'onde : repartition_energie
-  call Temp_finale()
+     ! Energie emise aux differente longueurs d'onde : repartition_energie
+     call Temp_finale()
+  endif
 
   return
 
