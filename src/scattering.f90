@@ -794,7 +794,7 @@ end subroutine cdapres
 
 !***************************************************
 
-integer function grainsize(lambda,aleat,ri,zj,phik)
+integer function grainsize(lambda,aleat, icell)
 !-----------------------------------------------------
 !  Nouvelle version : janvier 04
 !  la dichotomie se fait en comparant les indices
@@ -807,13 +807,12 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
 
   implicit none
 
-  integer, intent(in) :: lambda, ri, zj, phik
+  integer, intent(in) :: lambda, icell
   real, intent(in) :: aleat
   real :: prob
-  integer :: kmin, kmax, k, icell
+  integer :: kmin, kmax, k
 
-  prob = aleat ! ksca_CDF(lambda,ri,zj,n_grains_tot) est normalise a 1.0
-  icell = cell_map(ri,zj,phik)
+  prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
 
   ! dichotomie
   kmin = 0
@@ -1224,7 +1223,7 @@ end subroutine new_stokes_gmm
 
 !***********************************************************
 
-subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,stok)
+subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
   ! Routine derivee de stokes
   ! C. Pinte
   ! 9/01/05 : Prop des grains par cellule
@@ -1233,12 +1232,12 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   real, intent(in) :: frac
   real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, ri, zj, phik
+  integer, intent(in) :: lambda, itheta, icell
   real(kind=db), dimension(4), intent(inout) :: stok
 
   real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
   real(kind=db) :: v1pi, v1pj, v1pk
-  integer :: i, icell
+  integer :: i
   real(kind=db), dimension(4,4) :: ROP, RPO, XMUL
   real(kind=db), dimension(4) :: C, D
 
@@ -1327,7 +1326,6 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
 
   XMUL=0.0
-  icell = cell_map(ri,zj,phik)
   XMUL(1,1) = tab_s11_pos(itheta,icell,lambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,2) = XMUL(1,1)
   XMUL(1,2) = tab_s12_pos(itheta,icell,lambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
@@ -1528,7 +1526,7 @@ end subroutine angle_diff_theta
 
 !**********************************************************************
 
-subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cospsi)
+subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
 ! Calcul du cosinus de l'angle de diffusion
 ! a partir de l'integrale des s11 pretabulee par cellule
 ! itheta est l'indice i de l'angle de 1 a 180 correspondant à i-0.5°
@@ -1539,18 +1537,16 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
 
   implicit none
 
-  integer, intent(in) :: lambda,ri,zj, phik
+  integer, intent(in) :: lambda,icell
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
   real(kind=db), intent(out) :: cospsi
 
-  integer :: k, kmin, kmax, icell
+  integer :: k, kmin, kmax
 
   kmin=0
   kmax=180
   k=(kmin+kmax)/2
-
-  icell = cell_map(ri,zj,phik)
 
   do while ((kmax-kmin) > 1)
      if (prob_s11_pos(k,icell,lambda) < aleat) then

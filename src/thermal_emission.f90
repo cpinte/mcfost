@@ -118,7 +118,7 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: i,j,pk,k,lambda,t, pop, icell
+  integer :: i,j,pk,k,lambda,t, pop, icell, p_icell
   real(kind=db) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
@@ -231,9 +231,10 @@ subroutine init_reemission()
 
         ! Normalisation a 1
         if (integ3(n_lambda) > tiny(0.0_db)) then
-           icell = cell_map(1,1,1) ! When lvariable is off --> values stored in 1st cell
+           p_icell = 1 ! When lvariable is off --> values stored in 1st cell
+
            do lambda=1, n_lambda
-              kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
+              kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
            enddo !l
         endif
      endif !lvariable_dust
@@ -318,26 +319,23 @@ end subroutine init_reemission
 
 !********************************************************************
 
-subroutine im_reemission_LTE(id,ri,zj,phik,pri,pzj,pphik,aleat1,aleat2,lambda)
+subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
-  integer, intent(in) :: id,ri,zj,phik,pri,pzj, pphik
+  integer, intent(in) :: id, icell, p_icell
   real, intent(in) ::  aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, icell, p_icell, k, heating_method
+  integer :: l, l1, l2, T_int, T1, T2, k, heating_method
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   ! Absorption d'un photon : on ajoute son energie dans la cellule
   !xE_abs(ri,zj,phik,id) = xE_abs(ri,zj,phik,id) + E
   !E_abs=sum(xE_abs(ri,zj,phik,:))
   !log_frac_E_abs=log(E_abs*n_phot_L_tot + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
-
-  icell = cell_map(ri,zj,phik)
-  p_icell = cell_map(pri,pzj,pphik)
 
   if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_db
 
@@ -417,20 +415,19 @@ end subroutine im_reemission_LTE
 
 !********************************************************************
 
-subroutine im_reemission_NLTE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
+subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
-  integer, intent(in) :: id,ri,zj,pri,pzj
+  integer, intent(in) :: id,icell, p_icell
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell, heating_method
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, heating_method
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
-  icell = cell_map(ri,zj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon
@@ -1099,17 +1096,17 @@ end subroutine Temp_nRE
 
 !********************************************************************
 
-subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
+subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
-  integer, intent(in) :: id,ri,zj,pri,pzj
+  integer, intent(in) :: id, icell, p_icell
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, icell, p_icell
+  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   write(*,*) "ERROR, kabs_nRE_CDF not defined yet"
@@ -1117,8 +1114,6 @@ subroutine im_reemission_qRE(id,ri,zj,pri,pzj,aleat1,aleat2,lambda)
   write(*,*) "Exiting"
   stop
 
-  icell = cell_map(ri,zj,1)
-  p_icell = cell_map(pri,pzj,1)
   lambda0=lambda
 
   ! Selection du grain qui absorbe le photon

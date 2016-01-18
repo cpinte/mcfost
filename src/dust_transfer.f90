@@ -842,7 +842,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_ri, p_zj, p_phik, p_icell, taille_grain, itheta, icell
+  integer :: p_icell, taille_grain, itheta, icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -851,7 +851,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.
-  p_ri = 1 ; p_zj = 1 ; p_phik = 1 ; p_icell = 1
+  p_icell = 1
 
   lpacket_alive=.true.
 
@@ -894,13 +894,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
 
-     if (lvariable_dust) then ! TODO : pointeurs, alloue dans openMP ????
-        p_ri=ri
-        p_zj=zj
-        if (l3D) p_phik = phik
-        p_icell = icell
-     endif
-
+     if (lvariable_dust) p_icell = icell
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -974,7 +968,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
            rand = sprng(stream(id))
            rand2= sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
-              call angle_diff_theta_pos(lambda,p_ri,p_zj, p_phik, rand, rand2, itheta, cospsi)
+              call angle_diff_theta_pos(lambda,p_icell, rand, rand2, itheta, cospsi)
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -985,7 +979,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux paramètres de Stokes
-              if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
+              if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
@@ -1026,24 +1020,24 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
 
         ! Choix longueur d'onde
         if (lonly_LTE) then
-           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,rand2,lambda)
+           call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
         else if (lonly_NLTE) then
-           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+           call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
         else
            ! We need to select which type of dust grain will re-emit
            rand = sprng(stream(id))
            if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
               ! Cas RE - LTE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-              call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,rand2,lambda)
+              call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
            else if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
               ! Cas RE - nLTE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-              call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+              call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
            else
               ! Cas nRE - qRE
               rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-              call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+              call im_reemission_qRE(id,icell,p_icell,rand,rand2,lambda)
            endif
         endif ! only_LTE
 
