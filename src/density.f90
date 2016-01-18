@@ -159,10 +159,9 @@ subroutine define_gas_density()
         enddo ! i
 
 
-     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
+     else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
-           do j=0,nz
-              ! On calcule la densite au milieu de la cellule
+           do j=j_start,nz
               if (j==0) then
                  rcyl = r_grid(i,1)
                  z = 0.0_db
@@ -171,7 +170,6 @@ subroutine define_gas_density()
                  z = z_grid(i,j)
               endif
               rsph = sqrt(rcyl**2+z**2)
-
 
               ! Setup densite du gaz
               if (rsph > dz%rmax) then
@@ -183,9 +181,11 @@ subroutine define_gas_density()
               else
                  density = cst_gaz(izone) * rsph**(dz%surf)
               endif
-              densite_gaz_tmp(i,j,1) = density
+              do k=1, n_az
+                 densite_gaz_tmp(i,j,k) = density
+              enddo !k
            enddo !j
-        enddo ! i
+        enddo !i
 
      else if (dz%geometry == 4) then
         k=1
@@ -643,10 +643,11 @@ subroutine define_dust_density()
 
         endif ! migration
 
-     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
+     else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
-           do j=1,nz
+           bz_env : do j=j_start,nz
               ! On calcule la densite au milieu de la cellule
+              if (j==0) cycle bz_env
               rcyl = r_grid(i,j)
               z = z_grid(i,j)
               rsph = sqrt(rcyl**2+z**2)
@@ -661,9 +662,11 @@ subroutine define_dust_density()
                  else
                     density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
                  endif
-                 densite_pouss(i,j,1,l) = density
+                 do k=1, n_az
+                    densite_pouss(i,j,k,l) = density
+                 enddo
               enddo !l
-           enddo !j
+           enddo bz_env !j
         enddo ! i
 
      else if (dz%geometry == 4) then ! disque de debris
