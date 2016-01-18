@@ -189,7 +189,7 @@ subroutine define_gas_density()
                  else
                     density = cst_gaz(izone) * rsph**(dz%surf)
                  endif
-              if (j>0) then
+              if (j/=0) then
                  densite_gaz_tmp(icell) = density
               else
                  densite_gaz_midplane_tmp(i) = density
@@ -675,7 +675,8 @@ subroutine define_dust_density()
 
      else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
-           do j=1,nz
+           bz_env : do j=j_start,nz
+              if (j==0) cycle bz_env
               do k=1, n_az
                  icell = cell_map(i,j,k)
                  ! On calcule la densite au milieu de la cellule
@@ -697,7 +698,7 @@ subroutine define_dust_density()
                  enddo !l
 
               enddo ! k
-           enddo !j
+           enddo bz_env !j
         enddo ! i
 
      else if (dz%geometry == 4) then ! disque de debris
