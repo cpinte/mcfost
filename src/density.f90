@@ -164,40 +164,39 @@ subroutine define_gas_density()
            endif
         enddo ! i
 
-     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
+     else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
-           do j=0,nz
-              ! On calcule la densite au milieu de la cellule
-              if (j==0) then
-                 icell = cell_map(i,1,1)
-                 rcyl = r_grid(icell)
-                 z = 0.0_db
-              else
-                 icell = cell_map(i,j,1)
-                 rcyl = r_grid(icell)
-                 z = z_grid(icell)
-              endif
-              rsph = sqrt(rcyl**2+z**2)
+           do j=j_start,nz
+              do k=1, n_az
+                 if (j==0) then
+                    icell = cell_map(i,1,k)
+                    rcyl = r_grid(icell)
+                    z = 0.0_db
+                 else
+                    icell = cell_map(i,j,k)
+                    rcyl = r_grid(icell)
+                    z = z_grid(icell)
+                 endif
+                 rsph = sqrt(rcyl**2+z**2)
 
-
-              ! Setup densite du gaz
-              if (rsph > dz%rmax) then
-                 density = 0.0
-              else if (rsph < dz%rmin) then
-                 density = 0.0
-              else if (rsph < dz%rin) then
-                 density = cst_gaz(izone) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-              else
-                 density = cst_gaz(izone) * rsph**(dz%surf)
-              endif
-
+                 ! Setup densite du gaz
+                 if (rsph > dz%rmax) then
+                    density = 0.0
+                 else if (rsph < dz%rmin) then
+                    density = 0.0
+                 else if (rsph < dz%rin) then
+                    density = cst_gaz(izone) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+                 else
+                    density = cst_gaz(izone) * rsph**(dz%surf)
+                 endif
               if (j>0) then
                  densite_gaz_tmp(icell) = density
               else
                  densite_gaz_midplane_tmp(i) = density
               endif
+              enddo !k
            enddo !j
-        enddo ! i
+        enddo !i
 
      else if (dz%geometry == 4) then
         k=1
@@ -674,7 +673,7 @@ subroutine define_dust_density()
 
         endif ! migration
 
-     else if (dz%geometry == 3) then ! enveloppe : 2D uniquement pour le moment
+     else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
            do j=1,nz
               do k=1, n_az
