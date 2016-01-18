@@ -1138,9 +1138,9 @@ subroutine realloc_step2()
 
   ! Liberation memoire
   if (ltemp) then
-     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_frac_E_em, xT_ech)
-     if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
-     deallocate(xJ_abs, xKJ_abs, nbre_reemission)
+     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_frac_E_em, xT_ech,xKJ_abs)
+     if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain,xJ_abs)
+     if (lreemission_stats) deallocate(nbre_reemission)
      if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
   endif
 
