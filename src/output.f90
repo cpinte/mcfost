@@ -1159,6 +1159,7 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
+  dens = 0.0
   do k=1,n_az
      bz3 : do j=j_start,nz
         if (j==0) cycle bz3
@@ -1558,6 +1559,7 @@ subroutine write_disk_struct()
   naxes(4)=2
   nelements=naxes(1)*naxes(2)*naxes(3)
 
+  grid = 0.0
   if (l3D) then
      naxes(2)=2*nz+1
      naxes(3)=n_az
