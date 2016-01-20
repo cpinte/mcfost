@@ -123,8 +123,8 @@ subroutine alloc_ray_tracing()
   J_th = 0.0_db
 
   if (lscatt_ray_tracing1) then
-     mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_cells * n_az_rt * n_theta_rt * nb_proc * 4 / 1024.**2
-     if (mem_size > 500) write(*,*) "Trying to allocate", mem_size, "MB for ray-tracing"
+     mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_cells * n_az_rt * n_theta_rt * nb_proc * 4 / 1024.**3
+     if (mem_size > 0.5) write(*,*) "Trying to allocate", mem_size, "GB for ray-tracing"
 
      allocate(xI_scatt(N_type_flux,RT_n_incl*RT_n_az,n_cells,n_az_rt,n_theta_rt,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
