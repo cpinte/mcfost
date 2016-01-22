@@ -173,7 +173,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      !call cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
 
      ! Comparaison integrale avec tau
-     ! et ajustement longueur de vol evntuellement
+     ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
         lstop = .true.
         l = l * (extr/tau) ! on rescale l pour que tau=extr
@@ -1058,12 +1058,13 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   real(kind=db) :: xm, ym, zm
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
 
-  logical :: lcellule_non_vide
+  logical :: lcellule_non_vide, lstop
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
+  lstop = .false.
 
   x1=xio;y1=yio;z1=zio
   extr=extrin
@@ -1302,46 +1303,46 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
      tau=l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
+     ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
+        lstop = .true.
         l = l*extr/tau ! on rescale l pour que tau=extr
         ltot=ltot+l
-        if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
+     else ! Il reste extr - tau a integrer dans la cellule suivante
+        extr=extr-tau
+        ltot=ltot+l
+     endif ! tau > extr
+
+     if (lcellule_non_vide) then
+        if (letape_th) then
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + &
+                kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
            if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        endif !l_abs
+        else ! letape_th
+           if (lscatt_ray_tracing1) then
+              xm = 0.5_db * (x0 + x1)
+              ym = 0.5_db * (y0 + y1)
+              zm = 0.5_db * (z0 + z1)
+
+              ! TODO : RT : clean the 0 in the indices
+              if (lsepar_pola) then
+                 call calc_xI_scatt_pola(id,lambda,icell0,1,1,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
+              else
+                 call calc_xI_scatt(id,lambda,icell0,1,1,l,Stokes(1),flag_star) ! phik & psup=1 in 3D
+              endif
+           endif
+
+        endif ! letape_th
+     endif ! lcellule_non_vide
+
+     if (lstop) then
         flag_sortie = .false.
         xio=x0+l*u
         yio=y0+l*v
         zio=z0+l*w
         call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
         return
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
-
-        if (lcellule_non_vide) then
-           if (letape_th) then
-              if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + &
-                   kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-              if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-           else ! letape_th
-              if (lscatt_ray_tracing1) then
-                 xm = 0.5_db * (x0 + x1)
-                 ym = 0.5_db * (y0 + y1)
-                 zm = 0.5_db * (z0 + z1)
-
-                 ! TODO : RT : clean the 0 in the indices
-                 if (lsepar_pola) then
-                    call calc_xI_scatt_pola(id,lambda,icell0,1,1,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
-                 else
-                    call calc_xI_scatt(id,lambda,icell0,1,1,l,Stokes(1),flag_star) ! phik & psup=1 in 3D
-                 endif
-              endif
-
-           endif ! letape_th
-        endif ! lcellule_non_vide
-
-     endif ! tau > extr
+     endif
 
   enddo ! boucle infinie
   write(*,*) "BUG"
