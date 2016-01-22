@@ -40,7 +40,7 @@ subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,f
 
   if (lcylindrical) then
      if (l3D) then
-        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
+        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
      else
         if (lopacity_wall) then
            call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
@@ -1038,7 +1038,7 @@ end subroutine length_deg2_sph
 
 !********************************************************************
 
-subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -1051,7 +1051,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   integer, intent(inout) :: ri,zj, phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: u,v,w
-  logical, intent(in) :: flag_star
+  logical, intent(in) :: flag_star, flag_direct_star
   real, intent(in) :: extrin
   real(kind=db), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
@@ -1319,27 +1319,8 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         ltot=ltot+l
      endif ! tau > extr
 
-     if (lcellule_non_vide) then
-        if (letape_th) then
-           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + &
-                kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        else ! letape_th
-           if (lscatt_ray_tracing1) then
-              xm = 0.5_db * (x0 + x1)
-              ym = 0.5_db * (y0 + y1)
-              zm = 0.5_db * (z0 + z1)
-
-              ! TODO : RT : clean the 0 in the indices
-              if (lsepar_pola) then
-                 call calc_xI_scatt_pola(id,lambda,icell0,1,1,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
-              else
-                 call calc_xI_scatt(id,lambda,icell0,1,1,l,Stokes(1),flag_star) ! phik & psup=1 in 3D
-              endif
-           endif
-
-        endif ! letape_th
-     endif ! lcellule_non_vide
+     if (lcellule_non_vide)  call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      if (lstop) then
         flag_sortie = .false.
@@ -4557,7 +4538,8 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     do jj=1,j
@@ -4590,7 +4572,8 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     do jj=1,-1
