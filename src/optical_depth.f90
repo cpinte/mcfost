@@ -612,8 +612,6 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
   real(kind=db) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
-  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
-
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
      if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
@@ -629,25 +627,30 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
         ym = 0.5_db * (y0 + y1)
         zm = 0.5_db * (z0 + z1)
 
-        phi_pos = atan2(ym,xm)
-        phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-        if (phi_k > n_az_rt) phi_k=n_az_rt
-
-        if (zm > 0.0_db) then
+        if (l3D) then ! phik & psup=1 in 3D
+           phi_k = 1
            psup = 1
         else
-           psup = 2
+           phi_pos = atan2(ym,xm)
+           phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
+           if (phi_k > n_az_rt) phi_k=n_az_rt
+
+           if (zm > 0.0_db) then
+              psup = 1
+           else
+              psup = 2
+           endif
         endif
 
         if (lsepar_pola) then
-           call calc_xI_scatt_pola(id,lambda,icell0,phi_k,psup,l,Stokes(:),flag_star) ! phik & psup=1 in 3D
+           call calc_xI_scatt_pola(id,lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
         else
            ! ralentit d'un facteur 5 le calcul de SED
            ! facteur limitant
            call calc_xI_scatt(id,lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
         endif
 
-     else if (lscatt_ray_tracing2) then
+     else if (lscatt_ray_tracing2) then ! only 2D
         if (flag_direct_star) then
            I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
         else
@@ -655,6 +658,9 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
            ym = 0.5_db * (y0 + y1)
            zm = 0.5_db * (z0 + z1)
            phi_pos = atan2(ym,xm)
+
+           phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
+
 
            !  if (l_sym_ima) then
            !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
