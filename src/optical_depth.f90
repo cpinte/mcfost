@@ -88,8 +88,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   logical :: lcellule_non_vide, lstop
 
-!  flag_direct_star = .false. ! Ok c'est moins bon edge-on :-)
-
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
@@ -135,6 +133,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
+        lcellule_non_vide=.true.
         if (l_dark_zone(icell0)) then
            ! On revoie le paquet dans l'autre sens
            u = -u ; v = -v ; w=-w
@@ -145,10 +144,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
            flag_sortie= .false.
            return
         endif
+     else
+        lcellule_non_vide=.false.
      endif
-
-     lcellule_non_vide=.true.
-     if (ri0==0) lcellule_non_vide=.false.
 
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
@@ -156,8 +154,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         flag_sortie = .true.
         return
      elseif (zj0>nz) then
-        lcellule_non_vide=.false.
-
         ! Test sortie vericale
         if (abs(z0) > zmaxmax) then
            flag_sortie = .true.
@@ -165,10 +161,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         endif
      endif ! Test sortie
 
-
-     previous_cell = 0 ! unusued, just for Voronoi
+     previous_cell = 0 ! unused, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
-     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
+     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for the "test sortie"
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
