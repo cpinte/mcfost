@@ -82,7 +82,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real(kind=db) :: correct_moins, correct_plus
   real(kind=db) :: phi_vol, factor
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
-  integer :: ri_in, zj_in
+  integer :: ri_in, zj_in, tmp_k
 
   integer :: icell0, next_cell, previous_cell, icell
 
@@ -166,6 +166,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      previous_cell = 0 ! unusued, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
