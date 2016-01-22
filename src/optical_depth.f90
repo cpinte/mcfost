@@ -106,6 +106,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   ri1=ri
   zj1=zj
 
+  next_cell = cell_map(ri0,zj0,1)
+
   ltot=0.0
 
   if (abs(w) > tiny_real) then
@@ -129,7 +131,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
 
-     icell0 = cell_map(ri0,zj0,1)
+     icell0 = next_cell
 
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
