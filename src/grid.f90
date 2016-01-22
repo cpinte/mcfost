@@ -16,7 +16,7 @@ module grid
 
 subroutine build_cylindrical_cell_mapping()
 
-  integer :: i,j,k,icell, ntot, ntot2
+  integer :: i,j,k,icell, ntot, ntot2, alloc_status
   integer :: istart,iend,jstart,jend,kstart,kend, istart2,iend2,jstart2,jend2,kstart2,kend2
 
   istart = 1
@@ -93,6 +93,14 @@ subroutine build_cylindrical_cell_mapping()
 
   ! Virtual cell indices for when the packets are just around the grid
 
+  ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
+  allocate(lexit_cell(ntot+1:ntot2), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error lexit_cell'
+     stop
+  endif
+  lexit_cell(:) = 0
+
   ! Cases j=0 and j=nz+1
   do k=kstart, kend
      do j = jstart2, jend2, jend2 - jstart2
@@ -104,6 +112,8 @@ subroutine build_cylindrical_cell_mapping()
               write(*,*) "Exiting"
               stop
            endif
+
+           if (j==jend2) lexit_cell(icell) = 2
 
            cell_map_i(icell) = i
            cell_map_j(icell) = j
@@ -128,6 +138,8 @@ subroutine build_cylindrical_cell_mapping()
               write(*,*) "Exiting"
               stop
            endif
+
+           if (i==iend2) lexit_cell(icell) = 1
 
            cell_map_i(icell) = i
            cell_map_j(icell) = j
@@ -158,6 +170,33 @@ subroutine build_cylindrical_cell_mapping()
 
 end subroutine build_cylindrical_cell_mapping
 
+!******************************************************************************
+
+pure logical function exit_test_cylindrical(icell, x, y, z)
+
+  integer, intent(in) :: icell
+  real(kind=db), intent(in) :: x,y,z
+
+  if (icell <= n_cells) then
+     exit_test_cylindrical = .false.
+     return
+  endif
+
+  if (lexit_cell(icell)==0) then
+     exit_test_cylindrical = .false.
+  else if (lexit_cell(icell)==1) then ! radial
+     exit_test_cylindrical = .true.
+  else ! 2 --> vertical
+     if (abs(z) > zmaxmax) then
+        exit_test_cylindrical = .true.
+     else
+        exit_test_cylindrical = .false.
+     endif
+  endif
+
+  return
+
+end function exit_test_cylindrical
 
 !******************************************************************************
 
