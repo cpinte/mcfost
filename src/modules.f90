@@ -423,6 +423,7 @@ module opacity
   save
 
   real(kind=db) :: zmaxmax
+  integer, dimension(:), allocatable :: lexit_cell
   real(kind=db), dimension(:), allocatable :: zmax !n_rad
   real(kind=db), dimension(:), allocatable :: volume !n_rad en AU^3
   real(kind=db), dimension(:), allocatable :: masse  !en g ! n_cells

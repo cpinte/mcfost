@@ -83,7 +83,7 @@ subroutine alloc_dynamique()
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error'
+     write(*,*) 'Allocation error random number stream'
      stop
   endif
   gauss_random_saved = 0.0_db

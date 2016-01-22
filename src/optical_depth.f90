@@ -93,6 +93,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
   lstop = .false.
+  flag_sortie = .false.
 
   x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
@@ -128,7 +129,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
-
      icell0 = next_cell
 
      ! Pour cas avec approximation de diffusion
@@ -149,17 +149,10 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
+     if (exit_test_cylindrical(icell0, x0, y0, z0)) then
         flag_sortie = .true.
         return
-     elseif (zj0>nz) then
-        ! Test sortie vericale
-        if (abs(z0) > zmaxmax) then
-           flag_sortie = .true.
-           return
-        endif
-     endif ! Test sortie
+     endif
 
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
