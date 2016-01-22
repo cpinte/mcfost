@@ -167,7 +167,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      !call cylindrical2cell(ri0,zj0,1, cell) ! tmp : this routine should only know cell in the long term, not ri0, etc
      previous_cell = 0 ! unusued, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
-     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
+     !call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : this routine should only know cell in the long term
 
 
      !call cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
@@ -241,7 +241,6 @@ end subroutine length_deg2_cyl
 !********************************************************************
 
 subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
-!subroutine cross_cylindrical_cell_tmp(lambda, x0,y0,z0, u,v,w, ri0, zj0,  x1,y1,z1, ri1, zj1, l, tau)
 
   integer, intent(in) :: lambda, cell, previous_cell
   real(kind=db), intent(in) :: x0,y0,z0
@@ -613,17 +612,10 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
   real(kind=db) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
-  integer :: ri0, zj0, k0
-
-
- ! 3D cell indices : TMP
-  call cell2cylindrical(icell0, ri0,zj0,k0)
-
   phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   if (letape_th) then
-     if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) &
-          * l * Stokes(1)
+     if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
      if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
   else
      if (lProDiMo) then
@@ -978,52 +970,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      endif
 
      ! Stokage des champs de radiation
-     if (lcellule_non_vide) then
-        if (letape_th) then
-           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        else if (lscatt_ray_tracing2) then
-           if (flag_direct_star) then
-              I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
-           else
-              xm = 0.5_db * (x0 + x1)
-              ym = 0.5_db * (y0 + y1)
-              zm = 0.5_db * (z0 + z1)
-
-              if (l_sym_ima) then
-                 phi_pos = atan2(ym,xm)
-                 delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-                 if (delta_phi > pi) delta_phi = abs(delta_phi - deux_pi)
-                 phi_I =  nint( delta_phi  / pi * (n_phi_I ) ) + 1
-                 if (phi_I > n_phi_I) phi_I = n_phi_I
-              else
-                 phi_pos = atan2(ym,xm)
-                 phi_I =  nint(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
-                 if (phi_I > n_phi_I) phi_I = 1
-              endif
-
-              if (zm > 0._db) then
-                 theta_I = nint(0.5_db*( w + 1.0_db) * n_theta_I) + 1
-              else
-                 theta_I = nint(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
-              endif
-              if (theta_I > n_theta_I) theta_I = n_theta_I
-
-              I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
-
-              if (lsepar_contrib) then
-                 if (flag_star) then
-                    I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
-                 else
-                    I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
-                 endif
-              endif ! lsepar_contrib
-
-           endif
-
-        endif
-
-     endif ! lcellule_non_vide
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer
      if (lstop) then
@@ -1352,6 +1300,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      tau=l*opacite ! opacite constante dans la cellule
+
      ! Comparaison integrale avec tau
      if(tau > extr) then ! On a fini d'integrer
         l = l*extr/tau ! on rescale l pour que tau=extr
