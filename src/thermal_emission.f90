@@ -1366,7 +1366,7 @@ subroutine emission_nRE()
      frac_E_stars(lambda) = 0.0
 
      if (prob_E_cell(n_cells,lambda) > tiny_real) then
-        prob_E_cell(:,lambda)=prob_E_cell(lambda,:)/prob_E_cell(n_cells,lambda)
+        prob_E_cell(:,lambda)=prob_E_cell(:,lambda)/prob_E_cell(n_cells,lambda)
      else
         prob_E_cell(:,lambda)=0.0
      endif
@@ -1411,6 +1411,7 @@ subroutine init_emissivite_nRE()
      endif
 
      ! Emission par cellule des PAHs
+     E_emise = 0.0_db
      do icell=1,n_cells
         do k=grain_nRE_start,grain_nRE_end
            E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* volume(icell) * facteur !* Proba_Temperature = 1 pour Tmin
@@ -1522,7 +1523,6 @@ subroutine repartition_energie(lambda)
         enddo
      endif
 
-
      do icell=1,n_cells
         E_emise = 0.0
         do k=grain_nRE_start,grain_nRE_end
@@ -1530,7 +1530,9 @@ subroutine repartition_energie(lambda)
               temp=Temperature_1grain_nRE(k,icell)
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < cst_wl_max) then
+                 i = cell_map_i(icell)
                  if (i==1) then
+                    j=cell_map_j(icell)
                     Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)* &
                          (exp(cst_wl)-1.0))
                     frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
@@ -1545,7 +1547,9 @@ subroutine repartition_energie(lambda)
                  temp=tab_Temp(T)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
+                    i = cell_map_i(icell)
                     if (i==1) then
+                       j=cell_map_j(icell)
                        Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)* &
                             (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
@@ -1562,7 +1566,6 @@ subroutine repartition_energie(lambda)
      enddo !icell
 
   endif
-
 
   if (lweight_emission) then
      do icell=1,n_cells
