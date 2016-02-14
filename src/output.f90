@@ -2076,7 +2076,7 @@ subroutine ecriture_temperature(iTemperature)
         naxes(2)=n_rad
         naxes(3)=2*nz
         naxes(4)=n_az
-        naxes(4)=n_grains_nRE
+        naxes(5)=n_grains_nRE
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
      else
         naxis=4
