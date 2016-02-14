@@ -1827,15 +1827,16 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: i, j, l, icell
+  integer :: i, j, l, k, icell
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements
+  integer, dimension(5) :: naxes
+  integer :: group,fpixel,nelements, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
 
-  integer, dimension(n_rad,nz,grain_nRE_start:grain_nRE_end) :: tmp
+  ! integer, dimension(n_rad,nz,grain_nRE_start:grain_nRE_end) :: tmp
+  integer, dimension(:,:,:,:), allocatable :: tmp
 
 
   if (lRE_LTE) then
@@ -1863,35 +1864,24 @@ subroutine ecriture_temperature(iTemperature)
         naxes(1)=n_rad
         naxes(2)=2*nz
         naxes(3)=n_az
-
-        !  Write the required header keywords.
-        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-        !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-        !  Write the array to the FITS file.
-        group=1
-        fpixel=1
         nelements=naxes(1)*naxes(2)*naxes(3)
-
-        ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature,status)
      else
         naxis=2
         naxes(1)=n_rad
         naxes(2)=nz
-
-        !  Write the required header keywords.
-        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-        !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-        !  Write the array to the FITS file.
-        group=1
-        fpixel=1
         nelements=naxes(1)*naxes(2)
-
-        ! le e signifie real*4
-        call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
      endif
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+     !  Write the array to the FITS file.
+     group=1
+     fpixel=1
+
+     ! le e signifie real*4
+     call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
@@ -1904,11 +1894,6 @@ subroutine ecriture_temperature(iTemperature)
   endif
 
   if (lRE_nLTE) then
-     if (l3D) then
-        write(*,*) "ERROR : 3D nLTE version not written yet"
-        stop
-     endif
-
      if (iTemperature == 2) then
         filename = "!"//trim(data_dir)//"/Temperature_nLTE_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
@@ -1929,10 +1914,20 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=-32
      extend=.true.
 
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_grains_RE_nLTE
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4)=n_grains_RE_nLTE
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=n_grains_RE_nLTE
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1941,7 +1936,7 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)
+
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
@@ -1957,11 +1952,6 @@ subroutine ecriture_temperature(iTemperature)
   endif
 
   if (lnRE) then
-     if (l3D) then
-        write(*,*) "ERROR : 3D nRE version not written yet"
-        stop
-     endif
-
      if (iTemperature == 2) then
         filename = "!"//trim(data_dir)//"/Temperature_nRE_DA.fits.gz" ! "!" to overwrite file if computing diffusion approx twice
      else
@@ -1986,11 +1976,21 @@ subroutine ecriture_temperature(iTemperature)
      ! 1er HDU : Temperature d'equilibre
      !------------------------------------------------------------------------------
      bitpix=-32
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_grains_nRE
-     nelements=naxes(1)*naxes(2)*naxes(3)
+
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2002,11 +2002,28 @@ subroutine ecriture_temperature(iTemperature)
      ! 2eme HDU : is the grain at equilibrium ?
      !------------------------------------------------------------------------------
      bitpix=32
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_grains_nRE
-     nelements=naxes(1)*naxes(2)*naxes(3)
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz+1
+        naxes(3)=n_az
+        naxes(4)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        allocate(tmp(n_rad,-nz:nz,n_az,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)
+        allocate(tmp(n_rad,nz,n_az,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     endif
+
+     if (alloc_status /= 0) then
+        write(*,*) "Allocation error in ecriture_temperature"
+        write(*,*) "Exiting"
+        stop
+     endif
 
       ! create new hdu
      call ftcrhd(unit, status)
@@ -2016,14 +2033,17 @@ subroutine ecriture_temperature(iTemperature)
 
      ! le j signifie integer
      do i=1, n_rad
-        do j=1,nz
-           icell = cell_map(i,j,1)
-           do l=grain_nRE_start, grain_nRE_end
-              if (l_RE(l,icell)) then
-                 tmp(i,j,l) = 1
-              else
-                 tmp(i,j,l) = 0
-              endif
+        do j=j_start,nz
+           if (j==0) cycle
+           do k=1, n_az
+              icell = cell_map(i,j,k)
+              do l=grain_nRE_start, grain_nRE_end
+                 if (l_RE(l,icell)) then
+                    tmp(i,j,k,l) = 1
+                 else
+                    tmp(i,j,k,l) = 0
+                 endif
+              enddo
            enddo
         enddo
      enddo
@@ -2046,17 +2066,26 @@ subroutine ecriture_temperature(iTemperature)
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,tab_Temp,status)
 
-
      !------------------------------------------------------------------------------
      ! 4eme HDU : Proba Temperature
      !------------------------------------------------------------------------------
      bitpix=-32
-     naxis=4
-     naxes(1)=n_T
-     naxes(2)=n_rad
-     naxes(3)=nz
-     naxes(4)=n_grains_nRE
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     if (l3D) then
+        naxis=5
+        naxes(1)=n_T
+        naxes(2)=n_rad
+        naxes(3)=2*nz
+        naxes(4)=n_az
+        naxes(4)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+     else
+        naxis=4
+        naxes(1)=n_T
+        naxes(2)=n_rad
+        naxes(3)=nz
+        naxes(4)=n_grains_nRE
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     endif
 
      ! create new hdu
      call ftcrhd(unit, status)
