@@ -1494,8 +1494,8 @@ subroutine repartition_energie(lambda)
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < cst_wl_max) then
                  i = cell_map_i(icell)
+                 j = cell_map_j(icell)
                  if (i==1) then
-                    j=cell_map_j(icell)
                     Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                     frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                     E_emise = E_emise + Ener * frac
@@ -1531,8 +1531,8 @@ subroutine repartition_energie(lambda)
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < cst_wl_max) then
                  i = cell_map_i(icell)
+                 j = cell_map_j(icell)
                  if (i==1) then
-                    j=cell_map_j(icell)
                     Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)* &
                          (exp(cst_wl)-1.0))
                     frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
@@ -1548,8 +1548,8 @@ subroutine repartition_energie(lambda)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     i = cell_map_i(icell)
+                    j = cell_map_j(icell)
                     if (i==1) then
-                       j=cell_map_j(icell)
                        Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)* &
                             (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
