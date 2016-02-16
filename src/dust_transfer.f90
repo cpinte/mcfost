@@ -60,7 +60,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand, tau
-  integer :: i, ri, zj, phik, icell
+  integer :: i, ri, zj, phik, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -170,11 +170,11 @@ subroutine transfert_poussiere()
      if (loptical_depth_map) call calc_optical_depth_map(1)
 
      write(*,*) ""
-     write(*,*) "Dust properties in cell (1,1,1): "
-     icell = cell_map(1,1,1)
-     write(*,*) "g             ", tab_g_pos(icell,1)
-     write(*,*) "albedo        ", tab_albedo_pos(icell,1)
-     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(:,icell,1)/tab_s11_pos(:,icell,1))
+     write(*,*) "Dust properties in cell #1: "
+     p_icell = 1
+     write(*,*) "g             ", tab_g_pos(p_icell,1)
+     write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
+     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(:,p_icell,1)/tab_s11_pos(:,p_icell,1))
 
      if (lopacite_only) stop
 
