@@ -846,7 +846,11 @@ subroutine Temp_nRE(lconverged)
 
               ! time interval for photon absorption
               t_abs = sum(C_abs_norm(l,:)*lambda_Jlambda(:,id)*tab_lambda(:)) * 1.0e-6/c_light
-              t_abs = hp/(4.*pi*t_abs)
+              if (t_abs > tiny_real) then
+                 t_abs = hp/(4.*pi*t_abs)
+              else
+                 t_abs = huge_real
+              endif
 
               ! mean absorbed photon energy
               mean_abs_E = t_abs * 4*pi * Int_k_lambda_Jlambda ! D01 eq 46
@@ -1123,7 +1127,6 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   do while((kmax-kmin) > 1)
      if (kabs_nRE_CDF(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
-
         kmin = k
      else
         kmax = k
