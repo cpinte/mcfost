@@ -1433,7 +1433,7 @@ contains
     ! HDU 6 : Read dimensions : radiation field(n_rad,nz,n_lambda)
     !------------------------------------------------------------------------
     call ftmahd(unit,6,hdutype,status)
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 6 file.',nfound,' Exiting.'
@@ -1467,7 +1467,7 @@ contains
     call ftmahd(unit,2,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 2) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 2 file. Exiting.'
@@ -1492,7 +1492,7 @@ contains
     call ftmahd(unit,3,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 3 file.',nfound,' Exiting.'
@@ -1518,7 +1518,7 @@ contains
 
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 7 file. Exiting.'
@@ -1541,7 +1541,7 @@ contains
     call ftmahd(unit,8,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 8 file. Exiting.'
@@ -1564,7 +1564,7 @@ contains
     call ftmahd(unit,9,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 9 file. Exiting.'
@@ -1705,7 +1705,7 @@ contains
        ! Format is the same as for the mcfost2ProDiMo interface
        !---------------------------------------------------------
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 1 file. Exiting.'
@@ -1838,7 +1838,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,2,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 2) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 2 file. Exiting.'
@@ -1861,7 +1861,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 3 file. Exiting.'
@@ -1892,7 +1892,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 4 file. Exiting.'
@@ -1923,7 +1923,7 @@ contains
           call ftmrhd(unit,1,hdutype,fits_status)
 
           ! Check dimensions
-          call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+          call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
           if (nfound /= 3) then
              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
              write(*,*) 'of HDU ',i+4,' file. Exiting.'

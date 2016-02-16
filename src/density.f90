@@ -1304,7 +1304,7 @@ subroutine densite_file()
   nullval=-999
 
   !  determine the size of density file
-  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 4) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
@@ -1381,7 +1381,7 @@ subroutine densite_file()
      call ftmrhd(unit,1,hdutype,status)
      nfound=1
      ! Check dimensions
-     call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 1) then
         write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
         write(*,*) 'HDU 2 has', nfound, 'dimensions.'
@@ -1441,7 +1441,7 @@ subroutine densite_file()
 
         nfound = 0 ; naxes = 0 ;
         ! Check dimensions
-        call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 1) then
            write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
            write(*,*) 'HDU 3 has', nfound, 'dimensions.'
@@ -1729,7 +1729,7 @@ subroutine read_Sigma_file()
   nullval=-999
 
   ! determine the size of density file
-  call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 1) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
@@ -1928,7 +1928,7 @@ subroutine densite_Seb_Charnoz2()
   nullval=-999
 
   !  determine the size of density file
-  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 2) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
