@@ -1442,17 +1442,17 @@ subroutine realloc_step2()
      ksca_CDF = 0
   endif ! method
 
-  deallocate(kappa, kappa_abs_LTE)
+  deallocate(kappa, kappa_sca, kappa_abs_LTE)
   deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  allocate(kappa(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
+  allocate(kappa(n_cells,n_lambda2), kappa_sca(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
-  kappa=0.0 ; kappa_abs_LTE=0.0 ;
+  kappa=0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE=0.0
 
 
   if (lorigine) then
