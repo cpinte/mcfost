@@ -534,7 +534,7 @@ subroutine lect_Temperature()
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
   real :: nullval
-  integer, dimension(4) :: naxes
+  integer, dimension(5) :: naxes
   logical :: anynull
 
   if (lRE_LTE) then
@@ -556,8 +556,8 @@ subroutine lect_Temperature()
      nullval=-999
 
      !  determine the size of temperature file
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (l3D) then
-        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 3) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
@@ -575,7 +575,6 @@ subroutine lect_Temperature()
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
      else
-        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
@@ -618,13 +617,24 @@ subroutine lect_Temperature()
 
      ! determine the size of temperature file
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (nfound /= 3) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
-        write(*,*) "Found", nfound, "axes", naxes
-        stop
+     if (l3D) then
+        if (nfound /= 4) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+           write(*,*) "Found", nfound, "axes", naxes
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        if (nfound /= 3) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+           write(*,*) "Found", nfound, "axes", naxes
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
-     npixels=naxes(1)*naxes(2)*naxes(3)
+
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain,anynull,status)
@@ -657,11 +667,19 @@ subroutine lect_Temperature()
 
      ! HDU 1 : Teq
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (nfound /= 3) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+     if (l3D) then
+        if (nfound /= 4) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        if (nfound /= 3) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
-     npixels=naxes(1)*naxes(2)*naxes(3)
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain_nRE,anynull,status)
@@ -669,12 +687,21 @@ subroutine lect_Temperature()
      ! HDU 2 : is_eq
      call ftmahd(unit,2,hdutype,status)
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (nfound /= 3) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
-        stop
+     if (l3D) then
+        if (nfound /= 4) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        if (nfound /= 3) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
-     npixels=naxes(1)*naxes(2)*naxes(3)
      nbuffer=npixels
      ! read_image
      call ftgpvj(unit,group,firstpix,nbuffer,nullval,l_RE,anynull,status)
@@ -683,12 +710,21 @@ subroutine lect_Temperature()
      call ftmahd(unit,4,hdutype,status)
 
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (nfound /= 4) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
-        stop
+     if (l3D) then
+        if (nfound /= 5) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+     else
+        if (nfound /= 4) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      endif
-     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      nbuffer=npixels
      ! read_image
      call ftgpve(unit,group,firstpix,nbuffer,nullval,Proba_Temperature,anynull,status)
