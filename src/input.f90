@@ -557,7 +557,7 @@ subroutine lect_Temperature()
 
      !  determine the size of temperature file
      if (l3D) then
-        call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 3) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
@@ -575,7 +575,7 @@ subroutine lect_Temperature()
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
      else
-        call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
@@ -616,8 +616,8 @@ subroutine lect_Temperature()
      firstpix=1
      nullval=-999
 
-     !  determine the size of temperature file
-     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+     ! determine the size of temperature file
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
         write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
@@ -656,11 +656,10 @@ subroutine lect_Temperature()
      nullval=-999
 
      ! HDU 1 : Teq
-     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
         write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
-        stop
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
      nbuffer=npixels
@@ -669,7 +668,7 @@ subroutine lect_Temperature()
 
      ! HDU 2 : is_eq
      call ftmahd(unit,2,hdutype,status)
-     call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
         write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
@@ -683,7 +682,7 @@ subroutine lect_Temperature()
      ! HDU 4 : proba temperature
      call ftmahd(unit,4,hdutype,status)
 
-     call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 4) then
         write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
         write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
@@ -736,7 +735,7 @@ subroutine read_abundance(imol)
   nullval=-999
 
   !  determine the size of temperature file
-  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 2) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'

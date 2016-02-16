@@ -304,7 +304,7 @@ subroutine repartition_energie_etoiles()
         end if
 
         !  determine the size of the image
-        call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         !  check that it found both NAXIS1 and NAXIS2 keywords
         if (nfound /= 2)then
            write(*,*) 'ERROR failed to read the NAXISn keywords in '//trim(filename)

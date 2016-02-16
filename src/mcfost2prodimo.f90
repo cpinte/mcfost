@@ -94,7 +94,7 @@ contains
     ! hdu 1
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 1 file. Exiting.'
@@ -138,7 +138,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 2) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 2 file. Exiting.'
@@ -164,7 +164,7 @@ contains
 
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 3 file. Exiting.'
@@ -189,7 +189,7 @@ contains
 
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 3 file. Exiting.'
@@ -214,7 +214,7 @@ contains
 
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 3 file. Exiting.'
@@ -238,7 +238,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 4 file. Exiting.'
@@ -261,7 +261,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 4 file. Exiting.'
@@ -284,7 +284,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 4 file. Exiting.'
@@ -307,7 +307,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 4 file. Exiting.'
@@ -330,7 +330,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 2) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 5 file. Exiting.'
@@ -353,7 +353,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 4) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 6 file. Exiting.'
@@ -379,7 +379,7 @@ contains
     call ftmrhd(unit,1,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 7 file. Exiting.'
