@@ -213,6 +213,10 @@ contains
        lstrat = .false.
     else
        lstrat = .true.
+       if (exp_strat < 0.) then
+          exp_strat = -exp_strat
+          write(*,*) "Setting exp_strat > 0"
+       endif
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
@@ -655,6 +659,10 @@ contains
        lstrat = .false.
     else
        lstrat = .true.
+       if (exp_strat < 0.) then
+          exp_strat = -exp_strat
+          write(*,*) "Setting exp_strat > 0"
+       endif
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation , correct_Rsub
@@ -1074,6 +1082,10 @@ contains
        lstrat = .false.
     else
        lstrat = .true.
+        if (exp_strat < 0.) then
+          exp_strat = -exp_strat
+          write(*,*) "Setting exp_strat > 0"
+       endif
     endif
     read(1,*) lmigration
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
@@ -1462,6 +1474,10 @@ contains
        lstrat = .false.
     else
        lstrat = .true.
+        if (exp_strat < 0.) then
+          exp_strat = -exp_strat
+          write(*,*) "Setting exp_strat > 0"
+       endif
     endif
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
@@ -1869,6 +1885,10 @@ contains
        lstrat = .false.
     else
        lstrat = .true.
+        if (exp_strat < 0.) then
+          exp_strat = -exp_strat
+          write(*,*) "Setting exp_strat > 0"
+       endif
     endif
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
@@ -2276,6 +2296,10 @@ contains
     ! ----------------------
     read(1,*) line_buffer
     read(1,*) lstrat, exp_strat, a_strat
+    if (exp_strat < 0.) then
+       exp_strat = -exp_strat
+       write(*,*) "Setting exp_strat > 0"
+    endif
     read(1,*,IOSTAT=status) ldust_sublimation, correct_Rsub
     if (status/=0) correct_Rsub = 1.0
     read(1,*) lchauff_int, alpha
