@@ -1252,7 +1252,14 @@ subroutine update_proba_abs_nRE()
               ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
               Proba_abs_RE_LTE(icell,lambda) =  Proba_abs_RE_LTE(icell,lambda) * correct_m1
               Proba_abs_RE_LTE_p_nLTE(icell,lambda) =  Proba_abs_RE_LTE_p_nLTE(icell,lambda) * correct_m1
+
               ! Todo : update proba_abs_1grain
+              write(*,*) "kabs_nRE_CDF needs to be updated"
+              write(*,*) "implementation is not finished yet"
+              write(*,*) "Contact Christophe"
+              write(*,*) "Exiting"
+              stop
+
            endif
 
         endif
