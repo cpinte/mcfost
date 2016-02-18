@@ -1226,7 +1226,7 @@ subroutine update_proba_abs_nRE()
            if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
               delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * densite_pouss(l,icell)
            else
-              if (.not.l_RE(l,icell)) lall_grains_eq = .true. ! il reste des grains qui ne sont pas a l'equilibre
+              if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! il reste des grains qui ne sont pas a l'equilibre
            endif
         enddo !l
 
