@@ -880,7 +880,7 @@ subroutine opacite(lambda)
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
               density=densite_pouss(k,icell)
-              kabs_nLTE_CDF(k,icell,lambda)=kabs_nLTE_CDF(k-1,icell,lambda) + &
+              kabs_nLTE_CDF(k,icell,lambda) = kabs_nLTE_CDF(k-1,icell,lambda) + &
                    C_abs(k,lambda) * density
            enddo !k
            if (kabs_nLTE_CDF(grain_RE_nLTE_end,icell,lambda) > tiny_real) then

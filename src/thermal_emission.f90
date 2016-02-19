@@ -1106,34 +1106,18 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   implicit none
 
-  integer, intent(in) :: id, icell, p_icell
+  integer, intent(in) :: id, icell, p_icell ! p_icell usused
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
-  write(*,*) "ERROR, kabs_nRE_CDF not defined yet"
-  write(*,*) "Contact Christophe"
-  write(*,*) "Exiting"
-  stop
+  integer, parameter :: heating_method = 3
 
   lambda0=lambda
 
-  ! Selection du grain qui absorbe le photon
-  kmin=grain_nRE_start
-  kmax=grain_nRE_end
-  k=(kmin+kmax)/2
-
-  do while((kmax-kmin) > 1)
-     if (kabs_nRE_CDF(k,p_icell,lambda0) < aleat1) then  ! TODO : updater prob_kappa_abs_1grain
-        kmin = k
-     else
-        kmax = k
-     endif
-     k = (kmin + kmax)/2
-  enddo   ! while
-  k=kmax
+  k = select_absorbing_grain(lambda0,icell, aleat1, heating_method)
 
   ! Mean intensity
   ! Somme sur differents processeurs
@@ -1141,7 +1125,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
   do ilambda=1, n_lambda
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,lambda))
   enddo ! ilambda
- ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
+  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
   log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(icell))
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
@@ -1232,12 +1216,15 @@ subroutine update_proba_abs_nRE()
 
         if (delta_kappa_abs_qRE > tiny_db) then ! au moins 1 grain a change de status, on met a jour les differentes probabilites
            kappa_abs_RE_old = kappa_abs_RE(icell,lambda)
-           kappa_abs_RE_new = kappa_abs_RE(icell,lambda) + delta_kappa_abs_qRE
+           kappa_abs_RE_new = kappa_abs_RE_old + delta_kappa_abs_qRE
            kappa_abs_RE(icell,lambda) = kappa_abs_RE_new
 
            if (kappa_abs_RE_old < tiny_db) then
               write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
+              write(*,*) "Something went wrong"
+              write(*,*) "Cell #", icell, " lambda #", lambda
               write(*,*) "Exiting"
+              stop
            else
               correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
               correct_m1 = 1.0_db/correct ! < 1
@@ -1252,14 +1239,6 @@ subroutine update_proba_abs_nRE()
               ! Parmis les grains a eq, proba d'absorbe sur un grain a LTE ou sur un grain a LTE ou nLTE
               Proba_abs_RE_LTE(icell,lambda) =  Proba_abs_RE_LTE(icell,lambda) * correct_m1
               Proba_abs_RE_LTE_p_nLTE(icell,lambda) =  Proba_abs_RE_LTE_p_nLTE(icell,lambda) * correct_m1
-
-              ! Todo : update proba_abs_1grain
-              write(*,*) "kabs_nRE_CDF needs to be updated"
-              write(*,*) "implementation is not finished yet"
-              write(*,*) "Contact Christophe"
-              write(*,*) "Exiting"
-              stop
-
            endif
 
         endif
@@ -1690,25 +1669,46 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
      norm =  kappa_abs_nLTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
-     write(*,*) "ERROR in select_absorbing_grain"
-     write(*,*) "Exiting"
+     ! todo : maybe update with an extra variable kappa_abs_qRE
+     norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
+          / ( AU_to_cm * mum_to_cm**2 )
+     kstart = grain_nRE_start ; kend = grain_nRE_end
   endif
 
-  if (aleat < 0.5) then ! We start from first grain
-     prob = aleat * norm
-     CDF = 0.0
-     do k=kstart, kend
-        CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
-        if (CDF > prob) exit
-     enddo
-  else ! We start from the end of the grain size distribution
-     prob = (1.0-aleat) * norm
-     CDF = 0.0
-     do k=kend, kstart, -1
-        CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
-        if (CDF > prob) exit
-     enddo
+  if (heating_method <= 2) then
+     if (aleat < 0.5) then ! We start from first grain
+        prob = aleat * norm
+        CDF = 0.0
+        do k=kstart, kend
+           CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     else ! We start from the end of the grain size distribution
+        prob = (1.0-aleat) * norm
+        CDF = 0.0
+        do k=kend, kstart, -1
+           CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     endif
+  else ! Same thing but with lRE to only include dust grains that are at qRE
+     if (aleat < 0.5) then ! We start from first grain
+        prob = aleat * norm
+        CDF = 0.0
+        do k=kstart, kend
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     else ! We start from the end of the grain size distribution
+        prob = (1.0-aleat) * norm
+        CDF = 0.0
+        do k=kend, kstart, -1
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     endif
   endif
+
 
   return
 
