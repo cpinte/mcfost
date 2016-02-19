@@ -36,9 +36,11 @@ subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,f
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-   if (lcylindrical) then
+  !call test_convert()
+
+  if (lcylindrical) then
      if (l3D) then
-        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
+        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
      else
         if (lopacity_wall) then
            call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
@@ -75,23 +77,23 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
+  real(kind=db) :: l, tau
   real(kind=db) :: correct_moins, correct_plus
-  real(kind=db) :: phi_pos, phi_vol, xm, ym, zm, factor
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, ri_old, zj_old, p_ri0, p_zj0
-  integer :: theta_I, phi_I, phi_k, psup, ri_in, zj_in
+  real(kind=db) :: phi_vol, factor
+  integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
+  integer :: ri_in, zj_in, tmp_k
+
+  integer :: icell0, next_cell, previous_cell, icell
 
   logical :: lcellule_non_vide, lstop
-
-!  flag_direct_star = .false. ! Ok c'est moins bon edge-on :-)
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
   lstop = .false.
+  flag_sortie = .false.
 
   x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
@@ -103,20 +105,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
   ri1=ri
   zj1=zj
 
-  ! Cas sans strat
-  p_ri0=1
-  p_zj0=1
+  next_cell = cell_map(ri0,zj0,1)
 
   ltot=0.0
-  nbr_cell = 0
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0_db/a
-  else
-     inv_a=huge_real
-  endif
 
   if (abs(w) > tiny_real) then
      inv_w=1.0_db/w
@@ -138,169 +129,37 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
      ri0=ri1 ; zj0=zj1
      x0=x1 ; y0=y1 ; z0=z1
+     icell0 = next_cell
 
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,zj0,1)) then
-        ! On revoie le paquet dans l'autre sens
-        u = -u ; v = -v ; w=-w
-        inv_w = -inv_w
-        ! et on le renvoie au point de depart
-        ri = ri_old ; zj = zj_old
-        xio = x_old ; yio = y_old ; zio = z_old
-        flag_sortie= .false.
-        return
-     endif
-
-     lcellule_non_vide=.true.
-     ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
-        flag_sortie = .true.
-        return
-     elseif (zj0>nz) then
-        lcellule_non_vide=.false.
-
-        ! Test sortie vericale
-        if (abs(z0) > zmaxmax) then
-           flag_sortie = .true.
+     if (icell0 <= n_cells) then
+        lcellule_non_vide=.true.
+        if (l_dark_zone(icell0)) then
+           ! On revoie le paquet dans l'autre sens
+           u = -u ; v = -v ; w=-w
+           inv_w = -inv_w
+           ! et on le renvoie au point de depart
+           ri = ri_old ; zj = zj_old
+           xio = x_old ; yio = y_old ; zio = z_old
+           flag_sortie= .false.
            return
         endif
-     endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
-
-     ! Detection interface
-     r_2=x0*x0+y0*y0
-     b=(x0*u+y0*v)*inv_a
-
-     if (ri0==0) then
-        lcellule_non_vide=.false.
-        opacite=0.0_db
-        ! Si on est avant le bord interne,  on passe forcement par rmin
-        ! et on cherche forcement la racine positive (unique)
-        c=(r_2-r_lim_2(0))*inv_a
-        delta=b*b-c
-        rac=sqrt(delta)
-        s = (-b+rac) * correct_plus
-        t=huge_real
-        delta_rad=1
      else
-        opacite=kappa(lambda,ri0,zj0,1)
-        ! 1) position interface radiale
-        ! on avance ou recule en r ? -> produit scalaire
-        dotprod=u*x0+v*y0  ! ~ b
-        if (dotprod < 0.0_db) then
-           ! on recule : on cherche rayon inférieur
-           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
-           delta=b*b-c
-           if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
-              ! on cherche le rayon supérieur
-              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-              delta_rad=1
-           else
-              delta_rad=-1
-           endif
-        else
-           ! on avance : on cherche le rayon supérieur
-           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-           delta_rad=1
-        endif !dotprod
-        rac=sqrt(delta)
-        s=(-b-rac) * correct_plus
-        if (s < 0.0_db) then
-           s=(-b+rac) * correct_plus
-        else if (s==0.0_db) then
-           s=prec_grille
-        endif
-
-
-        ! 2) position interface verticale
-        ! on monte ou on descend par rapport au plan équatorial ?
-        dotprod=w*z0
-        if (dotprod == 0.0_db) then
-           t=1.0e10
-        else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 if (z0 > 0.0_db) then
-                    zlim=1.0e10
-                 else
-                    zlim=-1.0e10
-                 endif
-              else
-                 if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
-                 else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
-                 endif
-                 delta_zj=1
-              endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
-                 else
-                    zlim=z_lim(ri0,2)*correct_moins
-                 endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
-                 else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
-                 endif
-                 delta_zj=-1
-              endif !(zj0==1)
-           endif ! monte ou descend
-           t=(zlim-z0)*inv_w
-           ! correct pb precision
-           if (t < 0.0_db) t=prec_grille
-        endif !dotprod=0.0
-     endif ! ri0==0
-
-
-     ! 3) interface en r ou z ?
-     if (s < t) then ! r
-        l=s
-        delta_vol=s
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0+delta_rad
-        if ((ri1<1).or.(ri1>n_rad)) then
-           zj1=zj0
-        else
-           zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
-           if (zj1>nz) zj1=nz+1
-        endif
-     else ! z
-        l=t
-        delta_vol=t
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        zj1=zj0+delta_zj
+        lcellule_non_vide=.false.
      endif
 
-     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-     if (z1 == 0.0_db) z1 = prec_grille
+     ! Test sortie
+     if (exit_test_cylindrical(icell0, x0, y0, z0)) then
+        flag_sortie = .true.
+        return
+     endif
 
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     tau=l*opacite ! opacite constante dans la cellule
+     previous_cell = 0 ! unused, just for Voronoi
+     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for the "test sortie"
 
      ! Comparaison integrale avec tau
-     ! et ajustement longueur de vol evntuellement
+     ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
         lstop = .true.
         l = l * (extr/tau) ! on rescale l pour que tau=extr
@@ -310,96 +169,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         ltot=ltot+l
      endif
 
-
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) then
-        if (letape_th) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(lambda,ri0,zj0,1) &
-                * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-
-        else
-           if (lProDiMo) then
-              xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-              ! Pour statistique: nbre de paquet contribuant a intensite specifique
-              xN_abs(lambda,ri0,zj0,id) = xN_abs(lambda,ri0,zj0,id) + 1.0
-           endif ! lProDiMo
-
-           if (lscatt_ray_tracing1) then
-              xm = 0.5_db * (x0 + x1)
-              ym = 0.5_db * (y0 + y1)
-              zm = 0.5_db * (z0 + z1)
-
-              phi_pos = atan2(ym,xm)
-              phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-              if (phi_k > n_az_rt) phi_k=n_az_rt
-
-              if (zm > 0.0_db) then
-                 psup = 1
-              else
-                 psup = 0
-              endif
-
-              ! Les indices sont 4, RT_ibin
-              if (lsepar_pola) then
-                 ! call calc_new_stokes_rt1_pola(id,lambda,p_ri0,p_zj0,Stokes(:))
-                 ! xI_scatt(:,:,ri0,zj0,phi_k,psup,id) =  xI_scatt(:,:,ri0,zj0,phi_k,psup,id) + &
-                 ! l * new_stokes_rt1(:,:,id)
-                 write(*,*) "ERROR: implementation of polarizarion mode is not finished"
-                 write(*,*) "       in the ray-tracing mode 1  2D"
-                 write(*,*) "       Exiting."
-                 stop
-              else
-                 ! ralentit d'un facteur 5 le calcul de SED
-                 ! facteur limitant
-                 call calc_xI_scatt(id,lambda,ri0,zj0,phi_k,psup,l,Stokes(1),flag_star)
-              endif
-
-           else if (lscatt_ray_tracing2) then
-              if (flag_direct_star) then
-                 xI_star(ri0,zj0,id) = xI_star(ri0,zj0,id) + l * Stokes(1)
-                 xw_star(ri0,zj0,id) = xw_star(ri0,zj0,id) + l * abs(w)
-                 !     xl_star(ri0,zj0,id) = xl_star(ri0,zj0,id) + l
-              else
-                 xm = 0.5_db * (x0 + x1)
-                 ym = 0.5_db * (y0 + y1)
-                 zm = 0.5_db * (z0 + z1)
-                 phi_pos = atan2(ym,xm)
-
-                 !  if (l_sym_ima) then
-                 !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-                 !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
-                 !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
-                 !     if (phi_I > n_phi_I) phi_I = n_phi_I
-                 !  else
-                 phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
-                 if (phi_I > n_phi_I) phi_I = 1
-                 !  endif
-
-                 if (zm > 0.0_db) then
-                    theta_I = floor(0.5_db*( w + 1.0_db) * n_theta_I) + 1
-                 else
-                    theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
-                 endif
-                 if (theta_I > n_theta_I) theta_I = n_theta_I
-
-                 xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1:n_Stokes)
-
-                 if (lsepar_contrib) then
-                    if (flag_star) then
-                       xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
-                    else
-                       xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,zj0,id) + l * Stokes(1)
-                    endif
-                 endif ! lsepar_contrib
-
-              endif ! flag_direct_star
-           endif !lscatt_ray_tracing
-        endif !letape_th
-     endif ! lcellule_non_vide
-
-     !if (abs(xio - 1.028122097156825E-003 ) < 1e-12) write(*,*) "stop test"
-
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
      if (lstop) then
@@ -411,7 +183,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
         ! Patch pour eviter BUG sur position radiale
         ! a cause de limite de precision
-!        if ((ri/=ri0).or.(zj/=zj0).or.(zj > nz)) then
         if (ri==0) then
            factor = rmin/ sqrt(xio*xio+yio*yio) * correct_plus
            xio = xio * factor
@@ -427,7 +198,8 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
            endif
         endif
 
-        if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
+        icell = cell_map(ri,zj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (zj < zj0) then
               zj = zj0
@@ -454,6 +226,367 @@ end subroutine length_deg2_cyl
 
 !********************************************************************
 
+subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+
+  integer, intent(in) :: lambda, cell, previous_cell
+  real(kind=db), intent(in) :: x0,y0,z0
+  real(kind=db), intent(in) :: u,v,w ! Todo : check that
+
+
+  real(kind=db), intent(out) :: x1, y1, z1
+  integer, intent(out) :: next_cell
+  real(kind=db), intent(out) :: l, tau
+
+  ! Variables to be sorted out
+  integer :: ri0,zj0,k0, k0m1
+  integer ::  delta_rad, delta_zj, delta_phi, ri1, zj1, k1
+
+  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, den, tan_angle_lim
+  real(kind=db) :: phi, delta_vol, zlim, dotprod, opacite
+  real(kind=db) :: correct_moins, correct_plus
+
+
+
+
+  ! TODO: Can be calculated outside
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
+  a=u*u+v*v
+
+  if (a > tiny_real) then
+     inv_a=1.0_db/a
+  else
+     inv_a=huge_real
+  endif
+
+  if (abs(w) > tiny_real) then
+     inv_w=1.0_db/w
+  else
+     inv_w=sign(huge_db,w) ! huge_real avant
+  endif
+  ! End : TODO : Can be calculated outside
+
+  ! 3D cell indices
+  call cell2cylindrical(cell, ri0,zj0,k0)
+
+  ! Detection interface
+  r_2=x0*x0+y0*y0
+  b=(x0*u+y0*v)*inv_a
+
+  if (ri0==0) then
+     opacite=0.0_db
+     ! Si on est avant le bord interne,  on passe forcement par rmin
+     ! et on cherche forcement la racine positive (unique)
+     c=(r_2-r_lim_2(0))*inv_a
+     delta=b*b-c
+     rac=sqrt(delta)
+     s = (-b+rac) * correct_plus
+     t=huge_real
+     t_phi= huge_real
+     delta_rad=1
+  else
+     if (cell > n_cells) then
+        opacite = 0.0_db
+     else
+        opacite=kappa(cell,lambda)
+     endif
+     ! 1) position interface radiale
+     ! on avance ou recule en r ? -> produit scalaire
+     dotprod=u*x0+v*y0  ! ~ b
+     if (dotprod < 0.0_db) then
+        ! on recule : on cherche rayon inférieur
+        c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
+        delta=b*b-c
+        if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
+           ! on cherche le rayon supérieur
+           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+           delta_rad=1
+        else
+           delta_rad=-1
+        endif
+     else
+        ! on avance : on cherche le rayon supérieur
+        c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
+        delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+        delta_rad=1
+     endif !dotprod
+     rac=sqrt(delta)
+     s=(-b-rac) * correct_plus
+     if (s < 0.0_db) then
+        s=(-b+rac) * correct_plus
+     else if (s==0.0_db) then
+        s=prec_grille
+     endif
+
+
+     ! 2) position interface verticale
+     ! on monte ou on descend par rapport au plan équatorial ?
+     dotprod=w*z0
+     if (dotprod == 0.0_db) then
+        t=1.0e10
+     else
+        if (dotprod > 0.0_db) then
+           ! on s'eloigne du midplane (ou on monte en 2D)
+           if (abs(zj0)==nz+1) then
+              delta_zj=0
+              zlim=sign(1.0e10_db,z0)
+           else
+              zlim= sign(z_lim(ri0,abs(zj0)+1)*correct_plus, z0)  ! BUUG HERE TODO
+              delta_zj=1
+              if (l3D.and.(z0 < 0.0))  delta_zj=-1
+           endif
+        else
+           !  on se rapproche du midplane (ou on descend en 2D)
+           if (l3D) then
+              if (z0 > 0.0) then
+                 zlim=z_lim(ri0,abs(zj0))*correct_moins
+                 delta_zj=-1
+                 if (zj0==1) delta_zj=-2 ! pas d'indice 0
+              else
+                 zlim=-z_lim(ri0,abs(zj0))*correct_moins
+                 delta_zj=1
+                 if (zj0==-1) delta_zj=2 ! pas d'indice 0
+              endif
+           else ! 2D
+              if (zj0==1) then
+                 ! on traverse le plan eq donc on va remonter
+                 ! et z va changer de signe
+                 delta_zj=1
+                 if (z0 > 0.0_db) then
+                    zlim=-z_lim(ri0,2)*correct_moins
+                 else
+                    zlim=z_lim(ri0,2)*correct_moins
+                 endif
+              else !(zj0==1)
+                 ! on ne traverse pas z=0.
+                 if (z0 > 0.0_db) then
+                    zlim=z_lim(ri0,zj0)*correct_moins
+                 else
+                    zlim=-z_lim(ri0,zj0)*correct_moins
+                 endif
+                 delta_zj=-1
+              endif !(zj0==1)
+           endif ! 3D
+        endif ! monte ou descend
+        t=(zlim-z0)*inv_w
+        ! correct pb precision
+        if (t < 0.0_db) t=prec_grille
+     endif !dotprod=0.0
+
+
+     ! 3) position interface azimuthale
+     if (l3D) then
+        dotprod =  x0*v - y0*u
+        if (abs(dotprod) < 1.0e-10) then
+           ! on ne franchit pas d'interface azimuthale
+           t_phi = 1.0e30
+        else
+           ! Quelle cellule on va franchir
+           if (dotprod > 0.0) then
+              tan_angle_lim = tan_phi_lim(k0)
+              delta_phi=1
+           else
+              k0m1=k0-1
+              if (k0m1==0) k0m1=N_az
+              tan_angle_lim = tan_phi_lim(k0m1)
+              delta_phi=-1
+           endif
+           ! Longueur av interserction
+           if (tan_angle_lim > 1.0d299) then
+              t_phi = -x0/u
+           else
+              den= v-u*tan_angle_lim
+              if (abs(den) > 1.0e-6) then
+                 t_phi = -(y0-x0*tan_angle_lim)/den
+              else
+                 t_phi = 1.0e30
+              endif
+           endif
+           if (t_phi < 0.0) t_phi = 1.0e30
+        endif !dotprod = 0.0
+     else ! l3D
+         t_phi = huge_real
+     endif
+  endif ! ri0==0
+
+
+  ! 4) interface en r ou z ?
+    if ((s < t).and.(s < t_phi)) then ! r
+     l=s
+     delta_vol=s
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0+delta_rad
+     if ((ri1<1).or.(ri1>n_rad)) then
+        zj1=zj0
+     else
+        zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+        if (zj1>nz) zj1=nz+1
+        if (l3D.and.(z1 < 0.0)) zj1=-zj1
+     endif
+
+     k1=k0
+     if (l3D) then
+        ! We need to find the azimuth when we enter the disc
+        ! It can be different from the initial azimuth if the star is not centered
+        ! so we need to compute it here
+        if (ri0==0) then
+           phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
+           k1=floor(phi*un_sur_deux_pi*real(N_az))+1
+           if (k1==n_az+1) k1=n_az
+        endif
+     endif
+
+  else if (t < t_phi) then ! z
+     l=t
+     delta_vol=t
+     ! Position au bord de la cellule suivante
+     x1=x0+delta_vol*u
+     y1=y0+delta_vol*v
+     z1=z0+delta_vol*w
+     ri1=ri0
+     zj1=zj0+delta_zj
+     k1=k0
+   else ! phi --> only happens in 3D
+      l=t_phi
+      delta_vol=correct_plus*t_phi
+      ! Position au bord de la cellule suivante
+      x1=x0+delta_vol*u
+      y1=y0+delta_vol*v
+      z1=z0+delta_vol*w
+      ri1=ri0
+      zj1= floor(abs(z1)/zmax(ri1)*nz) + 1
+      if (zj1>nz) zj1=nz+1
+      if (z1 < 0.0) zj1=-zj1
+      k1=k0+delta_phi
+      if (k1 == 0) k1=N_az
+      if (k1 == N_az+1) k1=1
+   endif
+
+  ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
+   if (z1 == 0.0_db) then
+      if (l3D) then
+         z1 = sign(prec_grille,w)
+      else
+         z1 = prec_grille
+      endif
+   endif
+
+  ! Calcul longeur de vol et profondeur optique dans la cellule
+  tau = l*opacite ! opacite constante dans la cellule
+
+  !call cylindrical2cell(ri1,zj1,1, next_cell)
+  next_cell =  cell_map(ri1,zj1,k1)
+
+  return
+
+end subroutine cross_cylindrical_cell
+
+!********************************************************************
+
+subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
+
+  integer, intent(in) :: id,lambda,icell0
+  real(kind=db), dimension(4), intent(in) :: Stokes
+  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, u,v,w
+  logical, intent(in) :: flag_star, flag_direct_star
+
+
+  real(kind=db) :: xm,ym,zm, phi_pos, phi_vol
+  integer :: psup, phi_I, theta_I, phi_k
+
+  if (letape_th) then
+     if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
+     if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+  else
+     if (lProDiMo) then
+        xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+        ! Pour statistique: nbre de paquet contribuant a intensite specifique
+        xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
+     endif ! lProDiMo
+
+     if (lscatt_ray_tracing1) then
+        xm = 0.5_db * (x0 + x1)
+        ym = 0.5_db * (y0 + y1)
+        zm = 0.5_db * (z0 + z1)
+
+        if (l3D) then ! phik & psup=1 in 3D
+           phi_k = 1
+           psup = 1
+        else
+           phi_pos = atan2(ym,xm)
+           phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
+           if (phi_k > n_az_rt) phi_k=n_az_rt
+
+           if (zm > 0.0_db) then
+              psup = 1
+           else
+              psup = 2
+           endif
+        endif
+
+        if (lsepar_pola) then
+           call calc_xI_scatt_pola(id,lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
+        else
+           ! ralentit d'un facteur 5 le calcul de SED
+           ! facteur limitant
+           call calc_xI_scatt(id,lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
+        endif
+
+     else if (lscatt_ray_tracing2) then ! only 2D
+        if (flag_direct_star) then
+           I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
+        else
+           xm = 0.5_db * (x0 + x1)
+           ym = 0.5_db * (y0 + y1)
+           zm = 0.5_db * (z0 + z1)
+           phi_pos = atan2(ym,xm)
+
+           phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
+
+
+           !  if (l_sym_ima) then
+           !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
+           !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
+           !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
+           !     if (phi_I > n_phi_I) phi_I = n_phi_I
+           !  else
+           phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
+           if (phi_I > n_phi_I) phi_I = 1
+           !  endif
+
+           if (zm > 0.0_db) then
+              theta_I = floor(0.5_db*( w + 1.0_db) * n_theta_I) + 1
+           else
+              theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
+           endif
+           if (theta_I > n_theta_I) theta_I = n_theta_I
+
+           I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
+
+           if (lsepar_contrib) then
+              if (flag_star) then
+                 I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
+              else
+                 I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
+              endif
+           endif ! lsepar_contrib
+
+        endif ! flag_direct_star
+     endif !lscatt_ray_tracing
+  endif !letape_th
+
+  return
+
+end subroutine save_radiation_field
+
+!*************************************************************************************
+
+
 subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
@@ -478,8 +611,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
   real(kind=db) :: delta_vol, l, tau, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus, uv, precision
   real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
-  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0
-  integer :: theta_I, phi_I, thetaj_old, ri_old
+  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
+  integer :: theta_I, phi_I, thetaj_old, ri_old, icell
   logical :: lcellule_non_vide, lstop
 
   real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
@@ -528,8 +661,10 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      ri0=ri1;thetaj0=thetaj1
      x0=x1;y0=y1;z0=z1
 
+     icell0 = cell_map(ri0,thetaj0,1)
+
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,thetaj0,1)) then
+     if (l_dark_zone(icell0)) then
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         ! et on le renvoie au point de depart
@@ -566,8 +701,11 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         t=huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,thetaj0,1)
-
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
 
         ! 1) position interface radiale
         ! on avance ou recule en r ? -> produit scalaire
@@ -725,78 +863,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      endif
 
      ! Stokage des champs de radiation
-     if (lcellule_non_vide) then
-        if (letape_th) then
-           if (lRE_LTE) xKJ_abs(ri0,thetaj0,1,id) = xKJ_abs(ri0,thetaj0,1,id) + kappa_abs_eg(lambda,ri0,thetaj0,1) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,thetaj0,id) = xJ_abs(lambda,ri0,thetaj0,id) + l * Stokes(1)
-!!$        else if (lscatt_ray_tracing1) then
-!!$           xm = 0.5_db * (x0 + x1)
-!!$           ym = 0.5_db * (y0 + y1)
-!!$           zm = 0.5_db * (z0 + z1)
-!!$
-!!$           phi_pos = atan2(ym,xm)
-!!$           phi_k =  floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-!!$           if (phi_k > n_az_rt) phi_k=1
-!!$
-!!$           if (zm > 0.0_db) then
-!!$              psup = 1
-!!$           else
-!!$              psup = 0
-!!$           endif
-!!$
-!!$           ! TODO : ca calcule plein de fois a meme chose si pas de strat et meme direction
-!!$           ! D'ou l'interet de la separation dans mcfost3 !!!
-!!$           if (lstrat) then
-!!$              p_ri0 = ri0
-!!$              p_thetaj0 = thetaj0
-!!$           endif
-!!$           xI_scatt(:,ri0,thetaj0,phi_k,psup,id) = xI_scatt(:,ri0,thetaj0,phi_k,psup,id) +   &
-!!$                l * new_stokes_ray_tracing1(id,lambda,p_ri0,p_thetaj0,u,v,w,stokes(:))
-
-        else if (lscatt_ray_tracing2) then
-           if (flag_direct_star) then
-              xI_star(ri0,thetaj0,id) = xI_star(ri0,thetaj0,id) + l * Stokes(1)
-              xw_star(ri0,thetaj0,id) = xw_star(ri0,thetaj0,id) + l * abs(w)
-              !     xl_star(ri0,thetaj0,id) = xl_star(ri0,thetaj0,id) + l
-           else
-              xm = 0.5_db * (x0 + x1)
-              ym = 0.5_db * (y0 + y1)
-              zm = 0.5_db * (z0 + z1)
-
-              if (l_sym_ima) then
-                 phi_pos = atan2(ym,xm)
-                 delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-                 if (delta_phi > pi) delta_phi = abs(delta_phi - deux_pi)
-                 phi_I =  nint( delta_phi  / pi * (n_phi_I ) ) + 1
-                 if (phi_I > n_phi_I) phi_I = n_phi_I
-              else
-                 phi_pos = atan2(ym,xm)
-                 phi_I =  nint(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
-                 if (phi_I > n_phi_I) phi_I = 1
-              endif
-
-              if (zm > 0._db) then
-                 theta_I = nint(0.5_db*( w + 1.0_db) * n_theta_I) + 1
-              else
-                 theta_I = nint(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
-              endif
-              if (theta_I > n_theta_I) theta_I = n_theta_I
-
-              xI(1:n_Stokes,theta_I,phi_I,ri0,thetaj0,id) = xI(1:n_Stokes,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1:n_Stokes)
-
-              if (lsepar_contrib) then
-                 if (flag_star) then
-                    xI(n_Stokes+2,theta_I,phi_I,ri0,thetaj0,id) = xI(n_Stokes+2,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1)
-                 else
-                    xI(n_Stokes+4,theta_I,phi_I,ri0,thetaj0,id) = xI(n_Stokes+4,theta_I,phi_I,ri0,thetaj0,id) + l * Stokes(1)
-                 endif
-              endif ! lsepar_contrib
-
-           endif
-
-        endif
-
-     endif ! lcellule_non_vide
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer
      if (lstop) then
@@ -823,13 +891,8 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
            endif
         endif
 
-
-      !  if (lmono) then
-      !     write(*,*) "xio", real(xio),real(yio),real(zio)
-      !     write(*,*), "r", ri0, thetaj0, ri,thetaj
-      !  endif
-
-        if (l_dark_zone(ri,thetaj,1)) then ! Petit test de securite
+        icell = cell_map(ri,thetaj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (thetaj < thetaj0) then
               thetaj = thetaj0
@@ -848,7 +911,6 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
         return
      endif ! lstop
 
-
   enddo ! boucle infinie
 
   write(*,*) "BUG"
@@ -858,7 +920,7 @@ end subroutine length_deg2_sph
 
 !********************************************************************
 
-subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -871,7 +933,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   integer, intent(inout) :: ri,zj, phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: u,v,w
-  logical, intent(in) :: flag_star
+  logical, intent(in) :: flag_star, flag_direct_star
   real, intent(in) :: extrin
   real(kind=db), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
@@ -882,14 +944,15 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
   real(kind=db) :: xm, ym, zm
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
 
-  logical :: lcellule_non_vide
+  logical :: lcellule_non_vide, lstop
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
+  lstop = .false.
 
   x1=xio;y1=yio;z1=zio
   extr=extrin
@@ -960,7 +1023,12 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         t_phi= huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,zj0,phik0)
+        icell0 = cell_map(ri0,zj0,phik0)
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
         ! 1) position interface radiale
         ! on avance ou recule en r ? -> produit scalaire
         dotprod=u*x0+v*y0
@@ -1121,47 +1189,29 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      tau=l*opacite ! opacite constante dans la cellule
+
      ! Comparaison integrale avec tau
+     ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
+        lstop = .true.
         l = l*extr/tau ! on rescale l pour que tau=extr
         ltot=ltot+l
-        if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
-           if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-        endif !l_abs
+     else ! Il reste extr - tau a integrer dans la cellule suivante
+        extr=extr-tau
+        ltot=ltot+l
+     endif ! tau > extr
+
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
+
+     if (lstop) then
         flag_sortie = .false.
         xio=x0+l*u
         yio=y0+l*v
         zio=z0+l*w
         call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
         return
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
-
-        if (lcellule_non_vide) then
-           if (letape_th) then
-              if (lRE_LTE) xKJ_abs(ri0,zj0,phik0,id) = xKJ_abs(ri0,zj0,phik0,id) + &
-                   kappa_abs_eg(lambda,ri0,zj0,phik0) * l * Stokes(1)
-              if (lxJ_abs) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
-           else ! letape_th
-              if (lscatt_ray_tracing1) then
-                 xm = 0.5_db * (x0 + x1)
-                 ym = 0.5_db * (y0 + y1)
-                 zm = 0.5_db * (z0 + z1)
-
-                 ! TODO : RT : clean the 0 in the indices
-                 if (lsepar_pola) then
-                    call calc_xI_scatt_pola(id,lambda,ri0,zj0,phik0,1,l,Stokes(:),flag_star) ! psup=1 in 3D
-                 else
-                    call calc_xI_scatt(id,lambda,ri0,zj0,phik0,1,l,Stokes(1),flag_star) ! psup=1 in 3D
-                 endif
-              endif
-
-           endif ! letape_th
-        endif ! lcellule_non_vide
-
-     endif ! tau > extr
+     endif
 
   enddo ! boucle infinie
   write(*,*) "BUG"
@@ -1178,7 +1228,7 @@ subroutine integ_tau(lambda)
   integer, intent(in) :: lambda
 
   real :: norme
-  integer :: i, ri, zj, j
+  integer :: i, ri, zj, j, icell
 
   real(kind=db), dimension(4) :: Stokes
   ! angle de visee en deg
@@ -1191,36 +1241,38 @@ subroutine integ_tau(lambda)
 
   norme=0.0
   do i=1, n_rad
-     norme=norme+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
-   !  write(*,*) "TEST",i,real(r_grid(i,1)), real(kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))), real(norme)
+     icell = cell_map(i,1,1)
+     norme=norme+kappa(icell,lambda)*(r_lim(i)-r_lim(i-1))
   enddo
-  !stop
 
   norme = norme
   write(*,*) 'Integ tau dans plan eq. = ', norme
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
-  if (.not.lstrat) then
-     if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1,1,1)/(volume(1)*AU_to_cm**3))/ &
-             (kappa(lambda,1,1,1)/AU_to_cm))
+  if (.not.lvariable_dust) then
+     icell = cell_map(1,1,1)
+     if (kappa(icell,lambda) > tiny_real) then
+        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
+             (kappa(icell,lambda)/AU_to_cm))
      endif
   endif
 
 
   norme=0.0
   do j=1, nz
-     norme=norme+kappa(lambda,1,j,1)*(z_lim(1,j+1)-z_lim(1,j))
+     icell = cell_map(1,j,1)
+     norme=norme+kappa(icell,lambda)*(z_lim(1,j+1)-z_lim(1,j))
   enddo
   norme = norme * 2.
 
   write(*,*) 'Integ tau vert = ', norme
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
-  if (.not.lstrat) then
-     if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(1,1,1)/(volume(1)*AU_to_cm**3))/ &
-             (kappa(lambda,1,1,1)/AU_to_cm))
+  if (.not.lvariable_dust) then
+     icell = cell_map(1,1,1)
+     if (kappa(icell,lambda) > tiny_real) then
+        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
+             (kappa(icell,lambda)/AU_to_cm))
      endif
   endif
 
@@ -1234,10 +1286,11 @@ subroutine integ_tau(lambda)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
-  if (.not.lstrat) then
-     if (kappa(lambda,1,1,1) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(1,1,1)/(volume(1)*3.347929d39))/ &
-             (kappa(lambda,1,1,1)/1.49597870691e13))
+  if (.not.lvariable_dust) then
+     icell = cell_map(1,1,1)
+     if (kappa(icell,lambda) > tiny_real) then
+        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
+             (kappa(icell,lambda)/1.49597870691e13))
      endif
   endif
 
@@ -1314,7 +1367,7 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
@@ -1384,7 +1437,12 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
         t=huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,zj0,1)
+        icell0 = cell_map(ri0,zj0,1)
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
         ! 1) position interface radiale
         ! on avance ou recule en r ? -> produit scalaire
         dotprod=u*x0+v*y0
@@ -1526,7 +1584,7 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
 
   logical :: lcellule_non_vide
 
@@ -1603,7 +1661,12 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
         t_phi= huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,zj0,phik0)
+        icell0 = cell_map(ri0,zj0,phik0)
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
         ! 1) position interface radiale
         ! on avance ou recule en r ? -> produit scalaire
         dotprod=u*x0+v*y0
@@ -1795,7 +1858,7 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
   real(kind=db) :: delta_vol, l, tau, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus, uv
-  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell
+  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, icell0
 
   logical :: lcellule_non_vide
 
@@ -1853,8 +1916,12 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
         t=huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,thetaj0,1)
-
+        icell0 = cell_map(ri0,thetaj0,1)
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
 
         ! 1) position interface radiale
         ! on avance ou recule en r ? -> produit scalaire
@@ -2068,7 +2135,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
   real(kind=db) :: dtau_c, Snu_c
   real(kind=db), dimension(nTrans) :: tau_c
   real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
   integer :: iTrans, ivpoint, iiTrans, n_vpoints
 
   real :: facteur_tau
@@ -2121,6 +2188,8 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
 
      ri0=ri1 ; zj0=zj1 ; phik0=phik1
      x0=x1 ; y0=y1 ; z0=z1
+
+     icell0 = cell_map(ri0,zj0,phik0)
 
      lcellule_non_vide=.true.
      ! Test sortie
@@ -2362,7 +2431,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
 
         ! Nbre de points d'integration en fct du differentiel de vitesse
         ! compare a la largeur de raie de la cellule de depart
-        n_vpoints  = min(max(2,nint(dv/v_line(ri0,zj0,phik0)*20.)),n_vpoints_max)
+        n_vpoints  = min(max(2,nint(dv/v_line(icell0)*20.)),n_vpoints_max)
 
         ! Vitesse projete le long du trajet dans la cellule
         do ivpoint=2, n_vpoints-1
@@ -2387,7 +2456,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         P(:) = 0.0_db
         do ivpoint=1,n_vpoints
            tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
-           P(:) = P(:) + phiProf(ri0,zj0,phik0,ispeed,tspeed)
+           P(:) = P(:) + phiProf(icell0,ispeed,tspeed)
         enddo
         P(:) = P(:)/n_vpoints
 
@@ -2399,16 +2468,16 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         do iTrans=1,nTrans
            iiTrans = indice_Trans(iTrans)
 
-           opacite(:) = kappa_mol_o_freq(ri0,zj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,phik0)
+           opacite(:) = kappa_mol_o_freq(icell0,iiTrans) * P(:) + kappa(icell0,iiTrans)
 
            ! Epaisseur optique
            dtau(:) =  l * opacite(:)
-           dtau_c = l * kappa(iiTrans,ri0,zj0,phik0)
+           dtau_c = l * kappa(icell0,iiTrans)
 
            ! Fonction source
-           Snu(:) = ( emissivite_mol_o_freq(ri0,zj0,phik0,iiTrans) * P(:) &
-                + emissivite_dust(iiTrans,ri0,zj0,phik0) ) / (opacite(:) + 1.0e-300_db)
-           Snu_c = emissivite_dust(iiTrans,ri0,zj0,phik0) / (kappa(iiTrans,ri0,zj0,phik0) + 1.0e-300_db)
+           Snu(:) = ( emissivite_mol_o_freq(icell0,iiTrans) * P(:) &
+                + emissivite_dust(icell0,iiTrans) ) / (opacite(:) + 1.0e-300_db)
+           Snu_c = emissivite_dust(icell0,iiTrans) / (kappa(icell0,iiTrans) + 1.0e-300_db)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
@@ -2442,13 +2511,13 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
         if (ldouble_RT) then
            do iTrans=1,nTrans
               iiTrans = indice_Trans(iTrans)
-              opacite(:) = kappa_mol_o_freq2(ri0,zj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,zj0,phik0)
+              opacite(:) = kappa_mol_o_freq2(icell0,iiTrans) * P(:) + kappa(icell0,iiTrans)
               dtau(:) =  l * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
-              Snu(:) = ( emissivite_mol_o_freq2(ri0,zj0,phik0,iiTrans) * P(:) + &
-                   emissivite_dust(iiTrans,ri0,zj0,phik0) ) / (opacite(:) + 1.0e-30_db)
+              Snu(:) = ( emissivite_mol_o_freq2(icell0,iiTrans) * P(:) + &
+                   emissivite_dust(icell0,iiTrans) ) / (opacite(:) + 1.0e-30_db)
               I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
                    exp(-tau2(:,iTrans)) * (1.0_db - exp(-dtau2(:))) * Snu(:)
 
@@ -2513,7 +2582,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: dtau, dtau2, opacite, Snu
   real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0, precision
-  integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1
+  integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1, icell0
   integer :: iTrans, nbr_cell, ivpoint, iiTrans, n_vpoints
 
   real :: facteur_tau
@@ -2550,6 +2619,8 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
      ! Indice de la cellule
      ri0=ri1 ; thetaj0=thetaj1 ; phik0=phik1
      x0=x1 ; y0=y1 ; z0=z1
+
+     icell0 = cell_map(ri0,thetaj0,phik0)
 
      nbr_cell = nbr_cell + 1
 
@@ -2779,7 +2850,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
 
         ! Nbre de points d'integration en fct du differentiel de vitesse
         ! compare a la largeur de raie de la cellule de depart
-        n_vpoints  = min(max(2,nint(dv/v_line(ri0,thetaj0,phik0)*20.)),n_vpoints_max)
+        n_vpoints  = min(max(2,nint(dv/v_line(icell0)*20.)),n_vpoints_max)
      !   n_vpoints = 2
 
 !        write(*,*) ri0, real(dv), real(v0), real(v1), real(v_line(ri0,thetaj0)), nint(dv/v_line(ri0,thetaj0)*20.)
@@ -2816,7 +2887,7 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
         P(:) = 0.0_db
         do ivpoint=1,n_vpoints
            tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
-           P(:) = P(:) + phiProf(ri0,thetaj0,phik0,ispeed,tspeed)
+           P(:) = P(:) + phiProf(icell0,ispeed,tspeed)
         enddo
         P(:) = P(:)/n_vpoints
 
@@ -2827,13 +2898,13 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
 
         do iTrans=1,nTrans
            iiTrans = indice_Trans(iTrans)
-           opacite(:) = kappa_mol_o_freq(ri0,thetaj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,phik0)
+           opacite(:) = kappa_mol_o_freq(icell0,iiTrans) * P(:) + kappa(icell0,iiTrans)
            dtau(:) =  l * opacite(:)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
-           Snu(:) = ( emissivite_mol_o_freq(ri0,thetaj0,phik0,iiTrans) * P(:) + &
-                emissivite_dust(iiTrans,ri0,thetaj0,phik0) ) / (opacite(:) + 1.0e-30_db)
+           Snu(:) = ( emissivite_mol_o_freq(icell0,iiTrans) * P(:) + &
+                emissivite_dust(icell0,iiTrans) ) / (opacite(:) + 1.0e-30_db)
            I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
 
            ! surface superieure ou inf
@@ -2848,13 +2919,13 @@ subroutine integ_ray_mol_sph(id,ri_in,thetaj_in,phik_in,x,y,z,u,v,w,iray,labs,is
         if (ldouble_RT) then
            do iTrans=1,nTrans
               iiTrans = indice_Trans(iTrans)
-              opacite(:) = kappa_mol_o_freq2(ri0,thetaj0,phik0,iiTrans) * P(:) + kappa(iiTrans,ri0,thetaj0,phik0)
+              opacite(:) = kappa_mol_o_freq2(icell0,iiTrans) * P(:) + kappa(icell0,iiTrans)
               dtau(:) =  l * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
-              Snu(:) = ( emissivite_mol_o_freq2(ri0,thetaj0,phik0,iiTrans) * P(:) + &
-                   emissivite_dust(iiTrans,ri0,thetaj0,1) ) / (opacite(:) + 1.0e-30_db)
+              Snu(:) = ( emissivite_mol_o_freq2(icell0,iiTrans) * P(:) + &
+                   emissivite_dust(icell0,iiTrans) ) / (opacite(:) + 1.0e-30_db)
               I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + exp(-tau2(:,iTrans)) * (1.0_db - exp(-dtau2(:))) * Snu(:)
 
               ! Mise a jour profondeur optique pour cellule suivante
@@ -3129,12 +3200,8 @@ subroutine integ_tau_mol(imol)
 
   integer, intent(in) :: imol
 
-  real ::  norme, norme1
-  integer :: i
-
-  real :: vmax, angle
-  integer :: j, iTrans
-  integer :: n_speed
+  real ::  norme, norme1, vmax, angle
+  integer :: i, j, iTrans, n_speed, icell
 
   integer, dimension(2) :: ispeed
   real(kind=db), dimension(:), allocatable :: tab_speed, P
@@ -3155,21 +3222,24 @@ subroutine integ_tau_mol(imol)
   norme=0.0
   norme1=0.0
   do i=1, n_rad
-     P(:) = phiProf(i,1,1,ispeed,tab_speed)
-     norme=norme+kappa_mol_o_freq(i,1,1,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
-     norme1=norme1 + kappa(1,i,1,1) * (r_lim(i)-r_lim(i-1))
+     icell = cell_map(i,1,1)
+     P(:) = phiProf(icell,ispeed,tab_speed)
+     norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
+     norme1=norme1 + kappa(icell,1) * (r_lim(i)-r_lim(i-1))
   enddo
   write(*,*) "tau_mol = ", norme
   write(*,*) "tau_dust=", norme1
 
   loop_r : do i=1,n_rad
-     if (r_grid(i,1) > 100.0) then
+     icell = cell_map(i,1,1)
+     if (r_grid(icell) > 100.0) then
         norme=0.0
         loop_z : do j=nz, 1, -1
-           P(:) = phiProf(i,j,1,ispeed,tab_speed)
-           norme=norme+kappa_mol_o_freq(i,j,1,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+           icell = cell_map(i,j,1)
+           P(:) = phiProf(icell,ispeed,tab_speed)
+           norme=norme+kappa_mol_o_freq(icell,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
            if (norme > 1.0) then
-              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(i,j), "AU"
+              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(icell), "AU"
               exit loop_z
            endif
         enddo loop_z
@@ -3210,7 +3280,7 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0, icell
 
   logical :: lcellule_non_vide
 
@@ -3254,8 +3324,10 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
      ri0=ri1;zj0=zj1
      x0=x1;y0=y1;z0=z1
 
+     icell0 = cell_map(ri0,zj0,1)
+
      ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(ri0,zj0,1)) then
+     if (l_dark_zone(icell0)) then
         ! On revoie le paquet dans l'autre sens
         u = -u ; v = -v ; w=-w
         inv_w = -inv_w
@@ -3296,7 +3368,11 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         t=huge_real
         delta_rad=1
      else
-        opacite=kappa(lambda,ri0,zj0,1)
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
 
         if (ri0 == 1) then
            ! Variation de hauteur du mur en cos(phi/2)
@@ -3426,15 +3502,17 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         l = l*extr/tau ! on rescale l pour que tau=extr
         ltot=ltot+l
         if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(lambda,ri0,zj0,1) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
+           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         endif !l_abs
         flag_sortie = .false.
         xio=x0+l*u
         yio=y0+l*v
         zio=z0+l*w
         call indice_cellule(xio,yio,zio,ri,zj)
-        if (l_dark_zone(ri,zj,1)) then ! Petit test de securite
+
+        icell = cell_map(ri,zj,1)
+        if (l_dark_zone(icell)) then ! Petit test de securite
            ! On resort le paquet
            if (zj < zj0) then
               zj = zj0
@@ -3455,8 +3533,8 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
         extr=extr-tau
         ltot=ltot+l
         if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(ri0,zj0,1,id) = xKJ_abs(ri0,zj0,1,id) + kappa_abs_eg(lambda,ri0,zj0,1) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(lambda,ri0,zj0,id) = xJ_abs(lambda,ri0,zj0,id) + l * Stokes(1)
+           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
+           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         endif !l_abs
      endif ! tau > extr
 
@@ -3797,7 +3875,7 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(lambda,ri0,zj0,phik0)
+        dtau =  l * kappa(cell_map(ri0,zj0,phik0),lambda)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
@@ -4102,7 +4180,7 @@ function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(lambda,ri0,thetaj0,1)
+        dtau =  l * kappa(cell_map(ri0,thetaj0,1),lambda)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
@@ -4190,7 +4268,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: i, j, pk, n, id, ri, zj, phik
+  integer :: i, j, pk, n, id, ri, zj, phik, icell, jj
   real(kind=db) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, d_r, phi, r0
 
@@ -4209,7 +4287,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
      ! étape 1 : radialement depuis le centre
      somme = 0.0
      do1 : do i=1,n_rad
-        somme=somme+kappa(lambda,i,1,pk)*(r_lim(i)-r_lim(i-1))
+        somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
         if (somme > tau_max) then
            ri_in_dark_zone(pk) = i
            exit do1
@@ -4219,7 +4297,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
      ! étape 2 : radialement depuis rout
      somme = 0.0
      do2 : do i=n_rad,1,-1
-        somme=somme+kappa(lambda,i,1,pk)*(r_lim(i)-r_lim(i-1))
+        somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
         if (somme > tau_max) then
            ri_out_dark_zone(pk) = i
            exit do2
@@ -4232,7 +4310,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
         do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
            somme = 0.0
            do3 : do j=nz, 1, -1
-              somme=somme+kappa(lambda,i,j,pk)*(z_lim(i,j+1)-z_lim(i,j))
+              somme=somme+kappa(cell_map(i,j,pk),lambda)*(z_lim(i,j+1)-z_lim(i,j))
               if (somme > tau_max) then
                  zj_sup_dark_zone(i,pk) = j
                  exit do3
@@ -4245,7 +4323,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
            do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
               somme = 0.0
               do3_5 : do j=-nz, -1
-                 somme=somme+kappa(lambda,i,j,pk)*(z_lim(i,abs(j)+1)-z_lim(i,abs(j)))
+                 somme=somme+kappa(cell_map(i,j,pk),lambda)*(z_lim(i,abs(j)+1)-z_lim(i,abs(j)))
                  if (somme > tau_max) then
                     zj_inf_dark_zone(i,pk) = j
                     exit do3_5
@@ -4261,7 +4339,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
 
   l_is_dark_zone = .false.
-  l_dark_zone(:,:,:) = .false.
+  l_dark_zone(:) = .false.
 
   ! Cas premiere cellule
   r_in_opacite(:,:) = r_lim(1) ! bord externe de la premiere cellule
@@ -4270,14 +4348,14 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   do pk=1, n_az
      if (ri_in_dark_zone(pk)==1) then
         do j=1, zj_sup_dark_zone(ri_in_dark_zone(pk),pk)
-           d_r=tau_max/kappa(lambda,1,j,pk)
+           d_r=tau_max/kappa(cell_map(1,j,pk),lambda)
            r_in_opacite(j,pk) = (rmin + d_r)
            r_in_opacite2(j,pk) = r_in_opacite(j,pk)**2
         enddo
 
         if (l3D) then
            do j=-1, zj_inf_dark_zone(ri_in_dark_zone(pk),pk), -1
-              d_r=tau_max/kappa(lambda,1,j,pk)
+              d_r=tau_max/kappa(cell_map(1,j,pk),lambda)
               r_in_opacite(j,pk) = (rmin + d_r)
               r_in_opacite2(j,pk) = r_in_opacite(j,pk)**2
            enddo
@@ -4290,13 +4368,14 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
   if (.not.l3D) then
      cell : do i=max(ri_in_dark_zone(1),2), ri_out_dark_zone(1)
         do j=zj_sup_dark_zone(i,1),1,-1
+           icell = cell_map(i,j,1)
            do n=1,nbre_angle
               id=1
               ! position et direction vol
               angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-              x0=r_grid(i,j) !x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
+              x0=r_grid(icell) !x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
               y0=0.0
-              z0=z_grid(i,j) !z0=0.99999*z_lim(i,j+1)
+              z0=z_grid(icell) !z0=0.99999*z_lim(i,j+1)
               u0=cos(angle)
               v0=0.0
               w0=sin(angle)
@@ -4308,7 +4387,10 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
               call length_deg2(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
-                 l_dark_zone(i,1:j,1) = .true.
+                 do jj=1,j
+                    icell = cell_map(i,jj,1)
+                    l_dark_zone(icell) = .true.
+                 enddo
                  l_is_dark_zone = .true.
                  ! on passe a la cellule suivante
                  cycle cell
@@ -4321,14 +4403,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
         phi = 2*pi * (real(pk)-0.5)/real(n_az)
         cell_3D : do i=max(ri_in_dark_zone(pk),2), ri_out_dark_zone(pk)
            do j=zj_sup_dark_zone(i,pk),1,-1
+              icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
                  ! position et direction vol
                  angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(i,j)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
-                 z0=z_grid(i,j)!z0.99999*z_lim(i,j+1)
+                 z0=z_grid(icell)!z0.99999*z_lim(i,j+1)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
@@ -4337,10 +4420,14 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
-                    l_dark_zone(i,1:j,pk) = .true.
+                    do jj=1,j
+                       icell = cell_map(i,jj,pk)
+                       l_dark_zone(icell) = .true.
+                    enddo
                     ! on passe a la cellule suivante
                     cycle cell_3D
                  endif
@@ -4350,14 +4437,15 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
         cell_3D_2 : do i=max(ri_in_dark_zone(pk),2), ri_out_dark_zone(pk)
            do j=zj_inf_dark_zone(i,pk),-1
+              icell = cell_map(i,j,pk)
               do n=1,nbre_angle
                  id=1
                  ! position et direction vol
                  angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-                 r0=r_grid(i,j)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
+                 r0=r_grid(icell)!1.00001*r_lim(i-1) ! cellule 1 traitee a part
                  x0 = r0 *cos(phi)
                  y0 = r0 * sin(phi)
-                 z0=-z_grid(i,j)!-0.99999*z_lim(i,abs(j)+1)
+                 z0=-z_grid(icell)!-0.99999*z_lim(i,abs(j)+1)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
@@ -4366,10 +4454,14 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,tau_max,dvol1,flag_sortie)
+                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
-                    l_dark_zone(i,j:-1,pk) = .true.
+                    do jj=1,-1
+                       icell = cell_map(i,j,pk)
+                       l_dark_zone(icell) = .true.
+                    enddo
                     l_is_dark_zone=.true.
                     ! on passe a la cellule suivante
                     cycle cell_3D_2
@@ -4399,16 +4491,16 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
 
   if (n_zones > 1) then
-     do i=1, n_rad
-        if (sum(densite_pouss(i,1,1,:)) < tiny_real) then
-           l_dark_zone(i,:,1) = .false.
-        endif
+     do icell=1, n_cells
+        if (sum(densite_pouss(:,icell)) < tiny_real) l_dark_zone(icell) = .false.
      enddo
   endif
 
   do i=1, n_regions
-     l_dark_zone(regions(i)%iRmin,:,1) = .false.
-     l_dark_zone(regions(i)%iRmax,:,1) = .false.
+     do j=1,nz
+        l_dark_zone(cell_map(regions(i)%iRmin,j,1)) = .false.
+        l_dark_zone(cell_map(regions(i)%iRmax,j,1)) = .false.
+     enddo
   enddo
 
 !  write(*,*) l_dark_zone(:,nz,1)
@@ -4439,7 +4531,7 @@ subroutine no_dark_zone()
   r_in_opacite(:,:) = r_lim(1)
   r_in_opacite2(:,:) = r_lim_2(1)
 
-  l_dark_zone(:,:,:)=.false.
+  l_dark_zone(:)=.false.
 
   return
 
@@ -4457,6 +4549,7 @@ logical function test_dark_zone(ri,zj,phik,x,y)
   integer, intent(in) :: ri, zj, phik
   real(kind=db), intent(in) :: x, y
 
+  integer :: icell
 
   if (ri==1) then
      if (x*x+y*y > r_in_opacite2(zj,phik)) then
@@ -4465,7 +4558,8 @@ logical function test_dark_zone(ri,zj,phik,x,y)
         test_dark_zone = .false.
      endif
   else
-     test_dark_zone = l_dark_zone(ri,zj,phik)
+     icell = cell_map(ri,zj,phik)
+     test_dark_zone = l_dark_zone(icell)
   endif
 
 
@@ -4491,7 +4585,7 @@ subroutine define_proba_weight_emission(lambda)
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
   real :: tau
-  integer :: i, j, n, id, ri, zj
+  integer :: i, j, n, id, ri, zj, icell
   integer, parameter :: nbre_angle = 101
 
   tau_min(:,:) = 1.e30 ;
@@ -4523,12 +4617,13 @@ subroutine define_proba_weight_emission(lambda)
 
   do i=1,n_rad
      do j=1,nz
-        weight_proba_emission(i,j) =  exp(-tau_min(i,j))
+        icell = cell_map(i,j,1)
+        weight_proba_emission(icell) =  exp(-tau_min(i,j))
      enddo
   enddo
 
   ! correct_E_emission sera normalise dans repartition energie
-  correct_E_emission(:,:) = 1.0_db / weight_proba_emission
+  correct_E_emission(:) = 1.0_db / weight_proba_emission(:)
 
   return
 

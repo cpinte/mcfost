@@ -171,11 +171,11 @@ FF = $(FC_OMP) -O1
 endif
 
 
-SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 input.f90 output.f90 \
+SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 grid.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 \
 	io_phantom_infiles.f90 io_phantom_utils.f90 io_phantom.f90 \
 	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
-	dust.f90 molecules.f90 grid.f90 Voronoi.f90 optical_depth.f90 disk_physics.f90 \
+	dust.f90 molecules.f90 Voronoi.f90 optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
 	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90
 
@@ -214,7 +214,7 @@ utils.o :      sha.f90
 
 # Le fichier sha.f90 n'est cree que sur mon mac
 ifeq ($(MCFOST_GIT),1)
-sha.f90 : ../.git/objects
+sha.f90 : ../.git/objects modules.o
 	printf "module sha\n  implicit none\n" > sha.f90
 	git log --pretty=format:"%H %d" | grep \(HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
 	printf "end module sha\n" >> sha.f90
@@ -299,7 +299,7 @@ wardlaw :
 # Nettoyage
 #*************************************************************
 clean :
-	rm -rf *.o  *.mod _dust_prop*.tmp
+	rm -rf *.o  *.mod _dust_prop*.tmp *.i90
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :

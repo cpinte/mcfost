@@ -40,7 +40,7 @@ module Voronoi_grid
 
     integer, intent(in) :: n
 
-    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, ifirst
+    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot
 
     !integer, dimension(:), allocatable :: id_list
 
@@ -93,8 +93,8 @@ module Voronoi_grid
 
     do i=1, n
        ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
-       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, &
-            Voronoi(i)%V, n_neighbours, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, &
+            neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
@@ -179,7 +179,7 @@ module Voronoi_grid
 
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
-       write(unit=1,fmt="(i5,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
+       write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
     enddo
     close(unit=1)
 
@@ -192,9 +192,9 @@ module Voronoi_grid
     call appel_syst(cmd,syst_status)
     write(*,*) "Voronoi Tesselation done"
 
-    write(*,*) "TMP : filtering out 10 cells for safety, will do it better later"
+    write(*,*) "TMP : filtering out 5000 cells for safety, will do it better later"
 
-    call read_Voronoi(n_cells-10)
+    call read_Voronoi(n_cells-5000)
 
     write(*,*) "Tesselation finished"
     return
@@ -211,7 +211,7 @@ module Voronoi_grid
 
     real(kind=db) :: rand, rand2, rand3
     real :: x, y, z
-    integer :: icell, np_proc, i, id, k
+    integer :: icell, i, id, k
 
 
     nb_proc = 1 ; id = 1

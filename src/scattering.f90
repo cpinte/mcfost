@@ -370,10 +370,10 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
            norme = 0.5 * x**2
         endif
 
-        tab_s11(lambda,taille_grain,j) = s11(j) / norme
-        tab_s12(lambda,taille_grain,j) = s12(j) / norme
-        tab_s33(lambda,taille_grain,j) = s33(j) / norme
-        tab_s34(lambda,taille_grain,j) = s34(j) / norme
+        tab_s11(j,taille_grain,lambda) = s11(j) / norme
+        tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s33(j,taille_grain,lambda) = s33(j) / norme
+        tab_s34(j,taille_grain,lambda) = s34(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -541,7 +541,7 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
         mueller(:,:,j) = mueller(:,:,j) / norme
      endif
 
-     tab_mueller(lambda,taille_grain,:,:,j) = mueller(:,:,j)
+     tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
   enddo
 
   gsca = assym
@@ -724,10 +724,10 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
            endif
         endif
 
-        tab_s11(lambda,taille_grain,j) = s11(j) / norme
-        tab_s12(lambda,taille_grain,j) = s12(j) / norme
-        tab_s33(lambda,taille_grain,j) = s33(j) / norme
-        tab_s34(lambda,taille_grain,j) = s34(j) / norme
+        tab_s11(j,taille_grain,lambda) = s11(j) / norme
+        tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s33(j,taille_grain,lambda) = s33(j) / norme
+        tab_s34(j,taille_grain,lambda) = s34(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -794,12 +794,8 @@ end subroutine cdapres
 
 !***************************************************
 
-integer function grainsize(lambda,aleat,ri,zj,phik)
+integer function grainsize(lambda,aleat, icell)
 !-----------------------------------------------------
-!  tirage aleatoire de la taille du grain qui diffuse
-!  selon la distribution de Mathis, Rumpl et Nordsieck
-!  (1997): n(a)= a^-aexp, entre amin et amax.
-!
 !  Nouvelle version : janvier 04
 !  la dichotomie se fait en comparant les indices
 !  et non plus en utilisant la taille du pas
@@ -811,43 +807,20 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
 
   implicit none
 
-  integer, intent(in) :: lambda, ri, zj, phik
+  integer, intent(in) :: lambda, icell
   real, intent(in) :: aleat
   real :: prob
   integer :: kmin, kmax, k
 
-  prob = aleat  ! probsizecumul(lambda,ri,zj,n_grains_tot) est normalise a 1.0
+  prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
 
-  ! Cas particulier prob=1.0
-  if ((1.0-prob) < 1.e-6) then
-     grainsize=amax_reel(lambda,ri,zj,phik)
-     return
-  endif
-
-! Prediction (plus rapide : donne des meilleurs valeurs initiales pour la dichotomie)
-  ! 2 cas particulier ou l'echantollonage n'est plus lineaire
-!!$  if (prob < proba_resol) then
-!!$     kmin = 1
-!!$     kmax = ech_prob(lambda,ri,zj,1)
-!!$  else if (prob > (1.0-proba_resol)) then
-!!$     kmin = max(ech_prob(lambda,ri,zj,n_prob)-1,1)
-!!$     kmax = amax_reel(lambda,ri,zj)
-!!$  else
-!!$     p = int(prob*real(n_prob-1)) + 1
-!!$     kmin = max(ech_prob(lambda,ri,zj,p)-1,1) ! pour eviter de tomber sur l'indice 0
-!!$     kmax = ech_prob(lambda,ri,zj,p+1)
-!!$  endif
-
-!  write(*,*) 'grainsize', aleat
-!  write(*,*) kmin, kmax
-
-! dichotomie
+  ! dichotomie
   kmin = 0
   kmax = n_grains_tot
   k=(kmin + kmax)/2
 
-  do while (probsizecumul(lambda,ri,zj,phik,k) /= prob)
-     if (probsizecumul(lambda,ri,zj,phik,k) < prob) then
+  do while (ksca_CDF(k,icell,lambda) /= prob)
+     if (ksca_CDF(k,icell,lambda) < prob) then
         kmin = k
      else
         kmax = k
@@ -861,56 +834,51 @@ integer function grainsize(lambda,aleat,ri,zj,phik)
   k=kmax
 
   grainsize = k
-
-!  write(*,*) k, probsizecumul(lambda,ri,zj,k), probsizecumul(lambda,ri,zj,k+1)
+  return
 
 end function grainsize
 
-!*******************************************************************
+!***************************************************
 
-subroutine MULMAT (M, N, K, A, B, C)
-!*******************************************************************
-!       subroutine MULMAT pour multiplier deux matrices.
-!
-!       format: call mulmat (m,n,k,a,b,c)
-!
-!               A = import matrix (M*N)
-!               B = import matrix (N*K)
-!               C = export matrix (M*K)
-!
-!      	        sum = temporary storage
-!
-!       Francois Menard, Heidelberg, 5 october 1990
-!
-! Inutilise : remplace par la fonction intrinseque matmul plus efficace (C. Pinte)
-!*******************************************************************
+integer function select_scattering_grain(lambda,icell, aleat) result(k)
+  ! This routine will select randomly the scattering grain
+  ! from the CDF of ksca
+  ! Because we cannot store all the CDF for all cells
+  ! (n_grains x ncells x n_lambda)
+  ! The CDF is recomputed on the fly here
+  ! The normalization is saved via kappa_sca, so we do not need to compute
+  ! all the CDF
 
   implicit none
 
-  integer, intent(in) :: m,n,k
-  real(kind=db), dimension(m,n), intent(in) :: a
-  real(kind=db), dimension(n,k), intent(in) :: b
-  real(kind=db), dimension(m,k), intent(out) :: c
+  integer, intent(in) :: lambda, icell
+  real, intent(in) :: aleat
+  real :: prob, CDF, norm
 
-  integer :: r,s,i
-  real(kind=db) :: sum
-!
-!       pour chaque rangee R et colonne S, calculer le produit du vecteur
-!       rangee avec le vecteur colonne
-!
-  do  r = 1,m
-     do  s = 1,k
-        sum = 0.0
-        do  i = 1,n
-           sum = sum + a(r,i) * b(i,s)
-        enddo   !i
-        c(r,s) = sum
-     enddo   !s
-  enddo   !r
+  ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
+  norm =  kappa_sca(icell,lambda) / (AU_to_cm * mum_to_cm**2)
+
+  if (aleat < 0.5) then ! We start from first grain
+     prob = aleat * norm
+     CDF = 0.0
+     do k=1, n_grains_tot
+        CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+        if (CDF > prob) exit
+     enddo
+  else ! We start from the end of the grain size distribution
+     prob = (1.0-aleat) * norm
+     CDF = 0.0
+     do k=n_grains_tot, 1, -1
+        CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+        if (CDF > prob) exit
+     enddo
+  endif
+
   return
-end subroutine MULMAT
 
-!*****************************************************
+end function select_scattering_grain
+
+!*******************************************************************
 
 subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !***********************************************************
@@ -1049,14 +1017,14 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !     MATRICE DE MUELLER
 !     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  XMUL(1,1) = tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(2,2) = tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(1,2) = tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(2,1) = tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(3,3) = tab_s33(lambda,taille_grain,itheta) * frac + tab_s33(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(4,4) = tab_s33(lambda,taille_grain,itheta) * frac + tab_s33(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(3,4) = -tab_s34(lambda,taille_grain,itheta)* frac - tab_s34(lambda,taille_grain,itheta-1) * frac_m1
-  XMUL(4,3) = tab_s34(lambda,taille_grain,itheta) * frac + tab_s34(lambda,taille_grain,itheta-1) * frac_m1
+  XMUL(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(2,2) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(2,1) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(4,4) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
+  XMUL(4,3) = tab_s34(itheta,taille_grain,lambda) * frac + tab_s34(itheta-1,taille_grain,lambda) * frac_m1
   XMUL(1,3) = 0.0
   XMUL(1,4) = 0.0
   XMUL(2,3) = 0.0
@@ -1070,16 +1038,12 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 
   stok_I0 = stok(1)
 !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-!  call MULMAT (4,4,1,ROP,STOK,C)
-
   C=matmul(ROP,STOK)
 ! LE RESULTAT EST C(4,1)
 
-!  call MULMAT (4,4,1,XMUL,C,D)
   D=matmul(XMUL,C)
 ! LE RESULTAT EST D(4,1)
 
-!  call MULMAT (4,4,1,RPO,D,STOK)
   stok=matmul(RPO,D)
 
 ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
@@ -1089,9 +1053,9 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
 
-!  norme=tab_albedo(l)*tab_s11(lambda,taille_grain,itheta)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(lambda,taille_grain,itheta), stok_I0, stok(1,1)
-  norme=(tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1) &
+!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
+!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
+  norme=(tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1) &
        * (stok_I0/stok(1))
   do i=1,4
      stok(i)=stok(i)*norme
@@ -1224,22 +1188,19 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   ROP(4,3) = 0.0
 
 !     MATRICE DE MUELLER
-  xmul(:,:) = tab_mueller(lambda,taille_grain,:,:,itheta) * frac + tab_mueller(lambda,taille_grain,:,:,itheta-1) * frac_m1
+  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
 
 
 ! -------- CALCUL DE LA POLARISATION ---------
 
   stok_I0 = stok(1,1)
 !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-!  call MULMAT (4,4,1,ROP,STOK,C)
   C=matmul(ROP,STOK)
 ! LE RESULTAT EST C(4,1)
 
-!  call MULMAT (4,4,1,XMUL,C,D)
   D=matmul(XMUL,C)
 ! LE RESULTAT EST D(4,1)
 
-!  call MULMAT (4,4,1,RPO,D,STOK)
   stok=matmul(RPO,D)
 
 ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
@@ -1249,9 +1210,9 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
 
-!  norme=tab_albedo(l)*tab_s11(lambda,taille_grain,itheta)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(lambda,taille_grain,itheta), stok_I0, stok(1,1)
-  norme=(tab_mueller(lambda,taille_grain,1,1,itheta)*frac + tab_mueller(lambda,taille_grain,1,1,itheta-1)*frac_m1 ) &
+!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
+!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
+  norme=(tab_mueller(1,1,itheta,taille_grain,lambda)*frac + tab_mueller(1,1,itheta-1,taille_grain,lambda)*frac_m1 ) &
   * (stok_I0/stok(1,1))
   do i=1,4
      stok(i,1)=stok(i,1)*norme
@@ -1262,7 +1223,7 @@ end subroutine new_stokes_gmm
 
 !***********************************************************
 
-subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,stok)
+subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
   ! Routine derivee de stokes
   ! C. Pinte
   ! 9/01/05 : Prop des grains par cellule
@@ -1271,7 +1232,7 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 
   real, intent(in) :: frac
   real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, ri, zj, phik
+  integer, intent(in) :: lambda, itheta, icell
   real(kind=db), dimension(4), intent(inout) :: stok
 
   real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
@@ -1365,35 +1326,30 @@ subroutine new_stokes_pos(lambda,itheta,frac, ri, zj, phik, u0,v0,w0,u1,v1,w1,st
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
 
   XMUL=0.0
-  XMUL(1,1) = tab_s11_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s11_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(1,1) = tab_s11_pos(itheta,icell,lambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s12_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(1,2) = tab_s12_pos(itheta,icell,lambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(lambda,ri,zj,phik,itheta) * frac +  tab_s33_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(3,3) = tab_s33_pos(itheta,icell,lambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_pos(lambda,ri,zj,phik,itheta)* frac -  tab_s34_pos(lambda,ri,zj,phik,itheta-1) * frac_m1
+  XMUL(3,4) = -tab_s34_pos(itheta,icell,lambda)* frac -  tab_s34_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
 
   ! -------- CALCUL DE LA POLARISATION ---------
 
   stok_I0 = stok(1)
   !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  call MULMAT (4,4,1,ROP,STOK,C)
   !  C=matmul(ROP,STOK)
   C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
   C(1)=stok(1)
   C(4)=stok(4)
-
-
   ! LE RESULTAT EST C(4,1)
 
-  !  call MULMAT (4,4,1,XMUL,C,D)
   ! LE RESULTAT EST D(4,1)
   !  D=matmul(XMUL,C)
   D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
   D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
 
-  !  call MULMAT (4,4,1,RPO,D,STOK)
   !  stok=matmul(RPO,D)
   stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
   stok(1)=D(1)
@@ -1433,7 +1389,7 @@ integer function seuil_n_dif(lambda)
   integer, parameter :: seuil_n = 15
 
 
-  albedo = maxval(tab_albedo_pos(lambda,:,:,:))
+  albedo = maxval(tab_albedo_pos(:,lambda))
 
   n = floor(log(seuil)/log(albedo))+1
 
@@ -1570,7 +1526,7 @@ end subroutine angle_diff_theta
 
 !**********************************************************************
 
-subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cospsi)
+subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
 ! Calcul du cosinus de l'angle de diffusion
 ! a partir de l'integrale des s11 pretabulee par cellule
 ! itheta est l'indice i de l'angle de 1 a 180 correspondant Ã  i-0.5Â°
@@ -1581,7 +1537,7 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
 
   implicit none
 
-  integer, intent(in) :: lambda,ri,zj, phik
+  integer, intent(in) :: lambda,icell
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
   real(kind=db), intent(out) :: cospsi
@@ -1593,7 +1549,7 @@ subroutine angle_diff_theta_pos(lambda, ri, zj, phik, aleat, aleat2, itheta, cos
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
-     if (prob_s11_pos(lambda,ri,zj,phik,k) < aleat) then
+     if (prob_s11_pos(k,icell,lambda) < aleat) then
         kmin = k
      else
         kmax = k
@@ -1663,8 +1619,8 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
   p=Ip/I
 
   ! polarisabilite
-  pp= (tab_s12(lambda,taille_grain,itheta) * frac + tab_s12(lambda,taille_grain,itheta-1) * frac_m1) &
-  / (tab_s11(lambda,taille_grain,itheta) * frac + tab_s11(lambda,taille_grain,itheta-1) * frac_m1)
+  pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
+  / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
 
   ppp=p*pp
 !  write(*,*) p,pp,ppp

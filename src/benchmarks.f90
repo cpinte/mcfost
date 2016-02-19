@@ -7,7 +7,6 @@ module benchmarks
   use em_th
   use molecular_emission
 
-
   implicit none
 
   contains
@@ -19,7 +18,7 @@ subroutine lect_section_eff()
 
   implicit none
 
-  integer :: i, j, lambda, l
+  integer :: lambda, l, icell
   real, dimension(61) :: qext, qsca
   real, dimension(0:61) :: tab_lambda_lim
 
@@ -45,26 +44,20 @@ subroutine lect_section_eff()
 
   ! Propriétés optiques des cellules
   do lambda=1,n_lambda
-     tab_albedo_pos(lambda,:,:,:)=qsca(lambda)/qext(lambda)
-     tab_s11_pos(lambda,:,:,:,:)=1.0
-     tab_s12_pos(lambda,:,:,:,:)=0.0
-     tab_s33_pos(lambda,:,:,:,:)=0.0
-     tab_s34_pos(lambda,:,:,:,:)=0.0
-     do i=1,n_rad
-        do j=1,nz
-           ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-           ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
-           ! density en cm-3                      > reste facteur 1.49595e17
-           ! longueur de vol en AU = 1.5e13 cm   /
-           kappa(lambda,i,j,1)=densite_pouss(i,j,1,1) * qext(lambda) * 1.49595e17
-           kappa_abs_eg(lambda,i,j,1)=densite_pouss(i,j,1,1)*(qext(lambda)-qsca(lambda))*1.49595e17
-        enddo !j
-     enddo !i
+     tab_albedo_pos(:,lambda)=qsca(lambda)/qext(lambda)
+     tab_s11_pos(:,:,lambda)=1.0
+     tab_s12_pos(:,:,lambda)=0.0
+     tab_s33_pos(:,:,lambda)=0.0
+     tab_s34_pos(:,:,lambda)=0.0
+     do icell=1, n_cells
+        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+        ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
+        ! density en cm-3                      > reste facteur 1.49595e17
+        ! longueur de vol en AU = 1.5e13 cm   /
+        kappa(icell,lambda)=densite_pouss(1,icell) * qext(lambda) * 1.49595e17
+        kappa_abs_LTE(icell,lambda)=densite_pouss(1,icell)*(qext(lambda)-qsca(lambda))*1.49595e17
+     enddo !icell
   enddo !lambda
-
-
-  kappa(:,:,nz+1,:)=0.0
-  kappa_abs_eg(:,:,nz+1,:)=0.0
 
   tab_g_pos=0.0
   proba_abs_RE = 1.0

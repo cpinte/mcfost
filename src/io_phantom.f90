@@ -52,7 +52,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  endif
  !print*,hdr%inttags(:)
  !print*,hdr%realtags(:)
- 
+
  ! get nblocks
  call extract('nblocks',nblocks,hdr,ierr,default=1)
  call extract('nparttot',np,hdr,ierr)
@@ -274,6 +274,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
 
  if (allocated(etoile)) deallocate(etoile)
  allocate(etoile(nptmass))
+
  do i=1,nptmass
     etoile(i)%x = xyzmh_ptmass(1,i) * ulength
     etoile(i)%y = xyzmh_ptmass(2,i) * ulength

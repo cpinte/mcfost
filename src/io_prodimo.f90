@@ -173,7 +173,7 @@ contains
     fUV_ProDiMo = etoile(1)%fUV
     slope_UV_ProDiMo = etoile(1)%slope_UV
 
-    allocate(xN_abs(n_lambda2,n_rad,nz,nb_proc),  stat=alloc_status)
+    allocate(xN_abs(n_cells,n_lambda2,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error xN_abs'
        stop
@@ -310,23 +310,8 @@ contains
     ! avant de calculer le champ ISM
 
     integer, intent(in) :: lambda
-    integer :: ri, zj
+    integer :: ri, zj, phik, icell
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur
-
-    ! Step1
-    ! 1/4pi est inclus dans n_phot_l_tot
-    !    J_ProDiMo(:,:,:) = (sum(xJ_abs,dim=4) + J0(:,:,:,1)) * n_phot_L_tot !* 4* pi
-    !
-    !    do ri=1, n_rad
-    !       J_ProDiMo(:,ri,:) = J_ProDiMo(:,ri,:) / volume(ri)
-    !    enddo
-    !
-    !    ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
-    !    ! J en W.m-2 (lambda.F_lambda)
-    !    ! teste OK par rapport a fct bb de yorick
-    !    do lambda=1, n_lambda
-    !       J_ProDiMo(lambda,:,:) = J_ProDiMo(lambda,:,:) * tab_lambda(lambda) / tab_delta_lambda(lambda)
-    !    enddo
 
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
@@ -334,15 +319,18 @@ contains
          * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
 
     do ri=1, n_rad
-       do zj=1,nz
-          facteur = energie_photon / volume(ri)
-          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
-          N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(lambda,ri,zj,:))
+       do zj=j_start,nz
+          if (zj==0) cycle
+          phik=1
+          icell = cell_map(ri,zj,phik)
+          facteur = energie_photon / volume(icell)
+          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
+          N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(icell,lambda,:))
        enddo
     enddo
 
-    xJ_abs(lambda,:,:,:) = 0.0
-    xN_abs(lambda,:,:,:) = 0.0
+    xJ_abs(:,lambda,:) = 0.0
+    xN_abs(:,lambda,:) = 0.0
 
     return
 
@@ -406,7 +394,7 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, i, iRegion, k
+    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k
     integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme, Ttmp
@@ -592,9 +580,10 @@ contains
 
     !  Write the array to the FITS file.
     do ri=1, n_rad
-       grid(ri,:,1) = r_grid(ri,:)
        do zj=1,nz
-          grid(ri,zj,2) = z_grid(ri,zj)
+          icell = cell_map(ri,zj,1)
+          grid(ri,:,1) = r_grid(icell)
+          grid(ri,zj,2) = z_grid(icell)
        enddo
     enddo
 
@@ -633,7 +622,7 @@ contains
     !endif
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,Temperature(:,:,1),status)
+    call ftppre(unit,group,fpixel,nelements,Temperature,status)
 
     !------------------------------------------------------------------------------
     ! HDU 3 : Longueurs d'onde
@@ -776,8 +765,9 @@ contains
 
        do ri=1, n_rad
           do zj=1,nz
-             facteur = energie_photon / volume(ri)
-             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(lambda,ri,zj,:))
+             icell = cell_map(ri,zj,1)
+             facteur = energie_photon / volume(icell)
+             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
           enddo
        enddo
     enddo ! lambda
@@ -812,7 +802,8 @@ contains
     ! Inversion de l'ordre des dimensions et somaation
     do zj=1,nz
        do ri=1, n_rad
-          J_io(ri,zj,:) = sum(xN_abs(:,ri,zj,:), dim=2)
+          icell = cell_map(ri,zj,1)
+          J_io(ri,zj,:) = sum(xN_abs(icell,:,:), dim=2)
        enddo
     enddo
 
@@ -837,7 +828,8 @@ contains
     !  Write the array to the FITS file.
     do ri=1, n_rad
        do zj=1,nz
-          dens(ri,zj) =  densite_gaz(ri,zj,1) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
+          icell = cell_map(ri,zj,1)
+          dens(ri,zj) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
@@ -868,10 +860,11 @@ contains
     opacite = 0.0
     do zj=1,nz
        do ri=1,n_rad
+          icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l) * facteur
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -898,12 +891,13 @@ contains
     do zj=1,nz
        do ri=1,n_rad
           ! Nbre total de grain : le da est deja dans densite_pouss
-          N = sum(densite_pouss(ri,zj,1,:),mask=mask_not_PAH)
+          icell = cell_map(ri,zj,1)
+          N = sum(densite_pouss(:,icell),mask=mask_not_PAH)
           N_grains(ri,zj,0) = N
           if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(ri,zj,1,:) * r_grain(:),mask=mask_not_PAH) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**2,mask=mask_not_PAH) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(ri,zj,1,:) * r_grain(:)**3,mask=mask_not_PAH) / N
+             N_grains(ri,zj,1) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
+             N_grains(ri,zj,2) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
+             N_grains(ri,zj,3) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
           else
              N_grains(ri,zj,1) = 0.0
              N_grains(ri,zj,2) = 0.0
@@ -935,7 +929,8 @@ contains
        which_region = 0
        do iRegion=1,n_regions
           do i=1, n_rad
-             if ( (r_grid(i,1) > regions(iRegion)%Rmin).and.(r_grid(i,1) < regions(iRegion)%Rmax) ) which_region(i) = iRegion
+             icell = cell_map(i,1,1)
+             if ( (r_grid(icell) > regions(iRegion)%Rmin).and.(r_grid(icell) < regions(iRegion)%Rmax) ) which_region(i) = iRegion
           enddo !i
        enddo ! iRegion
        call ftpprj(unit,group,fpixel,nelements,which_region,status)
@@ -991,7 +986,8 @@ contains
        k=1 ! azimuth
        do ri=1, n_rad
           do zj=1,nz
-             dens(ri,zj) = sum(densite_pouss(ri,zj,k, iPAH_start:iPAH_end) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             icell = cell_map(ri,zj,k)
+             dens(ri,zj) = sum(densite_pouss(iPAH_start:iPAH_end, icell) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
           enddo
        enddo
        call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1016,10 +1012,11 @@ contains
        opacite = 0.0
        do zj=1,nz
           do ri=1,n_rad
+             icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(lambda,l) * densite_pouss(ri,zj,1,l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(lambda,l) * densite_pouss(ri,zj,1,l)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1043,15 +1040,16 @@ contains
        TPAH_eq = 0.0
        do zj=1,nz
           do ri=1,n_rad
+             icell = cell_map(ri,zj,1)
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
-                   Ttmp = temperature_1grain_nRE(ri,zj,l)
+                   Ttmp = temperature_1grain_nRE(l,icell)
                 else
-                   Ttmp = temperature_1grain(ri,zj,l)
+                   Ttmp = temperature_1grain(l,icell)
                 endif
-                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(ri,zj,1,l)
-                norme = norme + densite_pouss(ri,zj,1,l)
+                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(l,icell)
+                norme = norme + densite_pouss(l,icell)
              enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
           enddo ! ri
@@ -1086,8 +1084,9 @@ contains
        if (lPAH_nRE) then
           do ri=1, n_rad
              do zj=1,nz
+                icell = cell_map(ri,zj,1)
                 do l=grain_nRE_start, grain_nRE_end
-                   if (l_RE(ri,zj,l)) then
+                   if (l_RE(l,icell)) then
                       is_eq(ri,zj,1) = 1
                    else
                       is_eq(ri,zj,1) = 0
@@ -1135,13 +1134,17 @@ contains
           !  Write the required header keywords.
           call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-          do i=1, n_rad
-             if (tab_region(i) > 0) then
-                P_TPAH(:,i,:,1) = Proba_Temperature(:,i,:,tab_region(i))
-             else
-                P_TPAH(:,i,:,1) = 0.0
-             endif
-          enddo
+          ! Trick to moved pack all the grain on index 1 using grain index = tab_region(ri)
+          do ri=1, n_rad
+             do zj=1, nz
+                icell = cell_map(ri,zj,1)
+                if (tab_region(i) > 0) then
+                   P_TPAH(:,ri,zj,1) = Proba_Temperature(:,tab_region(ri),icell)
+                else
+                   P_TPAH(:,ri,zj,1) = 0.0
+                endif
+             enddo ! j
+          enddo ! j
 
            ! le e signifie real*4
           call ftppre(unit,group,fpixel,nelements,P_TPAH,status)
@@ -1430,7 +1433,7 @@ contains
     ! HDU 6 : Read dimensions : radiation field(n_rad,nz,n_lambda)
     !------------------------------------------------------------------------
     call ftmahd(unit,6,hdutype,status)
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 6 file.',nfound,' Exiting.'
@@ -1464,7 +1467,7 @@ contains
     call ftmahd(unit,2,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 2) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 2 file. Exiting.'
@@ -1489,7 +1492,7 @@ contains
     call ftmahd(unit,3,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,1,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 1) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 3 file.',nfound,' Exiting.'
@@ -1515,7 +1518,7 @@ contains
 
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 7 file. Exiting.'
@@ -1538,7 +1541,7 @@ contains
     call ftmahd(unit,8,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 8 file. Exiting.'
@@ -1561,7 +1564,7 @@ contains
     call ftmahd(unit,9,hdutype,status)
 
     ! Check dimensions
-    call ftgknj(unit,'NAXIS',1,3,naxes,nfound,status)
+    call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) then
        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
        write(*,*) 'of HDU 9 file. Exiting.'
@@ -1657,8 +1660,8 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, sigma2_m1, r_cyl
-    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status
+    real :: sigma2, sigma2_m1, r_sph
+    integer :: i,j, ri, zj, n_speed_rt, l, keyword_status, icell
 
     n_speed_rt = mol(imol)%n_speed_rt
 
@@ -1702,7 +1705,7 @@ contains
        ! Format is the same as for the mcfost2ProDiMo interface
        !---------------------------------------------------------
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 1 file. Exiting.'
@@ -1813,15 +1816,16 @@ contains
        ! Verification grille
        do ri=1,n_rad
           do zj=1,nz
-             if (abs(r_grid(ri,zj) - grid(ri,zj,1)) > 1e-5 * r_grid(ri,zj)) then
+             icell = cell_map(ri,zj,1)
+             if (abs(r_grid(icell) - grid(ri,zj,1)) > 1e-5 * r_grid(icell)) then
                 write(*,*) "ERROR R. Exiting."
-                write(*,*) ri, "MCFOST=", r_grid(ri,zj), "ProDiMo=", grid(ri,zj,1)
+                write(*,*) ri, "MCFOST=", r_grid(icell), "ProDiMo=", grid(ri,zj,1)
                 !stop
              endif
 
-             if (abs(z_grid(ri,zj) - grid(ri,zj,2)) > 1e-5 * z_grid(ri,zj)) then
+             if (abs(z_grid(icell) - grid(ri,zj,2)) > 1e-5 * z_grid(icell)) then
                 write(*,*) "ERROR Z. Exiting."
-                write(*,*) ri, zj, z_grid(ri,zj), grid(ri,zj,2)
+                write(*,*) ri, zj, z_grid(icell), grid(ri,zj,2)
                 !stop
              endif
           enddo
@@ -1834,7 +1838,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,2,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 2) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 2 file. Exiting.'
@@ -1857,7 +1861,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 3 file. Exiting.'
@@ -1888,7 +1892,7 @@ contains
        call ftmrhd(unit,1,hdutype,fits_status)
 
        ! Check dimensions
-       call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+       call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
        if (nfound /= 3) then
           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
           write(*,*) 'of HDU 4 file. Exiting.'
@@ -1919,7 +1923,7 @@ contains
           call ftmrhd(unit,1,hdutype,fits_status)
 
           ! Check dimensions
-          call ftgknj(unit,'NAXIS',1,3,naxes,nfound,fits_status)
+          call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
           if (nfound /= 3) then
              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
              write(*,*) 'of HDU ',i+4,' file. Exiting.'
@@ -1994,36 +1998,38 @@ contains
 
     ! Niveaux et populations
     write(*,*) "Setting ProDiMo abundances, population levels and Tgas"
-    tab_abundance(:,:,:) = 0.0
-    tab_nLevel(:,:,:,:) = 0.0
+    tab_abundance(:) = 0.0
+    tab_nLevel(:,:) = 0.0
     do i=1, n_rad
        do j=1, nz
+          icell =cell_map(i,j,1)
           if (lCII) then
-             tab_nLevel(i,j,1,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
-             tab_abundance(i,j,1) = nCII(i,j)
+             tab_nLevel(icell,1:nLevel_CII) = pop_CII(:,i,j) * nCII(i,j)
+             tab_abundance(icell) = nCII(i,j)
           endif
           if (lOI) then
-             tab_nLevel(i,j,1,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
-             tab_abundance(i,j,1) = nOI(i,j)
+             tab_nLevel(icell,1:nLevel_OI) = pop_OI(:,i,j) * nOI(i,j)
+             tab_abundance(icell) = nOI(i,j)
           endif
           if (lCO) then
-             tab_nLevel(i,j,1,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
-             tab_abundance(i,j,1) = nCO(i,j)
+             tab_nLevel(icell,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
+             tab_abundance(icell) = nCO(i,j)
           endif
           if (loH2O) then
-             tab_nLevel(i,j,1,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
-             tab_abundance(i,j,1) = noH2O(i,j)
+             tab_nLevel(icell,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
+             tab_abundance(icell) = noH2O(i,j)
           endif
           if (lpH2O) then
-             tab_nLevel(i,j,1,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
-             tab_abundance(i,j,1) = npH2O(i,j)
+             tab_nLevel(icell,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
+             tab_abundance(icell) = npH2O(i,j)
           endif
+          Tcin(icell) = Tgas(i,j)
        enddo
     enddo
-    tab_abundance(:,:,:) = tab_abundance(:,:,:) / densite_gaz(:,:,:) ! conversion nbre en abondance
+    do icell=1, n_cells
+       tab_abundance(icell) = tab_abundance(icell) / densite_gaz(icell) ! conversion nbre en abondance
+    enddo
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
-
-    Tcin(:,:,1) = Tgas
 
 
 
@@ -2075,9 +2081,10 @@ contains
     ! Vitesse keplerienne
     do i=1, n_rad
        do j=1, nz
-          r_cyl = sqrt(r_grid(i,j)**2 + z_grid(i,j)**2)
-!          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
-          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(i,j) * AU_to_m)**2 /  (r_cyl * AU_to_m)**3 )
+          icell = cell_map(i,j,1)
+          r_sph = sqrt(r_grid(icell)**2 + z_grid(icell)**2)
+          !          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
+          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
        enddo
     enddo
 
@@ -2089,7 +2096,8 @@ contains
           if (lCO) sigma2 =  dvCO(i,j)**2
           if (loH2O) sigma2 =  dvoH2O(i,j)**2
           if (lpH2O) sigma2 =  dvpH2O(i,j)**2
-          v_line(i,j,1) = sqrt(sigma2)
+          icell = cell_map(i,j,1)
+          v_line(icell) = sqrt(sigma2)
 
           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
           if (sigma2 <=0.) then
@@ -2098,10 +2106,10 @@ contains
           endif
 
           sigma2_m1 = 1.0_db / sigma2
-          sigma2_phiProf_m1(i,j,1) = sigma2_m1
+          sigma2_phiProf_m1(icell) = sigma2_m1
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
-          norme_phiProf_m1(i,j,1) = c_light / sqrt(pi * sigma2)
+          norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
 
 !----          ! Echantillonage du profil de vitesse dans la cellule
 !----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
