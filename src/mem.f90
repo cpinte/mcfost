@@ -25,9 +25,65 @@ subroutine alloc_dynamique()
   integer ::  alloc_status
   real :: mem_size
 
+  nrz = n_rad * nz
+  if (l3D) then
+     n_cells = 2*nrz*n_az
+  else
+     n_cells = nrz
+  endif
+
+  if (n_cells < 1e6) then
+     write(*,*) "Using", n_cells, "cells"
+  else
+     write(*,*) "Using", real(n_cells)/1e6, "millions cell"
+  endif
+
+  if (lvariable_dust) then
+     p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
+  else
+     p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
+  endif
+
+  lonly_LTE = .false.
+  lonly_nLTE = .false.
+  if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
+  if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
+
+  if (l3D) then
+     j_start = -nz
+     if (lvariable_dust) then
+        p_n_az = n_az
+     else
+        p_n_az = 1
+     endif
+  else
+     j_start = 1
+     p_n_az = 1
+  endif
+
+  if ((p_nz /= 1).and.l3D) then
+     pj_start = -nz
+  else
+     pj_start = 1
+  endif
+
+
+  ! parametrage methode de diffusion
+  if (scattering_method == 0) then
+     if ((lvariable_dust).and.(.not.lmono)) then
+        scattering_method = 1
+     else
+        scattering_method = 2
+     endif
+  endif
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
+
+
+
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error'
+     write(*,*) 'Allocation error random number stream'
      stop
   endif
   gauss_random_saved = 0.0_db
@@ -40,7 +96,6 @@ subroutine alloc_dynamique()
   endif
   n_phot_envoyes = 0.0
 
-
   ! **************************************************
   ! Tableaux relatifs a la grille
   ! **************************************************
@@ -52,11 +107,7 @@ subroutine alloc_dynamique()
   endif
   r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
 
-  if (l3D) then
-     allocate(r_grid(n_rad,-nz:nz), z_grid(n_rad,-nz:nz), phi_grid(n_az), stat=alloc_status)
-  else
-     allocate(r_grid(n_rad,nz), z_grid(n_rad,nz), phi_grid(n_az), stat=alloc_status)
-  endif
+  allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error r_lim'
      stop
@@ -87,30 +138,21 @@ subroutine alloc_dynamique()
   tan_theta_lim = 0.0
   tan_phi_lim = 0.0
 
-  allocate(zmax(n_rad),volume(n_rad), stat=alloc_status)
+  allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error zmax, volume'
      stop
   endif
   zmax = 0.0 ; volume=0.0
 
-  if (l3D) then
-     allocate(masse(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(masse(n_rad,nz,1), stat=alloc_status)
-  endif
-
+  allocate(masse(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error masse'
      stop
   endif
   masse = 0.0
 
-  if (l3D) then
-     allocate(densite_pouss(n_rad,-nz-1:nz+1,n_az,n_grains_tot), stat=alloc_status)
-  else
-     allocate(densite_pouss(n_rad,nz+1,1,n_grains_tot), stat=alloc_status)
-  endif
+  allocate(densite_pouss(n_grains_tot,n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_pouss'
      stop
@@ -126,13 +168,8 @@ subroutine alloc_dynamique()
      Surface_density = 0.0_db
   endif
 
-  if (l3D) then
-     allocate(l_dark_zone(0:n_rad+1,-nz-1:nz+1,n_az), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
+  allocate(l_dark_zone(n_cells), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
-  else
-     allocate(l_dark_zone(0:n_rad+1,0:nz+1,1), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
-          zj_sup_dark_zone(n_rad,n_az), stat=alloc_status)
-  endif
   if (alloc_status > 0) then
      write(*,*) 'Allocation error l_dark_zone'
      stop
@@ -155,7 +192,6 @@ subroutine alloc_dynamique()
   endif
   r_in_opacite=0.0 ; r_in_opacite2=0.0
 
-
   ! **************************************************
   ! Tableaux relatifs aux grains
   ! **************************************************
@@ -168,15 +204,15 @@ subroutine alloc_dynamique()
   nbre_grains = 0.0   ; r_core=0.0
   r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
-  allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo'
      stop
   endif
   tab_albedo = 0
 
-  allocate(C_ext(n_lambda,n_grains_tot), C_sca(n_lambda,n_grains_tot), &
-       C_abs(n_lambda,n_grains_tot), C_abs_norm(n_lambda,n_grains_tot), stat=alloc_status) !  C_geo(n_grains_tot)
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda), C_abs_norm(n_grains_tot,n_lambda), stat=alloc_status) !  C_geo(n_grains_tot)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error q_ext'
      stop
@@ -184,13 +220,12 @@ subroutine alloc_dynamique()
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm =0
 
 
-  allocate(tab_g(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_g(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_g'
      stop
   endif
   tab_g = 0
-
 
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
@@ -243,179 +278,126 @@ subroutine alloc_dynamique()
 
 
   ! Tableaux relatifs aux prop optiques des cellules
-  if (l3D) then
-     allocate(amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az),  stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(amax_reel(n_lambda,n_rad,nz+1,1), kappa(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_eg(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1),  stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa'
-     stop
-  endif
-  amax_reel = 0.0 ; kappa=0.0 ; kappa_abs_eg=0.0 ;
-  proba_abs_RE_LTE=0.0
-  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
-  if (lnRE)  then
-     proba_abs_RE=0.0
-     kappa_abs_RE=0.0
+  allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
+
+  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
+     allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
+     if (lRE_nLTE)  allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa'
+        stop
+     endif
+     kappa=0.0 ; kappa_abs_LTE=0.0
+     proba_abs_RE_LTE=0.0
+     if (lRE_nLTE) kappa_abs_nLTE=0.0
+     if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+     if (lnRE)  then
+        proba_abs_RE=0.0
+        kappa_abs_RE=0.0
+     endif
   endif
 
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
-          stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,p_nz,1), tab_g_pos(n_lambda,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+  allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
+     write(*,*) 'Allocation error tab_albedo_pos'
      stop
   endif
   tab_albedo_pos = 0
-  tab_g_pos = 0.0
 
+  allocate(tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_albedo_pos'
+     stop
+  endif
+  tab_g_pos = 0.0
 
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
-     p_n_lambda = n_lambda ! was 1 : changed to save dust properties
+     p_n_lambda = n_lambda ! was 1 : changed to save dust properties with +dust_prop
 
-     if (l3D) then
-        allocate(tab_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
+     if (lsepar_pola) then
+        mem_size = (5. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**3
      else
-        allocate(tab_s11_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
+        mem_size = (2. * nang_scatt) * p_n_cells * n_lambda * 4. / 1024.**3
      endif
+     if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering matrices"
+     allocate(tab_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
      endif
      tab_s11_pos = 0
 
-     if (lsepar_pola) then
-        if (l3D) then
-           allocate(tab_s12_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s12_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s12_pos'
-           stop
-        endif
-        tab_s12_pos = 0
-
-        if (l3D) then
-           allocate(tab_s33_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s33_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s33_pos'
-           stop
-        endif
-        tab_s33_pos = 0
-
-        if (l3D) then
-           allocate(tab_s34_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s34_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s34_pos'
-           stop
-        endif
-        tab_s34_pos = 0
-     endif
-
-     if (l3D) then
-        allocate(prob_s11_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(prob_s11_pos(n_lambda,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(prob_s11_pos(0:nang_scatt, p_n_cells, n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
      endif
      prob_s11_pos = 0
-  else ! prop par grains
+
+     if (lsepar_pola) then
+        allocate(tab_s12_pos(0:nang_scatt, p_n_cells, n_lambda), &
+             tab_s33_pos(0:nang_scatt, p_n_cells, n_lambda), &
+             tab_s34_pos(0:nang_scatt, p_n_cells, n_lambda), &
+             stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error tab_s12_pos'
+           stop
+        endif
+        tab_s12_pos = 0
+        tab_s33_pos = 0
+        tab_s34_pos = 0
+     endif
+  else ! scattering method==1 --> prop par grains
      p_n_lambda = n_lambda
 
-     if (l3D) then
-        allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-     else
-        allocate(probsizecumul(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error probsizecumul'
-        stop
-     endif
-     probsizecumul = 0
+     mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**3
+     if (mem_size < max_mem) then
+        low_mem_scattering = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
 
-     if (l3D) then
-        allocate(ech_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(ech_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error ech_prob'
-        stop
-     endif
-     ech_prob = 0
+        allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
 
-     if (l3D) then
-        allocate(valeur_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(valeur_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error ksca_CDF'
+           stop
+        endif
+        ksca_CDF = 0
+     else ! Array is to big, we will recompute ksca_CDF on the fly
+        low_mem_scattering = .true.
+        write(*,*) "Using low memory mode for scattering properties"
      endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error valeur_prob'
-        stop
-     endif
-     valeur_prob = 0
-
-     allocate(xspline(n_lambda,p_n_rad,p_nz,0:n_prob+1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xspline'
-        stop
-     endif
-     xspline = 0
   endif ! method
-
 
   ! **************************************************
   ! tableaux relatifs aux prop optiques des grains
   ! **************************************************
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11'
      stop
   endif
   tab_s11 = 0
 
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12'
      stop
   endif
   tab_s12 = 0
 
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33'
      stop
   endif
   tab_s33 = 0
 
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34'
      stop
@@ -423,7 +405,7 @@ subroutine alloc_dynamique()
   tab_s34 = 0
 
   if (laggregate) then
-     allocate(tab_mueller(p_n_lambda,n_grains_tot,4,4,0:nang_scatt), stat=alloc_status)
+     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_mueller'
         stop
@@ -449,11 +431,7 @@ subroutine alloc_dynamique()
   l_emission_pah = .false.
 
 
-  if (l3D) then
-     allocate(prob_E_cell(n_lambda,0:n_rad*2*nz*n_az), stat=alloc_status)
-  else
-     allocate(prob_E_cell(n_lambda,0:n_rad*nz), stat=alloc_status)
-  endif
+  allocate(prob_E_cell(0:n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_cell'
      stop
@@ -461,7 +439,7 @@ subroutine alloc_dynamique()
   prob_E_cell = 0.0
 
   if (lweight_emission) then
-     allocate(weight_proba_emission(n_rad,nz), correct_E_emission(n_rad,nz), stat=alloc_status)
+     allocate(weight_proba_emission(n_cells), correct_E_emission(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_E_cell'
         stop
@@ -481,15 +459,10 @@ subroutine alloc_dynamique()
      star_origin = 0.0
   endif
 
-
   ! **************************************************
   ! Tableaux de temperature
   ! **************************************************
-  if (l3D) then
-     allocate(Temperature(n_rad,-nz:nz,n_az), Temperature_old(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(Temperature(n_rad,nz,1), Temperature_old(n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(Temperature(n_cells), Temperature_old(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Temperature'
      stop
@@ -498,7 +471,7 @@ subroutine alloc_dynamique()
 
 
   if (lRE_nLTE) then
-     allocate(Temperature_1grain(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Temperature_1grain'
         stop
@@ -516,8 +489,8 @@ subroutine alloc_dynamique()
         tab_Temp = 0.0
      endif
 
-     allocate(Proba_Temperature(n_T,n_rad,nz,grain_nRE_start:grain_nRE_end), &
-          Temperature_1grain_nRE(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,n_cells), &
+          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Proba_Temperature'
         stop
@@ -525,14 +498,13 @@ subroutine alloc_dynamique()
      Proba_Temperature=0.0
      Temperature_1grain_nRE=0.0
 
-     allocate(l_RE(n_rad,nz,grain_nRE_start:grain_nRE_end), lchange_nRE(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+     allocate(l_RE(grain_nRE_start:grain_nRE_end,n_cells), lchange_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error l_RE'
         stop
      endif
      l_RE=.false. ; lchange_nRE = .false.
   endif
-
 
   ! **************************************************
   ! Tableaux relatifs au *calcul* de la temperature
@@ -545,11 +517,7 @@ subroutine alloc_dynamique()
      endif
      tab_Temp = 0.0
 
-     if (l3D) then
-        allocate(log_frac_E_em(n_rad,-nz:nz,n_az,n_T), stat=alloc_status)
-     else
-        allocate(log_frac_E_em(n_rad,nz,1,n_T), stat=alloc_status)
-     endif
+     allocate(log_frac_E_em(n_T,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error log_frac_E_em'
         stop
@@ -563,74 +531,84 @@ subroutine alloc_dynamique()
      endif
      DensE = 0.0 ; DensE_m1 = 0.0
 
+     if (lRE_LTE) then
+        allocate(xKJ_abs(n_cells,nb_proc), E0(n_cells), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xKJ_abs'
+           stop
+        endif
+        xKJ_abs = 0.0 ; E0 = 0.0
+     endif
 
-     if (l3D) then
-        allocate(xKJ_abs(n_rad,-nz:nz,n_az,nb_proc), &
-             xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,-nz:nz,n_az,nb_proc),&
-             stat=alloc_status)
-     else
-        allocate(xKJ_abs(n_rad,nz,1,nb_proc),  &
-             xJ_abs(n_lambda,n_rad,nz,nb_proc), nbre_reemission(n_rad,nz,1,nb_proc), &
-             stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) then
+        allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status) ! BIG array
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xJ_abs'
+           stop
+        endif
+        xJ_abs=0.0 ; J0 = 0.0
      endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xKJ_abs'
-        stop
-     endif
-     xKJ_abs = 0.0 ; xJ_abs=0.0 ; nbre_reemission = 0.0
 
-     if (l3D) then
-        allocate(E0(n_rad,-nz:nz,n_az), J0(n_lambda,n_rad,-nz:nz,n_az),  stat=alloc_status)
-     else
-        allocate(E0(n_rad,nz,1),J0(n_lambda,n_rad,nz,1),  stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error E0'
-        stop
-     endif
-     E0 = 0.0
-     J0 = 0.0
-
-     if (l3D) then
-        allocate(xT_ech(nb_proc,n_rad,-nz:nz,n_az), stat=alloc_status)
-     else
-        allocate(xT_ech(nb_proc,n_rad,nz,1), stat=alloc_status)
-     endif
+     allocate(xT_ech(n_cells,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xT_ech'
         stop
      endif
      xT_ech = 2
 
-     if (l3D) then
-        allocate(prob_delta_T(p_n_rad,-p_nz:p_nz,p_n_az,n_T,n_lambda), stat=alloc_status)
-        mem_size = real(p_n_rad) * 2. * real(p_nz) * real(p_n_az) * n_T * n_lambda * 4 / 1024.**2
-     else
-        allocate(prob_delta_T(p_n_rad,p_nz,1,n_T,n_lambda), stat=alloc_status)
-        mem_size = real(p_n_rad) * real(p_nz) * n_T * n_lambda * 4 / 1024.**2
+     if (lreemission_stats) then
+        allocate(nbre_reemission(n_cells,nb_proc), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error nbre_reemission'
+           stop
+        endif
+        nbre_reemission = 0.0
      endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error prob_delta_T'
-        stop
-     endif
-     prob_delta_T = 0
 
-     if (mem_size > 1000) write(*,*) "Trying to allocate", mem_size/1024., "GB for temperature calculation"
+     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**3
+     if (mem_size < max_mem) then
+        low_mem_th_emission = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
+        allocate(kdB_dT_CDF(n_lambda,n_T,p_n_cells), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_CDF'
+           stop
+        endif
+        kdB_dT_CDF = 0
+     else
+        low_mem_th_emission = .true.
+        write(*,*) "Using low memory mode for thermal emission"
+        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
+           stop
+        endif
+        kdB_dT_1grain_LTE_CDF = 0
+     endif
 
      if (lRE_nLTE) then
-        allocate(prob_kappa_abs_1grain(n_lambda,n_rad,nz+1,grain_RE_nLTE_start-1:grain_RE_nLTE_end),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_abs_1grain'
-           stop
-        endif
-        prob_kappa_abs_1grain=0.0
 
-        allocate(prob_delta_T_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T,n_lambda),stat=alloc_status)
+        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_n_cells * n_lambda * 4. / 1024.**3
+        if (mem_size < max_mem) then
+           low_mem_th_emission_nLTE = .false.
+           if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
+           if (alloc_status > 0) then
+              write(*,*) 'Allocation error kabs_nLTE_CDF'
+              stop
+           endif
+           kabs_nLTE_CDF = 0.0
+        else
+           low_mem_th_emission_nLTE = .true.
+           write(*,*) "Using low memory mode for nLTE thermal emission"
+        endif
+
+        allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error prob_delta_T_1grain'
+           write(*,*) 'Allocation error kdB_dT_1grain_nLTE_CDF'
            stop
         endif
-        prob_delta_T_1grain=0.0
+        kdB_dT_1grain_nLTE_CDF=0.0
 
         allocate(log_frac_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
@@ -639,7 +617,7 @@ subroutine alloc_dynamique()
         endif
         log_frac_E_em_1grain=0.0
 
-        allocate(xT_ech_1grain(nb_proc,n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain'
            stop
@@ -658,15 +636,15 @@ subroutine alloc_dynamique()
         frac_E_em_1grain_nRE=0.0
         log_frac_E_em_1grain_nRE=0.0
 
-        allocate(Temperature_1grain_nRE_old(n_rad,nz,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Proba_Temperature'
            stop
         endif
         Temperature_1grain_nRE_old =0.0
 
-        allocate(Tpeak_old(n_rad,nz,grain_nRE_start:grain_nRE_end), &
-             maxP_old(n_rad,nz,grain_nRE_start:grain_nRE_end), &
+        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,n_cells), &
+             maxP_old(grain_nRE_start:grain_nRE_end,n_cells), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Tpeak'
@@ -675,22 +653,22 @@ subroutine alloc_dynamique()
         Tpeak_old=0
         maxP_old=0.
 
-        allocate(xT_ech_1grain_nRE(nb_proc,n_rad,nz,grain_nRE_start:grain_nRE_end),stat=alloc_status)
+        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain_nRE'
            stop
         endif
         xT_ech_1grain_nRE = 2
 
-        allocate(prob_delta_T_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T,n_lambda),stat=alloc_status)
+        allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error prob_delta_T_1grain_nRE'
+           write(*,*) 'Allocation error kdB_dT_1grain_nRE_CDF'
            stop
         endif
-        prob_delta_T_1grain_nRE=0.0
+        kdB_dT_1grain_nRE_CDF=0.0
 
         if (lRE_nlTE) then
-           allocate(Temperature_1grain_old(n_rad,nz,grain_RE_nLTE_start:grain_RE_nLTE_end),stat=alloc_status)
+           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error Temperature_old'
               stop
@@ -702,24 +680,13 @@ subroutine alloc_dynamique()
   endif ! lTemp
 
   if (lnRE) then
-     allocate(Emissivite_nRE_old(n_lambda,n_rad,nz,1), stat=alloc_status)
+     allocate(Emissivite_nRE_old(n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Proba_Temperature'
         stop
      endif
      Emissivite_nRE_old = 0.0
   endif
-
-
-
- ! if (lProDiMo) then
- !    allocate(J_prodimo(n_lambda,n_rad,nz),stat=alloc_status)
- !    if (alloc_status > 0) then
- !       write(*,*) 'Allocation error J_prodimo'
- !       stop
- !    endif
- !    J_prodimo = 0.
- ! endif
 
   ! **************************************************
   ! Tableaux relatifs aux SEDs
@@ -876,89 +843,51 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs a l'emission moleculaire
   ! **************************************************
   if (lemission_mol) then
-     if (l3D) then
-        allocate(tab_abundance(n_rad,-nz:nz,n_az), Tcin(n_rad,-nz:nz,n_az), lcompute_molRT(n_rad,-nz:nz,n_az), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tcin & tab_abundance'
-           stop
-        endif
-        tab_abundance = 0.0
-        lcompute_molRT = .true.
-        Tcin=0.0
-     else
-        allocate(tab_abundance(n_rad,nz,1), Tcin(n_rad,nz,1), lcompute_molRT(n_rad,nz,1), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tcin & tab_abundance'
-           stop
-        endif
-        tab_abundance = 0.0
-        lcompute_molRT = .true.
-        Tcin=0.0
+     allocate(tab_abundance(n_cells), Tcin(n_cells), lcompute_molRT(n_cells), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error Tcin & tab_abundance'
+        stop
      endif
+     tab_abundance = 0.0
+     lcompute_molRT = .true.
+     Tcin=0.0
 
-     allocate(vfield(n_rad,nz), stat=alloc_status)
+     allocate(vfield(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error vfield'
         stop
      endif
      vfield=0.0 !; vx=0.0 ; vy=0.0
 
-     if (l3D) then
-        allocate(v_turb(n_rad, -nz:nz,n_az), v_line(n_rad, -nz:nz,n_az), deltaVmax(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(v_turb(n_cells), v_line(n_cells), deltaVmax(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sigma2'
         stop
      endif
      v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
 
-     allocate(tab_dnu_o_freq(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(tab_dnu_o_freq(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_dnu'
         stop
      endif
      tab_dnu_o_freq=0.0
 
-     allocate(norme_phiProf_m1(n_rad,-nz:nz,n_az), sigma2_phiProf_m1(n_rad,-nz:nz,n_az), stat=alloc_status)
+     allocate(norme_phiProf_m1(n_cells), sigma2_phiProf_m1(n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error norme_phiProf_m1'
         stop
      endif
      norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
-  else
-     allocate(v_turb(n_rad,nz,1), v_line(n_rad,nz,1), deltaVmax(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error sigma2'
-        stop
-     endif
-     v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
-
-     allocate(tab_dnu_o_freq(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_dnu'
-        stop
-     endif
-     tab_dnu_o_freq=0.0
-
-     allocate(norme_phiProf_m1(n_rad,nz,1), sigma2_phiProf_m1(n_rad,nz,1), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error norme_phiProf_m1'
-        stop
-     endif
-     norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
-  endif !l3D
 
   endif ! lemission_mol
 
-  if (l3D) then
-     allocate(densite_gaz(n_rad,-nz:nz,n_az), masse_gaz(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(densite_gaz(n_rad,0:nz,1), masse_gaz(n_rad,0:nz,1), stat=alloc_status)
-  endif
+  allocate(densite_gaz(n_cells), densite_gaz_midplane(n_rad), masse_gaz(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_gaz'
      stop
   endif
-  densite_gaz = 0.0 ; masse_gaz = 0.0
+  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
   return
 
@@ -979,9 +908,10 @@ subroutine dealloc_em_th()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
-  deallocate(amax_reel,kappa,kappa_abs_eg)
+  deallocate(kappa,kappa_abs_LTE)
   if (allocated(proba_abs_RE_LTE)) then
      deallocate(proba_abs_RE_LTE)
+     if (lRE_nLTE) deallocate(kappa_abs_nLTE)
      if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
      if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
   endif
@@ -992,7 +922,7 @@ subroutine dealloc_em_th()
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
   else ! prop par grains
-     deallocate(probsizecumul,ech_prob,valeur_prob,xspline)
+     deallocate(ksca_CDF)
   endif ! method
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
@@ -1007,17 +937,17 @@ subroutine dealloc_em_th()
         deallocate(log_frac_E_em)
         deallocate(DensE, DensE_m1, Dcoeff)
         deallocate(xKJ_abs,xJ_abs,nbre_reemission)
-        deallocate(E0,J0,xT_ech,prob_delta_T)
+        deallocate(E0,J0,xT_ech,kdB_dT_CDF)
      endif
 
      if (lRE_nLTE) then
-        deallocate(prob_kappa_abs_1grain,prob_delta_T_1grain,log_frac_E_em_1grain)
+        deallocate(kabs_nLTE_CDF,kdB_dT_1grain_nLTE_CDF,log_frac_E_em_1grain)
         deallocate(xT_ech_1grain)
      endif
 
      if (lnRE) then
         deallocate(frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE)
-        deallocate(Temperature_1grain_nRE_old,prob_delta_T_1grain_nRE,xT_ech_1grain_nRE)
+        deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
         deallocate(Emissivite_nRE_old)
         deallocate(Tpeak_old)
         if (lRE_nlTE) deallocate(Temperature_1grain_old)
@@ -1039,7 +969,7 @@ end subroutine dealloc_em_th
 
 subroutine realloc_dust_mol()
 
-  integer :: alloc_status
+  integer :: alloc_status, mem_size
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
        tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
@@ -1051,15 +981,15 @@ subroutine realloc_dust_mol()
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda= 0.0 ;
   tab_amu1=0.0 ; tab_amu2=0.0 ; tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
-  allocate(tab_albedo(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo (realloc)'
      stop
   endif
   tab_albedo = 0
 
-  allocate(C_ext(n_lambda,n_grains_tot), C_sca(n_lambda,n_grains_tot), &
-       C_abs(n_lambda,n_grains_tot),  C_abs_norm(n_lambda,n_grains_tot), tab_g(n_lambda,n_grains_tot), stat=alloc_status)
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda),  C_abs_norm(n_grains_tot,n_lambda), tab_g(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_ext (realloc)'
      stop
@@ -1074,28 +1004,28 @@ subroutine realloc_dust_mol()
   endif
   prob_s11 = 0
 
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11 (realloc)'
      stop
   endif
   tab_s11 = 0
 
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12 (realloc)'
      stop
   endif
   tab_s12 = 0
 
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33 (realloc)'
      stop
   endif
   tab_s33 = 0
 
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34 (realloc)'
      stop
@@ -1103,83 +1033,44 @@ subroutine realloc_dust_mol()
   tab_s34 = 0
 
   ! TODO : cette partie prend bcp de memoire
-  if (l3D) then
-     allocate(probsizecumul(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-  else
-     allocate(probsizecumul(n_lambda,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-  endif
+  allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
+  mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**3
+  if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error probsizecumul (realloc)'
+     write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
   endif
-  probsizecumul = 0
+  ksca_CDF = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  if (l3D) then
-     allocate(kappa(n_lambda,n_rad,-nz-1:nz+1,n_az),kappa_abs_eg(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_sca(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          emissivite_dust(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          amax_reel(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(kappa(n_lambda,n_rad,nz+1,1),kappa_abs_eg(n_lambda,n_rad,nz+1,1), &
-          kappa_sca(n_lambda,n_rad,nz+1,1), &
-          emissivite_dust(n_lambda,n_rad,nz+1,1), &
-          amax_reel(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     allocate(proba_abs_RE_LTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), &
-          kappa_abs_RE(n_lambda,n_rad,nz+1,1),stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa (realloc)'
-     stop
-  endif
-  kappa = 0.0 ; kappa_abs_eg = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
-  proba_abs_RE_LTE=0.0
-  if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
-  if (lnRE)  then
-     proba_abs_RE=0.0
-     kappa_abs_RE=0.0
+  allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), &
+       emissivite_dust(n_cells,n_lambda), stat=alloc_status)
+  kappa = 0.0 ; kappa_abs_LTE = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
+  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
+     allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE) allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa (realloc)'
+        stop
+     endif
+     proba_abs_RE_LTE=0.0
+     if (lRE_nLTE) kappa_abs_nLTE = 0.0
+     if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0
+     if (lnRE)  then
+        proba_abs_RE=0.0
+        kappa_abs_RE=0.0
+     endif
   endif
 
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az), tab_g_pos(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az),&
-          stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda,p_n_rad,p_nz,1), tab_g_pos(n_lambda,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+  allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos (realloc)'
      stop
   endif
   tab_albedo_pos = 0
   tab_g_pos = 0.0
-
-  if (l3D) then
-     allocate(ech_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-  else
-     allocate(ech_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error ech_prob (realloc)'
-     stop
-  endif
-  ech_prob = 0
-
-  if (l3D) then
-     allocate(valeur_prob(n_lambda,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-  else
-     allocate(valeur_prob(n_lambda,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error valeur_prob (realloc)'
-     stop
-  endif
-  valeur_prob = 0
 
   allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1212,13 +1103,15 @@ subroutine clean_mem_dust_mol()
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
-  deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,probsizecumul)
-  deallocate(kappa_abs_eg,amax_reel)
-  deallocate(proba_abs_RE_LTE)
-  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
-  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,ksca_CDF)
+  deallocate(kappa_abs_LTE)
+  if (allocated(proba_abs_RE_LTE)) then
+     deallocate(proba_abs_RE_LTE)
+     if (lRE_nLTE) deallocate(kappa_abs_nLTE)
+     if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
+     if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  endif
   deallocate(tab_albedo_pos, tab_g_pos)
-  deallocate(ech_prob,valeur_prob)
 
   return
 
@@ -1228,20 +1121,32 @@ end subroutine clean_mem_dust_mol
 
 subroutine realloc_step2()
 
-  integer :: alloc_status
+  integer :: alloc_status, mem_size
 
   p_n_lambda = n_lambda2 ! Plus de pointeur a 1 depuis que l'on sauvegarde les proprietes optiques
 
+  ! parametrage methode de diffusion
+  if (scattering_method == 0) then
+     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
+        scattering_method = 1
+     else
+        scattering_method = 2
+     endif
+  endif
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
+
   ! Liberation memoire
   if (ltemp) then
-     if (lRE_LTE)  deallocate(prob_delta_T, log_frac_E_em, xT_ech)
-     if (lRE_nLTE) deallocate(prob_kappa_abs_1grain, prob_delta_T_1grain, log_frac_E_em_1grain,xT_ech_1grain)
-     deallocate(xJ_abs, xKJ_abs, nbre_reemission)
-     if (lnRE) deallocate(prob_delta_T_1grain_nRE,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
+     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_frac_E_em, xT_ech,xKJ_abs)
+     if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
+     if (lreemission_stats) deallocate(nbre_reemission)
+     if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
+     if (lRE_nLTE.or.lnRE) deallocate(xJ_abs,J0)
   endif
 
   if (lProDiMo) then
-     allocate(xJ_abs(n_lambda2,n_rad,nz,nb_proc), stat=alloc_status)
+     allocate(xJ_abs(n_cells,n_lambda2,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xJ_abs in realloc_step2'
         stop
@@ -1352,11 +1257,7 @@ subroutine realloc_step2()
   n_phot_envoyes = 0.0
 
   deallocate(prob_E_cell)
-  if (l3D) then
-     allocate(prob_E_cell(n_lambda2,0:n_rad*2*nz*n_az), stat=alloc_status)
-  else
-     allocate(prob_E_cell(n_lambda2,0:n_rad*nz), stat=alloc_status)
-  endif
+  allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_cell'
      stop
@@ -1400,7 +1301,7 @@ subroutine realloc_step2()
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(tab_albedo)
-  allocate(tab_albedo(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(tab_albedo(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo'
      stop
@@ -1408,7 +1309,7 @@ subroutine realloc_step2()
   tab_albedo = 0
 
   deallocate(C_ext)
-  allocate(C_ext(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_ext(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_ext'
      stop
@@ -1416,7 +1317,7 @@ subroutine realloc_step2()
   C_ext = 0
 
   deallocate(C_sca)
-  allocate(C_sca(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_sca(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_sca'
      stop
@@ -1424,7 +1325,7 @@ subroutine realloc_step2()
   C_sca = 0
 
   deallocate(C_abs,C_abs_norm)
-  allocate(C_abs(n_lambda2,n_grains_tot), C_abs_norm(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(C_abs(n_grains_tot,n_lambda2), C_abs_norm(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error C_abs'
      stop
@@ -1432,40 +1333,24 @@ subroutine realloc_step2()
   C_abs = 0 ; C_abs_norm = 0
 
   deallocate(tab_g)
-  allocate(tab_g(n_lambda2,n_grains_tot), stat=alloc_status)
+  allocate(tab_g(n_grains_tot,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_g'
      stop
   endif
   tab_g = 0
 
-
-  deallocate(tab_albedo_pos)
-  if (l3D) then
-     allocate(tab_albedo_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az), stat=alloc_status)
-  else
-     allocate(tab_albedo_pos(n_lambda2,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
+  deallocate(tab_albedo_pos,tab_g_pos)
+  allocate(tab_albedo_pos(p_n_cells,n_lambda2), tab_g_pos(p_n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos'
+     write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
      stop
   endif
   tab_albedo_pos = 0
-
-  deallocate(tab_g_pos)
-  if (l3D) then
-     allocate(tab_g_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az), stat=alloc_status)
-  else
-     allocate(tab_g_pos(n_lambda2,p_n_rad,p_nz,1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_g_pos'
-     stop
-  endif
   tab_g_pos = 0
 
   deallocate(tab_s11)
-  allocate(tab_s11(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s11'
      stop
@@ -1473,7 +1358,7 @@ subroutine realloc_step2()
   tab_s11 = 0
 
   deallocate(tab_s12)
-  allocate(tab_s12(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s12'
      stop
@@ -1481,7 +1366,7 @@ subroutine realloc_step2()
   tab_s12 = 0
 
   deallocate(tab_s33)
-  allocate(tab_s33(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s33'
      stop
@@ -1489,7 +1374,7 @@ subroutine realloc_step2()
   tab_s33 = 0
 
   deallocate(tab_s34)
-  allocate(tab_s34(p_n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,p_n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_s34'
      stop
@@ -1498,7 +1383,7 @@ subroutine realloc_step2()
 
   if (laggregate) then
      deallocate(tab_mueller)
-     allocate(tab_mueller(n_lambda2,n_grains_tot,4,4,0:nang_scatt), stat=alloc_status)
+     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_mueller'
         stop
@@ -1516,11 +1401,7 @@ subroutine realloc_step2()
 
   if (scattering_method == 2) then
      deallocate(tab_s11_pos)
-     if (l3D) then
-        allocate(tab_s11_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(tab_s11_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(tab_s11_pos(0:nang_scatt,p_n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
@@ -1528,114 +1409,50 @@ subroutine realloc_step2()
      tab_s11_pos = 0
 
      if (lsepar_pola) then
-        deallocate(tab_s12_pos)
-        if (l3D) then
-           allocate(tab_s12_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s12_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
+        deallocate(tab_s12_pos,tab_s33_pos,tab_s34_pos)
+        allocate(tab_s12_pos(0:nang_scatt,p_n_cells,n_lambda2), &
+             tab_s33_pos(0:nang_scatt,p_n_cells,n_lambda2), &
+             tab_s34_pos(0:nang_scatt,p_n_cells,n_lambda2), &
+             stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_pos'
            stop
         endif
         tab_s12_pos = 0
-
-        deallocate(tab_s33_pos)
-        if (l3D) then
-           allocate(tab_s33_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s33_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s33_pos'
-           stop
-        endif
         tab_s33_pos = 0
-
-        deallocate(tab_s34_pos)
-        if (l3D) then
-           allocate(tab_s34_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-        else
-           allocate(tab_s34_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-        endif
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_s34_pos'
-           stop
-        endif
         tab_s34_pos = 0
      endif
 
      deallocate(prob_s11_pos)
-     if (l3D) then
-        allocate(prob_s11_pos(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:nang_scatt), stat=alloc_status)
-     else
-        allocate(prob_s11_pos(n_lambda2,p_n_rad,p_nz,1,0:nang_scatt), stat=alloc_status)
-     endif
+     allocate(prob_s11_pos(0:nang_scatt,p_n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
      endif
      prob_s11_pos = 0
   else
-     deallocate(probsizecumul)
-     if (l3D) then
-        allocate(probsizecumul(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_grains_tot), stat=alloc_status)
-     else
-        allocate(probsizecumul(n_lambda2,p_n_rad,p_nz,1,0:n_grains_tot), stat=alloc_status)
-     endif
+     deallocate(ksca_CDF)
+     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda2), stat=alloc_status)
+     mem_size = n_grains_tot * p_n_cells * n_lambda2 * 4. / 1024.**3
+     if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error probsizecumul'
+        write(*,*) 'Allocation error ksca_CDF'
         stop
      endif
-     probsizecumul = 0
-
-     deallocate(ech_prob)
-     if (l3D) then
-        allocate(ech_prob(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(ech_prob(n_lambda2,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error ech_prob'
-        stop
-     endif
-     ech_prob = 0
-
-     deallocate(valeur_prob)
-     if (l3D) then
-        allocate(valeur_prob(n_lambda2,p_n_rad,-p_nz:p_nz,p_n_az,0:n_prob+1), stat=alloc_status)
-     else
-        allocate(valeur_prob(n_lambda2,p_n_rad,p_nz,1,0:n_prob+1), stat=alloc_status)
-     endif
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error valeur_prob'
-        stop
-     endif
-     valeur_prob = 0
+     ksca_CDF = 0
   endif ! method
 
-  deallocate(amax_reel, kappa, kappa_abs_eg)
+  deallocate(kappa, kappa_sca, kappa_abs_LTE)
   deallocate(proba_abs_RE_LTE)
+  if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  if (l3D) then
-     allocate(amax_reel(n_lambda2,n_rad,-nz-1:nz+1,n_az), kappa(n_lambda2,n_rad,-nz-1:nz+1,n_az), &
-          kappa_abs_eg(n_lambda2,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(amax_reel(n_lambda2,n_rad,nz+1,1), kappa(n_lambda2,n_rad,nz+1,1), &
-          kappa_abs_eg(n_lambda2,n_rad,nz+1,1), stat=alloc_status)
-    ! if (lRE_LTE.and.lRE_nLTE) allocate(proba_abs_RE_nLTE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-    ! if (lnRE) allocate(proba_abs_RE(n_lambda,n_rad,nz+1,1), stat=alloc_status)
-  endif
+  allocate(kappa(n_cells,n_lambda2), kappa_sca(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
-  amax_reel = 0.0 ; kappa=0.0 ; kappa_abs_eg=0.0 ;
-  !if (lRE_LTE.and.lRE_nLTE) proba_abs_RE_nLTE=0.0
-  !if (lnRE)  proba_abs_RE=0.0
+  kappa=0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE=0.0
 
 
   if (lorigine) then
@@ -1665,55 +1482,29 @@ subroutine alloc_emission_mol(imol)
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
-  if (l3D) then
-     allocate(kappa_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq(n_rad,-nz-1:nz+1,n_az,nTrans_tot), &
-          stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_mol_o_freq'
-        stop
-     endif
-     kappa_mol_o_freq=0.0
-     emissivite_mol_o_freq = 0.0
-
-     allocate(tab_nLevel(n_rad,-nz:nz,n_az,nLevels), tab_nLevel_old(n_rad,-nz:nz,n_az,nLevels), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_nLevel'
-        stop
-     endif
-     tab_nLevel = 0.0
-     tab_nLevel_old = 0.0
-
-     allocate(maser_map(n_rad,-nz:nz,n_az,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error maser_map'
-        stop
-     endif
-     maser_map = 0.0
-
-  else
-     allocate(kappa_mol_o_freq(n_rad,nz+1,1,nTrans_tot), emissivite_mol_o_freq(n_rad,nz+1,1,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_mol_o_freq'
-        stop
-     endif
-     kappa_mol_o_freq=0.0
-     emissivite_mol_o_freq = 0.0
-
-     allocate(tab_nLevel(n_rad,nz,1,nLevels), tab_nLevel_old(n_rad,nz,1,nLevels), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_nLevel'
-        stop
-     endif
-     tab_nLevel = 0.0
-     tab_nLevel_old = 0.0
-
-     allocate(maser_map(n_rad,nz,1,nTrans_tot), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error maser_map'
-        stop
-     endif
-     maser_map = 0.0
+  allocate(kappa_mol_o_freq(n_cells,nTrans_tot), emissivite_mol_o_freq(n_cells,nTrans_tot), &
+       stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error kappa_mol_o_freq'
+     stop
   endif
+  kappa_mol_o_freq=0.0
+  emissivite_mol_o_freq = 0.0
+
+  allocate(tab_nLevel(n_cells,nLevels), tab_nLevel_old(n_cells,nLevels), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_nLevel'
+     stop
+  endif
+  tab_nLevel = 0.0
+  tab_nLevel_old = 0.0
+
+  allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error maser_map'
+     stop
+  endif
+  maser_map = 0.0
 
   allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
   if (alloc_status > 0) then
@@ -1722,11 +1513,7 @@ subroutine alloc_emission_mol(imol)
   endif
   tab_v=0.0
 
-  if (l3D) then
-     allocate(tab_deltaV(-n_speed:n_speed,n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(tab_deltaV(-n_speed:n_speed,n_rad,nz,1), stat=alloc_status)
-  endif
+  allocate(tab_deltaV(-n_speed:n_speed,n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_deltaV'
      stop
@@ -1748,38 +1535,21 @@ subroutine alloc_emission_mol(imol)
    Jmol = 0.0_db
 
   if (ldouble_RT) then
-     if (l3D) then
-        allocate(kappa_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot), emissivite_mol_o_freq2(n_rad,-nz+1:nz+1,n_az,nTrans_tot),&
-             stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_mol2'
-           stop
-        endif
-        kappa_mol_o_freq2=0.0
-        emissivite_mol_o_freq2=0.0
-
-        allocate(tab_nLevel2(n_rad,-nz:nz,n_az,nLevels), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_nLevel2'
-           stop
-        endif
-        tab_nLevel2 = 0.0
-     else
-        allocate(kappa_mol_o_freq2(n_rad,nz+1,1,nTrans_tot), emissivite_mol_o_freq2(n_rad,nz+1,1,nTrans_tot), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kappa_mol2'
-           stop
-        endif
-        kappa_mol_o_freq2=0.0
-        emissivite_mol_o_freq2=0.0
-
-        allocate(tab_nLevel2(n_rad,nz,1,nLevels), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_nLevel2'
-           stop
-        endif
-        tab_nLevel2 = 0.0
+     allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
+          stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa_mol2'
+        stop
      endif
+     kappa_mol_o_freq2=0.0
+     emissivite_mol_o_freq2=0.0
+
+     allocate(tab_nLevel2(n_cells,nLevels), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tab_nLevel2'
+        stop
+     endif
+     tab_nLevel2 = 0.0
 
      allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then

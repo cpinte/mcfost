@@ -17,13 +17,13 @@ subroutine compute_othin_sublimation_radius()
 
   real(kind=db) :: E_dust, E_etoile
   real :: cst, wl, delta_wl
-  integer :: lambda, i
+  integer :: lambda, i, icell
   real(kind=db) :: sublimation_radius, coeff_exp, cst_wl
 
   ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
 
 
-  !  if (lstrat) then
+  !  if (lvariable_dust) then
   !     write(*,*) "Sublimation radius calculation not implemented"
   !     write(*,*) "in case of statification"
   !     stop
@@ -35,6 +35,8 @@ subroutine compute_othin_sublimation_radius()
   cst=cst_th/dust_pop(1)%T_sub
   cst=cst_th/1500.
 
+  icell = cell_map(1,1,1)
+
   do lambda=1, n_lambda
      ! longueur d'onde en metre
      wl = tab_lambda(lambda)*1.e-6
@@ -42,7 +44,7 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-        E_dust = E_dust + 4.0 * sum(kappa_abs_eg(lambda,1,:,1))/((wl**5)*(coeff_exp-1.0)) *delta_wl
+        E_dust = E_dust + 4.0 * kappa_abs_LTE(icell,lambda)/((wl**5)*(coeff_exp-1.0)) *delta_wl
      endif
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
@@ -57,8 +59,8 @@ subroutine compute_othin_sublimation_radius()
      cst_wl=cst/wl
      if (cst_wl < 500.0) then
         coeff_exp=exp(cst_wl)
-!        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl
-        E_etoile = E_etoile + sum(kappa_abs_eg(lambda,1,:,1)) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
+!        E_etoile = E_etoile + sum(kappa_abs_LTE(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl
+        E_etoile = E_etoile + kappa_abs_LTE(icell,lambda) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
 
 
        ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)
@@ -132,7 +134,7 @@ subroutine sublimate_dust()
   ! C. Pinte
   ! 07/08/12
 
-  integer :: i, j, pk, k, ipop
+  integer :: i, j, pk, icell, k, ipop
   real :: mass
 
   write(*,*) "Sublimating dust"
@@ -140,14 +142,15 @@ subroutine sublimate_dust()
   do i=1,n_rad
      do j=1,nz
         do pk=1,n_az
+           icell = cell_map(i,j,pk)
 
            ! Cas LTE
            do k=1,n_grains_tot
               ipop = grain(k)%pop
 
               if (.not.dust_pop(ipop)%is_PAH) then
-                 if (Temperature(i,j,pk) > dust_pop(ipop)%T_sub) then
-                    densite_pouss(i,j,pk,k) = 0.0
+                 if (Temperature(icell) > dust_pop(ipop)%T_sub) then
+                    densite_pouss(k,icell) = 0.0
                  endif
               endif
            enddo
@@ -160,8 +163,9 @@ subroutine sublimate_dust()
   mass = 0.0
   do i=1,n_rad
      do j=1,nz
+        icell = cell_map(i,j,1)
         do k=1,n_grains_tot
-           mass=mass + densite_pouss(i,j,1,k) * M_grain(k) * (volume(i) * AU3_to_cm3)
+           mass=mass + densite_pouss(k,icell) * M_grain(k) * (volume(icell) * AU3_to_cm3)
         enddo
      enddo
   enddo
@@ -186,7 +190,7 @@ subroutine equilibre_hydrostatique()
 
   real, dimension(nz) :: rho, ln_rho
   real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
-  integer :: i,j, k
+  integer :: i,j, k, icell, icell_m1
 
   real, parameter :: gas_dust = 100
 
@@ -203,17 +207,22 @@ subroutine equilibre_hydrostatique()
         dz_m1 = 1.0/dz
         somme = rho(1)
         do j = 2, nz
-           dTdz = (Temperature(i,j,k)-Temperature(i,j-1,k)) * dz_m1
-           fac1 = cst * z_grid(i,j)/ (r_grid(i,j)**3)
-           fac2 = -1.0 * (dTdz + fac1) / Temperature(i,j,k)
+           icell = cell_map(i,j,k)
+           icell_m1 = cell_map(i,j-1,k)
+           dTdz = (Temperature(icell)-Temperature(icell_m1)) * dz_m1
+           fac1 = cst * z_grid(icell)/ (r_grid(icell)**3)
+           fac2 = -1.0 * (dTdz + fac1) / Temperature(icell)
            ln_rho(j) = ln_rho(j-1) + fac2 * dz
            rho(j) = exp(ln_rho(j))
            somme = somme + rho(j)
         enddo !j
 
         ! Renormalisation
-        fac = gas_dust * masse_rayon(i,k) / (volume(i) * somme) ! TODO : densite est en particule, non ???
-        densite_gaz(i,:,k) =  rho(:) * fac
+        do j = 1, nz
+           icell = cell_map(i,j,k)
+           fac = gas_dust * masse_rayon(i,k) / (volume(icell) * somme) ! TODO : densite est en particule, non ???
+           densite_gaz(icell) =  rho(j) * fac
+        enddo
 
      enddo !i
   enddo !k

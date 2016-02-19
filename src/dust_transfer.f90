@@ -60,7 +60,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand, tau
-  integer :: i, ri, zj, phik
+  integer :: i, ri, zj, phik, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -80,16 +80,11 @@ subroutine transfert_poussiere()
   ! Nbre iteration grains hors equilibre
   n_iter = 0
 
-  ! parametrage methode de diffusion
-  if (scattering_method == 0) then
-     if ((lstrat).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
-        scattering_method = 1
-     else
-        scattering_method = 2
-     endif
-  endif
-  write(*,fmt='(" Using scattering method ",i1)') scattering_method
-  lscattering_method1 = (scattering_method==1)
+
+
+  ! Allocation dynamique
+  call alloc_dynamique()
+
   if (lscattering_method1) then
      lambda = 1
      p_lambda => lambda
@@ -97,35 +92,6 @@ subroutine transfert_poussiere()
      lambda0=1
      p_lambda => lambda ! was lambda0 : changed to save dust properties
   endif
-
-
-  if (lstrat) then
-     p_n_rad=n_rad ; p_nz = nz
-  else
-     p_n_rad=1 ;  p_nz=1
-  endif
-
-  if (l3D) then
-     j_start = -nz
-     if (lstrat) then
-        p_n_az = n_az
-     else
-        p_n_az = 1
-     endif
-  else
-     j_start = 1
-     p_n_az = 1
-  endif
-
-  if ((p_nz /= 1).and.l3D) then
-     pj_start = -nz
-  else
-     pj_start = 1
-  endif
-
-
-  ! Allocation dynamique
-  call alloc_dynamique()
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -147,13 +113,9 @@ subroutine transfert_poussiere()
 
   call taille_grains()
 
-  if (lold_grid) then
-     call define_grid3()
-  else
-     call order_zones()
-     call define_physical_zones()
-     call define_grid4()
-  endif
+  call order_zones()
+  call define_physical_zones()
+  call define_grid()
 
   if (lProDiMo) call setup_ProDiMo()
 
@@ -208,10 +170,11 @@ subroutine transfert_poussiere()
      if (loptical_depth_map) call calc_optical_depth_map(1)
 
      write(*,*) ""
-     write(*,*) "Dust properties in cell (1,1,1): "
-     write(*,*) "g             ", tab_g_pos(1,1,1,1)
-     write(*,*) "albedo        ", tab_albedo_pos(1,1,1,1)
-     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(1,1,1,1,:)/tab_s11_pos(1,1,1,1,:))
+     write(*,*) "Dust properties in cell #1: "
+     p_icell = 1
+     write(*,*) "g             ", tab_g_pos(p_icell,1)
+     write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
+     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(:,p_icell,1)/tab_s11_pos(:,p_icell,1))
 
      if (lopacite_only) stop
 
@@ -286,7 +249,7 @@ subroutine transfert_poussiere()
 
            if (ldust_sublimation)  then
               call compute_othin_sublimation_radius()
-              call define_grid4()
+              call define_grid()
               call define_dust_density()
 
               do lambda=1,n_lambda
@@ -411,6 +374,11 @@ subroutine transfert_poussiere()
 
         if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! Changement des lambda
            call init_lambda2()
+           if (lscattering_method1) then
+              lambda = 1  ; p_lambda => lambda
+           else
+              lambda0 = 1 ; p_lambda => lambda ! was lambda0 : changed to save dust properties
+           endif
            call init_indices_optiques()
 
            call repartition_energie_etoiles()
@@ -468,7 +436,7 @@ subroutine transfert_poussiere()
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
         tau=0.0 ;
         do i=1, n_rad
-           tau=tau+kappa(lambda,i,1,1)*(r_lim(i)-r_lim(i-1))
+           tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
         enddo
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
@@ -525,7 +493,7 @@ subroutine transfert_poussiere()
            lpacket_alive = .true.
 
            ! Propagation du packet
-           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,&
+           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
@@ -715,7 +683,7 @@ subroutine transfert_poussiere()
            if (lscatt_ray_tracing1) then
               xI_scatt = 0.0_db
            else
-              xI = 0.0_db ; xI_star = 0.0_db ; xw_star = 0.0_db
+              I_spec = 0.0_db ; I_spec_star = 0.0_db
            endif
         endif
 
@@ -753,7 +721,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
   ! Proprietes du packet
   logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
-  integer :: i_star
+  integer :: i_star, icell
 
   real(kind=db) :: w02, srw02
   real :: argmt
@@ -806,9 +774,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
         ! On multiplis par r_star car x0, y0, et z0 ont ete multiplies par r_star
         !write(*,*) "test"
         if (x_spot*x0+y_spot*y0+z_spot*z0  > cos_thet_spot * etoile(1)%r) then
-
-           !write(*,*)  "SPOT"
-
            !  Rapport des intensites point chaud / etoile
            hc_lk = hp * c_light / (tab_lambda(lambda)*1e-6 * kb)
            correct_spot = (exp(hc_lk/etoile(1)%T) - 1)/(exp(hc_lk/T_spot) - 1)
@@ -844,7 +809,10 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      ! Parametres de stokes : lumière non polarisée
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
-     if (lweight_emission) Stokes(1) = Stokes(1) * correct_E_emission(ri,zj)
+     if (lweight_emission) then
+        icell = cell_map(ri,zj,1)
+        Stokes(1) = Stokes(1) * correct_E_emission(icell)
+     endif
   else ! Emission ISM
      flag_star=.false.
      flag_ISM=.true.
@@ -874,15 +842,16 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_ri, p_zj, p_phik, taille_grain, itheta
+  integer :: p_icell, taille_grain, itheta, icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
 
+  icell = cell_map(ri,zj,phik)
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.
-  p_ri = 1 ; p_zj = 1 ; p_phik = 1
+  p_icell = 1
 
   lpacket_alive=.true.
 
@@ -920,14 +889,12 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         zj=nz
      endif
 
+     icell = cell_map(ri,zj,phik)
+
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
 
-     if (lstrat) then ! TODO : pointeurs, alloue dans openMP ????
-        p_ri=ri
-        p_zj=zj
-        if (l3D) p_phik = phik
-     endif
+     if (lvariable_dust) p_icell = icell
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -940,7 +907,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         endif
 
         ! Multiplication par albedo
-        Stokes(:)=Stokes(:)*tab_albedo_pos(lambda,p_ri,p_zj,p_phik)
+        Stokes(:)=Stokes(:)*tab_albedo_pos(p_icell,lambda)
         if (Stokes(1) < tiny_real_x1e6)then ! on saute le photon
            lpacket_alive = .false.
            return
@@ -952,13 +919,16 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         rand = sprng(stream(id))
      endif ! lmono
 
-     if (rand < tab_albedo_pos(lambda,p_ri,p_zj,p_phik)) then ! Diffusion
+
+     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Diffusion
         flag_scatt=.true.
         flag_direct_star = .false.
 
         if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
            rand = sprng(stream(id))
-           taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
+           !taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
+           taille_grain = select_scattering_grain(lambda,p_icell, rand) ! ok, not too bad, not much smaller
+
            rand = sprng(stream(id))
            rand2 = sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
@@ -981,7 +951,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
                  endif
               endif
            else ! fonction de phase HG
-              call hg(tab_g(lambda,taille_grain),rand, itheta, COSPSI) !HG
+              call hg(tab_g(taille_grain,lambda),rand, itheta, COSPSI) !HG
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -998,7 +968,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
            rand = sprng(stream(id))
            rand2= sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
-              call angle_diff_theta_pos(lambda,p_ri,p_zj, p_phik, rand, rand2, itheta, cospsi)
+              call angle_diff_theta_pos(lambda,p_icell, rand, rand2, itheta, cospsi)
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1009,9 +979,9 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux paramètres de Stokes
-              if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_ri,p_zj, p_phik,u,v,w,u1,v1,w1,Stokes)
+              if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
-              call hg(tab_g_pos(lambda,p_ri,p_zj, p_phik),rand, itheta, cospsi) !HG
+              call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -1029,11 +999,13 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
+
+
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
-           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(lambda,ri, zj, p_phik))
+           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(icell,lambda))
            ! Multiplication par proba abs sur grain en eq. radiatif
-           Stokes = Stokes * proba_abs_RE(lambda,ri, zj, p_phik)
+           Stokes = Stokes * proba_abs_RE(icell,lambda)
 
            if (Stokes(1) < tiny_real)  then ! on saute le photon
               lpacket_alive = .false.
@@ -1047,21 +1019,27 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
         flag_ISM=.false.
 
         ! Choix longueur d'onde
-        rand = sprng(stream(id))
-        !write(*,*) rand, Proba_abs_RE_LTE(lambda,ri, zj, p_phik)
-        if (rand <= Proba_abs_RE_LTE(lambda,ri, zj, p_phik)) then
-           ! Cas RE - LTE
-           rand = sprng(stream(id))
-           call im_reemission_LTE(id,ri,zj,phik,p_ri,p_zj,p_phik,rand,lambda)
-        else  if (rand <= Proba_abs_RE_LTE_p_nLTE(lambda,ri, zj, p_phik)) then
-           ! Cas RE - nLTE
-           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_NLTE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
+        if (lonly_LTE) then
+           call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
+        else if (lonly_NLTE) then
+           call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
         else
-           ! Cas nRE - qRE
-           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
-           call im_reemission_qRE(id,ri,zj,p_ri,p_zj,rand,rand2,lambda)
-        endif
+           ! We need to select which type of dust grain will re-emit
+           rand = sprng(stream(id))
+           if (rand <= Proba_abs_RE_LTE(icell,lambda)) then
+              ! Cas RE - LTE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
+           else if (rand <= Proba_abs_RE_LTE_p_nLTE(icell,lambda)) then
+              ! Cas RE - nLTE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
+           else
+              ! Cas nRE - qRE
+              rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
+              call im_reemission_qRE(id,icell,p_icell,rand,rand2,lambda)
+           endif
+        endif ! only_LTE
 
         ! Nouvelle direction de vol : emission isotrope
         rand = sprng(stream(id))
@@ -1253,10 +1231,12 @@ subroutine dust_map(lambda,ibin,iaz)
   id = 1
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
   if (lsepar_contrib) then
-     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) + stars_map(:,:,1)
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) &
+          + stars_map(:,:,1)
   endif
   if (lsepar_pola.and.llimb_darkening) then
-     Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) + stars_map(:,:,2:3)
+     Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,2:3,id) &
+          + stars_map(:,:,2:3)
   endif
 
   if (lmono0) write(*,*) "Done"

@@ -21,15 +21,16 @@ subroutine setDiffusion_coeff(i)
   integer, intent(in) :: i
 
   real(kind=db) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda
+  integer :: j, k, lambda, icell
 
   real(kind=db), parameter :: precision = 1.0e-1_db ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
   ! le mettre a 0, evite le drole de BUG
 
   cst_Dcoeff = c_light*pi/(12.*sigma)
 
-  do j=1, nz
-     do k=1,n_az
+  do k=1,n_az
+     do j=1, nz
+        icell = cell_map(i,j,k)
         !Temp=Temperature(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
            ! On met a jour le coeff
@@ -49,7 +50,7 @@ subroutine setDiffusion_coeff(i)
               else
                  dB_dT = 0.0_db
               endif
-              somme = somme + dB_dT/kappa(lambda,i,j,k) * delta_wl
+              somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
            enddo
            !kappa_R = 4.*sigma * Temp**3 / (pi * somme)
            ! Dcoeff = c_light/(3kappa_R) car kappa volumique
@@ -79,13 +80,14 @@ subroutine setDiffusion_coeff0(i)
   integer, intent(in) :: i
 
   real(kind=db) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda
+  integer :: j, k, lambda, icell
 
   cst_Dcoeff = c_light*pi/(12.*sigma)
 
-  do j=1,nz
-     do k=1,n_az
-        Temp=Temperature(i,j,k)
+  do k=1,n_az
+     do j=1,nz
+        icell = cell_map(i,j,k)
+        Temp=Temperature(icell)
         cst=cst_th/Temp
         somme=0.0_db
         do lambda=1, n_lambda
@@ -99,7 +101,7 @@ subroutine setDiffusion_coeff0(i)
            else
               dB_dT = 0.0_db
            endif
-           somme = somme + dB_dT/kappa(lambda,i,j,k) * delta_wl
+           somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
         enddo
         ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
         ! Dcoeff = c_light/(3kappa_R) car kappa volumique
@@ -128,7 +130,14 @@ subroutine Temperature_to_DensE(ri)
 
   integer, intent(in) :: ri
 
-  DensE(ri,1:nz,:) =  Temperature(ri,:,:)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+  integer :: j, k, icell
+
+  do j=1,nz
+     do k=1,n_az
+        icell = cell_map(ri,j,k)
+        DensE(ri,j,k) =  Temperature(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+     enddo
+  enddo
 
   ! Condition limite : pas de flux au niveau du plan median
   DensE(ri,0,:) = DensE(ri,1,:)
@@ -155,7 +164,7 @@ subroutine DensE_to_temperature()
   do k=1,n_az
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1,zj_sup_dark_zone(i,1) + delta_cell_dark_zone
-           Temperature(i,j,k) = DensE(i,j,k)**0.25
+           Temperature(cell_map(i,j,k)) = DensE(i,j,k)**0.25
         enddo !j
      enddo !j
   enddo !k
@@ -177,7 +186,7 @@ subroutine clean_temperature()
   do k=1,n_az
      do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
         do j=1,zj_sup_dark_zone(i,1)
-           Temperature(i,j,k) = T_min
+           Temperature(cell_map(i,j,k)) = T_min
         enddo !j
      enddo !j
   enddo !k
@@ -198,7 +207,7 @@ subroutine Temp_approx_diffusion()
 
   implicit none
 
-  real, dimension(n_rad,nz,1) :: Temp0
+  real, dimension(n_cells) :: Temp0
   real :: max_delta_E_r, stabilite, precision
   integer :: n_iter, i
   logical :: lconverged
@@ -397,7 +406,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   do k=1, n_az
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
-           dr = r_grid(i,j)-r_grid(i-1,j)
+           dr = r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1))
            dz = delta_z(i)
            ! tab_dt(i,j,k) = min(dr,dz)**2/Dcoeff(i,j,k)
            tab_dt(i,j,k) = 1.0_db/(Dcoeff(i,j,k)*(1.0_db/dr**2 + 1.0_db/dz**2))
@@ -424,7 +433,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      !$omp default(none) &
      !$omp private(i,j,dE_dr_m1,dE_dr_p1,d2E_dr2,delta_E_r,D_Laplacien_E,delta_E,d2E_dz2) &
      !$omp shared(DensE_m1,r_grid,z_grid,Dcoeff,ri_in_dark_zone,ri_out_dark_zone,zj_sup_dark_zone,max_delta_E_r) &
-     !$omp shared(DensE,dt,delta_z,k,n_rad)
+     !$omp shared(DensE,dt,delta_z,k,n_rad,cell_map)
      !$omp do schedule(dynamic,10)
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
@@ -432,8 +441,8 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
            ! Calcul du Laplacien en cylindrique
            ! Attention D rentre dans le laplacien car il depend de laposition
            ! Ne marche qu'en 2D pour le moment
-           dE_dr_m1 = (DensE_m1(i,j,k) - DensE_m1(i-1,j,k))/(r_grid(i,j)-r_grid(i-1,j))
-           dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(i+1,j)-r_grid(i,j))
+           dE_dr_m1 = (DensE_m1(i,j,k) - DensE_m1(i-1,j,k))/(r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1)))
+           dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(cell_map(i+1,j,1))-r_grid(cell_map(i,j,1)))
 
            !    frac=(log(r_lim(i))-log(r_grid(i)))/(log(r_grid(i+1))-log(r_grid(i)))
            !    Dcoeff_p=exp(log(Dcoeff(i,j,k))*frac+log(Dcoeff(i+1,j,k))*(1.0_db-frac))
@@ -450,7 +459,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
 
            !d2E_dr2  = (dE_dr_p1*Dcoeff_p  - dE_dr_m1*Dcoeff_m) / (2._db*(r_grid(i+1,j)-r_grid(i-1,j)))
 
-           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._db*(r_grid(i+1,j)-r_grid(i-1,j)))
+           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._db*(r_grid(cell_map(i+1,j,1))-r_grid(cell_map(i-1,j,1))))
 
            !Dcoeff_p = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i,j+1,k))
            !Dcoeff_m = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i-1,j-1,k))
@@ -596,13 +605,14 @@ end subroutine iter_Temp_approx_diffusion_vertical
 
 subroutine diffusion_approx_nLTE_nRE()
 
-  integer :: i,j,k
+  integer :: i,j,k, icell
 
   if (lRE_nLTE) then
      do k=1,n_az
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
-              Temperature_1grain(i,j,:) = Temperature(i,j,k)
+              icell = cell_map(i,j,k)
+              Temperature_1grain(:,icell) = Temperature(icell)
            enddo !j
         enddo !j
      enddo !k
@@ -612,8 +622,9 @@ subroutine diffusion_approx_nLTE_nRE()
       do k=1,n_az
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
-              Temperature_1grain_nRE(i,j,:) = Temperature(i,j,k)
-              l_RE(i,j,:) = .true.
+              icell = cell_map(i,j,k)
+              Temperature_1grain_nRE(icell,:) = Temperature(icell)
+              l_RE(:,icell) = .true.
            enddo !j
         enddo !j
      enddo !k

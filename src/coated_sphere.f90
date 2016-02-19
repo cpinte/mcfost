@@ -114,10 +114,10 @@ contains
              norme = 0.5 * x**2
           endif
 
-          tab_s11(lambda,taille_grain,j) = s11(j) / norme
-          tab_s12(lambda,taille_grain,j) = s12(j) / norme
-          tab_s33(lambda,taille_grain,j) = s33(j) / norme
-          tab_s34(lambda,taille_grain,j) = s34(j) / norme
+          tab_s11(j,taille_grain,lambda) = s11(j) / norme
+          tab_s12(j,taille_grain,lambda) = s12(j) / norme
+          tab_s33(j,taille_grain,lambda) = s33(j) / norme
+          tab_s34(j,taille_grain,lambda) = s34(j) / norme
        enddo
 
     endif ! aniso_method ==1
@@ -252,10 +252,10 @@ contains
              norme = 0.5 * x**2
           endif
 
-          tab_s11(lambda,taille_grain,j) = s11(j) / norme
-          tab_s12(lambda,taille_grain,j) = s12(j) / norme
-          tab_s33(lambda,taille_grain,j) = s33(j) / norme
-          tab_s34(lambda,taille_grain,j) = s34(j) / norme
+          tab_s11(j,taille_grain,lambda) = s11(j) / norme
+          tab_s12(j,taille_grain,lambda) = s12(j) / norme
+          tab_s33(j,taille_grain,lambda) = s33(j) / norme
+          tab_s34(j,taille_grain,lambda) = s34(j) / norme
        enddo
 
     endif ! aniso_method ==1

@@ -61,7 +61,6 @@ subroutine initialisation_mcfost()
 
   ldisk_struct = .false.
   ldust_prop = .false.
-  ldust_gas_ratio = .false.
   lstop_after_init= .false.
   lwall=.false.
   lpah=.false.
@@ -95,7 +94,6 @@ subroutine initialisation_mcfost()
   lpuffed_rim = .false.
   lopacity_wall = .false.
   lno_backup = .false.
-  loutput_J = .false.
   loutput_UV_field = .false.
   laverage_grain_size = .false.
   llinear_grid=.false.
@@ -124,7 +122,6 @@ subroutine initialisation_mcfost()
   lSeb_Charnoz = .false.
   lread_Seb_Charnoz = .false.
   lread_Seb_Charnoz2 = .false.
-  lold_grid = .false.
   lonly_bottom = .false.
   lonly_top = .false.
   lcorrect_Tgas = .false.
@@ -434,7 +431,7 @@ subroutine initialisation_mcfost()
         ltilt=.true.
         i_arg = i_arg+1
         if (i_arg > nbr_arg) then
-           write(*,*) "Error : tit angle needed"
+           write(*,*) "Error : tilt angle needed"
            stop
         endif
         call get_command_argument(i_arg,s)
@@ -492,9 +489,6 @@ subroutine initialisation_mcfost()
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
-     case("-output_J")
-        loutput_J=.true.
-        i_arg = i_arg+1
      case("-output_UV_field")
         loutput_UV_field=.true.
         i_arg = i_arg+1
@@ -667,9 +661,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         sigma_file = s
         i_arg = i_arg + 1
-     case("-dg_ratio")
-        i_arg = i_arg+1
-        ldust_gas_ratio = .true.
      case("-weight_emission")
         i_arg = i_arg+1
         lweight_emission=.true.
@@ -765,9 +756,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
-     case("-old_grid")
-        i_arg = i_arg+1
-        lold_grid=.true.
      case("-only_top")
         i_arg = i_arg+1
         lonly_top=.true.
@@ -921,10 +909,10 @@ subroutine initialisation_mcfost()
         !limg=.false.
         !lmono=.false.
         !lmono0=.false.
-        lstrat=.false.
+        lvariable_dust=.false.
         scattering_method=2
      else
-        if (lstrat) then
+        if (lvariable_dust) then
            write(*,*) "Cannot use +dust_prop when settling is on"
            write(*,*) "Please use -dust_prop instead"
            write(*,*) "This will compute the dust properties of the complete"
@@ -947,8 +935,8 @@ subroutine initialisation_mcfost()
   endif
 
   if (ln_zone) then
-     !lstrat=.true.
-     write(*,*) "WARNING: lstrat is not set automatically to TRUE !!!!!!!!!"
+     !lvariable_dust=.true.
+     write(*,*) "WARNING: lvariable_dust is not set automatically to TRUE !!!!!!!!!"
 
      if (exp_strat > 1.0e-6) then
         write(*,*) "!!!  WARNING  !!!"
@@ -958,7 +946,7 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if (lread_Seb_Charnoz) lstrat = .true.
+  if (lread_Seb_Charnoz) lvariable_dust = .true.
 
 
   if (lonly_scatt) l_em_disk_image=.false.
@@ -1283,7 +1271,6 @@ subroutine display_disclaimer()
 
   write(*,*) "*******************************************"
   write(*,*) "*          MCFOST DISCLAIMER              *"
-  !write(*,*) "*     You are running MCFOST "//trim(mcfost_release)//"       *"
   write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
   write(*,*) "*                                         *"
   write(*,*) "* MCFOST is available on a collaborative  *"
@@ -1308,7 +1295,6 @@ subroutine display_disclaimer()
         open(unit=1,file=trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
         close(unit=1)
         write(*,*) "* Thank you !                             *"
-        !write(*,*) "* This screen will not appear again       *"
      else
         write(*,*) "* Exiting MCFOST                          *"
         write(*,*) "*******************************************"
