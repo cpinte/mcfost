@@ -79,7 +79,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
   real(kind=db) :: l, tau
-  real(kind=db) :: correct_moins, correct_plus
   real(kind=db) :: phi_vol, factor
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
   integer :: ri_in, zj_in, tmp_k
@@ -90,8 +89,6 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   ! Petit delta pour franchir la limite de la cellule
   ! et ne pas etre pile-poil dessus
-  correct_moins = 1.0_db - prec_grille
-  correct_plus = 1.0_db + prec_grille
   lstop = .false.
   flag_sortie = .false.
 
@@ -179,42 +176,9 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
         xio=x0+l*u
         yio=y0+l*v
         zio=z0+l*w
-        call indice_cellule(xio,yio,zio,ri,zj)
 
-        ! Patch pour eviter BUG sur position radiale
-        ! a cause de limite de precision
-        if (ri==0) then
-           factor = rmin/ sqrt(xio*xio+yio*yio) * correct_plus
-           xio = xio * factor
-           yio = yio * factor
-           zio = zio * factor
-
-           ! On verifie que c'est OK maintenant
-           call indice_cellule(xio,yio,zio,ri,zj)
-           if (ri==0) then
-              write(*,*) "BUG integ_deg2_cyl"
-              write(*,*) "Exiting"
-              stop
-           endif
-        endif
-
-        icell = cell_map(ri,zj,1)
-        if (l_dark_zone(icell)) then ! Petit test de securite
-           ! On resort le paquet
-           if (zj < zj0) then
-              zj = zj0
-              zio = z_lim(ri0,zj0)*correct_plus
-           endif
-           if (ri < ri0) then
-              ri = ri0
-              xio = xio * correct_plus
-              yio = yio * correct_plus
-           else if (ri > ri0) then
-              ri = ri0
-              xio = xio * correct_moins
-              yio = yio * correct_moins
-           endif
-        endif
+        call verif_cell_position_cyl(icell0, xio, yio, zio)
+        call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
         return
      endif ! lstop
 
