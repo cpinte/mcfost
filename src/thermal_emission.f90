@@ -1670,8 +1670,13 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
      ! todo : maybe update with an extra variable kappa_abs_qRE
-     norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
-          / ( AU_to_cm * mum_to_cm**2 )
+     if (lRE_nLTE) then
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
+             / ( AU_to_cm * mum_to_cm**2 )
+     else
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda)) &
+             / ( AU_to_cm * mum_to_cm**2 )
+     endif
      kstart = grain_nRE_start ; kend = grain_nRE_end
   endif
 
