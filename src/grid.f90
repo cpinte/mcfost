@@ -491,6 +491,7 @@ subroutine define_grid()
   ! 03/05/11, version 3 :  27/04/05
 
   real, parameter :: pi = 3.1415926535
+  logical, save :: lfirst = .true.
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
@@ -509,7 +510,12 @@ subroutine define_grid()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-  call build_cylindrical_cell_mapping()
+
+
+  if (lfirst) then
+     call build_cylindrical_cell_mapping()
+     lfirst = .false.
+  endif
 
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
