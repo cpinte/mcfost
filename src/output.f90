@@ -421,8 +421,15 @@ subroutine write_stokes_fits()
 
   if (lsepar_pola) then
      do id=1, nb_proc
-        stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
-        stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(lambda,:,:,:,:,id)
+        if (abs(ang_disque > 0.)) then ! Rotation Q and U
+           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id) * cos_disk_x2 - &
+                stokeu(lambda,:,:,:,:,id) * sin_disk_x2
+           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+ stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
+                stokeu(lambda,:,:,:,:,id) * cos_disk_x2
+        else ! No need for rotation
+           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
+           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(lambda,:,:,:,:,id)
+        endif
         stoke_io(:,:,:,:,4)=stoke_io(:,:,:,:,4)+stokev(lambda,:,:,:,:,id)
      enddo
      deallocate(stokeq,stokeu,stokev)
@@ -542,7 +549,7 @@ subroutine ecriture_map_ray_tracing()
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -683,17 +690,32 @@ subroutine ecriture_map_ray_tracing()
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,image_casa,status)
   else ! mode non casa
-     do itype=1,N_type_flux
+     type_loop : do itype=1,N_type_flux
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               do j=1,igridy
                  do i=1,igridx
-                    image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                    if (lsepar_pola) then
+                       if ((itype == 2 ).or. (itype==3)) then
+                          if (itype==2) then
+                             Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
+                             U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
+                             image(i,j,ibin,iaz,2) = Q * cos_disk_x2 - U * sin_disk_x2
+                             image(i,j,ibin,iaz,3) = Q * sin_disk_x2 + U * cos_disk_x2
+                          else
+                             cycle type_loop ! itype 3 already done together with itype 2
+                          endif
+                       else ! Other images do not need rotation
+                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                       endif
+                    else ! No need for rotation when there is no pola
+                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                    endif
                  enddo !i
               enddo !j
            enddo ! iaz
         enddo !ibin
-     enddo ! itype
+     enddo type_loop ! itype
 
      if (l_sym_ima) then
         xcenter = igridx/2 + modulo(igridx,2)

@@ -99,6 +99,8 @@ subroutine transfert_poussiere()
   ! Pour rotation du disque (signe - pour convention astro)
   cos_disk = cos(ang_disque/180.*pi)
   sin_disk = -sin(ang_disque/180.*pi)
+  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
+  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   laffichage=.true.
 
