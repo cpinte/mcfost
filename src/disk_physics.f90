@@ -7,7 +7,10 @@ module disk_physics
   use molecular_emission, only : densite_gaz
   use constantes
 
+  character(len=32) :: sublimationFile = "sublimation_radius.txt"
+
 contains
+
 
 
 subroutine compute_othin_sublimation_radius()
@@ -104,8 +107,25 @@ subroutine compute_othin_sublimation_radius()
 
   !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
   write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
-
   sublimation_radius = sublimation_radius * 1.6
+
+  open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
+  write(1,*) sublimation_radius
+  close(1)
+
+  call set_sublimation_radius(sublimation_radius)
+
+  return
+
+end subroutine compute_othin_sublimation_radius
+
+!***********************************************************
+
+subroutine set_sublimation_radius(sublimation_radius)
+
+  real(kind=db), intent(in) :: sublimation_radius
+
+  integer :: i
 
   do i=1,n_zones
      !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
@@ -117,17 +137,33 @@ subroutine compute_othin_sublimation_radius()
      endif
   enddo !i
   rmin = minval(disk_zone(:)%rmin)
-  write(*,*) "New minimum radius = ", rmin
+  write(*,*) "New minimum radius = ", rmin, "AU"
 
   do i = 1, n_regions
      regions(i)%Rmin = max(regions(i)%Rmin,sublimation_radius)
   enddo !i
 
-  return
-
-end subroutine compute_othin_sublimation_radius
+end subroutine set_sublimation_radius
 
 !***********************************************************
+
+subroutine read_sublimation_radius()
+
+  real(kind=db) :: sublimation_radius
+
+  write(*,*) "Reading sublimation file : ./data_th/"//trim(sublimationfile)
+
+  open(unit=1,file=trim(root_dir)//"/"//trim(seed_dir)//"/data_th/"//trim(sublimationfile), status="old")
+  read(1,*) sublimation_radius
+  close(unit=1)
+
+  call set_sublimation_radius(sublimation_radius)
+
+  return
+
+end subroutine read_sublimation_radius
+
+!**********************************************************************
 
 subroutine sublimate_dust()
   ! Supprime les grains dont la temperature depasse la temperature de sublimation

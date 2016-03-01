@@ -159,6 +159,12 @@ subroutine transfert_poussiere()
 
      if (llimb_darkening) call read_limb_darkening_file(1)
 
+     if (ldust_sublimation) then
+        call read_sublimation_radius()
+        call define_grid()
+        call define_dust_density()
+     endif
+
      call prop_grains(1,1)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
