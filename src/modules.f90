@@ -80,7 +80,7 @@ module parametres
 
   ! rotation du plan du disque en deg., sens trigo.
   real(kind=db) :: ang_disque
-  real(kind=db) :: sin_disk, cos_disk
+  real(kind=db) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
