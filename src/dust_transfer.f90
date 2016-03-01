@@ -1347,8 +1347,13 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         y1 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
-        x0 = x1 * cos(tab_RT_az(iaz) * deg_to_rad) + y1 * sin(tab_RT_az(iaz) * deg_to_rad)
-        y0 = x1 * sin(tab_RT_az(iaz) * deg_to_rad) - y1 * cos(tab_RT_az(iaz) * deg_to_rad)
+        if (abs(w -1) < tiny_real) then ! rotating the position as the old "rotation" routine does not deal properly with case w==1
+           x0 = x1 * cos(tab_RT_az(iaz) * deg_to_rad) + y1 * sin(tab_RT_az(iaz) * deg_to_rad)
+           y0 = x1 * sin(tab_RT_az(iaz) * deg_to_rad) - y1 * cos(tab_RT_az(iaz) * deg_to_rad)
+        else ! the rotation information is already incoded in u,v,w
+           x0=x1
+           y0=y1
+        endif
 
         Stokes = 0.0_db
         if (l3D) then

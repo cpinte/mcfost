@@ -320,7 +320,7 @@ subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
   !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
   !*****************************************************
 
-  call rotation(x,y,z, u,v,w, x2,y2,z2)
+  call rotation(x,y,z, -u,v,w, x2,y2,z2)
 
   ! rotation eventuelle du disque
   y_map = y2 * cos_disk + z2 * sin_disk
