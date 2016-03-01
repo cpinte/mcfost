@@ -422,9 +422,9 @@ subroutine write_stokes_fits()
   if (lsepar_pola) then
      do id=1, nb_proc
         if (abs(ang_disque > 0.)) then ! Rotation Q and U
-           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id) * cos_disk_x2 - &
+           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2) + stokeq(lambda,:,:,:,:,id) * cos_disk_x2 + &
                 stokeu(lambda,:,:,:,:,id) * sin_disk_x2
-           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+ stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
+           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3) - stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
                 stokeu(lambda,:,:,:,:,id) * cos_disk_x2
         else ! No need for rotation
            stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
@@ -700,8 +700,8 @@ subroutine ecriture_map_ray_tracing()
                           if (itype==2) then
                              Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
                              U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
-                             image(i,j,ibin,iaz,2) = Q * cos_disk_x2 - U * sin_disk_x2
-                             image(i,j,ibin,iaz,3) = Q * sin_disk_x2 + U * cos_disk_x2
+                             image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
+                             image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
                           else
                              cycle type_loop ! itype 3 already done together with itype 2
                           endif
