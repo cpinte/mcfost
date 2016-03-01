@@ -474,20 +474,20 @@ subroutine write_stokes_fits()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -605,20 +605,20 @@ subroutine ecriture_map_ray_tracing()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
      call ftpkys(unit,'BUNIT',"Jy/pixel",' ',status)
@@ -627,14 +627,14 @@ subroutine ecriture_map_ray_tracing()
 
      ! 3eme axe
      call ftpkys(unit,'CTYPE3',"STOKES",' ',status)
-     call ftpkye(unit,'CRVAL3',1.0,-3,'',status)
-     call ftpkye(unit,'CDELT3',1.0,-3,'',status)
+     call ftpkye(unit,'CRVAL3',1.0,-7,'',status)
+     call ftpkye(unit,'CDELT3',1.0,-7,'',status)
      call ftpkyj(unit,'CRPIX3',1,'',status)
 
      ! 4eme axe
      call ftpkys(unit,'CTYPE4',"FREQ",' ',status)
      call ftpkyd(unit,'CRVAL4',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
-     call ftpkye(unit,'CDELT4',2e9,-3,'Hz',status) ! 2GHz by default
+     call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
      call ftpkyj(unit,'CRPIX4',0,'',status)
   else
      call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
@@ -2572,16 +2572,16 @@ subroutine ecriture_spectre(imol)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
