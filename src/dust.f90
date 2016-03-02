@@ -852,8 +852,7 @@ subroutine opacite(lambda)
      if (lRE_nLTE) then
         kappa_abs_nLTE(icell,lambda) = 0.0
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-           density=densite_pouss(k,icell)
-           kappa_abs_nLTE(icell,lambda) = 0.0
+           kappa_abs_nLTE(icell,lambda) =  kappa_abs_nLTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
         k_abs_RE = k_abs_RE + kappa_abs_nLTE(icell,lambda)
      endif

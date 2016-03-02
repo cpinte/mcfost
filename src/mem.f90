@@ -1451,7 +1451,14 @@ subroutine realloc_step2()
      stop
   endif
   kappa=0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE=0.0
-
+  if (lRE_nLTE) then
+     allocate(kappa_abs_nLTE(n_cells,n_lambda2))
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error kappa_abs_nLTE'
+        stop
+     endif
+     kappa_abs_nLTE=0.0
+  endif
 
   if (lorigine) then
      deallocate(disk_origin, star_origin)
