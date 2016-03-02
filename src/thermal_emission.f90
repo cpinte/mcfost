@@ -1221,7 +1221,8 @@ subroutine update_proba_abs_nRE()
 
            if (kappa_abs_RE_old < tiny_db) then
               write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
-              write(*,*) "Something went wrong"
+              write(*,*) "Something went wrong."
+              write(*,*) "Having only grains out of equilibrium is not implemented yet."
               write(*,*) "Cell #", icell, " lambda #", lambda
               write(*,*) "Exiting"
               stop
