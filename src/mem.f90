@@ -70,7 +70,7 @@ subroutine alloc_dynamique()
 
   ! parametrage methode de diffusion
   if (scattering_method == 0) then
-     if ((lvariable_dust).and.(.not.lmono)) then
+     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
         scattering_method = 1
      else
         scattering_method = 2
@@ -78,8 +78,6 @@ subroutine alloc_dynamique()
   endif
   write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
-
-
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then

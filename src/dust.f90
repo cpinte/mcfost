@@ -974,7 +974,9 @@ subroutine opacite(lambda)
      if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
 
 
-     if (.not.letape_th.and.lcompute_obs.and.lscatt_ray_tracing) then
+     ! if (.not.letape_th.and.lcompute_obs.and.lscatt_ray_tracing) then
+     !PATCH
+     if (lcompute_obs.and.lscatt_ray_tracing) then
         if (scattering_method == 1) then !  choix taille du grain diffuseur + matrice Mueller par grain
            write(*,*) "ERROR: ray-tracing is incompatible with scattering method 1"
            stop
@@ -1043,7 +1045,6 @@ subroutine opacite(lambda)
               prob_s11_pos(:,icell,lambda)=prob_s11_pos(:,icell,lambda)/k_sca_tot
 
               ! TODO : normaliser les s11 en sortie des matrices de Mueller
-
 
               ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
               do l=0,180
