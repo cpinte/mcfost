@@ -1473,7 +1473,7 @@ subroutine hg(g, aleat, itheta, cospsi)
 
   if (cospsi > 1.0_db) write(*,*) g1, rand
   itheta = floor(acos(cospsi)*180.0_db/pi)+1
-  if (itheta > 180) itheta = 180
+  if (itheta > nang_scatt) itheta = nang_scatt
 
   return
 end subroutine hg
@@ -1499,7 +1499,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
   integer :: k, kmin, kmax
 
   kmin=0
-  kmax=180
+  kmax=nang_scatt
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
@@ -1545,7 +1545,7 @@ subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
   integer :: k, kmin, kmax
 
   kmin=0
-  kmax=180
+  kmax=nang_scatt
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
