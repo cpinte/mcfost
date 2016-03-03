@@ -921,7 +921,7 @@ subroutine opacite(lambda)
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing,letape_th) &
-  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
+  !$omp shared(lsepar_pola,ldust_prop,cell_map)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
      k_sca_tot=0.0
@@ -1004,16 +1004,6 @@ subroutine opacite(lambda)
                  tab_s34_ray_tracing(:,icell,lambda) =  0.0_db
               endif
            endif ! norme
-
-           if (lsepar_pola) then
-              tab_s12_o_s11_ray_tracing(:,icell,lambda) = tab_s12_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
-              tab_s33_o_s11_ray_tracing(:,icell,lambda) = tab_s33_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
-              tab_s34_o_s11_ray_tracing(:,icell,lambda) = tab_s34_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
-           endif
-
         else ! aniso_method = 2 --> HG
            gsca = tab_g_pos(icell,lambda)
            tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
