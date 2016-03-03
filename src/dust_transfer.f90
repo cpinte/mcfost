@@ -182,7 +182,7 @@ subroutine transfert_poussiere()
      p_icell = 1
      write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_pos(:,p_icell,1)/tab_s11_pos(:,p_icell,1))
+     if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
 
      if (lopacite_only) stop
 

@@ -1326,13 +1326,13 @@ subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
 
   XMUL=0.0
-  XMUL(1,1) = tab_s11_pos(itheta,icell,lambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(itheta,icell,lambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(itheta,icell,lambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_pos(itheta,icell,lambda)* frac -  tab_s34_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
 
   ! -------- CALCUL DE LA POLARISATION ---------
