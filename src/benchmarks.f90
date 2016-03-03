@@ -46,9 +46,9 @@ subroutine lect_section_eff()
   do lambda=1,n_lambda
      tab_albedo_pos(:,lambda)=qsca(lambda)/qext(lambda)
      tab_s11_pos(:,:,lambda)=1.0
-     tab_s12_pos(:,:,lambda)=0.0
-     tab_s33_pos(:,:,lambda)=0.0
-     tab_s34_pos(:,:,lambda)=0.0
+     tab_s12_o_s11_pos(:,:,lambda)=0.0
+     tab_s33_o_s11_pos(:,:,lambda)=0.0
+     tab_s34_o_s11_pos(:,:,lambda)=0.0
      do icell=1, n_cells
         ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
         ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
