@@ -783,7 +783,8 @@ subroutine opacite(lambda)
   integer, intent(in) :: lambda
 
   integer :: icell, k, l, thetaj
-  real(kind=db) ::  density, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
+  real(kind=db), parameter :: dtheta = pi/real(nang_scatt)
+  real(kind=db) ::  density, k_sca_tot, k_ext_tot,norme, theta, fact
   logical :: lcompute_obs
 
   real :: somme, gsca
@@ -917,7 +918,7 @@ subroutine opacite(lambda)
   !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
   !$omp shared(tab_albedo_pos,prob_s11_pos,somme) &
-  !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
+  !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta)&
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing,letape_th) &
@@ -984,7 +985,7 @@ subroutine opacite(lambda)
         if (aniso_method == 1) then ! full phase-function
            ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
            if (abs(k_sca_tot) > 0.0_db) then
-              norme = deg_to_rad / (k_sca_tot * deux_pi) ! TODO: bizarre je ne sais pas d'ou vient le deg_to_rad
+              norme = dtheta / (k_sca_tot * deux_pi)
 
               tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_pos(:,icell,lambda) * norme
               if (lsepar_pola) then
@@ -1018,7 +1019,6 @@ subroutine opacite(lambda)
            if (aniso_method==1) then
               ! Propriétés optiques des cellules
               prob_s11_pos(0,icell,lambda)=0.0
-              dtheta = pi/real(nang_scatt)
 
               do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
                  theta = real(l)*dtheta
@@ -1036,7 +1036,7 @@ subroutine opacite(lambda)
               ! TODO : normaliser les s11 en sortie des matrices de Mueller
 
               ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
-              do l=0,180
+              do l=0,nang_scatt
                  if (tab_s11_pos(l,icell,lambda) > tiny_real) then ! NEW TEST STRAT LAURE
                     norme=1.0/tab_s11_pos(l,icell,lambda)
                     if (.not.ldust_prop) then
