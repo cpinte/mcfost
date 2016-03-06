@@ -226,7 +226,7 @@ module disk
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
   logical :: lgap_Gaussian
-  real :: r_gap_Gaussian, sigma_gap_Gaussian
+  real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
 
   ! Fichier de Gasp pour la structure du disque
   real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta

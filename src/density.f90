@@ -749,8 +749,8 @@ subroutine define_dust_density()
 
   if (lgap_Gaussian) then
      do icell=1, n_cells
-        densite_pouss(:,icell) = densite_pouss(:,icell) * &
-             (1.0 - exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
+        densite_pouss(:,icell) = densite_pouss(:,icell) * (1.0 - f_gap_Gaussian * &
+             exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
      enddo
   endif
 
