@@ -1730,9 +1730,10 @@ subroutine read_Sigma_file()
 
   ! determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 1) then
+  if (nfound > 2) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     write(*,*) "nfound = ", nfound, "instead of 1 or 2"
      stop
   endif
 
