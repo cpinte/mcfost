@@ -35,7 +35,7 @@ subroutine alloc_dynamique()
   if (n_cells < 1e6) then
      write(*,*) "Using", n_cells, "cells"
   else
-     write(*,*) "Using", real(n_cells)/1e6, "millions cell"
+     write(*,*) "Using", real(n_cells)/1e6, "million cells"
   endif
 
   if (lvariable_dust) then
