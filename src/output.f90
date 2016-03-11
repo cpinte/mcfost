@@ -421,7 +421,7 @@ subroutine write_stokes_fits()
 
   if (lsepar_pola) then
      do id=1, nb_proc
-        if (abs(ang_disque > 0.)) then ! Rotation Q and U
+        if (abs(ang_disque) > 0.) then ! Rotation Q and U
            stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2) + stokeq(lambda,:,:,:,:,id) * cos_disk_x2 + &
                 stokeu(lambda,:,:,:,:,id) * sin_disk_x2
            stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3) - stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
