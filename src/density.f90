@@ -1308,6 +1308,7 @@ subroutine densite_file()
   if (nfound /= 4) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     write(*,*) "I found", nfound, "axis instead of 4"
      stop
   endif
 
@@ -1381,6 +1382,7 @@ subroutine densite_file()
      call ftmrhd(unit,1,hdutype,status)
      nfound=1
      ! Check dimensions
+     naxes(:) = 0
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 1) then
         write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
