@@ -509,6 +509,8 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
         xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
      endif ! lProDiMo
 
+     if (loutput_UV_field) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+
      if (lscatt_ray_tracing1) then
         xm = 0.5_db * (x0 + x1)
         ym = 0.5_db * (y0 + y1)

@@ -1759,6 +1759,8 @@ subroutine ecriture_UV_field()
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
+  write(*,*) "Writing "//trim(filename)
+
   ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
