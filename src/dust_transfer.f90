@@ -642,7 +642,6 @@ subroutine transfert_poussiere()
         ! A-t-on fini le calcul des grains hors eq ?
         if (.not.letape_th) then ! oui, on passe a la suite
            if (loutput_J) call ecriture_J()
-           if (loutput_UV_field) call ecriture_UV_field()
 
            call ecriture_temperature(1)
            call ecriture_sed(1)
@@ -658,6 +657,7 @@ subroutine transfert_poussiere()
            sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0
            n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
            sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
+           if (loutput_UV_field) xJ_abs = 0.0
            if (lProDiMo) xJ_abs = 0.0  ! Au cas ou
         endif ! .not.letape_th
 
@@ -699,6 +699,7 @@ subroutine transfert_poussiere()
            call ecriture_sed(2)
            if (lscatt_ray_tracing) call ecriture_sed_ray_tracing()
            if (lProDiMo) call mcfost2ProDiMo()
+           if (loutput_UV_field) call ecriture_UV_field()
         endif
 
      endif

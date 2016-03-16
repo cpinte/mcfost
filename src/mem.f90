@@ -538,7 +538,8 @@ subroutine alloc_dynamique()
         xKJ_abs = 0.0 ; E0 = 0.0
      endif
 
-     if (lRE_nLTE.or.lnRE) then
+     lxJ_abs = loutput_J .or. lRE_nLTE .or. lnRE .or. loutput_UV_field
+     if (lxJ_abs) then
         allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status) ! BIG array
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xJ_abs'
@@ -1140,10 +1141,10 @@ subroutine realloc_step2()
      if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_frac_E_em_1grain,xT_ech_1grain)
      if (lreemission_stats) deallocate(nbre_reemission)
      if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,frac_E_em_1grain_nRE,log_frac_E_em_1grain_nRE,xT_ech_1grain_nRE)
-     if (lRE_nLTE.or.lnRE) deallocate(xJ_abs,J0)
+     if (lxJ_abs) deallocate(xJ_abs,J0)
   endif
 
-  if (lProDiMo) then
+  if (lProDiMo.or.loutput_UV_field) then
      allocate(xJ_abs(n_cells,n_lambda2,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xJ_abs in realloc_step2'
