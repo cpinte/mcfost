@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.21"
+  character(8), parameter :: mcfost_release = "2.20.22"
   real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -226,7 +226,7 @@ module disk
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
   logical :: lgap_Gaussian
-  real :: r_gap_Gaussian, sigma_gap_Gaussian
+  real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
 
   ! Fichier de Gasp pour la structure du disque
   real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta
@@ -447,7 +447,7 @@ module opacity
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
-  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda

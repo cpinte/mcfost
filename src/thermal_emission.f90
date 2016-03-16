@@ -126,8 +126,6 @@ subroutine init_reemission()
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
-  lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
-
   !  cst_E=2.0*hp*c_light**2/L_etoile
   ! Depuis chauffage interne, L_etoile est sorti car il aurait du etre remplace par L_tot
   ! qui depend des temp et donc de log_frac_E_em
