@@ -94,7 +94,7 @@ subroutine build_cylindrical_cell_mapping()
   ! Virtual cell indices for when the packets are just around the grid
 
   ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
-  allocate(lexit_cell(ntot+1:ntot2), stat=alloc_status)
+  allocate(lexit_cell(1:ntot2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error lexit_cell'
      stop
@@ -114,6 +114,7 @@ subroutine build_cylindrical_cell_mapping()
            endif
 
            if (j==jend2) lexit_cell(icell) = 2
+           if (i==iend2) lexit_cell(icell) = 1
 
            cell_map_i(icell) = i
            cell_map_j(icell) = j
