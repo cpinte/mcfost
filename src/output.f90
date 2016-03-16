@@ -1748,7 +1748,7 @@ subroutine ecriture_UV_field()
 
   integer, parameter :: n=200
 
-  real(kind=db), dimension(n_lambda,n_rad,nz) :: J
+  real(kind=db), dimension(n_lambda2,n_rad,nz) :: J
   real(kind=db), dimension(n_rad,nz) :: G
   real(kind=db), dimension(n) :: wl, J_interp
   real(kind=db), dimension(n_lambda) :: lamb
@@ -1774,7 +1774,7 @@ subroutine ecriture_UV_field()
 
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! J en W.m-2.m-1 (F_lambda)
-  do lambda=1, n_lambda
+  do lambda=1, n_lambda2
      J(lambda,:,:) = J(lambda,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
   enddo
 
