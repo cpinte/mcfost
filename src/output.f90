@@ -421,7 +421,7 @@ subroutine write_stokes_fits()
 
   if (lsepar_pola) then
      do id=1, nb_proc
-        if (abs(ang_disque > 0.)) then ! Rotation Q and U
+        if (abs(ang_disque) > 0.) then ! Rotation Q and U
            stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2) + stokeq(lambda,:,:,:,:,id) * cos_disk_x2 + &
                 stokeu(lambda,:,:,:,:,id) * sin_disk_x2
            stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3) - stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
@@ -2849,5 +2849,52 @@ subroutine cfitsWrite(filename,tab,dim)
 end subroutine cfitsWrite
 
 !**********************************************************************
+
+subroutine write_dust_prop()
+
+  integer :: icell, l
+
+  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+
+  write(*,*) "Writing dust properties"
+  ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
+
+  ! Only do it after the last pass through the wavelength table
+  ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
+  allocate(kappa_lambda(n_lambda))
+  allocate(albedo_lambda(n_lambda))
+  allocate(g_lambda(n_lambda))
+  allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
+  allocate(kappa_grain(n_lambda,n_grains_tot))
+
+  icell = cell_map(1,1,1)
+  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
+  albedo_lambda=tab_albedo_pos(icell,:)
+  g_lambda=tab_g_pos(icell,:)
+
+  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
+  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
+  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
+  call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+
+  do l=1, n_lambda
+     kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
+  enddo
+  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
+
+  S11_lambda_theta(:,:)= tab_s11_pos(:,icell,:)
+  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+
+  if (lsepar_pola) then
+     pol_lambda_theta(:,:) = -tab_s12_o_s11_pos(:,icell,:) ! Deja normalise par S11
+     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+  endif
+
+  deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
+
+  return
+
+end subroutine write_dust_prop
 
 end module output
