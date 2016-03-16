@@ -72,7 +72,7 @@ subroutine transfert_poussiere()
   real(kind=db), pointer :: p_nnfot2
   real(kind=db) :: n_phot_envoyes_in_loop
 
-  nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
+  lambda0 = -99 ; nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
@@ -80,18 +80,8 @@ subroutine transfert_poussiere()
   ! Nbre iteration grains hors equilibre
   n_iter = 0
 
-
-
   ! Allocation dynamique
   call alloc_dynamique()
-
-  if (lscattering_method1) then
-     lambda = 1
-     p_lambda => lambda
- else
-     lambda0=1
-     p_lambda => lambda ! was lambda0 : changed to save dust properties
-  endif
 
   ymap0 = (igridy/2) + 1
   xmap0 = (igridx/2) + 1
@@ -167,12 +157,12 @@ subroutine transfert_poussiere()
         call define_dust_density()
      endif
 
-     call prop_grains(1,1)
+     call prop_grains(1)
      if (lscatt_ray_tracing) then
         call alloc_ray_tracing()
         call init_directions_ray_tracing()
      endif
-     call opacite(1)
+     call opacite(1,1)
      call integ_tau(1) !TODO
 
      if (loptical_depth_map) call calc_optical_depth_map(1)
@@ -248,9 +238,23 @@ subroutine transfert_poussiere()
            else
               write(*,'(a46, $)') "Reading dust properties from previous run ..."
            endif
+
+           if (lscattering_method1) then
+              lambda = 1
+              p_lambda => lambda
+           else
+              if (p_n_lambda_pos == n_lambda) then
+                 lambda = 1
+                 p_lambda => lambda
+              else
+                 lambda0 = 1
+                 p_lambda => lambda0
+              endif
+           endif
+
            do lambda=1,n_lambda
-              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
-              call opacite(lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
+              if (lcompute_dust_prop) call prop_grains(lambda)
+              call opacite(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
@@ -262,8 +266,8 @@ subroutine transfert_poussiere()
 
               do lambda=1,n_lambda
                  ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
-                 call prop_grains(lambda, p_lambda)
-                 call opacite(lambda)
+                 call prop_grains(lambda)
+                 call opacite(lambda, p_lambda)
               enddo
            endif ! ldust_sublimation
 
@@ -283,7 +287,7 @@ subroutine transfert_poussiere()
               lapprox_diffusion=.false.
            else
               if (lapprox_diffusion) then
-                 call define_dark_zone(lambda_seuil,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+                 call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
               else
                  write(*,*) "No dark zone"
                  call no_dark_zone()
@@ -344,7 +348,10 @@ subroutine transfert_poussiere()
   lambda=1 ! pour eviter depassement tab a l'initialisation
   ind_etape = etape_start
 
-  ! Boucle principale sur les étapes du calcul
+
+  !************************************************************
+  !  Boucle principale sur les étapes du calcul
+  !************************************************************
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
 
@@ -354,8 +361,21 @@ subroutine transfert_poussiere()
      else ! calcul des observables
         ! on devient monochromatique
         lmono=.true.
-
         E_paquet = 1.0_db
+
+        !Todo: maybe we can use a variable lscatt_method2_mono
+        if (lscattering_method1) then
+           lambda = 1
+           p_lambda => lambda
+        else
+           if (p_n_lambda_pos == n_lambda) then
+              lambda = 1
+              p_lambda => lambda
+           else
+              lambda0 = 1
+              p_lambda => lambda0
+           endif
+        endif
 
         if (lmono0) then ! image
            laffichage=.true.
@@ -373,20 +393,19 @@ subroutine transfert_poussiere()
            if (ltemp.and.lsed_complete) then
               write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda
-                 call prop_grains(lambda, p_lambda) ! recalcul pour opacite
-                 call opacite(lambda)
+                 call prop_grains(lambda) ! recalcul pour opacite
+                 call opacite(lambda, p_lambda)
               enddo
               write(*,*) "Done"
            endif
         endif
 
+        if ((ind_etape==first_etape_obs).and.(lsed_complete).and.(.not.lmono0)) then
+           if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call realloc_ray_tracing_scattering_matrix()
+        endif
+
         if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! Changement des lambda
            call init_lambda2()
-           if (lscattering_method1) then
-              lambda = 1  ; p_lambda => lambda
-           else
-              lambda0 = 1 ; p_lambda => lambda ! was lambda0 : changed to save dust properties
-           endif
            call init_indices_optiques()
 
            call repartition_energie_etoiles()
@@ -406,18 +425,21 @@ subroutine transfert_poussiere()
               write(*,'(a46, $)') "Reading dust properties from previous run ..."
            endif
            do lambda=1,n_lambda2
-              if (lcompute_dust_prop) call prop_grains(lambda, p_lambda)
-              call opacite(lambda)!_eqdiff!_data  ! ~ takes 2 seconds
+              if (lcompute_dust_prop) call prop_grains(lambda)
+              call opacite(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
         endif
+
         lambda = ind_etape - first_etape_obs + 1
+
+        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call calc_local_scattering_matrices(lambda, p_lambda)
 
         if (lspherical.or.l3D) then
            call no_dark_zone()
         else
-           call define_dark_zone(lambda,tau_dark_zone_obs,.false.)
+           call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
         endif
         !call no_dark_zone()
         ! n_dif_max = seuil_n_dif(lambda)
@@ -452,7 +474,7 @@ subroutine transfert_poussiere()
      ! Les pointeurs (meme les tab) doivent être privés !!! COPYIN
      !$omp parallel &
      !$omp default(none) &
-     !$omp firstprivate(lambda) &
+     !$omp firstprivate(lambda,p_lambda) &
      !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
@@ -501,7 +523,7 @@ subroutine transfert_poussiere()
            lpacket_alive = .true.
 
            ! Propagation du packet
-           if (lintersect) call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
+           if (lintersect) call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
@@ -540,7 +562,7 @@ subroutine transfert_poussiere()
 
         !$omp parallel &
         !$omp default(none) &
-        !$omp shared(lambda,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
+        !$omp shared(lambda,p_lambda,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
         !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive,nnfot2)
 
         flag_star = .false.
@@ -563,7 +585,7 @@ subroutine transfert_poussiere()
               else
                  nnfot2 = nnfot2 + 1.0_db
                  ! Propagation du packet
-                 call propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+                 call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM ! nnfot2
         enddo ! nnfot1
@@ -594,7 +616,7 @@ subroutine transfert_poussiere()
                  enddo
               else
                  iaz=1
-                 call init_dust_source_fct2(lambda,ibin)
+                 call init_dust_source_fct2(lambda,p_lambda,ibin)
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
               endif
 
@@ -682,7 +704,7 @@ subroutine transfert_poussiere()
                  enddo
               else
                  iaz=1
-                 call init_dust_source_fct2(lambda,ibin)
+                 call init_dust_source_fct2(lambda,p_lambda,ibin)
                  call dust_map(lambda,ibin,iaz)
               endif
            enddo
@@ -832,7 +854,7 @@ end subroutine emit_packet
 
 !***********************************************************
 
-subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
 
@@ -842,7 +864,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, ri, zj, phik
+  integer, intent(inout) :: lambda, p_lambda, ri, zj, phik
   real(kind=db), intent(inout) :: x,y,z,u,v,w
   real(kind=db), dimension(4), intent(inout) :: stokes
 
@@ -890,7 +912,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call length_deg2(id,lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+     call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
      if ((ri==0).and.(.not.flag_sortie)) write(*,*) "PB r", ri, zj
      if ((zj > nz).and.(.not.flag_sortie)) then
         write(*,*) "PB z", ri, zj, abs(z)
@@ -976,7 +998,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
            rand = sprng(stream(id))
            rand2= sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
-              call angle_diff_theta_pos(lambda,p_icell, rand, rand2, itheta, cospsi)
+              call angle_diff_theta_pos(p_lambda,p_icell, rand, rand2, itheta, cospsi)
               if (lisotropic) then ! Diffusion isotrope
                  itheta=1
                  cospsi=2.0*rand-1.0
@@ -987,7 +1009,7 @@ subroutine propagate_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,fl
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux paramètres de Stokes
-              if (lsepar_pola) call new_stokes_pos(lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+              if (lsepar_pola) call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope

@@ -26,7 +26,7 @@ module parametres
   integer :: time_begin, time_end, time_tick, time_max
 
   real, parameter :: max_mem = 4. ! GBytes
-  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
 
   ! Nombre de photons lances
   logical :: ldust_transfer
@@ -101,7 +101,7 @@ module parametres
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
   ! Nombre de couches verticales ( = de stratifications)
-  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda
+  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale

@@ -19,14 +19,14 @@ module optical_depth
 
   contains
 
-subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Routine chapeau aux sous-routines suivant la geometrie
 ! C. Pinte
 ! 03/06/07
 
   implicit none
 
-  integer, intent(in) :: id,lambda
+  integer, intent(in) :: id,lambda, p_lambda
   integer, intent(inout) :: ri,zj,phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star,flag_direct_star
@@ -40,16 +40,16 @@ subroutine length_deg2(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,f
 
   if (lcylindrical) then
      if (l3D) then
-        call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+        call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
      else
         if (lopacity_wall) then
            call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
         else
-           call length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+           call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
         endif
      endif
   else ! spherical
-     call length_deg2_sph(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+     call length_deg2_sph(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
   endif
 
   return
@@ -58,7 +58,7 @@ end subroutine length_deg2
 
 !********************************************************************
 
-subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -67,7 +67,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
 
   implicit none
 
-  integer, intent(in) :: id,lambda
+  integer, intent(in) :: id,lambda, p_lambda
   integer, intent(inout) :: ri,zj
   real(kind=db), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star, flag_direct_star
@@ -170,7 +170,7 @@ subroutine length_deg2_cyl(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,fl
      endif
 
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l, &
           x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
@@ -488,9 +488,9 @@ end subroutine cross_cylindrical_cell
 
 !********************************************************************
 
-subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
-  integer, intent(in) :: id,lambda,icell0
+  integer, intent(in) :: id,lambda,p_lambda,icell0
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db) :: l, x0,y0,z0, x1,y1,z1, u,v,w
   logical, intent(in) :: flag_star, flag_direct_star
@@ -530,11 +530,11 @@ subroutine save_radiation_field(id,lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1
         endif
 
         if (lsepar_pola) then
-           call calc_xI_scatt_pola(id,lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
+           call calc_xI_scatt_pola(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
         else
            ! ralentit d'un facteur 5 le calcul de SED
            ! facteur limitant
-           call calc_xI_scatt(id,lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
+           call calc_xI_scatt(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
         endif
 
      else if (lscatt_ray_tracing2) then ! only 2D
@@ -587,7 +587,7 @@ end subroutine save_radiation_field
 !*************************************************************************************
 
 
-subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -596,7 +596,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
 
   implicit none
 
-  integer, intent(in) :: id,lambda
+  integer, intent(in) :: id,lambda, p_lambda
   integer, intent(inout) :: ri,thetaj
   real(kind=db), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star,flag_direct_star
@@ -863,7 +863,7 @@ subroutine length_deg2_sph(id,lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_sta
      endif
 
      ! Stokage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  &
           x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer
@@ -920,7 +920,7 @@ end subroutine length_deg2_sph
 
 !********************************************************************
 
-subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -929,7 +929,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
 
   implicit none
 
-  integer, intent(in) :: id,lambda
+  integer, intent(in) :: id,lambda, p_lambda
   integer, intent(inout) :: ri,zj, phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   real(kind=db), intent(in) :: u,v,w
@@ -1201,7 +1201,7 @@ subroutine length_deg2_3D(id,lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_sta
         ltot=ltot+l
      endif ! tau > extr
 
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,icell0, Stokes, l,  &
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  &
           x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      if (lstop) then
@@ -4254,7 +4254,7 @@ end subroutine angle_max
 
 !***********************************************************
 
-subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
+subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 ! Definition l'etendue de la zone noire
 ! definie le tableau logique l_dark_zone
 ! et les rayons limites r_in_opacite pour le premier rayon
@@ -4265,7 +4265,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
 
   integer, parameter :: nbre_angle = 11
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, p_lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
   integer :: i, j, pk, n, id, ri, zj, phik, icell, jj
@@ -4384,7 +4384,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
               zj=j
               phik=1
               Stokes(:) = 0.0_db ; !Stokes(1) = 1.0_db ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
-              call length_deg2(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
+              call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
                  do jj=1,j
@@ -4420,7 +4420,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
@@ -4454,7 +4454,7 @@ subroutine define_dark_zone(lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire

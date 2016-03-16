@@ -124,7 +124,7 @@ subroutine init_reemission()
   real(kind=db), dimension(0:n_lambda) :: integ3
   real(kind=db), dimension(n_lambda) :: B, dB_dT
 
-  write(*,'(a35, $)') "Initializing thermal properties ..."
+  write(*,'(a36, $)') " Initializing thermal properties ..."
 
   lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
 
@@ -160,6 +160,7 @@ subroutine init_reemission()
      enddo !lambda
 
      ! produit par opacite (abs seule) massique
+     ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
      do icell=1,n_cells
         integ=0.0
 
@@ -1110,7 +1111,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
+  integer :: l, l1, l2, T_int, T1, T2, k, lambda0, ilambda
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   integer, parameter :: heating_method = 3
