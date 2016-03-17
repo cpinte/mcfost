@@ -1159,7 +1159,7 @@ subroutine realloc_step2()
   endif
 
   if (lProDiMo.or.loutput_UV_field) then
-     allocate(xJ_abs(n_cells,n_lambda2,nb_proc), stat=alloc_status)
+     allocate(xJ_abs(n_cells,n_lambda2,nb_proc), J0(n_cells,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xJ_abs in realloc_step2'
         stop
