@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.20"
+  character(8), parameter :: mcfost_release = "2.20.22"
   real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -26,7 +26,7 @@ module parametres
   integer :: time_begin, time_end, time_tick, time_max
 
   real, parameter :: max_mem = 4. ! GBytes
-  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
 
   ! Nombre de photons lances
   logical :: ldust_transfer
@@ -80,7 +80,7 @@ module parametres
 
   ! rotation du plan du disque en deg., sens trigo.
   real(kind=db) :: ang_disque
-  real(kind=db) :: sin_disk, cos_disk
+  real(kind=db) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
@@ -101,7 +101,7 @@ module parametres
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
   ! Nombre de couches verticales ( = de stratifications)
-  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda
+  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
@@ -226,7 +226,7 @@ module disk
   real :: correct_density_factor, correct_density_Rin, correct_density_Rout
 
   logical :: lgap_Gaussian
-  real :: r_gap_Gaussian, sigma_gap_Gaussian
+  real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
 
   ! Fichier de Gasp pour la structure du disque
   real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta
@@ -362,7 +362,7 @@ module grains
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos ! n_cells,n_lambda
-  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
+  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
 
   character(len=512) :: aggregate_file, mueller_aggregate_file
   real :: R_sph_same_M
@@ -447,7 +447,7 @@ module opacity
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
-  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   integer :: ri_not_empty, zj_not_empty, phik_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
@@ -833,8 +833,6 @@ module ray_tracing
   integer :: nang_ray_tracing, nang_ray_tracing_star
 
   real, dimension(:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! 0:nang_scatt, n_cells, n_lambda
-  real, dimension(:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! 0:nang_scatt, n_cells, n_lambda
-
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
 

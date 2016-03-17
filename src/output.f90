@@ -320,7 +320,7 @@ subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
   !*    LE SYSTEME OU (U1,V1,W1)=(1,0,0)
   !*****************************************************
 
-  call rotation(x,y,z, u,v,w, x2,y2,z2)
+  call rotation(x,y,z, -u,v,w, x2,y2,z2)
 
   ! rotation eventuelle du disque
   y_map = y2 * cos_disk + z2 * sin_disk
@@ -421,8 +421,15 @@ subroutine write_stokes_fits()
 
   if (lsepar_pola) then
      do id=1, nb_proc
-        stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
-        stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(lambda,:,:,:,:,id)
+        if (abs(ang_disque) > 0.) then ! Rotation Q and U
+           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2) + stokeq(lambda,:,:,:,:,id) * cos_disk_x2 + &
+                stokeu(lambda,:,:,:,:,id) * sin_disk_x2
+           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3) - stokeq(lambda,:,:,:,:,id) * sin_disk_x2 + &
+                stokeu(lambda,:,:,:,:,id) * cos_disk_x2
+        else ! No need for rotation
+           stoke_io(:,:,:,:,2)=stoke_io(:,:,:,:,2)+stokeq(lambda,:,:,:,:,id)
+           stoke_io(:,:,:,:,3)=stoke_io(:,:,:,:,3)+stokeu(lambda,:,:,:,:,id)
+        endif
         stoke_io(:,:,:,:,4)=stoke_io(:,:,:,:,4)+stokev(lambda,:,:,:,:,id)
      enddo
      deallocate(stokeq,stokeu,stokev)
@@ -474,20 +481,20 @@ subroutine write_stokes_fits()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -542,7 +549,7 @@ subroutine ecriture_map_ray_tracing()
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -605,20 +612,20 @@ subroutine ecriture_map_ray_tracing()
 
   ! Write  optional keywords to the header
   !  wavelength
-  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-3,'wavelength [microns]',status)
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
      call ftpkys(unit,'BUNIT',"Jy/pixel",' ',status)
@@ -627,14 +634,14 @@ subroutine ecriture_map_ray_tracing()
 
      ! 3eme axe
      call ftpkys(unit,'CTYPE3',"STOKES",' ',status)
-     call ftpkye(unit,'CRVAL3',1.0,-3,'',status)
-     call ftpkye(unit,'CDELT3',1.0,-3,'',status)
+     call ftpkye(unit,'CRVAL3',1.0,-7,'',status)
+     call ftpkye(unit,'CDELT3',1.0,-7,'',status)
      call ftpkyj(unit,'CRPIX3',1,'',status)
 
      ! 4eme axe
      call ftpkys(unit,'CTYPE4',"FREQ",' ',status)
      call ftpkyd(unit,'CRVAL4',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
-     call ftpkye(unit,'CDELT4',2e9,-3,'Hz',status) ! 2GHz by default
+     call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
      call ftpkyj(unit,'CRPIX4',0,'',status)
   else
      call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
@@ -683,17 +690,32 @@ subroutine ecriture_map_ray_tracing()
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,image_casa,status)
   else ! mode non casa
-     do itype=1,N_type_flux
+     type_loop : do itype=1,N_type_flux
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               do j=1,igridy
                  do i=1,igridx
-                    image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                    if (lsepar_pola) then
+                       if ((itype == 2 ).or. (itype==3)) then
+                          if (itype==2) then
+                             Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
+                             U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
+                             image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
+                             image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
+                          else
+                             cycle type_loop ! itype 3 already done together with itype 2
+                          endif
+                       else ! Other images do not need rotation
+                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                       endif
+                    else ! No need for rotation when there is no pola
+                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                    endif
                  enddo !i
               enddo !j
            enddo ! iaz
         enddo !ibin
-     enddo ! itype
+     enddo type_loop ! itype
 
      if (l_sym_ima) then
         xcenter = igridx/2 + modulo(igridx,2)
@@ -1737,6 +1759,8 @@ subroutine ecriture_UV_field()
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
+  write(*,*) "Writing "//trim(filename)
+
   ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
@@ -2572,16 +2596,16 @@ subroutine ecriture_spectre(imol)
 
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-  call ftpkye(unit,'CRVAL1',0.,-3,'RAD',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
   call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
   pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-  call ftpkye(unit,'CDELT1',pixel_scale_x,-3,'pixel scale x [deg]',status)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-  call ftpkye(unit,'CRVAL2',0.,-3,'DEC',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
-  call ftpkye(unit,'CDELT2',pixel_scale_y,-3,'pixel scale y [deg]',status)
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
@@ -2827,5 +2851,52 @@ subroutine cfitsWrite(filename,tab,dim)
 end subroutine cfitsWrite
 
 !**********************************************************************
+
+subroutine write_dust_prop()
+
+  integer :: icell, l
+
+  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+
+  write(*,*) "Writing dust properties"
+  ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
+
+  ! Only do it after the last pass through the wavelength table
+  ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
+  allocate(kappa_lambda(n_lambda))
+  allocate(albedo_lambda(n_lambda))
+  allocate(g_lambda(n_lambda))
+  allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
+  allocate(kappa_grain(n_lambda,n_grains_tot))
+
+  icell = cell_map(1,1,1)
+  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
+  albedo_lambda=tab_albedo_pos(icell,:)
+  g_lambda=tab_g_pos(icell,:)
+
+  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
+  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
+  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
+  call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+
+  do l=1, n_lambda
+     kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
+  enddo
+  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
+
+  S11_lambda_theta(:,:)= tab_s11_pos(:,icell,:)
+  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+
+  if (lsepar_pola) then
+     pol_lambda_theta(:,:) = -tab_s12_o_s11_pos(:,icell,:) ! Deja normalise par S11
+     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+  endif
+
+  deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
+
+  return
+
+end subroutine write_dust_prop
 
 end module output

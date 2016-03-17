@@ -94,7 +94,7 @@ subroutine build_cylindrical_cell_mapping()
   ! Virtual cell indices for when the packets are just around the grid
 
   ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
-  allocate(lexit_cell(ntot+1:ntot2), stat=alloc_status)
+  allocate(lexit_cell(1:ntot2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error lexit_cell'
      stop
@@ -114,6 +114,7 @@ subroutine build_cylindrical_cell_mapping()
            endif
 
            if (j==jend2) lexit_cell(icell) = 2
+           if (i==iend2) lexit_cell(icell) = 1
 
            cell_map_i(icell) = i
            cell_map_j(icell) = j
@@ -491,6 +492,7 @@ subroutine define_grid()
   ! 03/05/11, version 3 :  27/04/05
 
   real, parameter :: pi = 3.1415926535
+  logical, save :: lfirst = .true.
   real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
@@ -509,7 +511,12 @@ subroutine define_grid()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-  call build_cylindrical_cell_mapping()
+
+
+  if (lfirst) then
+     call build_cylindrical_cell_mapping()
+     lfirst = .false.
+  endif
 
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
