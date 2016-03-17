@@ -713,6 +713,9 @@ subroutine initialisation_mcfost()
         lgap_Gaussian=.true.
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
+        read(s,*) f_gap_Gaussian
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
         read(s,*) r_gap_Gaussian
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
@@ -1223,7 +1226,7 @@ subroutine display_help()
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"
-  write(*,*) "        : -gap <R> <sigma>"
+  write(*,*) "        : -gap <depth> <R> <sigma> [depth is between 0 and 1, R and Sigma in au]"
   write(*,*) "        : -Seb_F <number>  1 = gaussian, 2 = cst diffusion coeff"
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"

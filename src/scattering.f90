@@ -1326,13 +1326,13 @@ subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
 !             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
 
   XMUL=0.0
-  XMUL(1,1) = tab_s11_pos(itheta,icell,lambda) * frac +  tab_s11_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
   XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_pos(itheta,icell,lambda) * frac +  tab_s12_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_pos(itheta,icell,lambda) * frac +  tab_s33_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_pos(itheta,icell,lambda)* frac -  tab_s34_pos(itheta-1,icell,lambda) * frac_m1
+  XMUL(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   XMUL(4,3) = -XMUL(3,4)
 
   ! -------- CALCUL DE LA POLARISATION ---------
@@ -1473,7 +1473,7 @@ subroutine hg(g, aleat, itheta, cospsi)
 
   if (cospsi > 1.0_db) write(*,*) g1, rand
   itheta = floor(acos(cospsi)*180.0_db/pi)+1
-  if (itheta > 180) itheta = 180
+  if (itheta > nang_scatt) itheta = nang_scatt
 
   return
 end subroutine hg
@@ -1499,7 +1499,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
   integer :: k, kmin, kmax
 
   kmin=0
-  kmax=180
+  kmax=nang_scatt
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
@@ -1545,7 +1545,7 @@ subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
   integer :: k, kmin, kmax
 
   kmin=0
-  kmax=180
+  kmax=nang_scatt
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)

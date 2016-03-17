@@ -124,9 +124,7 @@ subroutine init_reemission()
   real(kind=db), dimension(0:n_lambda) :: integ3
   real(kind=db), dimension(n_lambda) :: B, dB_dT
 
-  write(*,'(a35, $)') "Initializing thermal properties ..."
-
-  lxJ_abs = loutput_J .or. loutput_UV_field .or. lRE_nLTE .or. lnRE !.or. lProDiMo
+  write(*,'(a36, $)') " Initializing thermal properties ..."
 
   !  cst_E=2.0*hp*c_light**2/L_etoile
   ! Depuis chauffage interne, L_etoile est sorti car il aurait du etre remplace par L_tot
@@ -160,6 +158,7 @@ subroutine init_reemission()
      enddo !lambda
 
      ! produit par opacite (abs seule) massique
+     ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
      do icell=1,n_cells
         integ=0.0
 
@@ -1110,7 +1109,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
   real, intent(in) :: aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda
+  integer :: l, l1, l2, T_int, T1, T2, k, lambda0, ilambda
   real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_frac_E_abs, J_abs
 
   integer, parameter :: heating_method = 3
@@ -1221,7 +1220,8 @@ subroutine update_proba_abs_nRE()
 
            if (kappa_abs_RE_old < tiny_db) then
               write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
-              write(*,*) "Something went wrong"
+              write(*,*) "Something went wrong."
+              write(*,*) "Having only grains out of equilibrium is not implemented yet."
               write(*,*) "Cell #", icell, " lambda #", lambda
               write(*,*) "Exiting"
               stop
@@ -1670,8 +1670,13 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
      ! todo : maybe update with an extra variable kappa_abs_qRE
-     norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
-          / ( AU_to_cm * mum_to_cm**2 )
+     if (lRE_nLTE) then
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
+             / ( AU_to_cm * mum_to_cm**2 )
+     else
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda)) &
+             / ( AU_to_cm * mum_to_cm**2 )
+     endif
      kstart = grain_nRE_start ; kend = grain_nRE_end
   endif
 

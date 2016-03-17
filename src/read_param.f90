@@ -333,6 +333,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
@@ -779,6 +784,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
@@ -1177,6 +1187,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
@@ -1587,6 +1602,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
@@ -1999,6 +2019,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) &
@@ -2403,6 +2428,11 @@ contains
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
@@ -2808,6 +2838,11 @@ end subroutine read_para215
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme
@@ -3206,6 +3241,11 @@ end subroutine read_para215
              read(1,*,iostat=ios) dust_pop_tmp(n_pop)%indices(k), dust_pop_tmp(n_pop)%component_volume_fraction(k)
              V_somme = V_somme + dust_pop_tmp(n_pop)%component_volume_fraction(k)
           enddo
+          if (V_somme < tiny_real) then
+             write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
+             write(*,*) "Exiting"
+             stop
+          endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
              dust_pop_tmp(n_pop)%component_volume_fraction(k) = dust_pop_tmp(n_pop)%component_volume_fraction(k) / V_somme

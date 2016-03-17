@@ -712,8 +712,6 @@ subroutine init_dust_mol(imol)
 
   cst_E=2.0*hp*c_light**2
 
-  p_n_lambda = n_lambda
-
   ! Reallocation des tableaux de proprietes de poussiere
  ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
   n_lambda =   nTrans ! opacites dust considerees cst sur le profil de raie
@@ -767,8 +765,8 @@ subroutine init_dust_mol(imol)
         ! On recalcule les proprietes optiques
         write(*,*) "Computing dust properties for", nTrans, "wavelength"
         do iTrans=1,nTrans
-           call prop_grains(iTrans, p_lambda)
-           call opacite(iTrans)
+           call prop_grains(iTrans)
+           call opacite(iTrans, iTrans)
         enddo
      endif
 

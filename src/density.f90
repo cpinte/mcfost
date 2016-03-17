@@ -749,8 +749,8 @@ subroutine define_dust_density()
 
   if (lgap_Gaussian) then
      do icell=1, n_cells
-        densite_pouss(:,icell) = densite_pouss(:,icell) * &
-             (1.0 - exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
+        densite_pouss(:,icell) = densite_pouss(:,icell) * (1.0 - f_gap_Gaussian * &
+             exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
      enddo
   endif
 
@@ -1308,6 +1308,7 @@ subroutine densite_file()
   if (nfound /= 4) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     write(*,*) "I found", nfound, "axis instead of 4"
      stop
   endif
 
@@ -1381,6 +1382,7 @@ subroutine densite_file()
      call ftmrhd(unit,1,hdutype,status)
      nfound=1
      ! Check dimensions
+     naxes(:) = 0
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 1) then
         write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
@@ -1634,7 +1636,7 @@ subroutine densite_file()
      somme=0.0
 
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
+        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)
@@ -1730,9 +1732,10 @@ subroutine read_Sigma_file()
 
   ! determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 1) then
+  if (nfound > 2) then
      write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+     write(*,*) "nfound = ", nfound, "instead of 1 or 2"
      stop
   endif
 
