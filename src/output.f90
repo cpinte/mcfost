@@ -1741,41 +1741,56 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, l, phik, icell
+  integer :: group,fpixel,nelements, lambda, ri, zj, l, phik, icell, alloc_status
 
   logical :: simple, extend
   character(len=512) :: filename
 
   integer, parameter :: n=200
 
-  real(kind=db), dimension(n_lambda,n_rad,nz) :: J
-  real(kind=db), dimension(n_rad,nz) :: G
+  real(kind=db), dimension(:,:,:,:), allocatable :: J
+  real(kind=db), dimension(:,:,:), allocatable :: G
   real(kind=db), dimension(n) :: wl, J_interp
   real(kind=db), dimension(n_lambda) :: lamb
   real(kind=db) :: delta_wl
 
-  real, dimension(n_rad,nz) :: Gio
+  real, dimension(:,:,:), allocatable :: Gio
 
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
   write(*,*) "Writing "//trim(filename)
 
+  if (l3D) then
+     allocate(J(n_lambda2,n_rad,-nz:nz,n_az), G(n_rad,-nz:nz,n_az), Gio(n_rad,-nz:nz,n_az), stat=alloc_status)
+
+  else
+     allocate(J(n_lambda2,n_rad,1:nz,1), G(n_rad,1:nz,1), Gio(n_rad,1:nz,1), stat=alloc_status)
+  endif
+  if (alloc_status /= 0) then
+     write(*,*) "Allocation error in UV_field"
+     write(*,*) "Exiting"
+     stop
+  endif
+  J = 0. ; G = 0. ; Gio = 0.
+
+
   ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
      do zj=j_start,nz
         if (zj==0) cycle
-        phik=1
-        icell = cell_map(ri,zj,phik)
-        J(:,ri,zj) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
+        do phik=1, n_az
+           icell = cell_map(ri,zj,phik)
+           J(:,ri,zj,phik) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
+        enddo
      enddo
   enddo
 
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! J en W.m-2.m-1 (F_lambda)
-  do lambda=1, n_lambda
-     J(lambda,:,:) = J(lambda,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
+  do lambda=1, n_lambda2
+     J(lambda,:,:,:) = J(lambda,:,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
   enddo
 
   lamb = tab_lambda
@@ -1784,17 +1799,19 @@ subroutine ecriture_UV_field()
   delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6
 
   do ri=1,n_rad
-     do zj=1,nz
-        do l=1,n
-           J_interp(l) = interp( J(:,ri,zj),lamb(:),wl(l))
+     do zj=j_start,nz
+        do phik=1, n_az
+           do l=1,n
+              J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
+           enddo
+
+           ! Le Petit et al 2006 page 19-20
+           ! integration trapeze
+           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
+                * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
+
+           Gio(ri,zj,phik) = G(ri,zj,phik) ! Teste OK par comparaison avec yorick
         enddo
-
-        ! Le Petit et al 2006 page 19-20
-        ! integration trapeze
-        G(ri,zj) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
-             * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
-
-        Gio(ri,zj) = G(ri,zj) ! Teste OK par comparaison avec yorick
      enddo
   enddo
 
@@ -1812,9 +1829,18 @@ subroutine ecriture_UV_field()
   bitpix=-32
   extend=.true.
 
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz+1
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1823,7 +1849,6 @@ subroutine ecriture_UV_field()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Gio,status)
