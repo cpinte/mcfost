@@ -1884,7 +1884,6 @@ subroutine ecriture_temperature(iTemperature)
   logical :: simple, extend
   character(len=512) :: filename
 
-  ! integer, dimension(n_rad,nz,grain_nRE_start:grain_nRE_end) :: tmp
   integer, dimension(:,:,:,:), allocatable :: tmp
 
 
@@ -1965,16 +1964,16 @@ subroutine ecriture_temperature(iTemperature)
 
      if (l3D) then
         naxis=4
-        naxes(1)=n_rad
-        naxes(2)=2*nz
-        naxes(3)=n_az
-        naxes(4)=n_grains_RE_nLTE
+        naxes(1)=n_grains_RE_nLTE
+        naxes(2)=n_rad
+        naxes(3)=2*nz
+        naxes(4)=n_az
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      else
         naxis=3
-        naxes(1)=n_rad
-        naxes(2)=nz
-        naxes(3)=n_grains_RE_nLTE
+        naxes(1)=n_grains_RE_nLTE
+        naxes(2)=n_rad
+        naxes(3)=nz
         nelements=naxes(1)*naxes(2)*naxes(3)
      endif
 
@@ -2028,16 +2027,16 @@ subroutine ecriture_temperature(iTemperature)
 
      if (l3D) then
         naxis=4
-        naxes(1)=n_rad
-        naxes(2)=2*nz
-        naxes(3)=n_az
-        naxes(4)=n_grains_nRE
+        naxes(1)=n_grains_nRE
+        naxes(2)=n_rad
+        naxes(3)=2*nz
+        naxes(4)=n_az
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      else
         naxis=3
-        naxes(1)=n_rad
-        naxes(2)=nz
-        naxes(3)=n_grains_nRE
+        naxes(1)=n_grains_nRE
+        naxes(2)=n_rad
+        naxes(3)=nz
         nelements=naxes(1)*naxes(2)*naxes(3)
      endif
 
@@ -2053,19 +2052,19 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=32
      if (l3D) then
         naxis=4
-        naxes(1)=n_rad
-        naxes(2)=2*nz+1
-        naxes(3)=n_az
-        naxes(4)=n_grains_nRE
+        naxes(1)=n_grains_nRE
+        naxes(2)=n_rad
+        naxes(3)=2*nz+1
+        naxes(4)=n_az
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-        allocate(tmp(n_rad,-nz:nz,n_az,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,-nz:nz,n_az), stat=alloc_status)
      else
         naxis=3
-        naxes(1)=n_rad
-        naxes(2)=nz
-        naxes(3)=n_grains_nRE
+        naxes(1)=n_grains_nRE
+        naxes(2)=n_rad
+        naxes(3)=nz
         nelements=naxes(1)*naxes(2)*naxes(3)
-        allocate(tmp(n_rad,nz,n_az,grain_nRE_start:grain_nRE_end), stat=alloc_status)
+        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,nz,n_az), stat=alloc_status)
      endif
 
      if (alloc_status /= 0) then
@@ -2088,9 +2087,9 @@ subroutine ecriture_temperature(iTemperature)
               icell = cell_map(i,j,k)
               do l=grain_nRE_start, grain_nRE_end
                  if (l_RE(l,icell)) then
-                    tmp(i,j,k,l) = 1
+                    tmp(l,i,j,k) = 1
                  else
-                    tmp(i,j,k,l) = 0
+                    tmp(l,i,j,k) = 0
                  endif
               enddo
            enddo
@@ -2122,17 +2121,17 @@ subroutine ecriture_temperature(iTemperature)
      if (l3D) then
         naxis=5
         naxes(1)=n_T
-        naxes(2)=n_rad
-        naxes(3)=2*nz
-        naxes(4)=n_az
-        naxes(5)=n_grains_nRE
+        naxes(2)=n_grains_nRE
+        naxes(3)=n_rad
+        naxes(4)=2*nz
+        naxes(5)=n_az
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
      else
         naxis=4
         naxes(1)=n_T
-        naxes(2)=n_rad
-        naxes(3)=nz
-        naxes(4)=n_grains_nRE
+        naxes(2)=n_grains_nRE
+        naxes(3)=n_rad
+        naxes(4)=nz
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      endif
 
