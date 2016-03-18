@@ -25,7 +25,7 @@ module parametres
   integer :: indice_etape, etape_i, etape_f
   integer :: time_begin, time_end, time_tick, time_max
 
-  real, parameter :: max_mem = 4. ! GBytes
+  real :: max_mem = 4. ! GBytes maximum size for 1 array (mcfost can have 2 arrays of this size)
   logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
 
   ! Nombre de photons lances

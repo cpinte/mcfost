@@ -846,6 +846,12 @@ subroutine initialisation_mcfost()
         llimb_darkening = .true.
         call get_command_argument(i_arg,limb_darkening_file)
         i_arg = i_arg + 1
+     case("-max_mem")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) max_mem
+        max_mem = max_mem/2. ! facteur a la louche
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1164,6 +1170,7 @@ subroutine display_help()
   write(*,*) "       -u : updates MCFOST to most recent version"
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
   write(*,*) "       -h : displays full MCFOST history since v2.12.9"
+  write(*,*) "       -max_mem [GB] : maximum memory that MCFOST can use (approx), default 8"
   write(*,*) " "
   write(*,*) " Main mcfost options"
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
