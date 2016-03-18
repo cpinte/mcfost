@@ -811,7 +811,7 @@ subroutine calc_Jth(lambda)
         cst_E=2.0*hp*c_light**2
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Temperature_1grain(icell,l) ! WARNING : TODO : this does not work in 3D
+              Temp=Temperature_1grain(l,icell)
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < 500.0) then
                  coeff_exp=exp(cst_wl)
@@ -826,7 +826,7 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
-                 Temp=Temperature_1grain_nRE(icell,l) ! WARNING : TODO : this does not work in 3D
+                 Temp=Temperature_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < 500.) then
                     coeff_exp=exp(cst_wl)
