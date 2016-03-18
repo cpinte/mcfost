@@ -977,22 +977,21 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
 
   real(kind=db), parameter :: dtheta = pi/real(nang_scatt)
-  real(kind=db) :: density, theta, norme
+  real(kind=db) :: density, theta, norme, fact, k_sca_tot
 
   integer :: icell, k, l
 
+  fact = AU_to_cm * mum_to_cm**2
   !write(*,*) "Computing local scattering properties", lambda, p_lambda
 
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos) &
-  !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot) &
-  !$omp shared(tab_albedo_pos,prob_s11_pos) &
-  !$omp private(icell,k,density,norme,theta)&
-  !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells) &
+  !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
+  !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,letape_th) &
-  !$omp shared(lsepar_pola,ldust_prop,cell_map)
+  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,cell_map)
+  !$omp private(icell,k,density,norme,theta)&
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
      if (aniso_method==1) then
@@ -1022,7 +1021,9 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         endif !aniso_method
      enddo !k
 
-     if (kappa_sca(icell,lambda) > tiny_real) then
+     k_sca_tot = kappa_sca(icell,lambda) / fact ! We renormalize to remove the factor from opacity
+
+     if (k_sca_tot > tiny_real) then
 
         if (aniso_method==1) then ! full phase function
            ! Propriétés optiques des cellules
@@ -1036,10 +1037,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
            ! tab_s11_pos est calculee telle que la normalisation soit: k_sca_tot
            prob_s11_pos(1:nang_scatt,icell,p_lambda) = prob_s11_pos(1:nang_scatt,icell,p_lambda) + &
-                kappa_sca(icell,lambda) - prob_s11_pos(nang_scatt,icell,p_lambda)
+                k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda)
 
            ! Normalisation de la proba cumulee a 1
-           prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/kappa_sca(icell,lambda)
+           prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/k_sca_tot
 
            ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
            do l=0,nang_scatt
@@ -1055,7 +1056,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
            ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
            ! (for ray-tracing)
-           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (kappa_sca(icell,lambda) * deux_pi)
+           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * deux_pi)
 
 
            ! -- ! aniso_method = 2 --> HG
@@ -1083,7 +1084,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         ! 2) p_n_lambda = 1 au step 2 si p_n_cells > 1, sinon on peut utiliser n_lambda
         ! 3) on ne recalcule pas si fait au step 1
 
-     else ! kappa_sca = 0.0
+     else ! k_sca_tot = 0.0
         tab_albedo_pos(icell,lambda)=0.0
         ! Propriétés optiques des cellules
         prob_s11_pos(:,icell,p_lambda)=1.0
@@ -1096,7 +1097,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
         endif
 
-     endif ! kappa_sca > or = 0
+     endif ! k_sca_tot > or = 0
   enddo !icell
   !$omp enddo
   !$omp end parallel
