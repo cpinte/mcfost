@@ -40,16 +40,19 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
 
   if (lcylindrical) then
      if (l3D) then
-        call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+        call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w, &
+             flag_star,flag_direct_star,extrin,ltot,flag_sortie)
      else
         if (lopacity_wall) then
            call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
         else
-           call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+           call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w, &
+                flag_star,flag_direct_star,extrin,ltot,flag_sortie)
         endif
      endif
   else ! spherical
-     call length_deg2_sph(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+     call length_deg2_sph(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w, &
+          flag_star,flag_direct_star,extrin,ltot,flag_sortie)
   endif
 
   return
@@ -4350,7 +4353,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               zj=j
               phik=1
               Stokes(:) = 0.0_db ; !Stokes(1) = 1.0_db ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
-              call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
+              call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                   flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
                  do jj=1,j
