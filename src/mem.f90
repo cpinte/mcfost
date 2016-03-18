@@ -651,7 +651,7 @@ subroutine alloc_dynamique()
 
         allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error Proba_Temperature'
+           write(*,*) 'Allocation error (Temperature_1grain_nRE_old('
            stop
         endif
         Temperature_1grain_nRE_old =0.0
@@ -683,7 +683,7 @@ subroutine alloc_dynamique()
         if (lRE_nlTE) then
            allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
            if (alloc_status > 0) then
-              write(*,*) 'Allocation error Temperature_old'
+              write(*,*) 'Allocation error Temperature_1grain_old'
               stop
            endif
            Temperature_old=0.
@@ -695,7 +695,7 @@ subroutine alloc_dynamique()
   if (lnRE) then
      allocate(Emissivite_nRE_old(n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error Proba_Temperature'
+        write(*,*) 'Allocation error Emissivite_nRE_old'
         stop
      endif
      Emissivite_nRE_old = 0.0
