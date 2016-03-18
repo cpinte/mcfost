@@ -25,8 +25,8 @@ module parametres
   integer :: indice_etape, etape_i, etape_f
   integer :: time_begin, time_end, time_tick, time_max
 
-  real, parameter :: max_mem = 4. ! GBytes
-  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE
+  real :: max_mem = 4. ! GBytes maximum size for 1 array (mcfost can have 2 arrays of this size)
+  logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
 
   ! Nombre de photons lances
   logical :: ldust_transfer
@@ -101,7 +101,7 @@ module parametres
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
   ! Nombre de couches verticales ( = de stratifications)
-  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda
+  integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
@@ -362,7 +362,7 @@ module grains
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos ! n_cells,n_lambda
-  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_pos, tab_s33_pos, tab_s34_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
+  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
 
   character(len=512) :: aggregate_file, mueller_aggregate_file
   real :: R_sph_same_M
@@ -833,8 +833,6 @@ module ray_tracing
   integer :: nang_ray_tracing, nang_ray_tracing_star
 
   real, dimension(:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! 0:nang_scatt, n_cells, n_lambda
-  real, dimension(:,:,:), allocatable :: tab_s12_o_s11_ray_tracing, tab_s33_o_s11_ray_tracing, tab_s34_o_s11_ray_tracing ! 0:nang_scatt, n_cells, n_lambda
-
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
 

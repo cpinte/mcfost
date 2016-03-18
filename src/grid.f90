@@ -1404,4 +1404,63 @@ subroutine angle_disque()
 
 end subroutine angle_disque
 
+!***********************************************************
+
+subroutine verif_cell_position_cyl(icell, x, y, z)
+
+  real(kind=db), intent(inout) :: x,y,z
+  integer, intent(inout) :: icell
+
+  integer :: ri, zj, ri0, zj0, tmp_k
+  real(kind=db) :: factor, correct_moins, correct_plus
+
+  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_db + prec_grille
+
+  ! tmp :
+  call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
+
+  ! locate current cell index
+  call indice_cellule(x,y,z,ri,zj)
+
+  ! Patch pour eviter BUG sur position radiale
+  ! a cause de limite de precision
+  if (ri==0) then
+     factor = rmin/ sqrt(x*x+y*y) * correct_plus
+     x = x * factor
+     y = y * factor
+     z = z * factor
+
+     ! On verifie que c'est OK maintenant
+     call indice_cellule(x,y,z,ri,zj)
+     if (ri==0) then
+        write(*,*) "BUG in verif_cell_position_cyl"
+        write(*,*) "Exiting"
+        stop
+     endif
+  endif
+
+  icell = cell_map(ri,zj,1)
+
+  if (l_dark_zone(icell)) then ! Petit test de securite
+     write(*,*) "DARK ZONE"
+
+     ! On resort le paquet
+     if (zj < zj0) then
+        zj = zj0
+        z = z_lim(ri0,zj0)*correct_plus
+     endif
+     if (ri < ri0) then
+        ri = ri0
+        x = x * correct_plus
+        y = y * correct_plus
+     else if (ri > ri0) then
+        ri = ri0
+        x = x * correct_moins
+        y = y * correct_moins
+     endif
+  endif
+
+end subroutine verif_cell_position_cyl
+
 end module grid

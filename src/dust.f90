@@ -545,7 +545,7 @@ end function Bruggeman_EMT
 
 !******************************************************************************
 
-subroutine prop_grains(lambda, p_lambda)
+subroutine prop_grains(lambda)
   ! Calcule les propriétés des grains
   ! Masse, fraction en nombre, sections efficaces, matrices de muellers
   ! sortie des routines opacite
@@ -553,7 +553,7 @@ subroutine prop_grains(lambda, p_lambda)
 
   implicit none
 
-  integer, intent(in) :: lambda, p_lambda
+  integer, intent(in) :: lambda
   real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat
   integer :: k, pop
 
@@ -571,7 +571,7 @@ subroutine prop_grains(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,a,x,qext,qsca,gsca,amu1,amu2,pop) &
-  !$omp shared(r_grain,C_ext,C_sca,C_abs,C_abs_norm,wavel,aexp,tab_albedo,lambda,p_lambda,tab_g,grain) &
+  !$omp shared(r_grain,C_ext,C_sca,C_abs,C_abs_norm,wavel,aexp,tab_albedo,lambda,tab_g,grain) &
   !$omp shared(laggregate,tab_amu1,tab_amu2,n_grains_tot,S_grain) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop)
@@ -586,21 +586,21 @@ subroutine prop_grains(lambda, p_lambda)
         amu2=tab_amu2(lambda,pop)
         x = 2.0 * pi * a / wavel
         if (laggregate) then
-           call Mueller_GMM(p_lambda,k,qext,qsca,gsca)
+           call Mueller_GMM(lambda,k,qext,qsca,gsca)
         else
            if ((dust_pop(pop)%type=="Mie").or.(dust_pop(pop)%type=="mie").or.(dust_pop(pop)%type=="MIE")) then
               if (dust_pop(pop)%lcoating) then
                  amu1_coat=tab_amu1_coating(lambda,pop)
                  amu2_coat=tab_amu2_coating(lambda,pop)
-                 call Mueller_coated_sphere(p_lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
+                 call Mueller_coated_sphere(lambda,k,wavel,amu1,amu2,amu1_coat,amu2_coat, qext,qsca,gsca)
               else
-                 call Mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_Mie(lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else if ((dust_pop(pop)%type=="DHS").or.(dust_pop(pop)%type=="dhs")) then
               if (x < 1e4) then
-                 call Mueller_DHS(p_lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_DHS(lambda,k,wavel,amu1,amu2, qext,qsca,gsca)
               else
-                 call Mueller_Mie(p_lambda,k,x,amu1,amu2, qext,qsca,gsca)
+                 call Mueller_Mie(lambda,k,x,amu1,amu2, qext,qsca,gsca)
               endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
@@ -636,7 +636,7 @@ subroutine prop_grains(lambda, p_lambda)
      if (dust_pop(pop)%is_opacity_file) then
         a = r_grain(k)
         x = 2.0 * pi * a / wavel
-        call Mueller_opacity_file(p_lambda,k, qext,qsca,gsca)
+        call Mueller_opacity_file(lambda,k, qext,qsca,gsca)
 
         tab_albedo(k,lambda)=qsca/qext
         tab_g(k,lambda) = gsca
@@ -770,7 +770,7 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-subroutine opacite(lambda)
+subroutine opacite(lambda, p_lambda)
 ! Calcule la table d'opacite et ksca_CDF
 ! Inclus stratification empirique
 ! Utilise les resultats des routine densite et prop_grains
@@ -780,20 +780,11 @@ subroutine opacite(lambda)
 
   implicit none
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, p_lambda
 
-  integer :: icell, k, l, thetaj
-  real(kind=db) ::  density, k_sca_tot, k_ext_tot,norme, dtheta, theta, fact
-  logical :: lcompute_obs
-
-  real :: somme, gsca
-
-  logical :: ldens0
-
-  real(kind=db) :: k_abs_RE, k_abs_tot, angle
-
-  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
-  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+  integer :: icell, k, thetaj
+  real(kind=db) ::  density, fact, k_abs_RE, k_abs_tot, angle
+  logical :: lcompute_obs,  ldens0
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
@@ -817,15 +808,6 @@ subroutine opacite(lambda)
      endif
   endif
 
-  if (scattering_method == 2) then
-     tab_s11_pos(:,:,lambda)=0.0
-     if (lsepar_pola) then
-        tab_s12_pos(:,:,lambda)=0.0
-        tab_s33_pos(:,:,lambda)=0.0
-        tab_s34_pos(:,:,lambda)=0.0
-     endif
-  endif
-
   ! Calcul opacite et probabilite de diffusion
   do icell=1, n_cells
      kappa(icell,lambda) = 0.0
@@ -837,9 +819,13 @@ subroutine opacite(lambda)
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
+        tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
 
         k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
+
+     if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = kappa_sca(icell,lambda)/kappa(icell,lambda)
+     if (kappa_sca(icell,lambda) > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/kappa_sca(icell,lambda)
 
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
@@ -873,7 +859,7 @@ subroutine opacite(lambda)
   enddo !icell
 
   ! proba absorption sur une taille donnée
-  if (lRE_nLTE) then
+  if (lRE_nLTE.and. (.not.low_mem_th_emission_nLTE)) then
      if (letape_th) then
         do icell=1, n_cells
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
@@ -912,201 +898,30 @@ subroutine opacite(lambda)
      enddo
   endif
 
-  !$omp parallel &
-  !$omp default(none) &
-  !$omp shared(tab_s11_pos,tab_s12_pos,tab_s33_pos,tab_s34_pos,lcompute_obs) &
-  !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,n_grains_tot) &
-  !$omp shared(tab_albedo_pos,prob_s11_pos,somme) &
-  !$omp private(icell,k,density,k_sca_tot,k_ext_tot,norme,angle,gsca,theta,dtheta)&
-  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells) &
-  !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,tab_s11_ray_tracing,tab_s12_ray_tracing,tab_s33_ray_tracing,tab_s34_ray_tracing,letape_th) &
-  !$omp shared(tab_s12_o_s11_ray_tracing,tab_s33_o_s11_ray_tracing,tab_s34_o_s11_ray_tracing,lsepar_pola,ldust_prop,cell_map)
-  !$omp do schedule(dynamic,1)
-  do icell=1, p_n_cells
-     k_sca_tot=0.0
-     k_ext_tot=0.0
 
-     if (scattering_method == 2) then
-        if (aniso_method==1) then
-           tab_s11_pos(:,icell,lambda) = 0.
-           if (lsepar_pola) then
-              tab_s12_pos(:,icell,lambda) = 0.
-              tab_s33_pos(:,icell,lambda) = 0.
-              tab_s34_pos(:,icell,lambda) = 0.
-           endif
-        endif
-     else
-        if (.not.low_mem_scattering) ksca_CDF(0,icell,lambda)=0.0
-     endif
+  if (scattering_method==2) then
+     call calc_local_scattering_matrices(lambda, p_lambda)
+  else ! scattering_method ==1
+     if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
+        do icell=1, p_n_cells
+           ksca_CDF(0,icell,lambda)=0.0
 
-     somme=0.0
-     do  k=1,n_grains_tot
-        density=densite_pouss(k,icell)
-        k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
-        k_ext_tot = k_ext_tot + C_ext(k,lambda) * density
-        tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
-        !somme = somme + C_sca(lambda,k)*density
+           do  k=1,n_grains_tot
+              ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda) * densite_pouss(k,icell)
+           enddo !k
 
-        if (scattering_method == 2) then
-           if (aniso_method==1) then
-              ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
-              ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
-              ! tab_s11_pos soit normalisee a k_sca_tot
-              tab_s11_pos(:,icell,lambda) = tab_s11_pos(:,icell,lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
-              if (lsepar_pola) then
-                 tab_s12_pos(:,icell,lambda) = tab_s12_pos(:,icell,lambda) + tab_s12(:,k,lambda) * S_grain(k) * density
-                 tab_s33_pos(:,icell,lambda) = tab_s33_pos(:,icell,lambda) + tab_s33(:,k,lambda) * S_grain(k) * density
-                 tab_s34_pos(:,icell,lambda) = tab_s34_pos(:,icell,lambda) + tab_s34(:,k,lambda) * S_grain(k) * density
-              endif
-           endif !aniso_method
-        else
-           ! Au choix suivant que l'on considère un albedo par cellule ou par grain
-           ! albedo par cellule :
-           if (.not.low_mem_scattering) then
-              ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda)*density
-           endif
-        endif !scattering_method
-     enddo !k
-
-     if (k_ext_tot > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/k_ext_tot
-     if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
-
-
-     ! if (.not.letape_th.and.lcompute_obs.and.lscatt_ray_tracing) then
-     !PATCH
-     if (lcompute_obs.and.lscatt_ray_tracing) then
-        if (scattering_method == 1) then !  choix taille du grain diffuseur + matrice Mueller par grain
-           write(*,*) "ERROR: ray-tracing is incompatible with scattering method 1"
-           stop
-        endif
-
-        if (aniso_method == 1) then ! full phase-function
-           ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
-           if (abs(k_sca_tot) > 0.0_db) then
-              norme = deg_to_rad / (k_sca_tot * deux_pi) ! TODO: bizarre je ne sais pas d'ou vient le deg_to_rad
-
-              tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_pos(:,icell,lambda) * norme
-              if (lsepar_pola) then
-                 ! Signe moins pour corriger probleme de signe pola decouvert par Gaspard
-                 ! Le transfer est fait a l'envers (direction de propagation inversee), il faut donc changer
-                 ! le signe de la matrice de Mueller
-                 ! (--> supprime le signe dans dust_ray_tracing pour corriger le bug trouve par Marshall)
-                 tab_s12_ray_tracing(:,icell,lambda) =  - tab_s12_pos(:,icell,lambda) * norme
-                 tab_s33_ray_tracing(:,icell,lambda) =  - tab_s33_pos(:,icell,lambda) * norme
-                 tab_s34_ray_tracing(:,icell,lambda) =  - tab_s34_pos(:,icell,lambda) * norme
-              endif
+           if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
+              ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
            else
-              tab_s11_ray_tracing(:,icell,lambda) =  0.0_db
-              if (lsepar_pola) then
-                 tab_s12_ray_tracing(:,icell,lambda) =  0.0_db
-                 tab_s33_ray_tracing(:,icell,lambda) =  0.0_db
-                 tab_s34_ray_tracing(:,icell,lambda) =  0.0_db
-              endif
-           endif ! norme
-
-           if (lsepar_pola) then
-              tab_s12_o_s11_ray_tracing(:,icell,lambda) = tab_s12_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
-              tab_s33_o_s11_ray_tracing(:,icell,lambda) = tab_s33_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
-              tab_s34_o_s11_ray_tracing(:,icell,lambda) = tab_s34_ray_tracing(:,icell,lambda) / &
-                   max(tab_s11_ray_tracing(:,icell,lambda),tiny_real)
+              ! a la surface, on peut avoir une proba de 0.0 partout
+              ! dans ce cas, on decide qu'il n'y a que les plus petits grains
+              ! rq : en pratique, la densite est trop faible pour qu'il y ait
+              ! une diffusion a cet endroit.
+              ksca_CDF(:,icell,lambda) = 1.0
            endif
-
-        else ! aniso_method = 2 --> HG
-           gsca = tab_g_pos(icell,lambda)
-           tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
-        endif
-
-        if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
-     endif !lscatt_ray_tracing
-
-     if (sum(densite_pouss(:,icell)) > tiny_real) then
-
-        if (scattering_method==2) then ! scattering matrix per cell
-           if (aniso_method==1) then
-              ! Propriétés optiques des cellules
-              prob_s11_pos(0,icell,lambda)=0.0
-              dtheta = pi/real(nang_scatt)
-
-              do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
-                 theta = real(l)*dtheta
-                 prob_s11_pos(l,icell,lambda)=prob_s11_pos(l-1,icell,lambda)+ &
-                      tab_s11_pos(l,icell,lambda)*sin(theta)*dtheta
-              enddo
-
-              ! tab_s11_pos est calculee telle que la normalisation soit: k_sca_tot
-              prob_s11_pos(1:nang_scatt,icell,lambda) = prob_s11_pos(1:nang_scatt,icell,lambda) + &
-                   k_sca_tot - prob_s11_pos(nang_scatt,icell,lambda)
-
-              ! Normalisation de la proba cumulee a 1
-              prob_s11_pos(:,icell,lambda)=prob_s11_pos(:,icell,lambda)/k_sca_tot
-
-              ! TODO : normaliser les s11 en sortie des matrices de Mueller
-
-              ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
-              do l=0,180
-                 if (tab_s11_pos(l,icell,lambda) > tiny_real) then ! NEW TEST STRAT LAURE
-                    norme=1.0/tab_s11_pos(l,icell,lambda)
-                    if (.not.ldust_prop) then
-                       tab_s11_pos(l,icell,lambda)= 1.0 !tab_s11_pos(lambda,i,j,pk,l)*norme
-                    endif
-                    if (lsepar_pola) then
-                       tab_s12_pos(l,icell,lambda)=tab_s12_pos(l,icell,lambda)*norme
-                       tab_s33_pos(l,icell,lambda)=tab_s33_pos(l,icell,lambda)*norme
-                       tab_s34_pos(l,icell,lambda)=tab_s34_pos(l,icell,lambda)*norme
-                    endif
-                 endif
-              enddo
-
-           else !aniso_method == 2 : HG
-              tab_s11_pos(:,icell,lambda) = 1.0
-              if (lsepar_pola) then
-                 tab_s12_pos(:,icell,lambda)=0.0
-                 tab_s33_pos(:,icell,lambda)=0.0
-                 tab_s34_pos(:,icell,lambda)=0.0
-              endif
-           endif !aniso_method
-
-        else !scattering_method == 1 : choix taille du grain diffuseur
-           if (.not.low_mem_scattering) then
-              if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
-                 ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
-              else
-                 ! a la surface, on peut avoir une proba de 0.0 partout
-                 ! dans ce cas, on decide qu'il n'y a que les plus petits grains
-                 ! rq : en pratique, la densite est trop faible pour qu'il y ait
-                 ! une diffusion a cet endroit.
-                 ksca_CDF(:,icell,lambda) = 1.0
-              endif
-           endif ! low_mem_scattering
-        endif !scattering_method
-
-     else !densite_pouss = 0.0
-        tab_albedo_pos(icell,lambda)=0.0
-        if (scattering_method ==2) then
-           ! Propriétés optiques des cellules
-           prob_s11_pos(:,icell,lambda)=1.0
-           prob_s11_pos(0,icell,lambda)=0.0
-           ! Normalisation (idem que dans mueller)
-           tab_s11_pos(:,icell,lambda)=1.0
-           if (lsepar_pola) then
-              tab_s12_pos(:,icell,lambda)=0.0
-              tab_s33_pos(:,icell,lambda)=0.0
-              tab_s34_pos(:,icell,lambda)=0.0
-           endif
-        else !scattering_method
-           if (.not.low_mem_scattering) then
-              ksca_CDF(:,icell,lambda)=1.0
-              ksca_CDF(0,icell,lambda)=0.0
-           endif
-        endif ! scattering_method
-
-     endif !densite_pouss = 0.0
-  enddo !icell
-  !$omp enddo
-  !$omp end parallel
+        enddo ! icell
+     endif ! .not.low_mem_scattering
+  endif
 
   ! Supression scattering
   if (lno_scattering) then
@@ -1137,41 +952,7 @@ subroutine opacite(lambda)
   endif
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
-     write(*,*) "Writing dust properties"
-     ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
-
-     ! Only do it after the last pass through the wavelength table
-     ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
-     allocate(kappa_lambda(n_lambda))
-     allocate(albedo_lambda(n_lambda))
-     allocate(g_lambda(n_lambda))
-     allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
-     allocate(kappa_grain(n_lambda,n_grains_tot))
-
-     icell = cell_map(1,1,1)
-     kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
-     albedo_lambda=tab_albedo_pos(icell,:)
-     g_lambda=tab_g_pos(icell,:)
-
-     call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
-     call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
-     call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
-     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-
-     do l=1, n_lambda
-        kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
-     enddo
-     call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
-
-     S11_lambda_theta(:,:)= tab_s11_pos(:,icell,:)
-     call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
-
-     if (lsepar_pola) then
-        pol_lambda_theta(:,:)=-tab_s12_pos(:,icell,:) ! Deja normalise par S11
-        call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
-     endif
-
-     deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
+     call write_dust_prop()
 
      if (lstop_after_init) then
         write(*,*) "Exiting"
@@ -1188,6 +969,142 @@ subroutine opacite(lambda)
   return
 
 end subroutine opacite
+
+!******************************************************************************
+
+subroutine calc_local_scattering_matrices(lambda, p_lambda)
+
+  integer, intent(in) :: lambda, p_lambda
+
+  real(kind=db), parameter :: dtheta = pi/real(nang_scatt)
+  real(kind=db) :: density, theta, norme, fact, k_sca_tot
+
+  integer :: icell, k, l
+
+  fact = AU_to_cm * mum_to_cm**2
+  !write(*,*) "Computing local scattering properties", lambda, p_lambda
+
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos) &
+  !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
+  !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
+  !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
+  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,cell_map) &
+  !$omp private(icell,k,density,norme,theta,k_sca_tot)
+  !$omp do schedule(dynamic,1)
+  do icell=1, p_n_cells
+     if (aniso_method==1) then
+        tab_s11_pos(:,icell,p_lambda) = 0.
+        if (lsepar_pola) then
+           tab_s12_o_s11_pos(:,icell,p_lambda) = 0.
+           tab_s33_o_s11_pos(:,icell,p_lambda) = 0.
+           tab_s34_o_s11_pos(:,icell,p_lambda) = 0.
+        endif
+     endif
+
+     do  k=1,n_grains_tot
+        density=densite_pouss(k,icell)
+        if (aniso_method==1) then
+           ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
+           ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
+           ! tab_s11_pos soit normalisee a k_sca_tot
+           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
+           if (lsepar_pola) then
+              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + &
+                   tab_s12(:,k,lambda) * S_grain(k) * density
+              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + &
+                   tab_s33(:,k,lambda) * S_grain(k) * density
+              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + &
+                   tab_s34(:,k,lambda) * S_grain(k) * density
+           endif
+        endif !aniso_method
+     enddo !k
+
+     k_sca_tot = kappa_sca(icell,lambda) / fact ! We renormalize to remove the factor from opacity
+
+     if (k_sca_tot > tiny_real) then
+
+        if (aniso_method==1) then ! full phase function
+           ! Propriétés optiques des cellules
+           prob_s11_pos(0,icell,p_lambda)=0.0
+
+           do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+              theta = real(l)*dtheta
+              prob_s11_pos(l,icell,p_lambda)=prob_s11_pos(l-1,icell,p_lambda)+ &
+                   tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
+           enddo
+
+           ! tab_s11_pos est calculee telle que la normalisation soit: k_sca_tot
+           prob_s11_pos(1:nang_scatt,icell,p_lambda) = prob_s11_pos(1:nang_scatt,icell,p_lambda) + &
+                k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda)
+
+           ! Normalisation de la proba cumulee a 1
+           prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/k_sca_tot
+
+           ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
+           do l=0,nang_scatt
+              if (tab_s11_pos(l,icell,p_lambda) > tiny_real) then
+                 norme=1.0/tab_s11_pos(l,icell,p_lambda)
+                 if (lsepar_pola) then
+                    tab_s12_o_s11_pos(l,icell,p_lambda)=tab_s12_o_s11_pos(l,icell,p_lambda)*norme
+                    tab_s33_o_s11_pos(l,icell,p_lambda)=tab_s33_o_s11_pos(l,icell,p_lambda)*norme
+                    tab_s34_o_s11_pos(l,icell,p_lambda)=tab_s34_o_s11_pos(l,icell,p_lambda)*norme
+                 endif
+              endif
+           enddo
+
+           ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
+           ! (for ray-tracing)
+           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * deux_pi)
+
+
+           ! -- ! aniso_method = 2 --> HG
+           ! -- gsca = tab_g_pos(icell,lambda)
+           ! -- tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
+           ! --
+           ! -- if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
+        else !aniso_method == 2 : HG
+           tab_s11_pos(:,icell,p_lambda) = 1.0
+           if (lsepar_pola) then
+              tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
+              tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
+              tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
+           endif
+        endif !aniso_method
+
+
+        ! todo :
+        ! utiliser tab_s11_pos pour raie tracing et tab_s12_o_s11
+        ! 1) normaliser les tab_s12_o_s11
+        ! 2) normaliser les tab_s11 avec  norme = dtheta / (k_sca_tot * deux_pi)
+
+        ! Multi ou mono-lambda : mono-lambda si 180 * p_n_cells * p_n_lambda >> 1
+        ! 1) p_n_lambda = n_lambda au step 1
+        ! 2) p_n_lambda = 1 au step 2 si p_n_cells > 1, sinon on peut utiliser n_lambda
+        ! 3) on ne recalcule pas si fait au step 1
+
+     else ! k_sca_tot = 0.0
+        tab_albedo_pos(icell,lambda)=0.0
+        ! Propriétés optiques des cellules
+        prob_s11_pos(:,icell,p_lambda)=1.0
+        prob_s11_pos(0,icell,p_lambda)=0.0
+        ! Normalisation (idem que dans mueller)
+        tab_s11_pos(:,icell,p_lambda)=1.0
+        if (lsepar_pola) then
+           tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
+           tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
+           tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
+        endif
+
+     endif ! k_sca_tot > or = 0
+  enddo !icell
+  !$omp enddo
+  !$omp end parallel
+
+  return
+
+end subroutine calc_local_scattering_matrices
 
 !******************************************************************************
 
