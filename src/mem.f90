@@ -1078,7 +1078,8 @@ subroutine realloc_dust_mol()
      endif
   endif
 
-  allocate(tab_albedo_pos(p_n_cells,n_lambda), tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+  ! todo : could be p_n_cells
+  allocate(tab_albedo_pos(n_cells,n_lambda), tab_g_pos(n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos (realloc)'
      stop
@@ -1137,6 +1138,8 @@ subroutine realloc_step2()
 
   integer :: alloc_status, mem_size
   integer :: p_n_lambda2_pos = 1
+
+  p_n_lambda_pos = p_n_lambda2_pos ! just in case
 
   ! parametrage methode de diffusion
   if (scattering_method == 0) then
@@ -1354,7 +1357,8 @@ subroutine realloc_step2()
   tab_g = 0
 
   deallocate(tab_albedo_pos,tab_g_pos)
-  allocate(tab_albedo_pos(p_n_cells,n_lambda2), tab_g_pos(p_n_cells,n_lambda2), stat=alloc_status)
+  ! todo : could be p_n_cells
+  allocate(tab_albedo_pos(n_cells,n_lambda2), tab_g_pos(n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
      stop
