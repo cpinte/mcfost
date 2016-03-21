@@ -1130,7 +1130,7 @@ subroutine write_disk_struct()
 
   real, dimension(:,:,:), allocatable :: dens
   real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
-  real(kind=db), dimension(:,:,:), allocatable :: vol
+  real, dimension(:,:,:), allocatable :: vol
   real(kind=db), dimension(:,:,:,:), allocatable :: grid
 
 
@@ -1581,13 +1581,12 @@ subroutine write_disk_struct()
   naxes(4)=2
   nelements=naxes(1)*naxes(2)*naxes(3)
 
-  grid = 0.0
   if (l3D) then
      naxes(2)=2*nz+1
      naxes(3)=n_az
      naxes(4)=3
 
-     allocate(grid(n_rad,2*nz+1,n_az,3))
+     allocate(grid(n_rad,2*nz+1,n_az,3)) ; grid = 0.0
      do i=1, n_rad
         grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
         do j=1,nz
