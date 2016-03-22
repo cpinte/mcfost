@@ -681,7 +681,6 @@ subroutine transfert_poussiere()
            n_phot_sed=0.0;  n_phot_sed2=0.0; n_phot_envoyes=0.0
            sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
            if (loutput_UV_field) xJ_abs = 0.0
-           if (lProDiMo) xJ_abs = 0.0  ! Au cas ou
         endif ! .not.letape_th
 
 
