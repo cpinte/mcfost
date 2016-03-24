@@ -623,7 +623,7 @@ subroutine diffusion_approx_nLTE_nRE()
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
               icell = cell_map(i,j,k)
-              Temperature_1grain_nRE(icell,:) = Temperature(icell)
+              Temperature_1grain_nRE(:,icell) = Temperature(icell)
               l_RE(:,icell) = .true.
            enddo !j
         enddo !j

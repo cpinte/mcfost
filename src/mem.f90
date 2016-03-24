@@ -651,7 +651,7 @@ subroutine alloc_dynamique()
 
         allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
         if (alloc_status > 0) then
-           write(*,*) 'Allocation error (Temperature_1grain_nRE_old('
+           write(*,*) 'Allocation error Temperature_1grain_nRE_old'
            stop
         endif
         Temperature_1grain_nRE_old =0.0
