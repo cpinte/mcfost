@@ -472,7 +472,7 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
   if (lvariable_dust) then
      p_icell = icell
   else
-     p_icell = cell_map(1,1,1)
+     p_icell = icell_ref
   endif
 
   do ibin = 1, RT_n_incl
@@ -538,7 +538,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
   if (lvariable_dust) then
      p_icell = icell
   else
-     p_icell = cell_map(1,1,1)
+     p_icell = icell_ref
   endif
 
   do ibin = 1, RT_n_incl
@@ -917,7 +917,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,cell_map) &
-  !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos) &
+  !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref) &
   !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,correct_w,phi_scatt,norme) &
@@ -1003,7 +1003,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                           sum_s11(icell) = sum_s11(icell) + tab_s11_pos(k,icell,p_lambda) * sin_scatt
                        enddo
                     else ! pas de strat
-                       icell = cell_map(1,1,1)
+                       icell = icell_ref
                        sum_s11(icell) = sum_s11(icell) + tab_s11_pos(k,icell,p_lambda) * sin_scatt
                     endif
 
@@ -1078,7 +1078,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                        s34(icell) = - s11(icell) * tab_s34_o_s11_pos(k,icell,p_lambda)
                     enddo
                  else ! pas de strat
-                    icell = cell_map(1,1,1)
+                    icell = icell_ref
                     s12(icell) = - s11(icell) * tab_s12_o_s11_pos(k,icell,p_lambda)
                     s33(icell) = - s11(icell) * tab_s33_o_s11_pos(k,icell,p_lambda)
                     s34(icell) = - s11(icell) * tab_s34_o_s11_pos(k,icell,p_lambda)
@@ -1088,7 +1088,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
               !write(*,*) "s12"
 
               ! Boucle sur les cellules pour calculer l'intensite diffusee
-              p_icell = cell_map(1,1,1) ! k=1 en 2D
+              p_icell = icell_ref
               do icell=1, n_cells
                  if (lvariable_dust) p_icell = icell
 
@@ -1219,7 +1219,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   ! Boucle sur les cellules
   do ri=1, n_rad
      do zj=1,nz
-        icell = cell_map(ri,zj,1)
+        icell = cell_map(ri,zj,1) ! 2D
         ! Champ de radiation
         stokes(1) = Inu(icell)
 

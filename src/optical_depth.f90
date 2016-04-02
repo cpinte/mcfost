@@ -1219,7 +1219,7 @@ subroutine integ_tau(lambda)
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
   if (.not.lvariable_dust) then
-     icell = cell_map(1,1,1)
+     icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
              (kappa(icell,lambda)/AU_to_cm))
@@ -1229,7 +1229,7 @@ subroutine integ_tau(lambda)
 
   norme=0.0
   do j=1, nz
-     icell = cell_map(1,j,1)
+     icell = icell_ref
      norme=norme+kappa(icell,lambda)*(z_lim(1,j+1)-z_lim(1,j))
   enddo
   norme = norme * 2.
@@ -1238,7 +1238,7 @@ subroutine integ_tau(lambda)
   ! 1.49597870691e13 car kappa est en AU**-1
   ! Ok si pas de sedimentation
   if (.not.lvariable_dust) then
-     icell = cell_map(1,1,1)
+     icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
              (kappa(icell,lambda)/AU_to_cm))
@@ -1256,7 +1256,7 @@ subroutine integ_tau(lambda)
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
   if (.not.lvariable_dust) then
-     icell = cell_map(1,1,1)
+     icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
              (kappa(icell,lambda)/1.49597870691e13))

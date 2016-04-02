@@ -791,7 +791,7 @@ subroutine opacite(lambda, p_lambda)
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
   if (.not.lvariable_dust) then
-     icell = cell_map(1,1,1)
+     icell = icell_ref
      if (maxval(densite_pouss(:,icell)) < tiny_real) then
         ldens0 = .true.
         densite_pouss(:,icell) = nbre_grains(:)
@@ -937,7 +937,7 @@ subroutine opacite(lambda, p_lambda)
 
   ! On remet la densite à zéro si besoin
   if (ldens0) then
-     icell = cell_map(1,1,1)
+     icell = icell_ref
      densite_pouss(:,icell) = 0.0_db
      kappa(icell,lambda) = 0.0_db
      if (lRE_LTE) then

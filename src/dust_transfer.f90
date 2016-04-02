@@ -168,8 +168,8 @@ subroutine transfert_poussiere()
      if (loptical_depth_map) call calc_optical_depth_map(1)
 
      write(*,*) ""
-     write(*,*) "Dust properties in cell #1: "
-     p_icell = 1
+     write(*,*) "Dust properties in cell #", icell_ref
+     p_icell = icell_ref
      write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
      if (lsepar_pola) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
@@ -882,7 +882,7 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.
-  p_icell = 1
+  p_icell = icell_ref
 
   lpacket_alive=.true.
 
