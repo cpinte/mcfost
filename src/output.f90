@@ -2893,7 +2893,7 @@ subroutine write_dust_prop()
   allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
   allocate(kappa_grain(n_lambda,n_grains_tot))
 
-  icell = cell_map(1,1,1)
+  icell = icell_ref
   kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
   g_lambda=tab_g_pos(icell,:)

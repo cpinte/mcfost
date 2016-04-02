@@ -38,7 +38,7 @@ subroutine compute_othin_sublimation_radius()
   cst=cst_th/dust_pop(1)%T_sub
   cst=cst_th/1500.
 
-  icell = cell_map(1,1,1)
+  icell = icell_ref
 
   do lambda=1, n_lambda
      ! longueur d'onde en metre
@@ -176,7 +176,8 @@ subroutine sublimate_dust()
   write(*,*) "Sublimating dust"
 
   do i=1,n_rad
-     do j=1,nz
+     do j=j_start,nz
+        if (j==0) cycle
         do pk=1,n_az
            icell = cell_map(i,j,pk)
 
@@ -198,10 +199,13 @@ subroutine sublimate_dust()
 
   mass = 0.0
   do i=1,n_rad
-     do j=1,nz
-        icell = cell_map(i,j,1)
-        do k=1,n_grains_tot
-           mass=mass + densite_pouss(k,icell) * M_grain(k) * (volume(icell) * AU3_to_cm3)
+     do j=j_start,nz
+        if (j==0) cycle
+        do k=1,n_az
+           icell = cell_map(i,j,k)
+           do l=1,n_grains_tot
+              mass=mass + densite_pouss(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+           enddo
         enddo
      enddo
   enddo

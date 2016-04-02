@@ -74,7 +74,7 @@ subroutine init_GG_Tau_mol()
      Tcin(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
   enddo
 
-  icell = cell_map(1,1,1)
+  icell = icell_ref
   write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
 
   return
@@ -122,8 +122,8 @@ subroutine init_benchmark_vanZadelhoff1()
 
   tab_abundance = abundance
 
-  write(*,*) "Density", real(densite_gaz(cell_map(1,1,1)) * &
-       (r_grid(cell_map(1,1,1))**2 + z_grid(cell_map(1,1,1))**2)/rmin**2)
+  write(*,*) "Density", real(densite_gaz(icell_ref) * &
+       (r_grid(icell_ref)**2 + z_grid(icell_ref)**2)/rmin**2)
 
   return
 

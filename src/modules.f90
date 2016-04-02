@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.24"
+  character(8), parameter :: mcfost_release = "2.20.25"
   real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -105,7 +105,7 @@ module parametres
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
-  integer :: n_cells, nrz, p_n_cells
+  integer :: n_cells, nrz, p_n_cells, icell_ref
   logical :: llinear_grid
 
   integer :: n_lambda2

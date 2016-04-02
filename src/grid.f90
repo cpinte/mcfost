@@ -19,6 +19,8 @@ subroutine build_cylindrical_cell_mapping()
   integer :: i,j,k,icell, ntot, ntot2, alloc_status
   integer :: istart,iend,jstart,jend,kstart,kend, istart2,iend2,jstart2,jend2,kstart2,kend2
 
+  icell_ref = 1
+
   istart = 1
   iend = n_rad
 
