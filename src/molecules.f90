@@ -700,7 +700,7 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
   integer :: iTrans, ri, zj, phik, p_lambda, icell
-  real(kind=db) :: f, Jnu
+  real(kind=db) :: freq, Jnu
   real :: T, wl, kap
 
   real(kind=db) :: cst_E
@@ -778,7 +778,7 @@ subroutine init_dust_mol(imol)
 
      ! calcul de l'emissivite de la poussiere
      do iTrans=1,nTrans
-        f = Transfreq(iTrans)
+        freq = Transfreq(iTrans)
 
         ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
         ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
@@ -797,7 +797,7 @@ subroutine init_dust_mol(imol)
 
                  T = Temperature(icell)
                  ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-                 emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(f,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+                 emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
               enddo ! phik
            enddo bz ! zj
         enddo ! ri
