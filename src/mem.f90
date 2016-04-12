@@ -921,7 +921,7 @@ subroutine dealloc_em_th()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
-  deallocate(kappa,kappa_abs_LTE)
+  deallocate(kappa,kappa_abs_LTE,kappa_sca)
   if (allocated(proba_abs_RE_LTE)) then
      deallocate(proba_abs_RE_LTE)
      if (lRE_nLTE) deallocate(kappa_abs_nLTE)
@@ -949,8 +949,10 @@ subroutine dealloc_em_th()
      if (lsed_complete) then
         deallocate(log_frac_E_em)
         deallocate(DensE, DensE_m1, Dcoeff)
-        deallocate(xKJ_abs,xJ_abs,nbre_reemission)
-        deallocate(E0,J0,xT_ech,kdB_dT_CDF)
+        if (allocated(xKJ_abs)) deallocate(xKJ_abs,E0)
+        if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
+        if (allocated(nbre_reemission)) deallocate(nbre_reemission)
+        if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
      endif
 
      if (lRE_nLTE) then
@@ -1059,7 +1061,12 @@ subroutine realloc_dust_mol()
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), &
        emissivite_dust(n_cells,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error emissivite_dust (realloc)'
+     stop
+  endif
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
+
   if (.not.lonly_LTE .or. .not.lonly_nLTE) then
      allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
      if (lRE_nLTE) allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
