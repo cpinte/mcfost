@@ -185,22 +185,23 @@ subroutine init_reemission()
         endif
      enddo !icell
 
-     if (lvariable_dust) then ! Calcul dans toutes les cellules
-        if (low_mem_th_emission) then
-           do k=grain_RE_LTE_start,grain_RE_LTE_end
-              integ3(1) = 0.0
-              do lambda=2, n_lambda
-                 ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
-                 integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
+
+     if (low_mem_th_emission) then
+        do k=grain_RE_LTE_start,grain_RE_LTE_end
+           integ3(1) = 0.0
+           do lambda=2, n_lambda
+              ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
+              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
+           enddo !l
+           ! Normalisation a 1
+           if (integ3(n_lambda) > tiny(0.0_db)) then
+              do lambda=1, n_lambda
+                 kdB_dT_1grain_LTE_CDF(lambda,k,T) = integ3(lambda)/integ3(n_lambda)
               enddo !l
-              ! Normalisation a 1
-              if (integ3(n_lambda) > tiny(0.0_db)) then
-                 do lambda=1, n_lambda
-                    kdB_dT_1grain_LTE_CDF(lambda,k,T) = integ3(lambda)/integ3(n_lambda)
-                 enddo !l
-              endif
-           enddo !k
-        else  ! low_mem_th_emission
+           endif
+        enddo !k
+     else  ! low_mem_th_emission
+        if (lvariable_dust) then ! Calcul dans toutes les cellules
            do icell=1,p_n_cells
               integ3(0) = 0.0
               do lambda=1, n_lambda
@@ -215,28 +216,28 @@ subroutine init_reemission()
                  enddo !l
               endif
            enddo !icell
-        endif ! low_mem_th_emission
-     else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
-        ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
-        i=ri_not_empty
-        j=zj_not_empty
-        pk=phik_not_empty
-        icell = cell_map(i,j,pk)
-        integ3(0) = 0.0
-        do lambda=1, n_lambda
-           ! Pas besoin de cst , ni du volume (normalisation a 1)
-           integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
-        enddo !l
-
-        ! Normalisation a 1
-        if (integ3(n_lambda) > tiny(0.0_db)) then
-           p_icell = 1 ! When lvariable is off --> values stored in 1st cell
-
+        else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
+           ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
+           i=ri_not_empty
+           j=zj_not_empty
+           pk=phik_not_empty
+           icell = cell_map(i,j,pk)
+           integ3(0) = 0.0
            do lambda=1, n_lambda
-              kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
+              ! Pas besoin de cst , ni du volume (normalisation a 1)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
            enddo !l
-        endif
-     endif !lvariable_dust
+
+           ! Normalisation a 1
+           if (integ3(n_lambda) > tiny(0.0_db)) then
+              p_icell = icell_ref ! When lvariable is off --> values stored in 1st cell
+
+              do lambda=1, n_lambda
+                 kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
+              enddo !l
+           endif
+        endif !lvariable_dust
+     endif ! low_mem_th_emission
 
      if (lRE_nLTE) then
         ! produit par opacite (abs seule) massique d'une seule taille de grain
@@ -371,8 +372,6 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
   frac_T2=(Temp-Temp1)/(Temp2-Temp1)
   frac_T1=1.0-frac_T2
-
-
 
   l1=0
   l2=n_lambda
