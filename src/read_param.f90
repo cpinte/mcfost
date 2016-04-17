@@ -1127,6 +1127,26 @@ contains
     ! -----------------
     ! Density structure
     ! -----------------
+    read(1,*) line_buffer
+    do j=1,n_zones
+       read(1,*) disk_zone(j)%geometry
+       if (disk_zone(j)%geometry <=2) is_there_disk = .true.
+       if ((disk_zone(j)%geometry == 3).and.(grid_type == 1)) then
+          write(*,*) "WARNING : you are using an envelope density structure"
+          write(*,*) "          with a cylindrical grid !!!!"
+       endif
+       read(1,*) disk_zone(j)%diskmass, disk_zone(j)%gas_to_dust
+       read(1,*) disk_zone(j)%sclht, disk_zone(j)%Rref
+       disk_zone(j)%vert_exponent = 2.
+       read(1,*) disk_zone(j)%Rin, disk_zone(j)%edge, disk_zone(j)%Rout, disk_zone(j)%Rc
+       disk_zone(j)%Rmax = disk_zone(j)%Rout
+       if ((disk_zone(j)%geometry == 2).and.(disk_zone(j)%Rout < tiny_real)) then
+          disk_zone(j)%Rmax = 8 * disk_zone(j)%Rc ! tappered-edge
+       endif
+       read(1,*) disk_zone(j)%exp_beta
+       read(1,*) disk_zone(j)%surf, disk_zone(j)%moins_gamma_exp
+    enddo ! n_zones
+
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
     Rmin = minval(disk_zone(:)%Rmin)
     Rmax = maxval(disk_zone(:)%Rmax)
