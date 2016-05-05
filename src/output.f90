@@ -2908,11 +2908,15 @@ subroutine write_dust_prop()
   enddo
   call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
-  S11_lambda_theta(:,:)= tab_s11_pos(:,icell,:)
+  do l=1, n_lambda
+     S11_lambda_theta(l,:)= tab_s11_pos(:,icell,l)
+  enddo
   call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
-     pol_lambda_theta(:,:) = -tab_s12_o_s11_pos(:,icell,:) ! Deja normalise par S11
+     do l=1, n_lambda
+        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,icell,l) ! Deja normalise par S11
+     enddo
      call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif
 
