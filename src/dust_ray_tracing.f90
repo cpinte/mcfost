@@ -104,15 +104,6 @@ subroutine alloc_ray_tracing()
      endif
      xI_scatt = 0.0_db
 
-     allocate(xsin_scatt(RT_n_incl,RT_n_az,n_cells,n_az_rt,n_theta_rt,nb_proc), &
-          xN_scatt(RT_n_incl,RT_n_az,n_cells,n_az_rt,n_theta_rt,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xsin_scatt'
-        stop
-     endif
-     xsin_scatt = 0.0_db
-     xN_scatt = 0.0_db
-
      allocate(I_scatt(N_type_flux,n_az_rt,n_theta_rt), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error I_scatt'
@@ -205,7 +196,7 @@ subroutine dealloc_ray_tracing()
   deallocate(Stokes_ray_tracing,stars_map,J_th)
 
   if (lscatt_ray_tracing1) then
-     deallocate(xI_scatt,I_scatt, xsin_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
+     deallocate(xI_scatt,I_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
   else
      deallocate(I_spec_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,I_spec)
   endif
@@ -483,8 +474,6 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
 
         iRT = RT2d_to_RT1d(ibin, iaz)
         xI_scatt(1,iRT,icell,phik,psup,id) =  xI_scatt(1,iRT,icell,phik,psup,id) + flux
-        xsin_scatt(ibin,iaz,icell,phik,psup,id) =  xsin_scatt(ibin,iaz,icell,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
-        xN_scatt(ibin,iaz,icell,phik,psup,id) =  xN_scatt(ibin,iaz,icell,phik,psup,id) + 1.0_db
 
         if (lsepar_contrib) then
            if (flag_star) then
@@ -585,8 +574,6 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
 
         iRT = RT2d_to_RT1d(ibin, iaz)
         xI_scatt(1:4,iRT,icell,phik,psup,id) =  xI_scatt(1:4,iRT,icell,phik,psup,id) + l * S(:)
-        xsin_scatt(ibin,iaz,icell,phik,psup,id) =  xsin_scatt(ibin,iaz,icell,phik,psup,id) + 1.0_db !sin_scatt_rt1(ibin,id)
-        xN_scatt(ibin,iaz,icell,phik,psup,id) =  xN_scatt(ibin,iaz,icell,phik,psup,id) + 1.0_db
 
         if (lsepar_contrib) then
            flux = l * S(1)
@@ -652,9 +639,8 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa(icell,lambda) > tiny_db) then
-        norme(:,:) = sum(xN_scatt(ibin,iaz,icell,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,iaz,icell,:,:,:),dim=3),tiny_db)
         do itype=1,N_type_flux
-           I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,icell,:,:,:),dim=3) * norme(:,:)  * facteur * kappa_sca(icell,lambda)
+           I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,icell,:,:,:),dim=3) * facteur * kappa_sca(icell,lambda)
         enddo ! itype
 
         eps_dust1(1,icell,:,:) =  (  I_scatt(1,:,:) +  J_th(icell) ) / kappa(icell,lambda)
