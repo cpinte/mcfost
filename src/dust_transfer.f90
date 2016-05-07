@@ -72,6 +72,10 @@ subroutine transfert_poussiere()
   real(kind=db), pointer :: p_nnfot2
   real(kind=db) :: n_phot_envoyes_in_loop
 
+  integer :: time_1, time_2, time_RT, time_source_fct
+
+  time_source_fct = 0 ; time_RT = 0
+
   lambda0 = -99 ; nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
 
   ! Energie des paquets mise a 1
@@ -612,13 +616,27 @@ subroutine transfert_poussiere()
            do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
                  do iaz=1, RT_n_az
+                    call system_clock(time_1)
                     call init_dust_source_fct1(lambda,ibin,iaz)
+                    call system_clock(time_2)
+                    time_source_fct = time_source_fct + (time_2 - time_1)
+
+                    time_1 = time_2
                     call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                    call system_clock(time_2)
+                    time_RT = time_RT + (time_2 - time_1)
                  enddo
               else
                  iaz=1
+                 call system_clock(time_1)
                  call init_dust_source_fct2(lambda,p_lambda,ibin)
+                 call system_clock(time_2)
+                 time_source_fct = time_source_fct + (time_2 - time_1)
+
+                 time_1 = time_2
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                  call system_clock(time_2)
+                  time_RT = time_RT + (time_2 - time_1)
               endif
 
               call system_clock(time_end)
@@ -699,13 +717,27 @@ subroutine transfert_poussiere()
            do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
                  do iaz=1, RT_n_az
+                    call system_clock(time_1)
                     call init_dust_source_fct1(lambda,ibin,iaz)
-                    call dust_map(lambda,ibin,iaz)
+                    call system_clock(time_2)
+                    time_source_fct = time_source_fct + (time_2 - time_1)
+
+                    time_1 = time_2
+                    call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                    call system_clock(time_2)
+                    time_RT = time_RT + (time_2 - time_1)
                  enddo
               else
                  iaz=1
+                 call system_clock(time_1)
                  call init_dust_source_fct2(lambda,p_lambda,ibin)
-                 call dust_map(lambda,ibin,iaz)
+                 call system_clock(time_2)
+                 time_source_fct = time_source_fct + (time_2 - time_1)
+
+                 time_1 = time_2
+                 call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                 call system_clock(time_2)
+                 time_RT = time_RT + (time_2 - time_1)
               endif
            enddo
 
@@ -730,6 +762,9 @@ subroutine transfert_poussiere()
   enddo ! nbre_etapes
 
   if (lscatt_ray_tracing.and.(lsed_complete.or.(lmono0))) call dealloc_ray_tracing()
+
+  write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
+  write(*,*) "RT time        ", time_RT/real(time_tick), "s"
 
   return
 
