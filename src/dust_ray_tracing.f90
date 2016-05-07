@@ -650,11 +650,11 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   ! Intensite specifique diffusion
   do icell=1, n_cells
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
-     ! TODO : les lignes suivantes sont tres chers en OpenMP
+     ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa(icell,lambda) > tiny_db) then
+        norme(:,:) = sum(xN_scatt(ibin,iaz,icell,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,iaz,icell,:,:,:),dim=3),tiny_db)
         do itype=1,N_type_flux
-           norme = sum(xN_scatt(ibin,iaz,icell,:,:,:),dim=3) / max(sum(xsin_scatt(ibin,iaz,icell,:,:,:),dim=3),tiny_db)
-           I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,icell,:,:,:),dim=3) * norme  * facteur * kappa_sca(icell,lambda)
+           I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,icell,:,:,:),dim=3) * norme(:,:)  * facteur * kappa_sca(icell,lambda)
         enddo ! itype
 
         eps_dust1(1,icell,:,:) =  (  I_scatt(1,:,:) +  J_th(icell) ) / kappa(icell,lambda)
