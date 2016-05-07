@@ -1174,7 +1174,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
-  y_plan_image =cross_product(x_plan_image, uvw)
+  y_plan_image = cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image

@@ -47,8 +47,9 @@ ifeq ($(ARCH),DARWIN)
 MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
 FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.6 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
+
 ifeq ($(ARCH),LINUX)
-MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort 13
+MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort >=13
 ifeq ($(fostino),yes)
 MACH = -xW -axP # for fostino and ifort 10
 endif

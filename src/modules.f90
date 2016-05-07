@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.27"
+  character(8), parameter :: mcfost_release = "2.20.28"
   real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -845,7 +845,6 @@ module ray_tracing
   ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
   integer :: n_az_rt, n_theta_rt
   real, dimension(:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
-  real, dimension(:,:,:,:,:,:), allocatable ::  xsin_scatt, xN_scatt ! RT_n_incl, RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
   real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
   integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
   real(kind=db), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
