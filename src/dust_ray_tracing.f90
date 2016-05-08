@@ -97,14 +97,14 @@ subroutine alloc_ray_tracing()
      mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_cells * n_az_rt * n_theta_rt * nb_proc * 4 / 1024.**3
      if (mem_size > 0.5) write(*,*) "Trying to allocate", mem_size, "GB for ray-tracing"
 
-     allocate(xI_scatt(N_type_flux,RT_n_incl*RT_n_az,n_cells,n_az_rt,n_theta_rt,nb_proc), stat=alloc_status)
+     allocate(xI_scatt(n_az_rt,n_theta_rt,N_type_flux,RT_n_incl*RT_n_az,n_cells,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xI_scatt'
         stop
      endif
      xI_scatt = 0.0_db
 
-     allocate(I_scatt(N_type_flux,n_az_rt,n_theta_rt), stat=alloc_status)
+     allocate(I_scatt(n_az_rt,n_theta_rt,N_type_flux), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error I_scatt'
         stop
@@ -112,7 +112,7 @@ subroutine alloc_ray_tracing()
      I_scatt = 0.0_db
 
 
-     allocate(eps_dust1(N_type_flux,n_cells,n_az_rt,n_theta_rt), stat=alloc_status)
+     allocate(eps_dust1(n_az_rt,n_theta_rt,N_type_flux,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust1'
         stop
@@ -473,13 +473,13 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
         ! TODO : est-ce qu'il ne faut pas moyenner par le sin de l'angle de scatt dans la cellule azimuthale ???
 
         iRT = RT2d_to_RT1d(ibin, iaz)
-        xI_scatt(1,iRT,icell,phik,psup,id) =  xI_scatt(1,iRT,icell,phik,psup,id) + flux
+        xI_scatt(phik,psup,1,iRT,icell,id) =  xI_scatt(phik,psup,1,iRT,icell,id) + flux
 
         if (lsepar_contrib) then
            if (flag_star) then
-              xI_scatt(n_Stokes+2,iRT,icell,phik,psup,id) =  xI_scatt(n_Stokes+2,iRT,icell,phik,psup,id) + flux
+              xI_scatt(phik,psup,n_Stokes+2,iRT,icell,id) =  xI_scatt(phik,psup,n_Stokes+2,iRT,icell,id) + flux
            else
-              xI_scatt(n_Stokes+4,iRT,icell,phik,psup,id) =  xI_scatt(n_Stokes+4,iRT,icell,phik,psup,id) + flux
+              xI_scatt(phik,psup,n_Stokes+4,iRT,icell,id) =  xI_scatt(phik,psup,n_Stokes+4,iRT,icell,id) + flux
            endif
         endif
      enddo ! iaz
@@ -573,16 +573,16 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
         S(3)=-S(3)
 
         iRT = RT2d_to_RT1d(ibin, iaz)
-        xI_scatt(1:4,iRT,icell,phik,psup,id) =  xI_scatt(1:4,iRT,icell,phik,psup,id) + l * S(:)
+        xI_scatt(phik,psup,1:4,iRT,icell,id) =  xI_scatt(phik,psup,1:4,iRT,icell,id) + l * S(:)
 
         if (lsepar_contrib) then
            flux = l * S(1)
            if (flag_star) then
               !n_Stokes+2 = 6
-              xI_scatt(6,iRT,icell,phik,psup,id) =  xI_scatt(6,iRT,icell,phik,psup,id) + flux
+              xI_scatt(phik,psup,6,iRT,icell,id) =  xI_scatt(phik,psup,6,iRT,icell,id) + flux
            else
               !n_Stokes+4 = 8
-              xI_scatt(8,iRT,icell,phik,psup,id) =  xI_scatt(8,iRT,icell,phik,psup,id) + flux
+              xI_scatt(phik,psup,8,iRT,icell,id) =  xI_scatt(phik,psup,8,iRT,icell,id) + flux
            endif
         endif
      enddo ! iaz
@@ -640,23 +640,23 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa(icell,lambda) > tiny_db) then
         do itype=1,N_type_flux
-           I_scatt(itype,:,:) = sum(xI_scatt(itype,iRT,icell,:,:,:),dim=3) * facteur * kappa_sca(icell,lambda)
+           I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca(icell,lambda)
         enddo ! itype
 
-        eps_dust1(1,icell,:,:) =  (  I_scatt(1,:,:) +  J_th(icell) ) / kappa(icell,lambda)
+        eps_dust1(:,:,1,icell) =  (  I_scatt(:,:,1) +  J_th(icell) ) / kappa(icell,lambda)
 
         ! TODO : there is might a problem in polarization in 2D
         if (lsepar_pola) then
-           eps_dust1(2:4,icell,:,:) =  I_scatt(2:4,:,:) / kappa(icell,lambda)
+           eps_dust1(:,:,2:4,icell) =  I_scatt(:,:,2:4) / kappa(icell,lambda)
         endif
 
         if (lsepar_contrib) then
-           eps_dust1(n_Stokes+2,icell,:,:) =    I_scatt(n_Stokes+2,:,:) / kappa(icell,lambda)
-           eps_dust1(n_Stokes+3,icell,:,:) =    J_th(icell) / kappa(icell,lambda)
-           eps_dust1(n_Stokes+4,icell,:,:) =    I_scatt(n_Stokes+4,:,:) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+2,icell) =    I_scatt(:,:,n_Stokes+2) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+3,icell) =    J_th(icell) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+4,icell) =    I_scatt(:,:,n_Stokes+4) / kappa(icell,lambda)
         endif ! lsepar_contrib
      else
-        eps_dust1(:,icell,:,:) = 0.0_db
+        eps_dust1(:,:,:,icell) = 0.0_db
      endif ! kappa > 0
   enddo ! icell
 
@@ -1406,7 +1406,7 @@ function dust_source_fct(ri,zj,phik, x,y,z)
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
 
 
-     dust_source_fct(:) = eps_dust1(:,icell,k,psup)  ! ??? ce n'est pas lineaire
+     dust_source_fct(:) = eps_dust1(k,psup,:,icell)  ! ??? ce n'est pas lineaire
 
   else ! Methode 2 : la seule actuelle
      ! Pour interpolations spatiales
