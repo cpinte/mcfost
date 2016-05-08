@@ -628,7 +628,7 @@ subroutine ecriture_map_ray_tracing()
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
-     call ftpkys(unit,'BUNIT',"Jy/pixel",' ',status)
+     call ftpkys(unit,'BUNIT',"JY/PIXEL",' ',status)
      call ftpkyd(unit,'RESTFREQ',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
 
