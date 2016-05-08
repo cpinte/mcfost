@@ -44,11 +44,11 @@ subroutine transfert_poussiere()
   real(kind=db), dimension(4) :: Stokes
 
   ! Parametres simu
-  integer :: time, lambda_seuil, ymap0, xmap0, nbre_phot2
+  integer :: itime, lambda_seuil, ymap0, xmap0, nbre_phot2
   integer :: ind_etape, first_etape_obs
   integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, nnfot1_cumul
 
-  real :: n_phot_lim
+  real :: time, n_phot_lim
   logical :: lpacket_alive, lintersect
 
   logical :: lscatt_ray_tracing1_save, lscatt_ray_tracing2_save
@@ -459,9 +459,14 @@ subroutine transfert_poussiere()
      if (ind_etape==etape_start) then
         call system_clock(time_end)
 
-        time=int((time_end - time_begin)/time_tick)
-        write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
-     endif
+        time=(time_end - time_begin)/real(time_tick)
+         if (time > 60) then
+            itime = int(time)
+            write (*,'(" Initialization complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+         else
+            write (*,'(" Initialization complete in ", F5.2, "s")')  time
+         endif
+      endif
 
      if (letape_th) write(*,*) "Computing temperature structure ..."
      if (lmono0)    write(*,*) "Computing MC radiation field ..."
@@ -610,8 +615,13 @@ subroutine transfert_poussiere()
         if (lscatt_ray_tracing) then
 
            call system_clock(time_end)
-           time=int((time_end - time_begin)/time_tick)
-           write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+           time=(time_end - time_begin)/real(time_tick)
+           if (time > 60) then
+              itime = int(time)
+              write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+           else
+              write (*,'(" Time = ", F5.2, "s")')  time
+           endif
 
            do ibin=1,RT_n_incl
               if (lscatt_ray_tracing1) then
@@ -640,8 +650,13 @@ subroutine transfert_poussiere()
               endif
 
               call system_clock(time_end)
-              time=int((time_end - time_begin)/time_tick)
-              write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+              time=(time_end - time_begin)/real(time_tick)
+              if (time > 60) then
+                 itime = int(time)
+                 write (*,'(" Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+              else
+                 write (*,'(" Time = ", F5.2, "s")')  time
+              endif
            enddo
 
            call ecriture_map_ray_tracing()
@@ -704,12 +719,16 @@ subroutine transfert_poussiere()
 
         call system_clock(time_end)
         if (time_end < time_begin) then
-           time=int((time_end + (1.0 * time_max)- time_begin)/time_tick)
+           time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
         else
-           time=int((time_end - time_begin)/time_tick)
+           time=(time_end - time_begin)/real(time_tick)
         endif
-        write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
-
+        if (time > 60) then
+           itime = int(time)
+           write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+        else
+           write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
+        endif
      else ! Etape 2 SED
 
         ! SED ray-tracing
@@ -762,9 +781,10 @@ subroutine transfert_poussiere()
   enddo ! nbre_etapes
 
   if (lscatt_ray_tracing.and.(lsed_complete.or.(lmono0))) call dealloc_ray_tracing()
-
-  write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
-  write(*,*) "RT time        ", time_RT/real(time_tick), "s"
+  if (lscatt_ray_tracing) then
+     write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
+     write(*,*) "RT time        ", time_RT/real(time_tick), "s"
+  endif
 
   return
 
@@ -1225,7 +1245,7 @@ subroutine dust_map(lambda,ibin,iaz)
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
      !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j,ibin,iaz) &
      !$omp shared(n_iter_min,n_iter_max,lambda,l_sym_ima,cst_phi)
-     id =1 ! pour code sequentiel
+     id = 1 ! pour code sequentiel
 
      !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT
@@ -1535,7 +1555,7 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
               ! Flux recu dans le pixel
              ! write(*,*) i,j,  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
               !write(*,*) "pixel"
-              Stokes(:) = Stokes(:) +  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+              Stokes(:) = Stokes(:) + integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
      enddo !i
