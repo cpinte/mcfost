@@ -1170,7 +1170,7 @@ subroutine dust_map(lambda,ibin,iaz)
   integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
 
 
-  integer, parameter :: n_rad_RT = 100, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
+  integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
   real(kind=db), dimension(n_rad_RT) :: tab_r
   real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
 
@@ -1258,6 +1258,7 @@ subroutine dust_map(lambda,ibin,iaz)
            phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
+           ! this is of course the expensive line:
            call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
@@ -1341,29 +1342,25 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   integer, intent(in) :: lambda, iaz
   real(kind=db), intent(in) :: u,v,w
 
-  integer, parameter :: n_ray_star_SED = 10000
+  integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02, cos_thet
-  real :: rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
+  real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
+  real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center
   logical :: in_map, lpola
 
-  real, dimension(:,:), allocatable :: map_1star, Q_1star, U_1star
+  ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
+  real, dimension(npix_x,npix_y) :: map_1star, Q_1star, U_1star
 
-  stars_map = 0.0 ;
-  id = 1 ;
+  stars_map(:,:,:) = 0.0 ;
 
-  x_center = igridx/2 + 1
-  y_center = igridy/2 + 1
+  x_center = npix_x/2 + 1
+  y_center = npix_y/2 + 1
 
-  allocate(map_1star(igridx,igridy))
-  lpola = .false.
-  if (lsepar_pola.and.llimb_darkening) then
-     lpola = .true.
-     allocate(Q_1star(igridx,igridy), U_1star(igridx,igridy))
-  endif
+  cos_RT_az = cos(tab_RT_az(iaz) * deg_to_rad)
+  sin_RT_az = sin(tab_RT_az(iaz) * deg_to_rad)
 
   ! Energie
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
@@ -1376,7 +1373,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      pix_size = map_size/zoom / max(igridx,igridy)
      do istar=1, n_etoiles
         if (2*etoile(istar)%r > pix_size) then
-           n_ray_star(istar) = n_ray_star_SED * int(max(etoile(istar)%r/pix_size**2,1.))
+           n_ray_star(istar) = n_ray_star_SED * 8 * int(max(etoile(istar)%r/pix_size**2,1.))
            if (istar==1) write(*,*) ""
            write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
         endif
@@ -1400,6 +1397,20 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
 
      ! Etoile non ponctuelle
      norme = 0.0_db
+
+     !$omp parallel &
+     !$omp default(none) &
+     !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
+     !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
+     !$omp shared(x_center,y_center) &
+     !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
+     !$omp private(Pola_LimbDarkening,ri,zj,phik,cos_RT_az,sin_RT_az,tau,lmin,lmax,in_map,P,phi) &
+     !$omp reduction(+:norme,map_1star,Q_1star,U_1star)
+
+     id = 1 ! Pour code sequentiel
+     !$ id = omp_get_thread_num() + 1
+
+     !$omp do schedule(static,n_ray_star(istar)/nb_proc)
      do iray=1,n_ray_star(istar)
         ! Position aleatoire sur la disque stellaire
         rand  = sprng(stream(id))
@@ -1415,9 +1426,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         cos_thet = abs(x*u + y*v + z*w) ;
 
         if (llimb_darkening) then
-           LimbDarkening = interp(limb_darkening, mu_limb_darkening, real(cos_thet))
+           LimbDarkening = interp(limb_darkening, mu_limb_darkening, cos_thet)
            if (lsepar_pola) then
-              Pola_LimbDarkening = interp(pola_limb_darkening, mu_limb_darkening, real(cos_thet))
+              Pola_LimbDarkening = interp(pola_limb_darkening, mu_limb_darkening, cos_thet)
            endif
         endif
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
@@ -1426,8 +1437,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
         if (abs(w -1) < tiny_real) then ! rotating the position as the old "rotation" routine does not deal properly with case w==1
-           x0 = x1 * cos(tab_RT_az(iaz) * deg_to_rad) + y1 * sin(tab_RT_az(iaz) * deg_to_rad)
-           y0 = x1 * sin(tab_RT_az(iaz) * deg_to_rad) - y1 * cos(tab_RT_az(iaz) * deg_to_rad)
+           x0 = x1 * cos_RT_az + y1 * sin_RT_az
+           y0 = x1 * sin_RT_az - y1 * cos_RT_az
         else ! the rotation information is already incoded in u,v,w
            x0=x1
            y0=y1
@@ -1468,8 +1479,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         norme = norme + cos_thet * LimbDarkening
-     enddo
-
+     enddo ! iray
+     !$omp end do
+     !$omp end parallel
 
      ! Normalizing map
      map_1star(:,:) = map_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
