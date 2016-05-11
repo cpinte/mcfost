@@ -1354,6 +1354,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
   real, dimension(npix_x,npix_y) :: map_1star, Q_1star, U_1star
 
+  lpola = .false.
+
   stars_map(:,:,:) = 0.0 ;
 
   x_center = npix_x/2 + 1
