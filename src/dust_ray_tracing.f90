@@ -758,6 +758,11 @@ subroutine calc_Jth(lambda)
   if ((l_em_disk_image).or.(lsed)) then
      if (lRE_LTE) then
         cst_E=2.0*hp*c_light**2
+        !$omp parallel &
+        !$omp default(none) &
+        !$omp shared(n_cells,Temperature,wl,lambda,kappa_abs_LTE,cst_E,J_th) &
+        !$omp private(icell,Temp,cst_wl,coeff_exp)
+        !$omp do
         do icell=1, n_cells
            Temp=Temperature(icell) ! que LTE pour le moment
            cst_wl=cst_th/(Temp*wl)
@@ -768,6 +773,8 @@ subroutine calc_Jth(lambda)
               J_th(icell) = 0.0_db
            endif
         enddo ! icell
+        !$omp end do
+        !$omp end parallel
      endif !lRE_LTE
 
      if (lRE_nLTE) then
@@ -829,7 +836,6 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real(kind=db) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
 
   real(kind=db), dimension(:,:,:,:), allocatable :: Inu ! sum of I_spec over cpus
-  real(kind=db), dimension(n_cells) :: Inu_max
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
   integer :: theta_I, phi_I, dir, iscatt, id
@@ -880,7 +886,6 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
            Inu(:,theta_I,phi_I,icell) = sum(I_spec(:,theta_I,phi_I,icell,:),dim=2)
         enddo ! phi_I
      enddo ! theta_I
-     Inu_max(icell) = maxval(Inu(1,:,:,icell))
   enddo !icell
 
 
@@ -1171,7 +1176,6 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   real(kind=db), dimension(4) :: Stokes, S, C, D
   real(kind=db) :: x, y, z, u, v, w, facteur
 
-  real(kind=db), dimension(n_cells) :: Inu
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
   integer :: k, icell, p_icell
@@ -1179,8 +1183,6 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   real(kind=db) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
 
   real(kind=db), parameter :: prec = 0._db
-
-  id = 1 ! TMP
 
   if (lmono0) then ! image
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
@@ -1203,162 +1205,166 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   RPO(4,4) = 1.0_db
   ROP(4,4) = 1.0_db
 
-  ! Champ de radiation
-  do icell=1, n_cells
-     Inu(icell) = sum(I_spec_star(icell,:))
-  enddo !icell
-
   stokes(:) = 0.0_db
   p_ri = 1
   p_zj = 1
 
+  id = 1 ! sequentiel
+
   ! Boucle sur les cellules
-  do ri=1, n_rad
-     do zj=1,nz
-        icell = cell_map(ri,zj,1) ! 2D
-        ! Champ de radiation
-        stokes(1) = Inu(icell)
-
-        if (stokes(1) < 1.e-30_db) cycle
-
-        ! Direction de vol
-        x = r_grid(icell) ! doit juste etre non nul
-        y = 0.0_db
-        z = z_grid(icell) ! sert a rien
-
-        norme = sqrt(x**2 + z**2)
-        u = x / norme
-        v = 0.0_db
-        w = z / norme
-
-        ! cos_scatt_ray_tracing correspondants
-        call angles_scatt_rt2(id,ibin,x,y,z,u,v,w,.true.)
-
-        if (lvariable_dust) then
-           p_ri = ri
-           p_zj = zj
-        endif
-        p_icell = cell_map(p_ri,p_zj,1)
-
-        ! Boucle sur les directions de ray-tracing
-        do dir=0,1
-           do iscatt = 1, nang_ray_tracing_star
-
-              ! Angle de diffusion
-              cos_scatt = cos_thet_ray_tracing_star(iscatt,dir,id)
-
-              ! Dichotomie
-        !!$      kmin=0 ; kmax=nang_scatt ; k=(kmin+kmax)/2
-        !!$      do while ((kmax-kmin) > 1)
-        !!$         if (tab_cos_scatt(k) > cos_scatt) then ! cos decroissant
-        !!$            kmin = k
-        !!$         else
-        !!$            kmax = k
-        !!$         endif
-        !!$         k = (kmin + kmax)/2
-        !!$      enddo   ! while
-        !!$      k=kmax
-        !!$
-        !!$      ! Interpolation lineaire (en cos) des elements de la matrice de Mueller
-        !!$      frac =  (tab_cos_scatt(k-1) - cos_scatt) / (tab_cos_scatt(k-1) - tab_cos_scatt(k))
-        !!$      frac_m1 = 1.0_db - frac
-
-              ! 2 methode ---> semble OK
-              ! Plus propre que l'interpolation avec la dicotomie ci-dessus
-              ! en particulier quand nang_ray_tracing_star est faible
-              ! la dichotomie + interpolation donne n'inporte quoi
-              ! ---> c'est pas une bonne idee d'interpoler en cos car c'est rend la fct de phase encore plus pique pres de 0
-
-              k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
-              if (k > nang_scatt) k = nang_scatt
-              if (k < 1) k = 1 ! pour resoudre bug --> ne change pour le bench
-              !frac = 1. ; frac_m1 = 0.
-
-              ! Interpolation en lineaire ne marche pas non plus
-              ! sans doute parce que le fct de phase de phase est tres pique
-              ! et que c'est de toute facon pas une bonne idee d'interpoler
-              ! --> le pb ne vient pas de la dichotomie mais de l'interpolation
-
-              !   angle = acos(cos_scatt) * real(nang_scatt)/pi
-              !   k = ceiling(angle)
-              !   if (k > nang_scatt) then
-              !      k = nang_scatt
-              !      frac = 1. ; frac_m1 = 0.
-              !   else
-              !      frac =  (k - angle)
-              !      frac_m1 = 1.0 - frac
-              !   endif
-
-              if (lsepar_pola) then
-                 ! Rotation pour se recaller sur le Nord celeste
-                 omega = omega_ray_tracing_star(iscatt,dir,id)
-
-                 cosw = cos(omega)
-                 sinw = sin(omega)
-                 if (abs(cosw) < 1e-06) cosw = 0.0_db
-                 if (abs(sinw) < 1e-06) sinw = 0.0_db
-
-                 RPO(2,2) = COSW
-                 ROP(2,2) = COSW
-                 RPO(2,3) = SINW
-                 ROP(2,3) = -1.0_db * SINW
-                 RPO(3,2) = SINW
-                 ROP(3,2) = SINW
-                 RPO(3,3) = -COSW
-                 ROP(3,3) = COSW
-
-                 ! Matrice de Mueller
-                 s11 = tab_s11_pos(k,p_icell,p_lambda)
-                 s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
-                 s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
-                 s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
-
-                 M(1,1) = s11
-                 M(2,2) = s11
-                 M(1,2) = s12
-                 M(2,1) = s12
-
-                 M(3,3) = s33
-                 M(4,4) = s33
-                 M(3,4) = -s34
-                 M(4,3) = s34
-                 M(1,1) = s11
-
-
-                 !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
-
-                 ! 1ere rotation
-                 C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
-                 C(1)=stokes(1)
-                 C(4)=stokes(4)
-
-                 ! multiplication matrice Mueller par bloc
-                 D(1:2)=matmul(M(1:2,1:2),C(1:2))
-                 D(3:4)=matmul(M(3:4,3:4),C(3:4))
-
-                 ! 2nde rotation
-                 S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-                 S(1)=D(1)
-                 S(4)=D(4)
-
-                 eps_dust2_star(:,iscatt,dir,icell) =  eps_dust2_star(:,iscatt,dir,icell) + S(:)
-              else ! .not.lsepar_pola
-                 s11 = tab_s11_pos(k,p_icell,p_lambda)
-                 eps_dust2_star(1,iscatt,dir,icell) =  eps_dust2_star(1,iscatt,dir,icell) + s11 * stokes(1)
-              endif ! lsepar_pola
-
-           enddo ! iscatt
-        enddo ! dir
-
-     enddo ! zj
-  enddo ! ri
-
-  ! Normalisation
-  ! Boucle sur les cellules
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
+  !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
+  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,eps_dust2_star) &
+  !$omp shared(energie_photon,volume,kappa_sca) &
+  !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
+  !$omp private(s11,s12,s33,s34,C,D,M,facteur)
+  !$omp do
   do icell=1, n_cells
+     !$ id = omp_get_thread_num() + 1
+
+     if (lvariable_dust) then
+        p_icell = icell
+     else
+        p_icell = icell_ref
+     endif
+
+     ! Champ de radiation
+     stokes(1) = sum(I_spec_star(icell,:))
+
+     if (stokes(1) < 1.e-30_db) cycle
+
+     ! Direction de vol
+     x = r_grid(icell) ! doit juste etre non nul
+     y = 0.0_db
+     z = z_grid(icell) ! sert a rien
+
+     norme = sqrt(x**2 + z**2)
+     u = x / norme
+     v = 0.0_db
+     w = z / norme
+
+     ! cos_scatt_ray_tracing correspondants
+     call angles_scatt_rt2(id,ibin,x,y,z,u,v,w,.true.)
+
+     ! Boucle sur les directions de ray-tracing
+     do dir=0,1
+        do iscatt = 1, nang_ray_tracing_star
+
+           ! Angle de diffusion
+           cos_scatt = cos_thet_ray_tracing_star(iscatt,dir,id)
+
+           ! Dichotomie
+!!$      kmin=0 ; kmax=nang_scatt ; k=(kmin+kmax)/2
+!!$      do while ((kmax-kmin) > 1)
+!!$         if (tab_cos_scatt(k) > cos_scatt) then ! cos decroissant
+!!$            kmin = k
+!!$         else
+!!$            kmax = k
+!!$         endif
+!!$         k = (kmin + kmax)/2
+!!$      enddo   ! while
+!!$      k=kmax
+!!$
+!!$      ! Interpolation lineaire (en cos) des elements de la matrice de Mueller
+!!$      frac =  (tab_cos_scatt(k-1) - cos_scatt) / (tab_cos_scatt(k-1) - tab_cos_scatt(k))
+!!$      frac_m1 = 1.0_db - frac
+
+           ! 2 methode ---> semble OK
+           ! Plus propre que l'interpolation avec la dicotomie ci-dessus
+           ! en particulier quand nang_ray_tracing_star est faible
+           ! la dichotomie + interpolation donne n'inporte quoi
+           ! ---> c'est pas une bonne idee d'interpoler en cos car c'est rend la fct de phase encore plus pique pres de 0
+
+           k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
+           if (k > nang_scatt) k = nang_scatt
+           if (k < 1) k = 1 ! pour resoudre bug --> ne change pour le bench
+           !frac = 1. ; frac_m1 = 0.
+
+           ! Interpolation en lineaire ne marche pas non plus
+           ! sans doute parce que le fct de phase de phase est tres pique
+           ! et que c'est de toute facon pas une bonne idee d'interpoler
+           ! --> le pb ne vient pas de la dichotomie mais de l'interpolation
+
+           !   angle = acos(cos_scatt) * real(nang_scatt)/pi
+           !   k = ceiling(angle)
+           !   if (k > nang_scatt) then
+           !      k = nang_scatt
+           !      frac = 1. ; frac_m1 = 0.
+           !   else
+           !      frac =  (k - angle)
+           !      frac_m1 = 1.0 - frac
+           !   endif
+
+           if (lsepar_pola) then
+              ! Rotation pour se recaller sur le Nord celeste
+              omega = omega_ray_tracing_star(iscatt,dir,id)
+
+              cosw = cos(omega)
+              sinw = sin(omega)
+              if (abs(cosw) < 1e-06) cosw = 0.0_db
+              if (abs(sinw) < 1e-06) sinw = 0.0_db
+
+              RPO(2,2) = COSW
+              ROP(2,2) = COSW
+              RPO(2,3) = SINW
+              ROP(2,3) = -1.0_db * SINW
+              RPO(3,2) = SINW
+              ROP(3,2) = SINW
+              RPO(3,3) = -COSW
+              ROP(3,3) = COSW
+
+              ! Matrice de Mueller
+              s11 = tab_s11_pos(k,p_icell,p_lambda)
+              s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
+              s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
+              s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
+
+              M(1,1) = s11
+              M(2,2) = s11
+              M(1,2) = s12
+              M(2,1) = s12
+
+              M(3,3) = s33
+              M(4,4) = s33
+              M(3,4) = -s34
+              M(4,3) = s34
+              M(1,1) = s11
+
+
+              !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
+
+              ! 1ere rotation
+              C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
+              C(1)=stokes(1)
+              C(4)=stokes(4)
+
+              ! multiplication matrice Mueller par bloc
+              D(1:2)=matmul(M(1:2,1:2),C(1:2))
+              D(3:4)=matmul(M(3:4,3:4),C(3:4))
+
+              ! 2nde rotation
+              S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
+              S(1)=D(1)
+              S(4)=D(4)
+
+              eps_dust2_star(:,iscatt,dir,icell) =  eps_dust2_star(:,iscatt,dir,icell) + S(:)
+           else ! .not.lsepar_pola
+              s11 = tab_s11_pos(k,p_icell,p_lambda)
+              eps_dust2_star(1,iscatt,dir,icell) =  eps_dust2_star(1,iscatt,dir,icell) + s11 * stokes(1)
+           endif ! lsepar_pola
+
+        enddo ! iscatt
+     enddo ! dir
+
+     ! Normalisation
      facteur = energie_photon / volume(icell)
      eps_dust2_star(:,:,:,icell) =  eps_dust2_star(:,:,:,icell) *  facteur * kappa_sca(icell,lambda)
-  enddo
+
+  enddo ! icell
+  !$omp end do
+  !$omp end parallel
 
   return
 
@@ -1418,7 +1424,7 @@ function dust_source_fct(ri,zj,phik, x,y,z)
 
      dust_source_fct(:) = eps_dust1(k,psup,:,icell)  ! ??? ce n'est pas lineaire
 
-  else ! Methode 2 : la seule actuelle
+  else ! Methode 2
      ! Pour interpolations spatiales
      r = sqrt(x*x + y*y)
 
