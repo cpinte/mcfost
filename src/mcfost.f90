@@ -26,8 +26,8 @@ program BIGCRUNCH
 
   implicit none
 
-  integer :: time
-  real :: cpu_time_begin, cpu_time_end
+  integer :: itime
+  real :: time, cpu_time_begin, cpu_time_end
 
   ! debut de l'execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -54,14 +54,23 @@ program BIGCRUNCH
   ! Temps d'execution
   call system_clock(time_end)
   if (time_end < time_begin) then
-     time=int((time_end + (1.0 * time_max)- time_begin)/time_tick)
+     time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
   else
-     time=int((time_end - time_begin)/time_tick)
+     time=(time_end - time_begin)/real(time_tick)
   endif
-  write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
+  if (time > 60) then
+     write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+  else
+     itime = int(time)
+     write (*,'(" Processing complete in ", F5.2, "s")')  time
+  endif
   call cpu_time(cpu_time_end)
-  time = int(cpu_time_end - cpu_time_begin)
-  write (*,'(" CPU time used          ", I3, "h", I3, "m", I3, "s")')  time/3600, mod(time/60,60), mod(time,60)
-
+  time = cpu_time_end - cpu_time_begin
+  if (time > 60) then
+     itime = int(time)
+     write (*,'(" CPU time used          ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+  else
+     write (*,'(" CPU time used          ", F5.2, "s")')  time
+  endif
 
 end program BIGCRUNCH
