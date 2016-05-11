@@ -973,6 +973,7 @@ subroutine initialisation_mcfost()
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
   if (limg) then
+     npix_x = igridx ; npix_y = igridy
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
      else
@@ -994,6 +995,8 @@ subroutine initialisation_mcfost()
         write(*,*) "The [-reemission_stats] option is not relevant for image calculation"
         write(*,*) "It is therefore discarded here"
      endif
+  else ! SED : we do not need pixels
+     npix_x = 1 ; npix_y = 1
   endif
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
