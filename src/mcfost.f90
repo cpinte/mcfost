@@ -59,6 +59,7 @@ program BIGCRUNCH
      time=(time_end - time_begin)/real(time_tick)
   endif
   if (time > 60) then
+     itime = real(time)
      write (*,'(" Processing complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
   else
      itime = int(time)
