@@ -91,7 +91,7 @@ module parametres
 
   ! Parametres des cartes
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
-  integer ::  igridx, igridy, deltapix_x, deltapix_y, maxigrid
+  integer ::  igridx, igridy, deltapix_x, deltapix_y, maxigrid, npix_x, npix_y
   real :: angle_interet, zoom, size_pix, tau_seuil, wl_seuil
 
   real  :: cutoff = 7.0
