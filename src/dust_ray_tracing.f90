@@ -139,7 +139,7 @@ subroutine alloc_ray_tracing()
      I_spec_star = 0.0_db
 
      allocate(eps_dust2(N_type_flux,nang_ray_tracing,0:1,n_cells), &
-          I_sca2(N_type_flux,nang_ray_tracing,0:1,n_cells,nb_proc), stat=alloc_status)
+          I_sca2(N_type_flux,nang_ray_tracing,0:1,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust2'
         stop
@@ -709,16 +709,16 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
         ! Boucle sur les directions de ray-tracing
         do dir=0,1
            do iscatt = 1, nang_ray_tracing
-              eps_dust2(1,iscatt,dir,icell) =  ( sum(I_sca2(1,iscatt,dir,icell,:))  +  J_th(icell) ) / kappa(icell,lambda)
+              eps_dust2(1,iscatt,dir,icell) =  ( I_sca2(1,iscatt,dir,icell)  +  J_th(icell) ) / kappa(icell,lambda)
 
               if (lsepar_pola) then
-                 eps_dust2(2:4,iscatt,dir,icell) =  sum(I_sca2(2:4,iscatt,dir,icell,:),dim=2)  / kappa(icell,lambda)
+                 eps_dust2(2:4,iscatt,dir,icell) =  I_sca2(2:4,iscatt,dir,icell)  / kappa(icell,lambda)
               endif
 
               if (lsepar_contrib) then
-                 eps_dust2(n_Stokes+2,iscatt,dir,icell) =    sum(I_sca2(n_Stokes+2,iscatt,dir,icell,:)) / kappa(icell,lambda)
+                 eps_dust2(n_Stokes+2,iscatt,dir,icell) =    I_sca2(n_Stokes+2,iscatt,dir,icell) / kappa(icell,lambda)
                  eps_dust2(n_Stokes+3,iscatt,dir,icell) =    J_th(icell) / kappa(icell,lambda)
-                 eps_dust2(n_Stokes+4,iscatt,dir,icell) =    sum(I_sca2(n_Stokes+4,iscatt,dir,icell,:)) / kappa(icell,lambda)
+                 eps_dust2(n_Stokes+4,iscatt,dir,icell) =    I_sca2(n_Stokes+4,iscatt,dir,icell) / kappa(icell,lambda)
               endif ! lsepar_contrib
            enddo ! iscatt
 
@@ -1124,20 +1124,20 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     S(4)=D(4)
                     S(3)=-S(3)
 
-                    I_sca2(1:4,iscatt,dir,icell,id) = I_sca2(1:4,iscatt,dir,icell,id) + S(:)
+                    I_sca2(1:4,iscatt,dir,icell) = I_sca2(1:4,iscatt,dir,icell) + S(:)
 
                  else ! lsepar_pola
 
                     ! Champ de radiation
                     stokes(1) = Inu(1,theta_I,phi_I,icell)
-                    I_sca2(1,iscatt,dir,icell,id) = I_sca2(1,iscatt,dir,icell,id) + s11(p_icell) * stokes(1)
+                    I_sca2(1,iscatt,dir,icell) = I_sca2(1,iscatt,dir,icell) + s11(p_icell) * stokes(1)
                  endif  ! lsepar_pola
 
                  if (lsepar_contrib) then
-                    I_sca2(n_Stokes+2,iscatt,dir,icell,id) = I_sca2(n_Stokes+2,iscatt,dir,icell,id) + &
+                    I_sca2(n_Stokes+2,iscatt,dir,icell) = I_sca2(n_Stokes+2,iscatt,dir,icell) + &
                          s11(p_icell) * Inu(n_Stokes+2,theta_I,phi_I,icell)
 
-                    I_sca2(n_Stokes+4,iscatt,dir,icell,id) = I_sca2(n_Stokes+4,iscatt,dir,icell,id) + &
+                    I_sca2(n_Stokes+4,iscatt,dir,icell) = I_sca2(n_Stokes+4,iscatt,dir,icell) + &
                          s11(p_icell) * Inu(n_Stokes+4,theta_I,phi_I,icell)
                  endif ! lsepar_contrib
 
@@ -1156,7 +1156,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ! Boucle sur les cellules
   do icell=1, n_cells
      facteur = energie_photon / volume(icell)
-     I_sca2(:,:,:,icell,:) =  I_sca2(:,:,:,icell,:) *  facteur * kappa_sca(icell,lambda)
+     I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  facteur * kappa_sca(icell,lambda)
   enddo
 
   deallocate(Inu)
