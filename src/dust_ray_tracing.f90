@@ -703,7 +703,13 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   ! Contribution emission thermique directe
   call calc_Jth(lambda)
 
-  ! Fouction source, indices : pola, iscatt, dir, i, j
+  ! Fonction source, indices : pola, iscatt, dir, i, j
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,eps_dust2_star,lsepar_pola) &
+  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star) &
+  !$omp private(icell,dir,iscatt)
+  !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      if (kappa(icell,lambda) > tiny_db) then
         ! Boucle sur les directions de ray-tracing
@@ -731,6 +737,8 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
         eps_dust2_star(:,:,:,icell) = 0.0_db
      endif
   enddo !icell
+  !$omp end do
+  !$omp end parallel
 
   if (lmono0) write(*,*)  "Done"
 
