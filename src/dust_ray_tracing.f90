@@ -46,9 +46,9 @@ subroutine alloc_ray_tracing()
   integer :: alloc_status
   real :: mem_size
 
-  ! Ok, this is the trick which mcfost rt2 in 2D very fast
+  ! Ok, this is the trick which makes mcfost rt2 in 2D very fast
   ! in 2D, we save the scattered radiation field for various azimuth (as the cell is a ring) + 2 elevation directions (up & down)
-  ! in 3D, each cell is already divided in az, so there is no need to divide in azymuth (it is too memory expensive anyway)
+  ! in 3D, each cell is already divided in azimuth, so there is no need to divide the radiation field in azymuth (it is too memory expensive anyway)
   if (l3D) then
      n_az_rt = 1
      n_theta_rt = 1
@@ -57,11 +57,15 @@ subroutine alloc_ray_tracing()
      n_theta_rt = 2
   endif
 
+  ! n_phi_I and n_theta_I are the angular diemensions of the store radiation field
   ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
   n_theta_I = 15 ;
+
+  ! Number of angular directions were the the scattered radiation field will be calculated
+  ! We use a higher direction for the stellar radiation field, as it the radiation field is directive and not 2 or 3D
   nang_ray_tracing = 15 ;
-  nang_ray_tracing_star = 1000 ; ! Bug dans les cartes de pola si ce n'est pas le meme nbre
+  nang_ray_tracing_star = 1000 ;
 
   if (lisotropic) then
      n_phi_I = 1 ;
@@ -851,15 +855,17 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
   real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta, norme
 
-
-  integer, parameter :: N_super = 5
+  integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 cree un leger surcout dans le cas avec strat (qq 10 sec par inclinaison et par lambda)
   ! 15 cree un important surcout
 
-  real, dimension(N_super,N_super,n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w, tab_sin_scatt
-  integer, dimension(N_super,N_super,n_theta_I,n_phi_I) :: tab_k
-
   real :: s11, sum_s11, s12, s33, s34
+
+  ! Many dimensions but small numbers (<1MB for default values)
+  real, dimension(N_super,N_super,2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w, tab_sin_scatt_norm
+  integer, dimension(N_super,N_super,2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
+
+  real, dimension(2,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
 
   ! Direction observateur dans repere refence
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
@@ -902,53 +908,68 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ! Permet d'etre aussi rapide que la version initiale calc_Isca2
 
   ! TODO : save cos_scatt --> k et sin sca + sum : see below loop i2,i1
+  do dir=0,1
+     correct_w = (2 * dir - 1)
 
-  do theta_I=1,n_theta_I
-     do phi_I=1,n_phi_I
-        ! Moyennage de la fct de phase sur le  bin
-        sum_sin = 0.
-        do i2=1, N_super
-           do i1 = 1, N_super
-              ! direction de vol moyenne du bin
-              f1 = real(i1) / (N_super + 1)
-              f2 = real(i2) / (N_super + 1)
+     do iscatt = 1, nang_ray_tracing
 
-              w = 2.0_db * ((real(theta_I,kind=db) - f1) / real(n_theta_I,kind=db) ) - 1.0_db
-              tab_w(i1,i2,theta_I,phi_I) =  w
+        phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
+        u_ray_tracing = uv0 * cos(phi_scatt)
+        v_ray_tracing = uv0 * sin(phi_scatt)
+        w_ray_tracing = w0
+        do theta_I=1,n_theta_I
+           do phi_I=1,n_phi_I
+              ! Moyennage de la fct de phase sur le  bin
+              sum_sin = 0.
+              do i2=1, N_super
+                 do i1 = 1, N_super
+                    ! direction de vol moyenne du bin
+                    f1 = real(i1) / (N_super + 1)
+                    f2 = real(i2) / (N_super + 1)
 
-              phi = deux_pi * (real(phi_I,kind=db) - f2) / real(n_phi_I,kind=db)
+                    w = 2.0_db * ((real(theta_I,kind=db) - f1) / real(n_theta_I,kind=db) ) - 1.0_db
+                    tab_w(i1,i2,dir,iscatt,theta_I,phi_I) =  w
 
-              w02 = sqrt(1.0_db-w*w)
-              tab_u(i1,i2,theta_I,phi_I) = w02 * cos(phi)
-              tab_v(i1,i2,theta_I,phi_I) = w02 * sin(phi)
+                    phi = deux_pi * (real(phi_I,kind=db) - f2) / real(n_phi_I,kind=db)
 
-              ! Angle de diffusion --> n'utilise plus cos_thet_ray_tracing depuis super-echantillonage
-              cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
+                    w02 = sqrt(1.0_db-w*w)
+                    tab_u(i1,i2,dir,iscatt,theta_I,phi_I) = w02 * cos(phi)
+                    tab_v(i1,i2,dir,iscatt,theta_I,phi_I) = w02 * sin(phi)
 
-              k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
-              if (k > nang_scatt) k = nang_scatt
-              if (k < 0) k = 0
+                    ! BUG : u_ray_tracing
 
-              sin_scatt = sqrt(1.0_db - cos_scatt*cos_scatt)
+                    ! Angle de diffusion --> n'utilise plus cos_thet_ray_tracing depuis super-echantillonage
+                    cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
 
-              tab_k(i1,i2,theta_I,phi_I) = k
-              tab_sin_scatt(i1,i2,theta_I,phi_I) = sin_scatt
+                    k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
+                    if (k > nang_scatt) k = nang_scatt
+                    if (k < 0) k = 0
 
-              sum_sin = sum_sin + sin_scatt
-           enddo !i1
-        enddo !i2
-        ! Normalization du facteur sin ici
-        tab_sin_scatt(:,:,theta_I,phi_I) = tab_sin_scatt(:,:,theta_I,phi_I) / sum_sin
-     enddo !phi_I
-  enddo !theta_I
+                    sin_scatt = sqrt(1.0_db - cos_scatt*cos_scatt)
 
+                    tab_k(i1,i2,dir,iscatt,theta_I,phi_I) = k
+                    tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I) = sin_scatt
+
+                    sum_sin = sum_sin + sin_scatt
+                 enddo !i1
+              enddo !i2
+
+              ! Normalization du facteur sin ici
+              ! tab_sin_scatt depends on ibin !!!
+              tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) = tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) / sum_sin
+           enddo !phi_I
+        enddo !theta_I
+
+     enddo ! iscatt
+  enddo ! dir
 
 
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,kappa_sca) &
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
-  !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,tab_k,tab_sin_scatt,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
+  !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
+  !$omp shared(s11_save) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,correct_w,phi_scatt,norme) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
@@ -966,8 +987,34 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   RPO(4,4) = 1.0_db
   ROP(4,4) = 1.0_db
 
+
+  if (.not.lvariable_dust) then   ! we precalculate the s11 as they are all the same
+     icell = icell_ref
+
+     do dir=0,1
+        do iscatt = 1, nang_ray_tracing
+           do phi_I=1,n_phi_I
+              do theta_I=1,n_theta_I
+                 ! Average of the phase over the bin
+                 s11 = 0. ;
+                 do i2=1, N_super
+                    do i1 = 1, N_super
+                       k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
+                       s11 = s11 + tab_s11_pos(k,icell,p_lambda) * tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I)
+                    enddo ! i1
+                 enddo !i2
+                 s11_save(dir,iscatt,theta_I,phi_I) = s11
+
+              enddo ! theta_I
+           enddo ! phi_I
+
+        enddo ! iscatt
+     enddo ! dir
+  endif ! .not.lvariable_dust
+
   !$omp do schedule(static, n_cells/nb_proc)
   do icell = 1, n_cells
+     !$ id = omp_get_thread_num() + 1
      if (lvariable_dust) then
         p_icell = icell
      else
@@ -979,7 +1026,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
         correct_w = (2 * dir - 1)
 
         do iscatt = 1, nang_ray_tracing
-           !$ id = omp_get_thread_num() + 1
+
            phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
            u_ray_tracing = uv0 * cos(phi_scatt)
            v_ray_tracing = uv0 * sin(phi_scatt)
@@ -987,132 +1034,111 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
            do theta_I=1,n_theta_I
               do phi_I=1,n_phi_I
-                 ! Moyennage de la fct de phase sur le  bin
-                 !sum_s11 = 0.0
-                 !sum_sin = 0.0
-                 do i2=1, N_super
-                    do i1 = 1, N_super
-                       !u = tab_u(i1,i2,theta_I,phi_I)
-                       !v = tab_v(i1,i2,theta_I,phi_I)
-                       !w = tab_w(i1,i2,theta_I,phi_I) * correct_w
-                       !
-                       !! Angle de diffusion --> n'utilise plus cos_thet_ray_tracing depuis super-echantillonage
-                       !cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
-                       !
-                       !k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
-                       !if (k > nang_scatt) k = nang_scatt
-                       !if (k < 0) k = 0
-                       !
-                       !sin_scatt = sqrt(1.0_db - cos_scatt*cos_scatt)
 
-                       k = tab_k(i1,i2,theta_I,phi_I)
-                       sin_scatt = tab_sin_scatt(i1,i2,theta_I,phi_I)
-
-                       !sum_sin = sum_sin + sin_scatt
-
-                       ! TODO : if no strat : we can precalculate it as p_icell == 1
-
-                       s11 = s11 + tab_s11_pos(k,p_icell,p_lambda) * sin_scatt
-                    enddo ! i1
-                 enddo !i2
-
-              !if (sum_sin > 0.0) then
-              !   s11 = sum_s11 / sum_sin
-              !else
-              !   s11 = 0.0
-              !endif
-
-              if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
-
-                 ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
-            !     i1 = N_super/2 + 1
-            !     i2 = i1
-            !     u = tab_u(i1,i2,theta_I,phi_I)
-            !     v = tab_v(i1,i2,theta_I,phi_I)
-            !     w = tab_w(i1,i2,theta_I,phi_I) * correct_w
-            !
-            !     ! Angle de diffusion
-            !     cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
-            !
-            !     k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
-            !     if (k > nang_scatt) k = nang_scatt
-            !     if (k < 0) k = 0
-
-                 ! Calcul de l'angle omega
-                 call rotation(u,v,w,-u_ray_tracing,-v_ray_tracing,-w_ray_tracing,v1pi,v1pj,v1pk)
-                 xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
-                 if (xnyp < 1e-10) then
-                    xnyp = 0.0
-                    costhet = 1.0
-                 else
-                    costhet = -1.0*v1pj / xnyp
+                 if (lvariable_dust) then
+                    ! Average of the phase over the bin
+                    s11 = 0.
+                    do i2=1, N_super
+                       do i1 = 1, N_super
+                          k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
+                          s11 = s11 + tab_s11_pos(k,p_icell,p_lambda) * tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I)
+                       enddo ! i1
+                    enddo !i2
+                 else ! does not depend on icell, we use the stored value
+                    s11 = s11_save(dir,iscatt,theta_I,phi_I)
                  endif
 
-                 ! calcul de l'angle entre la normale et l'axe z (theta)
-                 theta = acos(costhet)
-                 if (theta >= pi) theta = 0.0
 
-                 !     le plan de diffusion est a +ou- 90deg de la normale
-                 ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
-                 !theta = theta  + pi_sur_deux
+                 if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
 
-                 !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-                 omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
-                 !     prochain if car l'arccos va de 0 a pi seulement
-                 !     le +/- pour faire la difference dans le sens de rotation
-                 if (v1pk < 0.0) omega = -1.0_db * omega
+                    ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
+                    i1 = N_super/2 + 1
+                    i2 = i1
+                    u = tab_u(i1,i2,dir,iscatt,theta_I,phi_I)
+                    v = tab_v(i1,i2,dir,iscatt,theta_I,phi_I)
+                    w = tab_w(i1,i2,dir,iscatt,theta_I,phi_I) * correct_w
 
-                 ! Matrices de rotations
-                 cosw = cos(omega)
-                 sinw = sin(omega)
-                 if (abs(cosw) < 1e-06) cosw = 0.0_db
-                 if (abs(sinw) < 1e-06) sinw = 0.0_db
+                    ! Angle de diffusion
+                    cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
 
-                 RPO(2,2) = cosw
-                 ROP(2,2) = cosw
-                 RPO(2,3) = sinw
-                 ROP(2,3) = -1.0_db * sinw
-                 RPO(3,2) = -1.0_db * sinw
-                 ROP(3,2) = sinw
-                 RPO(3,3) = cosw
-                 ROP(3,3) = cosw
+                    k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
+                    if (k > nang_scatt) k = nang_scatt
+                    if (k < 0) k = 0
 
-                 s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
-                 s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
-                 s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
+                    ! Calcul de l'angle omega
+                    call rotation(u,v,w,-u_ray_tracing,-v_ray_tracing,-w_ray_tracing,v1pi,v1pj,v1pk)
+                    xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
+                    if (xnyp < 1e-10) then
+                       xnyp = 0.0
+                       costhet = 1.0
+                    else
+                       costhet = -1.0*v1pj / xnyp
+                    endif
 
+                    ! calcul de l'angle entre la normale et l'axe z (theta)
+                    theta = acos(costhet)
+                    if (theta >= pi) theta = 0.0
 
-                 ! Champ de radiation
-                 stokes(:) = Inu(1:4,theta_I,phi_I,icell)
+                    !     le plan de diffusion est a +ou- 90deg de la normale
+                    ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
+                    !theta = theta  + pi_sur_deux
 
-                 M(1,1) = s11
-                 M(2,2) = s11
-                 M(1,2) = s12
-                 M(2,1) = s12
+                    !----dans les matrices de rotation l'angle est omega = 2 * theta-----
+                    omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
+                    !     prochain if car l'arccos va de 0 a pi seulement
+                    !     le +/- pour faire la difference dans le sens de rotation
+                    if (v1pk < 0.0) omega = -1.0_db * omega
 
-                 M(3,3) = s33
-                 M(4,4) = s33
-                 M(3,4) = -s34
-                 M(4,3) = s34
+                    ! Matrices de rotations
+                    cosw = cos(omega)
+                    sinw = sin(omega)
+                    if (abs(cosw) < 1e-06) cosw = 0.0_db
+                    if (abs(sinw) < 1e-06) sinw = 0.0_db
 
-                 !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
+                    RPO(2,2) = cosw
+                    ROP(2,2) = cosw
+                    RPO(2,3) = sinw
+                    ROP(2,3) = -1.0_db * sinw
+                    RPO(3,2) = -1.0_db * sinw
+                    ROP(3,2) = sinw
+                    RPO(3,3) = cosw
+                    ROP(3,3) = cosw
 
-                 ! 1ere rotation
-                 C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
-                 C(1)=stokes(1)
-                 C(4)=stokes(4)
+                    s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
+                    s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
+                    s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
 
-                 ! multiplication matrice Mueller par bloc
-                 D(1:2)=matmul(M(1:2,1:2),C(1:2))
-                 D(3:4)=matmul(M(3:4,3:4),C(3:4))
+                    ! Champ de radiation
+                    stokes(:) = Inu(1:4,theta_I,phi_I,icell)
 
-                 ! 2nde rotation
-                 S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-                 S(1)=D(1)
-                 S(4)=D(4)
-                 S(3)=-S(3)
+                    M(1,1) = s11
+                    M(2,2) = s11
+                    M(1,2) = s12
+                    M(2,1) = s12
 
-                 I_sca2(1:4,iscatt,dir,icell) = I_sca2(1:4,iscatt,dir,icell) + S(:)
+                    M(3,3) = s33
+                    M(4,4) = s33
+                    M(3,4) = -s34
+                    M(4,3) = s34
+
+                    !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
+
+                    ! 1ere rotation
+                    C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
+                    C(1)=stokes(1)
+                    C(4)=stokes(4)
+
+                    ! multiplication matrice Mueller par bloc
+                    D(1:2)=matmul(M(1:2,1:2),C(1:2))
+                    D(3:4)=matmul(M(3:4,3:4),C(3:4))
+
+                    ! 2nde rotation
+                    S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
+                    S(1)=D(1)
+                    S(4)=D(4)
+                    S(3)=-S(3)
+
+                    I_sca2(1:4,iscatt,dir,icell) = I_sca2(1:4,iscatt,dir,icell) + S(:)
 
                  else ! lsepar_pola
                     ! Champ de radiation
