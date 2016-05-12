@@ -866,6 +866,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer, dimension(N_super,N_super,2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
 
   real, dimension(2,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
+  real(kind=db), dimension(2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
+
 
   ! Direction observateur dans repere refence
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
@@ -957,6 +959,56 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
               ! Normalization du facteur sin ici
               ! tab_sin_scatt depends on ibin !!!
               tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) = tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) / sum_sin
+
+              if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
+
+                 ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
+                 i1 = N_super/2 + 1
+                 i2 = i1
+                 u = tab_u(i1,i2,dir,iscatt,theta_I,phi_I)
+                 v = tab_v(i1,i2,dir,iscatt,theta_I,phi_I)
+                 w = tab_w(i1,i2,dir,iscatt,theta_I,phi_I) * correct_w
+
+                 ! Angle de diffusion
+                 cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
+
+                 k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
+                 if (k > nang_scatt) k = nang_scatt
+                 if (k < 0) k = 0
+
+                 ! Calcul de l'angle omega
+                 call rotation(u,v,w,-u_ray_tracing,-v_ray_tracing,-w_ray_tracing,v1pi,v1pj,v1pk)
+                 xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
+                 if (xnyp < 1e-10) then
+                    xnyp = 0.0
+                    costhet = 1.0
+                 else
+                    costhet = -1.0*v1pj / xnyp
+                 endif
+
+                 ! calcul de l'angle entre la normale et l'axe z (theta)
+                 theta = acos(costhet)
+                 if (theta >= pi) theta = 0.0
+
+                 !     le plan de diffusion est a +ou- 90deg de la normale
+                 ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
+                 !theta = theta  + pi_sur_deux
+
+                 !----dans les matrices de rotation l'angle est omega = 2 * theta-----
+                 omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
+                 !     prochain if car l'arccos va de 0 a pi seulement
+                 !     le +/- pour faire la difference dans le sens de rotation
+                 if (v1pk < 0.0) omega = -1.0_db * omega
+
+                 ! Matrices de rotations
+                 cosw = cos(omega)
+                 sinw = sin(omega)
+                 if (abs(cosw) < 1e-06) cosw = 0.0_db
+                 if (abs(sinw) < 1e-06) sinw = 0.0_db
+
+                 tab_cosw(dir,iscatt,phi_I,theta_I) = cosw
+                 tab_sinw(dir,iscatt,phi_I,theta_I) = sinw
+              endif ! lsepar_pola
            enddo !phi_I
         enddo !theta_I
 
@@ -969,7 +1021,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,kappa_sca) &
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
   !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
-  !$omp shared(s11_save) &
+  !$omp shared(s11_save,tab_cosw,tab_sinw) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,correct_w,phi_scatt,norme) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
@@ -1050,50 +1102,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
 
                  if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
-
-                    ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
-                    i1 = N_super/2 + 1
-                    i2 = i1
-                    u = tab_u(i1,i2,dir,iscatt,theta_I,phi_I)
-                    v = tab_v(i1,i2,dir,iscatt,theta_I,phi_I)
-                    w = tab_w(i1,i2,dir,iscatt,theta_I,phi_I) * correct_w
-
-                    ! Angle de diffusion
-                    cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
-
-                    k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
-                    if (k > nang_scatt) k = nang_scatt
-                    if (k < 0) k = 0
-
-                    ! Calcul de l'angle omega
-                    call rotation(u,v,w,-u_ray_tracing,-v_ray_tracing,-w_ray_tracing,v1pi,v1pj,v1pk)
-                    xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
-                    if (xnyp < 1e-10) then
-                       xnyp = 0.0
-                       costhet = 1.0
-                    else
-                       costhet = -1.0*v1pj / xnyp
-                    endif
-
-                    ! calcul de l'angle entre la normale et l'axe z (theta)
-                    theta = acos(costhet)
-                    if (theta >= pi) theta = 0.0
-
-                    !     le plan de diffusion est a +ou- 90deg de la normale
-                    ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
-                    !theta = theta  + pi_sur_deux
-
-                    !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-                    omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
-                    !     prochain if car l'arccos va de 0 a pi seulement
-                    !     le +/- pour faire la difference dans le sens de rotation
-                    if (v1pk < 0.0) omega = -1.0_db * omega
-
-                    ! Matrices de rotations
-                    cosw = cos(omega)
-                    sinw = sin(omega)
-                    if (abs(cosw) < 1e-06) cosw = 0.0_db
-                    if (abs(sinw) < 1e-06) sinw = 0.0_db
+                    cosw = tab_cosw(dir,iscatt,phi_I,theta_I)
+                    sinw = tab_cosw(dir,iscatt,phi_I,theta_I)
 
                     RPO(2,2) = cosw
                     ROP(2,2) = cosw
