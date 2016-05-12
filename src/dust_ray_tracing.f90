@@ -862,11 +862,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real :: s11, sum_s11, s12, s33, s34
 
   ! Many dimensions but small numbers (<1MB for default values)
-  real, dimension(N_super,N_super,2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w, tab_sin_scatt_norm
-  integer, dimension(N_super,N_super,2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
+  real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w, tab_sin_scatt_norm
+  integer, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
 
-  real, dimension(2,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
-  real(kind=db), dimension(2,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
+  real, dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
+  real(kind=db), dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
 
 
   ! Direction observateur dans repere refence
@@ -935,8 +935,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     phi = deux_pi * (real(phi_I,kind=db) - f2) / real(n_phi_I,kind=db)
 
                     w02 = sqrt(1.0_db-w*w)
-                    tab_u(i1,i2,dir,iscatt,theta_I,phi_I) = w02 * cos(phi)
-                    tab_v(i1,i2,dir,iscatt,theta_I,phi_I) = w02 * sin(phi)
+                    u = w02 * cos(phi)
+                    v = w02 * sin(phi)
+                    tab_u(i1,i2,dir,iscatt,theta_I,phi_I) = u
+                    tab_v(i1,i2,dir,iscatt,theta_I,phi_I) = v
 
                     ! BUG : u_ray_tracing
 
