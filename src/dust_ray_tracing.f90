@@ -604,7 +604,6 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   integer :: itype, iRT, icell
   real(kind=db) :: facteur, energie_photon, n_photons_envoyes
-  real(kind=db), dimension(n_az_rt,0:1) :: norme
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
   iRT = RT2d_to_RT1d(ibin, iaz)
