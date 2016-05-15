@@ -636,12 +636,11 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   endif
 
   ! Intensite specifique diffusion
-
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(icell,facteur,itype) &
+  !$omp private(icell,facteur,itype,I_scatt) &
   !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_sca,N_type_flux,lambda,iRT) &
-  !$omp shared(J_th,xI_scatt,I_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes)
+  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
