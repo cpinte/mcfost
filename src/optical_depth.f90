@@ -81,12 +81,11 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
   logical, intent(out) :: flag_sortie
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
-  real(kind=db) :: l, tau
-  real(kind=db) :: phi_vol, factor
+  real(kind=db) :: l, tau, phi_vol
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
   integer :: ri_in, zj_in, tmp_k
 
-  integer :: icell0, next_cell, previous_cell, icell
+  integer :: icell0, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
@@ -578,10 +577,9 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
   real(kind=db) :: delta_vol, l, tau, extr, dotprod, opacite
-  real(kind=db) :: correct_moins, correct_plus, uv, precision
-  real(kind=db) :: phi_pos, phi_vol, delta_phi, xm, ym, zm
+  real(kind=db) :: correct_moins, correct_plus, uv, precision, phi_vol
   integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
-  integer :: theta_I, phi_I, thetaj_old, ri_old, icell
+  integer :: thetaj_old, ri_old, icell
   logical :: lcellule_non_vide, lstop
 
   real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
@@ -912,7 +910,6 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
-  real(kind=db) :: xm, ym, zm
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
 
   logical :: lcellule_non_vide, lstop
