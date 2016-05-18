@@ -6,7 +6,9 @@ crstsi_opct.dat: crystalline silicate dust (olivine), optical constants derived 
 
 ice_opct.dat: H2O-dominated "dirty" ice (mostly crystalline) compiled from several sources described in Li, A., & Greenberg, J. M. 1998, A&A, 331, 291, no corresponding optical constants figure in the literature
 
-ac_opct.dat: (amorphous) carbonaceous dust, optical constants derived by Li, A., & Greenberg, J. M. 1997, A&A, 323, 566, update to dashed/solid lines in Figure 2 of Li, A., & Greenberg, J. M. 1997, A&A, 323, 566
+ac_opct.dat: (amorphous) carbonaceous dust, optical constants from Rouleau & Martin 1991, ApJ, 377, 526
+
+derived by Li, A., & Greenberg, J. M. 1997, A&A, 323, 566, update to dashed/solid lines in Figure 2 of Li, A., & Greenberg, J. M. 1997, A&A, 323, 566
 
 Al2O3: Begemann B., Dorschner J., Henning Th., and Mutschke H. (1997) Aluminum oxide and the opacity of oxygen-rich circumstellar dust in the 12-17 micron range. Astrophys. J., v. 476, pp. 199 - 208. ( http://adsabs.harvard.edu/abs/1997ApJ...476..199B)
 
