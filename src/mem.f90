@@ -80,8 +80,9 @@ subroutine alloc_dynamique()
         endif
      else
         if (lscatt_ray_tracing) then
-           scattering_method = 2
+           scattering_method = 2 ! it needs to be 2 for ray-tracing
         else
+           ! ???
            scattering_method = 2
         endif
      endif
