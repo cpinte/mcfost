@@ -1389,6 +1389,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         Q_1star = 0.0
         U_1star = 0.0
      endif
+     norme = 0.0_db
+
      ! Etoile ponctuelle
      !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
      !  Stokes = 0.0_db
@@ -1397,7 +1399,6 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !  write(*,*)  "F0", Flux_etoile
 
      ! Etoile non ponctuelle
-
      !$omp parallel &
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
@@ -1406,10 +1407,11 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
      !$omp private(Pola_LimbDarkening,ri,zj,phik,cos_RT_az,sin_RT_az,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme,map_1star,Q_1star,U_1star)
+
      in_map = .true. ! for SED
      LimbDarkening = 1.0
 
-     norme = 0.0_db
+
 
      id = 1 ! Pour code sequentiel
      !$ id = omp_get_thread_num() + 1
@@ -1489,6 +1491,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
 
      ! Normalizing map
      map_1star(:,:) = map_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
+
      ! Adding all the stars
      stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:)
      if (lpola) then
