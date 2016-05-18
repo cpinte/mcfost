@@ -1221,7 +1221,7 @@ subroutine density_phantom()
   !  With grain growth: 1 line containing:
   !  - s_min,s_max: smallest and largest grain size in µm
 
-  open(unit=1,file="SPH_phantom.txt",status="new")
+  open(unit=1,file="SPH_phantom.txt",status="replace")
   write(1,*) ncells
   write(1,*) minval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
   write(1,*) maxval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
