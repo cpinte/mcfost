@@ -213,7 +213,7 @@ subroutine define_gas_density()
                  density = 0.0
               else
                  density = cst_gaz(izone) * &
-                      ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                      ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                       exp( - (abs(z)/h)**dz%vert_exponent)
               endif
               densite_gaz_tmp(icell) = density
