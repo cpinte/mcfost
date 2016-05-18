@@ -849,7 +849,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real(kind=db), dimension(4,4) ::  M, ROP, RPO
 
   integer :: theta_I, phi_I, dir, iscatt, id
-  integer :: k, alloc_status, i1, i2, correct_w, icell, p_icell
+  integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
   real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta, norme
 
@@ -860,7 +860,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real :: s11, sum_s11, s12, s33, s34
 
   ! Many dimensions but small numbers (<1MB for default values)
-  real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_u, tab_v, tab_w, tab_sin_scatt_norm
+  real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sin_scatt_norm
   integer, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
 
   real, dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
@@ -909,14 +909,12 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   ! TODO : save cos_scatt --> k et sin sca + sum : see below loop i2,i1
   do dir=0,1
-     correct_w = (2 * dir - 1)
-
      do iscatt = 1, nang_ray_tracing
-
         phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
         u_ray_tracing = uv0 * cos(phi_scatt)
         v_ray_tracing = uv0 * sin(phi_scatt)
-        w_ray_tracing = w0
+        w_ray_tracing = w0 * (2 * dir - 1)
+
         do theta_I=1,n_theta_I
            do phi_I=1,n_phi_I
               ! Moyennage de la fct de phase sur le  bin
@@ -928,16 +926,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     f2 = real(i2) / (N_super + 1)
 
                     w = 2.0_db * ((real(theta_I,kind=db) - f1) / real(n_theta_I,kind=db) ) - 1.0_db
-                    tab_w(i1,i2,dir,iscatt,theta_I,phi_I) =  w
-
                     phi = deux_pi * (real(phi_I,kind=db) - f2) / real(n_phi_I,kind=db)
 
                     w02 = sqrt(1.0_db-w*w)
                     u = w02 * cos(phi)
                     v = w02 * sin(phi)
-                    tab_u(i1,i2,dir,iscatt,theta_I,phi_I) = u
-                    tab_v(i1,i2,dir,iscatt,theta_I,phi_I) = v
-
                     ! BUG : u_ray_tracing
 
                     ! Angle de diffusion --> n'utilise plus cos_thet_ray_tracing depuis super-echantillonage
@@ -946,10 +939,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
                     if (k > nang_scatt) k = nang_scatt
                     if (k < 0) k = 0
+                    tab_k(i1,i2,dir,iscatt,theta_I,phi_I) = k
 
                     sin_scatt = sqrt(1.0_db - cos_scatt*cos_scatt)
-
-                    tab_k(i1,i2,dir,iscatt,theta_I,phi_I) = k
                     tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I) = sin_scatt
 
                     sum_sin = sum_sin + sin_scatt
@@ -963,11 +955,12 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
               if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
 
                  ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
-                 i1 = N_super/2 + 1
-                 i2 = i1
-                 u = tab_u(i1,i2,dir,iscatt,theta_I,phi_I)
-                 v = tab_v(i1,i2,dir,iscatt,theta_I,phi_I)
-                 w = tab_w(i1,i2,dir,iscatt,theta_I,phi_I) * correct_w
+                 w = 2.0_db * ((real(theta_I,kind=db) - 0.5) / real(n_theta_I,kind=db) ) - 1.0_db
+                 phi = deux_pi * (real(phi_I,kind=db) - 0.5) / real(n_phi_I,kind=db)
+
+                 w02 = sqrt(1.0_db-w*w)
+                 u = w02 * cos(phi)
+                 v = w02 * sin(phi)
 
                  ! Angle de diffusion
                  cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
@@ -1020,10 +1013,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp default(none) &
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,kappa_sca) &
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
-  !$omp shared(lsepar_pola,tab_u,tab_v,tab_w,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
+  !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
-  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,correct_w,phi_scatt,norme) &
+  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt,norme) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
   id = 1 ! pour code sequentiel
 
@@ -1075,8 +1068,6 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
      ! Boucle sur les directions de ray-tracing
      do dir=0,1
-        correct_w = (2 * dir - 1)
-
         do iscatt = 1, nang_ray_tracing
 
            phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
@@ -1102,8 +1093,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
 
                  if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
+                    i1 = N_super/2+1 ; i2 = i1
+                    k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
+
                     cosw = tab_cosw(dir,iscatt,phi_I,theta_I)
-                    sinw = tab_cosw(dir,iscatt,phi_I,theta_I)
+                    sinw = tab_sinw(dir,iscatt,phi_I,theta_I)
 
                     RPO(2,2) = cosw
                     ROP(2,2) = cosw
