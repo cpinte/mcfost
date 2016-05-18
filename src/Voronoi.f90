@@ -175,7 +175,8 @@ module Voronoi_grid
     real(kind=db), dimension(n_cells), intent(in) :: x, y, z
 
     character(len=512) :: cmd
-    integer :: i, syst_status
+    integer :: i, syst_status, time1, time2, itime
+    real :: time
 
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
@@ -186,13 +187,24 @@ module Voronoi_grid
     ! Run voro++ command line for now
     ! while I fix the c++/fortran interface and make all the tests
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    call system_clock(time1)
     cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' &
          -150 150 -150 150 -150 150 particles.txt ; &
          mv particles.txt.vol Voronoi.txt"
     call appel_syst(cmd,syst_status)
+    call system_clock(time2)
+    time=(time2 - time1)/real(time_tick)
+    if (time > 60) then
+       itime = int(time)
+       write (*,'(" Tesselation Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+    else
+       write (*,'(" Tesselation Time = ", F5.2, "s")')  time
+    endif
     write(*,*) "Voronoi Tesselation done"
 
     write(*,*) "TMP : filtering out 5000 cells for safety, will do it better later"
+    write(*,*) ""
+    write(*,*) ""
 
     call read_Voronoi(n_cells-5000)
 
