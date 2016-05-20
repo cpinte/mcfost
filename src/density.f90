@@ -1168,9 +1168,11 @@ subroutine density_phantom()
   real :: grainsize,graindens
 
   integer, parameter :: npart = 100 ! we will need to read that from the file
-  integer :: i
+  integer :: i, nVoronoi
 
   write(*,*) "Reading phantom density file: "//trim(density_file)
+
+  write(*,*) "n_cells = ", n_cells
 
   call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
   write(*,*) "Done"
@@ -1188,15 +1190,9 @@ subroutine density_phantom()
      call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
      write(*,*) grainsize,graindens
   endif
-  ! Make the Voronoi tesselation on the SPH particles
-  call Voronoi_tesselation(ncells, x,y,z)
 
 
-  i = 1
-  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
-  write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
-  deallocate(x,y,z)
-
+  ! Write the file for the grid version of mcfost
   !- N_part: total number of particles
   !  - r_in: disk inner edge in AU
   !  - r_out: disk outer edge in AU
@@ -1222,9 +1218,9 @@ subroutine density_phantom()
   !  - s_min,s_max: smallest and largest grain size in µm
 
   open(unit=1,file="SPH_phantom.txt",status="replace")
-  write(1,*) ncells
-  write(1,*) minval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
-  write(1,*) maxval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
+  write(1,*) size(x)
+  write(1,*) minval(sqrt(x**2 + y**2))
+  write(1,*) maxval(sqrt(x**2 + y**2))
   write(1,*) 1 ! p
   write(1,*) 0.5 ! q
   write(1,*) 1.0 ! mstar
@@ -1234,15 +1230,27 @@ subroutine density_phantom()
   write(1,*) .false.
   !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
 
-  do i=1,ncells
-     write(1,*) Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, 1.0, 1.0
+  do i=1,size(x)
+     write(1,*) x(i), y(i), z(i), 1.0, 1.0
   enddo
 
   write(1,*) 1
   write(1,*) 1.0
   close(unit=1)
-  ! Fill up the density grid
 
+
+
+  ! Make the Voronoi tesselation on the SPH particles
+  call Voronoi_tesselation(ncells, nVoronoi, x,y,z)
+
+
+  i = 1
+  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
+  write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
+  deallocate(x,y,z)
+
+
+  ! Fill up the density grid
 
   deallocate(rho,rhodust)
   stop
