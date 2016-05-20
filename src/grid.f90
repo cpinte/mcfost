@@ -1445,8 +1445,6 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
   icell = cell_map(ri,zj,1)
 
   if (l_dark_zone(icell)) then ! Petit test de securite
-     write(*,*) "DARK ZONE"
-
      ! On resort le paquet
      if (zj < zj0) then
         zj = zj0
