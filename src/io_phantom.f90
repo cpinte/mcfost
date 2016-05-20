@@ -239,7 +239,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   real(db) :: xi, yi, zi, hi, rhoi, udens, ulength, usolarmass, dustfraci
 
   udens = umass/udist**3
-  ulength = udist/au_to_cm
+  ulength = udist/ (au_to_cm * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
@@ -283,6 +283,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
 
     ! T, fUV, slope_UV, lb_body, spectre, ri, zj, phik
+
+
+    write(*,*) "STAR #",i,  etoile(i)%x,  etoile(i)%y,  etoile(i)%z,  etoile(i)%M
  enddo
 
  return
