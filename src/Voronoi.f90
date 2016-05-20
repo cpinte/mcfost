@@ -85,8 +85,8 @@ module Voronoi_grid
     enddo
 
     rewind(1)
-    write(*,*) "neighbours list size =", n_neighbours_tot
-    write(*,*)  "Voronoi volume =", sum(Voronoi%V)
+    write(*,*) "Neighbours list size =", n_neighbours_tot
+    write(*,*) "Voronoi volume =", sum(Voronoi%V)
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
 
@@ -169,14 +169,17 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_cells, x,y,z)
+  subroutine Voronoi_tesselation(n_cells, nVoronoi, x,y,z)
 
     integer, intent(in) :: n_cells
+    integer, intent(out) :: nVoronoi
     real(kind=db), dimension(n_cells), intent(in) :: x, y, z
 
     character(len=512) :: cmd
     integer :: i, syst_status, time1, time2, itime
     real :: time
+
+    character(len=128) :: limits
 
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
@@ -184,14 +187,25 @@ module Voronoi_grid
     enddo
     close(unit=1)
 
+    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") minval(x), maxval(x), minval(y), maxval(y), minval(z), maxval(z)
+    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") -150., 150., -150., 150., -150., 150.
+
     ! Run voro++ command line for now
     ! while I fix the c++/fortran interface and make all the tests
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call system_clock(time1)
-    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -g -c '%i %q %v %s %n' &
-         -150 150 -150 150 -150 150 particles.txt ; &
-         mv particles.txt.vol Voronoi.txt"
+    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
+         trim(limits)//&
+         " particles.txt ; mv particles.txt.vol Voronoi.txt"
+    write(*,*) trim(cmd)
+
     call appel_syst(cmd,syst_status)
+    cmd = "rm -rf nVoronoi.txt ; wc -l Voronoi.txt > nVoronoi.txt"
+    call appel_syst(cmd,syst_status)
+    open(unit=1,file="nVoronoi.txt",status="old")
+    read(1,*) nVoronoi
+    close(unit=1)
+
     call system_clock(time2)
     time=(time2 - time1)/real(time_tick)
     if (time > 60) then
@@ -202,11 +216,7 @@ module Voronoi_grid
     endif
     write(*,*) "Voronoi Tesselation done"
 
-    write(*,*) "TMP : filtering out 5000 cells for safety, will do it better later"
-    write(*,*) ""
-    write(*,*) ""
-
-    call read_Voronoi(n_cells-5000)
+    call read_Voronoi(nVoronoi)
 
     write(*,*) "Tesselation finished"
     return
@@ -419,7 +429,7 @@ module Voronoi_grid
 
     order = bubble_sort(real(s_walls,kind=db))
 
-    ! Move to the closest plane & check the packet is in the model
+    ! Move to the closest plane & check that the packet is in the model
     check_wall : do i = 1, n_walls
        iwall = order(i)
        l = s_walls(iwall)
