@@ -10,6 +10,7 @@ module stars
   use scattering
   use ProDiMo
   use optical_depth
+  use cylindrical_grid
 
   implicit none
 
