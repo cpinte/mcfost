@@ -725,7 +725,8 @@ subroutine transfert_poussiere()
         endif
         if (time > 60) then
            itime = int(time)
-           write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+           write (*,'(" Temperature calculation complete in ", I3, "h", I3, "m", I3, "s")')  &
+                itime/3600, mod(itime/60,60), mod(itime,60)
         else
            write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
         endif
@@ -1345,14 +1346,14 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: facteur, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
+  real(kind=db) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
   real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center
   logical :: in_map, lpola
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
-  real, dimension(npix_x,npix_y) :: map_1star, Q_1star, U_1star
+  real, dimension(npix_x,npix_y,nb_proc) :: map_1star, Q_1star, U_1star
 
   lpola = .false.
   if (lsepar_pola.and.llimb_darkening) lpola = .true.
@@ -1384,10 +1385,10 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   endif
 
   do istar=1, n_etoiles
-     map_1star = 0.0
+     map_1star(:,:,:) = 0.0
      if (lpola) then
-        Q_1star = 0.0
-        U_1star = 0.0
+        Q_1star(:,:,:) = 0.0
+        U_1star(:,:,:) = 0.0
      endif
      norme = 0.0_db
 
@@ -1403,15 +1404,12 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
-     !$omp shared(x_center,y_center) &
+     !$omp shared(x_center,y_center,nb_proc,map_1star,Q_1star,U_1star) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
      !$omp private(Pola_LimbDarkening,ri,zj,phik,cos_RT_az,sin_RT_az,tau,lmin,lmax,in_map,P,phi) &
-     !$omp reduction(+:norme,map_1star,Q_1star,U_1star)
-
+     !$omp reduction(+:norme)
      in_map = .true. ! for SED
      LimbDarkening = 1.0
-
-
 
      id = 1 ! Pour code sequentiel
      !$ id = omp_get_thread_num() + 1
@@ -1471,7 +1469,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         if (in_map) then
-           map_1star(i,j) = map_1star(i,j) + exp(-tau) * cos_thet * LimbDarkening
+           map_1star(i,j,id) = map_1star(i,j,id) + exp(-tau) * cos_thet * LimbDarkening
            if (lpola) then ! Average polarisation in the pixel
               P = exp(-tau) * cos_thet * LimbDarkening * Pola_LimbDarkening
 
@@ -1479,30 +1477,25 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
               ! to be fixed : phi needs to be calculated properly
               phi = atan2((j-y_center)*1.0,(i-x_center)*1.0)
 
-              Q_1star(i,j) = Q_1star(i,j) + P * cos(2*phi)
-              U_1star(i,j) = U_1star(i,j) + P * sin(2*phi)
+              Q_1star(i,j,id) = Q_1star(i,j,id) + P * cos(2*phi)
+              U_1star(i,j,id) = U_1star(i,j,id) + P * sin(2*phi)
            endif
         endif
-
         norme = norme + cos_thet * LimbDarkening
      enddo ! iray
      !$omp end do
      !$omp end parallel
 
-     ! Normalizing map
-     map_1star(:,:) = map_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
+     ! Normalizing map and Adding all the stars
+     facteur2 =  (facteur * prob_E_star(lambda,istar)) / norme
+     stars_map(:,:,1) = stars_map(:,:,1) + sum(map_1star(:,:,:),dim=3) * facteur2
 
-     ! Adding all the stars
-     stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:)
+
      if (lpola) then
-        ! Normalizing maps
-        Q_1star(:,:) = Q_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
-        U_1star(:,:) = U_1star(:,:) * (facteur * prob_E_star(lambda,istar)) / norme
-        ! Adding all the stars
-        stars_map(:,:,2) = stars_map(:,:,2) + Q_1star(:,:)
-        stars_map(:,:,3) = stars_map(:,:,3) + U_1star(:,:)
+        ! Normalizing maps and adding all the stars
+        stars_map(:,:,2) = stars_map(:,:,2) + sum(Q_1star(:,:,:),dim=3) * facteur2
+        stars_map(:,:,3) = stars_map(:,:,3) + sum(U_1star(:,:,:),dim=3) * facteur2
      endif
-
   enddo ! n_stars
 
   return
