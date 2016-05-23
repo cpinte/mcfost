@@ -12,6 +12,7 @@ module dust_transfer
   use wall
   use ray_tracing
   use scattering
+  use cylindrical_grid
   use grid
   use optical_depth
   use density
