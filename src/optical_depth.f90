@@ -156,7 +156,6 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
 
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
-     !call cell2cylindrical(next_cell, ri1,zj1,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for the "test sortie"
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
@@ -731,7 +730,6 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
   zj1=zj
 
   tau_tot=0.0_db
-  nbr_cell = 0
 
   a=u*u+v*v
 
@@ -1480,7 +1478,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
   real(kind=db), dimension(nTrans) :: tau_c
   real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0
   integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1, icell0
-  integer :: iTrans, ivpoint, iiTrans, n_vpoints
+  integer :: iTrans, ivpoint, iiTrans, n_vpoints, nbr_cell
 
   real :: facteur_tau
 
