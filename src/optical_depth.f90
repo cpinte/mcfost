@@ -40,16 +40,11 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
   !call test_convert()
 
   if (lcylindrical) then
-     if (l3D) then
-        call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w, &
-             flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+     if (lopacity_wall) then
+        call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
      else
-        if (lopacity_wall) then
-           call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
-        else
-           call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w, &
-                flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-        endif
+        call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w, &
+             flag_star,flag_direct_star,extrin,ltot,flag_sortie)
      endif
   else ! spherical
      call length_deg2_sph(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w, &
@@ -62,7 +57,7 @@ end subroutine length_deg2
 
 !********************************************************************
 
-subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -72,7 +67,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
   implicit none
 
   integer, intent(in) :: id,lambda, p_lambda
-  integer, intent(inout) :: ri,zj
+  integer, intent(inout) :: ri,zj, phik
   real(kind=db), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star, flag_direct_star
   real(kind=db), intent(inout) :: u,v,w
@@ -81,42 +76,29 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
-  real(kind=db) :: l, tau, phi_vol, opacite
-  integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
+  real(kind=db) :: l, tau, opacite
+  integer :: ri0, zj0, phik0, ri1, zj1, phik1, ri_old, zj_old, phik_old
   integer :: ri_in, zj_in, tmp_k
 
   integer :: icell0, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
-  ! Petit delta pour franchir la limite de la cellule
-  ! et ne pas etre pile-poil dessus
   lstop = .false.
   flag_sortie = .false.
 
-  x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
   extr=extrin
   ri_in = ri
   zj_in = zj
-  ri0=ri
-  zj0=zj
   ri1=ri
   zj1=zj
+  phik1=phik
 
-  next_cell = cell_map(ri0,zj0,1)
+  next_cell = cell_map(ri1,zj1,phik1)
 
   ltot = 0.0
-
-  if (abs(w) > tiny_real) then
-     inv_w=1.0_db/w
-  else
-     inv_w=sign(huge_db,w) ! huge_real avant
-  endif
-
-  ! Pour ray-tracing
-  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   ! Calcule les angles de diffusion pour la direction de propagation donnee
   if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
@@ -124,10 +106,10 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
      ! Indice de la cellule
-     ri_old = ri0 ; zj_old = zj0
+     ri_old = ri0 ; zj_old = zj0 ; phik_old = phik0
      x_old = x0 ; y_old = y0 ; z_old = z0
 
-     ri0=ri1 ; zj0=zj1
+     ri0=ri1 ; zj0=zj1 ; phik0=phik1
      x0=x1 ; y0=y1 ; z0=z1
      icell0 = next_cell
 
@@ -135,12 +117,12 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
         opacite=kappa(icell0,lambda)
+
         if (l_dark_zone(icell0)) then
            ! On revoie le paquet dans l'autre sens
            u = -u ; v = -v ; w=-w
-           inv_w = -inv_w
            ! et on le renvoie au point de depart
-           ri = ri_old ; zj = zj_old
+           ri = ri_old ; zj = zj_old ; phik = phik_old
            xio = x_old ; yio = y_old ; zio = z_old
            flag_sortie= .false.
            return
@@ -156,10 +138,11 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
         return
      endif
 
+     ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
 
-     ! Calcul longeur de vol et profondeur optique dans la cellule
+
      tau = l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
@@ -184,8 +167,13 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
         yio=y0+l*v
         zio=z0+l*w
 
-        call verif_cell_position_cyl(icell0, xio, yio, zio)
-        call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
+        if (l3D) then
+           call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
+           call cell2cylindrical(icell0, ri,zj,phik)
+        else
+           call verif_cell_position_cyl(icell0, xio, yio, zio)
+           call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
+        endif
         return
      endif ! lstop
 
@@ -468,127 +456,6 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
   return
 
 end subroutine length_deg2_sph
-
-!********************************************************************
-
-subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-! Integration par calcul de la position de l'interface entre cellules
-! par eq deg2 en r et deg 1 en z
-! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-! C. Pinte
-! 05/02/05
-
-  implicit none
-
-  integer, intent(in) :: id,lambda, p_lambda
-  integer, intent(inout) :: ri,zj, phik
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db), intent(in) :: u,v,w
-  logical, intent(in) :: flag_star, flag_direct_star
-  real, intent(in) :: extrin
-  real(kind=db), intent(inout) :: xio,yio,zio
-  real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie
-
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, phi
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
-  real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1, icell0, next_cell, previous_cell
-
-  logical :: lcellule_non_vide, lstop
-
-  ! Petit delta pour franchir la limite de la cellule
-  ! et ne pas etre pile-poil dessus
-  correct_moins = 1.0_db - prec_grille
-  correct_plus = 1.0_db + prec_grille
-  lstop = .false.
-
-  x1=xio;y1=yio;z1=zio
-  extr=extrin
-  ri0=ri
-  zj0=zj
-  phik0=phik
-  ri1=ri
-  zj1=zj
-  phik1=phik
-
-  next_cell = cell_map(ri0,zj0,phik)
-
-  ltot=0.0
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0/a
-  else
-     inv_a=huge_real
-  endif
-
-  if (abs(w) > tiny_real) then
-     inv_w=1.0/w
-  else
-     inv_w=sign(huge_db,w)
-  endif
-
-  ! Calcule les angles de diffusion pour la direction de propagation donnee
-  if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
-
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cellule
-     ri0=ri1 ; zj0=zj1 ; phik0=phik1
-     x0=x1 ; y0=y1 ; z0=z1
-     icell0 = next_cell
-
-     if (icell0 <= n_cells) then
-        lcellule_non_vide=.true.
-        opacite = kappa(icell0,lambda)
-     else
-        lcellule_non_vide=.false.
-        opacite = 0.0_db
-     endif
-
-     ! Test sortie
-     if (exit_test_cylindrical(icell0, x0, y0, z0)) then
-        flag_sortie = .true.
-        return
-     endif
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     previous_cell = 0 ! unused, just for Voronoi
-     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-     tau = l*opacite ! opacite constante dans la cellule
-
-     ! Comparaison integrale avec tau
-     ! et ajustement longueur de vol eventuellement
-     if(tau > extr) then ! On a fini d'integrer
-        lstop = .true.
-        l = l*extr/tau ! on rescale l pour que tau=extr
-        ltot=ltot+l
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
-     endif ! tau > extr
-
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  &
-          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
-
-     if (lstop) then
-        flag_sortie = .false.
-        xio=x0+l*u
-        yio=y0+l*v
-        zio=z0+l*w
-        call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
-        call cell2cylindrical(icell0, ri,zj,phik)
-        return
-     endif
-
-  enddo ! boucle infinie
-  write(*,*) "BUG"
-  return
-
-end subroutine length_deg2_3D
 
 !********************************************************
 
@@ -3572,7 +3439,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
@@ -3606,7 +3473,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  zj=j
                  phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
