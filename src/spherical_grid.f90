@@ -107,7 +107,7 @@ end subroutine indice_cellule_sph_theta
 
 !******************************************************************************
 
-  subroutine cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+  subroutine cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
     integer, intent(in) :: lambda, cell, previous_cell
     real(kind=db), intent(in) :: x0,y0,z0
@@ -115,12 +115,12 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=db), intent(out) :: x1, y1, z1
     integer, intent(out) :: next_cell
-    real(kind=db), intent(out) :: l, tau
+    real(kind=db), intent(out) :: l
 
 
     real(kind=db) :: correct_moins, correct_plus, uv, precision
     real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
-    real(kind=db) :: delta_vol, dotprod, opacite, t_phi, tan_angle_lim, den
+    real(kind=db) :: delta_vol, dotprod, t_phi, tan_angle_lim, den
     integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
 
     integer :: phik0, phik1, delta_phi, phik0m1
@@ -149,7 +149,6 @@ end subroutine indice_cellule_sph_theta
     b   = (x0*u+y0*v+z0*w)
 
     if (ri0==0) then
-       opacite=0.0_db
        ! Si on est avant le bord interne,  on passe forcement par rmin
        ! et on cherche forcement la racine positive (unique)
        c=(r0_2-r_lim_2(0)*correct_plus)
@@ -159,12 +158,6 @@ end subroutine indice_cellule_sph_theta
        t=huge_real
        delta_rad=1
     else
-       if (icell0 > n_cells) then
-          opacite = 0.0_db
-       else
-          opacite=kappa(icell0,lambda)
-       endif
-
        ! 1) position interface radiale
        ! on avance ou recule en r ? -> produit scalaire
        dotprod= b
@@ -359,9 +352,6 @@ end subroutine indice_cellule_sph_theta
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
     if (z1 == 0.0_db) z1 = prec_grille
-
-    ! Calcul longeur de vol et profondeur optique dans la cellule
-    tau=l*opacite ! opacite constante dans la cellule
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell =  cell_map(ri1,thetaj1,1)

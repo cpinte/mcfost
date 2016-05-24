@@ -82,7 +82,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
   logical, intent(out) :: flag_sortie
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr, inv_w
-  real(kind=db) :: l, tau, phi_vol
+  real(kind=db) :: l, tau, phi_vol, opacite
   integer :: ri0, zj0, ri1, zj1, ri_old, zj_old
   integer :: ri_in, zj_in, tmp_k
 
@@ -134,6 +134,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
+        opacite=kappa(icell0,lambda)
         if (l_dark_zone(icell0)) then
            ! On revoie le paquet dans l'autre sens
            u = -u ; v = -v ; w=-w
@@ -146,6 +147,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
         endif
      else
         lcellule_non_vide=.false.
+        opacite = 0.0_db
      endif
 
      ! Test sortie
@@ -155,7 +157,10 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
      endif
 
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     tau = l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
@@ -312,7 +317,7 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor, l, tau, phi_vol, extr, correct_plus, correct_moins
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor, l, tau, phi_vol, extr, correct_plus, correct_moins, opacite
 
   integer :: thetaj_old, ri_old, icell, ri0, ri1, thetaj0, thetaj1, p_ri0, p_thetaj0, previous_cell, cell, icell0, next_cell
   logical :: lcellule_non_vide, lstop
@@ -372,9 +377,17 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
      endif
 
      ! Todo : test_sortie_routine
-     lcellule_non_vide=.true.
-     if (ri0==0) lcellule_non_vide=.false.
-
+     if (ri0==0) then
+        lcellule_non_vide=.false.
+        opacite=0.0_db
+     else
+        lcellule_non_vide=.true.
+        if (icell0 > n_cells) then
+           opacite = 0.0_db
+        else
+           opacite=kappa(icell0,lambda)
+        endif
+     endif
 
      ! Test sortie
      if (ri0>n_rad) then ! On est dans la derniere cellule
@@ -384,7 +397,10 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
      endif ! Test sortie
 
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
+
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     tau=l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
@@ -527,8 +543,10 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
 
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
+        opacite = kappa(icell0,lambda)
      else
         lcellule_non_vide=.false.
+        opacite = 0.0_db
      endif
 
      ! Test sortie
@@ -537,8 +555,10 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
         return
      endif
 
+     ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     tau = l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
