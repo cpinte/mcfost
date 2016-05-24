@@ -124,6 +124,12 @@ subroutine define_gas_density()
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
+                 else if (ltilt) then
+                    if (izone==1) then
+                       z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
+                    else
+                       z0 = 0.0
+                    endif
                  else
                     z0 = 0.0
                  endif
@@ -166,7 +172,8 @@ subroutine define_gas_density()
 
      else if (dz%geometry == 3) then ! envelope
         do i=1, n_rad
-           do j=j_start,nz
+           bz_env : do j=j_start,nz
+              if (j==0) cycle bz_env
               do k=1, n_az
                  if (j==0) then
                     icell = cell_map(i,1,k)
@@ -195,29 +202,46 @@ subroutine define_gas_density()
                  densite_gaz_midplane_tmp(i) = density
               endif
               enddo !k
-           enddo !j
+           enddo bz_env !j
         enddo !i
 
-     else if (dz%geometry == 4) then
+     else if (dz%geometry == 4) then ! debris
         k=1
         do i=1, n_rad
-           do j=1,nz
-              icell = cell_map(i,j,1)
-              rcyl = r_grid(icell)
-              z = z_grid(icell)
+           bz_debris : do j=j_start,nz
+              if (j==0) cycle bz_debris
+              do k=1, n_az
+                 icell = cell_map(i,j,k)
+                 rcyl = r_grid(icell)
+                 z = z_grid(icell)
+                 phi = phi_grid(icell)
 
-              H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-              if (rcyl > dz%rmax) then
-                 density = 0.0
-              else if (rcyl < dz%rmin) then
-                 density = 0.0
-              else
-                 density = cst_gaz(izone) * &
-                      ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
-                      exp( - (abs(z)/h)**dz%vert_exponent)
-              endif
-              densite_gaz_tmp(icell) = density
-           enddo !j
+                 ! Warp analytique
+                 if (lwarp) then
+                    z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
+                 else if (ltilt) then
+                    if (izone==1) then
+                       z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
+                    else
+                       z0 = 0.0
+                    endif
+                 else
+                    z0 = 0.0
+                 endif
+
+                 H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else
+                    density = cst_gaz(izone) * &
+                         ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                         exp( - (abs(z-z0)/h)**dz%vert_exponent)
+                 endif
+                 densite_gaz_tmp(icell) = density
+              enddo ! k
+           enddo bz_debris !j
         enddo !i
 
      endif ! dz%geometry
@@ -703,17 +727,33 @@ subroutine define_dust_density()
 
      else if (dz%geometry == 4) then ! disque de debris
         do i=1, n_rad
-           do j=1,nz
+           bz_debris : do j=j_start,nz
+              if (j==0) cycle bz_debris
               do k=1, n_az
                  icell = cell_map(i,j,k)
                  ! On calcule la densite au milieu de la cellule
                  rcyl = r_grid(icell)
                  z = z_grid(icell)
+                 phi = phi_grid(icell)
 
                  h = dz%sclht * (rcyl/dz%Rref)**dz%exp_beta
 
                  !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
                  !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
+
+
+                 ! Warp analytique
+                 if (lwarp) then
+                    z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
+                 else if (ltilt) then
+                    if (izone==1) then
+                       z0 = rcyl * cos(phi) * tan(tilt_angle * deg_to_rad)
+                    else
+                       z0 = 0.0
+                    endif
+                 else
+                    z0 = 0.0
+                 endif
 
                  do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                     if (rcyl > dz%rmax) then
@@ -723,14 +763,14 @@ subroutine define_dust_density()
                     else
                        density = nbre_grains(l) * cst_pous(pop) * &
                             ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
-                            exp( - (abs(z)/h)**dz%vert_exponent)
+                            exp( - (abs(z -z0)/h)**dz%vert_exponent)
                     endif
                     densite_pouss(l,icell) = density
                  enddo ! l
 
 
               enddo !k
-           enddo !j
+           enddo bz_debris !j
         enddo !i
 
      endif ! dz%geometry

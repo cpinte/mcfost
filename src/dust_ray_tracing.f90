@@ -643,7 +643,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   !$omp default(none) &
   !$omp private(icell,facteur,itype,I_scatt) &
   !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_sca,N_type_flux,lambda,iRT) &
-  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes)
+  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
@@ -709,7 +709,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,eps_dust2_star,lsepar_pola) &
-  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star) &
+  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc) &
   !$omp private(icell,dir,iscatt)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
@@ -775,8 +775,8 @@ subroutine calc_Jth(lambda)
         !$omp do
         do icell=1, n_cells
            Temp=Temperature(icell) ! que LTE pour le moment
-           cst_wl=cst_th/(Temp*wl)
-           if (cst_wl < 500.0) then
+           if (Temp*wl > 3.e-4) then
+              cst_wl=cst_th/(Temp*wl)
               coeff_exp=exp(cst_wl)
               J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_LTE(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
            else
@@ -792,8 +792,8 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
               Temp=Temperature_1grain(l,icell)
-              cst_wl=cst_th/(Temp*wl)
-              if (cst_wl < 500.0) then
+              if (Temp*wl > 3.e-4) then
+                 cst_wl=cst_th/(Temp*wl)
                  coeff_exp=exp(cst_wl)
                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                       C_abs_norm(l,lambda)*densite_pouss(l,icell)
@@ -807,8 +807,8 @@ subroutine calc_Jth(lambda)
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
                  Temp=Temperature_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < 500.) then
+                 if (Temp*wl > 3.e-4) then
+                    cst_wl=cst_th/(Temp*wl)
                     coeff_exp=exp(cst_wl)
                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                          C_abs_norm(l,lambda)*densite_pouss(l,icell)
@@ -816,8 +816,8 @@ subroutine calc_Jth(lambda)
               else ! ! la grain a une proba de T
                  do T=1,n_T
                     temp=tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < 500.) then
+                    if (Temp*wl > 3.e-4) then
+                       cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                             C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Temperature(T,l,icell)
@@ -1014,7 +1014,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,kappa_sca) &
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
-  !$omp shared(s11_save,tab_cosw,tab_sinw) &
+  !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt,norme) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
@@ -1184,7 +1184,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   integer, intent(in) :: lambda, p_lambda, ibin
 
-  integer :: ri, zj, p_ri, p_zj, dir, iscatt, id
+  integer :: p_ri, p_zj, dir, iscatt, id
   real(kind=db), dimension(4) :: Stokes, S, C, D
   real(kind=db) :: x, y, z, u, v, w, facteur
 
