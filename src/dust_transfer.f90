@@ -929,7 +929,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta, ri, zj, phik
+  integer :: p_icell, taille_grain, itheta
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -981,12 +981,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
      if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
         ! test zone noire
-        ! todo : tmp
-        ri = cell_map_i(icell)
-        zj = cell_map_j(icell)
-        phik = cell_map_k(icell)
-
-        if (test_dark_zone(ri,zj,phik,x,y)) then ! on saute le photon
+        if (test_dark_zone(icell, x,y,z)) then ! on saute le photon
            lpacket_alive = .false.
            return
         endif
@@ -1011,7 +1006,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
         if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
            rand = sprng(stream(id))
-           !taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
            taille_grain = select_scattering_grain(lambda,p_icell, rand) ! ok, not too bad, not much smaller
 
            rand = sprng(stream(id))
