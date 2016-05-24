@@ -2017,36 +2017,6 @@ end subroutine integ_ray_mol_sph
 
 !***********************************************************
 
-subroutine move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
-  ! Calcule la position au bord de la grille dans
-  ! la direction donnee
-  ! C. Pinte
-  ! 01/08/07
-
-  implicit none
-
-  real(kind=db), intent(inout) :: x,y,z
-  real(kind=db), intent(in) :: u,v,w
-  integer, intent(out) :: ri, zj, phik
-  logical, intent(out) :: lintersect
-
-  if (lcylindrical) then
-     call move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
-  else
-     call move_to_grid_sph(x,y,z,u,v,w,ri,zj,lintersect)
-     phik=1 ! pas 3D
-  endif
-
-  if (zj == nz) then ! indice_cellule force nz si z > zmax, il faut corriger ca
-     if (ri < n_rad) zj = nz+1 ; ! suppose que zmaxmax est atteint dans la derniere cellule
-  endif
-
-  return
-
-end subroutine move_to_grid
-
-!***********************************************************
-
 subroutine integ_tau_mol(imol)
 
   implicit none

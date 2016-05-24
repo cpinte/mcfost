@@ -10,7 +10,7 @@ module stars
   use scattering
   use ProDiMo
   use optical_depth
-  use cylindrical_grid
+  use grid
 
   implicit none
 
@@ -49,7 +49,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,z,u,v,w,w2,lintersect)
+subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -60,11 +60,13 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
 
   integer, intent(in) :: n_star
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
-  integer, intent(out) :: ri, zj, phik
+  integer, intent(out) :: icell
+
   real(kind=db), intent(out) :: x, y, z, u, v, w, w2
   logical, intent(out) :: lintersect
 
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi
+  integer :: ri, zj, phik
 
   ! Position de depart aleatoire sur une sphere de rayon 1
   z = 2.0_db * aleat1 - 1.0_db
@@ -101,8 +103,10 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
   ! L'etoile peut occuper plusieurs cellules
   ! todo : tester a l'avance si c'est le cas
   call indice_cellule_3D(x,y,z,ri,zj,phik)
+  icell = cell_map(ri,zj,phik)
   lintersect = .true.
-  if (ri==n_rad) call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
+
+  if (ri==n_rad) call move_to_grid(x,y,z,u,v,w, icell,lintersect)
 
   return
 
@@ -606,7 +610,7 @@ end subroutine repartition_energie_ISM
 !***********************************************************
 
 
-subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
+subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur une sphere et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -618,7 +622,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 #include "sprng_f.h"
 
   integer, intent(in) :: id
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: icell
   real(kind=db), intent(out) :: x, y, z, u, v, w
   real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
@@ -660,7 +664,7 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   y = y * l
   z = z * l
 
-  call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
+  call move_to_grid(x,y,z,u,v,w, icell,lintersect)
 
   return
 

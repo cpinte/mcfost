@@ -693,7 +693,7 @@ contains
 
   !***********************************************************
 
-  subroutine move_to_grid_cyl(x,y,z,u,v,w,ri,zj,phik,lintersect)
+  subroutine move_to_grid_cyl(x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
     ! la direction donnee pour grille cylindrique
     ! C. Pinte
@@ -703,11 +703,12 @@ contains
 
     real(kind=db), intent(inout) :: x,y,z
     real(kind=db), intent(in) :: u,v,w
-    integer, intent(out) :: ri, zj, phik
+    integer, intent(out) :: icell
     logical, intent(out) :: lintersect
 
     real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t1, t2
     real(kind=db) :: zlim, zlim2, delta_vol, inv_w, correct_moins, correct_plus
+    integer :: ri, zj, phik
 
     correct_moins = 1.0_db - 1.0e-10_db
     correct_plus = 1.0_db + 1.0e-10_db
@@ -820,6 +821,7 @@ contains
     else
        call indice_cellule(x,y,z,ri,zj) ; phik=1
     endif
+    icell = cell_map(ri,zj,phik)
 
     return
 
