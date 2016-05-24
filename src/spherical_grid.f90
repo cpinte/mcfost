@@ -362,7 +362,7 @@ end subroutine indice_cellule_sph_theta
 
 !***********************************************************
 
-  subroutine move_to_grid_sph(x,y,z,u,v,w,ri,thetaj,lintersect)
+  subroutine move_to_grid_sph(x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
     ! la direction donnee pour grille spherique
     ! C. Pinte
@@ -372,10 +372,11 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=db), intent(inout) :: x,y,z
     real(kind=db), intent(in) :: u,v,w
-    integer, intent(out) :: ri, thetaj
+    integer, intent(out) :: icell
     logical, intent(out) :: lintersect
 
     real(kind=db) :: x0, y0, z0, x1, y1, z1, r0_2, b, c, rac, delta, s1, delta_vol, correct_moins
+    integer :: ri, thetaj, phik
 
     correct_moins = 1.0_db - 1.0e-10_db
 
@@ -418,8 +419,10 @@ end subroutine indice_cellule_sph_theta
     ! Determination de l'indice de la premiere cellule traversee
     ! pour initialiser la propagation
     call indice_cellule_sph(x1,y1,z1,ri,thetaj)
-
     x=x1 ; y=y1 ; z=z1
+
+    phik = 1 ;
+    icell = cell_map(ri,thetaj,phik)
 
     return
 
