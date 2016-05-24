@@ -426,4 +426,90 @@ end subroutine indice_cellule_sph_theta
 
   end subroutine move_to_grid_sph
 
+!***********************************************************
+
+  subroutine pos_em_cellule_sph(icell ,aleat1,aleat2,aleat3,x,y,z)
+! Choisit la position d'emission uniformement
+! dans la cellule (ri,thetaj)
+! Geometrie spherique
+! C. Pinte
+! 08/06/07
+
+  implicit none
+
+  integer, intent(in) :: icell
+  real, intent(in) :: aleat1, aleat2, aleat3
+  real(kind=db), intent(out) :: x,y,z
+
+  real(kind=db) :: r, theta, phi, r_cos_theta
+  integer :: ri, thetaj, phik
+
+  ri = cell_map_i(icell)
+  thetaj = cell_map_j(icell)
+  phik = cell_map_k(icell)
+
+  ! Position radiale
+  r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
+
+  ! Position theta
+  if (aleat2 > 0.5_db) then
+     theta=theta_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(theta_lim(thetaj)-theta_lim(thetaj-1))
+  else
+     theta=-(theta_lim(thetaj-1)+(2.0_db*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
+  endif
+
+  theta=theta_lim(thetaj-1)+aleat2*(theta_lim(thetaj)-theta_lim(thetaj-1))
+
+
+  ! BUG ??? : ca doit etre uniforme en w, non ??
+
+
+  ! Position azimuthale
+  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
+
+  ! x et y
+  z=r*sin(theta)
+  r_cos_theta = r*cos(theta)
+  x=r_cos_theta*cos(phi)
+  y=r_cos_theta*sin(phi)
+
+
+
+!!$  ! Position theta
+!!$  if (aleat2 > 0.5) then
+!!$     w=w_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(w_lim(thetaj)-w_lim(thetaj-1))
+!!$  else
+!!$     w=-(w_lim(thetaj-1)+(2.0_db*aleat2)*(w_lim(thetaj)-w_lim(thetaj-1)))
+!!$  endif
+!!$
+!!$  ! Position azimuthale
+!!$  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
+!!$
+!!$  ! x et y
+!!$  z=r*w
+!!$  r_cos_theta = r*sqrt(1.0_db-w*w)
+!!$  x=r_cos_theta*cos(phi)
+!!$  y=r_cos_theta*sin(phi)
+
+!  z = z_grid(ri,thetaj)
+!  r = r_grid(ri,thetaj)
+!  x = r*cos(phi)
+!  y = r*sin(phi)
+
+ ! call indice_cellule_sph(x,y,z,ri_tmp,thetaj_tmp)
+ ! if (ri /= ri_tmp) then
+ !    write(*,*) "Bug ri", ri, ri_tmp, sqrt(x*x+y*y)
+ !    read(*,*)
+ ! else if (thetaj /= thetaj_tmp) then
+ !    write(*,*) "Bug zj", w, thetaj, thetaj_tmp
+ !    call indice_cellule_sph(x,y,-z,ri_tmp,thetaj_tmp)
+ !    write(*,*) -z, thetaj_tmp
+ !    read(*,*)
+ ! endif
+
+
+  return
+
+end subroutine pos_em_cellule_sph
+
 end module spherical_grid
