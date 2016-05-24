@@ -17,6 +17,7 @@ module grid
   procedure(cross_cylindrical_cell), pointer :: cross_cell => null()
   procedure(pos_em_cellule_cyl), pointer :: pos_em_cellule => null()
   procedure(move_to_grid_cyl), pointer :: move_to_grid => null()
+  procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
 
   contains
 
@@ -208,12 +209,14 @@ subroutine define_grid()
      cross_cell => cross_cylindrical_cell
      pos_em_cellule => pos_em_cellule_cyl
      move_to_grid => move_to_grid_cyl
+     indice_cellule => indice_cellule_cyl
   else if (grid_type == 2) then
      lcylindrical = .false.
      lspherical = .true.
      cross_cell => cross_spherical_cell
      pos_em_cellule => pos_em_cellule_sph
      move_to_grid => move_to_grid_sph
+     indice_cellule => indice_cellule_sph
   else
      write(*,*) "Unknown grid type"
      write(*,*) "Exiting"

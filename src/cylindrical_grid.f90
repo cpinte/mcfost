@@ -321,55 +321,7 @@ contains
 
   !******************************************************************************
 
-  subroutine indice_cellule(xin,yin,zin, icell)
-
-    implicit none
-
-    real(kind=db), intent(in) :: xin,yin,zin
-    integer, intent(out) :: icell
-
-    real(kind=db) :: r2
-    integer :: ri, ri_min, ri_max, ri_out, zj_out
-
-    r2 = xin*xin+yin*yin
-
-
-    if (r2 < r_lim_2(0)) then
-       ri_out=0
-       zj_out=1
-       return
-    else if (r2 > Rmax2) then
-       ri_out=n_rad
-    else
-       ri_min=0
-       ri_max=n_rad
-       ri=(ri_min+ri_max)/2
-
-       do while((ri_max-ri_min) > 1)
-          if(r2 > r_lim_2(ri)) then
-             ri_min=ri
-          else
-             ri_max=ri
-          endif
-          ri=(ri_min+ri_max)/2
-       enddo
-       ri_out=ri+1
-    endif
-
-    zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
-    if (zj_out > nz) then
-       zj_out = nz + 1
-    endif
-
-    icell = cell_map(ri_out,zj_out,1)
-
-    return
-
-  end subroutine indice_cellule
-
-  !******************************************************************************
-
-  subroutine indice_cellule_3D(xin,yin,zin, icell)
+  subroutine indice_cellule_cyl(xin,yin,zin, icell)
 
     implicit none
 
@@ -383,8 +335,12 @@ contains
 
     if (r2 < r_lim_2(0)) then
        ri_out=0
+       zj_out=0
+       phik_out=1
     else if (r2 > Rmax2) then
        ri_out=n_rad
+       zj_out=1
+       phik_out=1
     else
        ri_min=0
        ri_max=n_rad
@@ -401,31 +357,32 @@ contains
        ri_out=ri+1
     endif
 
-    if (ri_out > 0) then
-       zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
-    else
-       zj_out = 0
-    endif
-    if (zj_out > nz) zj_out = nz
-    if (zin < 0.0)  zj_out = -zj_out
+    if (ri_out > 0) zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
 
-    if (zin /= 0.0) then
-       phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
-       phik_out=floor(phi/(2*pi)*real(N_az))+1
-       if (phik_out==n_az+1) phik_out=n_az
-    else
-       phik_out=1
+    if (l3D) then
+       if (zj_out > nz) zj_out = nz
+       if (zin < 0.0)  zj_out = -zj_out
+       if (zin /= 0.0) then
+          phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+          phik_out=floor(phi/(2*pi)*real(N_az))+1
+          if (phik_out==n_az+1) phik_out=n_az
+       else
+          phik_out=1
+       endif
+    else ! 2D
+       if (zj_out > nz) zj_out = nz + 1
     endif
 
-    icell = cell_map(ri_out,zj_out,phik_out)
+    icell = cell_map(ri_out,zj_out,1)
 
     return
 
-  end subroutine indice_cellule_3D
+  end subroutine indice_cellule_cyl
 
   !******************************************************************************
 
   subroutine indice_cellule_3D_phi(xin,yin,zin,phik_out)
+    ! ok : not necessary anymore, included directly dans cross_cylindrical_cell
 
     implicit none
 
@@ -819,11 +776,7 @@ contains
 
     ! Determination de l'indice de la premiere cellule traversee
     ! pour initialiser la propagation
-    if (l3D) then
-       call indice_cellule_3D(x,y,z, icell)
-    else
-       call indice_cellule(x,y,z, icell) ;
-    endif
+    call indice_cellule_cyl(x,y,z, icell)
 
     return
 

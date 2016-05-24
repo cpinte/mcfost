@@ -97,7 +97,7 @@ subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
 
   ! L'etoile peut occuper plusieurs cellules
   ! todo : tester a l'avance si c'est le cas
-  call indice_cellule_3D(x,y,z, icell)
+  call indice_cellule(x,y,z, icell)
   lintersect = .true.
 
   if (cell_map_i(icell)==n_rad) call move_to_grid(x,y,z,u,v,w, icell,lintersect)
@@ -571,15 +571,7 @@ subroutine repartition_energie_etoiles()
 
   ! Cellule d'origine dans laquelle est l'etoile
   do i=1, n_etoiles
-     if (l3D) then
-        call indice_cellule_3D(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
-     else
-        if (lcylindrical) then
-           call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
-        else
-           call indice_cellule_sph(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
-        endif
-     endif
+     call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
   enddo
 
   return

@@ -1441,25 +1441,18 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         Stokes = 0.0_db
+
+        ! Coordonnees initiale : position etoile dans la grille
+        call indice_cellule(x0,y0,z0, icell)
+
+        ! Todo : tmp
+        ri = cell_map_i(icell)
+        zj = cell_map_j(icell)
+        phik = cell_map_k(icell)
+
         if (l3D) then
-           ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule_3D(x0,y0,z0, icell)
-
-           ! Todo : tmp
-           ri = cell_map_i(icell)
-           zj = cell_map_j(icell)
-           phik = cell_map_k(icell)
-
            call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
         else
-           ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule(x0,y0,z0, icell)
-
-           ! Todo : tmp
-           ri = cell_map_i(icell)
-           zj = cell_map_j(icell)
-           phik = cell_map_k(icell)
-
            call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
         endif
 
