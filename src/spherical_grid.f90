@@ -120,10 +120,10 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=db) :: correct_moins, correct_plus, uv, precision
     real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
-    real(kind=db) :: delta_vol, dotprod, opacite
+    real(kind=db) :: delta_vol, dotprod, opacite, t_phi, tan_angle_lim, den
     integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
 
-    integer :: phik0
+    integer :: phik0, phik1, delta_phi, phik0m1
 
     real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
     real(kind=db) :: t1_1, t1_2, t2_1, t2_2, a_theta_m1
@@ -274,11 +274,50 @@ end subroutine indice_cellule_sph_theta
           if (thetaj0 == 1) delta_theta = 0
        endif
 
+       ! 3) position interface azimuthale
+       if (l3D) then
+          dotprod =  x0*v - y0*u
+          if (abs(dotprod) < 1.0e-10) then
+             ! on ne franchit pas d'interface azimuthale
+             t_phi = 1.0e30
+             delta_phi = 0
+          else
+             ! Quelle cellule on va franchir
+             if (dotprod > 0.0) then
+                tan_angle_lim = tan_phi_lim(phik0)
+                delta_phi=1
+             else
+                phik0m1=phik0-1
+                if (phik0m1==0) phik0m1=N_az
+                tan_angle_lim = tan_phi_lim(phik0m1)
+                delta_phi=-1
+             endif
+             ! Longueur av interserction
+             if (tan_angle_lim > 1.0d299) then
+                t_phi = -x0/u
+                delta_phi=0
+             else
+                den= v-u*tan_angle_lim
+                if (abs(den) > 1.0e-6) then
+                   t_phi = -(y0-x0*tan_angle_lim)/den
+                else
+                   t_phi = 1.0e30
+                   delta_phi = 0
+                endif
+             endif
+             if (t_phi < 0.0) then
+                t_phi = 1.0e30
+                delta_phi = 0
+             endif
+          endif !dotprod = 0.0
+       else ! l3D
+          t_phi = huge_real
+       endif
     endif ! ri0==0
 
 
-    ! 3) interface en r ou theta ?
-    if (s < t) then ! r
+    ! 4) interface en r ou theta ou phi ?
+    if ((s < t).and.(s < t_phi)) then ! r
        l=s
        delta_vol=s
        ! Position au bord de la cellule suivante
@@ -287,13 +326,14 @@ end subroutine indice_cellule_sph_theta
        z1=z0+delta_vol*w
        ri1=ri0+delta_rad
        thetaj1 = thetaj0
+       phik1=phik0
 
        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
        if (ri0==0) then
           call indice_cellule_sph_theta(x1,y1,z1,thetaj1)
        endif
 
-    else ! theta
+    else if (t < t_phi) then ! theta
        l=t
        delta_vol=t
        ! Position au bord de la cellule suivante
@@ -302,6 +342,19 @@ end subroutine indice_cellule_sph_theta
        z1=z0+delta_vol*w
        ri1=ri0
        thetaj1=thetaj0+delta_theta
+       phik1=phik0
+    else
+       l=t_phi
+       delta_vol=correct_plus*t_phi
+       ! Position au bord de la cellule suivante
+       x1=x0+delta_vol*u
+       y1=y0+delta_vol*v
+       z1=z0+delta_vol*w
+       ri1=ri0
+       thetaj1 = thetaj0
+       phik1=phik0+delta_phi
+       if (phik1 == 0) phik1=N_az
+       if (phik1 == N_az+1) phik1=1
     endif
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
