@@ -265,7 +265,7 @@ module prop_star
      real(kind=db) :: x,y,z
      logical :: lb_body
      character(len=512) :: spectre
-     integer :: ri, zj, phik
+     integer :: icell
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile

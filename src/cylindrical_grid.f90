@@ -321,15 +321,15 @@ contains
 
   !******************************************************************************
 
-  subroutine indice_cellule(xin,yin,zin,ri_out,zj_out)
+  subroutine indice_cellule(xin,yin,zin, icell)
 
     implicit none
 
     real(kind=db), intent(in) :: xin,yin,zin
-    integer, intent(out) :: ri_out, zj_out
+    integer, intent(out) :: icell
 
     real(kind=db) :: r2
-    integer :: ri, ri_min, ri_max
+    integer :: ri, ri_min, ri_max, ri_out, zj_out
 
     r2 = xin*xin+yin*yin
 
@@ -361,21 +361,23 @@ contains
        zj_out = nz + 1
     endif
 
+    icell = cell_map(ri_out,zj_out,1)
+
     return
 
   end subroutine indice_cellule
 
   !******************************************************************************
 
-  subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
+  subroutine indice_cellule_3D(xin,yin,zin, icell)
 
     implicit none
 
     real(kind=db), intent(in) :: xin,yin,zin
-    integer, intent(out) :: ri_out, zj_out, phik_out
+    integer, intent(out) :: icell
 
     real(kind=db) :: r2, phi
-    integer :: ri, ri_min, ri_max
+    integer :: ri, ri_min, ri_max, ri_out, zj_out, phik_out
 
     r2 = xin*xin+yin*yin
 
@@ -414,6 +416,8 @@ contains
     else
        phik_out=1
     endif
+
+    icell = cell_map(ri_out,zj_out,phik_out)
 
     return
 
@@ -708,7 +712,6 @@ contains
 
     real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t1, t2
     real(kind=db) :: zlim, zlim2, delta_vol, inv_w, correct_moins, correct_plus
-    integer :: ri, zj, phik
 
     correct_moins = 1.0_db - 1.0e-10_db
     correct_plus = 1.0_db + 1.0e-10_db
@@ -817,11 +820,10 @@ contains
     ! Determination de l'indice de la premiere cellule traversee
     ! pour initialiser la propagation
     if (l3D) then
-       call indice_cellule_3D(x,y,z,ri,zj,phik)
+       call indice_cellule_3D(x,y,z, icell)
     else
-       call indice_cellule(x,y,z,ri,zj) ; phik=1
+       call indice_cellule(x,y,z, icell) ;
     endif
-    icell = cell_map(ri,zj,phik)
 
     return
 
