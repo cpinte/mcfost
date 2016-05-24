@@ -51,13 +51,21 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
   lstop = .false.
   flag_sortie = .false.
 
+  x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
   extr=extrin
   ri_in = ri
   zj_in = zj
+
+  ri0=ri
+  zj0=zj
+  phik0=phik
+
   ri1=ri
   zj1=zj
   phik1=phik
+
+
 
   next_cell = cell_map(ri1,zj1,phik1)
 
