@@ -725,11 +725,12 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
 
-  ! tmp :
+  ! todo : tmp :
   call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
 
   ! locate current cell index
-  call indice_cellule(x,y,z,ri,zj)
+  call indice_cellule(x,y,z, icell)
+  ri = cell_map_i(icell)
 
   ! Patch pour eviter BUG sur position radiale
   ! a cause de limite de precision
@@ -740,15 +741,14 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
      z = z * factor
 
      ! On verifie que c'est OK maintenant
-     call indice_cellule(x,y,z,ri,zj)
+     call indice_cellule(x,y,z, icell)
+     ri = cell_map_i(icell)
      if (ri==0) then
         write(*,*) "BUG in verif_cell_position_cyl"
         write(*,*) "Exiting"
         stop
      endif
   endif
-
-  icell = cell_map(ri,zj,1)
 
   if (l_dark_zone(icell)) then ! Petit test de securite
      ! On resort le paquet
@@ -786,7 +786,7 @@ subroutine verif_cell_position_sph(icell, x, y, z)
   call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
 
   ! locate current cell index
-  call indice_cellule_sph(x,y,z,ri,zj)
+  call indice_cellule_sph(x,y,z, icell)
 
   ! Patch pour eviter BUG sur position radiale
   ! a cause de limite de precision
@@ -797,7 +797,7 @@ subroutine verif_cell_position_sph(icell, x, y, z)
      z = z * factor
 
      ! On verifie que c'est OK maintenant
-     call indice_cellule_sph(x,y,z,ri,zj)
+     call indice_cellule_sph(x,y,z, icell)
      if (ri==0) then
         write(*,*) "BUG in verif_cell_position_sph"
         write(*,*) "Exiting"

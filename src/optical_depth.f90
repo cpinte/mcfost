@@ -20,7 +20,7 @@ module optical_depth
 
   contains
 
-subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -30,7 +30,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
   implicit none
 
   integer, intent(in) :: id,lambda, p_lambda
-  integer, intent(inout) :: ri,zj, phik
+  integer, intent(inout) :: icell
   real(kind=db), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star, flag_direct_star
   real(kind=db), intent(inout) :: u,v,w
@@ -41,10 +41,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=db) :: l, tau, opacite
-  integer :: ri0, zj0, phik0, ri1, zj1, phik1, ri_old, zj_old, phik_old
-  integer :: ri_in, zj_in, tmp_k
-
-  integer :: icell0, next_cell, previous_cell
+  integer :: icell_in, icell0, icell1, icell_old, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
@@ -53,21 +50,14 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
 
   x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
+
   extr=extrin
-  ri_in = ri
-  zj_in = zj
-
-  ri0=ri
-  zj0=zj
-  phik0=phik
-
-  ri1=ri
-  zj1=zj
-  phik1=phik
+  icell_in = icell
+  icell0 = icell
+  icell1 = icell
 
 
-
-  next_cell = cell_map(ri1,zj1,phik1)
+  next_cell = icell
 
   ltot = 0.0
 
@@ -77,10 +67,10 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
      ! Indice de la cellule
-     ri_old = ri0 ; zj_old = zj0 ; phik_old = phik0
+     icell_old = icell0
      x_old = x0 ; y_old = y0 ; z_old = z0
 
-     ri0=ri1 ; zj0=zj1 ; phik0=phik1
+     icell0=icell1
      x0=x1 ; y0=y1 ; z0=z1
      icell0 = next_cell
 
@@ -93,7 +83,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
            ! On revoie le paquet dans l'autre sens
            u = -u ; v = -v ; w=-w
            ! et on le renvoie au point de depart
-           ri = ri_old ; zj = zj_old ; phik = phik_old
+           icell = icell_old
            xio = x_old ; yio = y_old ; zio = z_old
            flag_sortie= .false.
            return
@@ -158,16 +148,15 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
         yio=y0+l*v
         zio=z0+l*w
 
+        icell = icell0
+
         if (l3D) then
-           call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
-           call cell2cylindrical(icell0, ri,zj,phik)
+           call indice_cellule_3D(xio,yio,zio, icell)
         else
            if (lcylindrical) then
               call verif_cell_position_cyl(icell0, xio, yio, zio)
-              call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
            else
               call verif_cell_position_sph(icell0, xio, yio, zio)
-              call cell2cylindrical(icell0, ri,zj,tmp_k)
            endif
         endif
 
@@ -2903,12 +2892,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               u0=cos(angle)
               v0=0.0
               w0=sin(angle)
-              ! test
-              ri=i
-              zj=j
-              phik=1
               Stokes(:) = 0.0_db ; !Stokes(1) = 1.0_db ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
-              call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+              call length_deg2(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
                    flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
@@ -2940,12 +2925,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
-                 ! test
-                 ri=i
-                 zj=j
-                 phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
@@ -2974,12 +2955,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
-                 ! test
-                 ri=i
-                 zj=j
-                 phik=pk
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x0,y0,z0,u0,v0,w0, &
+                 call length_deg2(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire

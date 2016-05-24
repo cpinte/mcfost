@@ -7,15 +7,15 @@ module spherical_grid
 
 contains
 
-  subroutine indice_cellule_sph(xin,yin,zin,ri_out,thetaj_out)
+  subroutine indice_cellule_sph(xin,yin,zin, icell)
 
   implicit none
 
   real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: ri_out, thetaj_out
+  integer, intent(out) :: icell
 
   real(kind=db) :: r2, r02, tan_theta
-  integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max
+  integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max, ri_out, thetaj_out
 
   r02 = xin*xin+yin*yin
   r2 = r02+zin*zin
@@ -61,6 +61,8 @@ contains
      thetaj=(thetaj_min+thetaj_max)/2
   enddo
   thetaj_out=thetaj+1
+
+  icell = cell_map(ri_out,thetaj_out,1)
 
   return
 
@@ -418,14 +420,10 @@ end subroutine indice_cellule_sph_theta
 
     ! Determination de l'indice de la premiere cellule traversee
     ! pour initialiser la propagation
-    call indice_cellule_sph(x1,y1,z1,ri,thetaj)
+    call indice_cellule_sph(x1,y1,z1, icell)
     x=x1 ; y=y1 ; z=z1
 
-    phik = 1 ;
-    icell = cell_map(ri,thetaj,phik)
-
     return
-
 
   end subroutine move_to_grid_sph
 

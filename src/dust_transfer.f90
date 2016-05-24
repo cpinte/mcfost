@@ -534,19 +534,19 @@ subroutine transfert_poussiere()
            call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
 
-           if (lintersect) then
-              ! Todo : tmp
-              ri = cell_map_i(icell)
-              zj = cell_map_j(icell)
-              phik = cell_map_k(icell)
-           endif
+
 
            ! Propagation du packet
-           if (lintersect) call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
+           if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
+              ! Todo : tmp
+              ri = cell_map_i(icell)
+              zj = cell_map_j(icell)
+              phik = cell_map_k(icell)
+
               call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
               if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
            endif
@@ -599,18 +599,13 @@ subroutine transfert_poussiere()
               call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
               flag_ISM = .true.
 
-               ! Todo : tmp
-              ri = cell_map_i(icell)
-              zj = cell_map_j(icell)
-              phik = cell_map_k(icell)
-
               ! Le photon sert a quelquechose ou pas ??
               if (.not.lintersect) then
                  cycle photon_ISM
               else
                  nnfot2 = nnfot2 + 1.0_db
                  ! Propagation du packet
-                 call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+                 call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM ! nnfot2
         enddo ! nnfot1
@@ -926,7 +921,7 @@ end subroutine emit_packet
 
 !***********************************************************
 
-subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
 
@@ -936,7 +931,7 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, p_lambda, ri, zj, phik
+  integer, intent(inout) :: lambda, p_lambda, icell
   real(kind=db), intent(inout) :: x,y,z,u,v,w
   real(kind=db), dimension(4), intent(inout) :: stokes
 
@@ -944,12 +939,11 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta, icell
+  integer :: p_icell, taille_grain, itheta, ri, zj, phik
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
 
-  icell = cell_map(ri,zj,phik)
   flag_scatt = .false.
   flag_sortie = .false.
   flag_direct_star = .false.
@@ -984,14 +978,8 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
-     if ((ri==0).and.(.not.flag_sortie)) write(*,*) "PB r", ri, zj
-     if ((zj > nz).and.(.not.flag_sortie)) then
-        write(*,*) "PB z", ri, zj, abs(z)
-        zj=nz
-     endif
-
-     icell = cell_map(ri,zj,phik)
+     call length_deg2(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+     if ((icell>n_cells).and.(.not.flag_sortie)) write(*,*) "PB cell", icell
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
@@ -1003,6 +991,11 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
      flag_direct_star = .false.
      if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
         ! test zone noire
+        ! todo : tmp
+        ri = cell_map_i(icell)
+        zj = cell_map_j(icell)
+        phik = cell_map_k(icell)
+
         if (test_dark_zone(ri,zj,phik,x,y)) then ! on saute le photon
            lpacket_alive = .false.
            return
@@ -1364,7 +1357,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   real(kind=db) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
   real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
-  integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center
+  integer :: id, ri, zj, phik, icell, iray, istar, i,j, x_center, y_center
   logical :: in_map, lpola
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
@@ -1419,9 +1412,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
-     !$omp shared(x_center,y_center,nb_proc,map_1star,Q_1star,U_1star) &
+     !$omp shared(x_center,y_center,nb_proc,map_1star,Q_1star,U_1star,cell_map_i,cell_map_j,cell_map_k) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
-     !$omp private(Pola_LimbDarkening,ri,zj,phik,cos_RT_az,sin_RT_az,tau,lmin,lmax,in_map,P,phi) &
+     !$omp private(Pola_LimbDarkening,ri,zj,phik,icell,cos_RT_az,sin_RT_az,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme)
      in_map = .true. ! for SED
      LimbDarkening = 1.0
@@ -1466,12 +1459,22 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         Stokes = 0.0_db
         if (l3D) then
            ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
+           call indice_cellule_3D(x0,y0,z0, icell)
+
+           ! Todo : tmp
+           ri = cell_map_i(icell)
+           zj = cell_map_j(icell)
+           phik = cell_map_k(icell)
 
            call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
         else
            ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule(x0,y0,z0,ri,zj)
+           call indice_cellule(x0,y0,z0, icell)
+
+           ! Todo : tmp
+           ri = cell_map_i(icell)
+           zj = cell_map_j(icell)
+           phik = cell_map_k(icell)
 
            call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
         endif

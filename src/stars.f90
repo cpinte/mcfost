@@ -49,7 +49,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
+subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -58,7 +58,7 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
 
   implicit none
 
-  integer, intent(in) :: n_star
+  integer, intent(in) :: i_star
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
   integer, intent(out) :: icell
 
@@ -66,7 +66,6 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
   logical, intent(out) :: lintersect
 
   real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi
-  integer :: ri, zj, phik
 
   ! Position de depart aleatoire sur une sphere de rayon 1
   z = 2.0_db * aleat1 - 1.0_db
@@ -86,27 +85,24 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
   w2=1.0_db-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  r_etoile = etoile(n_star)%r
+  r_etoile = etoile(i_star)%r
   x = x * r_etoile
   y = y * r_etoile
   z = z * r_etoile
 
   ! Ajout position de l'étoile
-  x=x+etoile(n_star)%x
-  y=y+etoile(n_star)%y
-  z=z+etoile(n_star)%z
-
-  !ri=etoile(n_star)%ri
-  !zj=etoile(n_star)%zj
-  !phik=etoile(n_star)%phik
+  x=x+etoile(i_star)%x
+  y=y+etoile(i_star)%y
+  z=z+etoile(i_star)%z
 
   ! L'etoile peut occuper plusieurs cellules
   ! todo : tester a l'avance si c'est le cas
-  call indice_cellule_3D(x,y,z,ri,zj,phik)
-  icell = cell_map(ri,zj,phik)
+  call indice_cellule_3D(x,y,z, icell)
   lintersect = .true.
 
-  if (ri==n_rad) call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+  if (cell_map_i(icell)==n_rad) call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+
+  etoile(i_star)%icell = icell
 
   return
 
@@ -114,40 +110,40 @@ end subroutine em_sphere_uniforme
 
 !**********************************************************************
 
-subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,phik,x,y,z,u,v,w,w2)
-! Emission isotrope
-! C. Pinte
-! 21/05/05
-
-  implicit none
-
-  integer, intent(in) :: n_star
-  real, intent(in) :: aleat1, aleat2
-  integer, intent(out) :: ri, zj, phik
-  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
-
-  real(kind=db) :: srw02, argmt
-
-  ! Emission isotrope
-  w = 2.0_db * aleat1 - 1.0_db
-  w2 = 1.0_db-w*w
-  srw02 = sqrt(w2)
-  argmt = pi*(2.0_db*aleat2-1.0_db)
-  u = srw02 * cos(argmt)
-  v = srw02 * sin(argmt)
-
-  ! Position de l'étoile
-  x=etoile(n_star)%x
-  y=etoile(n_star)%y
-  z=etoile(n_star)%z
-
-  ri=etoile(n_star)%ri
-  zj=etoile(n_star)%zj
-  phik=etoile(n_star)%phik
-
-  return
-
-end subroutine em_etoile_ponctuelle
+!subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,phik,x,y,z,u,v,w,w2)
+!! Emission isotrope
+!! C. Pinte
+!! 21/05/05
+!
+!  implicit none
+!
+!  integer, intent(in) :: n_star
+!  real, intent(in) :: aleat1, aleat2
+!  integer, intent(out) :: ri, zj, phik
+!  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
+!
+!  real(kind=db) :: srw02, argmt
+!
+!  ! Emission isotrope
+!  w = 2.0_db * aleat1 - 1.0_db
+!  w2 = 1.0_db-w*w
+!  srw02 = sqrt(w2)
+!  argmt = pi*(2.0_db*aleat2-1.0_db)
+!  u = srw02 * cos(argmt)
+!  v = srw02 * sin(argmt)
+!
+!  ! Position de l'étoile
+!  x=etoile(n_star)%x
+!  y=etoile(n_star)%y
+!  z=etoile(n_star)%z
+!
+!  ri=etoile(n_star)%ri
+!  zj=etoile(n_star)%zj
+!  phik=etoile(n_star)%phik
+!
+!  return
+!
+!end subroutine em_etoile_ponctuelle
 
 !**********************************************************************
 
@@ -576,14 +572,13 @@ subroutine repartition_energie_etoiles()
   ! Cellule d'origine dans laquelle est l'etoile
   do i=1, n_etoiles
      if (l3D) then
-        call indice_cellule_3D(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj,etoile(i)%phik)
+        call indice_cellule_3D(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
      else
         if (lcylindrical) then
-           call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
+           call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
         else
-           call indice_cellule_sph(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
+           call indice_cellule_sph(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
         endif
-        etoile(i)%phik=1
      endif
   enddo
 
