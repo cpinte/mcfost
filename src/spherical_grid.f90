@@ -327,7 +327,6 @@ end subroutine indice_cellule_sph_theta
        if (ri0==0) then
           call indice_cellule_sph_theta(x1,y1,z1,thetaj1)
        endif
-
     else if (t < t_phi) then ! theta
        l=t
        delta_vol=t
@@ -356,7 +355,7 @@ end subroutine indice_cellule_sph_theta
     if (z1 == 0.0_db) z1 = prec_grille
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
-    next_cell =  cell_map(ri1,thetaj1,1)
+    next_cell =  cell_map(ri1,thetaj1,phik1)
 
     return
 
