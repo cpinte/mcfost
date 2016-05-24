@@ -111,11 +111,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     if (lcylindrical) then
-        call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-     else
-        call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-     endif
+     call cross_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
 
      ! opacity wall
      !---if (ri0 == 1) then

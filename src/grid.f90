@@ -14,6 +14,8 @@ module grid
 
   implicit none
 
+  procedure(cross_cylindrical_cell), pointer :: cross_cell => null()
+
   contains
 
  subroutine order_zones()
@@ -198,7 +200,19 @@ subroutine define_grid()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-
+  if (grid_type == 1) then
+     lcylindrical = .true.
+     lspherical = .false.
+     cross_cell => cross_cylindrical_cell
+  else if (grid_type == 2) then
+     lcylindrical = .false.
+     lspherical = .true.
+     cross_cell => cross_spherical_cell
+  else
+     write(*,*) "Unknown grid type"
+     write(*,*) "Exiting"
+     stop
+  endif
 
   if (lfirst) then
      call build_cylindrical_cell_mapping()
@@ -213,18 +227,6 @@ subroutine define_grid()
 
 
   Rmax2 = Rmax*Rmax
-
-  if (grid_type == 1) then
-     lcylindrical = .true.
-     lspherical = .false.
-  else if (grid_type == 2) then
-     lcylindrical = .false.
-     lspherical = .true.
-  else
-     write(*,*) "Unknown grid type"
-     write(*,*) "Exiting"
-     stop
-  endif
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
 
