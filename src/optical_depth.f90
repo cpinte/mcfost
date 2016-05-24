@@ -3041,17 +3041,21 @@ end subroutine no_dark_zone
 
 !***********************************************************
 
-logical function test_dark_zone(ri,zj,phik,x,y)
+logical function test_dark_zone(icell ,x,y,z)
 ! Test si on est dans la zone noire
 ! C. Pinte
 ! 22/04/05
 
   implicit none
 
-  integer, intent(in) :: ri, zj, phik
-  real(kind=db), intent(in) :: x, y
+  integer, intent(in) :: icell
+  real(kind=db), intent(in) :: x, y, z
 
-  integer :: icell
+  integer :: ri, zj, phik
+
+  ri = cell_map_i(icell)
+  zj = cell_map_j(icell)
+  phik = cell_map_k(icell)
 
   if (ri==1) then
      if (x*x+y*y > r_in_opacite2(zj,phik)) then
@@ -3060,7 +3064,6 @@ logical function test_dark_zone(ri,zj,phik,x,y)
         test_dark_zone = .false.
      endif
   else
-     icell = cell_map(ri,zj,phik)
      test_dark_zone = l_dark_zone(icell)
   endif
 
