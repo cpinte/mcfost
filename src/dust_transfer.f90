@@ -877,12 +877,17 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
 
      ! Position initiale
      rand = sprng(stream(id))
-     call select_cellule(lambda,rand,ri,zj,phik)
+     call select_cellule(lambda,rand, icell)
+
+     ! Todo : tmp for return value
+     ri = cell_map_i(icell)
+     zj = cell_map_j(icell)
+     phik = cell_map_k(icell)
 
      rand  = sprng(stream(id))
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
-     call  pos_em_cellule(ri,zj,phik,rand,rand2,rand3,x0,y0,z0)
+     call  pos_em_cellule(icell, rand,rand2,rand3,x0,y0,z0)
 
      ! Direction de vol (uniforme)
      rand = sprng(stream(id))
@@ -898,7 +903,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      if (lweight_emission) then
-        icell = cell_map(ri,zj,1)
         Stokes(1) = Stokes(1) * correct_E_emission(icell)
      endif
   else ! Emission ISM
@@ -907,6 +911,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      call emit_packet_ISM(id,ri,zj,x0,y0,z0,u0,v0,w0,stokes,lintersect)
   endif !(rand < prob_E_star)
 
+  return
 
 end subroutine emit_packet
 

@@ -126,7 +126,6 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,fl
      !---   endif
      !---endif
 
-
      tau = l*opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau

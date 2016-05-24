@@ -825,6 +825,65 @@ contains
 
   end subroutine move_to_grid_cyl
 
-  !***********************************************************
+
+  !**********************************************************************
+
+  subroutine pos_em_cellule_cyl(icell ,aleat1,aleat2,aleat3,x,y,z)
+    ! Choisit la position d'emission uniformement
+    ! dans la cellule (ri,zj)
+    ! Geometrie cylindrique
+    ! C. Pinte
+    ! 04/02/05
+
+    implicit none
+
+    integer, intent(in) :: icell
+    real, intent(in) :: aleat1, aleat2, aleat3
+    real(kind=db), intent(out) :: x,y,z
+
+    real(kind=db) :: r,phi
+    integer :: ri, zj, phik
+
+    ri = cell_map_i(icell)
+    zj = cell_map_j(icell)
+    phik = cell_map_k(icell)
+
+    ! Position aleatoire dans cellule
+    ! Position radiale
+    !  r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
+    !  r=sqrt(r_lim(ri-1)**2+aleat1*(r_lim(ri)**2-r_lim(ri-1)**2))
+
+    ! La premiere cellule ne peut plus etre dans la zone sombre maintenant
+    ! if (ri==1) then
+    !    r=sqrt(rmin2+aleat1*(r_in_opacite2(zj,phik)-rmin2))
+    ! else
+    r=sqrt(r_lim_2(ri-1)+aleat1*(r_lim_2(ri)-r_lim_2(ri-1)))
+    ! endif
+    ! Position verticale
+    if (l3D) then ! signe de z = signe de zj
+       if (zj > 0) then
+          z=z_lim(ri,zj)+aleat2*(z_lim(ri,zj+1)-z_lim(ri,zj))
+       else
+          z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
+       endif
+    else ! 2D : choix aléatoire du signe
+       if (aleat2 > 0.5_db) then
+          z=z_lim(ri,zj)+(2.0_db*(aleat2-0.5_db))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
+       else
+          z=-(z_lim(ri,zj)+(2.0_db*aleat2)*(z_lim(ri,zj+1)-z_lim(ri,zj)))
+       endif
+    endif
+
+    ! Position azimuthale
+    !phi=(2.0*aleat3-1.0)*pi
+    phi = 2.0_db*pi * (real(phik,kind=db)-1.0_db+aleat3)/real(n_az,kind=db)
+
+    ! x et y
+    x=r*cos(phi)
+    y=r*sin(phi)
+
+    return
+
+  end subroutine pos_em_cellule_cyl
 
 end module cylindrical_grid

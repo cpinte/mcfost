@@ -15,6 +15,7 @@ module grid
   implicit none
 
   procedure(cross_cylindrical_cell), pointer :: cross_cell => null()
+  procedure(pos_em_cellule_cyl), pointer :: pos_em_cellule => null()
 
   contains
 
@@ -204,10 +205,12 @@ subroutine define_grid()
      lcylindrical = .true.
      lspherical = .false.
      cross_cell => cross_cylindrical_cell
+     pos_em_cellule => pos_em_cellule_cyl
   else if (grid_type == 2) then
      lcylindrical = .false.
      lspherical = .true.
      cross_cell => cross_spherical_cell
+     pos_em_cellule => pos_em_cellule_sph
   else
      write(*,*) "Unknown grid type"
      write(*,*) "Exiting"
@@ -623,7 +626,7 @@ end subroutine init_lambda2
 
 !**********************************************************************
 
-subroutine select_cellule(lambda,aleat,ri,zj, phik)
+subroutine select_cellule(lambda,aleat, icell)
   ! Sélection de la cellule qui va émettre le photon
 ! C. Pinte
 ! 04/02/05
@@ -633,7 +636,7 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
 
   integer, intent(in) :: lambda
   real, intent(in) :: aleat
-  integer, intent(out) :: ri,zj, phik
+  integer, intent(out) :: icell
   integer :: k, kmin, kmax
 
 
@@ -650,177 +653,13 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
      endif
      k = (kmin + kmax)/2
    enddo   ! while
-   k=kmax
-
-   ri = cell_map_i(k)
-   zj = cell_map_j(k)
-   phik = cell_map_k(k)
+   icell=kmax
 
    return
 
 end subroutine select_cellule
 
 !**********************************************************************
-
-subroutine pos_em_cellule(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la poistion d'emission uniformement dans la cellule
-! C. Pinte
-! 8/06/07
-
-  implicit none
-
-  integer, intent(in) :: ri, zj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  if (lspherical) then
-     call pos_em_cellule_sph(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-  else
-     call pos_em_cellule_cyl(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-  endif
-
-  return
-
-end subroutine pos_em_cellule
-
-!**********************************************************************
-
-subroutine pos_em_cellule_cyl(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la position d'emission uniformement
-! dans la cellule (ri,zj)
-! Geometrie cylindrique
-! C. Pinte
-! 04/02/05
-
-  implicit none
-
-  integer, intent(in) :: ri, zj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  real(kind=db) :: r,phi
-
-  ! Position aleatoire dans cellule
-  ! Position radiale
-!  r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
-!  r=sqrt(r_lim(ri-1)**2+aleat1*(r_lim(ri)**2-r_lim(ri-1)**2))
-
-  ! La premiere cellule ne peut plus etre dans la zone sombre maintenant
- ! if (ri==1) then
- !    r=sqrt(rmin2+aleat1*(r_in_opacite2(zj,phik)-rmin2))
- ! else
-     r=sqrt(r_lim_2(ri-1)+aleat1*(r_lim_2(ri)-r_lim_2(ri-1)))
- ! endif
-  ! Position verticale
-  if (l3D) then ! signe de z = signe de zj
-     if (zj > 0) then
-        z=z_lim(ri,zj)+aleat2*(z_lim(ri,zj+1)-z_lim(ri,zj))
-     else
-        z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
-     endif
-  else ! 2D : choix aléatoire du signe
-     if (aleat2 > 0.5_db) then
-        z=z_lim(ri,zj)+(2.0_db*(aleat2-0.5_db))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
-     else
-        z=-(z_lim(ri,zj)+(2.0_db*aleat2)*(z_lim(ri,zj+1)-z_lim(ri,zj)))
-     endif
-  endif
-
-
-  ! Position azimuthale
-  !phi=(2.0*aleat3-1.0)*pi
-  phi = 2.0_db*pi * (real(phik,kind=db)-1.0_db+aleat3)/real(n_az,kind=db)
-
-  ! x et y
-  x=r*cos(phi)
-  y=r*sin(phi)
-
-  return
-
-end subroutine pos_em_cellule_cyl
-
-!***********************************************************
-
-subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la position d'emission uniformement
-! dans la cellule (ri,thetaj)
-! Geometrie spherique
-! C. Pinte
-! 08/06/07
-
-  implicit none
-
-  integer, intent(in) :: ri, thetaj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  real(kind=db) :: r, theta, phi, r_cos_theta
-
-  ! Position radiale
-  r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
-
-  ! Position theta
-  if (aleat2 > 0.5_db) then
-     theta=theta_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(theta_lim(thetaj)-theta_lim(thetaj-1))
-  else
-     theta=-(theta_lim(thetaj-1)+(2.0_db*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
-  endif
-
-  theta=theta_lim(thetaj-1)+aleat2*(theta_lim(thetaj)-theta_lim(thetaj-1))
-
-
-  ! BUG ??? : ca doit etre uniforme en w, non ??
-
-
-  ! Position azimuthale
-  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
-
-  ! x et y
-  z=r*sin(theta)
-  r_cos_theta = r*cos(theta)
-  x=r_cos_theta*cos(phi)
-  y=r_cos_theta*sin(phi)
-
-
-
-!!$  ! Position theta
-!!$  if (aleat2 > 0.5) then
-!!$     w=w_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(w_lim(thetaj)-w_lim(thetaj-1))
-!!$  else
-!!$     w=-(w_lim(thetaj-1)+(2.0_db*aleat2)*(w_lim(thetaj)-w_lim(thetaj-1)))
-!!$  endif
-!!$
-!!$  ! Position azimuthale
-!!$  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
-!!$
-!!$  ! x et y
-!!$  z=r*w
-!!$  r_cos_theta = r*sqrt(1.0_db-w*w)
-!!$  x=r_cos_theta*cos(phi)
-!!$  y=r_cos_theta*sin(phi)
-
-!  z = z_grid(ri,thetaj)
-!  r = r_grid(ri,thetaj)
-!  x = r*cos(phi)
-!  y = r*sin(phi)
-
- ! call indice_cellule_sph(x,y,z,ri_tmp,thetaj_tmp)
- ! if (ri /= ri_tmp) then
- !    write(*,*) "Bug ri", ri, ri_tmp, sqrt(x*x+y*y)
- !    read(*,*)
- ! else if (thetaj /= thetaj_tmp) then
- !    write(*,*) "Bug zj", w, thetaj, thetaj_tmp
- !    call indice_cellule_sph(x,y,-z,ri_tmp,thetaj_tmp)
- !    write(*,*) -z, thetaj_tmp
- !    read(*,*)
- ! endif
-
-
-  return
-
-end subroutine pos_em_cellule_sph
-
-!***********************************************************
 
 subroutine angle_disque()
 
