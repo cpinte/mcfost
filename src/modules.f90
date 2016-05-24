@@ -205,7 +205,7 @@ module disk
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
+  real(kind=db), dimension(:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
   real(kind=db) :: frac_star_origin
 

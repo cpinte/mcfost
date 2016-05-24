@@ -463,7 +463,7 @@ subroutine alloc_dynamique()
 
 
   if (lorigine) then
-     allocate(disk_origin(n_lambda, n_rad, nz, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
+     allocate(disk_origin(n_lambda, n_cells, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error disk_origin'
         stop
@@ -1490,7 +1490,7 @@ subroutine realloc_step2()
 
   if (lorigine) then
      deallocate(disk_origin, star_origin)
-     allocate(disk_origin(n_lambda2, n_rad, nz, nb_proc), star_origin(n_lambda2, nb_proc), stat=alloc_status)
+     allocate(disk_origin(n_lambda2, n_cells, nb_proc), star_origin(n_lambda2, nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error disk_origin'
         stop

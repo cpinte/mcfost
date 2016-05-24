@@ -61,7 +61,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand, tau
-  integer :: i, ri, zj, phik, icell, p_icell
+  integer :: i, icell, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -486,12 +486,11 @@ subroutine transfert_poussiere()
      !$omp parallel &
      !$omp default(none) &
      !$omp firstprivate(lambda,p_lambda) &
-     !$omp private(id,ri,zj,phik,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
+     !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(nbre_phot2,n_phot_envoyes,nb_proc) &
      !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda, nnfot1_cumul,ibar) &
-     !$omp shared(cell_map_i, cell_map_j, cell_map_k) &
      !$omp reduction(+:E_abs_nRE)
      if (letape_th) then
         p_nnfot2 => nnfot2
@@ -542,12 +541,7 @@ subroutine transfert_poussiere()
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
-              ! Todo : tmp
-              ri = cell_map_i(icell)
-              zj = cell_map_j(icell)
-              phik = cell_map_k(icell)
-
-              call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+              call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
               if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
            endif
         enddo photon !nnfot2
@@ -582,11 +576,9 @@ subroutine transfert_poussiere()
         !$omp parallel &
         !$omp default(none) &
         !$omp shared(lambda,p_lambda,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
-        !$omp shared(cell_map_i,cell_map_j,cell_map_k) &
-        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,icell,lpacket_alive,nnfot2)
+        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,icell,lpacket_alive,nnfot2)
 
         flag_star = .false.
-        phik=1
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,nbre_photons_loop
@@ -844,8 +836,6 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
      call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
-     !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
-
      ! Lumiere non polarisee emanant de l'etoile
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
