@@ -531,8 +531,15 @@ subroutine transfert_poussiere()
            endif
 
            ! Emission du paquet
-           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
+           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
+
+           if (lintersect) then
+              ! Todo : tmp
+              ri = cell_map_i(icell)
+              zj = cell_map_j(icell)
+              phik = cell_map_k(icell)
+           endif
 
            ! Propagation du packet
            if (lintersect) call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
@@ -801,14 +808,14 @@ end subroutine transfert_poussiere
 
 !***********************************************************
 
-subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_ISM,lintersect)
+subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_ISM,lintersect)
   ! C. Pinte
   ! 27/05/09
 
   integer, intent(in) :: id, lambda
 
   ! Position et direction du packet
-  integer, intent(out) :: ri, zj, phik
+  integer, intent(out) :: icell
   real(kind=db), intent(out) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(4), intent(out) :: Stokes
   logical, intent(out) :: lintersect
@@ -816,7 +823,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
   ! Proprietes du packet
   logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
-  integer :: i_star, icell
+  integer :: i_star
 
   real(kind=db) :: w02, srw02
   real :: argmt
@@ -842,13 +849,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
      call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
-     ! Todo : tmp for return value
-     if (lintersect) then
-        ri = cell_map_i(icell)
-        zj = cell_map_j(icell)
-        phik = cell_map_k(icell)
-     endif
-
      !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
 
      ! Lumiere non polarisee emanant de l'etoile
@@ -892,10 +892,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      ! Position initiale
      rand = sprng(stream(id))
      call select_cellule(lambda,rand, icell)
-     ! Todo : tmp for return value
-     ri = cell_map_i(icell)
-     zj = cell_map_j(icell)
-     phik = cell_map_k(icell)
 
      rand  = sprng(stream(id))
      rand2 = sprng(stream(id))
@@ -922,14 +918,6 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      flag_star=.false.
      flag_ISM=.true.
      call emit_packet_ISM(id,icell,x0,y0,z0,u0,v0,w0,stokes,lintersect)
-
-     if (lintersect) then
-        ! Todo : tmp for return value
-        ri = cell_map_i(icell)
-        zj = cell_map_j(icell)
-        phik = cell_map_k(icell)
-     endif
-
   endif !(rand < prob_E_star)
 
   return
