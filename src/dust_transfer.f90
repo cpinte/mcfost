@@ -1445,16 +1445,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         ! Coordonnees initiale : position etoile dans la grille
         call indice_cellule(x0,y0,z0, icell)
 
-        ! Todo : tmp
-        ri = cell_map_i(icell)
-        zj = cell_map_j(icell)
-        phik = cell_map_k(icell)
-
-        if (l3D) then
-           call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
-        else
-           call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
-        endif
+        call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
          if (lsed.and.(RT_sed_method == 1)) then
