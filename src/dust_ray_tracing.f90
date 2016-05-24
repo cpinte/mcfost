@@ -775,8 +775,8 @@ subroutine calc_Jth(lambda)
         !$omp do
         do icell=1, n_cells
            Temp=Temperature(icell) ! que LTE pour le moment
-           cst_wl=cst_th/(Temp*wl)
-           if (cst_wl < 500.0) then
+           if (Temp*wl > 3.e-4) then
+              cst_wl=cst_th/(Temp*wl)
               coeff_exp=exp(cst_wl)
               J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_LTE(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
            else
@@ -792,8 +792,8 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
               Temp=Temperature_1grain(l,icell)
-              cst_wl=cst_th/(Temp*wl)
-              if (cst_wl < 500.0) then
+              if (Temp*wl > 3.e-4) then
+                 cst_wl=cst_th/(Temp*wl)
                  coeff_exp=exp(cst_wl)
                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                       C_abs_norm(l,lambda)*densite_pouss(l,icell)
@@ -807,8 +807,8 @@ subroutine calc_Jth(lambda)
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
                  Temp=Temperature_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
-                 cst_wl=cst_th/(Temp*wl)
-                 if (cst_wl < 500.) then
+                 if (Temp*wl > 3.e-4) then
+                    cst_wl=cst_th/(Temp*wl)
                     coeff_exp=exp(cst_wl)
                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                          C_abs_norm(l,lambda)*densite_pouss(l,icell)
@@ -816,8 +816,8 @@ subroutine calc_Jth(lambda)
               else ! ! la grain a une proba de T
                  do T=1,n_T
                     temp=tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < 500.) then
+                    if (Temp*wl > 3.e-4) then
+                       cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
                             C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Temperature(T,l,icell)
