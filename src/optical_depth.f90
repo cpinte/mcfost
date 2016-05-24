@@ -107,7 +107,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
 
   next_cell = cell_map(ri0,zj0,1)
 
-  ltot=0.0
+  ltot = 0.0
 
   if (abs(w) > tiny_real) then
      inv_w=1.0_db/w
@@ -115,7 +115,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,fla
      inv_w=sign(huge_db,w) ! huge_real avant
   endif
 
-  ! pour ray-tracing
+  ! Pour ray-tracing
   phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   ! Calcule les angles de diffusion pour la direction de propagation donnee
@@ -315,7 +315,7 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor, l, tau, phi_vol, extr, correct_plus, correct_moins
 
-  integer :: thetaj_old, ri_old, icell, ri0, ri1, thetaj0, thetaj1, p_ri0, p_thetaj0, nbr_cell, previous_cell, cell, icell0, next_cell
+  integer :: thetaj_old, ri_old, icell, ri0, ri1, thetaj0, thetaj1, p_ri0, p_thetaj0, previous_cell, cell, icell0, next_cell
   logical :: lcellule_non_vide, lstop
 
 
@@ -325,10 +325,10 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
   correct_plus = 1.0_db + prec_grille_sph
   correct_moins = 1.0_db - prec_grille_sph
 
-!  detect_bug =  (abs(xio - 134.48909960993615_db ) < 1.0e-10)
+  ! detect_bug =  (abs(xio - 134.48909960993615_db ) < 1.0e-10)
   detect_bug=.false.
 
- ! pour ray-tracing
+  ! pour ray-tracing
   phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
   lstop = .false.
@@ -348,7 +348,6 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
   ! TODO : cas avec strat
 
   ltot=0.0
-  nbr_cell = 0
 
   next_cell = cell_map(ri0,thetaj0,1)
 
@@ -385,12 +384,8 @@ subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w
         return
      endif ! Test sortie
 
-     nbr_cell = nbr_cell + 1
-
-
-     ! TODO : cross routine
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+     call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
@@ -484,7 +479,7 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0, next_cell, previous_cell
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1, icell0, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
@@ -506,7 +501,6 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
   next_cell = cell_map(ri0,zj0,phik)
 
   ltot=0.0
-  nbr_cell = 0
 
   a=u*u+v*v
 
@@ -543,8 +537,6 @@ subroutine length_deg2_3D(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w
         flag_sortie = .true.
         return
      endif
-
-     nbr_cell = nbr_cell + 1
 
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, tau)
@@ -727,7 +719,7 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, icell0
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
@@ -779,8 +771,6 @@ subroutine length_deg2_tot_cyl(id,lambda,Stokes,ri,zj,xi,yi,zi,u,v,w,tau_tot_out
            return
         endif
      endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
 
      ! Detection interface
      r_2=x0*x0+y0*y0
@@ -944,7 +934,7 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1, icell0
 
   logical :: lcellule_non_vide
 
@@ -961,7 +951,6 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
   phik1=phik
 
   tau_tot=0.0_db
-  nbr_cell = 0
 
   a=u*u+v*v
 
@@ -1001,8 +990,6 @@ subroutine length_deg2_tot_3D(id,lambda,Stokes,ri,zj,phik,xi,yi,zi,u,v,w,tau_tot
            return
         endif
      endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
 
      ! Detection interface
      r_2=x0*x0+y0*y0
@@ -1218,7 +1205,7 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
   real(kind=db) :: delta_vol, l, tau, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus, uv
-  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, icell0
+  integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, icell0
 
   logical :: lcellule_non_vide
 
@@ -1237,7 +1224,6 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
   tau_tot=0.0_db
   lmin=0.0_db
   ltot=0.0_db
-  nbr_cell = 0
 
   uv = sqrt(u*u + v*v)
 
@@ -1255,8 +1241,6 @@ subroutine length_deg2_tot_sph(id,lambda,Stokes,ri,thetaj,xi,yi,zi,u,v,w,tau_tot
         lmax=ltot
         return
      endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
 
      ! Detection interface
      r0_2_cyl  = x0*x0+y0*y0
@@ -1495,7 +1479,7 @@ subroutine integ_ray_mol_cyl(id,ri_in,zj_in,phik_in,x,y,z,u,v,w,iray,labs,ispeed
   real(kind=db) :: dtau_c, Snu_c
   real(kind=db), dimension(nTrans) :: tau_c
   real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1, icell0
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1, icell0
   integer :: iTrans, ivpoint, iiTrans, n_vpoints
 
   real :: facteur_tau
@@ -2440,7 +2424,7 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
   real(kind=db) :: correct_moins, correct_plus
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, nbr_cell, icell0, icell
+  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, icell0, icell
 
   logical :: lcellule_non_vide
 
@@ -2461,7 +2445,6 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
 
 
   ltot=0.0
-  nbr_cell = 0
 
   a=u*u+v*v
 
@@ -2509,8 +2492,6 @@ subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,ext
            return
         endif
      endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
 
      ! Detection interface
      r_2=x0*x0+y0*y0
@@ -2758,7 +2739,7 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, zlim, dotprod
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, nbr_cell, delta_phi, phik0m1
+  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1
 
   real(kind=db) :: tau, dtau
 
@@ -2774,8 +2755,6 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
   ri1=ri_in
   zj1=zj_in
   phik1=phik_in
-
-  nbr_cell = 0
 
   a=u*u+v*v
 
@@ -2816,8 +2795,6 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
            exit infinie
         endif
      endif ! Test sortie
-
-     nbr_cell = nbr_cell + 1
 
      ! Detection interface
      r_2=x0*x0+y0*y0
@@ -3088,7 +3065,7 @@ function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
   real(kind=db) :: correct_plus, correct_moins, precision
   real(kind=db) :: tan_angle_lim1, tan_angle_lim2, a_theta, b_theta, c_theta
   real(kind=db) :: t1_1, t1_2, t2_1, t2_2, uv, r0_cyl, r0_2_cyl, r0_2, tan2
-  integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, nbr_cell, delta_phi, phik0m1
+  integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1
 
   real(kind=db) :: tau, dtau
 
@@ -3109,8 +3086,6 @@ function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
 
   uv = sqrt(u*u + v*v)
 
-  nbr_cell = 0
-
   tau = 0.0_db
   integ_ray_dust_sph(:) = 0.0_db
 
@@ -3119,8 +3094,6 @@ function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
      ! Indice de la cellule
      ri0=ri1 ; thetaj0=thetaj1 ; phik0=phik1
      x0=x1 ; y0=y1 ; z0=z1
-
-     nbr_cell = nbr_cell + 1
 
      lcellule_non_vide=.true.
      ! Test sortie
