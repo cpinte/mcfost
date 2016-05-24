@@ -21,43 +21,6 @@ module optical_depth
   contains
 
 subroutine length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-! Routine chapeau aux sous-routines suivant la geometrie
-! C. Pinte
-! 03/06/07
-
-  implicit none
-
-  integer, intent(in) :: id,lambda, p_lambda
-  integer, intent(inout) :: ri,zj,phik
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  logical, intent(in) :: flag_star,flag_direct_star
-  real(kind=db), intent(inout) :: u,v,w
-  real, intent(in) :: extrin
-  real(kind=db), intent(inout) :: xio,yio,zio
-  real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie
-
-  !call test_convert()
-
-  if (lcylindrical) then
-     if (lopacity_wall) then
-        call length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
-     else
-        call length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w, &
-             flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-     endif
-  else ! spherical
-     call length_deg2_sph(id,lambda,p_lambda,Stokes,ri,zj,xio,yio,zio,u,v,w, &
-          flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-  endif
-
-  return
-
-end subroutine length_deg2
-
-!********************************************************************
-
-subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
@@ -133,14 +96,39 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,
      endif
 
      ! Test sortie
-     if (exit_test_cylindrical(icell0, x0, y0, z0)) then
-        flag_sortie = .true.
-        return
+     if (lcylindrical) then
+        if (exit_test_cylindrical(icell0, x0, y0, z0)) then
+           flag_sortie = .true.
+           return
+        endif
+     else
+        if (icell0 > n_cells) then ! On est dans la derniere cellule
+           ! Le photon sort du disque
+           flag_sortie = .true.
+           return
+        endif ! Test sortie
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     if (lcylindrical) then
+        call cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     else
+        call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     endif
+
+     ! opacity wall
+     !---if (ri0 == 1) then
+     !---   ! Variation de hauteur du mur en cos(phi/2)
+     !---   phi = atan2(y0,x0)
+     !---   hh = h_wall * abs(cos(phi/2.))
+     !---   hhm = -h_wall * abs(cos((phi+pi)/2.))
+     !---
+     !---   ! Ajout de l'opacite du mur le cas echeant
+     !---   if ((z0 <= hh).and.(z0 >= hhm)) then
+     !---      opacite = opacite + kappa_wall
+     !---   endif
+     !---endif
 
 
      tau = l*opacite ! opacite constante dans la cellule
@@ -171,9 +159,15 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,
            call indice_cellule_3D(xio,yio,zio,ri,zj,phik)
            call cell2cylindrical(icell0, ri,zj,phik)
         else
-           call verif_cell_position_cyl(icell0, xio, yio, zio)
-           call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
+           if (lcylindrical) then
+              call verif_cell_position_cyl(icell0, xio, yio, zio)
+              call cell2cylindrical(icell0, ri,zj,tmp_k) ! tmp : the routine should only know cell in the long term --> still needed for ri and zj return values
+           else
+              call verif_cell_position_sph(icell0, xio, yio, zio)
+              call cell2cylindrical(icell0, ri,zj,tmp_k)
+           endif
         endif
+
         return
      endif ! lstop
 
@@ -181,7 +175,7 @@ subroutine length_deg2_cyl(id,lambda,p_lambda,Stokes,ri,zj,phik,xio,yio,zio,u,v,
   write(*,*) "BUG"
   return
 
-end subroutine length_deg2_cyl
+end subroutine length_deg2
 
 
 !********************************************************************
@@ -285,179 +279,6 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
 end subroutine save_radiation_field
 
 !*************************************************************************************
-
-subroutine length_deg2_sph(id,lambda,p_lambda,Stokes,ri,thetaj,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-! Integration par calcul de la position de l'interface entre cellules
-! par eq deg2 en r et deg 1 en z
-! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-! C. Pinte
-! 03/06/07
-
-  implicit none
-
-  integer, intent(in) :: id,lambda, p_lambda
-  integer, intent(inout) :: ri,thetaj
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  logical, intent(in) :: flag_star,flag_direct_star
-  real(kind=db), intent(inout) :: u,v,w
-  real, intent(in) :: extrin
-  real(kind=db), intent(inout) :: xio,yio,zio
-  real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie
-
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, factor, l, tau, phi_vol, extr, correct_plus, correct_moins, opacite
-
-  integer :: thetaj_old, ri_old, icell, ri0, ri1, thetaj0, thetaj1, p_ri0, p_thetaj0, previous_cell, cell, icell0, next_cell
-  logical :: lcellule_non_vide, lstop
-
-
-  logical :: detect_bug = .false.
-
-
-  correct_plus = 1.0_db + prec_grille_sph
-  correct_moins = 1.0_db - prec_grille_sph
-
-  ! detect_bug =  (abs(xio - 134.48909960993615_db ) < 1.0e-10)
-  detect_bug=.false.
-
-  ! pour ray-tracing
-  phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
-
-  lstop = .false.
-
-  x0=xio;y0=yio;z0=zio
-  x1=xio;y1=yio;z1=zio
-  extr=extrin
-  ri0=ri
-  thetaj0=thetaj
-  ri1=ri
-  thetaj1=thetaj
-
-  ! Cas sans strat
-  p_ri0=1
-  p_thetaj0=1
-
-  ! TODO : cas avec strat
-
-  ltot=0.0
-
-  next_cell = cell_map(ri0,thetaj0,1)
-
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cellule
-     ri_old = ri0 ; thetaj_old = thetaj0
-     x_old = x0 ; y_old = y0 ; z_old = z0
-
-     ri0=ri1;thetaj0=thetaj1
-     x0=x1;y0=y1;z0=z1
-
-     icell0 = next_cell
-
-     ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(icell0)) then
-        ! On revoie le paquet dans l'autre sens
-        u = -u ; v = -v ; w=-w
-        ! et on le renvoie au point de depart
-        ri = ri_old ; thetaj = thetaj_old
-        xio = x_old ; yio = y_old ; zio = z_old
-        return
-     endif
-
-     ! Todo : test_sortie_routine
-     if (ri0==0) then
-        lcellule_non_vide=.false.
-        opacite=0.0_db
-     else
-        lcellule_non_vide=.true.
-        if (icell0 > n_cells) then
-           opacite = 0.0_db
-        else
-           opacite=kappa(icell0,lambda)
-        endif
-     endif
-
-     ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
-        flag_sortie = .true.
-        return
-     endif ! Test sortie
-
-     previous_cell = 0 ! unused, just for Voronoi
-     call cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     tau=l*opacite ! opacite constante dans la cellule
-
-     ! Comparaison integrale avec tau
-     ! et ajustement longueur de vol eventuellement
-     if(tau > extr) then ! On a fini d'integrer
-        lstop = .true.
-        l = l*extr/tau ! on rescale l pour que tau=extr
-        ltot=ltot+l
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
-     endif
-
-     ! Stokage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  &
-          x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
-
-     ! On a fini d'integrer
-     if (lstop) then
-        flag_sortie = .false.
-        xio=x0+l*u
-        yio=y0+l*v
-        zio=z0+l*w
-        call indice_cellule_sph(xio,yio,zio,ri,thetaj)
-
-        ! Patch pour eviter BUG sur position radiale
-        ! a cause de limite de precision
-        if (ri==0) then
-           factor = rmin/ sqrt(xio*xio+yio*yio+zio*zio) * correct_plus
-           xio = xio * factor
-           yio = yio * factor
-           zio = zio * factor
-
-           ! On verifie que c'est OK maintenant
-           call indice_cellule_sph(xio,yio,zio,ri,thetaj)
-           if (ri==0) then
-              write(*,*) "BUG integ_deg2_SPH"
-              write(*,*) "Exiting"
-              stop
-           endif
-        endif
-
-        icell = cell_map(ri,thetaj,1)
-        if (l_dark_zone(icell)) then ! Petit test de securite
-           ! On resort le paquet
-           if (thetaj < thetaj0) then
-              thetaj = thetaj0
-              zio = z_lim(ri0,thetaj0)*correct_plus
-           endif
-           if (ri < ri0) then
-              ri = ri0
-              xio = xio * correct_plus
-              yio = yio * correct_plus
-           else if (ri > ri0) then
-              ri = ri0
-              xio = xio * correct_moins
-              yio = yio * correct_moins
-           endif
-        endif
-        return
-     endif ! lstop
-
-  enddo ! boucle infinie
-
-  write(*,*) "BUG"
-  return
-
-end subroutine length_deg2_sph
-
-!********************************************************
 
 subroutine integ_tau(lambda)
 
@@ -2281,294 +2102,6 @@ subroutine integ_tau_mol(imol)
   return
 
 end subroutine integ_tau_mol
-
-!***********************************************************
-
-subroutine length_deg2_opacity_wall(id,lambda,Stokes,ri,zj,xio,yio,zio,u,v,w,extrin,ltot,flag_sortie)
-! Integration par calcul de la position de l'interface entre cellules
-! par eq deg2 en r et deg 1 en z
-! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-! C. Pinte
-! 05/02/05
-
-! ATTENTION : ce n'est qu'un mur analytique en opacite, pas une structure en densite
-! donc, pas d'effet thermique, de dependance en lambda, etc
-
-  implicit none
-
-  integer, intent(in) :: id,lambda
-  integer, intent(inout) :: ri,zj
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db), intent(inout) :: u,v,w
-  real, intent(in) :: extrin
-  real(kind=db), intent(inout) :: xio,yio,zio
-  real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie
-
-  real(kind=db) :: x0, y0, z0, x1, y1, z1
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, tau, zlim, extr, dotprod, opacite
-  real(kind=db) :: correct_moins, correct_plus
-  integer :: ri0, zj0, ri1, zj1, delta_rad, delta_zj, icell0, icell
-
-  logical :: lcellule_non_vide
-
-  real(kind=db) :: hh, hhm, phi
-
-
-  ! Petit delta pour franchir la limite de la cellule
-  ! et ne pas etre pile-poil dessus
-  correct_moins = 1.0_db - prec_grille
-  correct_plus = 1.0_db + prec_grille
-
-  x1=xio;y1=yio;z1=zio
-  extr=extrin
-  ri0=ri
-  zj0=zj
-  ri1=ri
-  zj1=zj
-
-
-  ltot=0.0
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0_db/a
-  else
-     inv_a=huge_real
-  endif
-
-
-  if (abs(w) > tiny_real) then
-     inv_w=1.0_db/w
-  else
-     inv_w=sign(huge_db,w) ! huge_real avant
-  endif
-
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cellule
-     ri0=ri1;zj0=zj1
-     x0=x1;y0=y1;z0=z1
-
-     icell0 = cell_map(ri0,zj0,1)
-
-     ! Pour cas avec approximation de diffusion
-     if (l_dark_zone(icell0)) then
-        ! On revoie le paquet dans l'autre sens
-        u = -u ; v = -v ; w=-w
-        inv_w = -inv_w
-        ! et on le renvoie au point de depart
-        return
-     endif
-
-     lcellule_non_vide=.true.
-     ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
-        flag_sortie = .true.
-        return
-     elseif (zj0>nz) then
-        lcellule_non_vide = .false.
-        ! Test sortie vericale
-        if (abs(z0) > zmaxmax) then
-           flag_sortie = .true.
-           return
-        endif
-     endif ! Test sortie
-
-     ! Detection interface
-     r_2=x0*x0+y0*y0
-     b=(x0*u+y0*v)*inv_a
-
-     if (ri0==0) then
-        lcellule_non_vide = .false.
-        opacite=0.0_db
-        ! Si on est avant le bord interne,  on passe forcement par rmin
-        ! et on cherche forcement la racine positive (unique)
-        c=(r_2-r_lim_2(0))*inv_a
-        delta=b*b-c
-        rac=sqrt(delta)
-        s=-b+rac
-        t=huge_real
-        delta_rad=1
-     else
-        if (icell0 > n_cells) then
-           opacite = 0.0_db
-        else
-           opacite=kappa(icell0,lambda)
-        endif
-
-        if (ri0 == 1) then
-           ! Variation de hauteur du mur en cos(phi/2)
-           phi = atan2(y0,x0)
-           hh = h_wall * abs(cos(phi/2.))
-           hhm = -h_wall * abs(cos((phi+pi)/2.))
-
-           ! Ajout de l'opacite du mur le cas echeant
-           if ((z0 <= hh).and.(z0 >= hhm)) then
-              opacite = opacite + kappa_wall
-           endif
-        endif
-
-        ! 1) position interface radiale
-        ! on avance ou recule en r ? -> produit scalaire
-        dotprod=u*x0+v*y0  ! ~ b
-        if (dotprod < 0.0_db) then
-           ! on recule : on cherche rayon inférieur
-           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
-           delta=b*b-c
-           if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
-              ! on cherche le rayon supérieur
-              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-              delta_rad=1
-           else
-              delta_rad=-1
-           endif
-        else
-           ! on avance : on cherche le rayon supérieur
-           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-           delta_rad=1
-        endif !dotprod
-        rac=sqrt(delta)
-        s=-b-rac
-        if (s < 0.0_db) then
-           s=-b+rac
-        else if (s==0.0_db) then
-           s=prec_grille
-        endif
-
-
-        ! 2) position interface verticale
-        ! on monte ou on descend par plan équatorial ?
-        dotprod=w*z0
-        if (dotprod == 0.0_db) then
-           t=1.0e10
-        else
-           if (dotprod > 0.0_db) then
-              ! on monte
-              if (zj0==nz+1) then
-                 delta_zj=0
-                 if (z0 > 0.0_db) then
-                    zlim=1.0e10
-                 else
-                    zlim=-1.0e10
-                 endif
-              else
-                 if (z0 > 0.0) then
-                    zlim=z_lim(ri0,zj0+1)*correct_plus
-                 else
-                    zlim=-z_lim(ri0,zj0+1)*correct_plus
-                 endif
-                 delta_zj=1
-              endif
-           else
-              ! on descend
-              if (zj0==1) then
-                 ! on traverse le plan eq donc on va remonter
-                 ! et z va changer de signe
-                 delta_zj=1
-                 if (z0 > 0.0_db) then
-                    zlim=-z_lim(ri0,2)*correct_moins
-                 else
-                    zlim=z_lim(ri0,2)*correct_moins
-                 endif
-              else !(zj0==1)
-                 ! on ne traverse pas z=0.
-                 if (z0 > 0.0_db) then
-                    zlim=z_lim(ri0,zj0)*correct_moins
-                 else
-                    zlim=-z_lim(ri0,zj0)*correct_moins
-                 endif
-                 delta_zj=-1
-              endif !(zj0==1)
-           endif ! monte ou descend
-           t=(zlim-z0)*inv_w
-           ! correct pb precision
-           if (t < 0.0_db) t=prec_grille
-        endif !dotprod=0.0
-     endif ! ri0==0
-
-
-     ! 3) interface en r ou z ?
-     if (s < t) then ! r
-        l=s
-        delta_vol=s
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0+delta_rad
-        if ((ri1<1).or.(ri1>n_rad)) then
-           zj1=zj0
-        else
-           zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
-           if (zj1>nz) zj1=nz+1
-        endif
-     else ! z
-        l=t
-        delta_vol=t
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        zj1=zj0+delta_zj
-     endif
-
-
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     tau=l*opacite ! opacite constante dans la cellule
-     ! Comparaison integrale avec tau
-     if(tau > extr) then ! On a fini d'integrer
-        l = l*extr/tau ! on rescale l pour que tau=extr
-        ltot=ltot+l
-        if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        endif !l_abs
-        flag_sortie = .false.
-        xio=x0+l*u
-        yio=y0+l*v
-        zio=z0+l*w
-        call indice_cellule(xio,yio,zio,ri,zj)
-
-        icell = cell_map(ri,zj,1)
-        if (l_dark_zone(icell)) then ! Petit test de securite
-           ! On resort le paquet
-           if (zj < zj0) then
-              zj = zj0
-              zio = z_lim(ri0,zj0)*correct_plus
-           endif
-           if (ri < ri0) then
-              ri = ri0
-              xio = xio * correct_plus
-              yio = yio * correct_plus
-           else if (ri > ri0) then
-              ri = ri0
-              xio = xio * correct_moins
-              yio = yio * correct_moins
-           endif
-        endif
-        return
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
-        if (letape_th.and.lcellule_non_vide) then
-           if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-           if (lRE_nLTE.or.lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        endif !l_abs
-     endif ! tau > extr
-
-  enddo ! boucle infinie
-  write(*,*) "BUG"
-  return
-
-end subroutine length_deg2_opacity_wall
 
 !********************************************************************
 
