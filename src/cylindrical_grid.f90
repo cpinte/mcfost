@@ -444,7 +444,7 @@ contains
 
   !******************************************************************************
 
-  subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, tau)
+  subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
     integer, intent(in) :: lambda, cell, previous_cell
     real(kind=db), intent(in) :: x0,y0,z0
@@ -452,14 +452,14 @@ contains
 
     real(kind=db), intent(out) :: x1, y1, z1
     integer, intent(out) :: next_cell
-    real(kind=db), intent(out) :: l, tau
+    real(kind=db), intent(out) :: l
 
     ! Variables to be sorted out
     integer :: ri0,zj0,k0, k0m1
     integer ::  delta_rad, delta_zj, delta_phi, ri1, zj1, k1
 
     real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, den, tan_angle_lim
-    real(kind=db) :: phi, delta_vol, zlim, dotprod, opacite
+    real(kind=db) :: phi, delta_vol, zlim, dotprod
     real(kind=db) :: correct_moins, correct_plus
 
 
@@ -489,7 +489,6 @@ contains
     b=(x0*u+y0*v)*inv_a
 
     if (ri0==0) then
-       opacite=0.0_db
        ! Si on est avant le bord interne,  on passe forcement par rmin
        ! et on cherche forcement la racine positive (unique)
        c=(r_2-r_lim_2(0))*inv_a
@@ -500,11 +499,6 @@ contains
        t_phi= huge_real
        delta_rad=1
     else
-       if (cell > n_cells) then
-          opacite = 0.0_db
-       else
-          opacite=kappa(cell,lambda)
-       endif
        ! 1) position interface radiale
        ! on avance ou recule en r ? -> produit scalaire
        dotprod=u*x0+v*y0  ! ~ b
@@ -690,11 +684,8 @@ contains
        endif
     endif
 
-    ! Calcul longeur de vol et profondeur optique dans la cellule
-    tau = l*opacite ! opacite constante dans la cellule
-
     !call cylindrical2cell(ri1,zj1,1, next_cell)
-    next_cell =  cell_map(ri1,zj1,k1)
+    next_cell = cell_map(ri1,zj1,k1)
 
     return
 
