@@ -7,6 +7,24 @@ module spherical_grid
 
 contains
 
+  pure logical function test_exit_grid_sph(icell, x, y, z)
+
+    integer, intent(in) :: icell
+    real(kind=db), intent(in) :: x,y,z
+
+    if (icell > n_cells) then
+       test_exit_grid_sph = .true.
+    else
+       test_exit_grid_sph = .false.
+    endif
+    return
+
+    return
+
+  end function test_exit_grid_sph
+
+!******************************************************************************
+
   subroutine indice_cellule_sph(xin,yin,zin, icell)
 
   implicit none

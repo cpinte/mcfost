@@ -167,31 +167,31 @@ contains
 
   !******************************************************************************
 
-  pure logical function exit_test_cylindrical(icell, x, y, z)
+  pure logical function test_exit_grid_cyl(icell, x, y, z)
 
     integer, intent(in) :: icell
     real(kind=db), intent(in) :: x,y,z
 
     if (icell <= n_cells) then
-       exit_test_cylindrical = .false.
+       test_exit_grid_cyl = .false.
        return
     endif
 
     if (lexit_cell(icell)==0) then
-       exit_test_cylindrical = .false.
+       test_exit_grid_cyl = .false.
     else if (lexit_cell(icell)==1) then ! radial
-       exit_test_cylindrical = .true.
+       test_exit_grid_cyl = .true.
     else ! 2 --> vertical
        if (abs(z) > zmaxmax) then
-          exit_test_cylindrical = .true.
+          test_exit_grid_cyl = .true.
        else
-          exit_test_cylindrical = .false.
+          test_exit_grid_cyl = .false.
        endif
     endif
 
     return
 
-  end function exit_test_cylindrical
+  end function test_exit_grid_cyl
 
   !******************************************************************************
 

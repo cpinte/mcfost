@@ -18,6 +18,7 @@ module grid
   procedure(pos_em_cellule_cyl), pointer :: pos_em_cellule => null()
   procedure(move_to_grid_cyl), pointer :: move_to_grid => null()
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
+  procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
 
   contains
 
@@ -210,6 +211,7 @@ subroutine define_grid()
      pos_em_cellule => pos_em_cellule_cyl
      move_to_grid => move_to_grid_cyl
      indice_cellule => indice_cellule_cyl
+     test_exit_grid => test_exit_grid_cyl
   else if (grid_type == 2) then
      lcylindrical = .false.
      lspherical = .true.
@@ -217,6 +219,7 @@ subroutine define_grid()
      pos_em_cellule => pos_em_cellule_sph
      move_to_grid => move_to_grid_sph
      indice_cellule => indice_cellule_sph
+     test_exit_grid => test_exit_grid_sph
   else
      write(*,*) "Unknown grid type"
      write(*,*) "Exiting"

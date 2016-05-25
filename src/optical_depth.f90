@@ -93,17 +93,9 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
      endif
 
      ! Test sortie
-     if (lcylindrical) then
-        if (exit_test_cylindrical(icell0, x0, y0, z0)) then
-           flag_sortie = .true.
-           return
-        endif
-     else ! spherical
-        if (icell0 > n_cells) then ! On est dans la derniere cellule
-           ! Le photon sort du disque
-           flag_sortie = .true.
-           return
-        endif ! Test sortie
+     if (test_exit_grid(icell0, x0, y0, z0)) then
+        flag_sortie = .true.
+        return
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
@@ -416,18 +408,10 @@ subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmi
      x0=x1;y0=y1;z0=z1
 
      ! Test sortie
-     if (lcylindrical) then
-        if (exit_test_cylindrical(icell0, x0, y0, z0)) then
-           tau_tot_out=tau_tot
-           lmax=ltot
-           return
-        endif
-     else ! spherical
-        if (icell0 > n_cells) then ! On est dans la derniere cellule
-           tau_tot_out=tau_tot
-           lmax=ltot
-           return
-        endif ! Test sortie
+     if (test_exit_grid(icell0, x0, y0, z0)) then
+        tau_tot_out=tau_tot
+        lmax=ltot
+        return
      endif
 
      if (icell0 <= n_cells) then
@@ -521,15 +505,8 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
      endif
 
      ! Test sortie
-     if (lcylindrical) then
-        if (exit_test_cylindrical(icell, x0, y0, z0)) then
-           return
-        endif
-     else ! spherical
-        if (icell > n_cells) then ! On est dans la derniere cellule
-           ! Le photon sort du disque
-           return
-        endif ! Test sortie
+     if (test_exit_grid(icell, x0, y0, z0)) then
+        return
      endif
 
      nbr_cell = nbr_cell + 1
@@ -786,15 +763,8 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
      endif
 
      ! Test sortie
-     if (lcylindrical) then
-        if (exit_test_cylindrical(icell, x0, y0, z0)) then
-           return
-        endif
-     else ! spherical
-        if (icell > n_cells) then ! On est dans la derniere cellule
-           ! Le photon sort du disque
-           return
-        endif ! Test sortie
+     if (test_exit_grid(icell, x0, y0, z0)) then
+        return
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
