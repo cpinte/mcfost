@@ -1403,35 +1403,7 @@ end subroutine integ_tau_mol
 
 !********************************************************************
 
-function integ_ray_dust(lambda,ri,zj,phik,x,y,z,u,v,w)
-  ! Generalisation de la routine length_deg2
-  ! Modif depuis la routine moleculaire
-  ! Propage un paquet depuis un point d'origine donne
-  !
-  ! C. Pinte
-  ! 23/01/08
-
-  implicit none
-
-  integer, intent(in) :: lambda, ri,zj, phik
-  real(kind=db), intent(in) :: u,v,w
-  real(kind=db), intent(in) :: x,y,z
-
-  real(kind=db), dimension(N_type_flux) :: integ_ray_dust
-
-  if (lcylindrical) then
-     integ_ray_dust(:) = integ_ray_dust_cyl(lambda,ri,zj,phik,x,y,z,u,v,w)
-  else
-     integ_ray_dust(:) = integ_ray_dust_sph(lambda,ri,zj,phik,x,y,z,u,v,w)
-  endif
-
-  return
-
-end function integ_ray_dust
-
-!***********************************************************
-
-function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
+function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   ! Generalisation de la routine length_deg2
   ! Propage un paquet depuis un point d'origine donne
   ! et integre l'equation du transfert radiatif
@@ -1445,50 +1417,28 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
   implicit none
 
-  integer, intent(in) :: lambda, ri_in, zj_in, phik_in
+  integer, intent(in) :: lambda, icell_in
   real(kind=db), intent(in) :: u,v,w
   real(kind=db), intent(in) :: x,y,z
 
-  real(kind=db), dimension(N_type_flux) :: integ_ray_dust_cyl
+  real(kind=db), dimension(N_type_flux) :: integ_ray_dust
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm
   real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
   real(kind=db) :: delta_vol, l, zlim, dotprod
   real(kind=db) :: correct_plus, correct_moins
-  integer :: ri0, zj0, ri1, zj1, phik0, phik1, delta_rad, delta_zj, delta_phi, phik0m1
+  integer :: icell, previous_cell, next_cell
 
   real(kind=db) :: tau, dtau
 
   logical :: lcellule_non_vide
 
-  ! Petit delta pour franchir la limite de la cellule
-  ! et ne pas etre pile-poil dessus
-  correct_moins = 1.0_db - prec_grille
-  correct_plus = 1.0_db + prec_grille
-
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
-  ri1=ri_in
-  zj1=zj_in
-  phik1=phik_in
-
-  a=u*u+v*v
-
-  if (a > tiny_real) then
-     inv_a=1.0/a
-  else
-     inv_a=huge_real
-  endif
-
-
-  if (abs(w) > tiny_real) then
-     inv_w=1.0/w
-  else
-     inv_w=sign(huge_db,w)
-  endif
+  next_cell = icell_in
 
   tau = 0.0_db
-  integ_ray_dust_cyl(:) = 0.0_db
+  integ_ray_dust(:) = 0.0_db
 
 
   !*** propagation dans la grille
@@ -1496,239 +1446,34 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
      ! Indice de la cellule
-     ri0=ri1 ; zj0=zj1 ; phik0=phik1
+     icell=next_cell
      x0=x1 ; y0=y1 ; z0=z1
 
-     lcellule_non_vide=.true.
+     if (icell <= n_cells) then
+        lcellule_non_vide=.true.
+     else
+        lcellule_non_vide=.false.
+     endif
+
      ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
-        exit infinie
-     elseif (abs(zj0)>nz) then
-        lcellule_non_vide=.false.
-        ! Test sortie vericale
-        if (abs(z0) > zmaxmax) then
-           exit infinie
+     if (lcylindrical) then
+        if (exit_test_cylindrical(icell, x0, y0, z0)) then
+           return
         endif
-     endif ! Test sortie
-
-     ! Detection interface
-     r_2=x0*x0+y0*y0
-     b=(x0*u+y0*v)*inv_a
-
-     if (ri0==0) then
-        lcellule_non_vide=.false.
-        ! Si on est avant le bord interne,  on passe forcement par rmin
-        ! et on cherche forcement la racine positive (unique)
-        c=(r_2-r_lim_2(0)*correct_plus)*inv_a
-        delta=b*b-c
-        rac=sqrt(delta)
-        s=-b+rac
-        t=huge_real
-        t_phi= huge_real
-        delta_rad=1
-     else
-
-        ! 1) position interface radiale
-        ! on avance ou recule en r ? -> produit scalaire
-        dotprod=u*x0+v*y0
-        if (dotprod < 0.0) then
-           ! on recule : on cherche rayon inférieur
-           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
-           delta=b*b-c
-           if (delta < 0.0) then ! on ne rencontre pas le rayon inférieur
-              ! on cherche le rayon supérieur
-              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-              delta_rad=1
-           else
-              delta_rad=-1
-           endif
-        else
-           ! on avance : on cherche le rayon supérieur
-           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-           delta_rad=1
-        endif !dotprod
-        rac=sqrt(delta)
-        s=-b-rac
-        if (s < 0.0) then
-           s=-b+rac
-        else if (s==0.0) then
-           s=prec_grille
-        endif
-
-        ! 2) position interface verticale
-        ! on monte ou on descend par plan équatorial ?
-        dotprod=w*z0
-        if (dotprod == 0.0_db) then
-           t=1.0e10
-        else
-           if (dotprod > 0.0_db) then ! on se rapproche de la surface
-              if (l3D) then
-                 if (zj0==nz+1) then
-                    delta_zj=0
-                    zlim=1.0e10
-                 else if (zj0==-(nz+1)) then
-                    delta_zj=0
-                    zlim=-1.0e10
-                 else
-                    if (z0 > 0.0) then
-                       zlim=z_lim(ri0,zj0+1)*correct_plus
-                       delta_zj=1
-                    else
-                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
-                       delta_zj=-1
-                    endif
-                 endif
-              else ! 2D
-                 if (zj0==nz+1) then
-                    delta_zj=0
-                    if (z0 > 0.0_db) then
-                       zlim=1.0e10
-                    else
-                       zlim=-1.0e10
-                    endif
-                 else
-                    if (z0 > 0.0) then
-                       zlim=z_lim(ri0,zj0+1)*correct_plus
-                    else
-                       zlim=-z_lim(ri0,abs(zj0)+1)*correct_plus
-                    endif
-                    delta_zj=1
-                 endif
-              endif ! l3D
-           else ! on se rappoche du midplane
-              if (l3D) then
-                 if (z0 > 0.0) then
-                    zlim=z_lim(ri0,abs(zj0))*correct_moins
-                    delta_zj=-1
-                    if (zj0==1) delta_zj=-2 ! pas d'indice 0
-                 else
-                    zlim=-z_lim(ri0,abs(zj0))*correct_moins
-                    delta_zj=1
-                    if (zj0==-1) delta_zj=2 ! pas d'indice 0
-                 endif
-              else ! 2D
-                 if (zj0==1) then
-                    ! on traverse le plan eq donc on va remonter
-                    ! et z va changer de signe
-                    delta_zj=1
-                    if (z0 > 0.0_db) then
-                       zlim=-z_lim(ri0,2)*correct_moins
-                    else
-                       zlim=z_lim(ri0,2)*correct_moins
-                    endif
-                 else !(zj0==1)
-                    ! on ne traverse pas z=0.
-                    if (z0 > 0.0_db) then
-                       zlim=z_lim(ri0,zj0)*correct_moins
-                    else
-                       zlim=-z_lim(ri0,abs(zj0))*correct_moins
-                    endif
-                    delta_zj=-1
-                 endif !(zj0==1)
-              endif !l3D
-           endif ! monte ou descend
-           t=(zlim-z0)*inv_w
-           ! correct pb precision
-           if (t < 0.0_db) t=prec_grille
-        endif !dotprod=0.0
-
-        ! 3) position interface azimuthale
-        dotprod =  x0*v - y0*u
-        if (abs(dotprod) < 1.0e-10) then
-           ! on ne franchit pas d'interface azimuthale
-           t_phi = 1.0e30
-        else
-           ! Quelle cellule on va franchir
-           if (dotprod > 0.0) then
-              tan_angle_lim = tan_phi_lim(phik0)
-              delta_phi=1
-           else
-              phik0m1=phik0-1
-              if (phik0m1==0) phik0m1=N_az
-              tan_angle_lim = tan_phi_lim(phik0m1)
-              delta_phi=-1
-           endif
-           ! Longueur av interserction
-           if (tan_angle_lim > 1.0d299) then
-              t_phi = -x0/u
-           else
-              den= v-u*tan_angle_lim
-              if (abs(den) > 1.0e-6) then
-                 t_phi = -(y0-x0*tan_angle_lim)/den
-              else
-                 t_phi = 1.0e30
-              endif
-           endif
-           if (t_phi < 0.0) t_phi = 1.0e30
-        endif !dotprod = 0.0
-
-     endif ! ri==0
-
-     ! 4) interface en r ou z ou phi ?
-     if ((s < t).and.(s < t_phi)) then ! r
-        l=s
-        delta_vol=s
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0+delta_rad
-        if ((ri1<1).or.(ri1>n_rad)) then
-           zj1=zj0
-        else
-           zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
-           if (zj1>nz) zj1=nz+1
-           if (l3D) then
-              if (z1 < 0.0) zj1=-zj1
-           endif
-        endif
-        phik1=phik0
-
-        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
-        if (ri0==0) call indice_cellule_3D_phi(x1,y1,z1,phik1)
-     else if (t < t_phi) then ! z
-        l=t
-        delta_vol=t
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        zj1=zj0+delta_zj
-        phik1=phik0
-     else
-        l=t_phi
-        delta_vol=correct_plus*t_phi
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        zj1= floor(abs(z1)/zmax(ri1)*nz) + 1
-        if (zj1>nz) zj1=nz+1
-        if (l3D) then
-           if (z1 < 0.0) zj1=-zj1
-        endif
-        phik1=phik0+delta_phi
-        if (phik1 == 0) phik1=N_az
-        if (phik1 == N_az+1) phik1=1
+     else ! spherical
+        if (icell > n_cells) then ! On est dans la derniere cellule
+           ! Le photon sort du disque
+           return
+        endif ! Test sortie
      endif
 
-     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-     if (z1 == 0.0_db) then
-        if (l3D) then
-           z1 = sign(prec_grille,w)
-        else ! 2D
-           z1 = prec_grille
-        endif ! l3D
-     endif
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     previous_cell = 0 ! unused, just for Voronoi
+     call cross_cell(lambda, x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(cell_map(ri0,zj0,phik0),lambda)
+        dtau =  l * kappa(icell,lambda)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
@@ -1737,8 +1482,8 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
 
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
-        integ_ray_dust_cyl(:) = integ_ray_dust_cyl(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(ri0,zj0,phik0,xm,ym,zm)
+        integ_ray_dust(:) = integ_ray_dust(:) + &
+             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(icell, xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
@@ -1747,312 +1492,11 @@ function integ_ray_dust_cyl(lambda,ri_in,zj_in,phik_in,x,y,z,u,v,w)
         if (tau > tau_dark_zone_obs) return
      endif  ! lcellule_non_vide
 
-     ! TODO:stocker les ri0, zj0, l, xm, ym, zm pour chacun des rayons
-
   enddo infinie
 
   return
 
-end function integ_ray_dust_cyl
-
-!***********************************************************
-
-function integ_ray_dust_sph(lambda,ri_in,thetaj_in,phik_in,x,y,z,u,v,w)
-  ! Generalisation de la routine length_deg2
-  ! Propage un paquet depuis un point d'origine donne
-  ! et integre l'equation du transfert radiatif
-  ! La propagation doit etre a l'envers pour faire du
-  ! ray tracing  !!
-  !
-  ! C. Pinte
-  ! 15/08/08
-
-  implicit none
-
-  integer, intent(in) :: lambda, ri_in, thetaj_in, phik_in
-  real(kind=db), intent(in) :: u,v,w
-  real(kind=db), intent(in) :: x,y,z
-
-  real(kind=db), dimension(N_type_flux) :: integ_ray_dust_sph
-
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, t1, t2
-  real(kind=db) :: b, c, s, rac, t, t_phi, delta, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, dotprod
-  real(kind=db) :: correct_plus, correct_moins, precision
-  real(kind=db) :: tan_angle_lim1, tan_angle_lim2, a_theta, b_theta, c_theta
-  real(kind=db) :: t1_1, t1_2, t2_1, t2_2, uv, r0_cyl, r0_2_cyl, r0_2, tan2
-  integer :: ri0, thetaj0, ri1, thetaj1, phik0, phik1, delta_rad, delta_theta, delta_phi, phik0m1
-
-  real(kind=db) :: tau, dtau
-
-  logical :: lcellule_non_vide
-
-
-  ! Petit delta pour franchir la limite de la cellule
-  ! et ne pas etre pile-poil dessus
-  correct_moins = 1.0_db - 1.0e-10_db
-  correct_plus = 1.0_db + 1.0e-10_db
-  precision = 1.0e-20_db ! pour g95
-
-  x1=x;y1=y;z1=z
-  x0=x;y0=y;z0=z
-  ri1=ri_in
-  thetaj1=thetaj_in
-  phik1=phik_in
-
-  uv = sqrt(u*u + v*v)
-
-  tau = 0.0_db
-  integ_ray_dust_sph(:) = 0.0_db
-
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-     ! Indice de la cellule
-     ri0=ri1 ; thetaj0=thetaj1 ; phik0=phik1
-     x0=x1 ; y0=y1 ; z0=z1
-
-     lcellule_non_vide=.true.
-     ! Test sortie
-     if (ri0>n_rad) then ! On est dans la derniere cellule
-        ! Le photon sort du disque
-        exit infinie
-     endif ! Test sortie
-
-
-     ! Detection interface
-     r0_2_cyl  = x0*x0+y0*y0
-     r0_cyl = sqrt(r0_2_cyl)
-     r0_2 = r0_2_cyl + z0*z0
-     b   = (x0*u+y0*v+z0*w)
-
-     if (ri0==0) then
-        ! Si on est avant le bord interne,  on passe forcement par rmin
-        ! et on cherche forcement la racine positive (unique)
-        lcellule_non_vide = .false.
-        c=(r0_2-r_lim_2(0)*correct_plus)
-        delta=b*b-c
-        rac=sqrt(delta)
-        s=-b+rac
-        t=huge_real
-        delta_rad=1
-     else
-
-        ! 1) position interface radiale
-        ! on avance ou recule en r ? -> produit scalaire
-        dotprod= b
-        if (dotprod < 0.0_db) then
-           ! on recule : on cherche rayon inférieur
-           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
-           delta=b*b-c
-           if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
-              ! on cherche le rayon supérieur
-              c=(r0_2-r_lim_2(ri0)*correct_plus)
-              delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-              delta_rad=1
-           else
-              delta_rad=-1
-           endif
-        else
-           ! on avance : on cherche le rayon supérieur
-           c=(r0_2-r_lim_2(ri0)*correct_plus)
-           delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
-           delta_rad=1
-        endif !dotprod
-        rac=sqrt(delta)
-        s=-b-rac
-        if (s < 0.0_db) then
-           s=-b+rac
-        else if (s==0.0_db) then
-           s=prec_grille
-        endif
-
-
-        ! 2) position interface inclinaison
-        ! Meme methode que azimuth dans version cylindrique 3D
-        if (z0 >= 0.0_db) then ! on est dans le bon sens
-           tan_angle_lim1 = tan_theta_lim(thetaj0) * correct_plus
-           tan_angle_lim2 = tan_theta_lim(thetaj0-1) * correct_moins
-        else
-           tan_angle_lim1 = - tan_theta_lim(thetaj0) * correct_plus
-           tan_angle_lim2 = - tan_theta_lim(thetaj0-1) * correct_moins
-        endif ! z0
-
-        ! Premiere limite theta
-        tan2 = tan_angle_lim1 * tan_angle_lim1
-        a_theta = w*w - tan2 * (u*u + v*v)
-        b_theta = w*z0 - tan2 * (x0*u + y0*v)
-        c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
-
-        delta = b_theta * b_theta - a_theta * c_theta
-        if (delta < 0.0_db) then ! Pas de sol reelle
-           t1 = 1.0e30_db
-        else ! Au moins une sol reelle
-           rac = sqrt(delta)
-           t1_1 = (- b_theta - rac)/a_theta
-           t1_2 = (- b_theta + rac)/a_theta
-
-           if (t1_1 <= precision) then
-              if (t1_2 <= precision) then ! les 2 sont <0
-                 t1=1.0e30_db
-              else   ! Seul t1_2 > 0
-                 t1 = t1_2
-              endif
-           else
-              if (t1_2 <= precision) then ! Seul t1_1 >0
-                 t1 = t1_1
-              else ! les 2 sont > 0
-                 t1 = min(t1_1,t1_2)
-              endif
-           endif
-        endif ! signe delta
-
-        ! Deuxieme limite theta
-        tan2 = tan_angle_lim2 * tan_angle_lim2
-        a_theta = w*w - tan2 * (u*u + v*v)
-        b_theta = w*z0 - tan2 * (x0*u + y0*v)
-        c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
-
-        delta = b_theta * b_theta - a_theta * c_theta
-        if (delta < 0.0_db) then ! Pas de sol reelle
-           t2 = 1.0e30_db
-        else ! Au moins une sol reelle
-           rac = sqrt(delta)
-           t2_1 = (- b_theta - rac)/a_theta
-           t2_2 = (- b_theta + rac)/a_theta
-
-           if (t2_1 <= precision) then
-              if (t2_2 <= precision) then ! les 2 sont <0
-                 t2=1.0e30_db
-              else   ! Seul t2_2 > 0
-                 t2 = t2_2
-              endif
-           else
-              if (t2_2 <= 0.0_db) then ! Seul t2_1 >0
-                 t2 = t2_1
-              else ! les 2 sont > 0
-                 t2 = min(t2_1,t2_2)
-              endif
-           endif
-        endif ! signe delta
-
-        ! Selection limite theta
-        if (t1 < t2) then
-           t=t1
-           delta_theta = 1
-           if (thetaj0 == nz) delta_theta = 0
-        else
-           t=t2
-           delta_theta = -1
-           if (thetaj0 == 1) delta_theta = 0
-        endif
-
-
-        ! 3) position interface azimuthale
-        dotprod =  x0*v - y0*u
-        if (abs(dotprod) < 1.0e-10) then
-           ! on ne franchit pas d'interface azimuthale
-           t_phi = 1.0e30
-           delta_phi = 0
-        else
-           ! Quelle cellule on va franchir
-           if (dotprod > 0.0) then
-              tan_angle_lim = tan_phi_lim(phik0)
-              delta_phi=1
-           else
-              phik0m1=phik0-1
-              if (phik0m1==0) phik0m1=N_az
-              tan_angle_lim = tan_phi_lim(phik0m1)
-              delta_phi=-1
-           endif
-           ! Longueur av interserction
-           if (tan_angle_lim > 1.0d299) then
-              t_phi = -x0/u
-              delta_phi=0
-           else
-              den= v-u*tan_angle_lim
-              if (abs(den) > 1.0e-6) then
-                 t_phi = -(y0-x0*tan_angle_lim)/den
-              else
-                 t_phi = 1.0e30
-                 delta_phi = 0
-              endif
-           endif
-           if (t_phi < 0.0) then
-              t_phi = 1.0e30
-              delta_phi = 0
-           endif
-        endif !dotprod = 0.0
-
-     endif ! ri0==0
-
-
-     ! 4) interface en r ou z ou phi ?
-     if ((s < t).and.(s < t_phi)) then ! r
-        l=s
-        delta_vol=s
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0+delta_rad
-        thetaj1 = thetaj0
-        phik1=phik0
-
-        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
-        if (ri0==0) then
-           call indice_cellule_sph_theta(x1,y1,z1,thetaj1)
-        endif
-     else if (t < t_phi) then ! theta
-        l=t
-        delta_vol=t
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        thetaj1=thetaj0+delta_theta
-        phik1=phik0
-     else
-        l=t_phi
-        delta_vol=correct_plus*t_phi
-        ! Position au bord de la cellule suivante
-        x1=x0+delta_vol*u
-        y1=y0+delta_vol*v
-        z1=z0+delta_vol*w
-        ri1=ri0
-        thetaj1 = thetaj0
-        phik1=phik0+delta_phi
-        if (phik1 == 0) phik1=N_az
-        if (phik1 == N_az+1) phik1=1
-     endif
-
-
-     if (lcellule_non_vide) then
-        ! Epaisseur optique de la cellule
-        dtau =  l * kappa(cell_map(ri0,thetaj0,1),lambda)
-
-        ! Fct source au milieu du parcours dans la cellule
-        xm = 0.5 * (x0 + x1)
-        ym = 0.5 * (y0 + y1)
-        zm = 0.5 * (z0 + z1)
-
-        ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
-        ! la profondeur optique jusqu'a la cellule
-        integ_ray_dust_sph(:) = integ_ray_dust_sph(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(ri0,thetaj0,phik0,xm,ym,zm)
-
-        ! Mise a jour profondeur optique pour cellule suivante
-        tau = tau + dtau
-
-        ! Pas besoin d'integrer trop profond
-        if (tau > tau_dark_zone_obs) return
-     endif
-
-  enddo infinie
-
-  return
-
-end function integ_ray_dust_sph
+end function integ_ray_dust
 
 !***********************************************************
 
@@ -2127,10 +1571,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 
   real(kind=db), dimension(4) :: Stokes
 
-!  write(*,*) "defining DZ", tau_max
-
   do pk=1, n_az
-
      ri_in_dark_zone(pk)=n_rad
      ri_out_dark_zone(pk)=1
      ! étape 1 : radialement depuis le centre
@@ -2402,7 +1843,6 @@ logical function test_dark_zone(icell ,x,y,z)
   else
      test_dark_zone = l_dark_zone(icell)
   endif
-
 
   return
 

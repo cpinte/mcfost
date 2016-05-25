@@ -1550,16 +1550,9 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
            ! On se met au bord de la grille : propagation a l'envers
            call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG
 
-           ! todo : tmp
-           ri = cell_map_i(icell)
-           zj = cell_map_j(icell)
-           phik= cell_map_k(icell)
-
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel
-             ! write(*,*) i,j,  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
-              !write(*,*) "pixel"
-              Stokes(:) = Stokes(:) + integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+              Stokes(:) = Stokes(:) + integ_ray_dust(lambda,icell,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
      enddo !i
