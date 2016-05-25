@@ -416,9 +416,8 @@ subroutine NLTE_mol_line_transfer(imol)
                           enddo
                        endif
 
-
                        ! Integration le long du rayon
-                       call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
+                       call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
 
                     enddo ! iray
 
@@ -577,7 +576,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      enddo
 
      if (lorigine) then
-        allocate(origine_mol(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_rad,nz,nb_proc))
+        allocate(origine_mol(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells,nb_proc))
         origine_mol = 0.0
      endif
   endif
@@ -804,13 +803,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
            ! On se met au bord de la grille : propagation a l'envers
            call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-           ! Todo : tmp f
-           ri = cell_map_i(icell)
-           zj = cell_map_j(icell)
-           phik = cell_map_k(icell)
-
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-              call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
+              call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
               ! Flux recu dans le pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
               IPc(:) = IPc(:) +  I0c(:,iray,id)

@@ -2567,7 +2567,7 @@ subroutine ecriture_spectre(imol)
   integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
   logical :: simple, extend
 
-  real, dimension(:,:,:,:), allocatable ::  O ! nv, nTrans, n_rad, nz
+  real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
   real, dimension(nTrans) :: freq
 
   integer :: n_speed_rt, nTrans_raytracing
@@ -2766,10 +2766,10 @@ subroutine ecriture_spectre(imol)
   ! Origine
   !------------------------------------------------------------------------------
   if (lorigine) then
-     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_rad,nz))
+     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells))
      O = 0.0;
      do i=1, nb_proc
-        O(:,:,:,:) =  O(:,:,:,:) +  origine_mol(:,:,:,:,i)
+        O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
      enddo
 
 
@@ -2791,8 +2791,7 @@ subroutine ecriture_spectre(imol)
      naxis=4
      naxes(1)=2*n_speed_rt+1
      naxes(2)=ntrans
-     naxes(3)=n_rad
-     naxes(4)=nz
+     naxes(3)=n_cells
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2800,7 +2799,7 @@ subroutine ecriture_spectre(imol)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     nelements=naxes(1)*naxes(2)*naxes(3)
 
      call ftppre(unit,group,fpixel,nelements,O,status)
 

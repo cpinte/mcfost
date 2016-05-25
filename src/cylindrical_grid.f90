@@ -335,7 +335,7 @@ contains
 
     if (r2 < r_lim_2(0)) then
        ri_out=0
-       zj_out=0
+       zj_out=1
        phik_out=1
     else if (r2 > Rmax2) then
        ri_out=n_rad
@@ -405,9 +405,9 @@ contains
 
   !******************************************************************************
 
-  subroutine cross_cylindrical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
+  subroutine cross_cylindrical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
-    integer, intent(in) :: lambda, cell, previous_cell
+    integer, intent(in) :: cell, previous_cell
     real(kind=db), intent(in) :: x0,y0,z0
     real(kind=db), intent(in) :: u,v,w ! Todo : check that
 

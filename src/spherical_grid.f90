@@ -109,9 +109,9 @@ end subroutine indice_cellule_sph_theta
 
 !******************************************************************************
 
-  subroutine cross_spherical_cell(lambda, x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
+  subroutine cross_spherical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
-    integer, intent(in) :: lambda, cell, previous_cell
+    integer, intent(in) :: cell, previous_cell
     real(kind=db), intent(in) :: x0,y0,z0
     real(kind=db), intent(in) :: u,v,w ! Todo : check that
 

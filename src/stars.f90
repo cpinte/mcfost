@@ -614,7 +614,6 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
-  integer :: phik
   real :: aleat1, aleat2, aleat3, aleat4
   real(kind=db) :: srw02, argmt, cospsi, phi, l, w2
 
