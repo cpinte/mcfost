@@ -1349,14 +1349,29 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   real(kind=db) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
   real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
-  integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center
+  integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
-  real, dimension(npix_x,npix_y,nb_proc) :: map_1star, Q_1star, U_1star
+  ! allacatable array as it can be big and not fit in stack memory
+  real, dimension(:,:,:), allocatable :: map_1star, Q_1star, U_1star
+
+  alloc_status = 0
+  allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
+  map_1star = 0.0
 
   lpola = .false.
-  if (lsepar_pola.and.llimb_darkening) lpola = .true.
+  if (lsepar_pola.and.llimb_darkening) then
+     lpola = .true.
+     allocate(Q_1star(npix_x,npix_y,nb_proc),U_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
+     Q_1star = 0.0 ; U_1star = 0.0
+  endif
+
+  if (alloc_status/=0) then
+     write(*,*) "Alloctaion error in compute_stars_map"
+     write(*,*) "Exiting"
+     stop
+  endif
 
   stars_map(:,:,:) = 0.0 ;
 
@@ -1498,6 +1513,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      endif
   enddo ! n_stars
 
+  deallocate(map_1star)
+  if (lpola) deallocate(Q_1star, U_1star)
   return
 
 end subroutine compute_stars_map
