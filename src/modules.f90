@@ -780,7 +780,7 @@ module molecular_emission
   logical ::  lfreeze_out
   real :: T_freeze_out
 
-  real(kind=db), dimension(:,:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_rad, nz, nb_proc
+  real(kind=db), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
   integer :: RT_line_method, n_molecules
 
