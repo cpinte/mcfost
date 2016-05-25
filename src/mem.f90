@@ -1643,10 +1643,11 @@ subroutine alloc_emission_mol(imol)
   ! Methode d'echantillonnage
   if (igridx > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
+     npix_x = igridx ; npix_y = igridy ! we update the value after the SED calculation
 
      write(*,*) "WARNING : memory size if lots of pixels"
      allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
-          continu(igridx,igridy,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(igridx,igridy,1), stat=alloc_status)
+          continu(igridx,igridy,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
      allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
