@@ -9,327 +9,18 @@ module grid
   use prop_star
   use mem
   use utils
+  use cylindrical_grid
+  use spherical_grid
 
   implicit none
 
+  procedure(cross_cylindrical_cell), pointer :: cross_cell => null()
+  procedure(pos_em_cellule_cyl), pointer :: pos_em_cellule => null()
+  procedure(move_to_grid_cyl), pointer :: move_to_grid => null()
+  procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
+  procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
+
   contains
-
-subroutine build_cylindrical_cell_mapping()
-
-  integer :: i,j,k,icell, ntot, ntot2, alloc_status
-  integer :: istart,iend,jstart,jend,kstart,kend, istart2,iend2,jstart2,jend2,kstart2,kend2
-
-  icell_ref = 1
-
-  istart = 1
-  iend = n_rad
-
-  jstart = j_start
-  jend = nz
-
-  kstart=1
-  kend = n_az
-
-  if (j_start < 0) then
-     ntot = (iend - istart + 1) * (jend - jstart) * (kend - kstart + 1)
-  else
-     ntot = (iend - istart + 1) * (jend - jstart +1) * (kend - kstart + 1)
-  endif
-
-  if (ntot /= n_cells) then
-     write(*,*) "ERROR in 'build_cylindrical_cell_mapping'"
-     write(*,*) "The number of cells is not matching :"
-     write(*,*) "ntot=", ntot, "should be", n_cells
-     write(*,*) "Exiting."
-     stop
-  endif
-
-  istart2 = 0
-  iend2 = n_rad + 1
-
-  jstart2 = min(1,j_start)-1
-  jend2 = nz+1
-
-  kstart2=1
-  kend2 = n_az
-
-  if (jstart2 < 0) then
-     ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2) * (kend2 - kstart2 + 1)
-  else
-     ntot2 = (iend2 - istart2 + 1) * (jend2 - jstart2 +1) * (kend2 - kstart2 + 1)
-  endif
-  allocate(cell_map(istart2:iend2,jstart2:jend2,kstart2:kend2))
-  allocate(cell_map_i(ntot2), cell_map_j(ntot2), cell_map_k(ntot2))
-
-  ! Actual cells
-  icell = 0
-  do k=kstart, kend
-     bz : do j=j_start, jend
-        if (j==0) cycle bz
-          do i=istart, iend
-
-           icell = icell+1
-           if (icell > ntot) then
-              write(*,*) "ERROR : there is an issue in the cell mapping"
-              write(*,*) "Exiting"
-              stop
-           endif
-
-           cell_map_i(icell) = i
-           cell_map_j(icell) = j
-           cell_map_k(icell) = k
-
-           cell_map(i,j,k) = icell
-        enddo
-     enddo bz
-  enddo
-
-  if (icell /= ntot) then
-     write(*,*) "Something went wrong in the call mapping"
-     write(*,*) "I am missing some real cells"
-     write(*,*) icell, ntot
-     write(*,*)
-     stop
-  endif
-
-
-  ! Virtual cell indices for when the packets are just around the grid
-
-  ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
-  allocate(lexit_cell(1:ntot2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error lexit_cell'
-     stop
-  endif
-  lexit_cell(:) = 0
-
-  ! Cases j=0 and j=nz+1
-  do k=kstart, kend
-     do j = jstart2, jend2, jend2 - jstart2
-        do i=istart2, iend2
-
-           icell = icell+1
-           if (icell > ntot2) then
-              write(*,*) "ERROR : there is an issue in the cell mapping"
-              write(*,*) "Exiting"
-              stop
-           endif
-
-           if (j==jend2) lexit_cell(icell) = 2
-           if (i==iend2) lexit_cell(icell) = 1
-
-           cell_map_i(icell) = i
-           cell_map_j(icell) = j
-           cell_map_k(icell) = k
-
-           cell_map(i,j,k) = icell
-        enddo
-     enddo
-  enddo
-
-  ! Cases i=0 and i=n_rad+1 (except j=0 and j=nz+1 done above)
-  do k=kstart, kend
-     bz2 : do j = jstart, jend
-        if (j==0) cycle bz2
-        do i=istart2,iend2, iend2-istart2
-
-           icell = icell+1
-           if (icell > ntot2) then
-              write(*,*) "ERROR : there is an issue in the cell mapping"
-              write(*,*) "Extra cells:", icell, ntot2
-              write(*,*) i,j,k
-              write(*,*) "Exiting"
-              stop
-           endif
-
-           if (i==iend2) lexit_cell(icell) = 1
-
-           cell_map_i(icell) = i
-           cell_map_j(icell) = j
-           cell_map_k(icell) = k
-
-           cell_map(i,j,k) = icell
-        enddo
-     enddo bz2
-  enddo
-
-  if (icell /= ntot2) then
-     write(*,*) "Something went wrong in the cell mapping"
-     write(*,*) "I am missing some virtual cells"
-     write(*,*) icell, ntot2
-     write(*,*)
-     stop
-  endif
-
-  !if (cell_map(1,1,1) /= 1) then
-  !   write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
-  !   write(*,*) "(1,1,1) --->", cell_map(1,1,1)
-  !   write(*,*) "MCFOST might crash"
-  !   !write(*,*) "Exiting"
-  !   !stop
-  !endif
-
-  return
-
-end subroutine build_cylindrical_cell_mapping
-
-!******************************************************************************
-
-pure logical function exit_test_cylindrical(icell, x, y, z)
-
-  integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x,y,z
-
-  if (icell <= n_cells) then
-     exit_test_cylindrical = .false.
-     return
-  endif
-
-  if (lexit_cell(icell)==0) then
-     exit_test_cylindrical = .false.
-  else if (lexit_cell(icell)==1) then ! radial
-     exit_test_cylindrical = .true.
-  else ! 2 --> vertical
-     if (abs(z) > zmaxmax) then
-        exit_test_cylindrical = .true.
-     else
-        exit_test_cylindrical = .false.
-     endif
-  endif
-
-  return
-
-end function exit_test_cylindrical
-
-!******************************************************************************
-
-!pure subroutine cylindrical2cell(i,j,k, icell)
-!
-!  integer, intent(in) :: i,j,k
-!  integer, intent(out) :: icell
-!
-!  icell = cell_map(i,j,k)
-!
-!  return
-!
-!end subroutine cylindrical2cell
-
-!******************************************************************************
-
-pure subroutine cell2cylindrical(icell, i,j,k)
-
-  integer, intent(in) :: icell
-  integer, intent(out) :: i,j,k
-
-  i = cell_map_i(icell)
-  j = cell_map_j(icell)
-  k = cell_map_k(icell)
-
-  return
-
-end subroutine cell2cylindrical
-
-!******************************************************************************
-
-subroutine cylindrical2cell_old(i,j,k, icell)
-  ! icell is between 1 and n_rad * (n_z+1) * n_az
-
-  integer, intent(in) :: i,j,k
-  integer, intent(out) :: icell
-
-  if ((i==0).and.(j==0)) then
-     icell = 0
-  else if (j>nz+1) then
-     icell = -i
-  else
-     icell = i + n_rad * ( j-1 + nz * (k-1))
-  endif
-
-  return
-
-end subroutine cylindrical2cell_old
-
-!******************************************************************************
-
-subroutine cell2cylindrical_old(icell, i,j,k)
-
-  integer, intent(in) :: icell
-  integer, intent(out) :: i,j,k
-
-  integer :: ij ! indice combine i et j, ie : i + (j-1) * n_rad
-
-  if (icell==0) then
-     i=0
-     j=0
-     k=1
-  else if (icell < 0) then
-     i = -icell
-     j = nz+2
-     k = 1
-  else
-     k = (icell-1)/nrz + 1 ; if (k > n_az) k=n_az
-
-     ij = icell - (k-1)*nrz
-     j = (ij-1)/n_rad + 1 ; if (j > nz+1) j=nz+1
-
-     i = ij - (j-1)*n_rad
-
-     !write(*,*) "TEST ij", ij,  ij/n_rad
-     !write(*,*) "i,j", i, j
-  endif
-
-  return
-
-end subroutine cell2cylindrical_old
-
-!******************************************************************************
-
-
-subroutine test_convert()
-
-  integer :: i, j, k, icell
-  integer :: i2,j2,k2
-
-
-  write(*,*)
-  write(*,*) "TEST CONVERT"
-
-   do k=1, n_az
-     do j=1, nz+1
-        do i=0, n_rad
-
-           icell = cell_map(i,j,k)
-           write(*,*) "convert", i,j,k, "-->", icell
-
-           call cell2cylindrical(icell, i2,j2,k2)
-           if (i>0) then
-              if ((i/=i2).or.(j/=j2).or.(k2/=k)) then
-                 write(*,*) "PB test convert"
-                 write(*,*) i,j,k, "-->", icell
-                 write(*,*) icell, "-->", i2,j2,k2
-                 stop
-              endif
-           else
-              if ((i/=i2)) then ! seul i est defini ds la cas 0
-                 write(*,*) "PB test convert"
-                 write(*,*) i,j,k, "-->", icell
-                 write(*,*) icell, "-->", i2,j2,k2
-                 stop
-              endif
-           endif
-        enddo
-     enddo
-  enddo
-
-  write(*,*) "DONE"
-  stop
-  return
-
-
-end subroutine test_convert
-
-!******************************************************************************
-
 
  subroutine order_zones()
    ! Order the various zones according to their Rin
@@ -513,7 +204,27 @@ subroutine define_grid()
 
   logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
-
+  if (grid_type == 1) then
+     lcylindrical = .true.
+     lspherical = .false.
+     cross_cell => cross_cylindrical_cell
+     pos_em_cellule => pos_em_cellule_cyl
+     move_to_grid => move_to_grid_cyl
+     indice_cellule => indice_cellule_cyl
+     test_exit_grid => test_exit_grid_cyl
+  else if (grid_type == 2) then
+     lcylindrical = .false.
+     lspherical = .true.
+     cross_cell => cross_spherical_cell
+     pos_em_cellule => pos_em_cellule_sph
+     move_to_grid => move_to_grid_sph
+     indice_cellule => indice_cellule_sph
+     test_exit_grid => test_exit_grid_sph
+  else
+     write(*,*) "Unknown grid type"
+     write(*,*) "Exiting"
+     stop
+  endif
 
   if (lfirst) then
      call build_cylindrical_cell_mapping()
@@ -528,18 +239,6 @@ subroutine define_grid()
 
 
   Rmax2 = Rmax*Rmax
-
-  if (grid_type == 1) then
-     lcylindrical = .true.
-     lspherical = .false.
-  else if (grid_type == 2) then
-     lcylindrical = .false.
-     lspherical = .true.
-  else
-     write(*,*) "Unknown grid type"
-     write(*,*) "Exiting"
-     stop
-  endif
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
 
@@ -876,229 +575,6 @@ end subroutine define_grid
 
 !******************************************************************************
 
-subroutine indice_cellule(xin,yin,zin,ri_out,zj_out)
-
-  implicit none
-
-  real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: ri_out, zj_out
-
-  real(kind=db) :: r2
-  integer :: ri, ri_min, ri_max
-
-  r2 = xin*xin+yin*yin
-
-
-  if (r2 < r_lim_2(0)) then
-     ri_out=0
-     zj_out=1
-     return
-  else if (r2 > Rmax2) then
-     ri_out=n_rad
-  else
-     ri_min=0
-     ri_max=n_rad
-     ri=(ri_min+ri_max)/2
-
-     do while((ri_max-ri_min) > 1)
-        if(r2 > r_lim_2(ri)) then
-           ri_min=ri
-        else
-           ri_max=ri
-        endif
-        ri=(ri_min+ri_max)/2
-     enddo
-     ri_out=ri+1
-  endif
-
-  zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
-  if (zj_out > nz) then
-     zj_out = nz + 1
-  endif
-
-  return
-
-end subroutine indice_cellule
-
-!******************************************************************************
-
-subroutine indice_cellule_sph(xin,yin,zin,ri_out,thetaj_out)
-
-  implicit none
-
-  real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: ri_out, thetaj_out
-
-  real(kind=db) :: r2, r02, tan_theta
-  integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max
-
-  r02 = xin*xin+yin*yin
-  r2 = r02+zin*zin
-
-  ! Peut etre un bug en 0, 0 due a la correction sur grid_rmin dans define_grid3
-  if (r2 < r_lim_2(0)) then
-     ri_out=0
-  else if (r2 > Rmax2) then
-     ri_out=n_rad
-  else
-     ri_min=0
-     ri_max=n_rad
-     ri=(ri_min+ri_max)/2
-
-     do while((ri_max-ri_min) > 1)
-        if(r2 > r_lim_2(ri)) then
-           ri_min=ri
-        else
-           ri_max=ri
-        endif
-        ri=(ri_min+ri_max)/2
-     enddo
-     ri_out=ri+1
-  endif
-
-  ! thetaj_out
-  if (r02 > tiny_db) then
-     tan_theta = abs(zin) / sqrt(r02)
-  else
-     tan_theta = 1.0e30
-  endif
-
-  thetaj_min = 0
-  thetaj_max = nz
-  thetaj=(thetaj_min+thetaj_max)/2
-
-  do while((thetaj_max-thetaj_min) > 1)
-     if(tan_theta > tan_theta_lim(thetaj)) then
-        thetaj_min=thetaj
-     else
-        thetaj_max=thetaj
-     endif
-     thetaj=(thetaj_min+thetaj_max)/2
-  enddo
-  thetaj_out=thetaj+1
-
-  return
-
-end subroutine indice_cellule_sph
-
-!******************************************************************************
-
-subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out)
-
-  implicit none
-
-  real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: thetaj_out
-
-  real(kind=db) :: r02, tan_theta
-  integer :: thetaj, thetaj_min, thetaj_max
-
-  r02 = xin*xin+yin*yin
-
-  ! thetaj_out
-  if (r02 > tiny_db) then
-     tan_theta = abs(zin) / sqrt(r02)
-  else
-     tan_theta = 1.0e30
-  endif
-
-  thetaj_min = 0
-  thetaj_max = nz
-  thetaj=(thetaj_min+thetaj_max)/2
-
-  do while((thetaj_max-thetaj_min) > 1)
-     if(tan_theta > tan_theta_lim(thetaj)) then
-        thetaj_min=thetaj
-     else
-        thetaj_max=thetaj
-     endif
-     thetaj=(thetaj_min+thetaj_max)/2
-  enddo
-  thetaj_out=thetaj+1
-
-  return
-
-end subroutine indice_cellule_sph_theta
-
-!******************************************************************************
-
-subroutine indice_cellule_3D(xin,yin,zin,ri_out,zj_out,phik_out)
-
-  implicit none
-
-  real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: ri_out, zj_out, phik_out
-
-  real(kind=db) :: r2, phi
-  integer :: ri, ri_min, ri_max
-
-  r2 = xin*xin+yin*yin
-
-  if (r2 < r_lim_2(0)) then
-     ri_out=0
-  else if (r2 > Rmax2) then
-     ri_out=n_rad
-  else
-     ri_min=0
-     ri_max=n_rad
-     ri=(ri_min+ri_max)/2
-
-     do while((ri_max-ri_min) > 1)
-        if(r2 > r_lim_2(ri)) then
-           ri_min=ri
-        else
-           ri_max=ri
-        endif
-        ri=(ri_min+ri_max)/2
-     enddo
-     ri_out=ri+1
-  endif
-
-  if (ri_out > 0) then
-     zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
-  else
-     zj_out = 0
-  endif
-  if (zj_out > nz) zj_out = nz
-  if (zin < 0.0)  zj_out = -zj_out
-
-  if (zin /= 0.0) then
-     phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
-     phik_out=floor(phi/(2*pi)*real(N_az))+1
-     if (phik_out==n_az+1) phik_out=n_az
-  else
-     phik_out=1
-  endif
-
-  return
-
-end subroutine indice_cellule_3D
-
-!******************************************************************************
-
-subroutine indice_cellule_3D_phi(xin,yin,zin,phik_out)
-
-  implicit none
-
-  real(kind=db), intent(in) :: xin,yin,zin
-  integer, intent(out) :: phik_out
-
-  real(kind=db) :: phi
-
-  if (zin /= 0.0) then
-     phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
-     phik_out=floor(phi/(2*pi)*real(N_az))+1
-     if (phik_out==n_az+1) phik_out=n_az
-  else
-     phik_out=1
-  endif
-
-  return
-
-end subroutine indice_cellule_3D_phi
-
-!******************************************************************************
-
 subroutine init_lambda()
   ! Initialisation table de longueurs d'onde
 
@@ -1159,7 +635,7 @@ end subroutine init_lambda2
 
 !**********************************************************************
 
-subroutine select_cellule(lambda,aleat,ri,zj, phik)
+subroutine select_cellule(lambda,aleat, icell)
   ! Sélection de la cellule qui va émettre le photon
 ! C. Pinte
 ! 04/02/05
@@ -1169,7 +645,7 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
 
   integer, intent(in) :: lambda
   real, intent(in) :: aleat
-  integer, intent(out) :: ri,zj, phik
+  integer, intent(out) :: icell
   integer :: k, kmin, kmax
 
 
@@ -1186,177 +662,13 @@ subroutine select_cellule(lambda,aleat,ri,zj, phik)
      endif
      k = (kmin + kmax)/2
    enddo   ! while
-   k=kmax
-
-   ri = cell_map_i(k)
-   zj = cell_map_j(k)
-   phik = cell_map_k(k)
+   icell=kmax
 
    return
 
 end subroutine select_cellule
 
 !**********************************************************************
-
-subroutine pos_em_cellule(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la poistion d'emission uniformement dans la cellule
-! C. Pinte
-! 8/06/07
-
-  implicit none
-
-  integer, intent(in) :: ri, zj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  if (lspherical) then
-     call pos_em_cellule_sph(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-  else
-     call pos_em_cellule_cyl(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-  endif
-
-  return
-
-end subroutine pos_em_cellule
-
-!**********************************************************************
-
-subroutine pos_em_cellule_cyl(ri,zj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la position d'emission uniformement
-! dans la cellule (ri,zj)
-! Geometrie cylindrique
-! C. Pinte
-! 04/02/05
-
-  implicit none
-
-  integer, intent(in) :: ri, zj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  real(kind=db) :: r,phi
-
-  ! Position aleatoire dans cellule
-  ! Position radiale
-!  r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
-!  r=sqrt(r_lim(ri-1)**2+aleat1*(r_lim(ri)**2-r_lim(ri-1)**2))
-
-  ! La premiere cellule ne peut plus etre dans la zone sombre maintenant
- ! if (ri==1) then
- !    r=sqrt(rmin2+aleat1*(r_in_opacite2(zj,phik)-rmin2))
- ! else
-     r=sqrt(r_lim_2(ri-1)+aleat1*(r_lim_2(ri)-r_lim_2(ri-1)))
- ! endif
-  ! Position verticale
-  if (l3D) then ! signe de z = signe de zj
-     if (zj > 0) then
-        z=z_lim(ri,zj)+aleat2*(z_lim(ri,zj+1)-z_lim(ri,zj))
-     else
-        z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
-     endif
-  else ! 2D : choix aléatoire du signe
-     if (aleat2 > 0.5_db) then
-        z=z_lim(ri,zj)+(2.0_db*(aleat2-0.5_db))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
-     else
-        z=-(z_lim(ri,zj)+(2.0_db*aleat2)*(z_lim(ri,zj+1)-z_lim(ri,zj)))
-     endif
-  endif
-
-
-  ! Position azimuthale
-  !phi=(2.0*aleat3-1.0)*pi
-  phi = 2.0_db*pi * (real(phik,kind=db)-1.0_db+aleat3)/real(n_az,kind=db)
-
-  ! x et y
-  x=r*cos(phi)
-  y=r*sin(phi)
-
-  return
-
-end subroutine pos_em_cellule_cyl
-
-!***********************************************************
-
-subroutine pos_em_cellule_sph(ri,thetaj,phik,aleat1,aleat2,aleat3,x,y,z)
-! Choisit la position d'emission uniformement
-! dans la cellule (ri,thetaj)
-! Geometrie spherique
-! C. Pinte
-! 08/06/07
-
-  implicit none
-
-  integer, intent(in) :: ri, thetaj, phik
-  real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
-
-  real(kind=db) :: r, theta, phi, r_cos_theta
-
-  ! Position radiale
-  r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
-
-  ! Position theta
-  if (aleat2 > 0.5_db) then
-     theta=theta_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(theta_lim(thetaj)-theta_lim(thetaj-1))
-  else
-     theta=-(theta_lim(thetaj-1)+(2.0_db*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
-  endif
-
-  theta=theta_lim(thetaj-1)+aleat2*(theta_lim(thetaj)-theta_lim(thetaj-1))
-
-
-  ! BUG ??? : ca doit etre uniforme en w, non ??
-
-
-  ! Position azimuthale
-  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
-
-  ! x et y
-  z=r*sin(theta)
-  r_cos_theta = r*cos(theta)
-  x=r_cos_theta*cos(phi)
-  y=r_cos_theta*sin(phi)
-
-
-
-!!$  ! Position theta
-!!$  if (aleat2 > 0.5) then
-!!$     w=w_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(w_lim(thetaj)-w_lim(thetaj-1))
-!!$  else
-!!$     w=-(w_lim(thetaj-1)+(2.0_db*aleat2)*(w_lim(thetaj)-w_lim(thetaj-1)))
-!!$  endif
-!!$
-!!$  ! Position azimuthale
-!!$  phi = 2.0_db*pi * (real(phik)-1.0_db+aleat3)/real(n_az)
-!!$
-!!$  ! x et y
-!!$  z=r*w
-!!$  r_cos_theta = r*sqrt(1.0_db-w*w)
-!!$  x=r_cos_theta*cos(phi)
-!!$  y=r_cos_theta*sin(phi)
-
-!  z = z_grid(ri,thetaj)
-!  r = r_grid(ri,thetaj)
-!  x = r*cos(phi)
-!  y = r*sin(phi)
-
- ! call indice_cellule_sph(x,y,z,ri_tmp,thetaj_tmp)
- ! if (ri /= ri_tmp) then
- !    write(*,*) "Bug ri", ri, ri_tmp, sqrt(x*x+y*y)
- !    read(*,*)
- ! else if (thetaj /= thetaj_tmp) then
- !    write(*,*) "Bug zj", w, thetaj, thetaj_tmp
- !    call indice_cellule_sph(x,y,-z,ri_tmp,thetaj_tmp)
- !    write(*,*) -z, thetaj_tmp
- !    read(*,*)
- ! endif
-
-
-  return
-
-end subroutine pos_em_cellule_sph
-
-!***********************************************************
 
 subroutine angle_disque()
 
@@ -1419,11 +731,12 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
   correct_moins = 1.0_db - prec_grille
   correct_plus = 1.0_db + prec_grille
 
-  ! tmp :
+  ! todo : tmp :
   call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
 
   ! locate current cell index
-  call indice_cellule(x,y,z,ri,zj)
+  call indice_cellule(x,y,z, icell)
+  ri = cell_map_i(icell)
 
   ! Patch pour eviter BUG sur position radiale
   ! a cause de limite de precision
@@ -1434,7 +747,8 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
      z = z * factor
 
      ! On verifie que c'est OK maintenant
-     call indice_cellule(x,y,z,ri,zj)
+     call indice_cellule(x,y,z, icell)
+     ri = cell_map_i(icell)
      if (ri==0) then
         write(*,*) "BUG in verif_cell_position_cyl"
         write(*,*) "Exiting"
@@ -1442,11 +756,7 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
      endif
   endif
 
-  icell = cell_map(ri,zj,1)
-
   if (l_dark_zone(icell)) then ! Petit test de securite
-     write(*,*) "DARK ZONE"
-
      ! On resort le paquet
      if (zj < zj0) then
         zj = zj0
@@ -1464,5 +774,62 @@ subroutine verif_cell_position_cyl(icell, x, y, z)
   endif
 
 end subroutine verif_cell_position_cyl
+
+!***********************************************************
+
+subroutine verif_cell_position_sph(icell, x, y, z)
+
+  real(kind=db), intent(inout) :: x,y,z
+  integer, intent(inout) :: icell
+
+  integer :: ri, zj, ri0, zj0, tmp_k
+  real(kind=db) :: factor, correct_moins, correct_plus
+
+  correct_moins = 1.0_db - prec_grille_sph
+  correct_plus = 1.0_db + prec_grille_sph
+
+  ! tmp :
+  call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
+
+  ! locate current cell index
+  call indice_cellule_sph(x,y,z, icell)
+
+  ! Patch pour eviter BUG sur position radiale
+  ! a cause de limite de precision
+  if (ri==0) then
+     factor = rmin/ sqrt(x*x+y*y+z*z) * correct_plus
+     x = x * factor
+     y = y * factor
+     z = z * factor
+
+     ! On verifie que c'est OK maintenant
+     call indice_cellule_sph(x,y,z, icell)
+     if (ri==0) then
+        write(*,*) "BUG in verif_cell_position_sph"
+        write(*,*) "Exiting"
+        stop
+     endif
+  endif
+
+  icell = cell_map(ri,zj,1)
+
+  if (l_dark_zone(icell)) then ! Petit test de securite
+     ! On resort le paquet
+     if (zj < zj0) then
+        zj = zj0
+        z = z_lim(ri0,zj0)*correct_plus
+     endif
+     if (ri < ri0) then
+        ri = ri0
+        x = x * correct_plus
+        y = y * correct_plus
+     else if (ri > ri0) then
+        ri = ri0
+        x = x * correct_moins
+        y = y * correct_moins
+     endif
+  endif
+
+end subroutine verif_cell_position_sph
 
 end module grid

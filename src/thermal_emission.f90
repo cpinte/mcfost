@@ -1487,7 +1487,7 @@ subroutine repartition_energie(lambda)
                     Ener = 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                     frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                     E_emise = E_emise + Ener * frac
-                 else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
+                 else if (.not.test_dark_zone(icell,0.0_db,0.0_db,0.0_db)) then
                     E_emise = E_emise +   4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
                          volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                  endif
@@ -1525,7 +1525,7 @@ subroutine repartition_energie(lambda)
                          (exp(cst_wl)-1.0))
                     frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                     E_emise = E_emise + Ener * frac
-                 else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
+                 else if (.not.test_dark_zone(icell,0.0_db,0.0_db,0.0_db)) then
                     E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
                          volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                  endif
@@ -1542,7 +1542,7 @@ subroutine repartition_energie(lambda)
                             (exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                        frac = (r_in_opacite(j,1)-rmin)/(r_lim(1)-rmin)
                        E_emise = E_emise + Ener * frac
-                    else if (.not.test_dark_zone(i,j,1,0.0_db,0.0_db)) then
+                    else if (.not.test_dark_zone(icell,0.0_db,0.0_db,0.0_db)) then
                        E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
                             volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
                     endif

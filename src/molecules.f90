@@ -1120,7 +1120,7 @@ end subroutine J_mol_loc
 
 !***********************************************************
 
-function v_proj(ri,zj,x,y,z,u,v,w) !
+function v_proj(icell,x,y,z,u,v,w) !
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
@@ -1128,13 +1128,11 @@ function v_proj(ri,zj,x,y,z,u,v,w) !
   implicit none
 
   real(kind=db) :: v_proj
-  integer, intent(in) :: ri, zj
+  integer, intent(in) :: icell
   real(kind=db), intent(in) :: x,y,z,u,v,w
 
   real(kind=db) :: vitesse, vx, vy, vz, norme, r
-  integer :: icell
 
-  icell = cell_map(ri,zj,1)
   vitesse = vfield(icell)
 
   if (linfall) then
