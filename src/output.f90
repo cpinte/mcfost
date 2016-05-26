@@ -15,12 +15,12 @@ module output
 
   contains
 
-subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
+subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
 
   implicit none
 
   real(kind=db), intent(in) ::  xin,yin,zin, uin,vin,win
-  integer, intent(in) :: id, lambda, ri0, zj0
+  integer, intent(in) :: id, lambda, icell
   real(kind=db), dimension(4), intent(in)  :: stokin
   logical, intent(in) :: flag_star, flag_scatt
   integer, intent(out) :: capt
@@ -57,10 +57,10 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   ! Origine du paquet
   if (lorigine) then
      if (capt == capt_interet) then
-        if (ri0 == 0) then
+        if (flag_star) then
            star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
         else
-           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
+           disk_origin(lambda, icell,id) = disk_origin(lambda, icell, id) + stok(1)
         endif
      endif
   endif
@@ -358,12 +358,12 @@ subroutine write_stokes_fits()
   real :: facteur, pixel_scale_x, pixel_scale_y
 
   real :: o_star, frac_star, somme_disk
-  real, dimension(n_rad, nz) :: o_disk
+  real, dimension(n_cells) :: o_disk
 
   if (lorigine) then
 
      o_star = sum(star_origin(1,:))
-     o_disk(:,:) = sum(disk_origin(1,:,:,:), dim=3)
+     o_disk(:) = sum(disk_origin(1,:,:), dim=2)
      somme_disk = sum(o_disk)
      frac_star = o_star / (o_star+somme_disk)
      if (somme_disk > tiny_real) o_disk=o_disk/somme_disk
@@ -384,9 +384,8 @@ subroutine write_stokes_fits()
      bitpix=-32
      extend=.true.
 
-     naxis=2
-     naxes(1)=n_rad
-     naxes(2)=nz
+     naxis=1
+     naxes(1)=n_cells
 
      ! Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -864,13 +863,13 @@ subroutine write_origin()
   logical :: simple, extend
 
   real :: o_star
-  real, dimension(n_rad, nz) :: o_disk
+  real, dimension(n_cells) :: o_disk
 
   filename = trim(data_dir)//"/origine.fits.gz"
 
   ! Normalisation
   o_star = sum(star_origin(1,:))
-  o_disk(:,:) = o_disk(:,:) / (sum(o_disk) + o_star)
+  o_disk(:) = o_disk(:) / (sum(o_disk) + o_star)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou ( unit, status )
@@ -883,9 +882,8 @@ subroutine write_origin()
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  naxis=1
+  naxes(1)=n_cells
 
   extend=.true.
 
@@ -2569,7 +2567,7 @@ subroutine ecriture_spectre(imol)
   integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
   logical :: simple, extend
 
-  real, dimension(:,:,:,:), allocatable ::  O ! nv, nTrans, n_rad, nz
+  real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
   real, dimension(nTrans) :: freq
 
   integer :: n_speed_rt, nTrans_raytracing
@@ -2768,10 +2766,10 @@ subroutine ecriture_spectre(imol)
   ! Origine
   !------------------------------------------------------------------------------
   if (lorigine) then
-     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_rad,nz))
+     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells))
      O = 0.0;
      do i=1, nb_proc
-        O(:,:,:,:) =  O(:,:,:,:) +  origine_mol(:,:,:,:,i)
+        O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
      enddo
 
 
@@ -2793,8 +2791,7 @@ subroutine ecriture_spectre(imol)
      naxis=4
      naxes(1)=2*n_speed_rt+1
      naxes(2)=ntrans
-     naxes(3)=n_rad
-     naxes(4)=nz
+     naxes(3)=n_cells
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2802,7 +2799,7 @@ subroutine ecriture_spectre(imol)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     nelements=naxes(1)*naxes(2)*naxes(3)
 
      call ftppre(unit,group,fpixel,nelements,O,status)
 

@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 2.20
-  character(8), parameter :: mcfost_release = "2.20.33"
+  character(8), parameter :: mcfost_release = "2.20.35"
   real, parameter :: required_utils_version = 2.2017
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -205,7 +205,7 @@ module disk
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
+  real(kind=db), dimension(:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
   real(kind=db) :: frac_star_origin
 
@@ -265,7 +265,7 @@ module prop_star
      real(kind=db) :: x,y,z
      logical :: lb_body
      character(len=512) :: spectre
-     integer :: ri, zj, phik
+     integer :: icell
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile
@@ -780,7 +780,7 @@ module molecular_emission
   logical ::  lfreeze_out
   real :: T_freeze_out
 
-  real(kind=db), dimension(:,:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_rad, nz, nb_proc
+  real(kind=db), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
   integer :: RT_line_method, n_molecules
 
