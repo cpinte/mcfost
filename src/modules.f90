@@ -110,9 +110,9 @@ module parametres
 
   integer :: n_lambda2
 
-  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt
+  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
-  logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
+  logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file, lphantom_file
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
@@ -231,20 +231,6 @@ module disk
   integer :: struct_file_n_grains, struct_file_nspecies
 
 end module disk
-
-!********************************************************************
-
-module wall
-
-  use parametres
-
-  implicit none
-  save
-
-  logical :: lwall, lopacity_wall
-  real(kind=db) :: h_wall, tau_wall, kappa_wall
-
-end module wall
 
 !********************************************************************
 

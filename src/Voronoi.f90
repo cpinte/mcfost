@@ -45,14 +45,14 @@ module Voronoi_grid
     !integer, dimension(:), allocatable :: id_list
 
     ! For testing purposes
-    real :: x, y, z, u, v, w, s, norme
+    real(kind=db) :: x, y, z, u, v, w, s, norme
     integer :: icell
 
     integer :: id, lambda
-    real :: tau, lvol
+    real(kind=db) :: tau, lvol
 
     real(kind=db), dimension(4) :: Stokes
-    logical :: flag_star, flag_direct_star, flag_sortie
+    logical :: flag_star, flag_direct_star, flag_sortie, lintersect
 
     ! Fin testing
 
@@ -131,10 +131,7 @@ module Voronoi_grid
     norme = sqrt(u*u + v*v + w*w)
     u = u / norme ; v = v / norme ;  w = w / norme ;
 
-    call move_to_Voronoi_grid(x,y,z, u,v,w, s, icell)
-
-    x = x + s*u ; y = y + s*v ; z = z+s*w ! a mettre dans move ??
-
+    call move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
     write(*,*) "Packet is entering volume in cell", icell
 
     id = 1 ; lambda = 1 !TODO
@@ -231,8 +228,8 @@ module Voronoi_grid
 
     integer, parameter :: n_sample = 10000000
 
-    real(kind=db) :: rand, rand2, rand3
-    real :: x, y, z
+    real :: rand, rand2, rand3
+    real(kind=db) :: x, y, z
     integer :: icell, i, id, k
 
 
@@ -264,16 +261,18 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine cross_Voronoi_cell(icell, previous_cell, x,y,z, u,v,w, next_cell, s)
+  subroutine cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s)
 
     integer, intent(in) :: icell, previous_cell
-    real, intent(in) :: x,y,z, u,v,w
+    real(kind=db), intent(in) :: x,y,z, u,v,w
 
-    real, intent(out) ::  s
+    real(kind=db), intent(out) ::  s
     integer, intent(out) :: next_cell
 
     real :: s_tmp, den
     integer :: i, in
+
+    real(kind=db), intent(out) :: x1, y1, z1
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k
@@ -317,6 +316,10 @@ module Voronoi_grid
        endif
 
     enddo nb_loop ! i
+
+    x1 = x + u*s
+    y1 = y + u*s
+    z1 = z + u*s
 
     return
 
@@ -366,10 +369,10 @@ module Voronoi_grid
   !----------------------------------------
 
 
-  real function distance_to_wall(x,y,z, u,v,w, iwall)
+  real(kind=db) function distance_to_wall(x,y,z, u,v,w, iwall)
     ! Mur plan pour le moment : meme algorithme que cross Voronoi cell
 
-    real, intent(in) :: x,y,z, u,v,w
+    real(kind=db), intent(in) :: x,y,z, u,v,w
     integer, intent(in) :: iwall
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
@@ -398,17 +401,19 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine move_to_Voronoi_grid(x,y,z, u,v,w, s,icell)
+  subroutine move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
 
-    real, intent(in) :: x,y,z,u,v,w
-    real, intent(out) :: s
+    real(kind=db), intent(inout) :: x,y,z
+    real(kind=db), intent(in) :: u,v,w
+
     integer, intent(out) :: icell
+    logical, intent(out) :: lintersect
 
     logical, dimension(n_walls) :: intersect
     real, dimension(n_walls) :: s_walls
     integer, dimension(n_walls) :: order
 
-    real :: l, x_test, y_test, z_test
+    real(kind=db) :: s, l, x_test, y_test, z_test
     integer :: i, iwall
 
 
@@ -438,7 +443,8 @@ module Voronoi_grid
        y_test = y + l*v
        z_test = z + l*w
 
-       if (is_in_model(x_test,y_test,z_test)) then
+       icell = 0.
+       if (.not.test_exit_grid_Voronoi(icell, x_test,y_test,z_test)) then
           s = l ! distance to the closest wall
           exit check_wall
        endif
@@ -446,19 +452,20 @@ module Voronoi_grid
        if (i==n_walls) then
           ! The packet does not reach the model
           icell = 0
-          s = 0.0
+          lintersect = .false.
           return
        endif
     enddo check_wall
 
-    ! Find out the closest cell
-    icell = find_Voronoi_cell(iwall, x_test, y_test, z_test)
+    lintersect = .true.
+    x = x_test ; y = y_test ; z = z_test
 
-    ! Move to the cell (if wall is approximate)
+    ! Find out the closest cell
+    icell = find_Voronoi_cell(iwall, x, y, z)
 
     return
 
-  end subroutine move_to_Voronoi_grid
+  end subroutine move_to_grid_Voronoi
 
   !----------------------------------------
 
@@ -470,10 +477,10 @@ module Voronoi_grid
     integer, intent(inout) :: cell_io
     real(kind=db), dimension(4), intent(in) :: Stokes
     logical, intent(in) :: flag_star, flag_direct_star
-    real, intent(inout) :: u,v,w
-    real, intent(in) :: extrin
-    real, intent(inout) :: xio,yio,zio
-    real, intent(out) :: ltot
+    real(kind=db), intent(inout) :: u,v,w
+    real(kind=db), intent(in) :: extrin
+    real(kind=db), intent(inout) :: xio,yio,zio
+    real(kind=db), intent(out) :: ltot
     logical, intent(out) :: flag_sortie
 
 
@@ -482,7 +489,7 @@ module Voronoi_grid
     real(kind=db) :: extr, tau, opacite !, correct_moins, correct_plus
     integer :: previous_cell, cell, next_cell
 
-    real :: x, y, z, l
+    real(kind=db) :: x, y, z, l, x1,y1,z1
 
     !correct_moins = 1.0_db - prec_grille
     !correct_plus = 1.0_db + prec_grille
@@ -500,7 +507,7 @@ module Voronoi_grid
     ! Boucle infinie sur les cellules
     do
        !write(*,*) "I am in cell ", cell, "position", real(x), real(y), real(z)
-       call cross_Voronoi_cell(cell, previous_cell, x,y,z, u,v,w, next_cell, l)
+       call cross_Voronoi_cell(x,y,z, u,v,w, cell, previous_cell, x1,y1,z1, next_cell, l)
        opacite=1.0 !kappa(lambda,cell,1,1) ! TODO !!!
 
        ! Calcul longeur de vol et profondeur optique dans la cellule
@@ -518,7 +525,7 @@ module Voronoi_grid
        endif
 
        ! Update position
-       x=x+l*u ; y=y+l*v ; z=z+l*w
+       x=x1 ; y=y1 ; z=z1
 
        ! Test si on on sort de la routine ou pas
        if (lstop) then ! On a fini d'integrer
@@ -543,23 +550,24 @@ module Voronoi_grid
 
 !----------------------------------------
 
-logical function is_in_model(x,y,z)
+pure logical function test_exit_grid_Voronoi(icell, x,y,z)
 
-  real, intent(in) :: x,y,z
+  integer, intent(in) :: icell
+  real(kind=db), intent(in) :: x,y,z
 
-  is_in_model = .false.
+  test_exit_grid_Voronoi = .true.
 
   if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
      if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
         if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
-           is_in_model = .true.
+           test_exit_grid_Voronoi = .false.
         endif
      endif
   endif
 
   return
 
-end function is_in_model
+end function test_exit_grid_Voronoi
 
 
 !----------------------------------------
@@ -568,7 +576,7 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   ! Methode debile : boucle sur toutes les cellules pour test
 
   integer, intent(in) :: iwall
-  real, intent(in) :: x, y, z
+  real(kind=db), intent(in) :: x, y, z
 
   real :: dist2, dist2_min
   integer :: icell, icell_min, i
@@ -592,7 +600,7 @@ end function find_Voronoi_cell
 
 !----------------------------------------
 
-subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3,x,y,z)
+subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 ! Choisit la position d'emission uniformement dans la cellule
 ! C. Pinte
 ! 20/05/14
@@ -600,12 +608,12 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3,x,y,z)
   implicit none
 
   integer, intent(in) :: icell
-  real(kind=db), intent(in) :: aleat1, aleat2, aleat3
-  real, intent(out) :: x,y,z
+  real, intent(in) :: aleat1, aleat2, aleat3
+  real(kind=db), intent(out) :: x,y,z
 
-  real(kind=db) :: u, v, w, srw2, argmt
+  real(kind=db) :: u, v, w, srw2, argmt, x1,y1,z1
   integer :: previous_cell, next_cell
-  real :: l
+  real(kind=db) :: l
 
   ! Direction aleatoire
   w = 2.0_db * aleat1 - 1.0_db
@@ -617,15 +625,35 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3,x,y,z)
   ! Distance jusqu'au bord de la cellule
   previous_cell = 0
   x = Voronoi(icell)%x ; y = Voronoi(icell)%y ; z = Voronoi(icell)%z
-  call cross_Voronoi_cell(icell, previous_cell, x,y,z, real(u),real(v),real(w), next_cell, l)
+  call cross_Voronoi_cell( x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l)
 
   ! Repartition uniforme selon cette direction
   l = l * aleat3**(1./3)
-  x=x+l*u ; y=y+l*v ; z=z+l*w
+  x=x+l ; y=y+l*v ; z=z+l*w
 
   return
 
 end subroutine pos_em_cellule_Voronoi
+
+
+!----------------------------------------
+
+subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
+
+    implicit none
+
+    real(kind=db), intent(in) :: xin,yin,zin
+    integer, intent(out) :: icell
+
+
+    write(*,*) "indice_cellule_Voronoi not implemented yet"
+    write(*,*) "Exiting"
+    icell = 0
+    stop
+
+    return
+
+  end subroutine indice_cellule_Voronoi
 
 end module Voronoi_grid
 

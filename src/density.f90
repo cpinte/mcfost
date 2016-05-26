@@ -11,7 +11,6 @@ module density
   use nr, only : rkqs
   use nrtype, only : sp
   use ode_data
-  use wall
   use grid
   use utils
   use output
@@ -879,11 +878,10 @@ subroutine define_density_wall3D()
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
-  real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass
+  real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass, h_wall
 
   real(kind=db), dimension(:,:), allocatable :: density_wall
   real(kind=db), dimension(:), allocatable :: masse_wall
-
 
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
@@ -910,7 +908,7 @@ subroutine define_density_wall3D()
         endif
 
         write(*,*) "Wall between", real(dz%rin), "and", real(dz%rmax), "AU"
-        h_wall = real(dz%sclht)
+        h_wall = dz%sclht
         write(*,*) "h_wall =", real(h_wall)
 
 

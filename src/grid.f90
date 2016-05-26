@@ -11,6 +11,7 @@ module grid
   use utils
   use cylindrical_grid
   use spherical_grid
+  use Voronoi_grid
 
   implicit none
 
@@ -202,9 +203,19 @@ subroutine setup_grid()
      stop
   endif
 
-  if (lfirst) then
-     call build_cylindrical_cell_mapping()
-     lfirst = .false.
+  if (lVoronoi) then
+     lcylindrical = .false.
+     lspherical = .false.
+     cross_cell => cross_Voronoi_cell
+     pos_em_cellule => pos_em_cellule_Voronoi
+     move_to_grid => move_to_grid_Voronoi
+     indice_cellule => indice_cellule_Voronoi
+     test_exit_grid => test_exit_grid_Voronoi
+  else
+     if (lfirst) then
+        call build_cylindrical_cell_mapping()
+        lfirst = .false.
+     endif
   endif
 
   return
