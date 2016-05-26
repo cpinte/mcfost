@@ -317,7 +317,7 @@ subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
 ! Calcule les tableaux densite_pouss et masse
-! et indique ri_not_empty, zj_not_empty et phik_not_empty
+! et indique icell_not_empty
 ! C. Pinte : re-ecrit le 27/04/2013
 
   implicit none
@@ -795,18 +795,11 @@ subroutine define_dust_density()
   endif
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              if (densite_pouss(l,icell) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = 1
-                 exit search_not_empty
-              endif
-           enddo
-        enddo
+     do icell=1,n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
 
@@ -1689,18 +1682,12 @@ subroutine densite_file()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
 
@@ -1896,18 +1883,13 @@ subroutine densite_Seb_Charnoz()
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           if (densite_pouss(l,cell_map(i,j,1)) > 0.0_db) then
-              ri_not_empty = i
-              zj_not_empty = j
-              phik_not_empty = 1
-              exit search_not_empty
-           endif
-        enddo
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
-
 
   ! Re-population du tableau de grains
   ! les methodes de chauffages etc, ne changent pas
@@ -2031,18 +2013,12 @@ subroutine densite_Seb_Charnoz2()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
   write(*,*) "Done"

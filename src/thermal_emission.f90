@@ -218,10 +218,7 @@ subroutine init_reemission()
            enddo !icell
         else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
            ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
-           i=ri_not_empty
-           j=zj_not_empty
-           pk=phik_not_empty
-           icell = cell_map(i,j,pk)
+           icell = icell_not_empty
            integ3(0) = 0.0
            do lambda=1, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1)
@@ -608,7 +605,7 @@ subroutine Temp_finale_nLTE()
   !$omp private(log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
   !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
-  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0,cell_map)
+  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      do k=grain_RE_nLTE_start, grain_RE_nLTE_end
@@ -779,7 +776,7 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
-     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE,cell_map)
+     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
@@ -1304,7 +1301,7 @@ subroutine emission_nRE()
      !$omp private(k,E_emise,Temp,cst_wl,T,icell) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
      !$omp shared(n_cells,l_RE, Temperature_1grain_nRE,n_T,C_abs_norm,densite_pouss,volume,tab_Temp,Proba_Temperature) &
-     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,cell_map)
+     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE)
      !$omp do
      do icell=1,n_cells
         E_emise = 0.0
