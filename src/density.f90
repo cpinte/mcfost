@@ -1162,24 +1162,6 @@ subroutine derivs(x,y,dydx)
 
 end subroutine derivs
 
-!***********************************************************
-
-subroutine init_opacity_wall()
-  ! Calcule la densite du mur pour avoir la bonne opacite
-  ! ATTENTION : ca n'est qu'un mur en opacite pas en emission !!!
-  ! C. Pinte
-  ! 1/05/07 et oui, c'est pas ferie en Angleterre !!! :-(
-
-  implicit none
-
-  ! Opacite du mur qui a pour largeur celle de la premiere cellule
-  kappa_wall = tau_wall / (r_lim(1) - r_lim(0))
-  write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*avg_grain_mass/0.594098e-6
-
-  return
-
-end subroutine init_opacity_wall
-
 !********************************************************************
 
 subroutine density_phantom()

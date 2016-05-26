@@ -342,9 +342,6 @@ subroutine transfert_poussiere()
 
   if (laverage_grain_size) call taille_moyenne_grains()
 
-  if (lopacity_wall) call init_opacity_wall()
-
-
   etape_start=etape_i
   nnfot1_start=1
   lambda=1 ! pour eviter depassement tab a l'initialisation
