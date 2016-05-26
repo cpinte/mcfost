@@ -679,56 +679,6 @@ end subroutine select_cellule
 
 !**********************************************************************
 
-subroutine angle_disque()
-
-  implicit none
-
-  integer :: i
-  logical :: l_1etoile
-  real :: r, zr, rmax, zrmax, zzmax
-
-  ! test si le systeme est axisymetrique
-  if (n_etoiles > 1) then
-     l_1etoile=.false.
-  else
-     if ((abs(etoile(1)%x) > 1.0e-6).or.(abs(etoile(1)%y) > 1.0e-6).or.(abs(etoile(1)%z) > 1.0e-6))  then
-        l_1etoile=.false.
-     else
-        l_1etoile=.true.
-     endif
-  endif
-
-  if ((l_sym_axiale).and.(l_1etoile)) then
-     ! On cherche le zmax / r le plus grand
-     zzmax = zmax(1)
-     zrmax = zzmax / rmin
-     rmax = rmin
-     do i = 1,n_rad
-        ! On prend le rayon au bord interne de la cellule
-        r= r_lim(i-1)
-        zr = zmax(i) / r
-        if (zr > zrmax) then
-           zrmax = zr
-           zzmax = zmax(i)
-           rmax = r
-        endif
-     enddo !i
-
-     ! On calcule la hauteur correspondante a rmin
-     cos_max2 = rmax**2/(rmax**2+zzmax**2)
-
-     ! On place le photon juste apres le bord interne (ie dans une cellule non vide)
-     r_bord2 = (rmin*1.0001)**2
-  else
-     cos_max2 = 0.0
-  endif
-
-  return
-
-end subroutine angle_disque
-
-!***********************************************************
-
 subroutine verif_cell_position_cyl(icell, x, y, z)
 
   real(kind=db), intent(inout) :: x,y,z
