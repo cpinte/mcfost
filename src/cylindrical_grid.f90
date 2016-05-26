@@ -810,12 +810,7 @@ contains
     !  r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
     !  r=sqrt(r_lim(ri-1)**2+aleat1*(r_lim(ri)**2-r_lim(ri-1)**2))
 
-    ! La premiere cellule ne peut plus etre dans la zone sombre maintenant
-    ! if (ri==1) then
-    !    r=sqrt(rmin2+aleat1*(r_in_opacite2(zj,phik)-rmin2))
-    ! else
     r=sqrt(r_lim_2(ri-1)+aleat1*(r_lim_2(ri)-r_lim_2(ri-1)))
-    ! endif
     ! Position verticale
     if (l3D) then ! signe de z = signe de zj
        if (zj > 0) then

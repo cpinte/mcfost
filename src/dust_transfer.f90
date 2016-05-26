@@ -112,6 +112,8 @@ subroutine transfert_poussiere()
 
   call order_zones()
   call define_physical_zones()
+
+  call setup_grid()
   call define_grid()
 
   if (lProDiMo) call setup_ProDiMo()
@@ -981,7 +983,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
      if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
         ! test zone noire
-        if (test_dark_zone(icell, x,y,z)) then ! on saute le photon
+        if (l_dark_zone(icell)) then ! on saute le photon
            lpacket_alive = .false.
            return
         endif
