@@ -95,14 +95,13 @@ subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
   y=y+etoile(i_star)%y
   z=z+etoile(i_star)%z
 
-  ! L'etoile peut occuper plusieurs cellules
-  ! todo : tester a l'avance si c'est le cas
-  call indice_cellule(x,y,z, icell)
-  lintersect = .true.
+  icell = etoile(i_star)%icell
 
-  if (cell_map_i(icell)==n_rad) call move_to_grid(x,y,z,u,v,w, icell,lintersect)
-
-  etoile(i_star)%icell = icell
+  if (etoile(i_star)%out_model) then
+     call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+  else
+     lintersect = .true.
+  endif
 
   return
 
@@ -243,7 +242,6 @@ subroutine repartition_energie_etoiles()
         stop
      endif
   enddo
-
 
   if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
@@ -657,5 +655,26 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
 end subroutine emit_packet_ISM
 
 !***********************************************************
+
+subroutine stars_cell_indices()
+
+  real(kind=db) :: x, y, z
+  integer :: i_star, icell
+
+  do i_star=1, n_etoiles
+     x = etoile(i_star)%x
+     y = etoile(i_star)%y
+     z = etoile(i_star)%z
+
+     ! todo : l'etoile peut occuper plusieurs cellules
+     call indice_cellule(x,y,z, icell)
+     etoile(i_star)%icell = icell
+
+     etoile(i_star)%out_model = test_exit_grid(icell, x,y,z)
+  enddo
+
+  return
+
+end subroutine stars_cell_indices
 
 end module stars

@@ -800,53 +800,6 @@ end function integ_ray_dust
 
 !***********************************************************
 
-subroutine angle_max(lambda)
-
-  implicit none
-
-  real, parameter :: tau_lim = 10.0
-
-  integer, intent(in) :: lambda
-  integer :: i, ri, zj, icell
-
-  real(kind=db) :: x0, y0, z0
-  real(kind=db) :: u0, v0, w0
-  real :: tau
-  real(kind=db) ::  lmin, lmax, cos_max, cos_min
-  real(kind=db), dimension(4) :: Stokes
-
-  cos_max = sqrt(1.0-cos_max2)
-  cos_min = 0.0
-
-  v0= 0.0
-  do i=1,20
-     w0= 0.5*(cos_max + cos_min)
-     u0=sqrt(1.0-w0*w0)
-     ri = 0 ; zj=1 ; icell = cell_map(ri,zj,1)
-     x0=0.0 ; y0=0.0 ; z0=0.0
-     Stokes = 0.0_db
-     Stokes(1) = 1.0_db
-     call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
-!     write(*,*) i, cos_min, w0, cos_max, tau
-     if (tau > tau_lim) then
-        cos_min = w0
-     else
-        cos_max = w0
-     endif
-  enddo
-
-  w0_sup = sqrt(1.0-cos_max2)
-  w0_inf = cos_min
- ! write(*,*)  w0_sup, w0_inf
-
-  if (.not.lmono0) w0_inf=0.0
-
-  return
-
-end subroutine angle_max
-
-!***********************************************************
-
 subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 ! Definition l'etendue de la zone noire
 ! definie le tableau logique l_dark_zone
@@ -930,29 +883,6 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 
   l_is_dark_zone = .false.
   l_dark_zone(:) = .false.
-
-  ! Cas premiere cellule
-  r_in_opacite(:,:) = r_lim(1) ! bord externe de la premiere cellule
-  r_in_opacite2(:,:) = r_lim_2(1)
-
-  do pk=1, n_az
-     if (ri_in_dark_zone(pk)==1) then
-        do j=1, zj_sup_dark_zone(ri_in_dark_zone(pk),pk)
-           d_r=tau_max/kappa(cell_map(1,j,pk),lambda)
-           r_in_opacite(j,pk) = (rmin + d_r)
-           r_in_opacite2(j,pk) = r_in_opacite(j,pk)**2
-        enddo
-
-        if (l3D) then
-           do j=-1, zj_inf_dark_zone(ri_in_dark_zone(pk),pk), -1
-              d_r=tau_max/kappa(cell_map(1,j,pk),lambda)
-              r_in_opacite(j,pk) = (rmin + d_r)
-              r_in_opacite2(j,pk) = r_in_opacite(j,pk)**2
-           enddo
-        endif
-
-     endif
-  enddo
 
   ! étape 4 : test sur tous les angles
   if (.not.l3D) then
@@ -1062,7 +992,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 
   if ((ldiff_approx).and.(n_rad > 1)) then
      if (minval(ri_in_dark_zone(:))==1) then
-        write(*,*) "WARNING : first cell is in diffusion approximation zone"
+        write(*,*) "ERROR : first cell is in diffusion approximation zone"
         write(*,*) "Increase spatial grid resolution"
         stop
      endif
@@ -1082,18 +1012,6 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
      enddo
   enddo
 
-!  write(*,*) l_dark_zone(:,nz,1)
-!  write(*,*) "**"
- ! write(*,*) l_dark_zone(10,:,1)
-
-  !  do i=1, n_rad
-  !     do j=1,nz
-  !        write(*,*) i, j, l_dark_zone(i,j), r_lim(1)
-  !     enddo
-  !  enddo
-  !  write(*,*) sqrt(r_in_opacite2(1))
-  !  read(*,*)
-
   return
 
 end subroutine define_dark_zone
@@ -1107,46 +1025,11 @@ subroutine no_dark_zone()
 
   implicit none
 
-  r_in_opacite(:,:) = r_lim(1)
-  r_in_opacite2(:,:) = r_lim_2(1)
-
   l_dark_zone(:)=.false.
 
   return
 
 end subroutine no_dark_zone
-
-!***********************************************************
-
-logical function test_dark_zone(icell ,x,y,z)
-! Test si on est dans la zone noire
-! C. Pinte
-! 22/04/05
-
-  implicit none
-
-  integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x, y, z
-
-  integer :: ri, zj, phik
-
-  ri = cell_map_i(icell)
-  zj = cell_map_j(icell)
-  phik = cell_map_k(icell)
-
-  if (ri==1) then
-     if (x*x+y*y > r_in_opacite2(zj,phik)) then
-        test_dark_zone = .true.
-     else
-        test_dark_zone = .false.
-     endif
-  else
-     test_dark_zone = l_dark_zone(icell)
-  endif
-
-  return
-
-end function  test_dark_zone
 
 !***********************************************************
 

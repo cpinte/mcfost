@@ -317,7 +317,7 @@ subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
 ! Calcule les tableaux densite_pouss et masse
-! et indique ri_not_empty, zj_not_empty et phik_not_empty
+! et indique icell_not_empty
 ! C. Pinte : re-ecrit le 27/04/2013
 
   implicit none
@@ -795,18 +795,11 @@ subroutine define_dust_density()
   endif
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              if (densite_pouss(l,icell) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = 1
-                 exit search_not_empty
-              endif
-           enddo
-        enddo
+     do icell=1,n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
 
@@ -1168,29 +1161,6 @@ subroutine derivs(x,y,dydx)
   dydx = -y * coeff1 * x/rho_gaz * (1.0 + coeff2/rho_gaz) *  2.25e26
 
 end subroutine derivs
-
-!***********************************************************
-
-subroutine init_opacity_wall()
-  ! Calcule la densite du mur pour avoir la bonne opacite
-  ! ATTENTION : ca n'est qu'un mur en opacite pas en emission !!!
-  ! C. Pinte
-  ! 1/05/07 et oui, c'est pas ferie en Angleterre !!! :-(
-
-  implicit none
-
-  ! Opacite du mur qui a pour largeur celle de la premiere cellule
-  kappa_wall = tau_wall / (r_lim(1) - r_lim(0))
-
-  ! On ne vire pas les photons au-dessus de l'echelle de hauteur du disque
-  ! Au cas ou ils taperrait dans le mur
-  cos_max2 = 0.0
-
-  write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*avg_grain_mass/0.594098e-6
-
-  return
-
-end subroutine init_opacity_wall
 
 !********************************************************************
 
@@ -1700,18 +1670,12 @@ subroutine densite_file()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
 
@@ -1907,18 +1871,13 @@ subroutine densite_Seb_Charnoz()
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           if (densite_pouss(l,cell_map(i,j,1)) > 0.0_db) then
-              ri_not_empty = i
-              zj_not_empty = j
-              phik_not_empty = 1
-              exit search_not_empty
-           endif
-        enddo
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
-
 
   ! Re-population du tableau de grains
   ! les methodes de chauffages etc, ne changent pas
@@ -2042,18 +2001,12 @@ subroutine densite_Seb_Charnoz2()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
   write(*,*) "Done"

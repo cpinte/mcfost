@@ -112,7 +112,10 @@ subroutine transfert_poussiere()
 
   call order_zones()
   call define_physical_zones()
+
+  call setup_grid()
   call define_grid()
+  call stars_cell_indices()
 
   if (lProDiMo) call setup_ProDiMo()
 
@@ -338,15 +341,6 @@ subroutine transfert_poussiere()
   endif ! lmono
 
   if (laverage_grain_size) call taille_moyenne_grains()
-
-  ! Calcul de l'angle maximal d'ouverture du disque : TODO : revoir ce bout !!
-  call angle_disque()
-
-  if (lopacity_wall) call init_opacity_wall()
-  if (lwall) cos_max2 = 0.0
-
-  if (lcylindrical) call angle_max(1) ! TODO
-  if (lspherical) cos_max2=0.0
 
   etape_start=etape_i
   nnfot1_start=1
@@ -936,18 +930,14 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   flag_scatt = .false.
   flag_sortie = .false.
-  flag_direct_star = .false.
-  p_icell = icell_ref
-
   lpacket_alive=.true.
-
-  ! On teste si le photon (stellaire) peut rencontrer le disque
   if (flag_star) then
      flag_direct_star = .true.
-     ! W02 = 1.0 - w0**2 = u**2 + v**2
-     if (1.0_db - w*w < cos_max2) return ! Pas de diffusion
+  else
+     flag_direct_star = .false.
   endif
 
+  p_icell = icell_ref
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
@@ -981,7 +971,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
      if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
         ! test zone noire
-        if (test_dark_zone(icell, x,y,z)) then ! on saute le photon
+        if (l_dark_zone(icell)) then ! on saute le photon
            lpacket_alive = .false.
            return
         endif
