@@ -11,7 +11,7 @@ module dust_transfer
   use constantes
   use ray_tracing
   use scattering
-  use cylindrical_grid
+  use grid
   use grid
   use optical_depth
   use density
@@ -1436,6 +1436,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         y1 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
+        icell = etoile(istar)%icell
+
         if (abs(w -1) < tiny_real) then ! rotating the position as the old "rotation" routine does not deal properly with case w==1
            x0 = x1 * cos_RT_az + y1 * sin_RT_az
            y0 = x1 * sin_RT_az - y1 * cos_RT_az
@@ -1445,10 +1447,6 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         Stokes = 0.0_db
-
-        ! Coordonnees initiale : position etoile dans la grille
-        call indice_cellule(x0,y0,z0, icell)
-
         call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
