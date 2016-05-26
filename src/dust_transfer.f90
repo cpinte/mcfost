@@ -9,7 +9,6 @@ module dust_transfer
   use em_th
   use prop_star
   use constantes
-  use wall
   use ray_tracing
   use scattering
   use cylindrical_grid

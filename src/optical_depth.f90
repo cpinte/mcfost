@@ -1,6 +1,5 @@
 module optical_depth
 
-  use wall
   use parametres
   use disk
   use opacity

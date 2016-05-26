@@ -5,7 +5,6 @@ module init_mcfost
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
   use em_th, only : specie_removed, T_rm, Tfile
-  use wall
   use molecular_emission
   use ray_tracing
   !$ use omp_lib
