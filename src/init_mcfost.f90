@@ -92,7 +92,6 @@ subroutine initialisation_mcfost()
   lHH30mol = .false.
   lemission_mol=.false.
   lpuffed_rim = .false.
-  lopacity_wall = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
   laverage_grain_size = .false.
@@ -572,19 +571,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
-        i_arg = i_arg+1
-     case("-opacity_wall")
-        lopacity_wall = .true.
-        if (i_arg + 2 > nbr_arg) then
-           write(*,*) "Error : wall parameters needed"
-           stop
-        endif
-        i_arg = i_arg+1
-        call get_command_argument(i_arg,s)
-        read(s,*) h_wall
-        i_arg = i_arg+1
-        call get_command_argument(i_arg,s)
-        read(s,*) tau_wall
         i_arg = i_arg+1
      case("-spherical")
         lcylindrical=.false.
@@ -1229,9 +1215,6 @@ subroutine display_help()
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
-!  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
-  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
-  write(*,*) "                            NOT a density wall"
   write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
