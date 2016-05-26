@@ -7,12 +7,12 @@ module io_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncells,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas
  real(db), intent(out), dimension(:,:), allocatable :: rhodust
- integer, intent(out) :: ndusttypes,ncells,ierr
+ integer, intent(out) :: ndusttypes,n_SPH,ierr
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
@@ -202,10 +202,10 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
 
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,itype,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
-    write(*,"(a,i8,a)") ' Using ',ncells,' particles from Phantom file'
+         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,n_SPH)
+    write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
-    ncells = 0
+    n_SPH = 0
     write(*,*) ' ERROR reading h from file'
  endif
 
@@ -216,7 +216,7 @@ end subroutine read_phantom_file
 !*************************************************************************
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
+     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,n_SPH)
 
   use constantes, only : au_to_cm, Msun_to_g
   use prop_star
@@ -233,9 +233,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
 
   real(db), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas
   real(db), dimension(:,:), allocatable, intent(out) :: rhodust
-  integer, intent(out) :: ncells
+  integer, intent(out) :: n_SPH
 
-  integer :: i,j,k,itypei
+  integer :: i,j,k,itypei, alloc_status
   real(db) :: xi, yi, zi, hi, rhoi, udens, ulength, usolarmass, dustfraci
 
   udens = umass/udist**3
@@ -247,8 +247,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  do i=1,np
     if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
  enddo
- ncells = j
- allocate(x(ncells),y(ncells),z(ncells),rhogas(ncells),rhodust(ndusttypes,ncells))
+ n_SPH = j
+ alloc_status = 0
+ allocate(x(n_SPH),y(n_SPH),z(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+ if (alloc_status /=0) then
+    write(*,*) "Allocation error in phanton_2_mcfost"
+    write(*,*) "Exiting"
+ endif
 
  j = 0
  do i=1,np
@@ -270,7 +275,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
        enddo
     endif
  enddo
- ncells = j
+ n_SPH = j
 
  if (allocated(etoile)) deallocate(etoile)
  allocate(etoile(nptmass))
@@ -292,7 +297,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
 
 end subroutine phantom_2_mcfost
 
+!*************************************************************************
+
 subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
+
   use infile_utils
   integer, intent(in) :: iunit
   character(len=*), intent(in) :: filename

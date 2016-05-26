@@ -1167,7 +1167,6 @@ subroutine density_phantom()
 
   real :: grainsize,graindens
 
-  integer, parameter :: npart = 100 ! we will need to read that from the file
   integer :: i, nVoronoi
 
   write(*,*) "Reading phantom density file: "//trim(density_file)
@@ -1175,7 +1174,11 @@ subroutine density_phantom()
   write(*,*) "n_cells = ", n_cells
 
   call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
-  write(*,*) "Done"
+
+  write(*,*) shape(x)
+  write(*,*) shape(rho)
+
+  write(*,*) "Done n_cells =", n_cells
 
   if (ierr /=0) then
      write(*,*) "Error code =", ierr,  get_error_text(ierr)
