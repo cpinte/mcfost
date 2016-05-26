@@ -263,7 +263,7 @@ module prop_star
   type star_type
      real :: r, T, M, fUV, slope_UV
      real(kind=db) :: x,y,z
-     logical :: lb_body
+     logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
   end type star_type
