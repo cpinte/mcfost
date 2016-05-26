@@ -277,21 +277,20 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  enddo
  n_SPH = j
 
- if (allocated(etoile)) deallocate(etoile)
- allocate(etoile(nptmass))
+ write(*,*) "Found", nptmass, "stars in the phantom file"
+ if (nptmass > 0) then
+    write(*,*) "Updating the stellar properties"
+    if (allocated(etoile)) deallocate(etoile)
+    allocate(etoile(nptmass))
 
- do i=1,nptmass
-    etoile(i)%x = xyzmh_ptmass(1,i) * ulength
-    etoile(i)%y = xyzmh_ptmass(2,i) * ulength
-    etoile(i)%z = xyzmh_ptmass(3,i) * ulength
+    do i=1,nptmass
+       etoile(i)%x = xyzmh_ptmass(1,i) * ulength
+       etoile(i)%y = xyzmh_ptmass(2,i) * ulength
+       etoile(i)%z = xyzmh_ptmass(3,i) * ulength
 
-    etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
-
-    ! T, fUV, slope_UV, lb_body, spectre, ri, zj, phik
-
-
-    write(*,*) "STAR #",i,  etoile(i)%x,  etoile(i)%y,  etoile(i)%z,  etoile(i)%M
- enddo
+       etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+    enddo
+ endif
 
  return
 
