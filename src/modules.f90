@@ -198,9 +198,6 @@ module disk
   !! Loi exp (Garaud , Barriere 2004)
 !!  real, parameter :: fact_strat = 0.3
 
-  ! angle sous-tendu par le disque
-  real(kind=db) :: cos_max2, r_bord2
-
   ! Grille
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
@@ -263,7 +260,7 @@ module prop_star
   type star_type
      real :: r, T, M, fUV, slope_UV
      real(kind=db) :: x,y,z
-     logical :: lb_body
+     logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
   end type star_type
@@ -448,7 +445,7 @@ module opacity
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
   real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
-  integer :: ri_not_empty, zj_not_empty, phik_not_empty
+  integer :: icell_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
   !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
@@ -458,8 +455,7 @@ module opacity
   !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
   logical :: l_is_dark_zone
-  logical, dimension(:), allocatable :: l_dark_zone !0:n_rad+1,0:nz+1, n_az
-  real, dimension(:,:), allocatable :: r_in_opacite, r_in_opacite2 !nz+1, (n_az)
+  logical, dimension(:), allocatable :: l_dark_zone !n_cells
   integer, parameter :: delta_cell_dark_zone=3
 
   integer, dimension(:), allocatable :: ri_in_dark_zone, ri_out_dark_zone !n_az

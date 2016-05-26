@@ -590,16 +590,11 @@ subroutine opacite_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: i,j, k
+  integer :: icell
 
-  do i=1,n_rad
-     bz : do j=j_start,nz
-        if (j==0) cycle bz
-        do k=1, n_az
-           call opacite_mol_loc(i,j,k,imol)
-        enddo ! k
-     enddo bz ! j
-  enddo ! i
+  do icell=1,n_cells
+     call opacite_mol_loc(icell,imol)
+  enddo ! icell
 
   return
 
@@ -607,7 +602,7 @@ end subroutine opacite_mol
 
 !***********************************************************
 
-subroutine opacite_mol_loc(ri,zj,phik,imol)
+subroutine opacite_mol_loc(icell,imol)
   ! Calcule la fonction source dans chaque cellule
   ! etant donne les populations des niveaux
   ! C. Pinte
@@ -615,7 +610,7 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
 
   implicit none
 
-  integer, intent(in) :: ri, zj, phik, imol
+  integer, intent(in) :: icell, imol
 
   integer :: iTrans, iiTrans
   real(kind=db) :: nu, nl, kap, eps
@@ -624,11 +619,7 @@ subroutine opacite_mol_loc(ri,zj,phik,imol)
 
   character(len=128) :: filename
 
-  integer :: icell
-
   filename = trim(data_dir2(imol))//"/maser_map.fits.gz"
-
-  icell = cell_map(ri,zj,phik)
 
   do iTrans=1,nTrans
      iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
@@ -700,7 +691,7 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
   integer :: iTrans, ri, zj, phik, p_lambda, icell
-  real(kind=db) :: freq, Jnu
+  real(kind=db) :: freq!, Jnu
   real :: T, wl, kap
 
   real(kind=db) :: cst_E
@@ -783,24 +774,18 @@ subroutine init_dust_mol(imol)
         ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
         ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
         ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
-        do ri=1,n_rad
-           bz : do zj=j_start,nz
-              if (zj==0) cycle bz
-              do phik=1, n_az
-                 icell = cell_map(ri,zj,phik)
-                 ! Interpolation champ de radiation en longeur d'onde
-                 if (lProDiMo2mcfost) then
-                    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
-                 else
-                    Jnu = 0.0 ! todo : pour prendre en compte scattering
-                 endif
+        do icell=1, n_cells
+           !-- ! Interpolation champ de radiation en longeur d'onde
+           !-- if (lProDiMo2mcfost) then
+           !--    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
+           !-- else
+           !--    Jnu = 0.0 ! todo : pour prendre en compte scattering
+           !-- endif
 
-                 T = Temperature(icell)
-                 ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-                 emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
-              enddo ! phik
-           enddo bz ! zj
-        enddo ! ri
+           T = Temperature(icell)
+           ! On ne fait que du scattering isotropique dans les raies pour le moment ...
+           emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+        enddo ! icell
      enddo ! itrans
 
   else ! .not.ldust_mol
@@ -861,7 +846,7 @@ end subroutine equilibre_LTE_mol
 
 !********************************************************************
 
-subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
+subroutine equilibre_rad_mol_loc(id,icell)
   ! Calcul les populations sur les differents niveaux a l'aide de
   ! l'equilibre radiatif et collisionnel
   ! C. Pinte
@@ -870,7 +855,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
 
   implicit none
 
-  integer, intent(in) :: id, ri, zj, phik
+  integer, intent(in) :: id, icell
 
   real :: Temp, Tdust
   real(kind=db), dimension(nLevels,nLevels) :: A, C
@@ -878,7 +863,7 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   real(kind=db), dimension(nLevels) :: cTot
   real(kind=db) :: boltzFac, JJmol
   integer :: i, j, eq, n_eq
-  integer :: itrans, l, k, iPart, icell
+  integer :: itrans, l, k, iPart
   real(kind=db) :: collEx, colldeEx
 
   if (ldouble_RT) then
@@ -888,7 +873,6 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
   endif
 
   ! Matrice d'excitations/desexcitations collisionnelles
-  icell = cell_map(ri,zj,phik)
   Temp = Tcin(icell)
   nH2 = densite_gaz(icell) * cm_to_m**3
 
@@ -970,7 +954,6 @@ subroutine equilibre_rad_mol_loc(id,ri,zj,phik)
      ! Resolution systeme matriciel par methode Gauss-Jordan
      call GaussSlv(A, B, nLevels)
 
-     icell = cell_map(ri,zj,phik)
      if (eq==1) then
         tab_nLevel(icell,:) = densite_gaz(icell) * tab_abundance(icell) * B(:)
      else
@@ -993,25 +976,20 @@ subroutine equilibre_othin_mol()
 
   implicit none
 
-  integer :: ri, zj, phik, id
+  integer :: icell, id
 
   Jmol(:,:) = 0.0_db
 
-  id =1 ! TODO : parallelisation
+  id = 1 ! TODO : parallelisation
 
   ! Equilibre avec Cmb pour toutes les cellules
-  do ri=1, n_rad
-     do zj=1, nz
-        do phik=1,n_az
-           ! Le champ de radiation est egal au Cmb
-           Jmol(:,id) = tab_Cmb_mol(:)
+  do icell=1, n_cells
+     ! Le champ de radiation est egal au Cmb
+     Jmol(:,id) = tab_Cmb_mol(:)
 
-           ! Equilibre
-           call equilibre_rad_mol_loc(id,ri,zj,phik)
-
-        enddo !phik
-     enddo !zj
-  enddo !ri
+     ! Equilibre
+     call equilibre_rad_mol_loc(id,icell)
+  enddo !icell
 
   return
 
@@ -1053,21 +1031,19 @@ end subroutine equilibre_othin_mol_pop2
 
 !***********************************************************
 
-subroutine J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)
+subroutine J_mol_loc(id,icell,n_rayons,ispeed)
   ! C. Pinte
   ! 01/07/07
 
   implicit none
 
-  integer, intent(in) :: id,ri, zj, phik, n_rayons
+  integer, intent(in) :: id, icell, n_rayons
   integer, dimension(2), intent(in) :: ispeed
 
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
   real(kind=db) :: somme, J
 
-  integer :: iTrans, iray, icell
-
-  icell = cell_map(ri,zj,phik)
+  integer :: iTrans, iray
 
   Jmol(:,id) = 0.0_db
 
@@ -1168,7 +1144,7 @@ end function v_proj
 
 !***********************************************************
 
-real(kind=db) function dv_proj(ri,zj,x0,y0,z0,x1,y1,z1,u,v,w) !
+real(kind=db) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
   ! Differentiel de vitesse projete entre 2 points
   ! au sein d'une cellule
   ! C. Pinte
@@ -1176,13 +1152,11 @@ real(kind=db) function dv_proj(ri,zj,x0,y0,z0,x1,y1,z1,u,v,w) !
 
   implicit none
 
-  integer, intent(in) :: ri, zj
+  integer, intent(in) :: icell
   real(kind=db), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w
 
   real(kind=db) :: vitesse, vx0, vy0, vz0, vx1, vy1, vz1, norme
-  integer :: icell
 
-  icell = cell_map(ri,zj,1)
   vitesse = vfield(icell)
 
   if (linfall) then
@@ -1226,18 +1200,12 @@ subroutine freeze_out()
 
   implicit none
 
-  integer :: i, j, k, icell
+  integer :: icell
 
   write (*,*) "Freezing out of molecules"
 
-  do k=1, n_az
-     bz : do j=j_start, nz
-        if (j==0) cycle bz
-        do i=1, n_rad
-           icell = cell_map(i,j,k)
-           if (Temperature(icell) < T_freeze_out)  tab_abundance(icell) = 0.
-        enddo
-     enddo bz
+  do icell=1,n_cells
+     if (Temperature(icell) < T_freeze_out)  tab_abundance(icell) = 0.
   enddo
 
   return

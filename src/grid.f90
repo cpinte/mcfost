@@ -176,33 +176,9 @@ end subroutine define_physical_zones
 
 !******************************************************************************
 
-subroutine define_grid()
-  ! Definit la grille du code
-  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
-  ! et la variable Rmax2
-  ! Version 4 gere les subdivisions pour les zones multiples
-  ! C. Pinte
-  ! 03/05/11, version 3 :  27/04/05
+subroutine setup_grid()
 
-  real, parameter :: pi = 3.1415926535
   logical, save :: lfirst = .true.
-  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
-  real :: phi
-  integer :: i,j,k, izone, ii, ii_min, ii_max, icell
-
-  !tab en cylindrique ou spherique suivant grille
-  real(kind=db), dimension(n_rad) :: V
-  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
-  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
-  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
-
-  type(disk_zone_type) :: dz
-
-  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
-  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
-
-  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -231,12 +207,45 @@ subroutine define_grid()
      lfirst = .false.
   endif
 
+  return
+
+end subroutine setup_grid
+
+!******************************************************************************
+
+subroutine define_grid()
+  ! Definit la grille du code
+  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
+  ! et la variable Rmax2
+  ! Version 4 gere les subdivisions pour les zones multiples
+  ! C. Pinte
+  ! 03/05/11, version 3 :  27/04/05
+
+  real, parameter :: pi = 3.1415926535
+  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
+  real :: phi
+  integer :: i,j,k, izone, ii, ii_min, ii_max, icell
+
+  !tab en cylindrique ou spherique suivant grille
+  real(kind=db), dimension(n_rad) :: V
+  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
+  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
+  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
+  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
+
+  type(disk_zone_type) :: dz
+
+  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
+  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
+
+  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
   else
      allocate(r_grid_tmp(n_rad,nz), z_grid_tmp(n_rad,nz), phi_grid_tmp(n_az), stat=alloc_status)
   endif
-
 
   Rmax2 = Rmax*Rmax
 
@@ -669,56 +678,6 @@ subroutine select_cellule(lambda,aleat, icell)
 end subroutine select_cellule
 
 !**********************************************************************
-
-subroutine angle_disque()
-
-  implicit none
-
-  integer :: i
-  logical :: l_1etoile
-  real :: r, zr, rmax, zrmax, zzmax
-
-  ! test si le systeme est axisymetrique
-  if (n_etoiles > 1) then
-     l_1etoile=.false.
-  else
-     if ((abs(etoile(1)%x) > 1.0e-6).or.(abs(etoile(1)%y) > 1.0e-6).or.(abs(etoile(1)%z) > 1.0e-6))  then
-        l_1etoile=.false.
-     else
-        l_1etoile=.true.
-     endif
-  endif
-
-  if ((l_sym_axiale).and.(l_1etoile)) then
-     ! On cherche le zmax / r le plus grand
-     zzmax = zmax(1)
-     zrmax = zzmax / rmin
-     rmax = rmin
-     do i = 1,n_rad
-        ! On prend le rayon au bord interne de la cellule
-        r= r_lim(i-1)
-        zr = zmax(i) / r
-        if (zr > zrmax) then
-           zrmax = zr
-           zzmax = zmax(i)
-           rmax = r
-        endif
-     enddo !i
-
-     ! On calcule la hauteur correspondante a rmin
-     cos_max2 = rmax**2/(rmax**2+zzmax**2)
-
-     ! On place le photon juste apres le bord interne (ie dans une cellule non vide)
-     r_bord2 = (rmin*1.0001)**2
-  else
-     cos_max2 = 0.0
-  endif
-
-  return
-
-end subroutine angle_disque
-
-!***********************************************************
 
 subroutine verif_cell_position_cyl(icell, x, y, z)
 

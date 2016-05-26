@@ -203,17 +203,6 @@ subroutine alloc_dynamique()
   zj_sup_dark_zone=0
   if (l3D) zj_inf_dark_zone=0
 
-  if (l3D) then
-     allocate(r_in_opacite(-nz-1:nz+1,n_az), r_in_opacite2(-nz-1:nz+1,n_az), stat=alloc_status)
-  else
-     allocate(r_in_opacite(nz+1,1), r_in_opacite2(nz+1,1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_in_opacite'
-     stop
-  endif
-  r_in_opacite=0.0 ; r_in_opacite2=0.0
-
   ! **************************************************
   ! Tableaux relatifs aux grains
   ! **************************************************
