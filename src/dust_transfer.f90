@@ -115,6 +115,7 @@ subroutine transfert_poussiere()
 
   call setup_grid()
   call define_grid()
+  call stars_cell_indices()
 
   if (lProDiMo) call setup_ProDiMo()
 
