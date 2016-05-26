@@ -800,53 +800,6 @@ end function integ_ray_dust
 
 !***********************************************************
 
-subroutine angle_max(lambda)
-
-  implicit none
-
-  real, parameter :: tau_lim = 10.0
-
-  integer, intent(in) :: lambda
-  integer :: i, ri, zj, icell
-
-  real(kind=db) :: x0, y0, z0
-  real(kind=db) :: u0, v0, w0
-  real :: tau
-  real(kind=db) ::  lmin, lmax, cos_max, cos_min
-  real(kind=db), dimension(4) :: Stokes
-
-  cos_max = sqrt(1.0-cos_max2)
-  cos_min = 0.0
-
-  v0= 0.0
-  do i=1,20
-     w0= 0.5*(cos_max + cos_min)
-     u0=sqrt(1.0-w0*w0)
-     ri = 0 ; zj=1 ; icell = cell_map(ri,zj,1)
-     x0=0.0 ; y0=0.0 ; z0=0.0
-     Stokes = 0.0_db
-     Stokes(1) = 1.0_db
-     call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
-!     write(*,*) i, cos_min, w0, cos_max, tau
-     if (tau > tau_lim) then
-        cos_min = w0
-     else
-        cos_max = w0
-     endif
-  enddo
-
-  w0_sup = sqrt(1.0-cos_max2)
-  w0_inf = cos_min
- ! write(*,*)  w0_sup, w0_inf
-
-  if (.not.lmono0) w0_inf=0.0
-
-  return
-
-end subroutine angle_max
-
-!***********************************************************
-
 subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 ! Definition l'etendue de la zone noire
 ! definie le tableau logique l_dark_zone

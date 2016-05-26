@@ -1174,11 +1174,6 @@ subroutine init_opacity_wall()
 
   ! Opacite du mur qui a pour largeur celle de la premiere cellule
   kappa_wall = tau_wall / (r_lim(1) - r_lim(0))
-
-  ! On ne vire pas les photons au-dessus de l'echelle de hauteur du disque
-  ! Au cas ou ils taperrait dans le mur
-  cos_max2 = 0.0
-
   write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*avg_grain_mass/0.594098e-6
 
   return

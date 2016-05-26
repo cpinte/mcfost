@@ -198,9 +198,6 @@ module disk
   !! Loi exp (Garaud , Barriere 2004)
 !!  real, parameter :: fact_strat = 0.3
 
-  ! angle sous-tendu par le disque
-  real(kind=db) :: cos_max2, r_bord2
-
   ! Grille
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
