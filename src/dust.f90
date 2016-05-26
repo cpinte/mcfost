@@ -990,7 +990,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
   !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,cell_map) &
+  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop) &
   !$omp private(icell,k,density,norme,theta,k_sca_tot)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells

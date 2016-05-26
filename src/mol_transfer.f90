@@ -176,7 +176,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real, parameter :: precision_sub = 1.0e-3
   real, parameter :: precision = 1.0e-1
 
-  integer :: etape, etape_start, etape_end, ri, zj, phik, iray, n_rayons, icell
+  integer :: etape, etape_start, etape_end, iray, n_rayons, icell
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
   integer, dimension(nb_proc) :: max_n_iter_loc
 
@@ -340,10 +340,10 @@ subroutine NLTE_mol_line_transfer(imol)
 
         !$omp parallel &
         !$omp default(none) &
-        !$omp private(id,ri,zj,phik,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+        !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
-        !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,cell_map,n_cells) &
+        !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -455,23 +455,15 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp end do
         !$omp end parallel
 
-        phik = 1 ! pas 3D
         ! Critere de convergence totale
         maxdiff = 0.0
-        do ri=1,n_rad
-           do zj=1,nz
-              icell = cell_map(ri,zj,phik)
-              if (lcompute_molRT(icell)) then
-                 diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
-                      tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
-
-             !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
-              !        tab_nLevel_old(ri,zj,1:n_level_comp)
-               !  write(*,*) ri, zj, diff, tab_nLevel_old(ri,zj,1:n_level_comp)
-                 if (diff > maxdiff) maxdiff = diff
-              endif
-           enddo
-        enddo
+        do icell = 1, n_cells
+           if (lcompute_molRT(icell)) then
+              diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
+                   tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
+              if (diff > maxdiff) maxdiff = diff
+           endif
+        enddo ! icell
 
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
