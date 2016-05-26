@@ -176,33 +176,9 @@ end subroutine define_physical_zones
 
 !******************************************************************************
 
-subroutine define_grid()
-  ! Definit la grille du code
-  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
-  ! et la variable Rmax2
-  ! Version 4 gere les subdivisions pour les zones multiples
-  ! C. Pinte
-  ! 03/05/11, version 3 :  27/04/05
+subroutine setup_grid()
 
-  real, parameter :: pi = 3.1415926535
   logical, save :: lfirst = .true.
-  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
-  real :: phi
-  integer :: i,j,k, izone, ii, ii_min, ii_max, icell
-
-  !tab en cylindrique ou spherique suivant grille
-  real(kind=db), dimension(n_rad) :: V
-  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
-  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
-  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
-
-  type(disk_zone_type) :: dz
-
-  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
-  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
-
-  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
 
   if (grid_type == 1) then
      lcylindrical = .true.
@@ -231,12 +207,45 @@ subroutine define_grid()
      lfirst = .false.
   endif
 
+  return
+
+end subroutine setup_grid
+
+!******************************************************************************
+
+subroutine define_grid()
+  ! Definit la grille du code
+  ! Calcule les tableaux zmax, volume, r_lim, r_lim_2, z_lim
+  ! et la variable Rmax2
+  ! Version 4 gere les subdivisions pour les zones multiples
+  ! C. Pinte
+  ! 03/05/11, version 3 :  27/04/05
+
+  real, parameter :: pi = 3.1415926535
+  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
+  real :: phi
+  integer :: i,j,k, izone, ii, ii_min, ii_max, icell
+
+  !tab en cylindrique ou spherique suivant grille
+  real(kind=db), dimension(n_rad) :: V
+  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
+  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
+  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
+  integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
+
+  type(disk_zone_type) :: dz
+
+  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
+  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
+
+  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
+
+
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
   else
      allocate(r_grid_tmp(n_rad,nz), z_grid_tmp(n_rad,nz), phi_grid_tmp(n_az), stat=alloc_status)
   endif
-
 
   Rmax2 = Rmax*Rmax
 
