@@ -637,6 +637,7 @@ subroutine initialisation_mcfost()
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
+        lVoronoi = .true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1

@@ -181,29 +181,8 @@ subroutine setup_grid()
 
   logical, save :: lfirst = .true.
 
-  if (grid_type == 1) then
-     lcylindrical = .true.
-     lspherical = .false.
-     cross_cell => cross_cylindrical_cell
-     pos_em_cellule => pos_em_cellule_cyl
-     move_to_grid => move_to_grid_cyl
-     indice_cellule => indice_cellule_cyl
-     test_exit_grid => test_exit_grid_cyl
-  else if (grid_type == 2) then
-     lcylindrical = .false.
-     lspherical = .true.
-     cross_cell => cross_spherical_cell
-     pos_em_cellule => pos_em_cellule_sph
-     move_to_grid => move_to_grid_sph
-     indice_cellule => indice_cellule_sph
-     test_exit_grid => test_exit_grid_sph
-  else
-     write(*,*) "Unknown grid type"
-     write(*,*) "Exiting"
-     stop
-  endif
-
   if (lVoronoi) then
+     write(*,*) "Using a Voronoi mesh"
      lcylindrical = .false.
      lspherical = .false.
      cross_cell => cross_Voronoi_cell
@@ -212,8 +191,30 @@ subroutine setup_grid()
      indice_cellule => indice_cellule_Voronoi
      test_exit_grid => test_exit_grid_Voronoi
   else
+     if (grid_type == 1) then
+        lcylindrical = .true.
+        lspherical = .false.
+        cross_cell => cross_cylindrical_cell
+        pos_em_cellule => pos_em_cellule_cyl
+        move_to_grid => move_to_grid_cyl
+        indice_cellule => indice_cellule_cyl
+        test_exit_grid => test_exit_grid_cyl
+     else if (grid_type == 2) then
+        lcylindrical = .false.
+        lspherical = .true.
+        cross_cell => cross_spherical_cell
+        pos_em_cellule => pos_em_cellule_sph
+        move_to_grid => move_to_grid_sph
+        indice_cellule => indice_cellule_sph
+        test_exit_grid => test_exit_grid_sph
+     else
+        write(*,*) "Unknown grid type"
+        write(*,*) "Exiting"
+        stop
+     endif
+
      if (lfirst) then
-        call build_cylindrical_cell_mapping()
+        call build_cylindrical_cell_mapping() ! same for spherical
         lfirst = .false.
      endif
   endif
