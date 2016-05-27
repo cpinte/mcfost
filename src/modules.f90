@@ -106,7 +106,6 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
-  logical :: llinear_grid
 
   integer :: n_lambda2
 
