@@ -94,7 +94,6 @@ subroutine initialisation_mcfost()
   lno_backup = .false.
   loutput_UV_field = .false.
   laverage_grain_size = .false.
-  llinear_grid=.false.
   lr_subdivide=.false.
   lfreeze_out = .false.
   l_em_disk_image = .true.
@@ -582,9 +581,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,Tfile)
         i_arg = i_arg + 1
-     case("-linear_grid")
-        i_arg = i_arg + 1
-        llinear_grid=.true.
      case("-r_subdivide")
         i_arg = i_arg + 1
         lr_subdivide=.true.
@@ -1215,7 +1211,6 @@ subroutine display_help()
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
-  write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"

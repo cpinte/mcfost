@@ -260,118 +260,106 @@ subroutine define_grid()
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
 
-  if (llinear_grid) then
+  ! Definition du nombre de chaques cellules
+  n_empty = 3
+  n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
+  n_rad_in_region = n_rad_in
 
-     do i=1, n_rad+1
-        tab_r(i) = Rmin + (Rmax - Rmin) * real(i-1)/real(n_rad)
+  n_cells_tmp = 0
+
+  istart = 1
+  tab_r(:) = 0.0_db
+  do ir=1, n_regions
+     regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
+
+     if (ir == n_regions) then
+        n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
+     endif
+
+     ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
+     R0 =  regions(ir)%Rmin
+     if (ir > 1) then
+        if (regions(ir)%Rmin == regions(ir-1)%Rmax) then
+           R0 =  regions(ir)%Rmin * 1.00001_db
+        endif
+     endif
+
+     ! Grille log avec subdivision cellule interne
+     !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
+     ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(regions(ir)%Rmax/R0)
+     delta_r = exp(ln_delta_r)
+
+     ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
+     delta_r_in = exp(ln_delta_r_in)
+
+     ! Selection de la zone correpondante : pente la plus forte
+     puiss = 0.0_db
+     do iz=1, n_zones
+        if (disk_zone(iz)%region == ir) then
+           p=1+dz%surf-dz%exp_beta
+           if (p > puiss) then
+              puiss = p
+           endif
+        endif
+     enddo
+
+     ! Calcul recursif hors boucle //
+     ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
+     tab_r(istart) = R0
+     tab_r2(istart) = tab_r(istart) * tab_r(istart)
+     tab_r3(istart) = tab_r2(istart) * tab_r(istart)
+
+     if (puiss == 0.0) then
+        do i=istart+1, istart + n_rad_in_region
+           tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
+           tab_r2(i) = tab_r(i) * tab_r(i)
+           tab_r3(i) = tab_r2(i) * tab_r(i)
+        enddo
+     else
+        r_i = exp(puiss*log(R0))
+        r_f = exp(puiss*log(R0*delta_r))
+        dr=r_f-r_i
+        fac = 1.0/(2.0**(n_rad_in_region+1)-1.0)
+        do i=istart+1, istart + n_rad_in_region
+           tab_r(i) = (R0**puiss - (R0**puiss-(R0*delta_r)**puiss) &
+                *(2.0**(i-istart+1)-1.0)/(2.0**(n_rad_in_region+1)-1.0))**(1.0/puiss)
+           !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
+           !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
+           if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
+              write(*,*) "Error : spatial grid resolution too high"
+              write(*,*) "Differences between two cells are below double precision"
+              stop
+           endif
+           tab_r2(i) = tab_r(i) * tab_r(i)
+           tab_r3(i) = tab_r2(i) * tab_r(i)
+        enddo
+     endif
+
+     ! Grille log apres subdivision "1ere" cellule
+     do i=istart + n_rad_in_region+1, istart+n_rad_region
+        tab_r(i) = tab_r(i-1) * delta_r
         tab_r2(i) = tab_r(i) * tab_r(i)
         tab_r3(i) = tab_r2(i) * tab_r(i)
      enddo
 
-  else
-     ! Definition du nombre de chaques cellules
-     n_empty = 3
-     n_rad_region = (n_rad - (n_regions -1) * n_empty) / n_regions
-     n_rad_in_region = n_rad_in
+     n_cells_tmp = istart+n_rad_region
 
-     n_cells_tmp = 0
-
-     istart = 1
-     tab_r(:) = 0.0_db
-     do ir=1, n_regions
-        regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
-
-        if (ir == n_regions) then
-           n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
-        endif
-
-        ! Pour eviter d'avoir 2 cellules a la meme position si les regions se touchent
-        R0 =  regions(ir)%Rmin
-        if (ir > 1) then
-           if (regions(ir)%Rmin == regions(ir-1)%Rmax) then
-              R0 =  regions(ir)%Rmin * 1.00001_db
-           endif
-        endif
-
-        ! Grille log avec subdivision cellule interne
-        !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-        ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(regions(ir)%Rmax/R0)
-        delta_r = exp(ln_delta_r)
-
-        ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
-        delta_r_in = exp(ln_delta_r_in)
-
-        ! Selection de la zone correpondante : pente la plus forte
-        puiss = 0.0_db
-        do iz=1, n_zones
-           if (disk_zone(iz)%region == ir) then
-              p=1+dz%surf-dz%exp_beta
-              if (p > puiss) then
-                 puiss = p
-              endif
-           endif
-        enddo
-
-        ! Calcul recursif hors boucle //
-        ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
-
-        tab_r(istart) = R0
-        tab_r2(istart) = tab_r(istart) * tab_r(istart)
-        tab_r3(istart) = tab_r2(istart) * tab_r(istart)
-
-        if (puiss == 0.0) then
-           do i=istart+1, istart + n_rad_in_region
-              tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
+     ! Cellules vides
+     if (ir < n_regions) then
+        if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
+           ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
+           delta_r = exp(ln_delta_r)
+           do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
+              tab_r(i) = tab_r(i-1) * delta_r
               tab_r2(i) = tab_r(i) * tab_r(i)
               tab_r3(i) = tab_r2(i) * tab_r(i)
            enddo
-        else
-           r_i = exp(puiss*log(R0))
-           r_f = exp(puiss*log(R0*delta_r))
-           dr=r_f-r_i
-           fac = 1.0/(2.0**(n_rad_in_region+1)-1.0)
-           do i=istart+1, istart + n_rad_in_region
-              tab_r(i) = (R0**puiss - (R0**puiss-(R0*delta_r)**puiss) &
-                   *(2.0**(i-istart+1)-1.0)/(2.0**(n_rad_in_region+1)-1.0))**(1.0/puiss)
-              !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
-              !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
-              if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
-                 write(*,*) "Error : spatial grid resolution too high"
-                 write(*,*) "Differences between two cells are below double precision"
-                 stop
-              endif
-              tab_r2(i) = tab_r(i) * tab_r(i)
-              tab_r3(i) = tab_r2(i) * tab_r(i)
-           enddo
+           n_cells_tmp = n_cells_tmp + n_empty
         endif
+     endif
 
-        ! Grille log apres subdivision "1ere" cellule
-        do i=istart + n_rad_in_region+1, istart+n_rad_region
-           tab_r(i) = tab_r(i-1) * delta_r
-           tab_r2(i) = tab_r(i) * tab_r(i)
-           tab_r3(i) = tab_r2(i) * tab_r(i)
-        enddo
-
-        n_cells_tmp = istart+n_rad_region
-
-        ! Cellules vides
-        if (ir < n_regions) then
-           if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
-              ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
-              delta_r = exp(ln_delta_r)
-              do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
-                 tab_r(i) = tab_r(i-1) * delta_r
-                 tab_r2(i) = tab_r(i) * tab_r(i)
-                 tab_r3(i) = tab_r2(i) * tab_r(i)
-              enddo
-              n_cells_tmp = n_cells_tmp + n_empty
-           endif
-        endif
-
-        istart = n_cells_tmp+1
-     enddo ! ir
-
-  endif ! llinear_grid
+     istart = n_cells_tmp+1
+  enddo ! ir
 
   r_lim(0)= rmin
   r_lim_2(0)= rmin**2
