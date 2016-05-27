@@ -250,9 +250,6 @@ subroutine define_grid()
   real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
   real(kind=db), dimension(:), allocatable :: phi_grid_tmp
 
-  logical, parameter :: lprint = .false. ! TEMPORARY : the time to validate and test the new routine
-
-
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
   else
@@ -282,13 +279,6 @@ subroutine define_grid()
      istart = 1
      tab_r(:) = 0.0_db
      do ir=1, n_regions
-        if (lprint) then
-           write(*,*) "**********************"
-           write(*,*) "New region", ir
-           write(*,*) "istart", istart, n_rad_in_region, n_rad_in
-           write(*,*) "R=", regions(ir)%Rmin, regions(ir)%Rmax
-        endif
-
         regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
 
         if (ir == n_regions) then
@@ -311,8 +301,6 @@ subroutine define_grid()
         ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
         delta_r_in = exp(ln_delta_r_in)
 
-        if (lprint) write(*,*) "Delta_r", delta_r, delta_r_in
-
         ! Selection de la zone correpondante : pente la plus forte
         puiss = 0.0_db
         do iz=1, n_zones
@@ -324,8 +312,6 @@ subroutine define_grid()
            endif
         enddo
 
-        if (lprint) write(*,*) "n_rad_in, puiss=", puiss
-
         ! Calcul recursif hors boucle //
         ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
 
@@ -333,15 +319,11 @@ subroutine define_grid()
         tab_r2(istart) = tab_r(istart) * tab_r(istart)
         tab_r3(istart) = tab_r2(istart) * tab_r(istart)
 
-         if (lprint) write(*,*) istart, ir, tab_r(istart)
-
         if (puiss == 0.0) then
            do i=istart+1, istart + n_rad_in_region
               tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
               tab_r2(i) = tab_r(i) * tab_r(i)
               tab_r3(i) = tab_r2(i) * tab_r(i)
-
-              if (lprint) write(*,*) i, ir, tab_r(i)
            enddo
         else
            r_i = exp(puiss*log(R0))
@@ -360,20 +342,14 @@ subroutine define_grid()
               endif
               tab_r2(i) = tab_r(i) * tab_r(i)
               tab_r3(i) = tab_r2(i) * tab_r(i)
-
-              if (lprint) write(*,*) i, ir, tab_r(i)
            enddo
         endif
-
-        if (lprint) write(*,*) "n_rad"
 
         ! Grille log apres subdivision "1ere" cellule
         do i=istart + n_rad_in_region+1, istart+n_rad_region
            tab_r(i) = tab_r(i-1) * delta_r
            tab_r2(i) = tab_r(i) * tab_r(i)
            tab_r3(i) = tab_r2(i) * tab_r(i)
-
-           if (lprint) write(*,*) i, ir, tab_r(i)
         enddo
 
         n_cells_tmp = istart+n_rad_region
@@ -381,15 +357,12 @@ subroutine define_grid()
         ! Cellules vides
         if (ir < n_regions) then
            if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
-              if (lprint) write(*,*) "empty cells"
               ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
               delta_r = exp(ln_delta_r)
               do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
                  tab_r(i) = tab_r(i-1) * delta_r
                  tab_r2(i) = tab_r(i) * tab_r(i)
                  tab_r3(i) = tab_r2(i) * tab_r(i)
-
-                 if (lprint) write(*,*) i, ir, tab_r(i)
               enddo
               n_cells_tmp = n_cells_tmp + n_empty
            endif
@@ -402,7 +375,7 @@ subroutine define_grid()
 
   r_lim(0)= rmin
   r_lim_2(0)= rmin**2
-  r_lim_3(0) = rmin**3
+  r_lim_3(0) = rmin**3 ! only for spherical
   do i=1, n_rad
      r_lim(i)=tab_r(i+1)
      r_lim_2(i)= tab_r2(i+1)
