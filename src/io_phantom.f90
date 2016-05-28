@@ -219,6 +219,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
      massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,n_SPH)
 
   ! Convert phantom quantities & units to mcfost quantities & units
+  ! x,y,z are in au
+  ! rhodust & rhogas are in g/cm3
 
   use constantes, only : au_to_cm, Msun_to_g
   use prop_star
@@ -250,7 +252,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
  enddo
  n_SPH = j
-
 
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous

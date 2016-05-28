@@ -14,7 +14,6 @@ module density
   use grid
   use utils
   use output
-  use phantom2mcfost
 
   implicit none
 
@@ -1160,116 +1159,6 @@ subroutine derivs(x,y,dydx)
   dydx = -y * coeff1 * x/rho_gaz * (1.0 + coeff2/rho_gaz) *  2.25e26
 
 end subroutine derivs
-
-!********************************************************************
-
-subroutine density_phantom()
-
-  use io_phantom, only : read_phantom_file, read_phantom_input_file
-  use dump_utils, only : get_error_text
-  use Voronoi_grid
-
-  integer, parameter :: iunit = 1
-  integer :: ierr, n_SPH, ndusttypes
-  real(db), allocatable, dimension(:) :: x,y,z,rho
-  real(db), allocatable, dimension(:,:) :: rhodust
-
-  real :: grainsize,graindens
-
-  integer :: i, nVoronoi
-
-  write(*,*) "Reading phantom density file: "//trim(density_file)
-
-  write(*,*) "n_cells = ", n_cells
-
-  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
-
-  write(*,*) shape(x)
-  write(*,*) shape(rho)
-  write(*,*) shape(rhodust)
-
-  write(*,*) "Done n_cells =", n_cells
-  write(*,*) "Exiting"
-  stop
-
-  if (ierr /=0) then
-     write(*,*) "Error code =", ierr,  get_error_text(ierr)
-     stop
-  endif
-  write(*,*) "# Model size :"
-  write(*,*) "x =", minval(x), maxval(x)
-  write(*,*) "y =", minval(y), maxval(y)
-  write(*,*) "z =", minval(z), maxval(z)
-
-  if (ndusttypes==1) then
-     call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-     write(*,*) grainsize,graindens
-  endif
-
-
-  ! Write the file for the grid version of mcfost
-  !- N_part: total number of particles
-  !  - r_in: disk inner edge in AU
-  !  - r_out: disk outer edge in AU
-  !  - p: surface density exponent, Sigma=Sigma_0*(r/r_0)^(-p), p>0
-  !  - q: temperature exponent, T=T_0*(r/r_0)^(-q), q>0
-  !  - m_star: star mass in solar masses
-  !  - m_disk: disk mass in solar masses (99% gas + 1% dust)
-  !  - H_0: disk scale height at 100 AU, in AU
-  !  - rho_d: dust density in g.cm^-3
-  !  - flag_ggrowth: T with grain growth, F without
-  !
-  !
-  !    N_part lines containing:
-  !  - x,y,z: coordinates of each particle in AU
-  !  - h: smoothing length of each particle in AU
-  !  - s: grain size of each particle in µm
-  !
-  !  Without grain growth: 2 lines containing:
-  !  - n_sizes: number of grain sizes
-  !  - (s(i),i=1,n_sizes): grain sizes in µm
-  !  OR
-  !  With grain growth: 1 line containing:
-  !  - s_min,s_max: smallest and largest grain size in µm
-
-  open(unit=1,file="SPH_phantom.txt",status="replace")
-  write(1,*) size(x)
-  write(1,*) minval(sqrt(x**2 + y**2))
-  write(1,*) maxval(sqrt(x**2 + y**2))
-  write(1,*) 1 ! p
-  write(1,*) 0.5 ! q
-  write(1,*) 1.0 ! mstar
-  write(1,*) 1.e-3 !mdisk
-  write(1,*) 10 ! h0
-  write(1,*) 3.5 ! rhod
-  write(1,*) .false.
-  !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
-
-  do i=1,size(x)
-     write(1,*) x(i), y(i), z(i), 1.0, 1.0
-  enddo
-
-  write(1,*) 1
-  write(1,*) 1.0
-  close(unit=1)
-
-
-  ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid
-  call Voronoi_tesselation(n_SPH,x,y,z, nVoronoi)
-  i = 1
-  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%xyz(1), x(Voronoi(i)%id)
-  write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
-  deallocate(x,y,z)
-
-
-  ! Fill up the density grid
-
-  deallocate(rho,rhodust)
-  stop
-
-  return
-
-end subroutine density_phantom
 
 !********************************************************************
 

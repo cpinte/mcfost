@@ -82,18 +82,27 @@ subroutine transfert_poussiere()
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
 
-  ! Nbre iteration grains hors equilibre
-  n_iter = 0
+  ! Building the wavelength & basic dust properties grid
+  call init_lambda()
+  call init_indices_optiques()
 
-  ! Allocation dynamique
-  if (lphantom_file) call setup_phantom2mcfost(density_file) ! todo : conflict in allocation with lin below
+  ! Building the dust grain population
+  call build_grain_size_distribution()
+
+  ! Building the model volume and corresponding grid
+  call order_zones()
+  call define_physical_zones()
+
+  call setup_grid()
+  if (lphantom_file) then
+     call setup_phantom2mcfost(density_file)
+  else
+     call define_grid() ! included in setup_phantom2mcfost
+  endif
+  call stars_cell_indices()
+
+  ! Allocation dynamique de tous les autres tableaux
   call alloc_dynamique()
-
-  ! Pour rotation du disque (signe - pour convention astro)
-  cos_disk = cos(ang_disque/180.*pi)
-  sin_disk = -sin(ang_disque/180.*pi)
-  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
-  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   laffichage=.true.
 
@@ -102,35 +111,23 @@ subroutine transfert_poussiere()
      stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
   enddo
 
-
-  call init_lambda()
-  call init_indices_optiques()
-
-  call taille_grains()
-
-  call order_zones()
-  call define_physical_zones()
-
-  call setup_grid()
-  call define_grid()
-  call stars_cell_indices()
-
   if (lProDiMo) call setup_ProDiMo()
 
-  if (ldensity_file) then
-     call densite_file()
-  else if (lphantom_file) then
-     call density_phantom()
-  else if (lread_Seb_Charnoz) then
-     call densite_Seb_Charnoz()
-  else if (lread_Seb_Charnoz2) then
-     call densite_Seb_Charnoz2()
-  else
-     if (lsigma_file) call read_sigma_file()
-     call define_density()
+  if (.not.lphantom_file) then ! already done by setup_phantom2mcfost
+     call allocate_densities()
+     if (ldensity_file) then
+        call densite_file()
+     else if (lread_Seb_Charnoz) then
+        call densite_Seb_Charnoz()
+     else if (lread_Seb_Charnoz2) then
+        call densite_Seb_Charnoz2()
+     else
+        if (lsigma_file) call read_sigma_file()
+        call define_density()
+     endif
+     if (lwall) call define_density_wall3D()
   endif
 
-  if (lwall) call define_density_wall3D()
 
   if (ldisk_struct) call write_disk_struct()
 
@@ -344,10 +341,10 @@ subroutine transfert_poussiere()
   lambda=1 ! pour eviter depassement tab a l'initialisation
   ind_etape = etape_start
 
-
   !************************************************************
   !  Boucle principale sur les étapes du calcul
   !************************************************************
+  n_iter = 0 ! Nbre iteration grains hors equilibre
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
 

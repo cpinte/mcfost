@@ -15,6 +15,35 @@ module mem
 
   contains
 
+subroutine allocate_densities()
+
+  integer ::  alloc_status
+
+  allocate(masse(n_cells), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error masse'
+     stop
+  endif
+  masse = 0.0
+
+  allocate(densite_pouss(n_grains_tot,n_cells), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error densite_pouss'
+     stop
+  endif
+  densite_pouss = 0.0
+
+  allocate(densite_gaz(n_cells), densite_gaz_midplane(n_rad), masse_gaz(n_cells), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error densite_gaz'
+     stop
+  endif
+  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
+
+end subroutine allocate_densities
+
+!*****************************************************************
+
 subroutine alloc_dynamique()
   ! Alloue les tableaux dynamiquement en fonction de l'organisation
   ! des calculs, de la presence de stratification ...
@@ -24,84 +53,6 @@ subroutine alloc_dynamique()
 
   integer ::  alloc_status
   real :: mem_size
-
-  nrz = n_rad * nz
-  if (l3D) then
-     n_cells = 2*nrz*n_az
-  else
-     n_cells = nrz
-  endif
-
-  if (n_cells < 1e6) then
-     write(*,*) "Using", n_cells, "cells"
-  else
-     write(*,*) "Using", real(n_cells)/1e6, "million cells"
-  endif
-
-  if (lvariable_dust) then
-     p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
-  else
-     p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
-  endif
-
-  lonly_LTE = .false.
-  lonly_nLTE = .false.
-  if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
-  if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
-
-  if (l3D) then
-     j_start = -nz
-     if (lvariable_dust) then
-        p_n_az = n_az
-     else
-        p_n_az = 1
-     endif
-  else
-     j_start = 1
-     p_n_az = 1
-  endif
-
-  if ((p_nz /= 1).and.l3D) then
-     pj_start = -nz
-  else
-     pj_start = 1
-  endif
-
-  ! parametrage methode de diffusion
-  ! 1 : per dust grain
-  ! 2 : per cell
-  if (scattering_method == 0) then
-     if (.not.lmono) then
-        mem_size = (1.0*p_n_cells) * (nang_scatt+1) * n_lambda * 4 / 1024**3
-        if (mem_size > max_mem) then
-           scattering_method = 1
-        else
-           scattering_method = 2
-        endif
-     else
-        if (lscatt_ray_tracing) then
-           scattering_method = 2 ! it needs to be 2 for ray-tracing
-        else
-           ! ???
-           scattering_method = 2
-        endif
-     endif
-  endif
-
-  lMueller_pos_multi = .false.
-  if (lmono) then
-     p_n_lambda_pos = 1
-  else
-     if (scattering_method==1) then
-        p_n_lambda_pos = 1
-     else
-        p_n_lambda_pos = n_lambda
-        lMueller_pos_multi = .true.
-     endif
-  endif
-
-  write(*,fmt='(" Using scattering method ",i1)') scattering_method
-  lscattering_method1 = (scattering_method==1)
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
@@ -117,69 +68,6 @@ subroutine alloc_dynamique()
      stop
   endif
   n_phot_envoyes = 0.0
-
-  ! **************************************************
-  ! Tableaux relatifs a la grille
-  ! **************************************************
-  allocate(r_lim(0:n_rad), r_lim_2(0:n_rad), r_lim_3(0:n_rad), &
-  delta_z(n_rad), dr2_grid(n_rad), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_lim'
-     stop
-  endif
-  r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
-
-  allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_lim'
-     stop
-  endif
-  r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
-
-  allocate(tab_region(n_rad), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_region'
-     stop
-  endif
-  tab_region = 0
-
-  allocate(z_lim(n_rad,nz+2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error z_lim'
-     stop
-  endif
-  z_lim = 0.0
-
-  allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tan_phi_lim'
-     stop
-  endif
-  w_lim = 0.0
-  theta_lim=0.0
-  tan_theta_lim = 0.0
-  tan_phi_lim = 0.0
-
-  allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error zmax, volume'
-     stop
-  endif
-  zmax = 0.0 ; volume=0.0
-
-  allocate(masse(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error masse'
-     stop
-  endif
-  masse = 0.0
-
-  allocate(densite_pouss(n_grains_tot,n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error densite_pouss'
-     stop
-  endif
-  densite_pouss = 0.0
 
   if (lSigma_file) then
      allocate(Surface_density(n_rad), stat=alloc_status)
@@ -202,18 +90,6 @@ subroutine alloc_dynamique()
   ri_out_dark_zone=0
   zj_sup_dark_zone=0
   if (l3D) zj_inf_dark_zone=0
-
-  ! **************************************************
-  ! Tableaux relatifs aux grains
-  ! **************************************************
-  allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
-       S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_grain'
-     stop
-  endif
-  nbre_grains = 0.0   ; r_core=0.0
-  r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
   allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
@@ -265,28 +141,6 @@ subroutine alloc_dynamique()
   spectre_etoiles_cumul = 0.0
   spectre_etoiles = 0.0
   spectre_emission_cumul = 0.0
-
-  allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_lambda'
-     stop
-  endif
-  tab_lambda=0.0 ;  tab_lambda_inf=0.0 ; tab_lambda_sup=0.0 ; tab_delta_lambda=0.0
-
-  allocate(tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_amu'
-     stop
-  endif
-  tab_amu1=0.0; tab_amu2=0.0;
-
-  allocate(tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_amu_coating'
-     stop
-  endif
-  tab_amu1_coating=0.0; tab_amu2_coating=0.0;
-
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
@@ -884,13 +738,6 @@ subroutine alloc_dynamique()
      norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
 
   endif ! lemission_mol
-
-  allocate(densite_gaz(n_cells), densite_gaz_midplane(n_rad), masse_gaz(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error densite_gaz'
-     stop
-  endif
-  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
   return
 

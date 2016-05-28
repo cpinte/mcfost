@@ -182,6 +182,44 @@ subroutine setup_grid()
 
   logical, save :: lfirst = .true.
 
+  nrz = n_rad * nz
+  if (l3D) then
+     n_cells = 2*nrz*n_az
+  else
+     n_cells = nrz
+  endif
+
+  if (n_cells < 1e6) then
+     write(*,*) "Using", n_cells, "cells"
+  else
+     write(*,*) "Using", real(n_cells)/1e6, "million cells"
+  endif
+
+  if (lvariable_dust) then
+     p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
+  else
+     p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
+  endif
+
+
+  if (l3D) then
+     j_start = -nz
+     if (lvariable_dust) then
+        p_n_az = n_az
+     else
+        p_n_az = 1
+     endif
+  else
+     j_start = 1
+     p_n_az = 1
+  endif
+
+  if ((p_nz /= 1).and.l3D) then
+     pj_start = -nz
+  else
+     pj_start = 1
+  endif
+
   if (lVoronoi) then
      write(*,*) "Using a Voronoi mesh"
      lcylindrical = .false.
@@ -232,7 +270,29 @@ end subroutine setup_grid
 subroutine init_lambda()
   ! Initialisation table de longueurs d'onde
 
-  integer :: i
+  integer :: i, alloc_status
+
+  allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_lambda'
+     stop
+  endif
+  tab_lambda=0.0 ;  tab_lambda_inf=0.0 ; tab_lambda_sup=0.0 ; tab_delta_lambda=0.0
+
+  allocate(tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_amu'
+     stop
+  endif
+  tab_amu1=0.0; tab_amu2=0.0;
+
+  allocate(tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_amu_coating'
+     stop
+  endif
+  tab_amu1_coating=0.0; tab_amu2_coating=0.0;
+
 
   if (lmono0) then
      ! Lecture longueur d'onde
