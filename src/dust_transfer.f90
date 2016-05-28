@@ -28,6 +28,7 @@ module dust_transfer
   use utils
   use ProDiMo
   use init_mcfost
+  use phantom2mcfost
   !$ use omp_lib
 
   implicit none
@@ -113,12 +114,12 @@ subroutine transfert_poussiere()
   call define_physical_zones()
 
   call setup_grid()
+  if (lphantom_file) call setup_phantom2mcfost(density_file)
   call define_grid()
   call stars_cell_indices()
 
   if (lProDiMo) call setup_ProDiMo()
 
-  !call densite_data_hd32297(para) ! grille redefinie dans routine
   if (ldensity_file) then
      call densite_file()
   else if (lphantom_file) then

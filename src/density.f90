@@ -14,6 +14,7 @@ module density
   use grid
   use utils
   use output
+  use phantom2mcfost
 
   implicit none
 
@@ -1169,7 +1170,7 @@ subroutine density_phantom()
   use Voronoi_grid
 
   integer, parameter :: iunit = 1
-  integer :: ierr, ncells, ndusttypes
+  integer :: ierr, n_SPH, ndusttypes
   real(db), allocatable, dimension(:) :: x,y,z,rho
   real(db), allocatable, dimension(:,:) :: rhodust
 
@@ -1181,12 +1182,15 @@ subroutine density_phantom()
 
   write(*,*) "n_cells = ", n_cells
 
-  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
+  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
 
   write(*,*) shape(x)
   write(*,*) shape(rho)
+  write(*,*) shape(rhodust)
 
   write(*,*) "Done n_cells =", n_cells
+  write(*,*) "Exiting"
+  stop
 
   if (ierr /=0) then
      write(*,*) "Error code =", ierr,  get_error_text(ierr)
@@ -1250,10 +1254,8 @@ subroutine density_phantom()
   close(unit=1)
 
 
-  ! Make the Voronoi tesselation on the SPH particles
-  call Voronoi_tesselation(ncells,x,y,z, nVoronoi)
-
-
+  ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid
+  call Voronoi_tesselation(n_SPH,x,y,z, nVoronoi)
   i = 1
   write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
   write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"

@@ -218,6 +218,8 @@ end subroutine read_phantom_file
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
      massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,n_SPH)
 
+  ! Convert phantom quantities & units to mcfost quantities & units
+
   use constantes, only : au_to_cm, Msun_to_g
   use prop_star
 
