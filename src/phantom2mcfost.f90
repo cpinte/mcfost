@@ -102,7 +102,7 @@ contains
 
     write(*,*) "n_cells = ", n_cells
 
-    call read_phantom_file(iunit,phantom_file,x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
+    call read_phantom_file(iunit,phantom_file, x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
 
     write(*,*) shape(x)
     write(*,*) shape(rho)
@@ -110,7 +110,6 @@ contains
 
     write(*,*) "Done n_cells =", n_cells, n_SPH
     write(*,*) "End setup_phantom2mcfost"
-
 
     return
 

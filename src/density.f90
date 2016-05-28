@@ -1257,7 +1257,7 @@ subroutine density_phantom()
   ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid
   call Voronoi_tesselation(n_SPH,x,y,z, nVoronoi)
   i = 1
-  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
+  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%xyz(1), x(Voronoi(i)%id)
   write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
   deallocate(x,y,z)
 
