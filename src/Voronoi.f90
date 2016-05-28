@@ -36,6 +36,16 @@ module Voronoi_grid
 
   contains
 
+
+  subroutine define_Voronoi_grid()
+
+    write(*,*) "TODO : define_Voronoi_grid"
+    return
+
+  end subroutine define_Voronoi_grid
+
+  !************************************************************************
+
   subroutine read_Voronoi(n)
 
     integer, intent(in) :: n
@@ -71,7 +81,7 @@ module Voronoi_grid
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
     do i=1, n
        read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours
-       Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points
+       Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points --> c'est ok, c'est l'id du fichier d'input, ie id_SPH
        !write(*,*) "Voronoi id = ", Voronoi(i)%id
 
        if (i>1) then
