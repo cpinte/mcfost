@@ -11,7 +11,8 @@ module Voronoi_grid
   real(kind=db), parameter :: prec = 1.e-6_db
 
   type Voronoi_cell
-     real :: x, y, z, V
+     real, dimension(3) :: xyz
+     real :: V
      integer :: id, first_neighbour, last_neighbour
   end type Voronoi_cell
 
@@ -78,7 +79,7 @@ module Voronoi_grid
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
     do i=1, n
-       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours
+       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), Voronoi(i)%V, n_neighbours
        Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points --> c'est ok, c'est l'id du fichier d'input, ie id_SPH
        !write(*,*) "Voronoi id = ", Voronoi(i)%id
 
@@ -101,7 +102,7 @@ module Voronoi_grid
 
     do i=1, n
        ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
-       read(1,*) Voronoi(i)%id, Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, Voronoi(i)%V, n_neighbours, &
+       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), Voronoi(i)%V, n_neighbours, &
             neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
        ! todo : find the cells touching the walls
@@ -258,7 +259,7 @@ module Voronoi_grid
 
     ! Testing pos
     icell = 1
-    write(*,*) "testing emission position", Voronoi(icell)%x, Voronoi(icell)%y, Voronoi(icell)%z
+    write(*,*) "testing emission position", Voronoi(icell)%xyz(1), Voronoi(icell)%xyz(2), Voronoi(icell)%xyz(3)
 
     do k=1, n_sample
        rand  = sprng(stream(id))
@@ -301,18 +302,14 @@ module Voronoi_grid
 
        if (in > 0) then ! cellule
           ! unnormalized vector to plane
-          n(1) = Voronoi(in)%x - Voronoi(icell)%x
-          n(2) = Voronoi(in)%y - Voronoi(icell)%y
-          n(3) = Voronoi(in)%z - Voronoi(icell)%z
+          n(:) = Voronoi(in)%xyz(:) - Voronoi(icell)%xyz(:)
 
           ! test direction
           den = dot_product(n, k)
           if (den <= 0) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
-          p(1) = 0.5 * (Voronoi(in)%x + Voronoi(icell)%x)
-          p(2) = 0.5 * (Voronoi(in)%y + Voronoi(icell)%y)
-          p(3) = 0.5 * (Voronoi(in)%z + Voronoi(icell)%z)
+          p(:) = 0.5 * (Voronoi(in)%xyz(:) + Voronoi(icell)%xyz(:))
 
           s_tmp = dot_product(n, p-r) / den
        else ! i < 0 ; le voisin est un wall
@@ -596,7 +593,7 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   dist2_min = huge(1.0)
   do i=1, wall(iwall)%n_neighbours
      icell = wall(iwall)%neighbour_list(i)
-     dist2 = (Voronoi(icell)%x - x)**2 + (Voronoi(icell)%y - y)**2 + (Voronoi(icell)%z - z)**2
+     dist2 = (Voronoi(icell)%xyz(1) - x)**2 + (Voronoi(icell)%xyz(2) - y)**2 + (Voronoi(icell)%xyz(3) - z)**2
 
      if (dist2 < dist2_min) then
         icell_min = icell
@@ -636,7 +633,7 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 
   ! Distance jusqu'au bord de la cellule
   previous_cell = 0
-  x = Voronoi(icell)%x ; y = Voronoi(icell)%y ; z = Voronoi(icell)%z
+  x = Voronoi(icell)%xyz(1) ; y = Voronoi(icell)%xyz(2) ; z = Voronoi(icell)%xyz(3)
   call cross_Voronoi_cell( x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l)
 
   ! Repartition uniforme selon cette direction

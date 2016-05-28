@@ -250,6 +250,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
  enddo
  n_SPH = j
+
+
+ ! TODO : use mcfost quantities directly rather that these intermediate variables
+ ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
  allocate(x(n_SPH),y(n_SPH),z(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
  if (alloc_status /=0) then
