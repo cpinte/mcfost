@@ -18,7 +18,7 @@ module dust
 
   contains
 
-subroutine taille_grains()
+subroutine build_grain_size_distribution()
 ! Distribution en taille des grains
 ! Sortie de prop_grains pour cas multi-lambda
 ! C. Pinte 14/01/05
@@ -33,8 +33,20 @@ subroutine taille_grains()
 
   type(dust_pop_type), pointer :: dp
 
-  integer :: ios, status, n_comment, n_grains
+  integer :: ios, status, n_comment, n_grains, alloc_status
   real :: fbuffer
+
+  ! **************************************************
+  ! Tableaux relatifs aux grains
+  ! **************************************************
+  allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
+       S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error r_grain'
+     stop
+  endif
+  nbre_grains = 0.0   ; r_core=0.0
+  r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
   ! Boucle sur les populations de grains
   do pop=1, n_pop
@@ -204,7 +216,7 @@ subroutine taille_grains()
 
   return
 
-end subroutine taille_grains
+end subroutine build_grain_size_distribution
 
 !********************************************************************
 

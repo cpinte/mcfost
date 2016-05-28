@@ -4,6 +4,7 @@ module Voronoi_grid
   use parametres
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
+  use opacity, only : volume
 
   implicit none
 
@@ -12,7 +13,6 @@ module Voronoi_grid
 
   type Voronoi_cell
      real, dimension(3) :: xyz
-     real :: V
      integer :: id, first_neighbour, last_neighbour
   end type Voronoi_cell
 
@@ -72,14 +72,12 @@ module Voronoi_grid
 
 
     call init_Voronoi_walls()
-    allocate(Voronoi(n))
-
     write(*,*) "Finding:", n, " Voronoi cells"
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
     do i=1, n
-       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), Voronoi(i)%V, n_neighbours
+       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), volume(i), n_neighbours
        Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points --> c'est ok, c'est l'id du fichier d'input, ie id_SPH
        !write(*,*) "Voronoi id = ", Voronoi(i)%id
 
@@ -95,14 +93,14 @@ module Voronoi_grid
 
     rewind(1)
     write(*,*) "Neighbours list size =", n_neighbours_tot
-    write(*,*) "Voronoi volume =", sum(Voronoi%V)
+    write(*,*) "Voronoi volume =", sum(volume(1:n))
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
 
 
     do i=1, n
        ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
-       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), Voronoi(i)%V, n_neighbours, &
+       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), volume(i), n_neighbours, &
             neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
        ! todo : find the cells touching the walls

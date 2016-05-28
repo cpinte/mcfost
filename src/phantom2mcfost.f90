@@ -80,35 +80,166 @@ contains
 
   subroutine setup_phantom2mcfost(phantom_file)
 
-
     use io_phantom, only : read_phantom_file, read_phantom_input_file
     use dump_utils, only : get_error_text
     use Voronoi_grid
+    use opacity, only : densite_pouss, masse
+    use molecular_emission, only : densite_gaz, masse_gaz
+    use grains, only : n_grains_tot, M_grain
+    use mem
 
     character(len=512), intent(in) :: phantom_file
 
     integer, parameter :: iunit = 1
-    integer :: ierr, n_SPH, ndusttypes
     real(db), allocatable, dimension(:) :: x,y,z,rho
     real(db), allocatable, dimension(:,:) :: rhodust
+    real, allocatable, dimension(:) :: a_SPH
+    real :: grainsize,graindens, f
+    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k
 
-    real :: grainsize,graindens
-
-    integer :: i, nVoronoi
-
+    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     write(*,*) "Performing phantom2mcfost setup"
     write(*,*) "Reading phantom density file: "//trim(phantom_file)
 
-    write(*,*) "n_cells = ", n_cells
-
     call read_phantom_file(iunit,phantom_file, x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
+    if (ierr /=0) then
+       write(*,*) "Error code =", ierr,  get_error_text(ierr)
+       stop
+    endif
+    write(*,*) "# Model size :"
+    write(*,*) "x =", minval(x), maxval(x)
+    write(*,*) "y =", minval(y), maxval(y)
+    write(*,*) "z =", minval(z), maxval(z)
 
-    write(*,*) shape(x)
-    write(*,*) shape(rho)
-    write(*,*) shape(rhodust)
+    if (ndusttypes==1) then
+       call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
+       write(*,*) grainsize,graindens
+    endif
+    write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
+    allocate(a_SPH(ndusttypes))
 
-    write(*,*) "Done n_cells =", n_cells, n_SPH
+    if (lwrite_ASCII) then
+       ! Write the file for the grid version of mcfost
+       !- N_part: total number of particles
+       !  - r_in: disk inner edge in AU
+       !  - r_out: disk outer edge in AU
+       !  - p: surface density exponent, Sigma=Sigma_0*(r/r_0)^(-p), p>0
+       !  - q: temperature exponent, T=T_0*(r/r_0)^(-q), q>0
+       !  - m_star: star mass in solar masses
+       !  - m_disk: disk mass in solar masses (99% gas + 1% dust)
+       !  - H_0: disk scale height at 100 AU, in AU
+       !  - rho_d: dust density in g.cm^-3
+       !  - flag_ggrowth: T with grain growth, F without
+       !
+       !
+       !    N_part lines containing:
+       !  - x,y,z: coordinates of each particle in AU
+       !  - h: smoothing length of each particle in AU
+       !  - s: grain size of each particle in µm
+       !
+       !  Without grain growth: 2 lines containing:
+       !  - n_sizes: number of grain sizes
+       !  - (s(i),i=1,n_sizes): grain sizes in µm
+       !  OR
+       !  With grain growth: 1 line containing:
+       !  - s_min,s_max: smallest and largest grain size in µm
+
+       open(unit=1,file="SPH_phantom.txt",status="replace")
+       write(1,*) size(x)
+       write(1,*) minval(sqrt(x**2 + y**2))
+       write(1,*) maxval(sqrt(x**2 + y**2))
+       write(1,*) 1 ! p
+       write(1,*) 0.5 ! q
+       write(1,*) 1.0 ! mstar
+       write(1,*) 1.e-3 !mdisk
+       write(1,*) 10 ! h0
+       write(1,*) 3.5 ! rhod
+       write(1,*) .false.
+       !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+
+       do icell=1,size(x)
+          write(1,*) x(icell), y(icell), z(icell), 1.0, 1.0
+       enddo
+
+       write(1,*) 1
+       write(1,*) 1.0
+       close(unit=1)
+    endif
+
+
+    !*******************************
+    ! Voronoi tesselation
+    !*******************************
+    n_cells = n_SPH ! this is a bit too big as we will loose particles during Voronoi tesselation
+    allocate(Voronoi(n_cells), volume(n_cells), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error Voronoi structure"
+       write(*,*) "Exiting"
+       stop
+    endif
+    volume(:) = 0.0
+
+    Voronoi(:)%xyz(1) = x(:)
+    Voronoi(:)%xyz(2) = y(:)
+    Voronoi(:)%xyz(3) = z(:)
+
+    ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
+    call Voronoi_tesselation(n_SPH,x,y,z, n_Voronoi)
+    deallocate(x,y,z)
+    ! Todo : we can allocate Voronoi, and maybe volume, here
+    n_cells = n_Voronoi
+    write(*,*) "Using n_cells =", n_cells
+
+    !*************************
+    ! Densities
+    !*************************
+    call allocate_densities()
+    ! Tableau de densite et masse de gaz
+    do icell=1,n_cells
+       densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
+       masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+    enddo
+
+    ! Tableau de densite et masse de poussiere
+    ! interpolation en taille
+    if (ndusttypes > 1) then
+       l=1
+       do icell=1,n_cells
+          do k=1,n_grains_tot
+             if (r_grain(l) < a_SPH(1)) then ! small grains
+                densite_pouss(k,icell) = rhodust(1,icell)
+             else if (r_grain(k) < a_SPH(ndusttypes)) then ! large grains
+                densite_pouss(k,icell) = rhodust(ndusttypes,icell)
+             else ! interpolation
+                if (r_grain(k) > a_sph(l+1)) l = l+1
+                f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+
+                densite_pouss(k,icell) = rhodust(l,icell) + f * (rhodust(l+1,icell)  - rhodust(l,icell))
+             endif
+             !write(*,*) "Todo : densite_pouss : missing factor"
+             !          stop
+             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+          enddo !l
+       enddo ! icell
+       masse(:) = masse(:) * AU3_to_cm3
+    else ! using the gas density
+       write(*,*) "Forcing gas/dust == 100"
+       do icell=1,n_cells
+          do k=1,n_grains_tot
+             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
+             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+          enddo
+       enddo
+        f = 0.01 * sum(masse_gaz)/sum(masse)
+        densite_pouss(:,:) = densite_pouss(:,:) * f
+        masse(:) = masse(:) * f
+    endif
+
+    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+    deallocate(rho,rhodust,a_SPH)
+
     write(*,*) "End setup_phantom2mcfost"
 
     return
