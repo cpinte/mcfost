@@ -45,7 +45,7 @@ subroutine transfert_poussiere()
   real(kind=db), dimension(4) :: Stokes
 
   ! Parametres simu
-  integer :: itime, lambda_seuil, ymap0, xmap0, nbre_phot2
+  integer :: itime, lambda_seuil, nbre_phot2
   integer :: ind_etape, first_etape_obs
   integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, nnfot1_cumul
 
@@ -86,10 +86,8 @@ subroutine transfert_poussiere()
   n_iter = 0
 
   ! Allocation dynamique
+  if (lphantom_file) call setup_phantom2mcfost(density_file) ! todo : conflict in allocation with lin below
   call alloc_dynamique()
-
-  ymap0 = (igridy/2) + 1
-  xmap0 = (igridx/2) + 1
 
   ! Pour rotation du disque (signe - pour convention astro)
   cos_disk = cos(ang_disque/180.*pi)
@@ -114,7 +112,6 @@ subroutine transfert_poussiere()
   call define_physical_zones()
 
   call setup_grid()
-  if (lphantom_file) call setup_phantom2mcfost(density_file)
   call define_grid()
   call stars_cell_indices()
 
