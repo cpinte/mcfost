@@ -1250,9 +1250,8 @@ subroutine density_phantom()
   close(unit=1)
 
 
-
   ! Make the Voronoi tesselation on the SPH particles
-  call Voronoi_tesselation(ncells, nVoronoi, x,y,z)
+  call Voronoi_tesselation(ncells,x,y,z, nVoronoi)
 
 
   i = 1

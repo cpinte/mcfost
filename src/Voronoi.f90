@@ -176,11 +176,11 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_cells, nVoronoi, x,y,z)
+  subroutine Voronoi_tesselation(n_cells, x,y,z,  nVoronoi)
 
     integer, intent(in) :: n_cells
-    integer, intent(out) :: nVoronoi
     real(kind=db), dimension(n_cells), intent(in) :: x, y, z
+    integer, intent(out) :: nVoronoi
 
     character(len=512) :: cmd
     integer :: i, syst_status, time1, time2, itime
