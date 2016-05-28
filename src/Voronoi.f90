@@ -64,8 +64,6 @@ module Voronoi_grid
     real(kind=db), dimension(4) :: Stokes
     logical :: flag_star, flag_direct_star, flag_sortie, lintersect
 
-    ! Fin testing
-
     id = 1
 
     n_walls = 6
@@ -121,6 +119,9 @@ module Voronoi_grid
     enddo ! i
 
     close(unit=1)
+
+
+    !------------- This is testing from now on
 
     do k=1, n_walls
        write(*,*) "wall", k, wall(k)%n_neighbours, "neighbours"
@@ -223,6 +224,7 @@ module Voronoi_grid
     endif
     write(*,*) "Voronoi Tesselation done"
 
+    ! TMP : we have to read the file now
     call read_Voronoi(nVoronoi)
 
     write(*,*) "Tesselation finished"
