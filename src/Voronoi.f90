@@ -299,7 +299,7 @@ module Voronoi_grid
     integer, intent(out) :: next_cell
 
     real :: s_tmp, den
-    integer :: i, in
+    integer :: i, id_n
 
     real(kind=db), intent(out) :: x1, y1, z1
 
@@ -313,31 +313,43 @@ module Voronoi_grid
     next_cell = 0
 
     nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-       in = neighbours_list(i) ! id du voisin
-       if (in==previous_cell) cycle nb_loop
+       id_n = neighbours_list(i) ! id du voisin
+       !write(*,*) "id_n",id_n, i, Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
 
-       if (in > 0) then ! cellule
+       if (id_n==previous_cell) cycle nb_loop
+
+       if (id_n > 0) then ! cellule
           ! unnormalized vector to plane
-          n(:) = Voronoi(in)%xyz(:) - Voronoi(icell)%xyz(:)
+          n(:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
 
           ! test direction
           den = dot_product(n, k)
           if (den <= 0) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
-          p(:) = 0.5 * (Voronoi(in)%xyz(:) + Voronoi(icell)%xyz(:))
+          p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
 
           s_tmp = dot_product(n, p-r) / den
-       else ! i < 0 ; le voisin est un wall
-          s_tmp = distance_to_wall(x,y,z, u,v,w, -in) ;
 
-          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardabt le wall d'entree
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+
+
+          IF (s_tmp < 0.) then
+             write(*,*) "Oups, there is something wrong"
+             write(*,*) s_tmp
+             write(*,*) "s_tmp", s_tmp, icell, id_n, den
+          endif
+
+       else ! i < 0 ; le voisin est un wall
+          s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
+
+          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
           if (s_tmp < 0.) s_tmp = huge(1.0)
        endif
 
        if (s_tmp < s) then
           s = s_tmp
-          next_cell = in
+          next_cell = id_n
        endif
 
     enddo nb_loop ! i
