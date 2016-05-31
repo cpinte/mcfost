@@ -99,6 +99,8 @@ contains
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
+    icell_ref = 1
+
     write(*,*) "Performing phantom2mcfost setup"
     write(*,*) "Reading phantom density file: "//trim(phantom_file)
 
@@ -251,7 +253,16 @@ contains
 
     write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-    deallocate(rho,rhodust,a_SPH)
+    deallocate(massgas,rho,rhodust,a_SPH)
+
+    search_not_empty : do k=1,n_grains_tot
+       do icell=1, n_cells
+          if (densite_pouss(k,icell) > 0.0_db) then
+             icell_not_empty = icell
+             exit search_not_empty
+          endif
+       enddo !icell
+    enddo search_not_empty
 
     write(*,*) "End setup_phantom2mcfost"
 
