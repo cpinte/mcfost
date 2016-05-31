@@ -51,12 +51,15 @@ module Voronoi_grid
 
     integer, intent(in) :: n
 
-    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot
+    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour
 
     !integer, dimension(:), allocatable :: id_list
 
+    real(kind=db) :: x, y, z, u, vol ! todo : make simple
+
+
     ! For testing purposes
-    real(kind=db) :: x, y, z, u, v, w, s, norme
+    real(kind=db) :: v, w, s, norme
     integer :: icell
 
     integer :: id, lambda
@@ -72,21 +75,33 @@ module Voronoi_grid
 
 
     call init_Voronoi_walls()
-    write(*,*) "Finding:", n, " Voronoi cells"
+    write(*,*) "Reading", n, " Voronoi cells"
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
+     Voronoi(icell)%first_neighbour = 0
+     Voronoi(icell)%last_neighbour = 0
     do i=1, n
-       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), volume(i), n_neighbours
-       Voronoi(i)%id = i ! id a un PB car Voronoi fait sauter des points --> c'est ok, c'est l'id du fichier d'input, ie id_SPH
-       !write(*,*) "Voronoi id = ", Voronoi(i)%id
+       read(1,*) icell , x, y, z, vol, n_neighbours
 
-       if (i>1) then
-          Voronoi(i)%first_neighbour = Voronoi(i-1)%last_neighbour + 1
-          Voronoi(i)%last_neighbour  = Voronoi(i-1)%last_neighbour + n_neighbours
-       else
-          Voronoi(i)%first_neighbour = 1
-          Voronoi(i)%last_neighbour =  n_neighbours
+       ! We use temporary variables first_neighbour and last_neighbour
+       ! as the id of the Voronoi cells might not be consecutive
+       if (i == 1) then
+           first_neighbour = 1
+           last_neighbour = n_neighbours
+        else
+           first_neighbour = last_neighbour + 1
+           last_neighbour = last_neighbour + n_neighbours
+       endif
+       Voronoi(icell)%first_neighbour = first_neighbour
+       Voronoi(icell)%last_neighbour  = last_neighbour
+
+       if (Voronoi(icell)%first_neighbour < 0) then
+          write(*,*) "ERROR in Voronoi cell map"
+          write(*,*) "icell=", icell,Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+          write(*,*) "icell-1=", icell-1,Voronoi(icell-1)%first_neighbour, Voronoi(icell-1)%last_neighbour
+          write(*,*) "Exiting"
+          stop
        endif
        n_neighbours_tot = n_neighbours_tot + n_neighbours
     enddo
@@ -97,22 +112,25 @@ module Voronoi_grid
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
 
-
     do i=1, n
-       ! id a un PB car Voronoi fait sauter des points quand bcp de ponts
-       read(1,*) Voronoi(i)%id, Voronoi(i)%xyz(1), Voronoi(i)%xyz(2), Voronoi(i)%xyz(3), volume(i), n_neighbours, &
-            neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+       read(1,*) icell, x, y, z, vol, n_neighbours, &
+            neighbours_list(Voronoi(icell)%first_neighbour:Voronoi(icell)%last_neighbour)
+
+       Voronoi(icell)%xyz(1) = x
+       Voronoi(icell)%xyz(2) = y
+       Voronoi(icell)%xyz(3) = z
+       Volume(icell) = vol
 
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
-          j = neighbours_list(Voronoi(i)%first_neighbour + k-1)
+          j = neighbours_list(Voronoi(icell)%first_neighbour + k-1)
           if (j < 0) then ! wall
              j = -j ! wall index
              wall(j)%n_neighbours = wall(j)%n_neighbours+1
              if (wall(j)%n_neighbours > max_wall_neighbours) then
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
              endif
-             wall(j)%neighbour_list(wall(j)%n_neighbours) = i
+             wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
        enddo ! k
     enddo ! i
