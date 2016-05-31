@@ -133,6 +133,7 @@ subroutine initialisation_mcfost()
   lno_T = .false.
   lISM_heating = .false.
   llimb_darkening = .false.
+  lVoronoi = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
