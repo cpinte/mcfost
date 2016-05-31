@@ -91,7 +91,7 @@ contains
     character(len=512), intent(in) :: phantom_file
 
     integer, parameter :: iunit = 1
-    real(db), allocatable, dimension(:) :: x,y,z,rho
+    real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH
     real :: grainsize,graindens, f
@@ -102,7 +102,7 @@ contains
     write(*,*) "Performing phantom2mcfost setup"
     write(*,*) "Reading phantom density file: "//trim(phantom_file)
 
-    call read_phantom_file(iunit,phantom_file, x,y,z,rho,rhodust,ndusttypes,n_SPH,ierr)
+    call read_phantom_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     if (ierr /=0) then
        write(*,*) "Error code =", ierr,  get_error_text(ierr)
        stop
@@ -198,12 +198,23 @@ contains
     ! Tableau de densite et masse de gaz
     do icell=1,n_cells
        densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
-       masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+       masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell)
+    enddo
+    masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
+
+    do icell=1,n_cells
+       masse_gaz(icell) = massgas(icell) /  g_to_Msun
     enddo
 
     ! Tableau de densite et masse de poussiere
     ! interpolation en taille
     if (ndusttypes > 1) then
+       lvariable_dust = .true.
+       write(*,*) "*********************************************"
+       write(*,*) "This part has not been tested"
+       write(*,*) "Dust mass is going to incorrect !!!"
+       write(*,*) "rhodust is not calibrated for mcfost yet"
+       write(*,*) "*********************************************"
        l=1
        do icell=1,n_cells
           do k=1,n_grains_tot
@@ -219,21 +230,23 @@ contains
              endif
              !write(*,*) "Todo : densite_pouss : missing factor"
              !          stop
-             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+             masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
           enddo !l
        enddo ! icell
        masse(:) = masse(:) * AU3_to_cm3
     else ! using the gas density
+       lvariable_dust = .false.
        write(*,*) "Forcing gas/dust == 100"
        do icell=1,n_cells
           do k=1,n_grains_tot
              densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
-             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+             masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
           enddo
        enddo
-        f = 0.01 * sum(masse_gaz)/sum(masse)
-        densite_pouss(:,:) = densite_pouss(:,:) * f
-        masse(:) = masse(:) * f
+       masse(:) = masse(:) * AU3_to_cm3
+       f = 0.01 * sum(masse_gaz)/sum(masse)
+       densite_pouss(:,:) = densite_pouss(:,:) * f
+       masse(:) = masse(:) * f
     endif
 
     write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
