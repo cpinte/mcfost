@@ -146,9 +146,10 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
         else
            if (lcylindrical) then
               call verif_cell_position_cyl(icell0, xio, yio, zio)
-           else
+           else if (lspherical) then
               call verif_cell_position_sph(icell0, xio, yio, zio)
            endif
+           ! todo : on ne fait rien dans la cas Voronoi ???
         endif
 
         return
