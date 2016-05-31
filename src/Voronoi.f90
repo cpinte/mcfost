@@ -670,11 +670,18 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
     real(kind=db), intent(in) :: xin,yin,zin
     integer, intent(out) :: icell
 
+    integer :: i
+    real :: dist2_min, dist2
 
-    write(*,*) "indice_cellule_Voronoi not implemented yet"
-    write(*,*) "Exiting"
-    icell = 0
-    stop
+    dist2_min = huge(1.0)
+    do i=1, n_cells
+       dist2 = (Voronoi(i)%xyz(1) - xin)**2 + (Voronoi(i)%xyz(2) - yin)**2 + (Voronoi(i)%xyz(3) - zin)**2
+
+       if (dist2 < dist2_min) then
+          icell = i
+          dist2_min = dist2
+       endif
+    enddo
 
     return
 
