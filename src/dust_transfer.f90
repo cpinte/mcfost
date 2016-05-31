@@ -289,7 +289,12 @@ subroutine transfert_poussiere()
               lapprox_diffusion=.false.
            else
               if (lapprox_diffusion) then
-                 call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+                 if (lcylindrical) then
+                    call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+                 else
+                    write(*,*) "No dark zone"
+                    call no_dark_zone()
+                 endif
               else
                  write(*,*) "No dark zone"
                  call no_dark_zone()
@@ -520,8 +525,6 @@ subroutine transfert_poussiere()
            ! Emission du paquet
            call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
-
-
 
            ! Propagation du packet
            if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
