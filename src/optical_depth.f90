@@ -270,8 +270,7 @@ subroutine integ_tau(lambda)
 
   integer, intent(in) :: lambda
 
-  real :: norme
-  integer :: i, ri, zj, j, icell
+  integer :: icell
 
   real(kind=db), dimension(4) :: Stokes
   ! angle de visee en deg
@@ -282,50 +281,28 @@ subroutine integ_tau(lambda)
 
   angle=angle_interet
 
-  norme=0.0
-  do i=1, n_rad
-     icell = cell_map(i,1,1)
-     norme=norme+kappa(icell,lambda)*(r_lim(i)-r_lim(i-1))
-  enddo
+  x0=0.0 ; y0=0.0 ; z0=0.0
+  Stokes = 0.0_db ; Stokes(1) = 1.0_db
+  w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
-  norme = norme
-  write(*,*) 'Integ tau dans plan eq. = ', norme
-  ! 1.49597870691e13 car kappa est en AU**-1
-  ! Ok si pas de sedimentation
+  call indice_cellule(x0,y0,z0, icell)
+  call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  write(*,*) 'Integ tau dans plan eq. = ', tau
+
   if (.not.lvariable_dust) then
      icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell,lambda)/AU_to_cm))
      endif
   endif
 
-
-  norme=0.0
-  do j=1, nz
-     icell = icell_ref
-     norme=norme+kappa(icell,lambda)*(z_lim(1,j+1)-z_lim(1,j))
-  enddo
-  norme = norme * 2.
-
-  write(*,*) 'Integ tau vert = ', norme
-  ! 1.49597870691e13 car kappa est en AU**-1
-  ! Ok si pas de sedimentation
-  if (.not.lvariable_dust) then
-     icell = icell_ref
-     if (kappa(icell,lambda) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(norme*(masse(icell)/(volume(1)*AU_to_cm**3))/ &
-             (kappa(icell,lambda)/AU_to_cm))
-     endif
-  endif
-
-  ri=0 ; zj=1 ; x0=0.0 ; y0=0.0 ; z0=0.0
   Stokes = 0.0_db ; Stokes(1) = 1.0_db
   w0 = cos((angle)*pi/180.)
   u0 = sqrt(1.0-w0*w0)
   v0 = 0.0
 
-  icell = cell_map(ri,zj,1)
+  call indice_cellule(x0,y0,z0, icell)
   call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
@@ -337,25 +314,6 @@ subroutine integ_tau(lambda)
              (kappa(icell,lambda)/1.49597870691e13))
      endif
   endif
-
-  if (norme > tau_seuil) then
-     write(*,*) "Tau greater than", tau_seuil, "Exiting"
-     stop
-  endif
-
-
-  ! Verif
-!!$  do i=1,30
-!!$     tau=0.5*(tau_max+tau_min)
-!!$     ri=0 ; zj=1 ; x0=0.0 ; y0=0.0 ; z0=0.0
-!!$     call length_deg2(1,lambda,1,ri,zj,x0,y0,y0,u0,v0,w0,tau,dvol1,flag_sortie)
-!!$     if (flag_sortie==4) then
-!!$        tau_max=tau
-!!$     else
-!!$        tau_min=tau
-!!$     endif
-!!$  enddo
-!!$  write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",F12.2)') angle, 0.5*(tau_max+tau_min)
 
   return
 
