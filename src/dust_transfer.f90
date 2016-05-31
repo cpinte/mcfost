@@ -438,7 +438,7 @@ subroutine transfert_poussiere()
         if (lspherical.or.l3D) then
            call no_dark_zone()
         else
-           call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
+           if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
         endif
         !call no_dark_zone()
         ! n_dif_max = seuil_n_dif(lambda)
@@ -469,9 +469,9 @@ subroutine transfert_poussiere()
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
         tau=0.0 ;
-        do i=1, n_rad
-           tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
-        enddo
+        !do i=1, n_rad
+        !   tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
+        !enddo
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
