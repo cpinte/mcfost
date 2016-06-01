@@ -181,6 +181,7 @@ end subroutine define_physical_zones
 subroutine setup_grid()
 
   logical, save :: lfirst = .true.
+  integer :: mem_size
 
   nrz = n_rad * nz
   if (l3D) then
@@ -200,7 +201,6 @@ subroutine setup_grid()
   else
      p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
   endif
-
 
   if (l3D) then
      j_start = -nz
@@ -258,6 +258,42 @@ subroutine setup_grid()
      if (lfirst) then
         call build_cylindrical_cell_mapping() ! same for spherical
         lfirst = .false.
+     endif
+  endif
+
+  ! parametrage methode de diffusion en fonction de la taille de la grille
+  ! 1 : per dust grain
+  ! 2 : per cell
+  if (scattering_method == 0) then
+     if (.not.lmono) then
+        mem_size = (1.0*p_n_cells) * (nang_scatt+1) * n_lambda * 4 / 1024**3
+         if (mem_size > max_mem) then
+           scattering_method = 1
+        else
+           scattering_method = 2
+        endif
+     else
+        if (lscatt_ray_tracing) then
+           scattering_method = 2 ! it needs to be 2 for ray-tracing
+        else
+           ! ???
+           scattering_method = 2
+        endif
+     endif
+  endif
+
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
+
+  lMueller_pos_multi = .false.
+  if (lmono) then
+     p_n_lambda_pos = 1
+  else
+     if (scattering_method==1) then
+        p_n_lambda_pos = 1
+     else
+        p_n_lambda_pos = n_lambda
+        lMueller_pos_multi = .true.
      endif
   endif
 
