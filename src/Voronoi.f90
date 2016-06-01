@@ -79,8 +79,8 @@ module Voronoi_grid
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
-     Voronoi(icell)%first_neighbour = 0
-     Voronoi(icell)%last_neighbour = 0
+    Voronoi(:)%first_neighbour = 0
+    Voronoi(:)%last_neighbour = 0
     do i=1, n
        read(1,*) icell , x, y, z, vol, n_neighbours
 
@@ -592,15 +592,19 @@ pure logical function test_exit_grid_Voronoi(icell, x,y,z)
   integer, intent(in) :: icell
   real(kind=db), intent(in) :: x,y,z
 
-  test_exit_grid_Voronoi = .true.
-
-  if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
-     if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
-        if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
-           test_exit_grid_Voronoi = .false.
-        endif
-     endif
+  if (icell < 0) then
+     test_exit_grid_Voronoi = .true.
+  else
+     test_exit_grid_Voronoi = .false.
   endif
+
+  !if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
+  !   if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
+  !      if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
+  !         test_exit_grid_Voronoi = .false.
+  !      endif
+  !   endif
+  !endif
 
   return
 
