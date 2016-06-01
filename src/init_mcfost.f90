@@ -1130,47 +1130,10 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-
   lonly_LTE = .false.
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
-
-  ! parametrage methode de diffusion
-  ! 1 : per dust grain
-  ! 2 : per cell
-  if (scattering_method == 0) then
-     if (.not.lmono) then
-        mem_size = (1.0*p_n_cells) * (nang_scatt+1) * n_lambda * 4 / 1024**3
-        if (mem_size > max_mem) then
-           scattering_method = 1
-        else
-           scattering_method = 2
-        endif
-     else
-        if (lscatt_ray_tracing) then
-           scattering_method = 2 ! it needs to be 2 for ray-tracing
-        else
-           ! ???
-           scattering_method = 2
-        endif
-     endif
-  endif
-
-  lMueller_pos_multi = .false.
-  if (lmono) then
-     p_n_lambda_pos = 1
-  else
-     if (scattering_method==1) then
-        p_n_lambda_pos = 1
-     else
-        p_n_lambda_pos = n_lambda
-        lMueller_pos_multi = .true.
-     endif
-  endif
-
-  write(*,fmt='(" Using scattering method ",i1)') scattering_method
-  lscattering_method1 = (scattering_method==1)
 
   ! Pour rotation du disque (signe - pour convention astro)
   cos_disk = cos(ang_disque/180.*pi)
