@@ -40,7 +40,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
 
   real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=db) :: l, tau, opacite
-  integer :: icell_in, icell0, icell1, icell_old, next_cell, previous_cell
+  integer :: icell_in, icell0, icell_old, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
 
@@ -52,10 +52,9 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
 
   extr=extrin
   icell_in = icell
-  icell0 = icell
-  icell1 = icell
 
   next_cell = icell
+  icell0 = 0 ! to define previous_cell
 
   ltot = 0.0
 
@@ -68,8 +67,8 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
      icell_old = icell0
      x_old = x0 ; y_old = y0 ; z_old = z0
 
-     icell0=icell1
      x0=x1 ; y0=y1 ; z0=z1
+     previous_cell = icell0
      icell0 = next_cell
 
      ! Pour cas avec approximation de diffusion
@@ -98,8 +97,8 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
-     previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     !write(*,*) icell, x0,y0,z0, next_cell, l
 
      ! opacity wall
      !---if (ri0 == 1) then
@@ -270,7 +269,7 @@ subroutine integ_tau(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: icell
+  integer :: icell!, i
 
   real(kind=db), dimension(4) :: Stokes
   ! angle de visee en deg
@@ -285,8 +284,14 @@ subroutine integ_tau(lambda)
   Stokes = 0.0_db ; Stokes(1) = 1.0_db
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
+
   call indice_cellule(x0,y0,z0, icell)
   call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+
+  !tau = 0.0
+  !do i=1, n_rad
+  !   tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
+  !enddo
   write(*,*) 'Integ tau dans plan eq. = ', tau
 
   if (.not.lvariable_dust) then
@@ -342,28 +347,26 @@ subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmi
   real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
   real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
   real(kind=db) :: correct_plus, correct_moins
-  integer :: icell0, icell1, delta_rad, delta_zj, previous_cell, next_cell
+  integer :: icell0, delta_rad, delta_zj, previous_cell, next_cell
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
 
   x1=xi;y1=yi;z1=zi
 
-  icell0=icell
-  icell1=icell
-
-  next_cell = icell
-
-
   tau_tot=0.0_db
 
   lmin=0.0_db
   ltot=0.0_db
 
+  next_cell = icell
+  icell0 = 0 ! for previous_cell, just for Voronoi
+
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
      ! Indice de la cellule
-     icell0=next_cell
+     previous_cell = icell0
+     icell0 = next_cell
      x0=x1;y0=y1;z0=z1
 
      ! Test sortie
@@ -380,8 +383,12 @@ subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmi
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
-     previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+
+!     write(*,*) icell0, x0,y0,z0, l
+!     write(*,*) "nextcell=", next_cell, x1,y1,z1
+!     write(*,*) "uvw", u, v, w
+!
 
      tau=l*opacite ! opacite constante dans la cellule
 

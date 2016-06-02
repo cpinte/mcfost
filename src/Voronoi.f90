@@ -14,6 +14,7 @@ module Voronoi_grid
   type Voronoi_cell
      real, dimension(3) :: xyz
      integer :: id, first_neighbour, last_neighbour
+     logical :: exist
   end type Voronoi_cell
 
   type Voronoi_wall
@@ -79,9 +80,14 @@ module Voronoi_grid
 
     n_neighbours_tot = 0
     open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
+
+    ! The Voronoi mesh is not defined to start with
+    Voronoi(:)%exist = .false.
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
+
     do i=1, n
+       ! We read the file to figure out the neighbours list
        read(1,*) icell , x, y, z, vol, n_neighbours
 
        ! We use temporary variables first_neighbour and last_neighbour
@@ -106,16 +112,19 @@ module Voronoi_grid
        n_neighbours_tot = n_neighbours_tot + n_neighbours
     enddo
 
-    rewind(1)
+
     write(*,*) "Neighbours list size =", n_neighbours_tot
     write(*,*) "Voronoi volume =", sum(volume(1:n))
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
 
+    ! We read the file again with all the information
+    rewind(1)
     do i=1, n
        read(1,*) icell, x, y, z, vol, n_neighbours, &
             neighbours_list(Voronoi(icell)%first_neighbour:Voronoi(icell)%last_neighbour)
 
+       Voronoi(icell)%exist = .true.
        Voronoi(icell)%xyz(1) = x
        Voronoi(icell)%xyz(2) = y
        Voronoi(icell)%xyz(3) = z
@@ -138,52 +147,53 @@ module Voronoi_grid
     close(unit=1)
 
 
-    !------------- This is testing from now on
-
-    do k=1, n_walls
-       write(*,*) "wall", k, wall(k)%n_neighbours, "neighbours"
-       !if (k==1) then
-       !   do i=1,  wall(k)%n_neighbours
-       !      write(*,*) i, wall(k)%neighbour_list(i)
-       !   enddo
-       !endif
-    enddo
-
-
-    write(*,*) "Testing radiative transfer routines on Voronoi grid"
-    x = -200.0 ; y = -200.0 ; z = -200.0 ;
-    !u = 1.2 ; v = 1.0 ; w = 1.1 ;
-    !u = 1.45 ; v = 1.2 ; w = 1.0 ;
-
-    u = 1.0 ; v = 1.0 ; w = 1.0 ;
-    norme = sqrt(u*u + v*v + w*w)
-    u = u / norme ; v = v / norme ;  w = w / norme ;
-
-    call move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
-    write(*,*) "Packet is entering volume in cell", icell
-
-    id = 1 ; lambda = 1 !TODO
-    Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
-
-    flag_star = .true.
-    flag_direct_star = .true.
-
-    tau = 500 ;
-
-    write(*,*) "Testing length_Voronoi with tau=", tau
-
-    if (icell > 0) then
-       call length_Voronoi(id,lambda,Stokes, icell,x,y,z, u,v,w, flag_star,flag_direct_star, tau, lvol,flag_sortie)
-
-       write(*,*) "lvol=", lvol
-       write(*,*) "Did I exit ?", flag_sortie
-       write(*,*) "Last cell", icell
-       write(*,*) "Final position", x, y, z
-    else
-       write(*,*) "Packet did not reach model volume"
-    endif
-
-    write(*,*) "TEST DONE"
+!---    !------------- This is testing from now on
+!---
+!---    do k=1, n_walls
+!---       write(*,*) "wall", k, wall(k)%n_neighbours, "neighbours"
+!---       !if (k==1) then
+!---       !   do i=1,  wall(k)%n_neighbours
+!---       !      write(*,*) i, wall(k)%neighbour_list(i)
+!---       !   enddo
+!---       !endif
+!---    enddo
+!---
+!---
+!---    write(*,*) "Testing radiative transfer routines on Voronoi grid"
+!---    x = -200.0 ; y = -200.0 ; z = -200.0 ;
+!---    !u = 1.2 ; v = 1.0 ; w = 1.1 ;
+!---    !u = 1.45 ; v = 1.2 ; w = 1.0 ;
+!---
+!---    u = 1.0 ; v = 1.0 ; w = 1.0 ;
+!---    norme = sqrt(u*u + v*v + w*w)
+!---    u = u / norme ; v = v / norme ;  w = w / norme ;
+!---
+!---    call move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
+!---    write(*,*) "Packet is entering volume in cell", icell
+!---
+!---    id = 1 ; lambda = 1 !TODO
+!---    Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
+!---
+!---    flag_star = .true.
+!---    flag_direct_star = .true.
+!---
+!---    tau = 500 ;
+!---
+!---    write(*,*) "Testing length_Voronoi with tau=", tau
+!---
+!---    if (icell > 0) then
+!---       call length_Voronoi(id,lambda,Stokes, icell,x,y,z, u,v,w, flag_star,flag_direct_star, tau, lvol,flag_sortie)
+!---       write(*,*) "lvol=", lvol
+!---       write(*,*) "Did I exit ?", flag_sortie
+!---       write(*,*) "Last cell", icell
+!---       write(*,*) "Final position", x, y, z
+!---    else
+!---       write(*,*) "Packet did not reach model volume"
+!---    endif
+!---
+!---
+!---    write(*,*) "TEST DONE"
+!---    stop
 
     ! OK jusqu'ici
     !call test_emission()
@@ -206,6 +216,8 @@ module Voronoi_grid
 
     character(len=128) :: limits
 
+    logical, parameter :: lrun = .false.
+
     open(unit=1, file="particles.txt", status="replace")
     do i=1, n_cells
        write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
@@ -215,18 +227,25 @@ module Voronoi_grid
     write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") minval(x), maxval(x), minval(y), maxval(y), minval(z), maxval(z)
     write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") -150., 150., -150., 150., -150., 150.
 
-    ! Run voro++ command line for now
-    ! while I fix the c++/fortran interface and make all the tests
-    write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    call system_clock(time1)
-    cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
-         trim(limits)//&
-         " particles.txt ; mv particles.txt.vol Voronoi.txt"
-    write(*,*) trim(cmd)
+    if (lrun) then
+       ! Run voro++ command line for now
+       ! while I fix the c++/fortran interface and make all the tests
+       write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+       call system_clock(time1)
+       cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
+            trim(limits)//&
+            " particles.txt ; mv particles.txt.vol Voronoi.txt"
+       !write(*,*) trim(cmd)
+       call appel_syst(cmd,syst_status)
+    else
+       write(*,*) "Using previous Voronoi tesselation"
+    endif
 
-    call appel_syst(cmd,syst_status)
+
     cmd = "rm -rf nVoronoi.txt ; wc -l Voronoi.txt > nVoronoi.txt"
     call appel_syst(cmd,syst_status)
+
+
     open(unit=1,file="nVoronoi.txt",status="old")
     read(1,*) nVoronoi
     close(unit=1)
@@ -324,7 +343,7 @@ module Voronoi_grid
 
           ! test direction
           den = dot_product(n, k)
-          if (den <= 0) cycle nb_loop ! car s_tmp sera < 0
+          if (den <= 0.) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
           p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
@@ -333,8 +352,7 @@ module Voronoi_grid
 
           if (s_tmp < 0.) s_tmp = huge(1.0)
 
-
-          IF (s_tmp < 0.) then
+          if (s_tmp < 0.) then
              write(*,*) "Oups, there is something wrong"
              write(*,*) s_tmp
              write(*,*) "s_tmp", s_tmp, icell, id_n, den
@@ -355,8 +373,8 @@ module Voronoi_grid
     enddo nb_loop ! i
 
     x1 = x + u*s
-    y1 = y + u*s
-    z1 = z + u*s
+    y1 = y + v*s
+    z1 = z + w*s
 
     return
 
@@ -691,11 +709,13 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
 
     dist2_min = huge(1.0)
     do i=1, n_cells
-       dist2 = (Voronoi(i)%xyz(1) - xin)**2 + (Voronoi(i)%xyz(2) - yin)**2 + (Voronoi(i)%xyz(3) - zin)**2
+       if (Voronoi(i)%exist) then ! testing only on the actual Voronoi cells
+          dist2 = (Voronoi(i)%xyz(1) - xin)**2 + (Voronoi(i)%xyz(2) - yin)**2 + (Voronoi(i)%xyz(3) - zin)**2
 
-       if (dist2 < dist2_min) then
-          icell = i
-          dist2_min = dist2
+          if (dist2 < dist2_min) then
+             icell = i
+             dist2_min = dist2
+          endif
        endif
     enddo
 
