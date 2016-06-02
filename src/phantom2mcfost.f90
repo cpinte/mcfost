@@ -180,11 +180,8 @@ contains
        write(*,*) "Exiting"
        stop
     endif
+    Voronoi(:)%exist = .false. ! cells are not defined yet
     volume(:) = 0.0
-
-    Voronoi(:)%xyz(1) = x(:)
-    Voronoi(:)%xyz(2) = y(:)
-    Voronoi(:)%xyz(3) = z(:)
 
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     call Voronoi_tesselation(n_SPH,x,y,z, n_Voronoi)
