@@ -557,36 +557,51 @@ subroutine lect_Temperature()
 
      !  determine the size of temperature file
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (l3D) then
-        if (nfound /= 3) then
+     if (lVoronoi) then
+         if (nfound /= 1) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
            stop
         endif
-        if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
+        if ((naxes(1) /= n_cells)) then
            write(*,*) "Error : Temperature.fits.gz does not have the"
            write(*,*) "right dimensions. Exiting."
            write(*,*) "# fits file,   required"
-           write(*,*) naxes(1), n_rad
-           write(*,*) naxes(2), 2*nz
-           write(*,*) naxes(3), n_az
-
+           write(*,*) naxes(1), n_cells
            stop
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)
+        npixels=naxes(1)
      else
-        if (nfound /= 2) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
-           stop
-        endif
+        if (l3D) then
+           if (nfound /= 3) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+              stop
+           endif
+           if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
+              write(*,*) "Error : Temperature.fits.gz does not have the"
+              write(*,*) "right dimensions. Exiting."
+              write(*,*) "# fits file,   required"
+              write(*,*) naxes(1), n_rad
+              write(*,*) naxes(2), 2*nz
+              write(*,*) naxes(3), n_az
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)
+        else
+           if (nfound /= 2) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+              stop
+           endif
 
-        if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-           write(*,*) "Error : Temperature.fits.gz does not have the"
-           write(*,*) "right dimensions. Exiting."
-           stop
+           if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
+              write(*,*) "Error : Temperature.fits.gz does not have the"
+              write(*,*) "right dimensions. Exiting."
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)
         endif
-        npixels=naxes(1)*naxes(2)
      endif
 
      nbuffer=npixels
@@ -617,22 +632,32 @@ subroutine lect_Temperature()
 
      ! determine the size of temperature file
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (l3D) then
-        if (nfound /= 4) then
+     if (lVoronoi) then
+        if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
            write(*,*) "Found", nfound, "axes", naxes
            stop
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        npixels=naxes(1)*naxes(2)
      else
-        if (nfound /= 3) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
-           write(*,*) "Found", nfound, "axes", naxes
-           stop
+        if (l3D) then
+           if (nfound /= 4) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+              write(*,*) "Found", nfound, "axes", naxes
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           if (nfound /= 3) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+              write(*,*) "Found", nfound, "axes", naxes
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
 
      nbuffer=npixels
@@ -667,18 +692,28 @@ subroutine lect_Temperature()
 
      ! HDU 1 : Teq
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (l3D) then
-        if (nfound /= 4) then
+     if (lVoronoi) then
+        if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+           write(*,*) "Found", nfound, "axes", naxes
+           stop
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        npixels=naxes(1)*naxes(2)
      else
-        if (nfound /= 3) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+        if (l3D) then
+           if (nfound /= 4) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           if (nfound /= 3) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
      nbuffer=npixels
      ! read_image
@@ -687,20 +722,30 @@ subroutine lect_Temperature()
      ! HDU 2 : is_eq
      call ftmahd(unit,2,hdutype,status)
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (l3D) then
-        if (nfound /= 4) then
+     if (lVoronoi) then
+        if (nfound /= 2) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+           write(*,*) "Found", nfound, "axes", naxes
            stop
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        npixels=naxes(1)*naxes(2)
      else
-        if (nfound /= 3) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
-           stop
+        if (l3D) then
+           if (nfound /= 4) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           if (nfound /= 3) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)
      endif
      nbuffer=npixels
      ! read_image
@@ -710,20 +755,30 @@ subroutine lect_Temperature()
      call ftmahd(unit,4,hdutype,status)
 
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-     if (l3D) then
-        if (nfound /= 5) then
+     if (lVoronoi) then
+        if (nfound /= 3) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
+           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
+           write(*,*) "Found", nfound, "axes", naxes
            stop
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        npixels=naxes(1)*naxes(2)*naxes(3)
      else
-        if (nfound /= 4) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
-           stop
+        if (l3D) then
+           if (nfound /= 5) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        else
+           if (nfound /= 4) then
+              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+              write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
+              stop
+           endif
+           npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         endif
-        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      endif
      nbuffer=npixels
      ! read_image
