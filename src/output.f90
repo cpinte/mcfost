@@ -1881,7 +1881,7 @@ subroutine ecriture_temperature(iTemperature)
   logical :: simple, extend
   character(len=512) :: filename
 
-  integer, dimension(:,:,:,:), allocatable :: tmp
+  integer, dimension(:,:), allocatable :: tmp
 
 
   if (lRE_LTE) then
@@ -1904,17 +1904,23 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=-32
      extend=.true.
 
-     if (l3D) then
-        naxis=3
-        naxes(1)=n_rad
-        naxes(2)=2*nz
-        naxes(3)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)
+     if (lVoronoi) then
+        naxis=1
+        naxes(1)=n_cells
+        nelements=naxes(1)
      else
-        naxis=2
-        naxes(1)=n_rad
-        naxes(2)=nz
-        nelements=naxes(1)*naxes(2)
+        if (l3D) then
+           naxis=3
+           naxes(1)=n_rad
+           naxes(2)=2*nz
+           naxes(3)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        else
+           naxis=2
+           naxes(1)=n_rad
+           naxes(2)=nz
+           nelements=naxes(1)*naxes(2)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -1959,19 +1965,26 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=-32
      extend=.true.
 
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_RE_nLTE
-        naxes(2)=n_rad
-        naxes(3)=2*nz
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_RE_nLTE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_RE_nLTE
+           naxes(2)=n_rad
+           naxes(3)=2*nz
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_RE_nLTE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -1981,7 +1994,6 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
@@ -2022,19 +2034,26 @@ subroutine ecriture_temperature(iTemperature)
      !------------------------------------------------------------------------------
      bitpix=-32
 
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=2*nz
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=2*nz
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -2047,22 +2066,28 @@ subroutine ecriture_temperature(iTemperature)
      ! 2eme HDU : is the grain at equilibrium ?
      !------------------------------------------------------------------------------
      bitpix=32
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=2*nz+1
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,-nz:nz,n_az), stat=alloc_status)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
-        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,nz,n_az), stat=alloc_status)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=2*nz+1
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
+     allocate(tmp(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
 
      if (alloc_status /= 0) then
         write(*,*) "Allocation error in ecriture_temperature"
@@ -2077,19 +2102,13 @@ subroutine ecriture_temperature(iTemperature)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      ! le j signifie integer
-     do i=1, n_rad
-        do j=j_start,nz
-           if (j==0) cycle
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              do l=grain_nRE_start, grain_nRE_end
-                 if (l_RE(l,icell)) then
-                    tmp(l,i,j,k) = 1
-                 else
-                    tmp(l,i,j,k) = 0
-                 endif
-              enddo
-           enddo
+     do icell=1, n_cells
+        do l=grain_nRE_start, grain_nRE_end
+           if (l_RE(l,icell)) then
+              tmp(l,icell) = 1
+           else
+              tmp(l,icell) = 0
+           endif
         enddo
      enddo
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
@@ -2115,21 +2134,29 @@ subroutine ecriture_temperature(iTemperature)
      ! 4eme HDU : Proba Temperature
      !------------------------------------------------------------------------------
      bitpix=-32
-     if (l3D) then
-        naxis=5
+     if (lVoronoi) then
+        naxis=3
         naxes(1)=n_T
         naxes(2)=n_grains_nRE
-        naxes(3)=n_rad
-        naxes(4)=2*nz
-        naxes(5)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        naxes(3)=n_cells
+        nelements=naxes(1)*naxes(2)*naxes(3)
      else
-        naxis=4
-        naxes(1)=n_T
-        naxes(2)=n_grains_nRE
-        naxes(3)=n_rad
-        naxes(4)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        if (l3D) then
+           naxis=5
+           naxes(1)=n_T
+           naxes(2)=n_grains_nRE
+           naxes(3)=n_rad
+           naxes(4)=2*nz
+           naxes(5)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        else
+           naxis=4
+           naxes(1)=n_T
+           naxes(2)=n_grains_nRE
+           naxes(3)=n_rad
+           naxes(4)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        endif
      endif
 
      ! create new hdu
