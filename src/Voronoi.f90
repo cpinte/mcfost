@@ -114,7 +114,6 @@ module Voronoi_grid
 
 
     write(*,*) "Neighbours list size =", n_neighbours_tot
-    write(*,*) "Voronoi volume =", sum(volume(1:n))
     write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
     allocate(neighbours_list(n_neighbours_tot))
 
@@ -129,7 +128,6 @@ module Voronoi_grid
        Voronoi(icell)%xyz(2) = y
        Voronoi(icell)%xyz(3) = z
        Volume(icell) = vol
-
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
           j = neighbours_list(Voronoi(icell)%first_neighbour + k-1)
@@ -145,6 +143,8 @@ module Voronoi_grid
     enddo ! i
 
     close(unit=1)
+
+    write(*,*) "Voronoi volume =", sum(volume(1:n))
 
 
 !---    !------------- This is testing from now on
@@ -351,13 +351,6 @@ module Voronoi_grid
           s_tmp = dot_product(n, p-r) / den
 
           if (s_tmp < 0.) s_tmp = huge(1.0)
-
-          if (s_tmp < 0.) then
-             write(*,*) "Oups, there is something wrong"
-             write(*,*) s_tmp
-             write(*,*) "s_tmp", s_tmp, icell, id_n, den
-          endif
-
        else ! i < 0 ; le voisin est un wall
           s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
 
@@ -375,6 +368,20 @@ module Voronoi_grid
     x1 = x + u*s
     y1 = y + v*s
     z1 = z + w*s
+
+    if (next_cell == 0) then ! there is a rounding-off error somewehere
+       ! We correct the cell index and do not move the packet
+       call indice_cellule_voronoi(x,y,z, next_cell)
+       x1 = x
+       y1 = y
+       z1 = z
+       s = 0.0
+
+       if (icell == next_cell) then
+          ! that means we are out of the grid already
+          next_cell = -1 ! the exact index does not matter
+       endif
+    endif
 
     return
 
@@ -688,7 +695,7 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 
   ! Repartition uniforme selon cette direction
   l = l * aleat3**(1./3)
-  x=x+l ; y=y+l*v ; z=z+l*w
+  !x=x+l ; y=y+l*v ; z=z+l*w
 
   return
 

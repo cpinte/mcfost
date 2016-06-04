@@ -77,14 +77,13 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
         return
      endif
 
-
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
         opacite=kappa(icell0,lambda)
 
         if (l_dark_zone(icell0)) then
-           ! On revoie le paquet dans l'autre sens
+           ! On renvoie le paquet dans l'autre sens
            u = -u ; v = -v ; w=-w
            ! et on le renvoie au point de depart
            icell = icell_old
