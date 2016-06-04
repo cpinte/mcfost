@@ -227,11 +227,11 @@ module Voronoi_grid
     write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") minval(x), maxval(x), minval(y), maxval(y), minval(z), maxval(z)
     write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") -150., 150., -150., 150., -150., 150.
 
+    call system_clock(time1)
     if (lrun) then
        ! Run voro++ command line for now
        ! while I fix the c++/fortran interface and make all the tests
        write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-       call system_clock(time1)
        cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
             trim(limits)//&
             " particles.txt ; mv particles.txt.vol Voronoi.txt"
@@ -684,7 +684,7 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
   ! Distance jusqu'au bord de la cellule
   previous_cell = 0
   x = Voronoi(icell)%xyz(1) ; y = Voronoi(icell)%xyz(2) ; z = Voronoi(icell)%xyz(3)
-  call cross_Voronoi_cell( x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l)
+  call cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l)
 
   ! Repartition uniforme selon cette direction
   l = l * aleat3**(1./3)
