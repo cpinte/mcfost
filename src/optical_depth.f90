@@ -71,6 +71,13 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
      previous_cell = icell0
      icell0 = next_cell
 
+     ! Test sortie
+     if (test_exit_grid(icell0, x0, y0, z0)) then
+        flag_sortie = .true.
+        return
+     endif
+
+
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
@@ -88,12 +95,6 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
      else
         lcellule_non_vide=.false.
         opacite = 0.0_db
-     endif
-
-     ! Test sortie
-     if (test_exit_grid(icell0, x0, y0, z0)) then
-        flag_sortie = .true.
-        return
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
