@@ -204,28 +204,50 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_cells, x,y,z,  nVoronoi)
+  subroutine Voronoi_tesselation(n_points, x,y,z,  nVoronoi)
 
-    integer, intent(in) :: n_cells
-    real(kind=db), dimension(n_cells), intent(in) :: x, y, z
+    integer, intent(in) :: n_points
+    real(kind=db), dimension(n_points), intent(in) :: x, y, z
     integer, intent(out) :: nVoronoi
 
     character(len=512) :: cmd
-    integer :: i, syst_status, time1, time2, itime
+    integer :: i, syst_status, time1, time2, itime, iVoronoi, alloc_status
     real :: time
 
     character(len=128) :: limits
 
-    logical, parameter :: lrun = .false.
+    logical, parameter :: lrun = .true.
+
+    real(kind=db), dimension(6) :: l
+
+    l = [-150.,150., -150.,150., -150.,150.]
 
     open(unit=1, file="particles.txt", status="replace")
-    do i=1, n_cells
-       write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") i, real(x(i)), real(y(i)), real(z(i))
+    iVoronoi = 0
+    do i=1, n_points
+       if ((x(i) > l(1)).and.(x(i) < l(2))) then
+          if ((y(i) > l(3)).and.(y(i) < l(4))) then
+             if ((z(i) > l(5)).and.(z(i) < l(6))) then
+                iVoronoi = iVoronoi + 1
+                write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") iVoronoi, real(x(i)), real(y(i)), real(z(i))
+             endif
+          endif
+       endif
     enddo
     close(unit=1)
+    n_cells = iVoronoi
 
-    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") minval(x), maxval(x), minval(y), maxval(y), minval(z), maxval(z)
-    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") -150., 150., -150., 150., -150., 150.
+    allocate(Voronoi(n_cells), volume(n_cells), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error Voronoi structure"
+       write(*,*) "Exiting"
+       stop
+    endif
+    Voronoi(:)%exist = .false. ! cells are not defined yet
+    volume(:) = 0.0
+
+    write(*,*) n_cells, "particles are in the volume"
+    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") l(1), l(2), l(3), l(4), l(5), l(6)
 
     call system_clock(time1)
     if (lrun) then
@@ -235,20 +257,23 @@ module Voronoi_grid
        cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
             trim(limits)//&
             " particles.txt ; mv particles.txt.vol Voronoi.txt"
-       !write(*,*) trim(cmd)
        call appel_syst(cmd,syst_status)
     else
        write(*,*) "Using previous Voronoi tesselation"
     endif
 
-
     cmd = "rm -rf nVoronoi.txt ; wc -l Voronoi.txt > nVoronoi.txt"
     call appel_syst(cmd,syst_status)
-
 
     open(unit=1,file="nVoronoi.txt",status="old")
     read(1,*) nVoronoi
     close(unit=1)
+    write(*,*) "Mesh was tesselated with ", nVoronoi, "cells"
+    if (nVoronoi /= n_cells) then
+       write(*,*) "*****************************************"
+       write(*,*) "WARNING : some particles are not the mesh"
+       write(*,*) "*****************************************"
+    endif
 
     call system_clock(time2)
     time=(time2 - time1)/real(time_tick)
