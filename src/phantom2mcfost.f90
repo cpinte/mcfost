@@ -169,25 +169,12 @@ contains
        close(unit=1)
     endif
 
-
     !*******************************
     ! Voronoi tesselation
     !*******************************
-    n_cells = n_SPH ! this is a bit too big as we will loose particles during Voronoi tesselation
-    allocate(Voronoi(n_cells), volume(n_cells), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error Voronoi structure"
-       write(*,*) "Exiting"
-       stop
-    endif
-    Voronoi(:)%exist = .false. ! cells are not defined yet
-    volume(:) = 0.0
-
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
-    call Voronoi_tesselation(n_SPH,x,y,z, n_Voronoi)
+    call Voronoi_tesselation(n_SPH, x,y,z, n_Voronoi)
     deallocate(x,y,z)
-    ! Todo : we can allocate Voronoi, and maybe volume, here
-    n_cells = n_Voronoi
     write(*,*) "Using n_cells =", n_cells
 
     !*************************
