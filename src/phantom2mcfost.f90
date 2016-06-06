@@ -2,6 +2,7 @@ module phantom2mcfost
 
   use parametres
   use constantes
+  use utils
 
   implicit none
 
@@ -97,14 +98,21 @@ contains
     real :: grainsize,graindens, f
     integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k
 
-    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
+    logical :: ltest = .true. ! read a test ascii file
+    logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     icell_ref = 1
 
     write(*,*) "Performing phantom2mcfost setup"
     write(*,*) "Reading phantom density file: "//trim(phantom_file)
 
-    call read_phantom_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    if (ltest) then
+       write(*,*) "USING PHANTOM TEST MODE"
+
+       call read_test_ascii_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    else
+       call read_phantom_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    endif
     if (ierr /=0) then
        write(*,*) "Error code =", ierr,  get_error_text(ierr)
        stop
@@ -253,5 +261,50 @@ contains
     return
 
   end subroutine setup_phantom2mcfost
+
+  !************
+
+  subroutine read_test_ascii_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+
+    integer,               intent(in) :: iunit
+    character(len=*),      intent(in) :: filename
+    real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
+    real(db), intent(out), dimension(:,:), allocatable :: rhodust
+    integer, intent(out) :: ndusttypes, n_SPH,ierr
+
+    integer :: syst_status, alloc_status, ios, i
+    character(len=512) :: cmd
+
+    ierr = 0
+
+    cmd = "wc -l "//trim(filename)//" > ntest.txt"
+    call appel_syst(cmd,syst_status)
+    open(unit=1,file="ntest.txt",status="old")
+    read(1,*) n_SPH
+    close(unit=1)
+    ndusttypes =1
+
+    write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
+
+    alloc_status = 0
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error in phanton_2_mcfost"
+       write(*,*) "Exiting"
+    endif
+
+    write(*,*) shape(x)
+
+    open(unit=1, file=filename, status='old', iostat=ios)
+    do i=1, n_SPH
+       read(1,*) x(i), y(i), z(i), massgas(i)
+       rhogas(i) = massgas(i)
+    enddo
+
+    write(*,*) "MinMax=", minval(massgas), maxval(massgas)
+
+    return
+
+  end subroutine read_test_ascii_file
 
 end module phantom2mcfost
