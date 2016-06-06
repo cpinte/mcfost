@@ -1399,10 +1399,6 @@ function dust_source_fct(icell, x,y,z)
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
 
-  ri = cell_map_i(icell)
-  zj = cell_map_j(icell)
-  phik = cell_map_k(icell)
-
   ! Interpolations angulaires
   if (lscatt_ray_tracing1) then
      if (l3D) then
@@ -1420,7 +1416,6 @@ function dust_source_fct(icell, x,y,z)
         if (k > n_az_rt) k = n_az_rt
      endif
 
-
      ! OK : lisse les images par rapport a la methode en dessous
 !---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
 !---     phi_k =  floor(xi_az)
@@ -1432,11 +1427,14 @@ function dust_source_fct(icell, x,y,z)
 !---     if (phi_k_p1 > n_az_rt) phi_k_p1=n_az_rt
 !---
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
-
-
      dust_source_fct(:) = eps_dust1(k,psup,:,icell)  ! ??? ce n'est pas lineaire
 
+
   else ! Methode 2
+     ri = cell_map_i(icell)
+     zj = cell_map_j(icell)
+     phik = cell_map_k(icell)
+
      ! Pour interpolations spatiales
      r = sqrt(x*x + y*y)
 
