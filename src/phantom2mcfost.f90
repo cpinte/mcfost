@@ -98,7 +98,7 @@ contains
     real :: grainsize,graindens, f
     integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k
 
-    logical :: ltest = .true. ! read a test ascii file
+    logical :: ltest = .false. ! read a test ascii file
     logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     icell_ref = 1
@@ -108,7 +108,6 @@ contains
 
     if (ltest) then
        write(*,*) "USING PHANTOM TEST MODE"
-
        call read_test_ascii_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     else
        call read_phantom_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
@@ -190,14 +189,15 @@ contains
     !*************************
     call allocate_densities()
     ! Tableau de densite et masse de gaz
-    do icell=1,n_cells
-       densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
-       masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell)
-    enddo
-    masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
+    !do icell=1,n_cells
+    !   densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
+    !   masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell)
+    !enddo
+    !masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
 
     do icell=1,n_cells
        masse_gaz(icell) = massgas(icell) /  g_to_Msun
+       densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
     enddo
 
     ! Tableau de densite et masse de poussiere
