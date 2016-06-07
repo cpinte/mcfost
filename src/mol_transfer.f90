@@ -21,6 +21,7 @@ module mol_transfer
   use dust_ray_tracing, only: init_directions_ray_tracing
   use dust_transfer, only : compute_stars_map
   use stars
+  use grid
 
   implicit none
 
@@ -344,7 +345,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
-        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape)
+        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule)
         !$omp do schedule(static,1)
         do icell=1, n_cells
            !$ id = omp_get_thread_num() + 1
