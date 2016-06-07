@@ -530,8 +530,7 @@ module Voronoi_grid
        y_test = y + l*v
        z_test = z + l*w
 
-       icell = 0.
-       if (.not.test_exit_grid_Voronoi(icell, x_test,y_test,z_test)) then
+       if (is_in_volume(x_test,y_test,z_test)) then
           s = l ! distance to the closest wall
           exit check_wall
        endif
@@ -648,18 +647,28 @@ pure logical function test_exit_grid_Voronoi(icell, x,y,z)
      test_exit_grid_Voronoi = .false.
   endif
 
-  !if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
-  !   if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
-  !      if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
-  !         test_exit_grid_Voronoi = .false.
-  !      endif
-  !   endif
-  !endif
-
   return
 
 end function test_exit_grid_Voronoi
 
+!----------------------------------------
+
+pure logical function is_in_volume(x,y,z)
+
+  real(kind=db), intent(in) :: x,y,z
+
+  is_in_volume  = .false.
+  if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
+     if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
+        if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
+           is_in_volume  = .true.
+        endif
+     endif
+  endif
+
+  return
+
+end function is_in_volume
 
 !----------------------------------------
 
