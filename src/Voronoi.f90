@@ -38,13 +38,11 @@ module Voronoi_grid
 
   contains
 
+    subroutine define_Voronoi_grid()
 
-  subroutine define_Voronoi_grid()
+      return
 
-    write(*,*) "TODO : define_Voronoi_grid"
-    return
-
-  end subroutine define_Voronoi_grid
+    end subroutine define_Voronoi_grid
 
   !************************************************************************
 
@@ -145,58 +143,6 @@ module Voronoi_grid
     close(unit=1)
 
     write(*,*) "Voronoi volume =", sum(volume(1:n))
-
-
-!---    !------------- This is testing from now on
-!---
-!---    do k=1, n_walls
-!---       write(*,*) "wall", k, wall(k)%n_neighbours, "neighbours"
-!---       !if (k==1) then
-!---       !   do i=1,  wall(k)%n_neighbours
-!---       !      write(*,*) i, wall(k)%neighbour_list(i)
-!---       !   enddo
-!---       !endif
-!---    enddo
-!---
-!---
-!---    write(*,*) "Testing radiative transfer routines on Voronoi grid"
-!---    x = -200.0 ; y = -200.0 ; z = -200.0 ;
-!---    !u = 1.2 ; v = 1.0 ; w = 1.1 ;
-!---    !u = 1.45 ; v = 1.2 ; w = 1.0 ;
-!---
-!---    u = 1.0 ; v = 1.0 ; w = 1.0 ;
-!---    norme = sqrt(u*u + v*v + w*w)
-!---    u = u / norme ; v = v / norme ;  w = w / norme ;
-!---
-!---    call move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
-!---    write(*,*) "Packet is entering volume in cell", icell
-!---
-!---    id = 1 ; lambda = 1 !TODO
-!---    Stokes(1) = 1.0 ; Stokes(2:4) = 0.0
-!---
-!---    flag_star = .true.
-!---    flag_direct_star = .true.
-!---
-!---    tau = 500 ;
-!---
-!---    write(*,*) "Testing length_Voronoi with tau=", tau
-!---
-!---    if (icell > 0) then
-!---       call length_Voronoi(id,lambda,Stokes, icell,x,y,z, u,v,w, flag_star,flag_direct_star, tau, lvol,flag_sortie)
-!---       write(*,*) "lvol=", lvol
-!---       write(*,*) "Did I exit ?", flag_sortie
-!---       write(*,*) "Last cell", icell
-!---       write(*,*) "Final position", x, y, z
-!---    else
-!---       write(*,*) "Packet did not reach model volume"
-!---    endif
-!---
-!---
-!---    write(*,*) "TEST DONE"
-!---    stop
-
-    ! OK jusqu'ici
-    !call test_emission()
 
     return
 
@@ -358,7 +304,6 @@ module Voronoi_grid
 
     nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
        id_n = neighbours_list(i) ! id du voisin
-       !write(*,*) "id_n",id_n, i, Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
 
        if (id_n==previous_cell) cycle nb_loop
 
@@ -729,7 +674,7 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 
   ! Repartition uniforme selon cette direction
   l = l * aleat3**(1./3)
-  !x=x+l ; y=y+l*v ; z=z+l*w
+  !x=x+l ; y=y+l*v ; z=z+l*w ! emission au centre cellule si cette ligne est commentee
 
   return
 
@@ -765,15 +710,3 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
   end subroutine indice_cellule_Voronoi
 
 end module Voronoi_grid
-
-!----------------------------------------
-
-!program Voronoi
-!
-!  use Voronoi_grid
-!
-!  implicit none
-!
-!  call read_Voronoi(1000000)
-!
-!end program Voronoi
