@@ -107,7 +107,7 @@ contains
                 stop
              endif
 
-             if (j==jend2) lexit_cell(icell) = 2
+             if (abs(j)==jend2) lexit_cell(icell) = 2
              if (i==iend2) lexit_cell(icell) = 1
 
              cell_map_i(icell) = i
