@@ -755,9 +755,10 @@ end subroutine define_cylindrical_grid
        endif
     else ! 2D
        if (zj_out > nz) zj_out = nz + 1
+       phik_out=1
     endif
 
-    icell = cell_map(ri_out,zj_out,1)
+    icell = cell_map(ri_out,zj_out,phik_out)
 
     return
 

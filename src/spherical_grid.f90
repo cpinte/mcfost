@@ -33,7 +33,7 @@ contains
   integer, intent(out) :: icell
 
   real(kind=db) :: r2, r02, tan_theta
-  integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max, ri_out, thetaj_out
+  integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max, ri_out, thetaj_out, phik_out
 
   r02 = xin*xin+yin*yin
   r2 = r02+zin*zin
@@ -41,8 +41,10 @@ contains
   ! Peut etre un bug en 0, 0 due a la correction sur grid_rmin dans define_grid3
   if (r2 < r_lim_2(0)) then
      ri_out=0
+     phik_out=1
   else if (r2 > Rmax2) then
      ri_out=n_rad
+     phik_out=1
   else
      ri_min=0
      ri_max=n_rad
@@ -80,7 +82,19 @@ contains
   enddo
   thetaj_out=thetaj+1
 
-  icell = cell_map(ri_out,thetaj_out,1)
+  if (l3D) then
+     if (zin /= 0.0) then
+        phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+        phik_out=floor(phi/(2*pi)*real(N_az))+1
+        if (phik_out==n_az+1) phik_out=n_az
+     else
+        phik_out=1
+     endif
+  else ! 2D
+     phik_out = 1
+  endif
+
+  icell = cell_map(ri_out,thetaj_out,phik_out)
 
   return
 
