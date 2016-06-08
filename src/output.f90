@@ -393,7 +393,7 @@ subroutine write_stokes_fits()
       !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)
+     nelements=naxes(1)
 
       ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,o_disk,status)
@@ -894,7 +894,7 @@ subroutine write_origin()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,o_disk,status)
@@ -1092,7 +1092,7 @@ subroutine reemission_stats()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,N_reemission,status)
@@ -1577,7 +1577,6 @@ subroutine write_disk_struct()
   naxes(2)=nz
   naxes(3)=1
   naxes(4)=2
-  nelements=naxes(1)*naxes(2)*naxes(3)
 
   if (l3D) then
      naxes(2)=2*nz+1
@@ -2201,10 +2200,9 @@ subroutine ecriture_Tex(imol)
   logical :: simple, extend
   character(len=512) :: filename
 
-  !real, dimension(n_rad,nz,nTrans_tot) :: Tex
-  real, dimension(:,:,:), allocatable :: Tex
+  real, dimension(:,:), allocatable :: Tex
 
-  allocate(Tex(n_rad,nz,nTrans_tot), stat = alloc_status)
+  allocate(Tex(n_cells,nTrans_tot), stat = alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Tex in ecriture_Tex'
      stop
@@ -2218,16 +2216,13 @@ subroutine ecriture_Tex(imol)
      iLow = iTransLower(iTrans)
      cst = - hp * Transfreq(iTrans) / kb
 
-     do j=1, nz
-        do i=1, n_rad
-           icell = cell_map(i,j,1)
-           nUp = tab_nLevel(icell,iUp)
-           nLow =  tab_nLevel(icell,iLow)
-           if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
-              Tex(i,j,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
-           endif
-        enddo ! i
-     enddo !j
+     do icell=1, n_cells
+        nUp = tab_nLevel(icell,iUp)
+        nLow =  tab_nLevel(icell,iLow)
+        if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
+           Tex(icell,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
+        endif
+     enddo ! icell
   enddo !iTrans
 
   filename = trim(data_dir2(imol))//"/Tex.fits.gz"
@@ -2246,10 +2241,9 @@ subroutine ecriture_Tex(imol)
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=nTrans_tot
+  naxis=2
+  naxes(1)=n_cells
+  naxes(2)=nTrans_tot
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2258,7 +2252,7 @@ subroutine ecriture_Tex(imol)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Tex,status)
@@ -2286,7 +2280,7 @@ subroutine taille_moyenne_grains()
 
   real(kind=db) :: somme
   integer ::  i, j, l, icell
-  real, dimension(n_rad,nz) :: a_moyen
+  real, dimension(n_cells) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -2298,18 +2292,15 @@ subroutine taille_moyenne_grains()
 
   write(*,*) "Writing average_grain_size.fits.gz"
 
-  a_moyen(:,:) = 0.
+  a_moyen(:) = 0.
 
-  do j=1,nz
-     do i=1,n_rad
-        somme=0.0
-        icell = cell_map(i,j,1)
-        do l=1, n_grains_tot
-           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(l,icell) * r_grain(l)**2
-           somme = somme + densite_pouss(l,icell)
-        enddo
-        a_moyen(i,j) = a_moyen(i,j) / somme
+  do icell=1, n_cells
+     somme=0.0
+     do l=1, n_grains_tot
+        a_moyen(icell) = a_moyen(icell) + densite_pouss(l,icell) * r_grain(l)**2
+        somme = somme + densite_pouss(l,icell)
      enddo
+     a_moyen(icell) = a_moyen(icell) / somme
   enddo
   a_moyen = sqrt(a_moyen)
 
@@ -2329,9 +2320,8 @@ subroutine taille_moyenne_grains()
   bitpix=-32
   extend=.true.
 
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  naxis=1
+  naxes(1)=n_cells
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2340,7 +2330,7 @@ subroutine taille_moyenne_grains()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,a_moyen,status)
@@ -2531,7 +2521,7 @@ subroutine ecriture_pops(imol)
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  real, dimension(n_rad,nz,nLevels) :: tab_nLevel_io ! pas en 3D
+  real, dimension(n_cells,nLevels) :: tab_nLevel_io
 
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 
@@ -2548,10 +2538,9 @@ subroutine ecriture_pops(imol)
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=nLevels
+  naxis=2
+  naxes(1)=n_cells
+  naxes(2)=nLevels
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2559,13 +2548,10 @@ subroutine ecriture_pops(imol)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)
 
-  do i=1, n_rad
-     do j=1, nz
-        icell = cell_map(i,j,1)
-        tab_nLevel_io(i,j,:) = tab_nLevel(icell,:)
-     enddo
+  do icell=1, n_cells
+     tab_nLevel_io(icell,:) = tab_nLevel(icell,:)
   enddo
   call ftppre(unit,group,fpixel,nelements,tab_nLevel_io,status)
 
@@ -2703,7 +2689,7 @@ subroutine ecriture_spectre(imol)
   endif
   naxes(3)=ntrans
   naxes(4)=RT_n_incl
-  naxes(4)=RT_n_az
+  naxes(5)=RT_n_az
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
   ! create new hdu
