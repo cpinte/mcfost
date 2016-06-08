@@ -32,7 +32,7 @@ contains
   real(kind=db), intent(in) :: xin,yin,zin
   integer, intent(out) :: icell
 
-  real(kind=db) :: r2, r02, tan_theta
+  real(kind=db) :: r2, r02, tan_theta, phi
   integer :: ri, ri_min, ri_max, thetaj, thetaj_min, thetaj_max, ri_out, thetaj_out, phik_out
 
   r02 = xin*xin+yin*yin

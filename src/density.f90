@@ -421,7 +421,7 @@ subroutine define_dust_density()
            bz : do j=j_start,nz
               if (j==0) cycle bz
 
-              icell = cell_map(i,j,1)
+              icell = cell_map(i,j,1) ! to compute factors independent of azimuth
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(icell)
               z = z_grid(icell)
@@ -614,7 +614,7 @@ subroutine define_dust_density()
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1e-200_db) then
-                          icell = cell_map(i,1,1)
+                          icell = cell_map(i,1,k)
                           densite_pouss(l,icell)  = 1.0_db
                           norme = 1.0_db
 
@@ -992,6 +992,7 @@ end subroutine define_density_wall3D
 !*************************************************************
 
 subroutine densite_eqdiff()
+  ! only 2D : old routine, has not been used in a long time
 
   implicit none
 
@@ -1115,7 +1116,7 @@ subroutine densite_eqdiff()
 
      ! Calcul opacite et probabilite de diffusion
      do j=1,nz
-        icell = cell_map(i,j,1)
+        icell = cell_map(i,j,1) ! only 2D
         do  k=1,n_grains_tot
            densite_pouss(k,icell) = nbre_grains(k) * correct_strat(k,j) * rho(j)
         enddo !k
@@ -1751,7 +1752,7 @@ subroutine densite_Seb_Charnoz()
         if (is_diff(Zmin,Zmin_mcfost)) write(*,*) "Pb Z cell", i,j, Zmin, Zmin_mcfost
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
 
-        icell = cell_map(i,j,1)
+        icell = cell_map(i,j,1) ! only 2D
         densite_pouss(:,icell) = density_Seb(:) / (volume(icell)*AU3_to_cm3) ! comversion en densite volumique
         Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
      enddo ! j
@@ -1872,7 +1873,7 @@ subroutine densite_Seb_Charnoz2()
   do k=1,n_grains_tot
      do i=1, n_rad
         do j=1,nz
-           densite_pouss(k,cell_map(i,j,1)) = dens(i,j)
+           densite_pouss(k,cell_map(i,j,1)) = dens(i,j) ! only 2D
         enddo
      enddo
   enddo

@@ -29,7 +29,8 @@ subroutine setDiffusion_coeff(i)
   cst_Dcoeff = c_light*pi/(12.*sigma)
 
   do k=1,n_az
-     do j=1, nz
+     do j=j_start, nz
+        if (j==0) cycle
         icell = cell_map(i,j,k)
         !Temp=Temperature(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
@@ -85,7 +86,8 @@ subroutine setDiffusion_coeff0(i)
   cst_Dcoeff = c_light*pi/(12.*sigma)
 
   do k=1,n_az
-     do j=1,nz
+     do j=j_start,nz
+        if (j==0) cycle
         icell = cell_map(i,j,k)
         Temp=Temperature(icell)
         cst=cst_th/Temp
@@ -132,7 +134,8 @@ subroutine Temperature_to_DensE(ri)
 
   integer :: j, k, icell
 
-  do j=1,nz
+  do j=j_start,nz
+     if (j==0) cycle
      do k=1,n_az
         icell = cell_map(ri,j,k)
         DensE(ri,j,k) =  Temperature(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
@@ -441,8 +444,8 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
            ! Calcul du Laplacien en cylindrique
            ! Attention D rentre dans le laplacien car il depend de laposition
            ! Ne marche qu'en 2D pour le moment
-           dE_dr_m1 = (DensE_m1(i,j,k) - DensE_m1(i-1,j,k))/(r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1)))
-           dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(cell_map(i+1,j,1))-r_grid(cell_map(i,j,1)))
+           dE_dr_m1 = (DensE_m1(i,j,k) - DensE_m1(i-1,j,k))/(r_grid(cell_map(i,j,k))-r_grid(cell_map(i-1,j,k)))
+           dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i,j,k)))
 
            !    frac=(log(r_lim(i))-log(r_grid(i)))/(log(r_grid(i+1))-log(r_grid(i)))
            !    Dcoeff_p=exp(log(Dcoeff(i,j,k))*frac+log(Dcoeff(i+1,j,k))*(1.0_db-frac))
@@ -459,7 +462,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
 
            !d2E_dr2  = (dE_dr_p1*Dcoeff_p  - dE_dr_m1*Dcoeff_m) / (2._db*(r_grid(i+1,j)-r_grid(i-1,j)))
 
-           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._db*(r_grid(cell_map(i+1,j,1))-r_grid(cell_map(i-1,j,1))))
+           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._db*(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i-1,j,k))))
 
            !Dcoeff_p = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i,j+1,k))
            !Dcoeff_m = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i-1,j-1,k))

@@ -482,14 +482,14 @@ subroutine verif_cell_position_sph(icell, x, y, z)
   real(kind=db), intent(inout) :: x,y,z
   integer, intent(inout) :: icell
 
-  integer :: ri, zj, ri0, zj0, tmp_k
+  integer :: ri, zj, ri0, zj0, phik
   real(kind=db) :: factor, correct_moins, correct_plus
 
   correct_moins = 1.0_db - prec_grille_sph
   correct_plus = 1.0_db + prec_grille_sph
 
   ! tmp :
-  call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
+  call cell2cylindrical(icell, ri0,zj0, phik) ! converting current cell index
 
   ! locate current cell index
   call indice_cellule_sph(x,y,z, icell)
@@ -511,7 +511,7 @@ subroutine verif_cell_position_sph(icell, x, y, z)
      endif
   endif
 
-  icell = cell_map(ri,zj,1)
+  icell = cell_map(ri,zj,phik)
 
   if (l_dark_zone(icell)) then ! Petit test de securite
      ! On resort le paquet
@@ -529,6 +529,8 @@ subroutine verif_cell_position_sph(icell, x, y, z)
         y = y * correct_moins
      endif
   endif
+
+  return
 
 end subroutine verif_cell_position_sph
 
