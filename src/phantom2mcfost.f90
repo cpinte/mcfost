@@ -98,7 +98,6 @@ contains
     real :: grainsize,graindens, f
     integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k
 
-    logical :: ltest = .false. ! read a test ascii file
     logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     icell_ref = 1
@@ -106,7 +105,7 @@ contains
     write(*,*) "Performing phantom2mcfost setup"
     write(*,*) "Reading phantom density file: "//trim(phantom_file)
 
-    if (ltest) then
+    if (lphantom_test) then
        write(*,*) "USING PHANTOM TEST MODE"
        call read_test_ascii_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     else
