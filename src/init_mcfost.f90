@@ -633,6 +633,16 @@ subroutine initialisation_mcfost()
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
+        lphantom_test = .false.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+     case("-phantom-test","-phantom_test")
+        i_arg = i_arg + 1
+        lphantom_file=.true.
+        lphantom_test = .true.
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
