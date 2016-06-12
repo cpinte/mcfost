@@ -30,7 +30,10 @@ FFLAGS_R8 = -r8
 # Linux ou Mac x86, ifort 64 bits
 ifeq ($(COMPILO),ifort)
 FC_SER = ifort -fpp -traceback
-FC_OMP = ifort -fpp  -openmp -traceback
+FC_OMP = ifort -fpp -openmp -traceback
+
+CC_SER = icc -traceback
+CC_OMP = icc -openmp -traceback
 
 OPTS = -mdynamic-no-pic -O3 -no-prec-div #-fast (because -fast implies -xHOST and -ipo)
 OPTS = -O3 -no-prec-div
@@ -117,6 +120,8 @@ endif
 ifeq ($(COMPILO),gfortran)
 FC_SER = gfortran -m64 -cpp
 FC_OMP = gfortran -m64 -cpp -fopenmp
+CC_SER = g++ -Wall -ansi -pedantic -m64
+CC_OMP = g++ -Wall -ansi -pedantic -m64
 OPTS = -O3 -funroll-loops -ffinite-math-only -fno-trapping-math #-ffast-math : -funsafe-math-optimizations make mcfost stall, rest not much faster than 03
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
 DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
@@ -150,25 +155,36 @@ LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
 INCLUDE_SPRNG = -I$(MCFOST_INSTALL)/include
 LIBS_SPRNG =  -L$(LIBS) -lsprng
 
+#Voro++
+INCLUDE_VORO = -I$(MCFOST_INSTALL)/include/voro++
+LIBS_VORO =  -L$(LIBS) -lvoro++ -cxxlib
+#-lstdc++ for gcc
 
 FF = $(FC_OMP)  $(MACH) $(OPTS)
+CC = $(CC_OMP)  $(MACH) $(OPTS)
 ifeq ($(debugp), yes)
 FF = $(FC_OMP)  $(DEBUG_OPTS)
+CC = $(CC_OMP)  $(DEBUG_OPTS)
 endif
 ifeq ($(debug), yes)
 FF = $(FC_SER) $(DEBUG_OPTS)
+CC = $(CC_SER) $(DEBUG_OPTS)
 endif
 ifeq ($(mono), yes)
 FF = $(FC_SER)  $(MACH) $(OPTS)
+CC = $(CC_SER)  $(MACH) $(OPTS)
 endif
 ifeq ($(prof), yes)
 FF = $(FC_SER) -O0 -g
+CC = $(CC_SER) -O0 -g
 endif
 ifeq ($(dev), yes)
 FF = $(FC_SER) -O1
+CC = $(CC_SER) -O1
 endif
 ifeq ($(devp), yes)
 FF = $(FC_OMP) -O1
+CC = $(CC_OMP) -O1
 endif
 
 
@@ -182,6 +198,8 @@ SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 \
 	thermal_emission.f90 dust_transfer.f90 mol_transfer.f90
 
+CC_SOURCES = voro++_wrapper.cpp
+
 OBJECTS = $(SOURCES:.f90=.o)
 
 main : mcfost
@@ -189,12 +207,12 @@ main : mcfost
 #*************************************************************
 # Code séquentiel et parallèle
 #*************************************************************
-mcfost : $(OBJECTS) mcfost.o
-	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(INCLUDE_SPRNG)
+mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
+	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 
-libmcfost.a : checkmcfost $(OBJECTS) phantom2mcfost.o
-	libtool -static -o ${@} $(OBJECTS) phantom2mcfost.o
+libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o phantom2mcfost.o
+	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o phantom2mcfost.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
@@ -208,9 +226,14 @@ mem.o : mem.f90  modules.o
 io_phantom_utils.o : io_phantom_utils.f90
 	$(FF) $(FFLAGS) $(FFLAGS_R8) io_phantom_utils.f90
 
+voro++_wrapper.o : voro++_wrapper.cpp
+	$(CC) $(FFLAGS) voro++_wrapper.cpp $(INCLUDE_VORO)
+
 # defaut
 %.o : %.f90  modules.o
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG) $(COMP_FITS)
+
+
 
 io_prodimo.o : sha.f90
 utils.o :      sha.f90
