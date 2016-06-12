@@ -36,6 +36,23 @@ module Voronoi_grid
 
   integer :: n_walls
 
+  interface
+     subroutine Voronoi_tesselation2(n_points,limits,x,y,z, volume,n_neighbours_tot,neighbours_list, ierr) bind(C, name='Voronoi_tesselation_C')
+       use, intrinsic :: iso_c_binding
+
+       integer(c_int), intent(in), value :: n_points
+       real(c_double), dimension(6), intent(in) :: limits
+       real(c_double), dimension(n_points), intent(in) :: x,y,z
+
+       real(c_double), dimension(n_points), intent(out) :: volume
+       integer(c_int), intent(out), value :: n_neighbours_tot, len_alloc
+       type(c_ptr), intent(out) :: neighbours_list
+
+       integer(c_int), intent(out) :: ierr
+
+     end subroutine Voronoi_Tesselation2
+  end interface
+
   contains
 
     subroutine define_Voronoi_grid()
@@ -203,6 +220,7 @@ module Voronoi_grid
        cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
             trim(limits)//&
             " particles.txt ; mv particles.txt.vol Voronoi.txt"
+       write(*,*) trim (cmd)
        call appel_syst(cmd,syst_status)
     else
        write(*,*) "Using previous Voronoi tesselation"
