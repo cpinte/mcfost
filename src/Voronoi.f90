@@ -37,7 +37,8 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine Voronoi_tesselation2(n_points,limits,x,y,z, volume,n_neighbours_tot,neighbours_list, ierr) bind(C, name='Voronoi_tesselation_C')
+     subroutine Voronoi_tesselation2(n_points,n, limits,x,y,z, &
+          volume,n_neighbours_tot,neighbours_list, ierr) bind(C, name='Voronoi_tesselation_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points
@@ -45,7 +46,7 @@ module Voronoi_grid
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
        real(c_double), dimension(n_points), intent(out) :: volume
-       integer(c_int), intent(out), value :: n_neighbours_tot, len_alloc
+       integer(c_int), intent(out) :: n_neighbours_tot
        type(c_ptr), intent(out) :: neighbours_list
 
        integer(c_int), intent(out) :: ierr
