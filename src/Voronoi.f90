@@ -37,21 +37,21 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine Voronoi_tesselation2(n_points,n, limits,x,y,z, &
-          volume,n_neighbours_tot,neighbours_list, ierr) bind(C, name='Voronoi_tesselation_C')
+     subroutine voro(n_points, limits,x,y,z, &
+          n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
+       integer(c_int), intent(out) :: n_in, n_neighbours_tot,  ierr
        real(c_double), dimension(n_points), intent(out) :: volume
-       integer(c_int), intent(out) :: n_neighbours_tot
-       type(c_ptr), intent(out) :: neighbours_list
+       integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
+       integer(c_int), dimension(n_points * 20), intent(out) :: neighbours_list
 
-       integer(c_int), intent(out) :: ierr
 
-     end subroutine Voronoi_Tesselation2
+     end subroutine voro
   end interface
 
   contains
@@ -168,7 +168,7 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,  nVoronoi)
+  subroutine Voronoi_tesselation_ascii(n_points, x,y,z,  nVoronoi)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
@@ -256,9 +256,72 @@ module Voronoi_grid
     write(*,*) "Tesselation finished"
     return
 
-  end subroutine Voronoi_tesselation
+  end subroutine Voronoi_tesselation_ascii
 
 !----------------------------------------
+
+  subroutine Voronoi_tesselation(n_points, x,y,z,  nVoronoi)
+
+    integer, intent(in) :: n_points
+    real(kind=db), dimension(n_points), intent(in) :: x, y, z
+    integer, intent(out) :: nVoronoi
+
+    real(kind=db), dimension(6) :: limits
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status
+
+    integer, dimension(:), allocatable :: first_neighbours,last_neighbours
+
+    integer :: time1, time2, itime
+    real :: time
+
+    write(*,*) "Voronoi tesselation"
+
+    allocate(neighbours_list(n_points * 20), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Error when allocatin neighbours list"
+       write(*,*) "Exiting"
+    endif
+    neighbours_list = 0
+
+    allocate(volume(n_points), first_neighbours(n_points),last_neighbours(n_points))
+    volume = 0.0 ; first_neighbours = 0 ; last_neighbours = 0 ;
+
+    limits = [-150.,150., -150.,150., -150.,150.]
+    n_in = 0 ;
+
+    write(*,*) "callling library", shape(volume), shape(neighbours_list)
+    ierr = 0
+    call system_clock(time1)
+    call voro(n_points,limits,x,y,z,  n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
+    if (ierr /= 0) then
+       write(*,*) "Voro++ excited with an error"
+       write(*,*) "Exiting"
+       stop
+    endif
+    call system_clock(time2)
+    time=(time2 - time1)/real(time_tick)
+    if (time > 60) then
+       itime = int(time)
+       write (*,'(" Tesselation Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+    else
+       write (*,'(" Tesselation Time = ", F5.2, "s")')  time
+    endif
+    write(*,*) "Voronoi Tesselation done"
+
+    write(*,*) "Done", n_in, volume(1), volume(n_points)
+    write(*,*) x(n_points), y(n_points), z(n_points)
+    nVoronoi = n_in
+    n_cells = n_in
+
+    write(*,*) "N_cells", n_cells
+    stop
+
+    return
+
+  end subroutine Voronoi_tesselation
+
+  !----------------------------------------
+
 
   subroutine test_emission()
 
