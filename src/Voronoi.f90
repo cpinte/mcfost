@@ -37,11 +37,11 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, limits,x,y,z, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z, &
           n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points
+       integer(c_int), intent(in), value :: n_points, max_neighbours
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
@@ -225,6 +225,7 @@ module Voronoi_grid
     write(*,*) "Voronoi volume =", sum(volume(1:nVoronoi))
 
     write(*,*) "Tesselation finished"
+
     return
 
   end subroutine Voronoi_tesselation_cmd_line
@@ -237,40 +238,100 @@ module Voronoi_grid
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
     integer, intent(out) :: nVoronoi
 
+    real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
     real(kind=db), dimension(6) :: limits
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status
 
+    integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
+
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
     integer :: time1, time2, itime
     real :: time
 
-    integer :: i
+    integer :: i, icell
 
-    write(*,*) "Voronoi tesselation"
+    limits = [-150.,150., -150.,150., -150.,150.]
 
-    allocate(neighbours_list(n_points * 20), stat=alloc_status)
+    n_walls = 6
+    write(*,*) "Finding ", n_walls, "walls"
+    call init_Voronoi_walls()
+
+    write(*,*) "WARNING: limits hard coded"
+
+    ! Filtering particles outise the limits
+    icell = 0
+    do i=1, n_points
+       if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
+          if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
+             if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
+                icell = icell + 1
+                x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;
+             endif
+          endif
+       endif
+    enddo
+    close(unit=1)
+    n_cells = icell
+    nVoronoi = n_cells
+
+    allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error Voronoi structure"
+       write(*,*) "Exiting"
+       stop
+    endif
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ;
+    Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
+    Voronoi(:)%first_neighbour = 0
+    Voronoi(:)%last_neighbour = 0
+
+    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2, "MB for neighbours list"
+    allocate(neighbours_list(n_cells * max_neighbours), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Error when allocating neighbours list"
        write(*,*) "Exiting"
     endif
     neighbours_list = 0
 
-    allocate(volume(n_points), first_neighbours(n_points),last_neighbours(n_points))
-    volume = 0.0 ; first_neighbours = 0 ; last_neighbours = 0 ;
 
-    limits = [-150.,150., -150.,150., -150.,150.]
-    n_in = 0 ;
+    do icell=1, n_cells
+       Voronoi(icell)%xyz(1) = x_tmp(icell)
+       Voronoi(icell)%xyz(2) = y_tmp(icell)
+       Voronoi(icell)%xyz(3) = z_tmp(icell)
+    enddo
 
-    write(*,*) "callling library", shape(volume), shape(neighbours_list)
-    ierr = 0
+
+    write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call system_clock(time1)
-    call voro(n_points,limits,x,y,z,  n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
+    call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
     if (ierr /= 0) then
        write(*,*) "Voro++ excited with an error"
        write(*,*) "Exiting"
        stop
     endif
+
+    ! Conversion to Fortran indices
+    Voronoi(:)%first_neighbour = first_neighbours(:) + 1
+    Voronoi(:)%last_neighbour = last_neighbours(:) + 1
+    deallocate(first_neighbours,last_neighbours)
+
+    ! Setting-up the walls
+    do icell=1, n_cells
+       ! todo : find the cells touching the walls
+       do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
+          j = neighbours_list(k)
+          if (j < 0) then ! wall
+             j = -j ! wall index
+             wall(j)%n_neighbours = wall(j)%n_neighbours+1
+             if (wall(j)%n_neighbours > max_wall_neighbours) then
+                write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
+             endif
+             wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
+          endif ! wall
+       enddo ! k
+    enddo ! i
+
     call system_clock(time2)
     time=(time2 - time1)/real(time_tick)
     if (time > 60) then
@@ -280,18 +341,40 @@ module Voronoi_grid
        write (*,'(" Tesselation Time = ", F5.2, "s")')  time
     endif
     write(*,*) "Voronoi Tesselation done"
+    write(*,*) "Found", n_in, "cells"
 
-    write(*,*) "Done", n_in, volume(1), volume(n_points)
-    write(*,*) x(n_points), y(n_points), z(n_points)
-    nVoronoi = n_in
-    n_cells = n_in
 
-    write(*,*) "N_cells", n_cells
-    stop
+    if (n_in /= n_cells) then
+       write(*,*) "*****************************************"
+       write(*,*) "WARNING : some particles are not the mesh"
+       write(*,*) "*****************************************"
+    endif
+
+    write(*,*) "Neighbours list size =", n_neighbours_tot
+    write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
+    write(*,*) "Voronoi volume =", sum(volume)
+
+    !i = 1
+    !write(*,*) i, real(Voronoi(i)%xyz(1)), real(Voronoi(i)%xyz(2)), real(Voronoi(i)%xyz(3)), real(volume(i)), Voronoi(i)%last_neighbour-Voronoi(i)%first_neighbour+1, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
     return
 
   end subroutine Voronoi_tesselation
+
+  !----------------------------------------
+
+  subroutine test_walls()
+
+    integer :: iwall
+
+    do iwall=1, n_walls
+       write(*,*) "wall#", iwall, wall(iwall)%n_neighbours
+    enddo
+
+    stop
+    return
+
+  end subroutine test_walls
 
   !----------------------------------------
 

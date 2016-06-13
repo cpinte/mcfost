@@ -179,9 +179,11 @@ contains
     ! Voronoi tesselation
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
+    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, n_Voronoi)
     call Voronoi_tesselation(n_SPH, x,y,z, n_Voronoi)
     deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
+    !call test_walls()
 
     !*************************
     ! Densities

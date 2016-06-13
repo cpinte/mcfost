@@ -3,10 +3,10 @@
 using namespace voro;
 
 extern "C" {
-  void voro_C(int n_points, double limits[6], double x[n_points], double y[n_points], double z[n_points],
+  void voro_C(int n, int max_neighbours, double limits[6], double x[n], double y[n], double z[n],
             int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
 
-    //std::cout << "Hello World!" << n_points << std::endl;
+    //std::cout << "Hello World!" << n << std::endl;
 
     ierr = 0 ;
 
@@ -27,7 +27,7 @@ extern "C" {
 
     // Define a pre-container to determine the optimal block size
     pcon=new pre_container(ax,bx,ay,by,az,bz,xperiodic,yperiodic,zperiodic);
-    for(i=0;i<n_points;i++) {
+    for(i=0;i<n;i++) {
       //std::cout << i << " " << x[i] << std::endl;
       pcon->put(i,x[i],y[i],z[i]);
     }
@@ -50,7 +50,7 @@ extern "C" {
     std::vector<int> vi;   // vi.size() pour avoir le nombre d'elements
 
     int n_neighbours, first_neighbour, last_neighbour ;
-    int max_size_list = 20 * n_points ; // todo : manage to get the size of the fortran array
+    int max_size_list = max_neighbours * n ; // todo : manage to get the size of the fortran array
 
     n_neighbours_tot = 0 ;
     last_neighbour = -1 ;
@@ -92,7 +92,12 @@ extern "C" {
            // std::cout << "A " << i << " " << vi[i] << std::endl;
            // std::cout << "fn = " << first_neighbour << std::endl;
            // std::cout << "B " << i << " " << neighbours_list[first_neighbour+1+i] << std::endl;
-            neighbours_list[first_neighbour+i] = vi[i] ;
+            if (vi[i] >=0) {
+              neighbours_list[first_neighbour+i] = vi[i] + 1 ;
+            } else {
+              // Wall
+              neighbours_list[first_neighbour+i] = vi[i] ;
+            }
           }
           //std::cout << "test5" << std::endl;
 
