@@ -64,119 +64,17 @@ module Voronoi_grid
 
   !************************************************************************
 
-  subroutine read_Voronoi(n)
-
-    integer, intent(in) :: n
-
-    integer :: i, j, k, ios, n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour
-
-    !integer, dimension(:), allocatable :: id_list
-
-    real(kind=db) :: x, y, z, u, vol ! todo : make simple
-
-
-    ! For testing purposes
-    real(kind=db) :: v, w, s, norme
-    integer :: icell
-
-    integer :: id, lambda
-    real(kind=db) :: tau, lvol
-
-    real(kind=db), dimension(4) :: Stokes
-    logical :: flag_star, flag_direct_star, flag_sortie, lintersect
-
-    id = 1
-
-    n_walls = 6
-    write(*,*) "Finding ", n_walls, "walls"
-
-
-    call init_Voronoi_walls()
-    write(*,*) "Reading", n, " Voronoi cells"
-
-    n_neighbours_tot = 0
-    open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
-
-    ! The Voronoi mesh is not defined to start with
-    Voronoi(:)%exist = .false.
-    Voronoi(:)%first_neighbour = 0
-    Voronoi(:)%last_neighbour = 0
-
-    do i=1, n
-       ! We read the file to figure out the neighbours list
-       read(1,*) icell , x, y, z, vol, n_neighbours
-
-       ! We use temporary variables first_neighbour and last_neighbour
-       ! as the id of the Voronoi cells might not be consecutive
-       if (i == 1) then
-           first_neighbour = 1
-           last_neighbour = n_neighbours
-        else
-           first_neighbour = last_neighbour + 1
-           last_neighbour = last_neighbour + n_neighbours
-       endif
-       Voronoi(icell)%first_neighbour = first_neighbour
-       Voronoi(icell)%last_neighbour  = last_neighbour
-
-       if (Voronoi(icell)%first_neighbour < 0) then
-          write(*,*) "ERROR in Voronoi cell map"
-          write(*,*) "icell=", icell,Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-          write(*,*) "icell-1=", icell-1,Voronoi(icell-1)%first_neighbour, Voronoi(icell-1)%last_neighbour
-          write(*,*) "Exiting"
-          stop
-       endif
-       n_neighbours_tot = n_neighbours_tot + n_neighbours
-    enddo
-
-
-    write(*,*) "Neighbours list size =", n_neighbours_tot
-    write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
-    allocate(neighbours_list(n_neighbours_tot))
-
-    ! We read the file again with all the information
-    rewind(1)
-    do i=1, n
-       read(1,*) icell, x, y, z, vol, n_neighbours, &
-            neighbours_list(Voronoi(icell)%first_neighbour:Voronoi(icell)%last_neighbour)
-
-       Voronoi(icell)%exist = .true.
-       Voronoi(icell)%xyz(1) = x
-       Voronoi(icell)%xyz(2) = y
-       Voronoi(icell)%xyz(3) = z
-       Volume(icell) = vol
-       ! todo : find the cells touching the walls
-       do k=1, n_neighbours
-          j = neighbours_list(Voronoi(icell)%first_neighbour + k-1)
-          if (j < 0) then ! wall
-             j = -j ! wall index
-             wall(j)%n_neighbours = wall(j)%n_neighbours+1
-             if (wall(j)%n_neighbours > max_wall_neighbours) then
-                write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
-             endif
-             wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
-          endif ! wall
-       enddo ! k
-    enddo ! i
-
-    close(unit=1)
-
-    write(*,*) "Voronoi volume =", sum(volume(1:n))
-
-    return
-
-  end subroutine read_Voronoi
-
-!----------------------------------------
-
-  subroutine Voronoi_tesselation_ascii(n_points, x,y,z,  nVoronoi)
+  subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  nVoronoi)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
     integer, intent(out) :: nVoronoi
 
     character(len=512) :: cmd
-    integer :: i, syst_status, time1, time2, itime, iVoronoi, alloc_status
+    integer :: i, syst_status, time1, time2, itime, iVoronoi, alloc_status, ios, icell
+    integer :: n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour, k, j
     real :: time
+    real(kind=db) :: x_tmp, y_tmp, z_tmp, vol
 
     character(len=128) :: limits
 
@@ -250,13 +148,86 @@ module Voronoi_grid
     endif
     write(*,*) "Voronoi Tesselation done"
 
-    ! TMP : we have to read the file now
-    call read_Voronoi(nVoronoi)
+    !************************************
+    ! We have to read the file now
+    !************************************
+    n_walls = 6
+    write(*,*) "Finding ", n_walls, "walls"
+
+    call init_Voronoi_walls()
+    write(*,*) "Reading", nVoronoi, " Voronoi cells"
+
+    n_neighbours_tot = 0
+    open(unit=1, file="Voronoi.txt", status='old', iostat=ios)
+
+    ! The Voronoi mesh is not defined to start with
+    Voronoi(:)%exist = .false.
+    Voronoi(:)%first_neighbour = 0
+    Voronoi(:)%last_neighbour = 0
+
+    do i=1, nVoronoi
+       ! We read the file to figure out the neighbours list
+       read(1,*) icell , x_tmp, y_tmp, z_tmp, vol, n_neighbours
+
+       ! We use temporary variables first_neighbour and last_neighbour
+       ! as the id of the Voronoi cells might not be consecutive
+       if (i == 1) then
+          first_neighbour = 1
+          last_neighbour = n_neighbours
+       else
+          first_neighbour = last_neighbour + 1
+          last_neighbour = last_neighbour + n_neighbours
+       endif
+       Voronoi(icell)%first_neighbour = first_neighbour
+       Voronoi(icell)%last_neighbour  = last_neighbour
+
+       if (Voronoi(icell)%first_neighbour < 0) then
+          write(*,*) "ERROR in Voronoi cell map"
+          write(*,*) "icell=", icell,Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+          write(*,*) "icell-1=", icell-1,Voronoi(icell-1)%first_neighbour, Voronoi(icell-1)%last_neighbour
+          write(*,*) "Exiting"
+          stop
+       endif
+       n_neighbours_tot = n_neighbours_tot + n_neighbours
+    enddo
+
+    write(*,*) "Neighbours list size =", n_neighbours_tot
+    write(*,*) "Trying to allocate", 4*n_neighbours_tot/ 1024.**2, "MB for neighbours list"
+    allocate(neighbours_list(n_neighbours_tot))
+
+    ! We read the file again with all the information
+    rewind(1)
+    do i=1, nVoronoi
+       read(1,*) icell, x_tmp, y_tmp, z_tmp, vol, n_neighbours, &
+            neighbours_list(Voronoi(icell)%first_neighbour:Voronoi(icell)%last_neighbour)
+
+       Voronoi(icell)%exist = .true.
+       Voronoi(icell)%xyz(1) = x_tmp
+       Voronoi(icell)%xyz(2) = y_tmp
+       Voronoi(icell)%xyz(3) = z_tmp
+       Volume(icell) = vol
+       ! todo : find the cells touching the walls
+       do k=1, n_neighbours
+          j = neighbours_list(Voronoi(icell)%first_neighbour + k-1)
+          if (j < 0) then ! wall
+             j = -j ! wall index
+             wall(j)%n_neighbours = wall(j)%n_neighbours+1
+             if (wall(j)%n_neighbours > max_wall_neighbours) then
+                write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
+             endif
+             wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
+          endif ! wall
+       enddo ! k
+    enddo ! i
+
+    close(unit=1)
+
+    write(*,*) "Voronoi volume =", sum(volume(1:nVoronoi))
 
     write(*,*) "Tesselation finished"
     return
 
-  end subroutine Voronoi_tesselation_ascii
+  end subroutine Voronoi_tesselation_cmd_line
 
 !----------------------------------------
 
@@ -274,11 +245,13 @@ module Voronoi_grid
     integer :: time1, time2, itime
     real :: time
 
+    integer :: i
+
     write(*,*) "Voronoi tesselation"
 
     allocate(neighbours_list(n_points * 20), stat=alloc_status)
     if (alloc_status /=0) then
-       write(*,*) "Error when allocatin neighbours list"
+       write(*,*) "Error when allocating neighbours list"
        write(*,*) "Exiting"
     endif
     neighbours_list = 0
