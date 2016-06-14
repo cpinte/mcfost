@@ -479,14 +479,13 @@ module Voronoi_grid
 
     if (next_cell == 0) then ! there is a rounding-off error somewehere
        ! We correct the cell index and do not move the packet
-       call indice_cellule_voronoi(x,y,z, next_cell)
-       x1 = x
-       y1 = y
-       z1 = z
-       s = 0.0
-
-       if (icell == next_cell) then
-          ! that means we are out of the grid already
+       x1 = x ; y1 = y ; z1 = z ; s = 0.0
+       if (is_in_volume(x,y,z)) then
+          call indice_cellule_voronoi(x,y,z, next_cell)
+          if (icell == next_cell) then ! that means we are out of the grid already
+             next_cell = -1 ! the exact index does not matter
+          endif
+       else
           next_cell = -1 ! the exact index does not matter
        endif
     endif
