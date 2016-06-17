@@ -61,8 +61,9 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  call extract('ndusttypes',ndusttypes,hdr,ierr,default=1)
  call extract('nptmass',nptmass,hdr,ierr,default=0)
 
- print*,' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
- print*,' npartoftype = ',npartoftype(1:ntypes)
+ write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
+ write(*,*) ' npartoftype = ',npartoftype(1:ntypes)
+ write(*,*) ' nptmass = ', nptmass
  if (npartoftype(2) > 0) then
     write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, will be discarded ***'
  endif
@@ -76,8 +77,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  call extract('hfact',hfact,hdr,ierr)
  call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr)
  call extract('graindens',graindens,hdr,ierr)
- !print*,' hfact = ',hfact
- !print*,' massoftype = ',massoftype(1:ntypes)
+ !write(*,*) ' hfact = ',hfact
+ !write(*,*) ' massoftype = ',massoftype(1:ntypes)
 
  call extract('umass',umass,hdr,ierr)
  call extract('utime',utime,hdr,ierr)
