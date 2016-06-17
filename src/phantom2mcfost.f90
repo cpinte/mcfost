@@ -120,10 +120,10 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    if (ndusttypes==1) then
-       call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-       write(*,*) grainsize,graindens
-    endif
+    !if (ndusttypes==1) then
+    !   call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
+    !   write(*,*) grainsize,graindens
+    !endif
     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
     allocate(a_SPH(ndusttypes))
 
