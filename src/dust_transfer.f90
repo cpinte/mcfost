@@ -955,7 +955,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call length_deg2(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
      if ((icell>n_cells).and.(.not.flag_sortie)) write(*,*) "PB cell", icell
 
      ! Le photon est-il encore dans la grille ?
@@ -1389,7 +1389,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      ! Etoile ponctuelle
      !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
      !  Stokes = 0.0_db
-     !  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+     !  call optical_length_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
      !  Flux_etoile =  exp(-tau)
      !  write(*,*)  "F0", Flux_etoile
 
@@ -1445,7 +1445,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         Stokes = 0.0_db
-        call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
          if (lsed.and.(RT_sed_method == 1)) then
