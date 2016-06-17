@@ -1450,7 +1450,7 @@ subroutine hg(g, aleat, itheta, cospsi)
 
   ! Le calcul de cospsi se fait en double precision mais on
   ! renvoie cospsi en simple precision
-  ! Passage cospsi en db lors passage length_deg2 en db
+  ! Passage cospsi en db lors passage physical_length en db
   real, intent(in) :: g
   real, intent(in) :: aleat
   real(kind=db), intent(out) :: cospsi

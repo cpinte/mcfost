@@ -19,9 +19,8 @@ module optical_depth
 
   contains
 
-subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
-! par eq deg2 en r et deg 1 en z
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
 ! 05/02/05
@@ -98,7 +97,6 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-     !write(*,*) icell, x0,y0,z0, next_cell, l
 
      ! opacity wall
      !---if (ri0 == 1) then
@@ -149,9 +147,8 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
               else if (lspherical) then
                  call verif_cell_position_sph(icell0, xio, yio, zio)
               endif
-              ! todo : on ne fait rien dans la cas Voronoi ???
            endif
-        endif
+        endif ! todo : on ne fait rien dans la cas Voronoi ???
 
         return
      endif ! lstop
@@ -160,8 +157,7 @@ subroutine length_deg2(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_st
   write(*,*) "BUG"
   return
 
-end subroutine length_deg2
-
+end subroutine physical_length
 
 !********************************************************************
 
@@ -288,7 +284,7 @@ subroutine integ_tau(lambda)
 
 
   call indice_cellule(x0,y0,z0, icell)
-  call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
 
   !tau = 0.0
   !do i=1, n_rad
@@ -310,7 +306,7 @@ subroutine integ_tau(lambda)
   v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call length_deg2_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
@@ -328,7 +324,7 @@ end subroutine integ_tau
 
 !***********************************************************
 
-subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
 ! Integration par calcul de la position de l'interface entre cellules
 ! de l'opacite totale dans une direction donnée
 ! Grille a geometrie cylindrique
@@ -387,15 +383,11 @@ subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmi
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
 
-!     write(*,*) icell0, x0,y0,z0, l
-!     write(*,*) "nextcell=", next_cell, x1,y1,z1
-!     write(*,*) "uvw", u, v, w
-!
-
      tau=l*opacite ! opacite constante dans la cellule
 
      tau_tot = tau_tot + tau
      ltot= ltot + l
+
      if (tau_tot < tiny_real) lmin=ltot
 
   enddo ! boucle infinie
@@ -403,12 +395,12 @@ subroutine length_deg2_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmi
   write(*,*) "BUG"
   return
 
-end subroutine length_deg2_tot
+end subroutine optical_length_tot
 
 !***********************************************************
 
 subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
-  ! Generalisation de la routine length_deg2
+  ! Generalisation de la routine physical_length
   ! pour le cas du transfert dans les raies
   ! Propage un paquet depuis un point d'origine donne
   ! et integre l'equation du transfert radiatif
@@ -679,7 +671,7 @@ end subroutine integ_tau_mol
 !********************************************************************
 
 function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
-  ! Generalisation de la routine length_deg2
+  ! Generalisation de la routine physical_length
   ! Propage un paquet depuis un point d'origine donne
   ! et integre l'equation du transfert radiatif
   ! La propagation doit etre a l'envers pour faire du
@@ -868,7 +860,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               v0=0.0
               w0=sin(angle)
               Stokes(:) = 0.0_db ; !Stokes(1) = 1.0_db ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
-              call length_deg2(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
+              call physical_length(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
                    flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
@@ -901,7 +893,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  v0=0.0
                  w0=sin(angle)
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
+                 call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
@@ -931,7 +923,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  v0=0.0
                  w0=sin(angle)
                  Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
-                 call length_deg2(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
+                 call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
@@ -1037,11 +1029,11 @@ subroutine define_proba_weight_emission(lambda)
         w0=sin(angle)
 
         Stokes(:) = 0.0_db ;
-        call length_deg2_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
         if (tau < tau_min(icell)) tau_min(icell) = tau
 
         x0 = 0.99999*r_lim(i)
-        call length_deg2_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
         if (tau < tau_min(icell)) tau_min(icell) = tau
 
      enddo
