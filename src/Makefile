@@ -164,11 +164,11 @@ FF = $(FC_OMP)  $(MACH) $(OPTS)
 CC = $(CC_OMP)  $(MACH) $(OPTS)
 ifeq ($(debugp), yes)
 FF = $(FC_OMP)  $(DEBUG_OPTS)
-CC = $(CC_OMP)  $(DEBUG_OPTS)
+CC = $(CC_OMP)
 endif
 ifeq ($(debug), yes)
 FF = $(FC_SER) $(DEBUG_OPTS)
-CC = $(CC_SER) $(DEBUG_OPTS)
+CC = $(CC_SER)
 endif
 ifeq ($(mono), yes)
 FF = $(FC_SER)  $(MACH) $(OPTS)

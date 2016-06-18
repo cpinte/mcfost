@@ -10,6 +10,8 @@ module output
   use molecular_emission
   use ray_tracing
   use utils
+  use Voronoi_grid
+  use grid
 
   implicit none
 
@@ -1054,6 +1056,118 @@ end subroutine calc_optical_depth_map
 
 !***********************************************************
 
+subroutine write_column_density()
+  ! Only works if the star in in 0, 0, 0 at the moment
+
+  real, dimension(n_cells) :: CD
+  integer :: icell, icell0, next_cell, previous_cell
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(3) :: naxes
+  integer :: group,fpixel,nelements, alloc_status
+
+  logical :: simple, extend
+  character(len=512) :: filename
+
+  real(kind=db) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
+
+  do icell=1,n_cells
+
+     if (lVoronoi) then
+        write(*,*) "Column density option not omplemented in Voronoi"
+        write(*,*) "Exiting"
+        ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
+        stop
+        x1 = Voronoi(icell)%xyz(1)
+        y1 = Voronoi(icell)%xyz(2)
+        z1 = Voronoi(icell)%xyz(3)
+     else
+        x1 = r_grid(icell) * cos(phi_grid(icell))
+        y1 = r_grid(icell) * sin(phi_grid(icell))
+        z1 = z_grid(icell)
+     endif
+
+     norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
+     u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
+
+     next_cell = icell
+     icell0 = 0
+     CD(icell) = 0.0
+     do while(next_cell <= n_cells)
+        previous_cell = icell0
+        icell0 = next_cell
+        x0 = x1 ; y0 = y1 ; z0 = z1
+
+        call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+        CD(icell) = CD(icell) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
+     enddo
+  enddo ! icell
+  CD(:) = CD(:) / (m_to_cm)**2 ! g/cm^-2
+
+  filename = "!Column_density.fits.gz"
+
+  write(*,*) "Writing "//trim(filename)
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  if (lVoronoi) then
+     naxis=1
+     naxes(1)=n_cells
+     nelements=naxes(1)
+  else
+     if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
+  endif
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,CD,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  return
+
+end subroutine write_column_density
+
+!***********************************************************
+
+
 subroutine reemission_stats()
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -1770,7 +1884,6 @@ subroutine ecriture_UV_field()
   endif
   J = 0. ; G = 0. ; Gio = 0.
 
-
   ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
@@ -2180,7 +2293,6 @@ subroutine ecriture_temperature(iTemperature)
   return
 
 end subroutine ecriture_temperature
-
 
 !********************************************************************
 

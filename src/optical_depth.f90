@@ -1002,7 +1002,6 @@ subroutine define_proba_weight_emission(lambda)
 
   implicit none
 
-
   integer, intent(in) :: lambda
 
   real, dimension(n_cells) :: tau_min

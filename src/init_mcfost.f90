@@ -73,6 +73,7 @@ subroutine initialisation_mcfost()
   lopacite_only=.false.
   lseed=.false.
   loptical_depth_map=.false.
+  lcolumn_density = .false.
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
@@ -539,6 +540,9 @@ subroutine initialisation_mcfost()
      case("-optical_depth_map","-od")
         i_arg = i_arg+1
         loptical_depth_map=.true.
+     case("-column_density","-cd","-CD")
+        i_arg = i_arg+1
+        lcolumn_density=.true.
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.

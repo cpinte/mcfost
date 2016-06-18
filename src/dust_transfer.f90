@@ -130,6 +130,7 @@ subroutine transfert_poussiere()
 
 
   if (ldisk_struct) call write_disk_struct()
+  if (lcolumn_density) call write_column_density()
 
   if (lmono) then ! code monochromatique
      lambda=1
