@@ -17,7 +17,7 @@ rm -rf sprng2.0
 
 
 # cfitsio
-# g77 ou f77 needed by configure to set up the fotran wrapper in Makefile 
+# g77 ou f77 needed by configure to set up the fotran wrapper in Makefile
 #wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
@@ -28,6 +28,16 @@ make
 cp libcfitsio.a ../lib
 cd ..
 rm -rf cfitsio
+
+# voro++
+tar xzvf voro++-0.4.6.tar.gz
+#\cp -f  linux/ifort64/config.mk voro++-0.4.6
+cd voro++-0.4.6
+make
+\cp src/libvoro++.a ../lib
+\cp src/voro++.hh ../include
+cd ..
+rm -rf voro++-0.4.6
 
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort

@@ -71,6 +71,7 @@ BINARY = mcfost.phi
 endif
 
 LIBS_FITS = -L $(LIBS) -lcfitsio
+LIBS_VORO =  -L$(LIBS) -lvoro++ -cxxlib
 
 # SPRNG
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
@@ -136,6 +137,7 @@ FFLAGS = -c $(PREC)
 FFLAGS_EXE = $(PREC)
 
 LIBS = $(MCFOST_INSTALL)/lib/gfortran64/
+LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
 
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif
@@ -157,8 +159,6 @@ LIBS_SPRNG =  -L$(LIBS) -lsprng
 
 #Voro++
 INCLUDE_VORO = -I$(MCFOST_INSTALL)/include/voro++
-LIBS_VORO =  -L$(LIBS) -lvoro++ -cxxlib
-#-lstdc++ for gcc
 
 FF = $(FC_OMP)  $(MACH) $(OPTS)
 CC = $(CC_OMP)  $(MACH) $(OPTS)

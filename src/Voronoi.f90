@@ -304,7 +304,8 @@ module Voronoi_grid
 
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call system_clock(time1)
-    call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
+    call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
+         n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
     if (ierr /= 0) then
        write(*,*) "Voro++ excited with an error"
        write(*,*) "Exiting"
