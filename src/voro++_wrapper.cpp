@@ -3,7 +3,7 @@
 using namespace voro;
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[n], double y[n], double z[n],
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[],
             int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
 
     //std::cout << "Hello World!" << n << std::endl;
@@ -46,7 +46,6 @@ extern "C" {
     // Perform the Voronoi tesselation
     voronoicell_neighbor c;
     int pid ;
-    double xx,yy,zz,r;
     std::vector<int> vi;   // vi.size() pour avoir le nombre d'elements
 
     int n_neighbours, first_neighbour, last_neighbour ;
