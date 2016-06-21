@@ -39,7 +39,6 @@ program BIGCRUNCH
   ! Here it comes ...
   !*************************************************************************
 
-
   ! Transfert radiatif dans le continu
   ldust_transfer = .true.
   if (ldust_transfer) then

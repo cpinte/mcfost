@@ -106,6 +106,7 @@ subroutine initialisation_mcfost()
   loutput_mc=.true.
   ldensity_file=.false.
   lphantom_file=.false.
+  llimits_file = .false.
   lsigma_file = .false.
   lweight_emission=.false.
   lprodimo=.false.
@@ -643,6 +644,7 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-phantom-test","-phantom_test")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -651,6 +653,13 @@ subroutine initialisation_mcfost()
         l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-limits_file","-limits")
+        i_arg = i_arg + 1
+        llimits_file = .true.
+        call get_command_argument(i_arg,s)
+        limits_file = s
         i_arg = i_arg + 1
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1

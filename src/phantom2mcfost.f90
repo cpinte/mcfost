@@ -79,7 +79,7 @@ contains
 
 !*************************************************************************
 
-  subroutine setup_phantom2mcfost(phantom_file)
+  subroutine setup_phantom2mcfost(phantom_file, phantom_limits_file)
 
     use io_phantom, only : read_phantom_file, read_phantom_input_file
     use dump_utils, only : get_error_text
@@ -89,16 +89,19 @@ contains
     use grains, only : n_grains_tot, M_grain
     use mem
 
-    character(len=512), intent(in) :: phantom_file
+    character(len=512), intent(in) :: phantom_file, phantom_limits_file
 
     integer, parameter :: iunit = 1
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH
     real :: grainsize,graindens, f
-    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k
+    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k, ios
 
     logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
+
+    character(len=100) :: line_buffer
+    real(db), dimension(6) :: limits
 
     icell_ref = 1
 
@@ -115,7 +118,7 @@ contains
        write(*,*) "Error code =", ierr,  get_error_text(ierr)
        stop
     endif
-    write(*,*) "# Model size :"
+    write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
@@ -175,12 +178,33 @@ contains
        close(unit=1)
     endif
 
+
+    !*******************************
+    ! Model limits
+    !*******************************
+    write(*,*) " "
+    write(*,*) "Reading phantom limits file: "//trim(phantom_limits_file)
+    open(unit=1, file=phantom_limits_file, status='old', iostat=ios)
+    if (ios/=0) then
+       write(*,*) "ERROR : cannot open "//trim(phantom_limits_file)
+       write(*,*) "Exiting"
+       stop
+    endif
+    read(1,*) line_buffer
+    read(1,*) limits(1), limits(3), limits(5)
+    read(1,*) limits(2), limits(4), limits(6)
+    write(*,*) "# Model limits :"
+    write(*,*) "x =", limits(1), limits(2)
+    write(*,*) "y =", limits(3), limits(4)
+    write(*,*) "z =", limits(5), limits(6)
+    close(unit=1)
+
     !*******************************
     ! Voronoi tesselation
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
-    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, n_Voronoi)
-    call Voronoi_tesselation(n_SPH, x,y,z, n_Voronoi)
+    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits, n_Voronoi)
+    call Voronoi_tesselation(n_SPH, x,y,z, limits, n_Voronoi)
     deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
     !call test_walls()
