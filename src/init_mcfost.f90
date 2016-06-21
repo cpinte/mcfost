@@ -1139,10 +1139,10 @@ subroutine initialisation_mcfost()
 
   call save_data()
 
-  if ((l3D).and.(n_az==1)) then
+  if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
   endif
-
+  if (n_az > 1) l3D = .true.
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
      if (lmono0.and.(.not.l3D)) then
