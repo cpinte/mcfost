@@ -158,11 +158,6 @@ contains
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -609,11 +604,6 @@ contains
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -1037,11 +1027,6 @@ contains
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -1455,11 +1440,6 @@ contains
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -1870,11 +1850,6 @@ contains
     read(1,*) line_buffer
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
-
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
 
     ! ----
     ! Maps
@@ -2290,11 +2265,6 @@ contains
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -2692,11 +2662,6 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
-
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
 
     ! ----
     ! Maps
@@ -3103,11 +3068,6 @@ end subroutine read_para215
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
 
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
-
     ! ----
     ! Maps
     ! ----
@@ -3504,11 +3464,6 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) grid_type
     read(1,*) n_rad, nz, n_az, n_rad_in
-
-    if ((.not.l3D).and.(n_az > 1)) then
-       write(*,*) "WARNING : n_az > 1 in 2D configuration, forcing n_az=1"
-       n_az=1
-    endif
 
     ! ----
     ! Maps
