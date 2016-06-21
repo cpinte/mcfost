@@ -12,11 +12,17 @@ contains
     integer, intent(in) :: icell
     real(kind=db), intent(in) :: x,y,z
 
-    if (icell > n_cells) then
+    if (icell <= n_cells) then
+       test_exit_grid_sph = .false.
+       return
+    endif
+
+    if (lexit_cell(icell)==1) then ! radial
        test_exit_grid_sph = .true.
     else
        test_exit_grid_sph = .false.
     endif
+
     return
 
     return
@@ -191,6 +197,7 @@ end subroutine indice_cellule_sph_theta
        s = (-b+rac) * correct_plus
        t=huge_real
        delta_rad=1
+       t_phi = huge_real
     else
        ! 1) position interface radiale
        ! on avance ou recule en r ? -> produit scalaire
@@ -395,6 +402,64 @@ end subroutine indice_cellule_sph_theta
 
 !***********************************************************
 
+  subroutine verif_cell_position_sph(icell, x, y, z)
+
+    real(kind=db), intent(inout) :: x,y,z
+    integer, intent(inout) :: icell
+
+    integer :: ri, zj, ri0, zj0, tmp_k
+    real(kind=db) :: factor, correct_moins, correct_plus
+
+    correct_moins = 1.0_db - prec_grille_sph
+    correct_plus = 1.0_db + prec_grille_sph
+
+    ! tmp :
+    call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
+
+    ! locate current cell index
+    call indice_cellule_sph(x,y,z, icell)
+    ri = cell_map_i(icell)
+
+    ! Patch pour eviter BUG sur position radiale
+    ! a cause de limite de precision
+    if (ri==0) then
+       factor = rmin/ sqrt(x*x+y*y+z*z) * correct_plus
+       x = x * factor
+       y = y * factor
+       z = z * factor
+
+       ! On verifie que c'est OK maintenant
+       call indice_cellule_sph(x,y,z, icell)
+       if (ri==0) then
+          write(*,*) "BUG in verif_cell_position_sph"
+          write(*,*) "Exiting"
+          stop
+       endif
+    endif
+
+    if (l_dark_zone(icell)) then ! Petit test de securite
+       ! On resort le paquet
+       if (zj < zj0) then
+          zj = zj0
+          z = z_lim(ri0,zj0)*correct_plus
+       endif
+       if (ri < ri0) then
+          ri = ri0
+          x = x * correct_plus
+          y = y * correct_plus
+       else if (ri > ri0) then
+          ri = ri0
+          x = x * correct_moins
+          y = y * correct_moins
+       endif
+    endif
+
+    return
+
+  end subroutine verif_cell_position_sph
+
+!***********************************************************
+
   subroutine move_to_grid_sph(x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
     ! la direction donnee pour grille spherique
@@ -413,8 +478,7 @@ end subroutine indice_cellule_sph_theta
 
     correct_moins = 1.0_db - 1.0e-10_db
 
-    x0=x ; y0=y ; z0 =z
-
+    x0=x ; y0=y ; z0=z
 
     r0_2 = x0*x0+y0*y0+z0*z0
     b   = (x0*u+y0*v+z0*w)
@@ -438,7 +502,10 @@ end subroutine indice_cellule_sph_theta
 
     ! TMP
     if (s1 < 0.0) then
-       write(*,*) "Bug dans ray tracing !!!"
+       write(*,*) "Bug dans ray tracing in spherical coordinates !!!  s1 =", s1
+       write(*,*) x,y,z, u,v,w
+       write(*,*) r_lim_2(n_rad)
+       stop
     endif
     ! END TMP
 

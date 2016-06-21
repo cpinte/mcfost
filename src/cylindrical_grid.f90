@@ -88,6 +88,7 @@ contains
     ! Virtual cell indices for when the packets are just around the grid
 
     ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
+    ! Warning lexit_cells == 2 works only in cylindrical
     allocate(lexit_cell(1:ntot2), stat=alloc_status)
     if (alloc_status > 0) then
        write(*,*) 'Allocation error lexit_cell'
@@ -1038,6 +1039,63 @@ end subroutine define_cylindrical_grid
   end subroutine cross_cylindrical_cell
 
   !***********************************************************
+
+  subroutine verif_cell_position_cyl(icell, x, y, z)
+
+    real(kind=db), intent(inout) :: x,y,z
+    integer, intent(inout) :: icell
+
+    integer :: ri, zj, ri0, zj0, tmp_k
+    real(kind=db) :: factor, correct_moins, correct_plus
+
+    correct_moins = 1.0_db - prec_grille
+    correct_plus = 1.0_db + prec_grille
+
+    ! todo : tmp :
+    call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
+
+    ! locate current cell index
+    call indice_cellule_cyl(x,y,z, icell)
+    ri = cell_map_i(icell)
+
+    ! Patch pour eviter BUG sur position radiale
+    ! a cause de limite de precision
+    if (ri==0) then
+       factor = rmin/ sqrt(x*x+y*y) * correct_plus
+       x = x * factor
+       y = y * factor
+       z = z * factor
+
+       ! On verifie que c'est OK maintenant
+       call indice_cellule_cyl(x,y,z, icell)
+       ri = cell_map_i(icell)
+       if (ri==0) then
+          write(*,*) "BUG in verif_cell_position_cyl"
+          write(*,*) "Exiting"
+          stop
+       endif
+    endif
+
+    if (l_dark_zone(icell)) then ! Petit test de securite
+       ! On resort le paquet
+       if (zj < zj0) then
+          zj = zj0
+          z = z_lim(ri0,zj0)*correct_plus
+       endif
+       if (ri < ri0) then
+          ri = ri0
+          x = x * correct_plus
+          y = y * correct_plus
+       else if (ri > ri0) then
+          ri = ri0
+          x = x * correct_moins
+          y = y * correct_moins
+       endif
+    endif
+
+  end subroutine verif_cell_position_cyl
+
+!**********************************************************************
 
   subroutine move_to_grid_cyl(x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
