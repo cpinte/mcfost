@@ -64,10 +64,11 @@ module Voronoi_grid
 
   !************************************************************************
 
-  subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  nVoronoi)
+  subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  limits, nVoronoi)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
+    real(kind=db), dimension(6), intent(in) :: limits
     integer, intent(out) :: nVoronoi
 
     character(len=512) :: cmd
@@ -76,20 +77,17 @@ module Voronoi_grid
     real :: time
     real(kind=db) :: x_tmp, y_tmp, z_tmp, vol
 
-    character(len=128) :: limits
+    character(len=128) :: slimits
 
     logical, parameter :: lrun = .true.
 
-    real(kind=db), dimension(6) :: l
-
-    l = [-150.,150., -150.,150., -150.,150.]
 
     open(unit=1, file="particles.txt", status="replace")
     iVoronoi = 0
     do i=1, n_points
-       if ((x(i) > l(1)).and.(x(i) < l(2))) then
-          if ((y(i) > l(3)).and.(y(i) < l(4))) then
-             if ((z(i) > l(5)).and.(z(i) < l(6))) then
+       if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
+          if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
+             if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
                 iVoronoi = iVoronoi + 1
                 write(unit=1,fmt="(i7,f15.6,f15.6,f15.6)") iVoronoi, real(x(i)), real(y(i)), real(z(i))
              endif
@@ -109,7 +107,8 @@ module Voronoi_grid
     volume(:) = 0.0
 
     write(*,*) n_cells, "particles are in the volume"
-    write(limits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") l(1), l(2), l(3), l(4), l(5), l(6)
+    write(slimits,fmt="(f15.6,f15.6,f15.6,f15.6,f15.6,f15.6)") limits(1), limits(2), &
+         limits(3), limits(4), limits(5), limits(6)
 
     call system_clock(time1)
     if (lrun) then
@@ -117,7 +116,7 @@ module Voronoi_grid
        ! while I fix the c++/fortran interface and make all the tests
        write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
        cmd = "~/codes/voro++-0.4.6/src/voro++  -v -o -c '%i %q %v %s %n' "//&
-            trim(limits)//&
+            trim(slimits)//&
             " particles.txt ; mv particles.txt.vol Voronoi.txt"
        write(*,*) trim (cmd)
        call appel_syst(cmd,syst_status)
@@ -153,8 +152,7 @@ module Voronoi_grid
     !************************************
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
-
-    call init_Voronoi_walls()
+    call init_Voronoi_walls(n_walls, limits)
     write(*,*) "Reading", nVoronoi, " Voronoi cells"
 
     n_neighbours_tot = 0
@@ -232,30 +230,24 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,  nVoronoi)
+  subroutine Voronoi_tesselation(n_points, x,y,z,  limits, nVoronoi)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
+    real(kind=db), dimension(6), intent(in) :: limits
     integer, intent(out) :: nVoronoi
-
-    real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
-    real(kind=db), dimension(6) :: limits
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j
+    real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
+    real :: time
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
-    integer :: time1, time2, itime
-    real :: time
-
-    integer :: i, icell
-
-    limits = [-150.,150., -150.,150., -150.,150.]
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
-    call init_Voronoi_walls()
+    call init_Voronoi_walls(n_walls, limits)
 
     write(*,*) "WARNING: limits hard coded"
 
@@ -497,13 +489,17 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine init_Voronoi_walls()
+  subroutine init_Voronoi_walls(n_walls, limits)
 
+    integer, intent(in) :: n_walls
+    real(kind=db), dimension(n_walls), intent(in) :: limits
     integer :: iwall
 
-    real, parameter :: xmin = -150, xmax = 150
-    real, parameter :: ymin = xmin, ymax = xmax
-    real, parameter :: zmin = xmin, zmax = xmax
+    if (n_walls /= 6) then
+       write(*,*) "ERROR: n_walls must be 6 in Voronoi grid"
+       write(*,*) "Exiting"
+       stop
+    endif
 
     allocate(wall(n_walls))
 
@@ -525,12 +521,12 @@ module Voronoi_grid
     ! j=5 ---> z = zmin
     ! j=6 ---> z = zmax
 
-    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = abs(xmin)
-    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = abs(xmax)
-    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = abs(ymin)
-    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = abs(ymax)
-    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = abs(zmin)
-    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = abs(zmax)
+    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = abs(limits(1))  !xmin
+    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = abs(limits(2))  !xmax
+    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = abs(limits(3))  !ymin
+    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = abs(limits(4))  !ymax
+    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = abs(limits(5))  !zmin
+    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = abs(limits(6))  !zmax
 
     return
 

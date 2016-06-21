@@ -142,7 +142,6 @@ LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif
 
-
 LIBS_FITS = -L$(LIBS) -lcfitsio
 
 # Numerical Recipes

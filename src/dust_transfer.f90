@@ -95,7 +95,7 @@ subroutine transfert_poussiere()
 
   call setup_grid()
   if (lphantom_file) then
-     call setup_phantom2mcfost(density_file)
+     call setup_phantom2mcfost(density_file, limits_file)
   else
      call define_grid() ! included in setup_phantom2mcfost
   endif
