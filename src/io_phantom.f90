@@ -19,7 +19,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  integer :: nblocks,narraylengths,nblockarrays,number
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
- integer :: np,ntypes,nptmass,ipos,ngrains
+ integer :: np,ntypes,nptmass,ipos,ngrains, isink
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
  real(db) :: massoftype(maxtypes),hfact,umass,utime,udist
@@ -60,16 +60,18 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  call extract('npartoftype',npartoftype(1:ntypes),hdr,ierr)
  call extract('ndusttypes',ndusttypes,hdr,ierr,default=1)
  call extract('nptmass',nptmass,hdr,ierr,default=0)
+ !call extract('isink',isink,hdr,ierr,default=0)
 
  write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
  write(*,*) ' npartoftype = ',npartoftype(1:ntypes)
  write(*,*) ' nptmass = ', nptmass
+
  if (npartoftype(2) > 0) then
     write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, will be discarded ***'
  endif
 
  allocate(xyzh(4,np),itype(np),dustfrac(ndusttypes,np),grainsize(ndusttypes),tmp(np))
- allocate(xyzmh_ptmass(5,nptmass))
+ !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
 
  ! extract info from real header
@@ -97,7 +99,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  do iblock = 1,nblocks
     call read_blockheader(iunit,narraylengths,number8,nums,ierr)
     do j=1,narraylengths
-       !print*,'block ',j
+       write(*,*) 'block ',iblock, j, number8(j)
        do i=1,ndatatypes
           !print*,' data type ',i,' arrays = ',nums(i,j)
           do k=1,nums(i,j)
@@ -154,7 +156,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
                 else
                    write(*,"(a)")
                 endif
-             elseif (j==1 .and. number8(j)==nptmass) then
+            !elseif (j==1 .and. number8(j)==nptmass) then
+             elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
+                nptmass = number8(j) ! HACK
+                if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
+
                 read(iunit,iostat=ierr) tag
                 matched = .true.
                 if (i==i_real .or. i==i_real8) then
@@ -209,6 +215,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
     n_SPH = 0
     write(*,*) ' ERROR reading h from file'
  endif
+
+ write(*,*) "Phantom dump file processed ok"
 
  deallocate(xyzh,itype,dustfrac,tmp,xyzmh_ptmass)
 
