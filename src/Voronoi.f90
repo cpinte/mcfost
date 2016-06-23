@@ -249,8 +249,6 @@ module Voronoi_grid
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
 
-    write(*,*) "WARNING: limits hard coded"
-
     ! Filtering particles outise the limits
     icell = 0
     do i=1, n_points
