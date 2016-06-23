@@ -1,12 +1,9 @@
 #include "voro++.hh"
-//#include <iostream>
 using namespace voro;
 
 extern "C" {
   void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[],
-            int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
-
-    //std::cout << "Hello World!" << n << std::endl;
+              int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
 
     ierr = 0 ;
 
@@ -17,7 +14,8 @@ extern "C" {
     az = limits[4] ; bz = limits[5] ;
 
     int i, nx,ny,nz,init_mem(8);
-    //wall_list wl; // I am adding extra walls yet
+
+    //wall_list wl; // I am not adding extra walls yet
     bool xperiodic,yperiodic,zperiodic ;
     pre_container *pcon=NULL; // pre-container pointer
 
@@ -46,26 +44,23 @@ extern "C" {
     // Perform the Voronoi tesselation
     voronoicell_neighbor c;
     int pid ;
-    std::vector<int> vi;   // vi.size() pour avoir le nombre d'elements
+    std::vector<int> vi;
 
     int n_neighbours, first_neighbour, last_neighbour ;
-    int max_size_list = max_neighbours * n ; // todo : manage to get the size of the fortran array
+    int max_size_list = max_neighbours * n ;
 
     n_neighbours_tot = 0 ;
     last_neighbour = -1 ;
     n_in = 0 ;
+
+
     if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return fals if the cell was removed
-          //std::cout << "test1" << std::endl;
           n_in++ ;
-          //std::cout << n_in << std::endl;
 
           // id of the current cell in the c_loop
           pid = vlo.pid() ;
 
           // Volume
-          //std::cout << pid << std::endl;
-
-          //std::cout << "test2" << std::endl;
           volume[pid] = c.volume() ;
 
           // Store the neighbours list
@@ -75,22 +70,13 @@ extern "C" {
           first_neighbour = last_neighbour+1 ; first_neighbours[pid] = first_neighbour ;
           last_neighbour  = last_neighbour + n_neighbours ; last_neighbours[pid]  = last_neighbour ;
 
-          //std::cout << "test3" << std::endl;
-
-          //std::cout << n_neighbours_tot << " AA "<< max_size_list << std::endl;
           if (n_neighbours_tot > max_size_list) {
             ierr = 1 ;
             exit(1) ;
           }
 
-          //std::cout << "test4" << std::endl;
-
           c.neighbors(vi) ;
           for (i=0 ; i<n_neighbours ; i++) {
-           // std::cout << "**************************************" << std::endl;
-           // std::cout << "A " << i << " " << vi[i] << std::endl;
-           // std::cout << "fn = " << first_neighbour << std::endl;
-           // std::cout << "B " << i << " " << neighbours_list[first_neighbour+1+i] << std::endl;
             if (vi[i] >=0) {
               neighbours_list[first_neighbour+i] = vi[i] + 1 ;
             } else {
@@ -98,10 +84,8 @@ extern "C" {
               neighbours_list[first_neighbour+i] = vi[i] ;
             }
           }
-          //std::cout << "test5" << std::endl;
 
 
-        } while(vlo.inc());
-    //std::cout << "END C! " << ierr << " " << n_in << std::endl;
+        } while(vlo.inc()); //Finds the next particle to test
   }
 }
