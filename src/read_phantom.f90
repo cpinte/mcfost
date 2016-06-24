@@ -1,4 +1,4 @@
-module io_phantom
+module read_phantom
 
   use parametres
   use dump_utils
@@ -334,4 +334,4 @@ subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
 
 end subroutine read_phantom_input_file
 
-end module io_phantom
+end module read_phantom

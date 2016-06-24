@@ -1,3 +1,13 @@
+module mcfost2phantom
+
+  use parametres
+  use constantes
+  use utils
+
+  implicit none
+
+contains
+
 !--  subroutine init_mcfost_phantom(mcfost_filename, ierr)
 !--
 !--    ! This routine should be in mcfost2phantom
@@ -67,3 +77,5 @@
 !--  end subroutine run_mcfost_phantom
 
 !*************************************************************************
+
+end module mcfost2phantom
