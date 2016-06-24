@@ -210,8 +210,8 @@ mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 
-libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o phantom2mcfost.o
-	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o phantom2mcfost.o
+libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
+	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
