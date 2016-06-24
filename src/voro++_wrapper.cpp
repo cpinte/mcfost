@@ -1,19 +1,21 @@
 #include "voro++.hh"
 #include <iostream>
+#include <iomanip>
 using namespace voro;
 
 void progress_bar(float progress) {
 
-  int barWidth = 70;
+  int barWidth = 50;
 
-  std::cout << "[";
+  std::cout  << " " << std::setfill(' ') << std::setw(3) << int(progress * 100.0) << "%";
+  std::cout << " |";
   int pos = barWidth * progress;
   for (int i = 0; i < barWidth; ++i) {
     if (i < pos) std::cout << "=";
-    else if (i == pos) std::cout << ">";
+    else if (i == pos) std::cout << " "; //">";
     else std::cout << " ";
   }
-  std::cout << "] " << int(progress * 100.0) << " %\r";
+  std::cout << "| \r";
   std::cout.flush();
 
   //progress += 0.16; // for demonstration only
