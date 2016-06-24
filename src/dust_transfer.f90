@@ -94,7 +94,7 @@ subroutine transfert_poussiere()
   call define_physical_zones()
 
   call setup_grid()
-  if (lphantom_file) then
+  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file)
   else
      call define_grid() ! included in setup_phantom2mcfost

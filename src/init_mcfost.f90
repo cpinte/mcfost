@@ -106,6 +106,8 @@ subroutine initialisation_mcfost()
   loutput_mc=.true.
   ldensity_file=.false.
   lphantom_file=.false.
+  lascii_SPH_file = .false.
+  lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
   lweight_emission=.false.
@@ -638,23 +640,30 @@ subroutine initialisation_mcfost()
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
-        lphantom_test = .false.
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-phantom-test","-phantom_test")
+     case("-ascii_SPH")
         i_arg = i_arg + 1
-        lphantom_file=.true.
-        lphantom_test = .true.
+        lascii_SPH_file = .true.
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-gadget","-gadget2")
+        i_arg = i_arg + 1
+        lgadget2_file=.true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "gadget2.limits"
      case("-limits_file","-limits")
         i_arg = i_arg + 1
         llimits_file = .true.
