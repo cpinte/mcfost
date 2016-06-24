@@ -1,4 +1,4 @@
-module phantom2mcfost
+module SPH2mcfost
 
   use parametres
   use constantes
@@ -9,7 +9,7 @@ module phantom2mcfost
 contains
 
 
-  subroutine setup_phantom2mcfost(phantom_file, phantom_limits_file)
+  subroutine setup_SPH2mcfost(phantom_file, phantom_limits_file)
 
     use io_phantom, only : read_phantom_file, read_phantom_input_file
     use dump_utils, only : get_error_text
@@ -215,7 +215,7 @@ contains
 
     return
 
-  end subroutine setup_phantom2mcfost
+  end subroutine setup_SPH2mcfost
 
   !************
 
@@ -262,4 +262,4 @@ contains
 
   end subroutine read_test_ascii_file
 
-end module phantom2mcfost
+end module SPH2mcfost

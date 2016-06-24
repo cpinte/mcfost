@@ -28,7 +28,7 @@ module dust_transfer
   use utils
   use ProDiMo
   use init_mcfost
-  use phantom2mcfost
+  use SPH2mcfost
   !$ use omp_lib
 
   implicit none
@@ -95,7 +95,7 @@ subroutine transfert_poussiere()
 
   call setup_grid()
   if (lphantom_file) then
-     call setup_phantom2mcfost(density_file, limits_file)
+     call setup_SPH2mcfost(density_file, limits_file)
   else
      call define_grid() ! included in setup_phantom2mcfost
   endif
