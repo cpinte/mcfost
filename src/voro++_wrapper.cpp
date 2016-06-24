@@ -1,5 +1,25 @@
 #include "voro++.hh"
+#include <iostream>
 using namespace voro;
+
+void progress_bar(float progress) {
+
+  int barWidth = 70;
+
+  std::cout << "[";
+  int pos = barWidth * progress;
+  for (int i = 0; i < barWidth; ++i) {
+    if (i < pos) std::cout << "=";
+    else if (i == pos) std::cout << ">";
+    else std::cout << " ";
+  }
+  std::cout << "] " << int(progress * 100.0) << " %\r";
+  std::cout.flush();
+
+  //progress += 0.16; // for demonstration only
+  if (progress >= 1.0) std::cout << std::endl;
+}
+
 
 extern "C" {
   void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[],
@@ -53,9 +73,17 @@ extern "C" {
     last_neighbour = -1 ;
     n_in = 0 ;
 
-
+    float progress = 0.0 ;
+    float threshold = n/100. ;
     if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return fals if the cell was removed
+
           n_in++ ;
+
+          if (n_in > threshold) {
+            progress  += 0.01 ;
+            threshold += n/100. ;
+            progress_bar(progress) ;
+          }
 
           // id of the current cell in the c_loop
           pid = vlo.pid() ;
@@ -87,5 +115,6 @@ extern "C" {
 
 
         } while(vlo.inc()); //Finds the next particle to test
+    progress_bar(1.0) ;
   }
 }
