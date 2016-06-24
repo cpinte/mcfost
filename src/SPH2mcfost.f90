@@ -8,10 +8,10 @@ module SPH2mcfost
 
 contains
 
+  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file)
 
-  subroutine setup_SPH2mcfost(phantom_file, phantom_limits_file)
-
-    use io_phantom, only : read_phantom_file, read_phantom_input_file
+    use read_phantom, only : read_phantom_file, read_phantom_input_file
+    use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use Voronoi_grid
     use opacity, only : densite_pouss, masse
@@ -19,7 +19,7 @@ contains
     use grains, only : n_grains_tot, M_grain
     use mem
 
-    character(len=512), intent(in) :: phantom_file, phantom_limits_file
+    character(len=512), intent(in) :: SPH_file, SPH_limits_file
 
     integer, parameter :: iunit = 1
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
@@ -28,26 +28,31 @@ contains
     real :: grainsize,graindens, f
     integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k, ios
 
-    logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
+    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     character(len=100) :: line_buffer
     real(db), dimension(6) :: limits
 
     icell_ref = 1
 
-    write(*,*) "Performing phantom2mcfost setup"
-    write(*,*) "Reading phantom density file: "//trim(phantom_file)
+    if (lphantom_file) then
+       write(*,*) "Performing phantom2mcfost setup"
+       write(*,*) "Reading phantom density file: "//trim(SPH_file)
+       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       if (ierr /=0) then
+          write(*,*) "Error code =", ierr,  get_error_text(ierr)
+          stop
+       endif
+    else if (lgadget2_file) then
+       write(*,*) "Performing gadget2mcfost setup"
+       write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
+       call read_gadget2_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    else if (lascii_SPH_file) then
+       write(*,*) "Performing SPH2mcfost setup"
+       write(*,*) "Reading SPH density file: "//trim(SPH_file)
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    endif
 
-    if (lphantom_test) then
-       write(*,*) "USING PHANTOM TEST MODE"
-       call read_test_ascii_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
-    else
-       call read_phantom_file(iunit,phantom_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
-    endif
-    if (ierr /=0) then
-       write(*,*) "Error code =", ierr,  get_error_text(ierr)
-       stop
-    endif
     write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)
     write(*,*) "y =", minval(y), maxval(y)
@@ -113,10 +118,10 @@ contains
     ! Model limits
     !*******************************
     write(*,*) " "
-    write(*,*) "Reading phantom limits file: "//trim(phantom_limits_file)
-    open(unit=1, file=phantom_limits_file, status='old', iostat=ios)
+    write(*,*) "Reading limits file: "//trim(SPH_limits_file)
+    open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
     if (ios/=0) then
-       write(*,*) "ERROR : cannot open "//trim(phantom_limits_file)
+       write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
        write(*,*) "Exiting"
        stop
     endif
@@ -211,15 +216,13 @@ contains
        enddo !icell
     enddo search_not_empty
 
-    write(*,*) "End setup_phantom2mcfost"
-
     return
 
   end subroutine setup_SPH2mcfost
 
   !************
 
-  subroutine read_test_ascii_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
@@ -246,9 +249,8 @@ contains
     if (alloc_status /=0) then
        write(*,*) "Allocation error in phanton_2_mcfost"
        write(*,*) "Exiting"
+       stop
     endif
-
-    write(*,*) shape(x)
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH
@@ -260,6 +262,6 @@ contains
 
     return
 
-  end subroutine read_test_ascii_file
+  end subroutine read_ascii_SPH_file
 
 end module SPH2mcfost
