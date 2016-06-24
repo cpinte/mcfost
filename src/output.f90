@@ -1059,49 +1059,60 @@ end subroutine calc_optical_depth_map
 subroutine write_column_density()
   ! Only works if the star in in 0, 0, 0 at the moment
 
-  real, dimension(n_cells) :: CD
+  real, dimension(n_cells,2) :: CD
   integer :: icell, icell0, next_cell, previous_cell
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, alloc_status
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements, alloc_status, direction
 
   logical :: simple, extend
   character(len=512) :: filename
 
   real(kind=db) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
 
-  do icell=1,n_cells
+  CD(:,:) = 0.0
+  do direction = 1, 2
+     do icell=1,n_cells
 
-     if (lVoronoi) then
-        write(*,*) "Column density option not omplemented in Voronoi"
-        write(*,*) "Exiting"
-        ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
-        stop
-        x1 = Voronoi(icell)%xyz(1)
-        y1 = Voronoi(icell)%xyz(2)
-        z1 = Voronoi(icell)%xyz(3)
-     else
-        x1 = r_grid(icell) * cos(phi_grid(icell))
-        y1 = r_grid(icell) * sin(phi_grid(icell))
-        z1 = z_grid(icell)
-     endif
+        if (lVoronoi) then
+           write(*,*) "Column density option not omplemented in Voronoi"
+           write(*,*) "Exiting"
+           ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
+           stop
+           x1 = Voronoi(icell)%xyz(1)
+           y1 = Voronoi(icell)%xyz(2)
+           z1 = Voronoi(icell)%xyz(3)
+        else
+           x1 = r_grid(icell) * cos(phi_grid(icell))
+           y1 = r_grid(icell) * sin(phi_grid(icell))
+           z1 = z_grid(icell)
+        endif
 
-     norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
-     u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
+        if (direction == 1) then
+           norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
+           u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
+        else
+           u = 0.0 ; v = 0.0 ;
+           if (z1 >= 0) then
+              w = 1.0
+           else
+              w = -1.0
+           endif
+        endif
 
-     next_cell = icell
-     icell0 = 0
-     CD(icell) = 0.0
-     do while(next_cell <= n_cells)
-        previous_cell = icell0
-        icell0 = next_cell
-        x0 = x1 ; y0 = y1 ; z0 = z1
+        next_cell = icell
+        icell0 = 0
+        do while(next_cell <= n_cells)
+           previous_cell = icell0
+           icell0 = next_cell
+           x0 = x1 ; y0 = y1 ; z0 = z1
+           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+           CD(icell,direction) = CD(icell,direction) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
+        enddo
+     enddo ! icell
+  end do ! direction
+  CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
 
-        call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-        CD(icell) = CD(icell) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
-     enddo
-  enddo ! icell
-  CD(:) = CD(:) / (m_to_cm)**2 ! g/cm^-2
 
   filename = "!Column_density.fits.gz"
 
@@ -1122,21 +1133,24 @@ subroutine write_column_density()
   extend=.true.
 
   if (lVoronoi) then
-     naxis=1
+     naxis=2
      naxes(1)=n_cells
-     nelements=naxes(1)
+     naxes(2)=2
+     nelements=naxes(1)*naxes(2)
   else
      if (l3D) then
-        naxis=3
+        naxis=4
         naxes(1)=n_rad
         naxes(2)=2*nz
         naxes(3)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        naxes(4)=2
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      else
-        naxis=2
+        naxis=3
         naxes(1)=n_rad
         naxes(2)=nz
-        nelements=naxes(1)*naxes(2)
+        naxes(3)=2
+        nelements=naxes(1)*naxes(2)*naxes(3)
      endif
   endif
 
