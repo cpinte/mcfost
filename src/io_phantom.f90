@@ -249,10 +249,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   integer, intent(out) :: n_SPH
 
   integer :: i,j,k,itypei, alloc_status
-  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength, usolarmass, dustfraci, Mtot
+  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength_au, usolarmass, dustfraci, Mtot
 
   udens = umass/udist**3
-  ulength = udist/ (au_to_cm * 100.) ! todo : je ne capte pas ce factor --> Daniel
+  ulength_au = udist/ (au_to_cm * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
@@ -281,9 +281,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     itypei = abs(iphase(i))
     if (hi > 0. .and. itypei==1) then
        j = j + 1
-       x(j) = xi * ulength
-       y(j) = yi * ulength
-       z(j) = zi * ulength
+       x(j) = xi * ulength_au
+       y(j) = yi * ulength_au
+       z(j) = zi * ulength_au
        rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
        dustfraci = sum(dustfrac(:,i))
        rhogas(j) = (1 - dustfraci)*rhoi
@@ -304,9 +304,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     allocate(etoile(nptmass))
 
     do i=1,nptmass
-       etoile(i)%x = xyzmh_ptmass(1,i) * ulength
-       etoile(i)%y = xyzmh_ptmass(2,i) * ulength
-       etoile(i)%z = xyzmh_ptmass(3,i) * ulength
+       etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
+       etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
+       etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
 
        etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
     enddo
