@@ -211,7 +211,7 @@ contains
     x(:) = pos(1,1:n_SPH) * ulength_au
     y(:) = pos(2,1:n_SPH) * ulength_au
     z(:) = pos(3,1:n_SPH) * ulength_au
-    massgas(:) = massarr(0) * umass ! en g
+    massgas(:) = massarr(0) * usolarmass ! en Msun
 
     rhogas(:) = 0.
     rhodust(:,:) = 0.
@@ -228,6 +228,7 @@ contains
           etoile(i)%z = pos(3,n_SPH + i) * ulength_au
 
           etoile(i)%M =  mass_stars(i) * usolarmass
+          write(*,*) i, etoile(i)%M
        enddo
     endif
 
