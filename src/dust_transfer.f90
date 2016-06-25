@@ -113,7 +113,7 @@ subroutine transfert_poussiere()
 
   if (lProDiMo) call setup_ProDiMo()
 
-  if (.not.lphantom_file) then ! already done by setup_phantom2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call densite_file()
