@@ -21,7 +21,7 @@ subroutine allocate_densities()
 
   allocate(masse(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error masse'
+     write(*,*) 'Allocation error mass'
      stop
   endif
   masse = 0.0
