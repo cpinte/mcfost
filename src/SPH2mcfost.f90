@@ -31,7 +31,7 @@ contains
     logical, allocatable, dimension(:) :: lsublimate
     real(kind=db) :: r_sublimation2, dist2
     real :: grainsize,graindens, f
-    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, i, l, k, ios, n_sublimate
+    integer :: ierr, n_SPH, ndusttypes, alloc_status, icell, i, l, k, ios, n_sublimate, iSPH
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -162,6 +162,9 @@ contains
        read(1,*) limits(2), limits(4), limits(6)
        close(unit=1)
     else
+       write(*,*) "Selecting spatial range which contains"
+       write(*,*) 1.0-2*limit_threshold, "particles in each dimension"
+
        k = int(limit_threshold * n_SPH)
        limits(1) = select_inplace(k,real(x))
        limits(3) = select_inplace(k,real(y))
@@ -182,8 +185,8 @@ contains
     ! Voronoi tesselation
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
-    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits, n_Voronoi)
-    call Voronoi_tesselation(n_SPH, x,y,z, limits, n_Voronoi)
+    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
+    call Voronoi_tesselation(n_SPH, x,y,z, limits)
     deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 
@@ -199,8 +202,14 @@ contains
     !masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
 
     do icell=1,n_cells
-       masse_gaz(icell) = massgas(icell) /  g_to_Msun
-       densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
+       iSPH = Voronoi(icell)%id
+       if (iSPH > 0) then
+          masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun
+          densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
+       else ! star
+          masse_gaz(icell)    = 0.
+          densite_gaz(icell)  = 0.
+       endif
     enddo
 
     ! Tableau de densite et masse de poussiere
@@ -214,21 +223,25 @@ contains
        write(*,*) "*********************************************"
        l=1
        do icell=1,n_cells
-          do k=1,n_grains_tot
-             if (r_grain(l) < a_SPH(1)) then ! small grains
-                densite_pouss(k,icell) = rhodust(1,icell)
-             else if (r_grain(k) < a_SPH(ndusttypes)) then ! large grains
-                densite_pouss(k,icell) = rhodust(ndusttypes,icell)
-             else ! interpolation
-                if (r_grain(k) > a_sph(l+1)) l = l+1
-                f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+             do k=1,n_grains_tot
+                if (r_grain(l) < a_SPH(1)) then ! small grains
+                   densite_pouss(k,icell) = rhodust(1,iSPH)
+                else if (r_grain(k) < a_SPH(ndusttypes)) then ! large grains
+                   densite_pouss(k,icell) = rhodust(ndusttypes,iSPH)
+                else ! interpolation
+                   if (r_grain(k) > a_sph(l+1)) l = l+1
+                   f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
 
-                densite_pouss(k,icell) = rhodust(l,icell) + f * (rhodust(l+1,icell)  - rhodust(l,icell))
-             endif
-             !write(*,*) "Todo : densite_pouss : missing factor"
-             !          stop
-             masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
-          enddo !l
+                   densite_pouss(k,icell) = rhodust(l,iSPH) + f * (rhodust(l+1,iSPH)  - rhodust(l,iSPH))
+                endif
+                masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
+             enddo !l
+          else ! iSPH == 0, star
+             densite_pouss(:,icell) = 0.
+             masse(icell) = 0.
+          endif
        enddo ! icell
        masse(:) = masse(:) * AU3_to_cm3
     else ! using the gas density
@@ -353,6 +366,8 @@ contains
     enddo
 
     write(*,*) "MinMax=", minval(massgas), maxval(massgas)
+
+    write(*,*) "Using stars from mcfost parameter file"
 
     return
 
