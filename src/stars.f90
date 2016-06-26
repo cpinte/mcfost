@@ -1,15 +1,10 @@
 module stars
 
   use parametres
-  use disk
   use prop_star
-  use grains
-  use em_th
+  use utils
   use constantes
-
-  use scattering
   use ProDiMo
-  use optical_depth
   use grid
 
   implicit none
@@ -568,9 +563,11 @@ subroutine repartition_energie_etoiles()
   endif
 
   ! Cellule d'origine dans laquelle est l'etoile
-  do i=1, n_etoiles
-     call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
-  enddo
+  if (.not.lVoronoi) then ! already done during tesselation for Voronoi grid
+     do i=1, n_etoiles
+        call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
+     enddo
+  endif
 
   return
 

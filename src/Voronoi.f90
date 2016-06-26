@@ -5,6 +5,7 @@ module Voronoi_grid
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
   use opacity, only : volume
+  use prop_star
 
   implicit none
 
@@ -64,16 +65,15 @@ module Voronoi_grid
 
   !************************************************************************
 
-  subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  limits, nVoronoi)
+  subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  limits)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
     real(kind=db), dimension(6), intent(in) :: limits
-    integer, intent(out) :: nVoronoi
 
     character(len=512) :: cmd
     integer :: i, syst_status, time1, time2, itime, iVoronoi, alloc_status, ios, icell
-    integer :: n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour, k, j
+    integer :: n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour, k, j, nVoronoi
     real :: time
     real(kind=db) :: x_tmp, y_tmp, z_tmp, vol
 
@@ -230,16 +230,16 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,  limits, nVoronoi)
+  subroutine Voronoi_tesselation(n_points, x,y,z,  limits)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
     real(kind=db), dimension(6), intent(in) :: limits
-    integer, intent(out) :: nVoronoi
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
+    integer, dimension(n_points+n_etoiles) :: SPH_id
     real :: time
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
@@ -249,21 +249,36 @@ module Voronoi_grid
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
 
-    ! Filtering particles outise the limits
+    ! Filtering particles outside the limits
     icell = 0
     do i=1, n_points
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
              if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
                 icell = icell + 1
+                SPH_id(icell) = i
                 x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;
              endif
           endif
        endif
     enddo
-    close(unit=1)
+
+    ! Filtering stars outside the limits
+    etoile(:)%out_model = .true.
+    do i=1, n_etoiles
+       if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
+          if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
+             if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
+                icell = icell + 1
+                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ;
+                etoile(i)%out_model = .false.
+                etoile(i)%icell = icell
+                SPH_id(icell) = 0
+             endif
+          endif
+       endif
+    enddo
     n_cells = icell
-    nVoronoi = n_cells
 
     allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), stat=alloc_status)
     if (alloc_status /=0) then
@@ -284,13 +299,12 @@ module Voronoi_grid
     endif
     neighbours_list = 0
 
-
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
        Voronoi(icell)%xyz(3) = z_tmp(icell)
+       Voronoi(icell)%id     = SPH_id(icell)
     enddo
-
 
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call system_clock(time1)
