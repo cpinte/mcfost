@@ -12,28 +12,15 @@ module disk_physics
 contains
 
 
-
 subroutine compute_othin_sublimation_radius()
-  ! Dans le cas optiquement mince, ne dépend que de la température de l'étoile
+  ! Dans le cas optiquement mince, ne dépend que de la température (et spectre) de l'étoile
 
   implicit none
 
-  real(kind=db) :: E_dust, E_etoile
+  real(kind=db) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
   real :: cst, wl, delta_wl
-  integer :: lambda, icell
-  real(kind=db) :: sublimation_radius, coeff_exp, cst_wl
+  integer :: lambda, icell, i
 
-  ! TODO : pb de normalization spectre_etoiles si Teff n'est pas celle du spectre en mode non-bb
-
-
-  !  if (lvariable_dust) then
-  !     write(*,*) "Sublimation radius calculation not implemented"
-  !     write(*,*) "in case of statification"
-  !     stop
-  !  endif
-  ! --> kappa moyenne verticalement
-
-  !  Emission poussière
   E_dust = 0.0
   cst=cst_th/dust_pop(1)%T_sub
   cst=cst_th/1500.
@@ -52,68 +39,34 @@ subroutine compute_othin_sublimation_radius()
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
 
-  ! emission étoile : BB seulement pour le moment
-  E_etoile = 0.0
-  cst=cst_th/etoile(1)%T
-  do lambda=1, n_lambda
-     ! longueur d'onde en metre
-     wl = tab_lambda(lambda)*1.e-6
-     delta_wl=tab_delta_lambda(lambda)*1.e-6
-     cst_wl=cst/wl
-     if (cst_wl < 500.0) then
-        coeff_exp=exp(cst_wl)
-!        E_etoile = E_etoile + sum(kappa_abs_LTE(lambda,1,:,1)) /((wl**5)*(coeff_exp-1.0)) *delta_wl
+  ! Emission étoiles
+  do i=1, n_etoiles
+     E_etoile = 0.0
+     do lambda=1, n_lambda
         E_etoile = E_etoile + kappa_abs_LTE(icell,lambda) * spectre_etoiles(lambda) / ( 4*pi * AU_to_m**2)
+     enddo
 
-
-       ! write(*,*)  2.0*pi*hp*c_light**2  * 4*pi*etoile(1)%r**2 * AU_to_m**2 / ((wl**5)*(coeff_exp-1.0)) * delta_wl  /  spectre_etoiles(lambda) !----> OK, c'est la bonne valeur de spectre etoile pour 1BB quand n_lambda est grand (binnage negligeable)
+     if (E_dust < tiny_real) then
+        write(*,*) "Sublimation radius : something is wrong"
+        write(*,*) "Opacity is not defined yet"
+        write(*,*) "Maybe the parameter file is old ?"
+        write(*,*) "Exiting"
+        stop
      endif
+     etoile(i)%othin_sublimation_radius = sqrt(E_etoile/E_dust)
   enddo
 
-  if (E_dust < tiny_real) then
-     write(*,*) "Sublimation radius : something is wrong"
-     write(*,*) "Opacity is not defined yet"
-     write(*,*) "Maybe the parameter file is old ?"
-     write(*,*) "Exiting"
-     stop
+  if (.not.lVoronoi) then
+     sublimation_radius = real(etoile(1)%othin_sublimation_radius)
+     write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
+     sublimation_radius = sublimation_radius * 1.6
+
+     open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
+     write(1,*) etoile(:)%othin_sublimation_radius
+     close(1)
+
+     call set_sublimation_radius(sublimation_radius)
   endif
-  sublimation_radius = sqrt(E_etoile/E_dust)
-
-
-
-  ! -------------
-!---
-!---  log_frac_E_abs=log(J_abs*n_phot_L_tot + E0(ri,zj,phik))
-!---
-!---
-!---  Cst0 = 2.0*hp*c_light**2 * 1e-6 * pi*Rsun_to_AU**2  / (pc_to_AU**2)
-!---
-!---  ! pour le spectre de MCFOST
-!---  tab_spectre(i,l) = Cst0/ ( ((exp(cst_w)) -1.)) * (wl**5))  ;
-!---  terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda)))
-!4*pi*(etoile(i)%r**2)
-!---  terme = terme / N * (surface / Cst0)
-!---
-!---  spectre = spectre + terme * delta_wl
-
-!---  spectre_etoiles(:) =  spectre_etoiles(:) * cst_spectre_etoiles
-! 2.0*pi*hp*c_light**2 * (AU_to_m)**2
-!---   surface=4*pi*(etoile(i)%r**2)
-!---     cst_spectre_etoiles = 2.0*pi*hp*c_light**2 * (AU_to_m)**2 ! cst BB + r_etoile est en AU
-!---  ---> spectre_etoile = B * surface * cst_spectre_etoiles * delta_wl
-!---
-  ! ---------------
-
-
-  !  sublimation_radius =  (etoile(1)%T/T_max)**2 * etoile(1)%r
-  write(*,*) "Optically thin sublimation radius =", real(sublimation_radius), "AU"
-  sublimation_radius = sublimation_radius * 1.6
-
-  open(unit=1,file=trim(data_dir)//"/"//trim(sublimationFile),status="replace")
-  write(1,*) sublimation_radius
-  close(1)
-
-  call set_sublimation_radius(sublimation_radius)
 
   return
 

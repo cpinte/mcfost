@@ -244,7 +244,7 @@ module prop_star
   integer :: n_etoiles
 
   type star_type
-     real :: r, T, M, fUV, slope_UV
+     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
      real(kind=db) :: x,y,z
      logical :: lb_body, out_model
      character(len=512) :: spectre
