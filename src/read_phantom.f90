@@ -207,6 +207,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
     dustfrac = 0.
  endif
 
+ write(*,*) "Found", nptmass, "stars in the phantom file"
+
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,itype,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,rhogas,rhodust,n_SPH)
@@ -296,7 +298,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  enddo
  n_SPH = j
 
- write(*,*) "Found", nptmass, "stars in the phantom file"
  write(*,*) "Total mass is", Mtot * usolarmass
  if (nptmass > 0) then
     write(*,*) "Updating the stellar properties"
