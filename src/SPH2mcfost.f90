@@ -21,7 +21,9 @@ contains
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
 
+    real, parameter :: limit_threshold = 0.01
     integer, parameter :: iunit = 1
+
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH
@@ -118,21 +120,34 @@ contains
     ! Model limits
     !*******************************
     write(*,*) " "
-    write(*,*) "Reading limits file: "//trim(SPH_limits_file)
-    open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
-    if (ios/=0) then
-       write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
-       write(*,*) "Exiting"
-       stop
+    if (llimits_file) then
+       write(*,*) "Reading limits file: "//trim(SPH_limits_file)
+       open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
+       if (ios/=0) then
+          write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
+          write(*,*) "Exiting"
+          stop
+       endif
+       read(1,*) line_buffer
+       read(1,*) limits(1), limits(3), limits(5)
+       read(1,*) limits(2), limits(4), limits(6)
+       close(unit=1)
+    else
+       k = int(limit_threshold * n_SPH)
+       limits(1) = select_inplace(k,real(x))
+       limits(3) = select_inplace(k,real(y))
+       limits(5) = select_inplace(k,real(z))
+
+       k = int((1.0-limit_threshold) * n_SPH)
+       limits(2) = select_inplace(k,real(x))
+       limits(4) = select_inplace(k,real(y))
+       limits(6) = select_inplace(k,real(z))
     endif
-    read(1,*) line_buffer
-    read(1,*) limits(1), limits(3), limits(5)
-    read(1,*) limits(2), limits(4), limits(6)
+
     write(*,*) "# Model limits :"
     write(*,*) "x =", limits(1), limits(2)
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
-    close(unit=1)
 
     !*******************************
     ! Voronoi tesselation

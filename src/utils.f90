@@ -1440,4 +1440,74 @@ end subroutine progress_bar
 
 !************************************************************
 
+function select(k,arr)
+  use nrtype; use nrutil, only : assert,swap
+  implicit none
+  integer(i4b), intent(in) :: k
+  real(sp), dimension(:), intent(inout) :: arr
+  real(sp) :: select
+  ! Returns the kth smallest value in the array arr. The input array will be rearranged to have
+  ! this value in location arr(k), with all smaller elements moved to arr(1:k-1) (in arbitrary
+  !order) and all larger elements in arr(k+1:) (also in arbitrary order).
+  integer(i4b) :: i,r,j,l,n
+  real(sp) :: a
+  n=size(arr)
+  call assert(k >= 1, k <= n, 'select args')
+  l=1
+  r=n
+  do
+     if (r-l <= 1) then !Active partition contains 1 or 2 elements.
+        if (r-l == 1) call swap(arr(l),arr(r),arr(l)>arr(r))  ! Active partition contains 2 elements.
+        select=arr(k)
+        RETURN
+     else
+        !Choose median of left, center, and right elements
+        !as partitioning element a. Also rearrange so
+        !that arr(l) <= arr(l+1) <= arr(r).
+        i=(l+r)/2
+        call swap(arr(i),arr(l+1))
+        call swap(arr(l),arr(r),arr(l)>arr(r))
+        call swap(arr(l+1),arr(r),arr(l+1)>arr(r))
+        call swap(arr(l),arr(l+1),arr(l)>arr(l+1))
+        i=l+1 ! Initialize pointers for partitioning.
+        j=r
+        a=arr(l+1) ! Partitioning element.
+        do !Here is the meat.
+           do ! Scan up to find element > a.
+              i=i+1
+              if (arr(i) >= a) exit
+           end do
+           do ! Scan down to find element < a.
+              j=j-1
+              if (arr(j) <= a) exit
+           end do
+           if (j < i) exit ! Pointers crossed. Exit with partitioning complete.
+           call swap(arr(i),arr(j)) ! Exchange elements.
+        end do
+        arr(l+1)=arr(j) ! Insert partitioning element.
+        arr(j)=a
+        if (j >= k) r=j-1 ! Keep active the partition that contains the kth element.
+        if (j <= k) l=i
+     end if
+  end do
+end function select
+
+!************************************************************
+
+function select_inplace(k,arr)
+  use nrtype
+  !use nr, only : select
+  implicit none
+  integer(i4b), intent(in) :: k
+  real(sp), dimension(:), intent(in) :: arr
+  real(sp) :: select_inplace
+  ! Returns the kth smallest value in the array arr, without altering the input array.
+  ! In Fortran 90's assumed memory-rich environment, we just call select in scratch space.
+  real(sp), dimension(size(arr)) :: tarr
+  tarr=arr
+  select_inplace=select(k,tarr)
+end function select_inplace
+
+!************************************************************
+
 end module utils
