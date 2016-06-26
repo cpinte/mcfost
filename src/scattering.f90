@@ -738,62 +738,6 @@ end subroutine mueller_opacity_file
 
 !**********************************************************************
 
-subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
-!***************************************************
-!*--------COSINUS DIRECTEURS APRES LA DIFFUSION-----
-!*
-!*        U0,V0 ET W0 ; COSINUS DIRECTEURS AVANT
-!*        U1,V1 ET W1 ; COSINUS DIRECTEURS APRES
-!*        U ; SELON X
-!*        V ; SELON Y    X VERS L'OBSERVATEUR
-!*        W ; SELON Z
-!*
-!*        COSPSI = COSINUS DE L'ANGLE DE DIFFUSION
-!*        PHI = AZIMUTH
-!*
-!*        FRANCOIS MENARD, 21 NOVEMBRE 1988, UDEM
-!*
-!***************************************************
-! 06/12/05 : - passage double car bug sous Icare
-!            - reduction nbre d'opérations
-!            (C. Pinte)
-!***************************************************
-
-  implicit none
-
-  real(kind=db), intent(in) :: cospsi, phi, u0, v0, w0
-  real(kind=db), intent(out) :: u1, v1, w1
-
-  real(kind=db) :: cpsi, spsi, cphi, sphi, a, b,c, Aw0, Cm1
-
-  cpsi = cospsi
-  spsi = sqrt(1.0_db - cpsi*cpsi)
-  sphi = sin(phi)
-  cphi = cos(phi)
-
-  a = spsi * cphi
-  b = spsi * sphi
-
-  ! Calcul de u1,v1 et w1
-  if ( abs(w0) <= 0.999999 ) then
-     c = sqrt(1.0_db - w0*w0)
-     cm1 = 1.0_db/c
-     aw0 = a*w0
-     u1 = ( aw0*u0 - b*v0 ) * cm1 + cpsi*u0
-     v1 = ( aw0*v0 + b*u0 ) * cm1 + cpsi*v0
-     w1 =  cpsi*w0 - a*c
-  else
-     u1 = a
-     v1 = b
-     w1 = cpsi!*w0
-  endif
-
-  return
-
-end subroutine cdapres
-
-!***************************************************
-
 integer function grainsize(lambda,aleat, icell)
 !-----------------------------------------------------
 !  Nouvelle version : janvier 04
