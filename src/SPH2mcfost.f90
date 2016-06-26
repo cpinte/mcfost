@@ -17,6 +17,7 @@ contains
     use opacity, only : densite_pouss, masse
     use molecular_emission, only : densite_gaz, masse_gaz
     use grains, only : n_grains_tot, M_grain
+    use disk_physics, only : compute_othin_sublimation_radius
     use mem
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
@@ -27,8 +28,10 @@ contains
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH
+    logical, allocatable, dimension(:) :: lsublimate
+    real(kind=db) :: r_sublimation2, dist2
     real :: grainsize,graindens, f
-    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, l, k, ios
+    integer :: ierr, n_SPH, n_Voronoi, ndusttypes, alloc_status, icell, i, l, k, ios, n_sublimate
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -114,6 +117,32 @@ contains
        write(1,*) 1.0
        close(unit=1)
     endif
+
+ !   !*******************************************************************
+ !   ! Check which cells will be in the sublimation regions of the stars
+ !   !*******************************************************************
+ !   call compute_othin_sublimation_radius()
+ !   allocate(lsublimate(n_cells), stat=alloc_status)
+ !   if (alloc_status /=0) then
+ !      write(*,*) "Allocation error lsublimate in SPH2mcfost"
+ !      write(*,*) "Exiting"
+ !      stop
+ !   endif
+ !   lsublimate(:) = .false.
+ !   do i=1, n_etoiles
+ !      n_sublimate = 0
+ !      r_sublimation2 = etoile(i)%othin_sublimation_radius**2
+ !      do icell=1, n_cells
+ !         dist2 = (x(icell) - etoile(i)%x)**2 + (y(icell) - etoile(i)%y)**2 + (z(icell) - etoile(i)%z)**2
+ !         if (dist2 < r_sublimation2) then
+ !            lsublimate(icell) = .true.
+ !            n_sublimate = n_sublimate+1
+ !         endif
+ !      enddo ! icell
+ !      if (n_sublimate > 0) then
+ !         write(*,*) n_sublimate, "SPH particles will be sublimated by star #", i
+ !      endif
+ !   enddo ! etoile
 
 
     !*******************************
