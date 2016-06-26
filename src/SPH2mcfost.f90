@@ -157,7 +157,6 @@ contains
     call Voronoi_tesselation(n_SPH, x,y,z, limits, n_Voronoi)
     deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
-    !call test_walls()
 
     !*************************
     ! Densities
@@ -231,11 +230,62 @@ contains
        enddo !icell
     enddo search_not_empty
 
+    call compute_stellar_parameters()
+
     return
 
   end subroutine setup_SPH2mcfost
 
-  !************
+  !*********************************************************
+
+  subroutine compute_stellar_parameters()
+
+    use prop_star
+
+    integer :: i
+
+    character(len=512) :: isochrone_file, filename
+    character(len=100) :: line_buffer
+
+    integer, parameter :: nSpT = 29
+    character(len=2), dimension(nSpT) :: SpT
+    real :: L, R, T, M
+    real, dimension(nSpT) :: logL, logR, logTeff, logM
+
+    isochrone_file = "Siess/isochrone_3Myr.txt"
+
+    write(*,*) ""
+    write(*,*) "Reading isochrone file: "//trim(isochrone_file)
+    filename = trim(mcfost_utils)//"Isochrones/"//trim(isochrone_file)
+    open(unit=1,file=filename,status="old")
+    do i=1,3
+       read(1,*) line_buffer
+    enddo
+    do i=1, nSpT
+       read(1,*) SpT(i), L, r, T, M
+       logL(i) = log(L) ; logR(i) = log(r) ; logTeff(i) = log(T) ; logM(i) = log(M)
+    enddo
+    close(unit=1)
+
+    ! interpoler L et T, les fonctions sont plus smooth
+    write(*,*) "New stellar parameters:"
+    do i=1, n_etoiles
+       etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
+       etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
+       etoile(i)%lb_body = .true.
+       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "AU"
+    enddo
+    write(*,*) ""
+
+    ! Passage rayon en AU
+    etoile(:)%r = etoile(:)%r * Rsun_to_AU
+
+    return
+
+  end subroutine compute_stellar_parameters
+
+  !*********************************************************
+
 
   subroutine read_ascii_SPH_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
