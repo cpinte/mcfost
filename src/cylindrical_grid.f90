@@ -740,23 +740,23 @@ end subroutine define_cylindrical_grid
           ri=(ri_min+ri_max)/2
        enddo
        ri_out=ri+1
-    endif
 
-    if (ri_out > 0) zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+       if (ri_out > 0) zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
 
-    if (l3D) then
-       if (zj_out > nz) zj_out = nz
-       if (zin < 0.0)  zj_out = -zj_out
-       if (zin /= 0.0) then
-          phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
-          phik_out=floor(phi/(2*pi)*real(N_az))+1
-          if (phik_out==n_az+1) phik_out=n_az
-       else
+       if (l3D) then
+          if (zj_out > nz) zj_out = nz
+          if (zin < 0.0)  zj_out = -zj_out
+          if (zin /= 0.0) then
+             phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+             phik_out=floor(phi/(2*pi)*real(N_az))+1
+             if (phik_out==n_az+1) phik_out=n_az
+          else
+             phik_out=1
+          endif
+       else ! 2D
+          if (zj_out > nz) zj_out = nz + 1
           phik_out=1
        endif
-    else ! 2D
-       if (zj_out > nz) zj_out = nz + 1
-       phik_out=1
     endif
 
     icell = cell_map(ri_out,zj_out,phik_out)
