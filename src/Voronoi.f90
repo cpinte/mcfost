@@ -244,7 +244,7 @@ module Voronoi_grid
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
-    logical :: is_outside_stars
+    logical :: is_outside_stars, lcompute
 
     real(kind=db), dimension(n_etoiles) :: deuxr2_star
     real(kind=db) :: dx, dy, dz, dist2
@@ -335,14 +335,17 @@ module Voronoi_grid
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
 
-    write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call system_clock(time1)
-    call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
-         n_in,volume, first_neighbours,last_neighbours,  n_neighbours_tot, neighbours_list,ierr)
-    if (ierr /= 0) then
-       write(*,*) "Voro++ excited with an error"
-       write(*,*) "Exiting"
-       stop
+    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    if (lcompute) then
+       write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
+            n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
+       if (ierr /= 0) then
+          write(*,*) "Voro++ excited with an error", ierr
+          write(*,*) "Exiting"
+          stop
+       endif
     endif
 
     ! Conversion to Fortran indices
@@ -395,7 +398,61 @@ module Voronoi_grid
 
   end subroutine Voronoi_tesselation
 
-  !----------------------------------------
+  !**********************************************************
+
+  subroutine save_Voronoi_tesselation(n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+
+    integer, intent(in) :: n_in, n_neighbours_tot
+    integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
+    character(len=512) :: filename
+
+    open(1,file=filename,status='replace',form='unformatted')
+    ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
+    write(1) n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
+    close(1)
+
+    return
+
+  end subroutine save_Voronoi_tesselation
+
+
+  !**********************************************************
+
+  subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+
+    integer, intent(in) :: n_cells,max_neighbours
+    logical, intent(out) :: lcompute
+    integer, intent(out) :: n_in, n_neighbours_tot
+    integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
+    integer, dimension(n_cells*max_neighbours), intent(out) :: neighbours_list
+
+    character(len=512) :: filename
+    integer :: ios
+
+    lcompute = .true.
+
+    ! check if there is a Voronoi file
+    ios = 0
+    open(1,file=filename,status='old',form='unformatted',iostat=ios)
+    if (ios /= 0)  then
+       close(unit=1)
+       return
+    endif
+
+    ! read the saved Voronoi mesh
+    read(1,iostat=ios) n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
+    close(unit=1)
+    if (ios /= 0) then ! if some dimension changed
+       return
+    endif
+
+    return
+
+  end subroutine read_saved_Voronoi_tesselation
+
+  !**********************************************************
+
+
 
   subroutine test_walls()
 
