@@ -241,23 +241,52 @@ module Voronoi_grid
     real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
     integer, dimension(n_points+n_etoiles) :: SPH_id
     real :: time
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
+    logical :: is_outside_stars
+
+    real(kind=db), dimension(n_etoiles) :: deuxr2_star
+    real(kind=db) :: dx, dy, dz, dist2
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
 
-    ! Filtering particles outside the limits
+    do istar=1, n_etoiles
+       deuxr2_star(istar) = (2*etoile(istar)%r)**2
+    enddo
+
+    ! Filtering particles outside the limits and inside stars
     icell = 0
     do i=1, n_points
+       ! We test if the point is in the model volume
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
              if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
-                icell = icell + 1
-                SPH_id(icell) = i
-                x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;
+
+                ! We also test if the edge of the cell can be inside the star
+                ! We test for the edge, so the center needs to be at twice the radius
+                is_outside_stars = .true.
+                loop_stars : do istar=1, n_etoiles
+                   dx = x(i) - etoile(istar)%x
+                   dy = y(i) - etoile(istar)%y
+                   dz = z(i) - etoile(istar)%z
+
+                   if (min(dx,dy,dz) < 2*etoile(istar)%r) then
+                      dist2 = dx**2 + dy**2 + dz**2
+                      if (dist2 < deuxr2_star(istar)) then
+                         is_outside_stars = .false.
+                         exit loop_stars
+                      endif
+                   endif
+                enddo loop_stars
+
+                if (is_outside_stars) then
+                   icell = icell + 1
+                   SPH_id(icell) = i
+                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;
+                endif
              endif
           endif
        endif
