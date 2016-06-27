@@ -341,11 +341,8 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   real(kind=db), intent(out) :: lmin,lmax
 
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, delta, inv_w, r_2
-  real(kind=db) :: delta_vol, l, ltot, tau, zlim, dotprod, opacite, tau_tot
-  real(kind=db) :: correct_plus, correct_moins
-  integer :: icell0, delta_rad, delta_zj, previous_cell, next_cell
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins
+  integer :: icell0, previous_cell, next_cell
 
   correct_plus = 1.0_db + prec_grille
   correct_moins = 1.0_db - prec_grille
@@ -421,13 +418,11 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
 
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: tspeed
   real(kind=db) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, dotprod, delta_vol_phi
+  real(kind=db) :: delta_vol, l, delta_vol_phi, v0, v1, v_avg0
   real(kind=db), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=db) :: dtau_c, Snu_c
   real(kind=db), dimension(nTrans) :: tau_c
-  real(kind=db) :: correct_plus, correct_moins, v0, v1, v_avg0
   integer :: iTrans, ivpoint, iiTrans, n_vpoints, nbr_cell, icell, next_cell, previous_cell
 
   real :: facteur_tau
@@ -690,10 +685,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
 
   real(kind=db), dimension(N_type_flux) :: integ_ray_dust
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm
-  real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, tan_angle_lim, den
-  real(kind=db) :: delta_vol, l, zlim, dotprod
-  real(kind=db) :: correct_plus, correct_moins
+  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l
   integer :: icell, previous_cell, next_cell
 
   real(kind=db) :: tau, dtau
@@ -774,9 +766,9 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda, p_lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: i, j, pk, n, id, ri, zj, phik, icell, jj
+  integer :: i, j, pk, n, id, icell, jj
   real(kind=db) :: x0, y0, z0, u0, v0, w0
-  real :: somme, angle, dvol1, d_r, phi, r0
+  real :: somme, angle, dvol1, phi, r0
 
   logical :: flag_direct_star = .false.
   logical :: flag_star = .false.
@@ -1008,7 +1000,7 @@ subroutine define_proba_weight_emission(lambda)
   real(kind=db), dimension(4) :: Stokes
   real(kind=db) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
   real :: tau
-  integer :: i, j, n, id, ri, zj, icell
+  integer :: i, j, n, id, icell
   integer, parameter :: nbre_angle = 101
 
   tau_min(:) = 1.e30 ;

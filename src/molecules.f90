@@ -690,7 +690,7 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, ri, zj, phik, p_lambda, icell
+  integer :: iTrans, p_lambda, icell
   real(kind=db) :: freq!, Jnu
   real :: T, wl, kap
 
@@ -698,8 +698,6 @@ subroutine init_dust_mol(imol)
 
   real, parameter :: gas_dust = 100
   real, parameter :: delta_lambda = 0.025
-
-  phik=1
 
   cst_E=2.0*hp*c_light**2
 

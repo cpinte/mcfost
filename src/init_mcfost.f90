@@ -24,7 +24,7 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
-  integer :: current_date, update_date, mcfost_auto_update, mem_size
+  integer :: current_date, update_date, mcfost_auto_update
   real(kind=db) :: wvl
   real :: opt_zoom, utils_version, PA
 

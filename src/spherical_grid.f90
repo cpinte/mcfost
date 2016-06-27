@@ -161,7 +161,7 @@ end subroutine indice_cellule_sph_theta
     real(kind=db) :: correct_moins, correct_plus, uv, precision
     real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
     real(kind=db) :: delta_vol, dotprod, t_phi, tan_angle_lim, den
-    integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta, nbr_cell, p_ri0, p_thetaj0, icell0
+    integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta
 
     integer :: phik0, phik1, delta_phi, phik0m1
 
@@ -438,6 +438,7 @@ end subroutine indice_cellule_sph_theta
     endif
 
     if (l_dark_zone(icell)) then ! Petit test de securite
+       zj = cell_map_j(icell)
        ! On resort le paquet
        if (zj < zj0) then
           zj = zj0
@@ -474,7 +475,7 @@ end subroutine indice_cellule_sph_theta
     logical, intent(out) :: lintersect
 
     real(kind=db) :: x0, y0, z0, x1, y1, z1, r0_2, b, c, rac, delta, s1, delta_vol, correct_moins
-    integer :: ri, thetaj, phik
+
 
     correct_moins = 1.0_db - 1.0e-10_db
 
@@ -488,8 +489,7 @@ end subroutine indice_cellule_sph_theta
     if (delta < 0.0_db) then
        ! On ne rencontre pas la sphere
        lintersect = .false.
-       ri = n_rad+1
-       thetaj = nz+1
+       icell = 0
        return
     endif
     lintersect = .true.
