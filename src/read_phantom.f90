@@ -19,7 +19,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  integer :: nblocks,narraylengths,nblockarrays,number
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
- integer :: np,ntypes,nptmass,ipos,ngrains, isink
+ integer :: np,ntypes,nptmass,ipos,ngrains
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
  real(db) :: massoftype(maxtypes),hfact,umass,utime,udist

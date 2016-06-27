@@ -1077,6 +1077,7 @@ end subroutine define_cylindrical_grid
     endif
 
     if (l_dark_zone(icell)) then ! Petit test de securite
+       zj = cell_map_j(icell)
        ! On resort le paquet
        if (zj < zj0) then
           zj = zj0

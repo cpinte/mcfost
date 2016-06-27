@@ -27,7 +27,7 @@ contains
     ! number of particles per type: npart(0) gives SPH particles, npart(5) gives N-body particles.
     ! ntot is total particle number
     ! others are required for data read but not used
-    integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, flag_cool, unused(33), nall(0:5), n_stars, alloc_status
+    integer :: npart(0:5), ntot, len, flag_sfr, flag_feedback, unused(33), nall(0:5), n_stars, alloc_status
     ! massarr gives particle mass per type (as with npart) for particle
     ! types of uniform mass (only type 0 SPH particles here)
     double precision :: massarr(0:5), time, redshift

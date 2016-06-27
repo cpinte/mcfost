@@ -850,13 +850,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer :: theta_I, phi_I, dir, iscatt, id
   integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
-  real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta, norme
+  real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
   integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 cree un leger surcout dans le cas avec strat (qq 10 sec par inclinaison et par lambda)
   ! 15 cree un important surcout
 
-  real :: s11, sum_s11, s12, s33, s34
+  real :: s11, s12, s33, s34
 
   ! Many dimensions but small numbers (<1MB for default values)
   real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sin_scatt_norm
@@ -1014,8 +1014,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc) &
-  !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
-  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt,norme) &
+  !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
+  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
   id = 1 ! pour code sequentiel
 

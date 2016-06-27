@@ -1063,7 +1063,7 @@ subroutine write_column_density()
   integer :: icell, icell0, next_cell, previous_cell
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, alloc_status, direction
+  integer :: group,fpixel,nelements, direction
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1999,7 +1999,7 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: i, j, l, k, icell
+  integer :: l, icell
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, alloc_status
@@ -2316,7 +2316,7 @@ subroutine ecriture_Tex(imol)
 
   integer, intent(in) :: imol
 
-  integer :: i, j, iTrans, iUp, iLow, k, icell
+  integer :: iTrans, iUp, iLow, k, icell
   real(kind=db) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2405,7 +2405,7 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=db) :: somme
-  integer ::  i, j, l, icell
+  integer :: l, icell
   real, dimension(n_cells) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2642,7 +2642,7 @@ subroutine ecriture_pops(imol)
   integer, intent(in) :: imol
 
   character(len=512) :: filename
-  integer :: status,unit,blocksize,bitpix,naxis, i,j,icell
+  integer :: status,unit,blocksize,bitpix,naxis,icell
   integer, dimension(3) :: naxes
   integer :: group,fpixel,nelements
   logical :: simple, extend

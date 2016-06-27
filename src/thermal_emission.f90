@@ -118,7 +118,7 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: i,j,pk,k,lambda,t, pop, icell, p_icell
+  integer :: k,lambda,t, pop, icell, p_icell
   real(kind=db) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=db), dimension(0:n_lambda) :: integ3
@@ -1429,8 +1429,8 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: i,j, k, T, icell, alloc_status
-  real(kind=db) :: Temp, wl, cst_wl, E_star, surface, Ener, frac, E_emise, cst_wl_max
+  integer :: k, T, icell, alloc_status
+  real(kind=db) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max
   real(kind=db) :: delta_T
   real(kind=db), dimension(:), allocatable :: E_cell, E_cell_corrected
 
