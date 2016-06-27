@@ -90,7 +90,11 @@ subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
   y=y+etoile(i_star)%y
   z=z+etoile(i_star)%z
 
-  icell = etoile(i_star)%icell
+  if (lVoronoi) then
+     icell = etoile(i_star)%icell
+  else ! star can overlap several cells on a classical grid
+     call indice_cellule(x,y,z, icell)
+  endif
 
   if (etoile(i_star)%out_model) then
      call move_to_grid(x,y,z,u,v,w, icell,lintersect)
