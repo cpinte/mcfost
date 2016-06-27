@@ -99,13 +99,13 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  do iblock = 1,nblocks
     call read_blockheader(iunit,narraylengths,number8,nums,ierr)
     do j=1,narraylengths
-       write(*,*) 'block ',iblock, j, number8(j)
+       !write(*,*) 'block ',iblock, j, number8(j)
        do i=1,ndatatypes
           !print*,' data type ',i,' arrays = ',nums(i,j)
           do k=1,nums(i,j)
              if (j==1 .and. number8(j)==np) then
                 read(iunit, iostat=ierr) tag
-                write(*,"(1x,a)",advance='no') trim(tag)
+                !write(*,"(1x,a)",advance='no') trim(tag)
                 matched = .true.
                 if (i==i_real .or. i==i_real8) then
                    select case(trim(tag))
@@ -151,11 +151,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
                 else
                    read(iunit,iostat=ierr)
                 endif
-                if (matched) then
-                   write(*,"(a)") '->'//trim(tag)
-                else
-                   write(*,"(a)")
-                endif
+              !  if (matched) then
+              !     write(*,"(a)") '->'//trim(tag)
+              !  else
+              !     write(*,"(a)")
+              !  endif
             !elseif (j==1 .and. number8(j)==nptmass) then
              elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                 nptmass = number8(j) ! HACK
@@ -186,11 +186,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
                    matched = .false.
                    read(iunit,iostat=ierr)
                 endif
-                if (matched) then
-                   write(*,"(a)") '->',trim(tag)
-                else
-                   write(*,"(a)")
-                endif
+           !     if (matched) then
+           !        write(*,"(a)") '->',trim(tag)
+           !     else
+           !        write(*,"(a)")
+           !     endif
              else
                 read(iunit, iostat=ierr) tag ! tag
                 !print*,tagarr(1)
