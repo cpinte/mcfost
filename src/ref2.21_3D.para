@@ -1,4 +1,4 @@
-2.20                      mcfost version
+2.21                      mcfost version
 
 #Number of photon packages
   1.28e5                  nbr_photons_eq_th  : T computation
@@ -49,11 +49,6 @@
   1.0  0.0    300.  100.  Rin, edge, Rout, Rc (AU) Rc is only used for tappered-edge & debris disks (Rout set to 8*Rc if Rout==0)
   1.125                   flaring exponent, unused for envelope
   -0.5  0.0    	          surface density exponent (or -gamma for tappered-edge disk or volume density for envelope), usually < 0, -gamma_exp (or alpha_in & alpha_out for debris disk)
-
-#Cavity : everything is empty above the surface
- F	  	     	  cavity ?
- 15. 50.		  height, reference radius (AU)
- 1.5 			  flaring exponent
 
 #Grain properties
   2  Number of species
