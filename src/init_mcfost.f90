@@ -24,7 +24,7 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
-  integer :: current_date, update_date, mcfost_auto_update
+  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
   real(kind=db) :: wvl
   real :: opt_zoom, utils_version, PA
 
@@ -32,7 +32,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -70,6 +70,7 @@ subroutine initialisation_mcfost()
   lresol=.false.
   lPA = .false.
   lzoom=.false.
+  lMC_bins = .false.
   lopacite_only=.false.
   lseed=.false.
   loptical_depth_map=.false.
@@ -100,10 +101,10 @@ subroutine initialisation_mcfost()
   lisotropic = .false.
   lno_scattering = .false.
   lqsca_equal_qabs = .false.
-  lscatt_ray_tracing=.false.
+  lscatt_ray_tracing=.true.
   lscatt_ray_tracing1=.false.
   lscatt_ray_tracing2=.false.
-  loutput_mc=.true.
+  loutput_mc=.false.
   ldensity_file=.false.
   lphantom_file=.false.
   lascii_SPH_file = .false.
@@ -138,6 +139,7 @@ subroutine initialisation_mcfost()
   lISM_heating = .false.
   llimb_darkening = .false.
   lVoronoi = .false.
+  lcavity = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -472,6 +474,23 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1
+     case("-n_MC_bins")
+        lMC_bins=.true.
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : MC bins needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) ntheta
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) then
+           write(*,*) "Error : MC bins needed"
+           stop
+        endif
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) nazimuth
+        i_arg= i_arg+1
      case("-PA")
         lPA = .true.
         i_arg = i_arg+1
@@ -627,6 +646,12 @@ subroutine initialisation_mcfost()
         lscatt_ray_tracing1=.false.
         lscatt_ray_tracing2=.true.
         if (.not.lmc) loutput_mc=.false.
+     case("-no-rt")
+        i_arg = i_arg + 1
+        lscatt_ray_tracing=.false.
+        lscatt_ray_tracing1=.false.
+        lscatt_ray_tracing2=.false.
+        loutput_mc=.true.
      case("-mc")
         i_arg = i_arg + 1
         lmc=.true.
@@ -867,6 +892,18 @@ subroutine initialisation_mcfost()
         read(s,*) max_mem
         max_mem = max_mem/2. ! facteur a la louche
         i_arg = i_arg + 1
+     case("-cavity")
+        lcavity = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cavity%sclht
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cavity%rref
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) cavity%exp_beta
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1044,6 +1081,8 @@ subroutine initialisation_mcfost()
      stop
   endif
 
+  if (.not.limg) loutput_mc = .true.
+
   if (lresol) then
      igridx = nx
      igridy = ny
@@ -1070,11 +1109,10 @@ subroutine initialisation_mcfost()
      write(*,*) "Updating zoom =", zoom
   endif
 
-! BUG dans version methode 2 de dust_map (ray-tracing)
-!  if (lsed) then
-!     igridx = 1
-!     igridy = 1
-!  endif
+  if (lMC_bins) then
+     N_thet = ntheta
+     N_phi = nazimuth
+  endif
 
   if (lemission_mol) then
      do imol=1,n_molecules
@@ -1203,7 +1241,6 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Main mcfost options"
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
-  write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs"
   write(*,*) "        : -mol : calculates molecular emission"
   write(*,*) "        : -prodimo : creates the files for ProDiMo"
   write(*,*) " "
@@ -1220,11 +1257,12 @@ subroutine display_help()
   write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
   write(*,*) "        : -PA (override value in parameter file)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
-!  write(*,*) "        : -rt1 : use ray-tracing method 1 (SED calculation)"
-!  write(*,*) "        : -rt2 : use ray-tracing method 2 (image calculation)"
-  write(*,*) "        : -mc : keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
+  write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs (on by default)"
+  write(*,*) "        : -rt1 or -rt2 : use ray-tracing method and force ray-tracing method"
+  write(*,*) "        : -no-rt : do not output the ray-tracing results"
+  write(*,*) "        : -mc :  keep Monte-Carlo output in ray-tracing mode"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
@@ -1252,6 +1290,7 @@ subroutine display_help()
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
   write(*,*) "        : -tilt : <angle> [degrees]"
+  write(*,*) "        : -cavity <h0> <r0> <flaring exponent>"
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
