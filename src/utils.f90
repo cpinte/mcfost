@@ -556,12 +556,13 @@ end subroutine mcfost_setup
 
 function mcfost_update(lforce_update, lmanual, n_days)
 
+  use system
+
   logical, intent(in) :: lforce_update, lmanual
   integer, intent(in), optional :: n_days
   logical :: lupdate, mcfost_update
 
   character(len=512) :: cmd, url, url_sha1, last_version, current_binary, s
-  character(len=32) :: system
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -614,23 +615,11 @@ function mcfost_update(lforce_update, lmanual, n_days)
   write(*,*) " "
 
   if (lupdate) then
-     ! get system info with uname : Darwin or Linux
-     cmd = "uname > arch.txt" ;  call appel_syst(cmd, syst_status)
-     open(unit=1, file="arch.txt", status='old',iostat=ios)
-     read(1,*,iostat=ios) system
-     close(unit=1,status="delete",iostat=ios)
-     if (ios/=0) then
-        write(*,*) "Unknown operating system : error 1"
-        write(*,*) "Cannot download new binary"
-        write(*,*) "Exiting."
-        stop
-     endif
-
      ! get the correct url corresponding to the system
-     if (system(1:5)=="Linux") then
+     if (operating_system=="Linux ") then
         url = trim(webpage)//"linux/mcfost_bin.tgz"
         url_sha1 = trim(webpage)//"linux/mcfost.sha1"
-     else if (system(1:6)=="Darwin") then
+     else if (operating_system=="Darwin") then
         url = trim(webpage)//"macos/mcfost_bin.tgz"
         url_sha1 = trim(webpage)//"macos/mcfost.sha1"
      else
@@ -640,7 +629,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
         stop
      endif
 
-     write(*,*) "Your system is ", trim(system)
+     write(*,*) "Your system is ", operating_system
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
@@ -658,9 +647,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! check sha
      write(*,'(a20, $)') "Checking binary ..."
-     if (system(1:5)=="Linux") then
+     if (operating_system=="Linux ") then
         cmd = "sha1sum  mcfost_bin.tgz > mcfost_update.sha1"
-     else if (system(1:6)=="Darwin") then
+     else if (operating_system=="Darwin") then
         cmd = "openssl sha1 mcfost_bin.tgz | awk '{print $2}' > mcfost_update.sha1"
      endif
      call appel_syst(cmd, syst_status)
