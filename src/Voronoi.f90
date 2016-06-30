@@ -5,6 +5,7 @@ module Voronoi_grid
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
   use opacity, only : volume
+  use disk, only : density_file
   use prop_star
 
   implicit none
@@ -336,7 +337,7 @@ module Voronoi_grid
     enddo
 
     call system_clock(time1)
-    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
     if (lcompute) then
        write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
@@ -346,6 +347,9 @@ module Voronoi_grid
           write(*,*) "Exiting"
           stop
        endif
+       call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+    else
+       write(*,*) "Reading previous Voronoi tesselation"
     endif
 
     ! Conversion to Fortran indices
@@ -400,15 +404,20 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list)
 
+    real(kind=db), intent(in), dimension(6) :: limits
     integer, intent(in) :: n_in, n_neighbours_tot
     integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
     character(len=512) :: filename
+    character(len=40) :: voronoi_sha1
 
+    call get_voronoi_sha1(density_file, voronoi_sha1)
+
+    filename = "_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
-    write(1) n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
+    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
     close(1)
 
     return
@@ -418,9 +427,11 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+  subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
 
     integer, intent(in) :: n_cells,max_neighbours
+    real(kind=db), intent(in), dimension(6) :: limits
+
     logical, intent(out) :: lcompute
     integer, intent(out) :: n_in, n_neighbours_tot
     integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
@@ -429,8 +440,14 @@ module Voronoi_grid
     character(len=512) :: filename
     integer :: ios
 
+    character(len=40) :: voronoi_sha1, voronoi_sha1_saved
+    real(kind=db), dimension(6) :: limits_saved
+
     lcompute = .true.
 
+    call get_voronoi_sha1(density_file, voronoi_sha1)
+
+    filename = "_voronoi.tmp"
     ! check if there is a Voronoi file
     ios = 0
     open(1,file=filename,status='old',form='unformatted',iostat=ios)
@@ -440,10 +457,17 @@ module Voronoi_grid
     endif
 
     ! read the saved Voronoi mesh
-    read(1,iostat=ios) n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
+    read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
     close(unit=1)
     if (ios /= 0) then ! if some dimension changed
        return
+    endif
+
+    ! We are using the same file with the same limits
+    if (voronoi_sha1 == voronoi_sha1_saved) then
+       if (maxval(abs(limits-limits_saved)) < 1e-3) then
+          lcompute = .false.
+       endif
     endif
 
     return
@@ -452,7 +476,34 @@ module Voronoi_grid
 
   !**********************************************************
 
+  subroutine get_voronoi_sha1(filename, voronoi_sha1)
 
+    use system
+
+    character(len=512), intent(in) :: filename
+    character(len=40), intent(out) :: voronoi_sha1
+    character(len=512) :: cmd
+    integer :: ios, syst_status
+
+    if (operating_system=="Linux ") then
+       cmd = "sha1sum  "//trim(filename)//" > voronoi.sha1"
+    else if (operating_system=="Darwin") then
+       cmd = "openssl sha1 "//trim(filename)//" | awk '{print $2}' > voronoi.sha1"
+    else
+       write(*,*) "Unknown operatinf system"
+       write(*,*) "Can't compute sha1 of "//trim(filename)
+       return
+    endif
+    call appel_syst(cmd, syst_status)
+    open(unit=1, file="voronoi.sha1", status='old',iostat=ios)
+    read(1,*,iostat=ios) voronoi_sha1
+    close(unit=1,status="delete",iostat=ios)
+
+    return
+
+  end subroutine get_voronoi_sha1
+
+  !**********************************************************
 
   subroutine test_walls()
 
