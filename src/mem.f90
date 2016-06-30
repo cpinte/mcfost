@@ -1144,9 +1144,13 @@ end subroutine clean_mem_dust_mol
 
 subroutine realloc_step2()
 
-  integer :: alloc_status, mem_size
-  integer :: p_n_lambda2_pos = 1
+  integer :: alloc_status, mem_size, p_n_lambda2_pos
 
+  if (ldust_prop) then
+     p_n_lambda2_pos = n_lambda2
+  else
+     p_n_lambda2_pos = 1
+  endif
   p_n_lambda_pos = p_n_lambda2_pos ! just in case
 
   ! parametrage methode de diffusion
