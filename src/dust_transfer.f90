@@ -404,7 +404,14 @@ subroutine transfert_poussiere()
         endif
 
         if ((ind_etape==first_etape_obs).and.(.not.lsed_complete).and.(.not.lmono0)) then ! Changement des lambda
-           lambda0 = 1 ;p_lambda => lambda0 ! if we reallocate, we are now in monochromatic
+           ! if we reallocate, we are now in monochromatic
+           ! except if we want to save the dust properties
+           if (ldust_prop) then
+              p_lambda => lambda
+           else
+              lambda0 = 1 ; p_lambda => lambda0
+           endif
+
            call init_lambda2()
            call init_indices_optiques()
 
