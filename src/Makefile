@@ -172,7 +172,7 @@ FF = $(FC_OMP) -O1
 endif
 
 
-SOURCES = modules.f90 sha.f90 utils.f90 mem.f90 grid.f90 input.f90 output.f90 \
+SOURCES = modules.f90 sha.f90 system.f90 utils.f90 mem.f90 grid.f90 input.f90 output.f90 \
 	benchmarks.f90 	read_param.f90 io_prodimo.f90 \
 	io_phantom_infiles.f90 io_phantom_utils.f90 io_phantom.f90 \
 	init_mcfost.f90 scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
@@ -220,6 +220,11 @@ sha.f90 : ../.git/objects modules.o
 	git log --pretty=format:"%H %d" | grep \(HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
 	printf "end module sha\n" >> sha.f90
 endif
+
+system.f90 : sha.o
+	printf "module system\n  implicit none\n" > system.f90
+	uname | awk '{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' >> system.f90
+	printf "end module system\n" >> system.f90
 
 mcfost2prodimo : mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
@@ -300,7 +305,7 @@ wardlaw :
 # Nettoyage
 #*************************************************************
 clean :
-	rm -rf *.o  *.mod _dust_prop*.tmp *.i90
+	rm -rf *.o  *.mod _dust_prop*.tmp *.i90 system.f90 system.o
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
