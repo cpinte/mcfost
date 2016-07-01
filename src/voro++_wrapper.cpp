@@ -77,8 +77,7 @@ extern "C" {
 
     float progress = 0.0 ;
     float threshold = n/100. ;
-    if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return fals if the cell was removed
-
+    if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return false if the cell was removed
           n_in++ ;
 
           if (n_in > threshold) {
