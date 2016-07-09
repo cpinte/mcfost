@@ -348,9 +348,9 @@ module Voronoi_grid
     enddo
 
     call system_clock(time1)
+    write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
     if (lcompute) then
-       write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
        if (ierr /= 0) then
@@ -370,6 +370,10 @@ module Voronoi_grid
 
     ! Setting-up the walls
     do icell=1, n_cells
+       if (volume(icell) < tiny_real) then
+          write(*,*) "icell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+       endif
+
        ! todo : find the cells touching the walls
        do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
           j = neighbours_list(k)
@@ -399,8 +403,9 @@ module Voronoi_grid
 
     if (n_in /= n_cells) then
        write(*,*) "*****************************************"
-       write(*,*) "WARNING : some particles are not the mesh"
+       write(*,*) "ERROR : some particles are not the mesh"
        write(*,*) "*****************************************"
+       stop
     endif
 
     write(*,*) "Neighbours list size =", n_neighbours_tot
