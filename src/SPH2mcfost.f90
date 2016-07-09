@@ -56,6 +56,8 @@ contains
        call read_ascii_SPH_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     endif
 
+    if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
+
     write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)
     write(*,*) "y =", minval(y), maxval(y)
