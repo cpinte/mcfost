@@ -243,7 +243,7 @@ contains
        enddo !icell
     enddo search_not_empty
 
-    call compute_stellar_parameters()
+    if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
 
     return
 
