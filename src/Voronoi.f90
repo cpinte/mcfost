@@ -213,6 +213,9 @@ module Voronoi_grid
              wall(j)%n_neighbours = wall(j)%n_neighbours+1
              if (wall(j)%n_neighbours > max_wall_neighbours) then
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
+                write(*,*) wall(j)%n_neighbours, max_wall_neighbours
+                write(*,*) "Exiting"
+                stop
              endif
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
@@ -239,10 +242,10 @@ module Voronoi_grid
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
-    real(kind=db), dimension(n_points) :: x_tmp, y_tmp, z_tmp
+    real(kind=db), dimension(n_points+n_etoiles) :: x_tmp, y_tmp, z_tmp
     integer, dimension(n_points+n_etoiles) :: SPH_id
     real :: time
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
     logical :: is_outside_stars, lcompute
@@ -260,6 +263,7 @@ module Voronoi_grid
 
     ! Filtering particles outside the limits and inside stars
     icell = 0
+    n_sublimate = 0
     do i=1, n_points
        ! We test if the point is in the model volume
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
@@ -278,6 +282,7 @@ module Voronoi_grid
                       dist2 = dx**2 + dy**2 + dz**2
                       if (dist2 < deuxr2_star(istar)) then
                          is_outside_stars = .false.
+                         n_sublimate = n_sublimate + 1
                          exit loop_stars
                       endif
                    endif
@@ -292,6 +297,11 @@ module Voronoi_grid
           endif
        endif
     enddo
+
+    if (n_sublimate > 0) then
+       write(*,*) n_sublimate, "particles have been sublimated"
+       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
+    endif
 
     ! Filtering stars outside the limits
     etoile(:)%out_model = .true.
@@ -367,6 +377,9 @@ module Voronoi_grid
              wall(j)%n_neighbours = wall(j)%n_neighbours+1
              if (wall(j)%n_neighbours > max_wall_neighbours) then
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
+                write(*,*) wall(j)%n_neighbours, max_wall_neighbours
+                write(*,*) "Exiting"
+                stop
              endif
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
@@ -381,9 +394,7 @@ module Voronoi_grid
     else
        write (*,'(" Tesselation Time = ", F5.2, "s")')  time
     endif
-    write(*,*) "Voronoi Tesselation done"
     write(*,*) "Found", n_in, "cells"
-
 
     if (n_in /= n_cells) then
        write(*,*) "*****************************************"
@@ -568,7 +579,7 @@ module Voronoi_grid
     real(kind=db), intent(out) ::  s
     integer, intent(out) :: next_cell
 
-    real :: s_tmp, den
+    real(kind=db) :: s_tmp, den
     integer :: i, id_n
 
     real(kind=db), intent(out) :: x1, y1, z1
@@ -691,7 +702,7 @@ module Voronoi_grid
     integer, intent(in) :: iwall
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real, dimension(3) :: n, p, r, k
+    real(kind=db), dimension(3) :: n, p, r, k
 
     real :: den
 
@@ -704,7 +715,7 @@ module Voronoi_grid
 
     den = dot_product(n, k) ! le signe depend du sens de propagation par rapport a la normale
 
-    if (abs(den) > 0) then
+    if (abs(den) > tiny_real) then
        distance_to_wall = dot_product(n, p-r) / den
     else
        distance_to_wall = huge(1.0)
@@ -725,7 +736,7 @@ module Voronoi_grid
     logical, intent(out) :: lintersect
 
     logical, dimension(n_walls) :: intersect
-    real, dimension(n_walls) :: s_walls
+    real(kind=db), dimension(n_walls) :: s_walls
     integer, dimension(n_walls) :: order
 
     real(kind=db) :: s, l, x_test, y_test, z_test
