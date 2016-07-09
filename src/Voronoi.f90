@@ -305,6 +305,7 @@ module Voronoi_grid
 
     ! Filtering stars outside the limits
     etoile(:)%out_model = .true.
+    etoile(:)%icell = 0
     do i=1, n_etoiles
        if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
           if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then

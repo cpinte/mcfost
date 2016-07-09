@@ -98,8 +98,8 @@ subroutine transfert_poussiere()
      call setup_SPH2mcfost(density_file, limits_file)
   else
      call define_grid() ! included in setup_phantom2mcfost
+     call stars_cell_indices()
   endif
-  call stars_cell_indices()
 
   ! Allocation dynamique de tous les autres tableaux
   call alloc_dynamique()
