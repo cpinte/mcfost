@@ -681,12 +681,12 @@ module Voronoi_grid
     ! j=5 ---> z = zmin
     ! j=6 ---> z = zmax
 
-    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = abs(limits(1))  !xmin
-    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = abs(limits(2))  !xmax
-    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = abs(limits(3))  !ymin
-    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = abs(limits(4))  !ymax
-    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = abs(limits(5))  !zmin
-    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = abs(limits(6))  !zmax
+    wall(1)%x1 = -1 ; wall(1)%x2 = 0  ; wall(1)%x3 = 0  ; wall(1)%x4 = limits(1)  !xmin
+    wall(2)%x1 =  1 ; wall(2)%x2 = 0  ; wall(2)%x3 = 0  ; wall(2)%x4 = limits(2)  !xmax
+    wall(3)%x1 =  0 ; wall(3)%x2 = -1 ; wall(3)%x3 = 0  ; wall(3)%x4 = limits(3)  !ymin
+    wall(4)%x1 =  0 ; wall(4)%x2 = 1  ; wall(4)%x3 = 0  ; wall(4)%x4 = limits(4)  !ymax
+    wall(5)%x1 =  0 ; wall(5)%x2 = 0  ; wall(5)%x3 = -1 ; wall(5)%x4 = limits(5)  !zmin
+    wall(6)%x1 =  0 ; wall(6)%x2 = 0  ; wall(6)%x3 = 1  ; wall(6)%x4 = limits(6)  !zmax
 
     return
 
@@ -709,9 +709,9 @@ module Voronoi_grid
     r(1) = x ; r(2) = y ; r(3) = z
     k(1) = u ; k(2) = v ; k(3) = w
 
-    n(1) = wall(iwall)%x1 ; n(2) = wall(iwall)%x2 ;  n(3) = wall(iwall)%x3 ;
+    n(1) = wall(iwall)%x1 ; n(2) = wall(iwall)%x2 ; n(3) = wall(iwall)%x3
 
-    p = wall(iwall)%x4 * n
+    p = wall(iwall)%x4 * abs(n)
 
     den = dot_product(n, k) ! le signe depend du sens de propagation par rapport a la normale
 
@@ -897,9 +897,9 @@ pure logical function is_in_volume(x,y,z)
   real(kind=db), intent(in) :: x,y,z
 
   is_in_volume  = .false.
-  if ((x > wall(1)%x4 *  wall(1)%x1).and.(x < wall(2)%x4 * wall(2)%x1)) then
-     if ((y > wall(3)%x4 * wall(3)%x2).and.(y < wall(4)%x4 * wall(4)%x2)) then
-        if ((z > wall(5)%x4 * wall(5)%x3).and.(z < wall(6)%x4 * wall(6)%x3)) then
+  if ((x > wall(1)%x4).and.(x < wall(2)%x4)) then
+     if ((y > wall(3)%x4).and.(y < wall(4)%x4)) then
+        if ((z > wall(5)%x4).and.(z < wall(6)%x4)) then
            is_in_volume  = .true.
         endif
      endif
