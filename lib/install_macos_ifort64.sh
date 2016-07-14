@@ -36,6 +36,8 @@ cd voro++-0.4.6
 make
 \cp src/libvoro++.a ../lib
 \cp src/voro++.hh ../include
+mkdir -p ../include/voro++
+\cp src/*.hh ../include
 cd ..
 rm -rf voro++-0.4.6
 
