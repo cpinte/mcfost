@@ -162,6 +162,7 @@ subroutine init_reemission()
      do icell=1,n_cells
         integ=0.0
 
+        ! this double loop is not needed when the dust grains are the same everywhere
         do lambda=1, n_lambda
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir frac_E_em en SI
@@ -200,7 +201,7 @@ subroutine init_reemission()
               enddo !l
            endif
         enddo !k
-     else  ! low_mem_th_emission
+     else  ! .not. low_mem_th_emission
         if (lvariable_dust) then ! Calcul dans toutes les cellules
            do icell=1,p_n_cells
               integ3(0) = 0.0

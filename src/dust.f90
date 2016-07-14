@@ -821,13 +821,13 @@ subroutine opacite(lambda, p_lambda)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, n_cells
+  do icell=1, n_cells  ! this can be log when there are many cells
      kappa(icell,lambda) = 0.0
      kappa_sca(icell,lambda) = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
 
-     do  k=1,n_grains_tot
+     do  k=1,n_grains_tot ! Expensive when n_cells is large
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
@@ -841,7 +841,7 @@ subroutine opacite(lambda, p_lambda)
 
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
-        do k=grain_RE_LTE_start,grain_RE_LTE_end
+        do k=grain_RE_LTE_start,grain_RE_LTE_end   ! Expensive when n_cells is large
            kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
         k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
@@ -869,6 +869,7 @@ subroutine opacite(lambda, p_lambda)
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
      endif ! letape_th
   enddo !icell
+
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE.and. (.not.low_mem_th_emission_nLTE)) then
