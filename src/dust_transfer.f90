@@ -9,9 +9,9 @@ module dust_transfer
   use em_th
   use prop_star
   use constantes
-  use wall
   use ray_tracing
   use scattering
+  use grid
   use grid
   use optical_depth
   use density
@@ -28,6 +28,7 @@ module dust_transfer
   use utils
   use ProDiMo
   use init_mcfost
+  use SPH2mcfost
   !$ use omp_lib
 
   implicit none
@@ -44,7 +45,7 @@ subroutine transfert_poussiere()
   real(kind=db), dimension(4) :: Stokes
 
   ! Parametres simu
-  integer :: itime, lambda_seuil, ymap0, xmap0, nbre_phot2
+  integer :: itime, lambda_seuil, nbre_phot2
   integer :: ind_etape, first_etape_obs
   integer :: etape_start, nnfot1_start, n_iter, ibin, iaz, ibar, nnfot1_cumul
 
@@ -60,7 +61,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w
   real :: rand, tau
-  integer :: i, ri, zj, phik, p_icell
+  integer :: i, icell, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -81,20 +82,27 @@ subroutine transfert_poussiere()
   ! Energie des paquets mise a 1
   E_paquet = 1.0_db
 
-  ! Nbre iteration grains hors equilibre
-  n_iter = 0
+  ! Building the wavelength & basic dust properties grid
+  call init_lambda()
+  call init_indices_optiques()
 
-  ! Allocation dynamique
+  ! Building the dust grain population
+  call build_grain_size_distribution()
+
+  ! Building the model volume and corresponding grid
+  call order_zones()
+  call define_physical_zones()
+
+  call setup_grid()
+  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
+     call setup_SPH2mcfost(density_file, limits_file)
+  else
+     call define_grid() ! included in setup_phantom2mcfost
+     call stars_cell_indices()
+  endif
+
+  ! Allocation dynamique de tous les autres tableaux
   call alloc_dynamique()
-
-  ymap0 = (igridy/2) + 1
-  xmap0 = (igridx/2) + 1
-
-  ! Pour rotation du disque (signe - pour convention astro)
-  cos_disk = cos(ang_disque/180.*pi)
-  sin_disk = -sin(ang_disque/180.*pi)
-  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
-  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   laffichage=.true.
 
@@ -103,35 +111,26 @@ subroutine transfert_poussiere()
      stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
   enddo
 
-
-  call init_lambda()
-  call init_indices_optiques()
-
-  call taille_grains()
-
-  call order_zones()
-  call define_physical_zones()
-  call define_grid()
-
   if (lProDiMo) call setup_ProDiMo()
 
-  !call densite_data_hd32297(para) ! grille redefinie dans routine
-  if (ldensity_file) then
-     call densite_file()
-  else if (lphantom_file) then
-     call density_phantom()
-  else if (lread_Seb_Charnoz) then
-     call densite_Seb_Charnoz()
-  else if (lread_Seb_Charnoz2) then
-     call densite_Seb_Charnoz2()
-  else
-     if (lsigma_file) call read_sigma_file()
-     call define_density()
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
+     call allocate_densities()
+     if (ldensity_file) then
+        call densite_file()
+     else if (lread_Seb_Charnoz) then
+        call densite_Seb_Charnoz()
+     else if (lread_Seb_Charnoz2) then
+        call densite_Seb_Charnoz2()
+     else
+        if (lsigma_file) call read_sigma_file()
+        call define_density()
+     endif
+     if (lwall) call define_density_wall3D()
   endif
 
-  if (lwall) call define_density_wall3D()
 
   if (ldisk_struct) call write_disk_struct()
+  if (lcolumn_density) call write_column_density()
 
   if (lmono) then ! code monochromatique
      lambda=1
@@ -291,7 +290,12 @@ subroutine transfert_poussiere()
               lapprox_diffusion=.false.
            else
               if (lapprox_diffusion) then
-                 call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+                 if (lcylindrical) then
+                    call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
+                 else
+                    write(*,*) "No dark zone"
+                    call no_dark_zone()
+                 endif
               else
                  write(*,*) "No dark zone"
                  call no_dark_zone()
@@ -338,24 +342,15 @@ subroutine transfert_poussiere()
 
   if (laverage_grain_size) call taille_moyenne_grains()
 
-  ! Calcul de l'angle maximal d'ouverture du disque : TODO : revoir ce bout !!
-  call angle_disque()
-
-  if (lopacity_wall) call init_opacity_wall()
-  if (lwall) cos_max2 = 0.0
-
-  if (lcylindrical) call angle_max(1) ! TODO
-  if (lspherical) cos_max2=0.0
-
   etape_start=etape_i
   nnfot1_start=1
   lambda=1 ! pour eviter depassement tab a l'initialisation
   ind_etape = etape_start
 
-
   !************************************************************
   !  Boucle principale sur les étapes du calcul
   !************************************************************
+  n_iter = 0 ! Nbre iteration grains hors equilibre
   do while (ind_etape <= etape_f)
      indice_etape=ind_etape
 
@@ -451,7 +446,7 @@ subroutine transfert_poussiere()
         if (lspherical.or.l3D) then
            call no_dark_zone()
         else
-           call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
+           if (lcylindrical) call define_dark_zone(lambda,p_lambda,tau_dark_zone_obs,.false.)
         endif
         !call no_dark_zone()
         ! n_dif_max = seuil_n_dif(lambda)
@@ -482,9 +477,9 @@ subroutine transfert_poussiere()
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
         tau=0.0 ;
-        do i=1, n_rad
-           tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
-        enddo
+        !do i=1, n_rad
+        !   tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
+        !enddo
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
@@ -492,7 +487,7 @@ subroutine transfert_poussiere()
      !$omp parallel &
      !$omp default(none) &
      !$omp firstprivate(lambda,p_lambda) &
-     !$omp private(id,ri,zj,phik,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
+     !$omp private(id,icell,lpacket_alive,lintersect,p_nnfot2,nnfot2,n_phot_envoyes_in_loop,rand) &
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(nbre_phot2,n_phot_envoyes,nb_proc) &
@@ -536,16 +531,16 @@ subroutine transfert_poussiere()
            endif
 
            ! Emission du paquet
-           call emit_packet(id,lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
+           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
            lpacket_alive = .true.
 
            ! Propagation du packet
-           if (lintersect) call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes, &
+           if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
                 flag_star,flag_ISM,flag_scatt,lpacket_alive)
 
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
-              call capteur(id,lambda,ri,zj,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
+              call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
               if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
            endif
         enddo photon !nnfot2
@@ -580,10 +575,9 @@ subroutine transfert_poussiere()
         !$omp parallel &
         !$omp default(none) &
         !$omp shared(lambda,p_lambda,nbre_photons_lambda,nbre_photons_loop,n_phot_envoyes_ISM) &
-        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,ri,zj,phik,lpacket_alive,nnfot2)
+        !$omp private(id, flag_star,flag_ISM,flag_scatt,nnfot1,x,y,z,u,v,w,stokes,lintersect,icell,lpacket_alive,nnfot2)
 
         flag_star = .false.
-        phik=1
 
         !$omp do schedule(dynamic,1)
         do nnfot1=1,nbre_photons_loop
@@ -593,7 +587,7 @@ subroutine transfert_poussiere()
               n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_db
 
               ! Emission du paquet
-              call emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
+              call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
               flag_ISM = .true.
 
               ! Le photon sert a quelquechose ou pas ??
@@ -602,7 +596,7 @@ subroutine transfert_poussiere()
               else
                  nnfot2 = nnfot2 + 1.0_db
                  ! Propagation du packet
-                 call propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+                 call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
            enddo photon_ISM ! nnfot2
         enddo ! nnfot1
@@ -800,14 +794,14 @@ end subroutine transfert_poussiere
 
 !***********************************************************
 
-subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_ISM,lintersect)
+subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_ISM,lintersect)
   ! C. Pinte
   ! 27/05/09
 
   integer, intent(in) :: id, lambda
 
   ! Position et direction du packet
-  integer, intent(out) :: ri, zj, phik
+  integer, intent(out) :: icell
   real(kind=db), intent(out) :: x0,y0,z0,u0,v0,w0
   real(kind=db), dimension(4), intent(out) :: Stokes
   logical, intent(out) :: lintersect
@@ -815,7 +809,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
   ! Proprietes du packet
   logical, intent(out) :: flag_star, flag_ISM
   real :: rand, rand2, rand3, rand4
-  integer :: i_star, icell
+  integer :: i_star
 
   real(kind=db) :: w02, srw02
   real :: argmt
@@ -840,9 +834,7 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
-     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4,ri,zj,phik,x0,y0,z0,u0,v0,w0,w02,lintersect)
-     !call em_etoile_ponctuelle(i_star,rand,rand2,ri,zj,x0,y0,z0,u0,v0,w0,w02)
-
+     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
      ! Lumiere non polarisee emanant de l'etoile
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
@@ -883,12 +875,12 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
 
      ! Position initiale
      rand = sprng(stream(id))
-     call select_cellule(lambda,rand,ri,zj,phik)
+     call select_cellule(lambda,rand, icell)
 
      rand  = sprng(stream(id))
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
-     call  pos_em_cellule(ri,zj,phik,rand,rand2,rand3,x0,y0,z0)
+     call  pos_em_cellule(icell, rand,rand2,rand3,x0,y0,z0)
 
      ! Direction de vol (uniforme)
      rand = sprng(stream(id))
@@ -904,21 +896,21 @@ subroutine emit_packet(id,lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0,stokes,flag_star,f
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      if (lweight_emission) then
-        icell = cell_map(ri,zj,1)
         Stokes(1) = Stokes(1) * correct_E_emission(icell)
      endif
   else ! Emission ISM
      flag_star=.false.
      flag_ISM=.true.
-     call emit_packet_ISM(id,ri,zj,x0,y0,z0,u0,v0,w0,stokes,lintersect)
+     call emit_packet_ISM(id,icell,x0,y0,z0,u0,v0,w0,stokes,lintersect)
   endif !(rand < prob_E_star)
 
+  return
 
 end subroutine emit_packet
 
 !***********************************************************
 
-subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
+subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
 
@@ -928,7 +920,7 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, p_lambda, ri, zj, phik
+  integer, intent(inout) :: lambda, p_lambda, icell
   real(kind=db), intent(inout) :: x,y,z,u,v,w
   real(kind=db), dimension(4), intent(inout) :: stokes
 
@@ -936,26 +928,21 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
   logical, intent(out) :: flag_scatt, lpacket_alive
 
   real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta, icell
+  integer :: p_icell, taille_grain, itheta
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
 
-  icell = cell_map(ri,zj,phik)
   flag_scatt = .false.
   flag_sortie = .false.
-  flag_direct_star = .false.
-  p_icell = icell_ref
-
   lpacket_alive=.true.
-
-  ! On teste si le photon (stellaire) peut rencontrer le disque
   if (flag_star) then
      flag_direct_star = .true.
-     ! W02 = 1.0 - w0**2 = u**2 + v**2
-     if (1.0_db - w*w < cos_max2) return ! Pas de diffusion
+  else
+     flag_direct_star = .false.
   endif
 
+  p_icell = icell_ref
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
@@ -976,14 +963,8 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call length_deg2(id,lambda,p_lambda,Stokes,ri,zj,phik,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
-     if ((ri==0).and.(.not.flag_sortie)) write(*,*) "PB r", ri, zj
-     if ((zj > nz).and.(.not.flag_sortie)) then
-        write(*,*) "PB z", ri, zj, abs(z)
-        zj=nz
-     endif
-
-     icell = cell_map(ri,zj,phik)
+     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+     if ((icell>n_cells).and.(.not.flag_sortie)) write(*,*) "PB cell", icell
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee
@@ -995,7 +976,7 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
      flag_direct_star = .false.
      if (lmono) then   ! Diffusion forcee : on multiplie l'energie du packet par l'albedo
         ! test zone noire
-        if (test_dark_zone(ri,zj,phik,x,y)) then ! on saute le photon
+        if (l_dark_zone(icell)) then ! on saute le photon
            lpacket_alive = .false.
            return
         endif
@@ -1020,7 +1001,6 @@ subroutine propagate_packet(id,lambda,p_lambda,ri,zj,phik,x,y,z,u,v,w,stokes,fla
 
         if (lscattering_method1) then ! methode 1 : choix du grain diffuseur
            rand = sprng(stream(id))
-           !taille_grain = grainsize(lambda,rand,p_ri,p_zj,p_phik)
            taille_grain = select_scattering_grain(lambda,p_icell, rand) ! ok, not too bad, not much smaller
 
            rand = sprng(stream(id))
@@ -1356,7 +1336,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   real(kind=db) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
   real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
-  integer :: id, ri, zj, phik, iray, istar, i,j, x_center, y_center, alloc_status
+  integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
@@ -1417,7 +1397,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      ! Etoile ponctuelle
      !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
      !  Stokes = 0.0_db
-     !  call length_deg2_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
+     !  call optical_length_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
      !  Flux_etoile =  exp(-tau)
      !  write(*,*)  "F0", Flux_etoile
 
@@ -1428,7 +1408,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
      !$omp shared(x_center,y_center,nb_proc,map_1star,Q_1star,U_1star,cos_RT_az,sin_RT_az) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
-     !$omp private(Pola_LimbDarkening,ri,zj,phik,tau,lmin,lmax,in_map,P,phi) &
+     !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme)
      in_map = .true. ! for SED
      LimbDarkening = 1.0
@@ -1462,6 +1442,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         y1 = etoile(istar)%y + y * etoile(istar)%r
         z0 = etoile(istar)%z + z * etoile(istar)%r
 
+        icell = etoile(istar)%icell
+
         if (abs(w -1) < tiny_real) then ! rotating the position as the old "rotation" routine does not deal properly with case w==1
            x0 = x1 * cos_RT_az + y1 * sin_RT_az
            y0 = x1 * sin_RT_az - y1 * cos_RT_az
@@ -1471,17 +1453,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         endif
 
         Stokes = 0.0_db
-        if (l3D) then
-           ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule_3D(x0,y0,z0,ri,zj,phik)
-
-           call length_deg2_tot_3D(1,lambda,Stokes,ri,zj,phik,x0,y0,z0,u,v,w,tau,lmin,lmax)
-        else
-           ! Coordonnees initiale : position etoile dans la grille
-           call indice_cellule(x0,y0,z0,ri,zj)
-
-           call length_deg2_tot(1,lambda,Stokes,ri,zj,x0,y0,z0,u,v,w,tau,lmin,lmax)
-        endif
+        call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
          if (lsed.and.(RT_sed_method == 1)) then
@@ -1550,7 +1522,7 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
   real(kind=db), dimension(3) :: sdx, sdy
 
   real(kind=db), parameter :: precision = 1.e-2_db
-  integer :: i, j, subpixels, ri, zj, phik, iter
+  integer :: i, j, subpixels, ri, zj, phik, iter, icell
 
   logical :: lintersect
 
@@ -1586,12 +1558,11 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)  !BUG
+           call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG
+
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel
-             ! write(*,*) i,j,  integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
-              !write(*,*) "pixel"
-              Stokes(:) = Stokes(:) + integ_ray_dust(lambda,ri,zj,phik,x0,y0,z0,u0,v0,w0)
+              Stokes(:) = Stokes(:) + integ_ray_dust(lambda,icell,x0,y0,z0,u0,v0,w0)
            endif
         enddo !j
      enddo !i

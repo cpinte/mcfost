@@ -1,15 +1,11 @@
 module stars
 
   use parametres
-  use disk
   use prop_star
-  use grains
-  use em_th
+  use utils
   use constantes
-
-  use scattering
   use ProDiMo
-  use optical_depth
+  use grid
 
   implicit none
 
@@ -48,7 +44,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,z,u,v,w,w2,lintersect)
+subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -57,9 +53,10 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
 
   implicit none
 
-  integer, intent(in) :: n_star
+  integer, intent(in) :: i_star
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
-  integer, intent(out) :: ri, zj, phik
+  integer, intent(out) :: icell
+
   real(kind=db), intent(out) :: x, y, z, u, v, w, w2
   logical, intent(out) :: lintersect
 
@@ -83,25 +80,27 @@ subroutine em_sphere_uniforme(n_star,aleat1,aleat2,aleat3,aleat4,ri,zj,phik,x,y,
   w2=1.0_db-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  r_etoile = etoile(n_star)%r
+  r_etoile = etoile(i_star)%r
   x = x * r_etoile
   y = y * r_etoile
   z = z * r_etoile
 
   ! Ajout position de l'étoile
-  x=x+etoile(n_star)%x
-  y=y+etoile(n_star)%y
-  z=z+etoile(n_star)%z
+  x=x+etoile(i_star)%x
+  y=y+etoile(i_star)%y
+  z=z+etoile(i_star)%z
 
-  !ri=etoile(n_star)%ri
-  !zj=etoile(n_star)%zj
-  !phik=etoile(n_star)%phik
+  if (lVoronoi) then
+     icell = etoile(i_star)%icell
+  else ! star can overlap several cells on a classical grid
+     call indice_cellule(x,y,z, icell)
+  endif
 
-  ! L'etoile peut occuper plusieurs cellules
-  ! todo : tester a l'avance si c'est le cas
-  call indice_cellule_3D(x,y,z,ri,zj,phik)
-  lintersect = .true.
-  if (ri==n_rad) call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
+  if (etoile(i_star)%out_model) then
+     call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+  else
+     lintersect = .true.
+  endif
 
   return
 
@@ -109,40 +108,40 @@ end subroutine em_sphere_uniforme
 
 !**********************************************************************
 
-subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,phik,x,y,z,u,v,w,w2)
-! Emission isotrope
-! C. Pinte
-! 21/05/05
-
-  implicit none
-
-  integer, intent(in) :: n_star
-  real, intent(in) :: aleat1, aleat2
-  integer, intent(out) :: ri, zj, phik
-  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
-
-  real(kind=db) :: srw02, argmt
-
-  ! Emission isotrope
-  w = 2.0_db * aleat1 - 1.0_db
-  w2 = 1.0_db-w*w
-  srw02 = sqrt(w2)
-  argmt = pi*(2.0_db*aleat2-1.0_db)
-  u = srw02 * cos(argmt)
-  v = srw02 * sin(argmt)
-
-  ! Position de l'étoile
-  x=etoile(n_star)%x
-  y=etoile(n_star)%y
-  z=etoile(n_star)%z
-
-  ri=etoile(n_star)%ri
-  zj=etoile(n_star)%zj
-  phik=etoile(n_star)%phik
-
-  return
-
-end subroutine em_etoile_ponctuelle
+!subroutine em_etoile_ponctuelle(n_star,aleat1,aleat2,ri,zj,phik,x,y,z,u,v,w,w2)
+!! Emission isotrope
+!! C. Pinte
+!! 21/05/05
+!
+!  implicit none
+!
+!  integer, intent(in) :: n_star
+!  real, intent(in) :: aleat1, aleat2
+!  integer, intent(out) :: ri, zj, phik
+!  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
+!
+!  real(kind=db) :: srw02, argmt
+!
+!  ! Emission isotrope
+!  w = 2.0_db * aleat1 - 1.0_db
+!  w2 = 1.0_db-w*w
+!  srw02 = sqrt(w2)
+!  argmt = pi*(2.0_db*aleat2-1.0_db)
+!  u = srw02 * cos(argmt)
+!  v = srw02 * sin(argmt)
+!
+!  ! Position de l'étoile
+!  x=etoile(n_star)%x
+!  y=etoile(n_star)%y
+!  z=etoile(n_star)%z
+!
+!  ri=etoile(n_star)%ri
+!  zj=etoile(n_star)%zj
+!  phik=etoile(n_star)%phik
+!
+!  return
+!
+!end subroutine em_etoile_ponctuelle
 
 !**********************************************************************
 
@@ -242,7 +241,6 @@ subroutine repartition_energie_etoiles()
         stop
      endif
   enddo
-
 
   if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
@@ -569,18 +567,11 @@ subroutine repartition_energie_etoiles()
   endif
 
   ! Cellule d'origine dans laquelle est l'etoile
-  do i=1, n_etoiles
-     if (l3D) then
-        call indice_cellule_3D(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj,etoile(i)%phik)
-     else
-        if (lcylindrical) then
-           call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
-        else
-           call indice_cellule_sph(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%ri,etoile(i)%zj)
-        endif
-        etoile(i)%phik=1
-     endif
-  enddo
+  if (.not.lVoronoi) then ! already done during tesselation for Voronoi grid
+     do i=1, n_etoiles
+        call indice_cellule(etoile(i)%x,etoile(i)%y,etoile(i)%z, etoile(i)%icell)
+     enddo
+  endif
 
   return
 
@@ -605,7 +596,7 @@ end subroutine repartition_energie_ISM
 !***********************************************************
 
 
-subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
+subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur une sphere et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -617,12 +608,11 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
 #include "sprng_f.h"
 
   integer, intent(in) :: id
-  integer, intent(out) :: ri, zj
+  integer, intent(out) :: icell
   real(kind=db), intent(out) :: x, y, z, u, v, w
   real(kind=db), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
-  integer :: phik
   real :: aleat1, aleat2, aleat3, aleat4
   real(kind=db) :: srw02, argmt, cospsi, phi, l, w2
 
@@ -659,12 +649,33 @@ subroutine emit_packet_ISM(id,ri,zj,x,y,z,u,v,w,stokes,lintersect)
   y = y * l
   z = z * l
 
-  call move_to_grid(x,y,z,u,v,w,ri,zj,phik,lintersect)
+  call move_to_grid(x,y,z,u,v,w, icell,lintersect)
 
   return
 
 end subroutine emit_packet_ISM
 
 !***********************************************************
+
+subroutine stars_cell_indices()
+
+  real(kind=db) :: x, y, z
+  integer :: i_star, icell
+
+  do i_star=1, n_etoiles
+     x = etoile(i_star)%x
+     y = etoile(i_star)%y
+     z = etoile(i_star)%z
+
+     ! todo : l'etoile peut occuper plusieurs cellules
+     call indice_cellule(x,y,z, icell)
+     etoile(i_star)%icell = icell
+
+     etoile(i_star)%out_model = test_exit_grid(icell, x,y,z)
+  enddo
+
+  return
+
+end subroutine stars_cell_indices
 
 end module stars

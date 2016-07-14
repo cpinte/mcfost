@@ -11,7 +11,6 @@ module density
   use nr, only : rkqs
   use nrtype, only : sp
   use ode_data
-  use wall
   use grid
   use utils
   use output
@@ -317,7 +316,7 @@ subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
 ! Calcule les tableaux densite_pouss et masse
-! et indique ri_not_empty, zj_not_empty et phik_not_empty
+! et indique icell_not_empty
 ! C. Pinte : re-ecrit le 27/04/2013
 
   implicit none
@@ -422,7 +421,7 @@ subroutine define_dust_density()
            bz : do j=j_start,nz
               if (j==0) cycle bz
 
-              icell = cell_map(i,j,1)
+              icell = cell_map(i,j,1) ! to compute factors independent of azimuth
               ! On calcule la densite au milieu de la cellule
               rcyl = r_grid(icell)
               z = z_grid(icell)
@@ -615,7 +614,7 @@ subroutine define_dust_density()
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1e-200_db) then
-                          icell = cell_map(i,1,1)
+                          icell = cell_map(i,1,k)
                           densite_pouss(l,icell)  = 1.0_db
                           norme = 1.0_db
 
@@ -795,18 +794,11 @@ subroutine define_dust_density()
   endif
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              if (densite_pouss(l,icell) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = 1
-                 exit search_not_empty
-              endif
-           enddo
-        enddo
+     do icell=1,n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
 
@@ -886,11 +878,10 @@ subroutine define_density_wall3D()
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
-  real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass
+  real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass, h_wall
 
   real(kind=db), dimension(:,:), allocatable :: density_wall
   real(kind=db), dimension(:), allocatable :: masse_wall
-
 
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
@@ -917,7 +908,7 @@ subroutine define_density_wall3D()
         endif
 
         write(*,*) "Wall between", real(dz%rin), "and", real(dz%rmax), "AU"
-        h_wall = real(dz%sclht)
+        h_wall = dz%sclht
         write(*,*) "h_wall =", real(h_wall)
 
 
@@ -1001,6 +992,7 @@ end subroutine define_density_wall3D
 !*************************************************************
 
 subroutine densite_eqdiff()
+  ! only 2D : old routine, has not been used in a long time
 
   implicit none
 
@@ -1124,7 +1116,7 @@ subroutine densite_eqdiff()
 
      ! Calcul opacite et probabilite de diffusion
      do j=1,nz
-        icell = cell_map(i,j,1)
+        icell = cell_map(i,j,1) ! only 2D
         do  k=1,n_grains_tot
            densite_pouss(k,icell) = nbre_grains(k) * correct_strat(k,j) * rho(j)
         enddo !k
@@ -1168,128 +1160,6 @@ subroutine derivs(x,y,dydx)
   dydx = -y * coeff1 * x/rho_gaz * (1.0 + coeff2/rho_gaz) *  2.25e26
 
 end subroutine derivs
-
-!***********************************************************
-
-subroutine init_opacity_wall()
-  ! Calcule la densite du mur pour avoir la bonne opacite
-  ! ATTENTION : ca n'est qu'un mur en opacite pas en emission !!!
-  ! C. Pinte
-  ! 1/05/07 et oui, c'est pas ferie en Angleterre !!! :-(
-
-  implicit none
-
-  ! Opacite du mur qui a pour largeur celle de la premiere cellule
-  kappa_wall = tau_wall / (r_lim(1) - r_lim(0))
-
-  ! On ne vire pas les photons au-dessus de l'echelle de hauteur du disque
-  ! Au cas ou ils taperrait dans le mur
-  cos_max2 = 0.0
-
-  write (*,*) 'Masse mur ='!,8*delta_r*r_wall*h_wall*rho_wall*avg_grain_mass/0.594098e-6
-
-  return
-
-end subroutine init_opacity_wall
-
-!********************************************************************
-
-subroutine density_phantom()
-
-  use io_phantom, only : read_phantom_file, read_phantom_input_file
-  use dump_utils, only : get_error_text
-  use Voronoi_grid
-
-  integer, parameter :: iunit = 1
-  integer :: ierr, ncells, ndusttypes
-  real(db), allocatable, dimension(:) :: x,y,z,rho
-  real(db), allocatable, dimension(:,:) :: rhodust
-
-  real :: grainsize,graindens
-
-  integer, parameter :: npart = 100 ! we will need to read that from the file
-  integer :: i
-
-  write(*,*) "Reading phantom density file: "//trim(density_file)
-
-  call read_phantom_file(iunit,density_file,x,y,z,rho,rhodust,ndusttypes,ncells,ierr)
-  write(*,*) "Done"
-
-  if (ierr /=0) then
-     write(*,*) "Error code =", ierr,  get_error_text(ierr)
-     stop
-  endif
-  write(*,*) "# Model size :"
-  write(*,*) "x =", minval(x), maxval(x)
-  write(*,*) "y =", minval(y), maxval(y)
-  write(*,*) "z =", minval(z), maxval(z)
-
-  if (ndusttypes==1) then
-     call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-     write(*,*) grainsize,graindens
-  endif
-  ! Make the Voronoi tesselation on the SPH particles
-  call Voronoi_tesselation(ncells, x,y,z)
-
-
-  i = 1
-  write(*,*) "Verif 1 SPH/Cell :", Voronoi(i)%x, x(Voronoi(i)%id)
-  write(*,*) "This cell has ", Voronoi(i)%last_neighbour - Voronoi(i)%first_neighbour + 1, "neighbours"
-  deallocate(x,y,z)
-
-  !- N_part: total number of particles
-  !  - r_in: disk inner edge in AU
-  !  - r_out: disk outer edge in AU
-  !  - p: surface density exponent, Sigma=Sigma_0*(r/r_0)^(-p), p>0
-  !  - q: temperature exponent, T=T_0*(r/r_0)^(-q), q>0
-  !  - m_star: star mass in solar masses
-  !  - m_disk: disk mass in solar masses (99% gas + 1% dust)
-  !  - H_0: disk scale height at 100 AU, in AU
-  !  - rho_d: dust density in g.cm^-3
-  !  - flag_ggrowth: T with grain growth, F without
-  !
-  !
-  !    N_part lines containing:
-  !  - x,y,z: coordinates of each particle in AU
-  !  - h: smoothing length of each particle in AU
-  !  - s: grain size of each particle in µm
-  !
-  !  Without grain growth: 2 lines containing:
-  !  - n_sizes: number of grain sizes
-  !  - (s(i),i=1,n_sizes): grain sizes in µm
-  !  OR
-  !  With grain growth: 1 line containing:
-  !  - s_min,s_max: smallest and largest grain size in µm
-
-  open(unit=1,file="SPH_phantom.txt",status="replace")
-  write(1,*) ncells
-  write(1,*) minval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
-  write(1,*) maxval(sqrt(Voronoi(:)%x**2 + Voronoi(:)%y**2))
-  write(1,*) 1 ! p
-  write(1,*) 0.5 ! q
-  write(1,*) 1.0 ! mstar
-  write(1,*) 1.e-3 !mdisk
-  write(1,*) 10 ! h0
-  write(1,*) 3.5 ! rhod
-  write(1,*) .false.
-  !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
-
-  do i=1,ncells
-     write(1,*) Voronoi(i)%x, Voronoi(i)%y, Voronoi(i)%z, 1.0, 1.0
-  enddo
-
-  write(1,*) 1
-  write(1,*) 1.0
-  close(unit=1)
-  ! Fill up the density grid
-
-
-  deallocate(rho,rhodust)
-  stop
-
-  return
-
-end subroutine density_phantom
 
 !********************************************************************
 
@@ -1689,18 +1559,12 @@ subroutine densite_file()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
 
@@ -1888,7 +1752,7 @@ subroutine densite_Seb_Charnoz()
         if (is_diff(Zmin,Zmin_mcfost)) write(*,*) "Pb Z cell", i,j, Zmin, Zmin_mcfost
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
 
-        icell = cell_map(i,j,1)
+        icell = cell_map(i,j,1) ! only 2D
         densite_pouss(:,icell) = density_Seb(:) / (volume(icell)*AU3_to_cm3) ! comversion en densite volumique
         Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
      enddo ! j
@@ -1896,18 +1760,13 @@ subroutine densite_Seb_Charnoz()
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
 
   search_not_empty : do l=1,n_grains_tot
-     do j=1,nz
-        do i=1,n_rad
-           if (densite_pouss(l,cell_map(i,j,1)) > 0.0_db) then
-              ri_not_empty = i
-              zj_not_empty = j
-              phik_not_empty = 1
-              exit search_not_empty
-           endif
-        enddo
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
      enddo
   enddo search_not_empty
-
 
   ! Re-population du tableau de grains
   ! les methodes de chauffages etc, ne changent pas
@@ -2014,7 +1873,7 @@ subroutine densite_Seb_Charnoz2()
   do k=1,n_grains_tot
      do i=1, n_rad
         do j=1,nz
-           densite_pouss(k,cell_map(i,j,1)) = dens(i,j)
+           densite_pouss(k,cell_map(i,j,1)) = dens(i,j) ! only 2D
         enddo
      enddo
   enddo
@@ -2031,18 +1890,12 @@ subroutine densite_Seb_Charnoz2()
   enddo
 
   search_not_empty : do l=1,n_grains_tot
-     do k=1,n_az
-        do j=1,nz
-           do i=1,n_rad
-              if (densite_pouss(l,cell_map(i,j,k)) > 0.0_db) then
-                 ri_not_empty = i
-                 zj_not_empty = j
-                 phik_not_empty = k
-                 exit search_not_empty
-              endif
-           enddo !i
-        enddo !j
-     enddo !k
+     do icell=1, n_cells
+        if (densite_pouss(l,icell) > 0.0_db) then
+           icell_not_empty = icell
+           exit search_not_empty
+        endif
+     enddo !icell
   enddo search_not_empty
 
   write(*,*) "Done"

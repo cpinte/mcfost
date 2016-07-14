@@ -21,6 +21,7 @@ module mol_transfer
   use dust_ray_tracing, only: init_directions_ray_tracing
   use dust_transfer, only : compute_stars_map
   use stars
+  use grid
 
   implicit none
 
@@ -176,7 +177,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real, parameter :: precision_sub = 1.0e-3
   real, parameter :: precision = 1.0e-1
 
-  integer :: etape, etape_start, etape_end, ri, zj, phik, iray, n_rayons, icell
+  integer :: etape, etape_start, etape_end, iray, n_rayons, icell
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
   integer, dimension(nb_proc) :: max_n_iter_loc
 
@@ -340,146 +341,130 @@ subroutine NLTE_mol_line_transfer(imol)
 
         !$omp parallel &
         !$omp default(none) &
-        !$omp private(id,ri,zj,phik,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+        !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
-        !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,cell_map) &
-        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape)
+        !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
+        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule)
         !$omp do schedule(static,1)
-        do ri=1, n_rad
+        do icell=1, n_cells
            !$ id = omp_get_thread_num() + 1
-           do zj=1, nz
 
-              do phik=1, n_az
-                 icell = cell_map(ri,zj,phik)
+           ! Echantillonage uniforme du profil de raie
+           if (lfixed_rays) then
+              tab_speed(:,id) = tab_deltaV(:,icell)
+           endif
 
-                 ! Echantillonage uniforme du profil de raie
-                 if (lfixed_rays) then
-                    tab_speed(:,id) = tab_deltaV(:,icell)
+           if (lcompute_molRT(icell)) then
+
+              ! Propagation des rayons
+              do iray=iray_start, iray_start-1+n_rayons
+
+                 if (etape==1) then
+                    ! Position = milieu de la cellule
+                    x0 = r_grid(icell)
+                    y0 = 0.0_db
+                    z0 = z_grid(icell)
+
+                    if (lkeplerian) then
+                       ! Direction verticale
+                       if (iray==1) then
+                          w0=1.0_db
+                       else
+                          w0=-1.0_db
+                       endif
+                       u0 = 0.0_db
+                       v0 = 0.0_db
+                    else
+                       norme = sqrt(x0*x0 + y0*y0 + z0*z0)
+                       if (iray==1) then
+                          u0 = x0/norme
+                          v0 = y0/norme
+                          w0 = z0/norme
+                       else
+                          u0 = -x0/norme
+                          v0 = -y0/norme
+                          w0 = -z0/norme
+                       endif
+                    endif
+                 else
+                    ! Position aleatoire dans la cellule
+                    rand  = sprng(stream(id))
+                    rand2 = sprng(stream(id))
+                    rand3 = sprng(stream(id))
+                    call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+
+                    ! Direction de propagation aleatoire
+                    rand = sprng(stream(id))
+                    W0 = 2.0_db * rand - 1.0_db
+                    W02 =  1.0_db - W0*W0
+                    SRW02 = sqrt(W02)
+                    rand = sprng(stream(id))
+                    ARGMT = PI * (2.0_db * rand - 1.0_db)
+                    U0 = SRW02 * cos(ARGMT)
+                    V0 = SRW02 * sin(ARGMT)
                  endif
 
-                 if (lcompute_molRT(icell)) then
+                 ! Echantillonnage aleatoire du champ de vitesse
+                 if (lnotfixed_Rays) then
+                    do iv=ispeed(1),ispeed(2)
+                       !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
+                       rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(icell)
+                    enddo
+                 endif
 
-                    ! Propagation des rayons
-                    do iray=iray_start, iray_start-1+n_rayons
+                 ! Integration le long du rayon
+                 call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
 
-                       if (etape==1) then
-                          ! Position = milieu de la cellule
-                          x0 = r_grid(icell)
-                          y0 = 0.0_db
-                          z0 = z_grid(icell)
-
-                          if (lkeplerian) then
-                             ! Direction verticale
-                             if (iray==1) then
-                                w0=1.0_db
-                             else
-                                w0=-1.0_db
-                             endif
-                             u0 = 0.0_db
-                             v0 = 0.0_db
-                          else
-                             norme = sqrt(x0*x0 + y0*y0 + z0*z0)
-                             if (iray==1) then
-                                u0 = x0/norme
-                                v0 = y0/norme
-                                w0 = z0/norme
-                             else
-                                u0 = -x0/norme
-                                v0 = -y0/norme
-                                w0 = -z0/norme
-                             endif
-                          endif
-                       else
-                          ! Position aleatoire dans la cellule
-                          rand  = sprng(stream(id))
-                          rand2 = sprng(stream(id))
-                          rand3 = sprng(stream(id))
-                          call  pos_em_cellule(ri,zj,phik,rand,rand2,rand3,x0,y0,z0)
-
-                          ! Direction de propagation aleatoire
-                          rand = sprng(stream(id))
-                          W0 = 2.0_db * rand - 1.0_db
-                          W02 =  1.0_db - W0*W0
-                          SRW02 = sqrt(W02)
-                          rand = sprng(stream(id))
-                          ARGMT = PI * (2.0_db * rand - 1.0_db)
-                          U0 = SRW02 * cos(ARGMT)
-                          V0 = SRW02 * sin(ARGMT)
-                       endif
-
-                       ! Echantillonnage aleatoire du champ de vitesse
-                       if (lnotfixed_Rays) then
-                          do iv=ispeed(1),ispeed(2)
-                             !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
-                             rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(icell)
-                          enddo
-                       endif
+              enddo ! iray
 
 
-                       ! Integration le long du rayon
-                       call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
+              ! Resolution de l'equilibre statistique
+              n_iter_loc = 0
+              pop(:,id) = tab_nLevel(icell,:)
+              lconverged_loc = .false.
+              ! Boucle pour converger le champ local et les populations
+              ! avec champ externe fixe
+              do while (.not.lconverged_loc)
+                 n_iter_loc = n_iter_loc + 1
 
-                    enddo ! iray
+                 ! Sauvegarde ancienne pop locale
+                 pop_old(:,id) = pop(:,id)
 
+                 ! Calcul du champ de radiation
+                 call J_mol_loc(id,icell,n_rayons,ispeed)  ! inclus les boucles sur Transition
 
-                    ! Resolution de l'equilibre statistique
-                    n_iter_loc = 0
-                    pop(:,id) = tab_nLevel(icell,:)
-                    lconverged_loc = .false.
-                    ! Boucle pour converger le champ local et les populations
-                    ! avec champ externe fixe
-                    do while (.not.lconverged_loc)
-                       n_iter_loc = n_iter_loc + 1
+                 call equilibre_rad_mol_loc(id,icell)
+                 pop(:,id) = tab_nLevel(icell,:)
 
-                       ! Sauvegarde ancienne pop locale
-                       pop_old(:,id) = pop(:,id)
+                 ! Critere de convergence locale
+                 diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
+                      / (pop_old(1:n_level_comp,id) + 1e-30) )
 
-                       ! Calcul du champ de radiation
-                       call J_mol_loc(id,ri,zj,phik,n_rayons,ispeed)  ! inclus les boucles sur Transition
+                 if (diff < precision_sub) then
+                    lconverged_loc = .true.
+                 else
+                    ! On est pas converge, on recalcule les opacites et fonctions source
+                    call opacite_mol_loc(icell,imol)
+                 endif
 
-                       call equilibre_rad_mol_loc(id,ri,zj,phik)
-                       pop(:,id) = tab_nLevel(icell,:)
+              enddo ! while : convergence champ local
+              if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+           endif ! lcompute_molRT
 
-                       ! Critere de convergence locale
-                       diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
-                            / (pop_old(1:n_level_comp,id) + 1e-30) )
-
-                       if (diff < precision_sub) then
-                          lconverged_loc = .true.
-                       else
-                          ! On est pas converge, on recalcule les opacites et fonctions source
-                          call opacite_mol_loc(ri,zj,phik,imol)
-                       endif
-
-                    enddo ! while : convergence champ local
-                    if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
-
-                 endif ! lcompute_molRT
-
-              enddo ! phik
-           enddo !zj
-        enddo !ri
+        enddo ! icell
         !$omp end do
         !$omp end parallel
 
-        phik = 1 ! pas 3D
         ! Critere de convergence totale
         maxdiff = 0.0
-        do ri=1,n_rad
-           do zj=1,nz
-              icell = cell_map(ri,zj,phik)
-              if (lcompute_molRT(icell)) then
-                 diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
-                      tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
-
-             !    write(*,*) abs(tab_nLevel(ri,zj,1:n_level_comp) - tab_nLevel_old(ri,zj,1:n_level_comp)) / &
-              !        tab_nLevel_old(ri,zj,1:n_level_comp)
-               !  write(*,*) ri, zj, diff, tab_nLevel_old(ri,zj,1:n_level_comp)
-                 if (diff > maxdiff) maxdiff = diff
-              endif
-           enddo
-        enddo
+        do icell = 1, n_cells
+           if (lcompute_molRT(icell)) then
+              diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
+                   tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
+              if (diff > maxdiff) maxdiff = diff
+           endif
+        enddo ! icell
 
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
@@ -577,7 +562,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      enddo
 
      if (lorigine) then
-        allocate(origine_mol(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_rad,nz,nb_proc))
+        allocate(origine_mol(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells,nb_proc))
         origine_mol = 0.0
      endif
   endif
@@ -752,7 +737,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   real :: npix2, diff
 
   real, parameter :: precision = 1.e-2
-  integer :: i, j, subpixels, iray, ri, zj, phik, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
+  integer :: i, j, subpixels, iray, ri, zj, phik, icell, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
 
   logical :: lintersect, labs
 
@@ -802,10 +787,10 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0,ri,zj,phik,lintersect)
+           call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)
 
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-              call integ_ray_mol(id,ri,zj,phik,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
+              call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
               ! Flux recu dans le pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
               IPc(:) = IPc(:) +  I0c(:,iray,id)

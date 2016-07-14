@@ -1,4 +1,4 @@
-module io_phantom
+module read_phantom
 
   use parametres
   use dump_utils
@@ -7,12 +7,12 @@ module io_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncells,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas
+ real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
  real(db), intent(out), dimension(:,:), allocatable :: rhodust
- integer, intent(out) :: ndusttypes,ncells,ierr
+ integer, intent(out) :: ndusttypes,n_SPH,ierr
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
@@ -60,15 +60,18 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  call extract('npartoftype',npartoftype(1:ntypes),hdr,ierr)
  call extract('ndusttypes',ndusttypes,hdr,ierr,default=1)
  call extract('nptmass',nptmass,hdr,ierr,default=0)
+ !call extract('isink',isink,hdr,ierr,default=0)
 
- print*,' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
- print*,' npartoftype = ',npartoftype(1:ntypes)
+ write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
+ write(*,*) ' npartoftype = ',npartoftype(1:ntypes)
+ write(*,*) ' nptmass = ', nptmass
+
  if (npartoftype(2) > 0) then
     write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, will be discarded ***'
  endif
 
  allocate(xyzh(4,np),itype(np),dustfrac(ndusttypes,np),grainsize(ndusttypes),tmp(np))
- allocate(xyzmh_ptmass(5,nptmass))
+ !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
 
  ! extract info from real header
@@ -76,8 +79,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  call extract('hfact',hfact,hdr,ierr)
  call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr)
  call extract('graindens',graindens,hdr,ierr)
- !print*,' hfact = ',hfact
- !print*,' massoftype = ',massoftype(1:ntypes)
+ !write(*,*) ' hfact = ',hfact
+ !write(*,*) ' massoftype = ',massoftype(1:ntypes)
 
  call extract('umass',umass,hdr,ierr)
  call extract('utime',utime,hdr,ierr)
@@ -96,13 +99,13 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
  do iblock = 1,nblocks
     call read_blockheader(iunit,narraylengths,number8,nums,ierr)
     do j=1,narraylengths
-       !print*,'block ',j
+       !write(*,*) 'block ',iblock, j, number8(j)
        do i=1,ndatatypes
           !print*,' data type ',i,' arrays = ',nums(i,j)
           do k=1,nums(i,j)
              if (j==1 .and. number8(j)==np) then
                 read(iunit, iostat=ierr) tag
-                write(*,"(1x,a)",advance='no') trim(tag)
+                !write(*,"(1x,a)",advance='no') trim(tag)
                 matched = .true.
                 if (i==i_real .or. i==i_real8) then
                    select case(trim(tag))
@@ -148,12 +151,16 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
                 else
                    read(iunit,iostat=ierr)
                 endif
-                if (matched) then
-                   write(*,"(a)") '->'//trim(tag)
-                else
-                   write(*,"(a)")
-                endif
-             elseif (j==1 .and. number8(j)==nptmass) then
+              !  if (matched) then
+              !     write(*,"(a)") '->'//trim(tag)
+              !  else
+              !     write(*,"(a)")
+              !  endif
+            !elseif (j==1 .and. number8(j)==nptmass) then
+             elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
+                nptmass = number8(j) ! HACK
+                if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
+
                 read(iunit,iostat=ierr) tag
                 matched = .true.
                 if (i==i_real .or. i==i_real8) then
@@ -179,11 +186,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
                    matched = .false.
                    read(iunit,iostat=ierr)
                 endif
-                if (matched) then
-                   write(*,"(a)") '->',trim(tag)
-                else
-                   write(*,"(a)")
-                endif
+           !     if (matched) then
+           !        write(*,"(a)") '->',trim(tag)
+           !     else
+           !        write(*,"(a)")
+           !     endif
              else
                 read(iunit, iostat=ierr) tag ! tag
                 !print*,tagarr(1)
@@ -200,14 +207,18 @@ subroutine read_phantom_file(iunit,filename,x,y,z,rhogas,rhodust,ndusttypes,ncel
     dustfrac = 0.
  endif
 
+ write(*,*) "Found", nptmass, "stars in the phantom file"
+
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,itype,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
-    write(*,"(a,i8,a)") ' Using ',ncells,' particles from Phantom file'
+         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,rhogas,rhodust,n_SPH)
+    write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
-    ncells = 0
+    n_SPH = 0
     write(*,*) ' ERROR reading h from file'
  endif
+
+ write(*,*) "Phantom dump file processed ok"
 
  deallocate(xyzh,itype,dustfrac,tmp,xyzmh_ptmass)
 
@@ -216,7 +227,11 @@ end subroutine read_phantom_file
 !*************************************************************************
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,rhogas,rhodust,ncells)
+     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,rhogas,rhodust,n_SPH)
+
+  ! Convert phantom quantities & units to mcfost quantities & units
+  ! x,y,z are in au
+  ! rhodust & rhogas are in g/cm3
 
   use constantes, only : au_to_cm, Msun_to_g
   use prop_star
@@ -231,15 +246,15 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   real(db), intent(in) :: hfact,umass,utime,udist
   real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
 
-  real(db), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas
+  real(db), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
   real(db), dimension(:,:), allocatable, intent(out) :: rhodust
-  integer, intent(out) :: ncells
+  integer, intent(out) :: n_SPH
 
-  integer :: i,j,k,itypei
-  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength, usolarmass, dustfraci
+  integer :: i,j,k,itypei, alloc_status
+  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength_au, usolarmass, dustfraci, Mtot
 
   udens = umass/udist**3
-  ulength = udist/au_to_cm
+  ulength_au = udist/ (au_to_cm * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
@@ -247,10 +262,19 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  do i=1,np
     if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
  enddo
- ncells = j
- allocate(x(ncells),y(ncells),z(ncells),rhogas(ncells),rhodust(ndusttypes,ncells))
+ n_SPH = j
+
+ ! TODO : use mcfost quantities directly rather that these intermediate variables
+ ! Voronoi()%x  densite_gaz & densite_pous
+ alloc_status = 0
+ allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+ if (alloc_status /=0) then
+    write(*,*) "Allocation error in phanton_2_mcfost"
+    write(*,*) "Exiting"
+ endif
 
  j = 0
+ Mtot = 0.0
  do i=1,np
     xi = xyzh(1,i)
     yi = xyzh(2,i)
@@ -259,37 +283,44 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     itypei = abs(iphase(i))
     if (hi > 0. .and. itypei==1) then
        j = j + 1
-       x(j) = xi * ulength
-       y(j) = yi * ulength
-       z(j) = zi * ulength
+       x(j) = xi * ulength_au
+       y(j) = yi * ulength_au
+       z(j) = zi * ulength_au
        rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
        dustfraci = sum(dustfrac(:,i))
        rhogas(j) = (1 - dustfraci)*rhoi
+       Mtot = Mtot + massoftype(itypei)
+       massgas(j) =  massoftype(itypei) * usolarmass ! Msun
        do k=1,ndusttypes
           rhodust(k,j) = dustfrac(k,i)*rhoi
        enddo
     endif
  enddo
- ncells = j
+ n_SPH = j
 
- if (allocated(etoile)) deallocate(etoile)
- allocate(etoile(nptmass))
+ write(*,*) "Total mass is", Mtot * usolarmass
+ if (nptmass > 0) then
+    write(*,*) "Updating the stellar properties"
+    if (allocated(etoile)) deallocate(etoile)
+    allocate(etoile(nptmass))
 
- do i=1,nptmass
-    etoile(i)%x = xyzmh_ptmass(1,i) * ulength
-    etoile(i)%y = xyzmh_ptmass(2,i) * ulength
-    etoile(i)%z = xyzmh_ptmass(3,i) * ulength
+    do i=1,nptmass
+       etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
+       etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
+       etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
 
-    etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
-
-    ! T, fUV, slope_UV, lb_body, spectre, ri, zj, phik
- enddo
+       etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+    enddo
+ endif
 
  return
 
 end subroutine phantom_2_mcfost
 
+!*************************************************************************
+
 subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
+
   use infile_utils
   integer, intent(in) :: iunit
   character(len=*), intent(in) :: filename
@@ -304,4 +335,4 @@ subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
 
 end subroutine read_phantom_input_file
 
-end module io_phantom
+end module read_phantom
