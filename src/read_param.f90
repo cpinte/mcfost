@@ -49,7 +49,10 @@ contains
     lhydrostatic = .false.
     lread_Misselt=.false.
 
-    if (abs(para_version - 2.21) > 1.e-4) then
+    ! Version 2.21 and 3.0 are the same
+    if (abs(para_version - 2.21) < 1.e-4) para_version = 3.0
+
+    if (abs(para_version - 3.0) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
        if (abs(para_version-2.20) < 1.e-4) then
           write(*,*) "Trying to read 2.20 parameter file."
