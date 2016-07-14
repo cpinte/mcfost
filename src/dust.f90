@@ -18,7 +18,7 @@ module dust
 
   contains
 
-subroutine taille_grains()
+subroutine build_grain_size_distribution()
 ! Distribution en taille des grains
 ! Sortie de prop_grains pour cas multi-lambda
 ! C. Pinte 14/01/05
@@ -33,8 +33,20 @@ subroutine taille_grains()
 
   type(dust_pop_type), pointer :: dp
 
-  integer :: ios, status, n_comment, n_grains
+  integer :: ios, status, n_comment, n_grains, alloc_status
   real :: fbuffer
+
+  ! **************************************************
+  ! Tableaux relatifs aux grains
+  ! **************************************************
+  allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
+       S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error r_grain'
+     stop
+  endif
+  nbre_grains = 0.0   ; r_core=0.0
+  r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
   ! Boucle sur les populations de grains
   do pop=1, n_pop
@@ -204,7 +216,7 @@ subroutine taille_grains()
 
   return
 
-end subroutine taille_grains
+end subroutine build_grain_size_distribution
 
 !********************************************************************
 
@@ -809,13 +821,13 @@ subroutine opacite(lambda, p_lambda)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, n_cells
+  do icell=1, n_cells  ! this can be log when there are many cells
      kappa(icell,lambda) = 0.0
      kappa_sca(icell,lambda) = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
 
-     do  k=1,n_grains_tot
+     do  k=1,n_grains_tot ! Expensive when n_cells is large
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
@@ -829,7 +841,7 @@ subroutine opacite(lambda, p_lambda)
 
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
-        do k=grain_RE_LTE_start,grain_RE_LTE_end
+        do k=grain_RE_LTE_start,grain_RE_LTE_end   ! Expensive when n_cells is large
            kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
         k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
@@ -857,6 +869,7 @@ subroutine opacite(lambda, p_lambda)
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
      endif ! letape_th
   enddo !icell
+
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE.and. (.not.low_mem_th_emission_nLTE)) then
@@ -990,7 +1003,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
   !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,cell_map) &
+  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop) &
   !$omp private(icell,k,density,norme,theta,k_sca_tot)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells

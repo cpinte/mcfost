@@ -6,9 +6,9 @@ module parametres
   implicit none
   save
 
-  real, parameter :: mcfost_version = 2.21
-  character(8), parameter :: mcfost_release = "2.21.1"
-  real, parameter :: required_utils_version = 2.2017
+  real, parameter :: mcfost_version = 3.0
+  character(8), parameter :: mcfost_release = "3.0.1"
+  real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
   character(len=128), parameter :: utils_webpage="http://ipag.osug.fr/public/pintec/mcfost_utils/"
@@ -106,16 +106,16 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
-  logical :: llinear_grid
 
   integer :: n_lambda2
 
-  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt
+  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
-  logical :: lapprox_diffusion, lcylindrical, lspherical, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
-  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, ldensity_file, lsigma_file, lphantom_file
+  logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
+  logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs
+  logical :: ldensity_file, lsigma_file, lphantom_file, lgadget2_file, lascii_SPH_file, llimits_file
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test
-  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lcolumn_density
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, home, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, para, band, model_pah, pah_grain, cmd_opt
@@ -198,14 +198,11 @@ module disk
   !! Loi exp (Garaud , Barriere 2004)
 !!  real, parameter :: fact_strat = 0.3
 
-  ! angle sous-tendu par le disque
-  real(kind=db) :: cos_max2, r_bord2
-
   ! Grille
   real(kind=db), parameter :: prec_grille=1.0e-14_db
   real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: disk_origin
+  real(kind=db), dimension(:,:,:), allocatable :: disk_origin
   real(kind=db), dimension(:,:), allocatable :: star_origin
   real(kind=db) :: frac_star_origin
 
@@ -219,7 +216,7 @@ module disk
   real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
   logical :: lpuffed_rim
 
-  character(len=512) :: density_file, sigma_file, grain_size_file
+  character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
   character(len=512), dimension(:), allocatable :: sh_file
 
   ! Correction locale de la desnite (dans un anneau)
@@ -237,20 +234,6 @@ end module disk
 
 !********************************************************************
 
-module wall
-
-  use parametres
-
-  implicit none
-  save
-
-  logical :: lwall, lopacity_wall
-  real(kind=db) :: h_wall, tau_wall, kappa_wall
-
-end module wall
-
-!********************************************************************
-
 module prop_star
 
   use parametres
@@ -261,11 +244,11 @@ module prop_star
   integer :: n_etoiles
 
   type star_type
-     real :: r, T, M, fUV, slope_UV
+     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
      real(kind=db) :: x,y,z
-     logical :: lb_body
+     logical :: lb_body, out_model
      character(len=512) :: spectre
-     integer :: ri, zj, phik
+     integer :: icell
   end type star_type
 
   type(star_type), dimension(:), allocatable :: etoile
@@ -448,7 +431,7 @@ module opacity
   real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
   real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
-  integer :: ri_not_empty, zj_not_empty, phik_not_empty
+  integer :: icell_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
   !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
@@ -458,8 +441,7 @@ module opacity
   !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
   logical :: l_is_dark_zone
-  logical, dimension(:), allocatable :: l_dark_zone !0:n_rad+1,0:nz+1, n_az
-  real, dimension(:,:), allocatable :: r_in_opacite, r_in_opacite2 !nz+1, (n_az)
+  logical, dimension(:), allocatable :: l_dark_zone !n_cells
   integer, parameter :: delta_cell_dark_zone=3
 
   integer, dimension(:), allocatable :: ri_in_dark_zone, ri_out_dark_zone !n_az
@@ -780,7 +762,7 @@ module molecular_emission
   logical ::  lfreeze_out
   real :: T_freeze_out
 
-  real(kind=db), dimension(:,:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_rad, nz, nb_proc
+  real(kind=db), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
   integer :: RT_line_method, n_molecules
 

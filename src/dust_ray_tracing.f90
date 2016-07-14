@@ -115,7 +115,6 @@ subroutine alloc_ray_tracing()
      endif
      I_scatt = 0.0_db
 
-
      allocate(eps_dust1(n_az_rt,n_theta_rt,N_type_flux,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust1'
@@ -851,13 +850,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer :: theta_I, phi_I, dir, iscatt, id
   integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
-  real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta, norme
+  real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
   integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 cree un leger surcout dans le cas avec strat (qq 10 sec par inclinaison et par lambda)
   ! 15 cree un important surcout
 
-  real :: s11, sum_s11, s12, s33, s34
+  real :: s11, s12, s33, s34
 
   ! Many dimensions but small numbers (<1MB for default values)
   real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sin_scatt_norm
@@ -1015,8 +1014,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc) &
-  !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,sum_s11,i1,i2,u,v,w,cos_scatt,sin_scatt) &
-  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt,norme) &
+  !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
+  !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
   !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
   id = 1 ! pour code sequentiel
 
@@ -1384,24 +1383,20 @@ end subroutine calc_Isca_rt2_star
 
 !***********************************************************
 
-function dust_source_fct(ri,zj,phik, x,y,z)
+function dust_source_fct(icell, x,y,z)
   ! La direction du rayon est maintenant fixee le long de l'axe x
   ! l'angle de diffusion ne depend que de la position x, y, z
 
-  integer, intent(in) :: ri, zj, phik
+  integer, intent(in) :: icell
   real(kind=db), intent(in) :: x, y, z
 
   real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
 
   real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, psup, ri1, zj1, ri2, zj2
-  integer :: k, n_pola, icell
+  integer :: k, n_pola, icell_tmp, ri, zj, phik
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
-
-!  write(*,*) "test"
-
-  icell = cell_map(ri,zj,phik)
 
   ! Interpolations angulaires
   if (lscatt_ray_tracing1) then
@@ -1420,7 +1415,6 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         if (k > n_az_rt) k = n_az_rt
      endif
 
-
      ! OK : lisse les images par rapport a la methode en dessous
 !---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
 !---     phi_k =  floor(xi_az)
@@ -1432,11 +1426,13 @@ function dust_source_fct(ri,zj,phik, x,y,z)
 !---     if (phi_k_p1 > n_az_rt) phi_k_p1=n_az_rt
 !---
 !---     dust_source_fct(:) = eps_dust1(:,ri,zj,phi_k_p1,psup) * frac + eps_dust1(:,ri,zj,phi_k,psup) * un_m_frac
-
-
      dust_source_fct(:) = eps_dust1(k,psup,:,icell)  ! ??? ce n'est pas lineaire
 
-  else ! Methode 2
+  else ! Methode 2 --> only 2D, so phik should be 1
+     ri = cell_map_i(icell)
+     zj = cell_map_j(icell)
+     phik = cell_map_k(icell)
+
      ! Pour interpolations spatiales
      r = sqrt(x*x + y*y)
 
@@ -1463,8 +1459,8 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         ri1 = 1
         frac_r = 0._db
      else
-        frac_r = (log(r_grid(cell_map(ri2,zj,1))) - log(r)) / &
-             (log(r_grid(cell_map(ri2,zj,1))) - log(r_grid(cell_map(ri1,zj,1))))
+        frac_r = (log(r_grid(cell_map(ri2,zj,phik))) - log(r)) / &
+             (log(r_grid(cell_map(ri2,zj,phik))) - log(r_grid(cell_map(ri1,zj,phik))))
      endif
 
      if (zj2 > nz) then
@@ -1474,8 +1470,8 @@ function dust_source_fct(ri,zj,phik, x,y,z)
         zj1 = 1
         frac_z = 1.0_db
      else
-        frac_z = (z_grid(cell_map(ri,zj2,1)) - abs(z)) / &
-             (z_grid(cell_map(ri,zj2,1)) - z_grid(cell_map(ri,zj1,1)))
+        frac_z = (z_grid(cell_map(ri,zj2,phik)) - abs(z)) / &
+             (z_grid(cell_map(ri,zj2,phik)) - z_grid(cell_map(ri,zj1,phik)))
      endif
 
      ! Ok si je decommente les 2
@@ -1518,14 +1514,14 @@ function dust_source_fct(ri,zj,phik, x,y,z)
      if (iscatt2==0) iscatt2 = nang_ray_tracing
 
      ! Fct source des cellules
-     icell = cell_map(ri1,zj1,1)
-     SF1(:) = eps_dust2(:,iscatt2,dir,icell) * frac + eps_dust2(:,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri2,zj1,1)
-     SF2(:) = eps_dust2(:,iscatt2,dir,icell) * frac + eps_dust2(:,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri1,zj2,1)
-     SF3(:) = eps_dust2(:,iscatt2,dir,icell) * frac + eps_dust2(:,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri2,zj2,1)
-     SF4(:) = eps_dust2(:,iscatt2,dir,icell) * frac + eps_dust2(:,iscatt1,dir,icell) * un_m_frac
+     icell_tmp = cell_map(ri1,zj1,phik)
+     SF1(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri2,zj1,phik)
+     SF2(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri1,zj2,phik)
+     SF3(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri2,zj2,phik)
+     SF4(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
 
      !----------------------------------------------------
      ! Emissivite du champ stellaire diffuse 1 fois
@@ -1556,32 +1552,32 @@ function dust_source_fct(ri,zj,phik, x,y,z)
      endif
 
      ! TODO : petit bug ici --> on peut ajuster la taille de eps_dust2_star au lieu de la fixer a 4
-     icell = cell_map(ri1,zj1,1)
-     SF1(1:n_pola) = SF1(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri2,zj1,1)
-     SF2(1:n_pola) = SF2(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri1,zj2,1)
-     SF3(1:n_pola) = SF3(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell) * un_m_frac
-     icell = cell_map(ri2,zj2,1)
-     SF4(1:n_pola) = SF4(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell) * un_m_frac
+     icell_tmp = cell_map(ri1,zj1,phik)
+     SF1(1:n_pola) = SF1(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri2,zj1,phik)
+     SF2(1:n_pola) = SF2(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri1,zj2,phik)
+     SF3(1:n_pola) = SF3(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     icell_tmp = cell_map(ri2,zj2,phik)
+     SF4(1:n_pola) = SF4(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
 
      if (lsepar_contrib) then
-        icell = cell_map(ri1,zj1,1)
-         SF1(n_pola+2) = SF1(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell) * frac &
-              + eps_dust2_star(1,iscatt1,dir,icell) * un_m_frac
-         icell = cell_map(ri2,zj1,1)
-         SF2(n_pola+2) = SF2(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell) * frac &
-              + eps_dust2_star(1,iscatt1,dir,icell) * un_m_frac
-         icell = cell_map(ri1,zj2,1)
-         SF3(n_pola+2) = SF3(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell) * frac &
-              + eps_dust2_star(1,iscatt1,dir,icell) * un_m_frac
-         icell = cell_map(ri2,zj2,1)
-         SF4(n_pola+2) = SF4(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell) * frac &
-              + eps_dust2_star(1,iscatt1,dir,icell) * un_m_frac
+        icell_tmp = cell_map(ri1,zj1,phik)
+        SF1(n_pola+2) = SF1(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+             + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+        icell_tmp = cell_map(ri2,zj1,phik)
+        SF2(n_pola+2) = SF2(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+             + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+        icell_tmp = cell_map(ri1,zj2,phik)
+        SF3(n_pola+2) = SF3(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+             + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+        icell_tmp = cell_map(ri2,zj2,phik)
+        SF4(n_pola+2) = SF4(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+             + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
      frac_r = 1.0

@@ -5,7 +5,6 @@ module init_mcfost
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
   use em_th, only : specie_removed, T_rm, Tfile
-  use wall
   use molecular_emission
   use ray_tracing
   !$ use omp_lib
@@ -35,8 +34,7 @@ subroutine initialisation_mcfost()
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
 
-  real :: nphot_img = 0.0
-  integer :: n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
+  real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
@@ -76,6 +74,7 @@ subroutine initialisation_mcfost()
   lopacite_only=.false.
   lseed=.false.
   loptical_depth_map=.false.
+  lcolumn_density = .false.
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
@@ -93,11 +92,9 @@ subroutine initialisation_mcfost()
   lHH30mol = .false.
   lemission_mol=.false.
   lpuffed_rim = .false.
-  lopacity_wall = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
   laverage_grain_size = .false.
-  llinear_grid=.false.
   lr_subdivide=.false.
   lfreeze_out = .false.
   l_em_disk_image = .true.
@@ -110,6 +107,9 @@ subroutine initialisation_mcfost()
   loutput_mc=.false.
   ldensity_file=.false.
   lphantom_file=.false.
+  lascii_SPH_file = .false.
+  lgadget2_file=.false.
+  llimits_file = .false.
   lsigma_file = .false.
   lweight_emission=.false.
   lprodimo=.false.
@@ -138,6 +138,7 @@ subroutine initialisation_mcfost()
   lno_T = .false.
   lISM_heating = .false.
   llimb_darkening = .false.
+  lVoronoi = .false.
   lcavity = .false.
 
   ! Geometrie Grille
@@ -561,6 +562,9 @@ subroutine initialisation_mcfost()
      case("-optical_depth_map","-od")
         i_arg = i_arg+1
         loptical_depth_map=.true.
+     case("-column_density","-cd","-CD")
+        i_arg = i_arg+1
+        lcolumn_density=.true.
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.
@@ -592,19 +596,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
         i_arg = i_arg+1
-     case("-opacity_wall")
-        lopacity_wall = .true.
-        if (i_arg + 2 > nbr_arg) then
-           write(*,*) "Error : wall parameters needed"
-           stop
-        endif
-        i_arg = i_arg+1
-        call get_command_argument(i_arg,s)
-        read(s,*) h_wall
-        i_arg = i_arg+1
-        call get_command_argument(i_arg,s)
-        read(s,*) tau_wall
-        i_arg = i_arg+1
      case("-spherical")
         lcylindrical=.false.
         lspherical=.true.
@@ -616,9 +607,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,Tfile)
         i_arg = i_arg + 1
-     case("-linear_grid")
-        i_arg = i_arg + 1
-        llinear_grid=.true.
      case("-r_subdivide")
         i_arg = i_arg + 1
         lr_subdivide=.true.
@@ -677,8 +665,35 @@ subroutine initialisation_mcfost()
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
+        lVoronoi = .true.
+        l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-ascii_SPH")
+        i_arg = i_arg + 1
+        lascii_SPH_file = .true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-gadget","-gadget2")
+        i_arg = i_arg + 1
+        lgadget2_file=.true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "gadget2.limits"
+     case("-limits_file","-limits")
+        i_arg = i_arg + 1
+        llimits_file = .true.
+        call get_command_argument(i_arg,s)
+        limits_file = s
         i_arg = i_arg + 1
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1
@@ -1171,10 +1186,10 @@ subroutine initialisation_mcfost()
 
   call save_data()
 
-  if ((l3D).and.(n_az==1)) then
+  if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
   endif
-
+  if (n_az > 1) l3D = .true.
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
      if (lmono0.and.(.not.l3D)) then
@@ -1185,6 +1200,17 @@ subroutine initialisation_mcfost()
         write(*,*) "Using ray-tracing method 1"
      endif
   endif
+
+  lonly_LTE = .false.
+  lonly_nLTE = .false.
+  if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
+  if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
+
+  ! Pour rotation du disque (signe - pour convention astro)
+  cos_disk = cos(ang_disque/180.*pi)
+  sin_disk = -sin(ang_disque/180.*pi)
+  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
+  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   ! Signal handler
   ! do i=1,17
@@ -1268,10 +1294,6 @@ subroutine display_help()
   write(*,*) "        : -output_J"
   write(*,*) "        : -output_UV_field"
   write(*,*) "        : -puffed_up_rim  <h rim / h0> <r> <delta_r>"
-!  write(*,*) "        : -wall <h_wall> <tau_wall>, implies 3D, density wall"
-  write(*,*) "        : -opacity_wall <h_wall> <tau_wall>, ONLY an opacity wall in MC,"
-  write(*,*) "                            NOT a density wall"
-  write(*,*) "        : -linear_grid : linearly spaced grid"
   write(*,*) "        : -density_file or -df <density_file>"
   write(*,*) "        : -sigma_file or -sigma <surface_density_file>"
   write(*,*) "        : -correct_density <factor> <Rmin> <Rmax>"

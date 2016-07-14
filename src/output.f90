@@ -10,17 +10,19 @@ module output
   use molecular_emission
   use ray_tracing
   use utils
+  use Voronoi_grid
+  use grid
 
   implicit none
 
   contains
 
-subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
+subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
 
   implicit none
 
   real(kind=db), intent(in) ::  xin,yin,zin, uin,vin,win
-  integer, intent(in) :: id, lambda, ri0, zj0
+  integer, intent(in) :: id, lambda, icell
   real(kind=db), dimension(4), intent(in)  :: stokin
   logical, intent(in) :: flag_star, flag_scatt
   integer, intent(out) :: capt
@@ -57,10 +59,10 @@ subroutine capteur(id,lambda,ri0,zj0,xin,yin,zin,uin,vin,win,stokin,flag_star,fl
   ! Origine du paquet
   if (lorigine) then
      if (capt == capt_interet) then
-        if (ri0 == 0) then
+        if (flag_star) then
            star_origin(lambda,id) = star_origin(lambda,id) + stok(1)
         else
-           disk_origin(lambda,ri0,zj0,id) = disk_origin(lambda, ri0,zj0, id) + stok(1)
+           disk_origin(lambda, icell,id) = disk_origin(lambda, icell, id) + stok(1)
         endif
      endif
   endif
@@ -358,12 +360,12 @@ subroutine write_stokes_fits()
   real :: facteur, pixel_scale_x, pixel_scale_y
 
   real :: o_star, frac_star, somme_disk
-  real, dimension(n_rad, nz) :: o_disk
+  real, dimension(n_cells) :: o_disk
 
   if (lorigine) then
 
      o_star = sum(star_origin(1,:))
-     o_disk(:,:) = sum(disk_origin(1,:,:,:), dim=3)
+     o_disk(:) = sum(disk_origin(1,:,:), dim=2)
      somme_disk = sum(o_disk)
      frac_star = o_star / (o_star+somme_disk)
      if (somme_disk > tiny_real) o_disk=o_disk/somme_disk
@@ -384,9 +386,8 @@ subroutine write_stokes_fits()
      bitpix=-32
      extend=.true.
 
-     naxis=2
-     naxes(1)=n_rad
-     naxes(2)=nz
+     naxis=1
+     naxes(1)=n_cells
 
      ! Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -394,7 +395,7 @@ subroutine write_stokes_fits()
       !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)
+     nelements=naxes(1)
 
       ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,o_disk,status)
@@ -864,13 +865,13 @@ subroutine write_origin()
   logical :: simple, extend
 
   real :: o_star
-  real, dimension(n_rad, nz) :: o_disk
+  real, dimension(n_cells) :: o_disk
 
   filename = trim(data_dir)//"/origine.fits.gz"
 
   ! Normalisation
   o_star = sum(star_origin(1,:))
-  o_disk(:,:) = o_disk(:,:) / (sum(o_disk) + o_star)
+  o_disk(:) = o_disk(:) / (sum(o_disk) + o_star)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou ( unit, status )
@@ -883,9 +884,8 @@ subroutine write_origin()
   simple=.true.
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  naxis=1
+  naxes(1)=n_cells
 
   extend=.true.
 
@@ -896,7 +896,7 @@ subroutine write_origin()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,o_disk,status)
@@ -1056,6 +1056,132 @@ end subroutine calc_optical_depth_map
 
 !***********************************************************
 
+subroutine write_column_density()
+  ! Only works if the star in in 0, 0, 0 at the moment
+
+  real, dimension(n_cells,2) :: CD
+  integer :: icell, icell0, next_cell, previous_cell
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements, direction
+
+  logical :: simple, extend
+  character(len=512) :: filename
+
+  real(kind=db) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
+
+  CD(:,:) = 0.0
+  do direction = 1, 2
+     do icell=1,n_cells
+
+        if (lVoronoi) then
+           write(*,*) "Column density option not omplemented in Voronoi"
+           write(*,*) "Exiting"
+           ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
+           stop
+           x1 = Voronoi(icell)%xyz(1)
+           y1 = Voronoi(icell)%xyz(2)
+           z1 = Voronoi(icell)%xyz(3)
+        else
+           x1 = r_grid(icell) * cos(phi_grid(icell))
+           y1 = r_grid(icell) * sin(phi_grid(icell))
+           z1 = z_grid(icell)
+        endif
+
+        if (direction == 1) then
+           norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
+           u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
+        else
+           u = 0.0 ; v = 0.0 ;
+           if (z1 >= 0) then
+              w = 1.0
+           else
+              w = -1.0
+           endif
+        endif
+
+        next_cell = icell
+        icell0 = 0
+        do while(next_cell <= n_cells)
+           previous_cell = icell0
+           icell0 = next_cell
+           x0 = x1 ; y0 = y1 ; z0 = z1
+           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+           CD(icell,direction) = CD(icell,direction) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
+        enddo
+     enddo ! icell
+  end do ! direction
+  CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
+
+
+  filename = "!Column_density.fits.gz"
+
+  write(*,*) "Writing "//trim(filename)
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit,status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  ! le signe - signifie que l'on ecrit des reels dans le fits
+  bitpix=-32
+  extend=.true.
+
+  if (lVoronoi) then
+     naxis=2
+     naxes(1)=n_cells
+     naxes(2)=2
+     nelements=naxes(1)*naxes(2)
+  else
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4)=2
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=2
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
+  endif
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,CD,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  return
+
+end subroutine write_column_density
+
+!***********************************************************
+
+
 subroutine reemission_stats()
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -1094,7 +1220,7 @@ subroutine reemission_stats()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,N_reemission,status)
@@ -1579,7 +1705,6 @@ subroutine write_disk_struct()
   naxes(2)=nz
   naxes(3)=1
   naxes(4)=2
-  nelements=naxes(1)*naxes(2)*naxes(3)
 
   if (l3D) then
      naxes(2)=2*nz+1
@@ -1773,7 +1898,6 @@ subroutine ecriture_UV_field()
   endif
   J = 0. ; G = 0. ; Gio = 0.
 
-
   ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
@@ -1875,7 +1999,7 @@ subroutine ecriture_temperature(iTemperature)
 
   integer, intent(in) :: iTemperature
 
-  integer :: i, j, l, k, icell
+  integer :: l, icell
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, alloc_status
@@ -1883,7 +2007,7 @@ subroutine ecriture_temperature(iTemperature)
   logical :: simple, extend
   character(len=512) :: filename
 
-  integer, dimension(:,:,:,:), allocatable :: tmp
+  integer, dimension(:,:), allocatable :: tmp
 
 
   if (lRE_LTE) then
@@ -1906,17 +2030,23 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=-32
      extend=.true.
 
-     if (l3D) then
-        naxis=3
-        naxes(1)=n_rad
-        naxes(2)=2*nz
-        naxes(3)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)
+     if (lVoronoi) then
+        naxis=1
+        naxes(1)=n_cells
+        nelements=naxes(1)
      else
-        naxis=2
-        naxes(1)=n_rad
-        naxes(2)=nz
-        nelements=naxes(1)*naxes(2)
+        if (l3D) then
+           naxis=3
+           naxes(1)=n_rad
+           naxes(2)=2*nz
+           naxes(3)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        else
+           naxis=2
+           naxes(1)=n_rad
+           naxes(2)=nz
+           nelements=naxes(1)*naxes(2)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -1961,19 +2091,26 @@ subroutine ecriture_temperature(iTemperature)
      bitpix=-32
      extend=.true.
 
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_RE_nLTE
-        naxes(2)=n_rad
-        naxes(3)=2*nz
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_RE_nLTE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_RE_nLTE
+           naxes(2)=n_rad
+           naxes(3)=2*nz
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_RE_nLTE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -1983,7 +2120,6 @@ subroutine ecriture_temperature(iTemperature)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
@@ -2024,19 +2160,26 @@ subroutine ecriture_temperature(iTemperature)
      !------------------------------------------------------------------------------
      bitpix=-32
 
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=2*nz
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=2*nz
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
 
      !  Write the required header keywords.
@@ -2049,22 +2192,28 @@ subroutine ecriture_temperature(iTemperature)
      ! 2eme HDU : is the grain at equilibrium ?
      !------------------------------------------------------------------------------
      bitpix=32
-     if (l3D) then
-        naxis=4
+     if (lVoronoi) then
+        naxis=2
         naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=2*nz+1
-        naxes(4)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,-nz:nz,n_az), stat=alloc_status)
+        naxes(2)=n_cells
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_grains_nRE
-        naxes(2)=n_rad
-        naxes(3)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)
-        allocate(tmp(grain_nRE_start:grain_nRE_end,n_rad,nz,n_az), stat=alloc_status)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=2*nz+1
+           naxes(4)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_grains_nRE
+           naxes(2)=n_rad
+           naxes(3)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
+     allocate(tmp(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
 
      if (alloc_status /= 0) then
         write(*,*) "Allocation error in ecriture_temperature"
@@ -2079,19 +2228,13 @@ subroutine ecriture_temperature(iTemperature)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      ! le j signifie integer
-     do i=1, n_rad
-        do j=j_start,nz
-           if (j==0) cycle
-           do k=1, n_az
-              icell = cell_map(i,j,k)
-              do l=grain_nRE_start, grain_nRE_end
-                 if (l_RE(l,icell)) then
-                    tmp(l,i,j,k) = 1
-                 else
-                    tmp(l,i,j,k) = 0
-                 endif
-              enddo
-           enddo
+     do icell=1, n_cells
+        do l=grain_nRE_start, grain_nRE_end
+           if (l_RE(l,icell)) then
+              tmp(l,icell) = 1
+           else
+              tmp(l,icell) = 0
+           endif
         enddo
      enddo
      call ftpprj(unit,group,fpixel,nelements,tmp,status)
@@ -2117,21 +2260,29 @@ subroutine ecriture_temperature(iTemperature)
      ! 4eme HDU : Proba Temperature
      !------------------------------------------------------------------------------
      bitpix=-32
-     if (l3D) then
-        naxis=5
+     if (lVoronoi) then
+        naxis=3
         naxes(1)=n_T
         naxes(2)=n_grains_nRE
-        naxes(3)=n_rad
-        naxes(4)=2*nz
-        naxes(5)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        naxes(3)=n_cells
+        nelements=naxes(1)*naxes(2)*naxes(3)
      else
-        naxis=4
-        naxes(1)=n_T
-        naxes(2)=n_grains_nRE
-        naxes(3)=n_rad
-        naxes(4)=nz
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        if (l3D) then
+           naxis=5
+           naxes(1)=n_T
+           naxes(2)=n_grains_nRE
+           naxes(3)=n_rad
+           naxes(4)=2*nz
+           naxes(5)=n_az
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+        else
+           naxis=4
+           naxes(1)=n_T
+           naxes(2)=n_grains_nRE
+           naxes(3)=n_rad
+           naxes(4)=nz
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        endif
      endif
 
      ! create new hdu
@@ -2157,7 +2308,6 @@ subroutine ecriture_temperature(iTemperature)
 
 end subroutine ecriture_temperature
 
-
 !********************************************************************
 
 subroutine ecriture_Tex(imol)
@@ -2166,7 +2316,7 @@ subroutine ecriture_Tex(imol)
 
   integer, intent(in) :: imol
 
-  integer :: i, j, iTrans, iUp, iLow, k, icell
+  integer :: iTrans, iUp, iLow, k, icell
   real(kind=db) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
@@ -2176,10 +2326,9 @@ subroutine ecriture_Tex(imol)
   logical :: simple, extend
   character(len=512) :: filename
 
-  !real, dimension(n_rad,nz,nTrans_tot) :: Tex
-  real, dimension(:,:,:), allocatable :: Tex
+  real, dimension(:,:), allocatable :: Tex
 
-  allocate(Tex(n_rad,nz,nTrans_tot), stat = alloc_status)
+  allocate(Tex(n_cells,nTrans_tot), stat = alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Tex in ecriture_Tex'
      stop
@@ -2193,16 +2342,13 @@ subroutine ecriture_Tex(imol)
      iLow = iTransLower(iTrans)
      cst = - hp * Transfreq(iTrans) / kb
 
-     do j=1, nz
-        do i=1, n_rad
-           icell = cell_map(i,j,1)
-           nUp = tab_nLevel(icell,iUp)
-           nLow =  tab_nLevel(icell,iLow)
-           if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
-              Tex(i,j,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
-           endif
-        enddo ! i
-     enddo !j
+     do icell=1, n_cells
+        nUp = tab_nLevel(icell,iUp)
+        nLow =  tab_nLevel(icell,iLow)
+        if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
+           Tex(icell,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
+        endif
+     enddo ! icell
   enddo !iTrans
 
   filename = trim(data_dir2(imol))//"/Tex.fits.gz"
@@ -2221,10 +2367,9 @@ subroutine ecriture_Tex(imol)
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=nTrans_tot
+  naxis=2
+  naxes(1)=n_cells
+  naxes(2)=nTrans_tot
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2233,7 +2378,7 @@ subroutine ecriture_Tex(imol)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Tex,status)
@@ -2260,8 +2405,8 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=db) :: somme
-  integer ::  i, j, l, icell
-  real, dimension(n_rad,nz) :: a_moyen
+  integer :: l, icell
+  real, dimension(n_cells) :: a_moyen
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -2273,18 +2418,15 @@ subroutine taille_moyenne_grains()
 
   write(*,*) "Writing average_grain_size.fits.gz"
 
-  a_moyen(:,:) = 0.
+  a_moyen(:) = 0.
 
-  do j=1,nz
-     do i=1,n_rad
-        somme=0.0
-        icell = cell_map(i,j,1)
-        do l=1, n_grains_tot
-           a_moyen(i,j) = a_moyen(i,j) + densite_pouss(l,icell) * r_grain(l)**2
-           somme = somme + densite_pouss(l,icell)
-        enddo
-        a_moyen(i,j) = a_moyen(i,j) / somme
+  do icell=1, n_cells
+     somme=0.0
+     do l=1, n_grains_tot
+        a_moyen(icell) = a_moyen(icell) + densite_pouss(l,icell) * r_grain(l)**2
+        somme = somme + densite_pouss(l,icell)
      enddo
+     a_moyen(icell) = a_moyen(icell) / somme
   enddo
   a_moyen = sqrt(a_moyen)
 
@@ -2304,9 +2446,8 @@ subroutine taille_moyenne_grains()
   bitpix=-32
   extend=.true.
 
-  naxis=2
-  naxes(1)=n_rad
-  naxes(2)=nz
+  naxis=1
+  naxes(1)=n_cells
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2315,7 +2456,7 @@ subroutine taille_moyenne_grains()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)
+  nelements=naxes(1)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,a_moyen,status)
@@ -2501,12 +2642,12 @@ subroutine ecriture_pops(imol)
   integer, intent(in) :: imol
 
   character(len=512) :: filename
-  integer :: status,unit,blocksize,bitpix,naxis, i,j,icell
+  integer :: status,unit,blocksize,bitpix,naxis,icell
   integer, dimension(3) :: naxes
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  real, dimension(n_rad,nz,nLevels) :: tab_nLevel_io ! pas en 3D
+  real, dimension(n_cells,nLevels) :: tab_nLevel_io
 
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 
@@ -2523,10 +2664,9 @@ subroutine ecriture_pops(imol)
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=nLevels
+  naxis=2
+  naxes(1)=n_cells
+  naxes(2)=nLevels
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2534,13 +2674,10 @@ subroutine ecriture_pops(imol)
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  nelements=naxes(1)*naxes(2)
 
-  do i=1, n_rad
-     do j=1, nz
-        icell = cell_map(i,j,1)
-        tab_nLevel_io(i,j,:) = tab_nLevel(icell,:)
-     enddo
+  do icell=1, n_cells
+     tab_nLevel_io(icell,:) = tab_nLevel(icell,:)
   enddo
   call ftppre(unit,group,fpixel,nelements,tab_nLevel_io,status)
 
@@ -2569,7 +2706,7 @@ subroutine ecriture_spectre(imol)
   integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
   logical :: simple, extend
 
-  real, dimension(:,:,:,:), allocatable ::  O ! nv, nTrans, n_rad, nz
+  real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
   real, dimension(nTrans) :: freq
 
   integer :: n_speed_rt, nTrans_raytracing
@@ -2678,7 +2815,7 @@ subroutine ecriture_spectre(imol)
   endif
   naxes(3)=ntrans
   naxes(4)=RT_n_incl
-  naxes(4)=RT_n_az
+  naxes(5)=RT_n_az
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
   ! create new hdu
@@ -2768,10 +2905,10 @@ subroutine ecriture_spectre(imol)
   ! Origine
   !------------------------------------------------------------------------------
   if (lorigine) then
-     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_rad,nz))
+     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells))
      O = 0.0;
      do i=1, nb_proc
-        O(:,:,:,:) =  O(:,:,:,:) +  origine_mol(:,:,:,:,i)
+        O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
      enddo
 
 
@@ -2793,8 +2930,7 @@ subroutine ecriture_spectre(imol)
      naxis=4
      naxes(1)=2*n_speed_rt+1
      naxes(2)=ntrans
-     naxes(3)=n_rad
-     naxes(4)=nz
+     naxes(3)=n_cells
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2802,7 +2938,7 @@ subroutine ecriture_spectre(imol)
      !  Write the array to the FITS file.
      group=1
      fpixel=1
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     nelements=naxes(1)*naxes(2)*naxes(3)
 
      call ftppre(unit,group,fpixel,nelements,O,status)
 
@@ -2894,7 +3030,7 @@ subroutine write_dust_prop()
   allocate(kappa_grain(n_lambda,n_grains_tot))
 
   icell = icell_ref
-  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(1)*AU_to_cm**3))) ! cm^2/g
+  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
   g_lambda=tab_g_pos(icell,:)
 
