@@ -759,9 +759,19 @@ subroutine mcfost_get_ref_para()
   character(len=15) :: ref_file_3D
   integer ::  syst_status
 
-  ref_file = "ref"//mcfost_release(1:4)//".para"
-  ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
-  ref_file_3D = "ref"//mcfost_release(1:4)//"_3D.para"
+  if (mcfost_release(5:5) == ".") then
+     ref_file = "ref"//mcfost_release(1:4)//".para"
+     ref_file_multi = "ref"//mcfost_release(1:4)//"_multi.para"
+     ref_file_3D = "ref"//mcfost_release(1:4)//"_3D.para"
+  else if (mcfost_release(4:4) == ".") then
+     ref_file = "ref"//mcfost_release(1:3)//".para"
+     ref_file_multi = "ref"//mcfost_release(1:3)//"_multi.para"
+     ref_file_3D = "ref"//mcfost_release(1:3)//"_3D.para"
+  else
+     write(*,*) "Cannot parse "//trim(mcfost_release)//" to find parameter files"
+     return
+  endif
+
 
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
   cmd = "curl "//trim(webpage)//ref_file//" -O -s"
@@ -974,7 +984,7 @@ subroutine update_utils(lforce_update)
         lupdate = .true.
      endif
   else ! We need to update MCFOST first
-     write(*,*) "New MCFOST version available: ", trim(s_last_version)
+     write(*,*) "New MCFOST UTILS version available: ", trim(s_last_version)
      write(*,*) "Please update mcfost first with mcfost -u"
      lupdate = .false.
   endif
