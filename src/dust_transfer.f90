@@ -59,7 +59,7 @@ subroutine transfert_poussiere()
   integer, pointer, save :: p_lambda
   integer :: capt
 
-  real(kind=db) :: x,y,z, u,v,w
+  real(kind=db) :: x,y,z, u,v,w, lmin, lmax
   real :: rand, tau
   integer :: i, icell, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
@@ -476,10 +476,12 @@ subroutine transfert_poussiere()
 
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
-        tau=0.0 ;
-        !do i=1, n_rad
-        !   tau=tau+kappa(cell_map(i,1,1),lambda)*(r_lim(i)-r_lim(i-1))
-        !enddo
+        ! Optical depth along midplane
+        x=0.0 ; y=0.0 ; z=0.0
+        Stokes = 0.0_db ; Stokes(1) = 1.0_db
+        w = 0.0 ; u = 1.0 ; v = 0.0
+        call indice_cellule(x,y,z, icell)
+        call optical_length_tot(1,lambda,Stokes,icell,x,y,y,u,v,w,tau,lmin,lmax)
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
