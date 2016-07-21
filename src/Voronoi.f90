@@ -349,7 +349,8 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
+         lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
     if (lcompute) then
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
@@ -444,7 +445,8 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+  subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
+       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
 
     integer, intent(in) :: n_cells,max_neighbours
     real(kind=db), intent(in), dimension(6) :: limits
@@ -474,7 +476,8 @@ module Voronoi_grid
     endif
 
     ! read the saved Voronoi mesh
-    read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list
+    read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, &
+         first_neighbours,last_neighbours, neighbours_list
     close(unit=1)
     if (ios /= 0) then ! if some dimension changed
        return
