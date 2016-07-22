@@ -32,9 +32,8 @@ tar xzvf voro++-0.4.6.tar.gz
 cd voro++-0.4.6
 make
 \cp src/libvoro++.a ../lib
-\cp src/voro++.hh ../include
 mkdir -p ../include/voro++
-\cp src/*.hh ../include
+\cp src/*.hh ../include/voro++/
 cd ..
 rm -rf voro++-0.4.6
 
