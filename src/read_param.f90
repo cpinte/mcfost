@@ -494,13 +494,6 @@ contains
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -946,13 +939,6 @@ contains
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -1377,13 +1363,6 @@ contains
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -1790,13 +1769,6 @@ contains
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -2199,13 +2171,6 @@ contains
        write(*,*) 'Allocation error etoile'
        stop
     endif
-
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2613,13 +2578,6 @@ contains
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -3014,13 +2972,6 @@ contains
        write(*,*) 'Allocation error etoile'
        stop
     endif
-
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3420,13 +3371,6 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -3818,13 +3762,6 @@ end subroutine read_para215
        stop
     endif
 
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
-
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
        l_sym_ima=.false.
@@ -4195,13 +4132,6 @@ end subroutine read_para215
        write(*,*) 'Allocation error etoile'
        stop
     endif
-
-    allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error CDF_E_star'
-       stop
-    endif
-    CDF_E_star = 0.0 ; prob_E_star = 0.0
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
