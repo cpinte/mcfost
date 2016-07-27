@@ -245,8 +245,6 @@ contains
        enddo !icell
     enddo search_not_empty
 
-    if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
-
     return
 
   end subroutine setup_SPH2mcfost
@@ -264,7 +262,7 @@ contains
 
     integer, parameter :: nSpT = 29
     character(len=2), dimension(nSpT) :: SpT
-    real :: L, R, T, M
+    real :: L, R, T, M, minM, maxM
     real, dimension(nSpT) :: logL, logR, logTeff, logM
 
     isochrone_file = "Siess/isochrone_3Myr.txt"
@@ -276,19 +274,26 @@ contains
     do i=1,3
        read(1,*) line_buffer
     enddo
+    minM = 1.e30 ; maxM = 0 ;
     do i=1, nSpT
        read(1,*) SpT(i), L, r, T, M
        logL(i) = log(L) ; logR(i) = log(r) ; logTeff(i) = log(T) ; logM(i) = log(M)
+       if (M < minM) minM = M
+       if (M > maxM) maxM = M
     enddo
     close(unit=1)
 
     ! interpoler L et T, les fonctions sont plus smooth
     write(*,*) "New stellar parameters:"
     do i=1, n_etoiles
+       if ((etoile(i)%M < minM) .or. (etoile(i)%M > maxM))  then
+          write(*,*) "   *** WARNING : stellar object mass not in isochrone range"
+          write(*,*) "   *** object #", i, "M=", etoile(i)%M, "Msun"
+       endif
        etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
        etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
        etoile(i)%lb_body = .true.
-       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "AU"
+       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
     enddo
     write(*,*) ""
 
