@@ -739,6 +739,13 @@ subroutine alloc_dynamique()
 
   endif ! lemission_mol
 
+  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error CDF_E_star'
+     stop
+  endif
+  CDF_E_star = 0.0 ; prob_E_star = 0.0
+
   return
 
 end subroutine alloc_dynamique
