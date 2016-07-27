@@ -254,7 +254,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   real(db) :: xi, yi, zi, hi, rhoi, udens, ulength_au, usolarmass, dustfraci, Mtot
 
   udens = umass/udist**3
-  ulength_au = udist/ (au_to_cm * 100.) ! todo : je ne capte pas ce factor --> Daniel
+  ulength_au = udist/ (au_to_cm ) ! * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
@@ -299,8 +299,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  n_SPH = j
 
  write(*,*) "Total mass is", Mtot * usolarmass
+
  if (nptmass > 0) then
+
     write(*,*) "Updating the stellar properties"
+    n_etoiles = nptmass
     if (allocated(etoile)) deallocate(etoile)
     allocate(etoile(nptmass))
 
