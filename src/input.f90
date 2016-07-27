@@ -561,6 +561,8 @@ subroutine lect_Temperature()
          if (nfound /= 1) then
            write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
            write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+           write(*,*) "# fits file,   required"
+           write(*,*) nfound, 1
            stop
         endif
         if ((naxes(1) /= n_cells)) then
@@ -576,6 +578,8 @@ subroutine lect_Temperature()
            if (nfound /= 3) then
               write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
               write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+              write(*,*) "# fits file,   required"
+              write(*,*) nfound, 3
               stop
            endif
            if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
@@ -592,6 +596,8 @@ subroutine lect_Temperature()
            if (nfound /= 2) then
               write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
               write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+              write(*,*) "# fits file,   required"
+              write(*,*) nfound, 2
               stop
            endif
 
