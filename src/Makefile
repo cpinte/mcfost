@@ -209,12 +209,12 @@ main : mcfost
 mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
-
 libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
+	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
 
@@ -273,8 +273,6 @@ release : main
 	ssh dmz "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp dmz:mcfost/src/mcfost_bin.tgz web/linux/
 	scp dmz:mcfost/src/mcfost.sha1 web/linux/
-	rm -rf ../utils/Version
-	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
@@ -295,8 +293,6 @@ release_mac : main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
-	rm -rf ../utils/Version
-	grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
