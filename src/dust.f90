@@ -339,28 +339,38 @@ subroutine init_indices_optiques()
            endif
            close(unit=1)
 
-
            ! Interpolation des indices optiques aux longeurs d'onde de MCFOST
            do i=1, n_lambda
               if (l_ordre_decroissant) then
-                 ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-                 do while((tab_lambda(i) < tab_l(ii)).and.(ii <= n_ind-1))
-                    ii=ii+1
-                 enddo
+                 ! Pas d'extrapolation aux courtes longueurs d'onde
+                 if (tab_lambda(i) < tab_l(n_ind)) then
+                    tab_tmp_amu1(i,k)=tab_n(n_ind)
+                    tab_tmp_amu2(i,k)=tab_k(n_ind)
+                 else
+                    ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                    do while((tab_lambda(i) < tab_l(ii)).and.(ii <= n_ind-1))
+                       ii=ii+1
+                    enddo
 
-                 frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
-                 tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
-                 tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
-
+                    frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
+                    tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
+                    tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
+                 endif
               else ! ordre croissant
-                 ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
-                 do while((tab_lambda(i) > tab_l(ii)).and.(ii <= n_ind-1))
-                    ii=ii+1
-                 enddo
+                 ! Pas d'extrapolation aux courtes longueurs d'onde
+                 if (tab_lambda(i) < tab_l(1)) then
+                    tab_tmp_amu1(i,k)=tab_n(1)
+                    tab_tmp_amu2(i,k)=tab_k(1)
+                 else
+                    ii=2 ! deplace ici car les lambda ne sont plus dans l'ordre pour l'emission moleculaire
+                    do while((tab_lambda(i) > tab_l(ii)).and.(ii <= n_ind-1))
+                       ii=ii+1
+                    enddo
 
-                 frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
-                 tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
-                 tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
+                    frac=(log(tab_l(ii))-log(tab_lambda(i)))/(log(tab_l(ii))-log(tab_l(ii-1)))
+                    tab_tmp_amu1(i,k)=exp(log(tab_n(ii-1))*frac+log(tab_n(ii))*(1.0-frac))
+                    tab_tmp_amu2(i,k)=exp(log(tab_k(ii-1))*frac+log(tab_k(ii))*(1.0-frac))
+                 endif
               endif ! croissant ou decroissant
 
            enddo ! lambda
@@ -379,6 +389,9 @@ subroutine init_indices_optiques()
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
            dust_pop(pop)%T_sub = dust_pop(pop)%component_T_sub(1)
+
+
+
         else
            if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
               allocate(m(n_components), f(n_components))
