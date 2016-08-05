@@ -195,7 +195,7 @@ subroutine dealloc_ray_tracing()
   ! C. Pinte
   ! 13/10/08
 
-  deallocate(kappa_sca)
+  if (allocated(kappa_sca)) deallocate(kappa_sca)
   deallocate(Stokes_ray_tracing,stars_map,J_th)
 
   if (lscatt_ray_tracing1) then

@@ -765,7 +765,8 @@ subroutine dealloc_em_th()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
-  deallocate(kappa,kappa_abs_LTE,kappa_sca)
+  deallocate(kappa,kappa_abs_LTE)
+  if (allocated(kappa_sca)) deallocate(kappa_sca)
   if (allocated(proba_abs_RE_LTE)) then
      deallocate(proba_abs_RE_LTE)
      if (lRE_nLTE) deallocate(kappa_abs_nLTE)
@@ -1315,7 +1316,8 @@ subroutine realloc_step2()
      ksca_CDF = 0
   endif ! method
 
-  deallocate(kappa, kappa_sca, kappa_abs_LTE)
+  deallocate(kappa,kappa_abs_LTE)
+  if (allocated(kappa_sca)) deallocate(kappa_sca)
   deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
@@ -1518,7 +1520,8 @@ subroutine dealloc_emission_mol()
 
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
-  deallocate(kappa, kappa_sca, emissivite_dust)
+  deallocate(kappa,emissivite_dust)
+  if (allocated(kappa_sca)) deallocate(kappa_sca)
   if (allocated(spectre_etoiles)) deallocate(spectre_etoiles)
   if (allocated(spectre_etoiles_cumul)) deallocate(spectre_etoiles_cumul)
   if (allocated(CDF_E_star)) deallocate(CDF_E_star)
