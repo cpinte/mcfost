@@ -935,7 +935,7 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  if ((.not.limg).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
+  if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
      write(*,*) "WARNING: polarization is turned off in ray-traced SEDs"
      write(*,*) "         it can be turned back on with -rt2"
      lsepar_pola = .false.
