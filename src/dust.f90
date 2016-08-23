@@ -252,7 +252,18 @@ subroutine init_indices_optiques()
      if (.not.dust_pop(pop)%is_opacity_file) then
 
         n_components = dust_pop(pop)%n_components
-        if (dust_pop(pop)%porosity > tiny_real) n_components = n_components + 1
+        if (dust_pop(pop)%porosity > tiny_real) then
+           n_components = n_components + 1
+           if (dust_pop(pop)%mixing_rule /= 1) then
+              dust_pop(pop)%mixing_rule = 1 ! forcing EMT when there is only 1 component
+              if (n_components > 2) then ! mcfost does not know what to do when there is more than 1 component
+                 write(*,*) "ERROR: cannot use porosity with coating"
+                 write(*,*) "dust population #", pop
+                 write(*,*) "Exiting"
+                 stop
+              endif
+           endif
+        endif
         allocate(tab_tmp_amu1(n_lambda,n_components), tab_tmp_amu2(n_lambda,n_components), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_tmp_amu1'
