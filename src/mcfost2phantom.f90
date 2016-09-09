@@ -8,7 +8,7 @@ module mcfost2phantom
 
 contains
 
-!--  subroutine init_mcfost_phantom(mcfost_filename, ierr)
+!--  subroutine init_mcfost_phantom(mcfost_filename, ierr,  np, nptmass, ntypes, ndusttypes, npoftype)
 !--
 !--    ! This routine should be in mcfost2phantom
 !--    character(len=*), intent(in) :: mcfost_filename
