@@ -207,7 +207,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
     dustfrac = 0.
  endif
 
- write(*,*) "Found", nptmass, "stars in the phantom file"
+ write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,itype,grainsize,dustfrac,&
@@ -250,7 +250,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   real(db), dimension(:,:), allocatable, intent(out) :: rhodust
   integer, intent(out) :: n_SPH
 
-  integer :: i,j,k,itypei, alloc_status
+  integer :: i,j,k,itypei, alloc_status, i_etoiles
   real(db) :: xi, yi, zi, hi, rhoi, udens, ulength_au, usolarmass, dustfraci, Mtot
 
   udens = umass/udist**3
@@ -303,16 +303,26 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  if (nptmass > 0) then
 
     write(*,*) "Updating the stellar properties"
-    n_etoiles = nptmass
-    if (allocated(etoile)) deallocate(etoile)
-    allocate(etoile(nptmass))
 
+    n_etoiles = 0
     do i=1,nptmass
-       etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
-       etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
-       etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
+       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+          n_etoiles =+ 1
+       endif
+    enddo
 
-       etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+    if (allocated(etoile)) deallocate(etoile)
+    allocate(etoile(n_etoiles))
+
+    i_etoiles = 0
+    do i=1,nptmass
+       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+          i_etoiles =+ 1
+          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
+          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
+          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
+          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
+       endif
     enddo
  endif
 
