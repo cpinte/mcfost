@@ -307,7 +307,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     n_etoiles = 0
     do i=1,nptmass
        if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          n_etoiles =+ 1
+          n_etoiles = n_etoiles + 1
        endif
     enddo
 
@@ -317,7 +317,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
     i_etoiles = 0
     do i=1,nptmass
        if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          i_etoiles =+ 1
+          i_etoiles = i_etoiles + 1
           etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
           etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
           etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
