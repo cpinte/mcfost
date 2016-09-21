@@ -27,7 +27,7 @@ contains
 
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
-    real, allocatable, dimension(:) :: a_SPH
+    real, allocatable, dimension(:) :: a_SPH, log_a_SPH
     real :: grainsize,graindens, f
     integer :: ierr, n_SPH, ndusttypes, icell, l, k, ios, iSPH
 
@@ -191,21 +191,43 @@ contains
        lvariable_dust = .true.
        write(*,*) "*********************************************"
        write(*,*) "This part has not been tested"
-       write(*,*) "Dust mass is going to incorrect !!!"
+       write(*,*) "Dust mass is going to be incorrect !!!"
        write(*,*) "rhodust is not calibrated for mcfost yet"
        write(*,*) "*********************************************"
+
+       ! On verifie que les grains sont tries
+       do l=1, ndusttypes-1
+          if (a_sph(l) >= a_sph(l+1)) then
+             write(*,*) "ERROR : grains must be ordered from small to large"
+             do k=1, ndusttypes
+                write(*,*) k, a_sph(k)
+             enddo
+             write(*,*) "Exiting"
+             stop
+          endif
+
+          if (a_SPH(l) > 0.) then
+             log_a_SPH(l) = log(a_SPH(l))
+          else
+             write(*,*) "ERROR : grains size must be > 0 in SPH file"
+             write(*,*) "Exiting"
+             stop
+          endif
+       enddo
+
+
        l=1
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
              do k=1,n_grains_tot
-                if (r_grain(l) < a_SPH(1)) then ! small grains
+                if (r_grain(k) < a_SPH(1)) then ! small grains
                    densite_pouss(k,icell) = rhodust(1,iSPH)
-                else if (r_grain(k) < a_SPH(ndusttypes)) then ! large grains
+                else if (r_grain(k) > a_SPH(ndusttypes)) then ! large grains
                    densite_pouss(k,icell) = rhodust(ndusttypes,iSPH)
                 else ! interpolation
                    if (r_grain(k) > a_sph(l+1)) l = l+1
-                   f = (r_grain(k)-a_sph(l))/(a_sph(l+1)-a_sph(l))
+                   f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
 
                    densite_pouss(k,icell) = rhodust(l,iSPH) + f * (rhodust(l+1,iSPH)  - rhodust(l,iSPH))
                 endif
@@ -217,6 +239,7 @@ contains
           endif
        enddo ! icell
        masse(:) = masse(:) * AU3_to_cm3
+
     else ! using the gas density
        lvariable_dust = .false.
        write(*,*) "Forcing gas/dust == 100"
