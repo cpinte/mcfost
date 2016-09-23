@@ -329,7 +329,7 @@ subroutine define_dust_density()
 
   real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=db) :: rho0, ztilde, dtilde, h, s_opt, somme
+  real(kind=db) :: rho0, ztilde, Dtilde, h, s_opt, somme
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
@@ -598,10 +598,10 @@ subroutine define_dust_density()
                           Ztilde=z/H
 
                           ! Fit Gaussien du profile de densite
-                          !densite_pouss(l,icell)=  exp(-(1+OmegaTau/dtilde) * (Ztilde**2/2.))
+                          !densite_pouss(l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
 
                           ! Coefficient de diffusion constant
-                          densite_pouss(l,icell)=  exp( -OmegaTau/dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                          densite_pouss(l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
                        enddo!j
 
                        ! normalization en z
@@ -1074,7 +1074,7 @@ subroutine densite_eqdiff()
         write(*,*) 2.*test*cst_gaz/cst_pous, fact_exp*cst_gaz*sqrt(coeff_exp*pi)*dz%sclht*1.5e13
      endif
 
-    ! Resolution eq_diff pour stratification
+     ! Resolution eq_diff pour stratification
      if (lvariable_dust) then
         eps = 1.e-2
         pas_z = delta_z(i)
