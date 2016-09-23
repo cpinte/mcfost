@@ -2911,7 +2911,6 @@ subroutine ecriture_spectre(imol)
         O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
      enddo
 
-
      filename = trim(data_dir2(imol))//'/origine.fits.gz'
 
      !  Get an unused Logical Unit Number to use to open the FITS file.

@@ -453,7 +453,7 @@ subroutine init_Doppler_profiles(imol)
      ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
-     sigma2 =  2.0_db * (kb*Tcin(icell) / (masse_mol* g_to_kg)) + v_turb(icell)**2
+     sigma2 =  2.0_db * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
      v_line(icell) = sqrt(sigma2)
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
