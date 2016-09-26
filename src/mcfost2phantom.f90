@@ -20,7 +20,7 @@ contains
 
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
-       T_SPH(i_SPH) = Temperature(icell)
+       if (i_SPH > 0) T_SPH(i_SPH) = Temperature(icell)
     enddo
 
     open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
