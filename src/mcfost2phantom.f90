@@ -3,10 +3,33 @@ module mcfost2phantom
   use parametres
   use constantes
   use utils
+  use Voronoi_grid
+  use em_th, only : temperature
 
   implicit none
 
 contains
+
+  subroutine write_temperature_for_phantom()
+
+
+    integer :: i_SPH, icell
+    real, dimension(n_SPH) :: T_SPH
+
+    T_SPH = -1.0 ;
+
+    do icell=1, n_cells
+       i_SPH = Voronoi(icell)%id
+       T_SPH(i_SPH) = Temperature(icell)
+    enddo
+
+    open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
+    write(1) T_SPH
+    close(unit=1)
+
+    return
+
+  end subroutine write_temperature_for_phantom
 
 !--  subroutine init_mcfost_phantom(mcfost_filename, ierr,  np, nptmass, ntypes, ndusttypes, npoftype)
 !--

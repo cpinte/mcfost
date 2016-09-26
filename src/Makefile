@@ -194,7 +194,7 @@ SOURCES = modules.f90 sha.f90 system.f90 utils.f90 mem.f90 \
 	dust.f90 molecules.f90  optical_depth.f90 disk_physics.f90 \
 	stars.f90 density.f90 PAH.f90 diffusion.f90 thermal_emission.f90 \
 	io_phantom_infiles.f90 io_phantom_utils.f90 read_phantom.f90 \
-	read_gadget2.f90 SPH2mcfost.f90 \
+	read_gadget2.f90 SPH2mcfost.f90 mcfost2phantom.f90 \
 	dust_transfer.f90 mol_transfer.f90 \
 
 CC_SOURCES = voro++_wrapper.cpp
