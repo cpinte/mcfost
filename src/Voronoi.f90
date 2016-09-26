@@ -28,7 +28,6 @@ module Voronoi_grid
      ! Plane wall :
      ! x1, x2, x3 : normal
      ! x4 : displacement along the normal
-
   end type Voronoi_wall
 
 
