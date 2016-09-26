@@ -874,7 +874,7 @@ subroutine define_density_wall3D()
   ! sur le disque
   ! C. Pinte  25/01/2011
 
-  integer :: pop, l, izone, alloc_status, n_cells, icell
+  integer :: pop, l, izone, alloc_status, icell
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: dp
 
