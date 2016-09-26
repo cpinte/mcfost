@@ -25,10 +25,10 @@ contains
     real, parameter :: limit_threshold = 0.01
     integer, parameter :: iunit = 1
 
-    real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
+    real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH
-    real :: grainsize,graindens, f
+    real :: graindens, f
     integer :: ierr, n_SPH, ndusttypes, icell, l, k, ios, iSPH
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
@@ -41,7 +41,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,grainsize,n_SPH,ierr)
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
           stop
@@ -68,7 +68,6 @@ contains
     !   write(*,*) grainsize,graindens
     !endif
     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
-    allocate(a_SPH(ndusttypes))
 
     if (lwrite_ASCII) then
        ! Write the file for the grid version of mcfost
@@ -189,6 +188,9 @@ contains
     ! interpolation en taille
     if (ndusttypes > 1) then
        lvariable_dust = .true.
+       allocate(a_SPH(ndusttypes))
+       a_SPH = grainsize
+
        write(*,*) "*********************************************"
        write(*,*) "This part has not been tested"
        write(*,*) "Dust mass is going to be incorrect !!!"
@@ -215,7 +217,6 @@ contains
           endif
        enddo
 
-
        l=1
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
@@ -240,6 +241,35 @@ contains
        enddo ! icell
        masse(:) = masse(:) * AU3_to_cm3
 
+    else if (ndusttypes == 1) then ! only one grainsize
+       allocate(a_SPH(ndusttypes+1)) ! mcfost needs and extra grain size follwing the gas
+       a_SPH(2) = grainsize(1)
+       write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
+       a_SPH(1) = 1. ;
+       if (grainsize(1) < 1) then
+          a_SPH(2) = 1000. ; ! temorary for old dumps
+          write(*,*) "WARNING: forcing big grains to be 1mm"
+       endif
+       lvariable_dust = .true.
+       write(*,*) "*********************************************"
+       write(*,*) "This part has not been tested"
+       write(*,*) "Dust mass is going to be incorrect !!!"
+       write(*,*) "rhodust is not calibrated for mcfost yet"
+       write(*,*) "*********************************************"
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          do k=1,n_grains_tot
+             if (iSPH > 0) then
+                f = (log(r_grain(k))-log(r_grain(1)))/(log(a_sph(2))-log(r_grain(1)))
+                densite_pouss(k,icell) = rho(iSPH)/100 + f * (rhodust(1,iSPH)  - rho(iSPH)/100)
+                masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
+             else ! iSPH == 0, star
+                densite_pouss(:,icell) = 0.
+                masse(icell) = 0.
+             endif
+          enddo ! icell
+       enddo
+       masse(:) = masse(:) * AU3_to_cm3
     else ! using the gas density
        lvariable_dust = .false.
        write(*,*) "Forcing gas/dust == 100"
