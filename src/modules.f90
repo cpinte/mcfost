@@ -107,6 +107,9 @@ module parametres
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
 
+  ! Nombre de SPH particles
+  integer :: n_SPH
+
   integer :: n_lambda2
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall

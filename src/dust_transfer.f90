@@ -29,6 +29,7 @@ module dust_transfer
   use ProDiMo
   use init_mcfost
   use SPH2mcfost
+  use mcfost2phantom
   !$ use omp_lib
 
   implicit none
@@ -711,6 +712,8 @@ subroutine transfert_poussiere()
               call diffusion_approx_nLTE_nRE()
               call ecriture_temperature(2)
            endif
+
+           if (lphantom_file) call write_temperature_for_phantom()
 
            ! Remise a zero pour etape suivante
            sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0

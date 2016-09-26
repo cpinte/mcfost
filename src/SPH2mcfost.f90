@@ -28,8 +28,8 @@ contains
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas
     real(db), allocatable, dimension(:,:) :: rhodust
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH
-    real :: grainsize,graindens, f
-    integer :: ierr, n_SPH, ndusttypes, icell, l, k, ios, iSPH
+    real :: graindens, f
+    integer :: ierr, ndusttypes, icell, l, k, ios, iSPH
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
