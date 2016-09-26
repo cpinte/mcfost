@@ -62,7 +62,7 @@ subroutine transfert_poussiere()
 
   real(kind=db) :: x,y,z, u,v,w, lmin, lmax
   real :: rand, tau
-  integer :: i, icell, p_icell
+  integer :: i, icell, p_icell, n_SPH
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -96,7 +96,7 @@ subroutine transfert_poussiere()
 
   call setup_grid()
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file)
+     call setup_SPH2mcfost(density_file, limits_file, n_SPH)
   else
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
@@ -713,7 +713,7 @@ subroutine transfert_poussiere()
               call ecriture_temperature(2)
            endif
 
-           if (lphantom_file) call write_temperature_for_phantom()
+           if (lphantom_file) call write_temperature_for_phantom(n_SPH)
 
            ! Remise a zero pour etape suivante
            sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0

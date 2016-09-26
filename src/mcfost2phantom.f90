@@ -10,9 +10,9 @@ module mcfost2phantom
 
 contains
 
-  subroutine write_temperature_for_phantom()
+  subroutine write_temperature_for_phantom(n_SPH)
 
-
+    integer, intent(in) :: n_SPH
     integer :: i_SPH, icell
     real, dimension(n_SPH) :: T_SPH
 

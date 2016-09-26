@@ -8,7 +8,7 @@ module SPH2mcfost
 
 contains
 
-  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file)
+  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH)
 
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file
@@ -21,6 +21,7 @@ contains
     use mem
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
+    integer, intent(out) :: n_SPH
 
     real, parameter :: limit_threshold = 0.01
     integer, parameter :: iunit = 1
