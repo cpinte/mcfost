@@ -183,11 +183,13 @@ subroutine setup_grid()
   logical, save :: lfirst = .true.
   integer :: mem_size
 
-  nrz = n_rad * nz
-  if (l3D) then
-     n_cells = 2*nrz*n_az
-  else
-     n_cells = nrz
+  if (.not.lVoronoi) then
+     nrz = n_rad * nz
+     if (l3D) then
+        n_cells = 2*nrz*n_az
+     else
+        n_cells = nrz
+     endif
   endif
 
   if (n_cells < 1e6) then
@@ -197,27 +199,9 @@ subroutine setup_grid()
   endif
 
   if (lvariable_dust) then
-     p_n_rad=n_rad ; p_nz = nz ; p_n_cells = n_cells
+     p_n_cells = n_cells
   else
-     p_n_rad=1 ;  p_nz=1 ; p_n_cells = 1
-  endif
-
-  if (l3D) then
-     j_start = -nz
-     if (lvariable_dust) then
-        p_n_az = n_az
-     else
-        p_n_az = 1
-     endif
-  else
-     j_start = 1
-     p_n_az = 1
-  endif
-
-  if ((p_nz /= 1).and.l3D) then
-     pj_start = -nz
-  else
-     pj_start = 1
+     p_n_cells = 1
   endif
 
   if (lVoronoi) then
@@ -231,6 +215,30 @@ subroutine setup_grid()
      test_exit_grid => test_exit_grid_Voronoi
      define_grid => define_Voronoi_grid
   else
+     if (lvariable_dust) then
+        p_n_rad=n_rad ; p_nz = nz
+     else
+        p_n_rad=1 ;  p_nz=1
+     endif
+
+     if (l3D) then
+        j_start = -nz
+        if (lvariable_dust) then
+           p_n_az = n_az
+        else
+           p_n_az = 1
+        endif
+     else
+        j_start = 1
+        p_n_az = 1
+     endif
+
+     if ((p_nz /= 1).and.l3D) then
+        pj_start = -nz
+     else
+        pj_start = 1
+     endif
+
      if (grid_type == 1) then
         lcylindrical = .true.
         lspherical = .false.
