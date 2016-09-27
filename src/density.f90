@@ -1552,7 +1552,6 @@ subroutine densite_file()
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)
   enddo !l
 
-
   ! Normalisation : on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)*nbre_grains(l)

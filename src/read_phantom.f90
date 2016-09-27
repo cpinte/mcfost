@@ -7,11 +7,11 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,massgas,dustfrac,rhogas,rhodust,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
- real(db), intent(out), dimension(:,:), allocatable :: rhodust
+ real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
+ real(db), intent(out), dimension(:,:), allocatable :: rhodust, dustfrac
  integer, intent(out) :: ndusttypes,n_SPH,ierr
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
@@ -19,15 +19,14 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  integer :: nblocks,narraylengths,nblockarrays,number
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
- integer :: np,ntypes,nptmass,ipos,ngrains
+ integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
  real(db) :: massoftype(maxtypes),hfact,umass,utime,udist
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
- real(db), allocatable, dimension(:) :: grainsize
  real(db) :: graindens
- real(db), allocatable, dimension(:,:) :: xyzh,dustfrac,xyzmh_ptmass
+ real(db), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
 
@@ -67,18 +66,26 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  write(*,*) ' nptmass = ', nptmass
 
  if (npartoftype(2) > 0) then
+    dustfluidtype = 2
     write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, will be discarded ***'
+ else
+    dustfluidtype = 1
  endif
 
- allocate(xyzh(4,np),itype(np),dustfrac(ndusttypes,np),grainsize(ndusttypes),tmp(np))
+ allocate(xyzh(4,np),itype(np),tmp(np))
+ if (ndusttypes > 0) then
+    allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
+ endif
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
 
  ! extract info from real header
  call extract('massoftype',massoftype(1:ntypes),hdr,ierr)
  call extract('hfact',hfact,hdr,ierr)
- call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr)
- call extract('graindens',graindens,hdr,ierr)
+ if (ndusttypes > 0) then
+    call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr)
+    call extract('graindens',graindens,hdr,ierr)
+ endif
  !write(*,*) ' hfact = ',hfact
  !write(*,*) ' massoftype = ',massoftype(1:ntypes)
 
@@ -121,6 +128,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
                    case('dustfrac')
                       ngrains = ngrains + 1
                       read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
+                      got_dustfrac = .true.
                    case default
                       matched = .false.
                       read(iunit,iostat=ierr)
@@ -203,14 +211,14 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
 
  close(iunit)
 
- if (.not.got_dustfrac) then
+ if ((ndusttypes > 0) .and. .not. got_dustfrac) then
     dustfrac = 0.
  endif
 
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,itype,grainsize,dustfrac,&
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,rhogas,rhodust,n_SPH)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
@@ -219,14 +227,13 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  endif
 
  write(*,*) "Phantom dump file processed ok"
-
- deallocate(xyzh,itype,dustfrac,tmp,xyzmh_ptmass)
+ deallocate(xyzh,itype,tmp,xyzmh_ptmass)
 
 end subroutine read_phantom_file
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,dustfrac,&
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
      massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,rhogas,rhodust,n_SPH)
 
   ! Convert phantom quantities & units to mcfost quantities & units
@@ -236,7 +243,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
   use constantes, only : au_to_cm, Msun_to_g
   use prop_star
 
-  integer, intent(in) :: np, nptmass, ntypes, ndusttypes
+  integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
   real(db), dimension(4,np), intent(in) :: xyzh
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(db), dimension(ndusttypes,np), intent(in) :: dustfrac
@@ -267,7 +274,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+ if (ndusttypes > 0) then
+    allocate(rhodust(ndusttypes,n_SPH))
+ endif
+ allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
@@ -288,7 +298,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,xyzh,iphase,grainsize,d
        z(j) = zi * ulength_au
        rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
        dustfraci = sum(dustfrac(:,i))
-       rhogas(j) = (1 - dustfraci)*rhoi
+       if (dustfluidtype==2) then
+          rhogas(j) = rhoi
+       else
+          rhogas(j) = (1 - dustfraci)*rhoi
+       endif
        Mtot = Mtot + massoftype(itypei)
        massgas(j) =  massoftype(itypei) * usolarmass ! Msun
        do k=1,ndusttypes
