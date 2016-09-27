@@ -96,11 +96,12 @@ subroutine transfert_poussiere()
 
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH)
+     call setup_grid()
   else
+     call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
-  call setup_grid()
 
   ! Allocation dynamique de tous les autres tableaux
   call alloc_dynamique()
