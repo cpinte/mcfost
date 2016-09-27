@@ -26,8 +26,9 @@ contains
     integer, parameter :: iunit = 1
 
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
-    real(db), allocatable, dimension(:,:) :: rhodust
-    real, allocatable, dimension(:) :: a_SPH, log_a_SPH
+    real(db), allocatable, dimension(:,:) :: rhodust, dustfrac
+    real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
+    real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
     real :: graindens, f
     integer :: ierr, n_SPH, ndusttypes, icell, l, k, ios, iSPH
 
@@ -41,7 +42,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,grainsize,n_SPH,ierr)
+       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,dustfrac,rho,rhodust,ndusttypes,grainsize,n_SPH,ierr)
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
           stop
@@ -186,26 +187,37 @@ contains
 
     ! Tableau de densite et masse de poussiere
     ! interpolation en taille
-    if (ndusttypes > 1) then
+    if (ndusttypes >= 1) then
        lvariable_dust = .true.
-       allocate(a_SPH(ndusttypes))
-       a_SPH = grainsize
 
-       write(*,*) "*********************************************"
-       write(*,*) "This part has not been tested"
-       write(*,*) "Dust mass is going to be incorrect !!!"
-       write(*,*) "rhodust is not calibrated for mcfost yet"
-       write(*,*) "*********************************************"
+       ! mcfost adds an extra grain size follwing the gas
+       ! this is required if ndusttypes == 1, but I do it in any case
+       allocate(a_SPH(ndusttypes+1),log_a_SPH(ndusttypes+1),rho_dust(ndusttypes+1))
+       do l=1, ndusttypes
+          a_SPH(l+1) = grainsize(l)
+       enddo
+       ! temorary for old phantom dumps were grain sizes were not defined
+       if (grainsize(1) < 1) then
+          a_SPH(2) = 1000. ;
+          write(*,*) "WARNING: forcing big grains to be 1mm"
+       endif
+       write(*,*) "WARNING: HARD-CODED: assuming dust grains smaller than 1mum are following the gas"
+       a_SPH(1) = 1. ;
 
-       ! On verifie que les grains sont tries
-       do l=1, ndusttypes-1
-          if (a_sph(l) >= a_sph(l+1)) then
-             write(*,*) "ERROR : grains must be ordered from small to large"
-             do k=1, ndusttypes
-                write(*,*) k, a_sph(k)
-             enddo
-             write(*,*) "Exiting"
-             stop
+       log_a_SPH(:) = 0.
+       rho_dust(:) = 0.
+
+       ! We are making sure that the grain sizes are sorted
+       do l=1, ndusttypes+1
+          if (l<=ndusttypes) then
+             if (a_sph(l) >= a_sph(l+1)) then
+                write(*,*) "ERROR : grains must be ordered from small to large"
+                do k=1, ndusttypes
+                   write(*,*) k, a_sph(k)
+                enddo
+                write(*,*) "Exiting"
+                stop
+             endif
           endif
 
           if (a_SPH(l) > 0.) then
@@ -217,62 +229,100 @@ contains
           endif
        enddo
 
-       l=1
+       ! I need to work with masses
+       Mtot = 0. ;
+       Mtot_dust = 0. ;
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
+             masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun
+             densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
+
+             Mtot = Mtot +  masse_gaz(icell)
+             Mtot_dust = Mtot_dust + masse_gaz(icell)* (sum(dustfrac(:,iSPH)))
+          else ! star
+             masse_gaz(icell)    = 0.
+             densite_gaz(icell)  = 0.
+          endif
+       enddo
+
+       ! Remark : you may want to had a factor here if there are only a few grainsize
+       ! in the SPH dump
+       dust_to_gas = Mtot_dust/Mtot
+
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+
+             ! mass & density indices are shifted by 1
+             do l=1, ndusttypes+1
+                if (l==1) then
+                   ! small grains follow the gas, we do not care about normalization here
+                   rho_dust(l) = massgas(iSPH) / volume(icell)
+                else
+                   rho_dust(l) = massgas(iSPH) * dustfrac(l-1,iSPH) / volume(icell)
+                endif
+             enddo
+
+             l=1
              do k=1,n_grains_tot
+                !write(*,*) k, r_grain(k), l
                 if (r_grain(k) < a_SPH(1)) then ! small grains
-                   densite_pouss(k,icell) = rhodust(1,iSPH)
-                else if (r_grain(k) > a_SPH(ndusttypes)) then ! large grains
-                   densite_pouss(k,icell) = rhodust(ndusttypes,iSPH)
+                   densite_pouss(k,icell) = rho_dust(1)
+                else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
+                   densite_pouss(k,icell) = rho_dust(ndusttypes+1)
                 else ! interpolation
                    if (r_grain(k) > a_sph(l+1)) l = l+1
                    f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
-
-                   densite_pouss(k,icell) = rhodust(l,iSPH) + f * (rhodust(l+1,iSPH)  - rhodust(l,iSPH))
+                   densite_pouss(k,icell) = rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))
                 endif
-                masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
-             enddo !l
+             enddo !k
+             !stop
           else ! iSPH == 0, star
              densite_pouss(:,icell) = 0.
-             masse(icell) = 0.
           endif
+       enddo ! icell
+
+       ! Normalisation : on a 1 grain de chaque taille dans le disque
+       do l=1,n_grains_tot
+          somme=0.0
+          do icell=1,n_cells
+             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
+             somme=somme+densite_pouss(l,icell)*volume(icell)
+          enddo !icell
+          densite_pouss(l,:) = (densite_pouss(l,:)/somme)
+       enddo !l
+
+       ! Normalisation : on a 1 grain en tout dans le disque
+       do l=1,n_grains_tot
+          densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
+       enddo
+
+       ! Normalisation : Calcul masse totale
+       mass = 0.0
+       do icell=1,n_cells
+          do l=1,n_grains_tot
+             mass=mass + densite_pouss(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+          enddo !l
+       enddo !icell
+       mass =  mass !/Msun_to_g
+       densite_pouss(:,:) = densite_pouss(:,:) * sum(masse_gaz)/mass * dust_to_gas
+
+
+       do icell=1,n_cells
+          masse(icell) = 0.
+          do l=1,n_grains_tot
+             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+          enddo !l
        enddo ! icell
        masse(:) = masse(:) * AU3_to_cm3
 
-    else if (ndusttypes == 1) then ! only one grainsize
-       allocate(a_SPH(ndusttypes+1)) ! mcfost needs and extra grain size follwing the gas
-       a_SPH(2) = grainsize(1)
-       write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
-       a_SPH(1) = 1. ;
-       if (grainsize(1) < 1) then
-          a_SPH(2) = 1000. ; ! temorary for old dumps
-          write(*,*) "WARNING: forcing big grains to be 1mm"
-       endif
-       lvariable_dust = .true.
-       write(*,*) "*********************************************"
-       write(*,*) "This part has not been tested"
-       write(*,*) "Dust mass is going to be incorrect !!!"
-       write(*,*) "rhodust is not calibrated for mcfost yet"
-       write(*,*) "*********************************************"
-       do icell=1,n_cells
-          iSPH = Voronoi(icell)%id
-          do k=1,n_grains_tot
-             if (iSPH > 0) then
-                f = (log(r_grain(k))-log(r_grain(1)))/(log(a_sph(2))-log(r_grain(1)))
-                densite_pouss(k,icell) = rho(iSPH)/100 + f * (rhodust(1,iSPH)  - rho(iSPH)/100)
-                masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
-             else ! iSPH == 0, star
-                densite_pouss(:,icell) = 0.
-                masse(icell) = 0.
-             endif
-          enddo ! icell
-       enddo
-       masse(:) = masse(:) * AU3_to_cm3
-    else ! using the gas density
+    else ! ndusttypes = 0 : using the gas density
+
        lvariable_dust = .false.
-       write(*,*) "Forcing gas/dust == 100"
+       write(*,*) "Using gas to dust ratio in mcfost parameter file"
+
+       masse(icell) = 0.
        do icell=1,n_cells
           do k=1,n_grains_tot
              densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
@@ -280,12 +330,12 @@ contains
           enddo
        enddo
        masse(:) = masse(:) * AU3_to_cm3
-       f = 0.01 * sum(masse_gaz)/sum(masse)
+       f = 1./disk_zone(1)%gas_to_dust * sum(masse_gaz)/sum(masse)
        densite_pouss(:,:) = densite_pouss(:,:) * f
        masse(:) = masse(:) * f
     endif
 
-    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
     deallocate(massgas,rho,rhodust,a_SPH)
 

@@ -7,11 +7,11 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,massgas,dustfrac,rhogas,rhodust,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
- real(db), intent(out), dimension(:,:), allocatable :: rhodust
+ real(db), intent(out), dimension(:,:), allocatable :: rhodust, dustfrac
  integer, intent(out) :: ndusttypes,n_SPH,ierr
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
@@ -26,7 +26,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
  real(db) :: graindens
- real(db), allocatable, dimension(:,:) :: xyzh,dustfrac,xyzmh_ptmass
+ real(db), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
 
@@ -227,10 +227,6 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndustty
  endif
 
  write(*,*) "Phantom dump file processed ok"
-
- if (ndusttypes > 0) then
-    deallocate(dustfrac)
- endif
  deallocate(xyzh,itype,tmp,xyzmh_ptmass)
 
 end subroutine read_phantom_file
