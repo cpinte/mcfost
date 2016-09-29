@@ -284,8 +284,8 @@ contains
           endif
        enddo ! icell
 
-       ! Normalisation : on a 1 grain de chaque taille dans le disque
-       ! Normalisation : on a 1 grain en tout dans le disque
+       ! Normalisation en taille de grain: on a 1 grain de chaque taille dans le disque,
+       ! puis 1 grain en tout dans le disque
        do l=1,n_grains_tot
           somme=0.0
           do icell=1,n_cells

@@ -17,39 +17,14 @@ module init_mcfost
 
   implicit none
 
-  contains
+contains
 
-subroutine initialisation_mcfost()
-
-  implicit none
-
-  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
-  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
-  real(kind=db) :: wvl
-  real :: opt_zoom, utils_version, PA
-
-  character(len=512) :: cmd, s, str_seed
-  character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1
-
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
-
-  real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
-
-  write(*,*) "You are running MCFOST "//trim(mcfost_release)
-  write(*,*) "Git SHA = ", sha_id
-
-  lmc = .false.
-
-  call get_environment_variable('HOME',home)
-  if (home == "") then
-     home="./"
-  else
-     home=trim(home)//"/"
-  endif
+subroutine set_default_variables()
 
   ! Pour code sequentiel
   nb_proc=1 ; lpara=.false.
+
+  n_zones=1
 
   ! Pour code parallel
   !$omp parallel default(none) &
@@ -62,15 +37,10 @@ subroutine initialisation_mcfost()
   lstop_after_init= .false.
   lwall=.false.
   lpah=.false.
-  ln_zone=.false. ; n_zones=1
   limg=.false.
   lorigine=.false.
   laggregate=.false.
   l3D=.false.
-  lresol=.false.
-  lPA = .false.
-  lzoom=.false.
-  lMC_bins = .false.
   lopacite_only=.false.
   lseed=.false.
   loptical_depth_map=.false.
@@ -128,14 +98,11 @@ subroutine initialisation_mcfost()
   lcorrect_Tgas = .false.
   lcorrect_density=.false.
   lremove = .false.
-  lonly_scatt = .false.
-  lHG = .false.
   lforce_PAH_equilibrium=.false.
   lforce_PAH_out_equilibrium=.false.
   lread_grain_size_distrib=.false.
   lMathis_field = .false.
   lchange_Tmax_PAH=.false.
-  lno_T = .false.
   lISM_heating = .false.
   llimb_darkening = .false.
   lVoronoi = .false.
@@ -148,6 +115,52 @@ subroutine initialisation_mcfost()
   ! Methodes par defaut
   RT_sed_method = 1
 
+  return
+
+end subroutine set_default_variables
+
+!**********************************************
+
+subroutine initialisation_mcfost()
+
+  implicit none
+
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
+  real(kind=db) :: wvl
+  real :: opt_zoom, utils_version, PA
+
+  character(len=512) :: cmd, s, str_seed
+  character(len=4) :: n_chiffres
+  character(len=128)  :: fmt1
+
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+
+  real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
+
+  write(*,*) "You are running MCFOST "//trim(mcfost_release)
+  write(*,*) "Git SHA = ", sha_id
+
+  ! Local logical variables
+  lzoom=.false.
+  lresol=.false.
+  lPA = .false.
+  lmc = .false.
+  lMC_bins = .false.
+  ln_zone=.false. ;
+  lHG = .false.
+  lonly_scatt = .false.
+  lno_T = .false.
+
+  ! Global logical variables
+  call set_default_variables()
+
+  call get_environment_variable('HOME',home)
+  if (home == "") then
+     home="./"
+  else
+     home=trim(home)//"/"
+  endif
 
   ! Test if MCFOST_UTILS is defined
   call get_environment_variable('MCFOST_UTILS',mcfost_utils)
