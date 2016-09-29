@@ -89,6 +89,8 @@ contains
   thetaj_out=thetaj+1
 
   if (l3D) then
+     if (zin < 0.) thetaj_out = -thetaj_out
+
      if (zin /= 0.0) then
         phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
         phik_out=floor(phi/(2*pi)*real(N_az))+1
@@ -141,6 +143,8 @@ subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out)
   enddo
   thetaj_out=thetaj+1
 
+  if (zin < 0) thetaj_out = - thetaj_out
+
   return
 
 end subroutine indice_cellule_sph_theta
@@ -158,7 +162,7 @@ end subroutine indice_cellule_sph_theta
     real(kind=db), intent(out) :: l
 
 
-    real(kind=db) :: correct_moins, correct_plus, uv, precision
+    real(kind=db) :: correct_moins, correct_plus, uv, precision, r0
     real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
     real(kind=db) :: delta_vol, dotprod, t_phi, tan_angle_lim, den
     integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta
@@ -229,84 +233,53 @@ end subroutine indice_cellule_sph_theta
        endif
 
        ! 2) position interface inclinaison
-       if (z0 >= 0.0_db) then ! on est dans le bon sens
-          tan_angle_lim1 = tan_theta_lim(thetaj0) * correct_plus
-          tan_angle_lim2 = tan_theta_lim(thetaj0-1) * correct_moins
+       r0 = sqrt(x0*x0 + y0*y0)
+       dotprod =  r0*w - z0*uv
+
+       ! on fait le meme calcul a l'envers
+       ! on inverse z0 et w
+       if (z0 < 0.) dotprod = -dotprod
+
+       if (abs(dotprod) < 1.0e-10) then
+          ! on ne franchit pas d'interface azimuthale
+          t = 1.0e30
+          delta_theta = 0
        else
-          tan_angle_lim1 = - tan_theta_lim(thetaj0) * correct_plus
-          tan_angle_lim2 = - tan_theta_lim(thetaj0-1) * correct_moins
-       endif ! z0
-
-       ! Premiere limite theta
-       tan2 = tan_angle_lim1 * tan_angle_lim1
-       a_theta = w*w - tan2 * (u*u + v*v)
-       a_theta_m1 = 1.0_db/a_theta
-       b_theta = w*z0 - tan2 * (x0*u + y0*v)
-       c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
-
-       delta = b_theta * b_theta - a_theta * c_theta
-       if (delta < 0.0_db) then ! Pas de sol reelle
-          t1 = 1.0e30_db
-       else ! Au moins une sol reelle
-          rac = sqrt(delta)
-          t1_1 = (- b_theta - rac) * a_theta_m1
-          t1_2 = (- b_theta + rac) * a_theta_m1
-
-          if (t1_1 <= precision) then
-             if (t1_2 <= precision) then ! les 2 sont <0
-                t1=1.0e30_db
-             else   ! Seul t1_2 > 0
-                t1 = t1_2
+          ! Quelle cellule on va franchir
+          if (dotprod > 0.0) then ! limite sup : on s'eloigne du plan median
+             tan_angle_lim = tan_theta_lim(abs(thetaj0))
+             if (abs(thetaj0)==nz) then
+                delta_theta = 0 ! on passe de l'autre cote de la verticale
+             else
+                delta_theta = sign(1,thetaj0) ! we increase the absolute value
              endif
           else
-             if (t1_2 <= precision) then ! Seul t1_1 >0
-                t1 = t1_1
-             else ! les 2 sont > 0
-                t1 = min(t1_1,t1_2)
+             tan_angle_lim = tan_theta_lim(abs(thetaj0)-1)
+             if (abs(thetaj0) == 1) then
+                delta_theta = - sign(2, thetaj0) ! on passe de l'autre cote du plan median
+             else
+                delta_theta= - sign(1,thetaj0) ! we decrease the absolute value
              endif
           endif
-       endif ! signe delta
 
-       ! Deuxieme limite theta
-       tan2 = tan_angle_lim2 * tan_angle_lim2
-       a_theta = w*w - tan2 * (u*u + v*v)
-       a_theta_m1 = 1.0_db/a_theta
-       b_theta = w*z0 - tan2 * (x0*u + y0*v)
-       c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
-
-       delta = b_theta * b_theta - a_theta * c_theta
-       if (delta < 0.0_db) then ! Pas de sol reelle
-          t2 = 1.0e30_db
-       else ! Au moins une sol reelle
-          rac = sqrt(delta)
-          t2_1 = (- b_theta - rac) * a_theta_m1
-          t2_2 = (- b_theta + rac) * a_theta_m1
-
-          if (t2_1 <= precision) then
-             if (t2_2 <= precision) then ! les 2 sont <0
-                t2=1.0e30_db
-             else   ! Seul t2_2 > 0
-                t2 = t2_2
-             endif
+          ! Longueur av interserction
+          if (tan_angle_lim > 1.0d299) then
+             t = -r0/uv
+             delta_theta=0
           else
-             if (t2_2 <= precision) then ! Seul t2_1 >0
-                t2 = t2_1
-             else ! les 2 sont > 0
-                t2 = min(t2_1,t2_2)
+             den= w-uv*tan_angle_lim
+             if (abs(den) > 1.0e-6) then
+                t = -(z0-r0*tan_angle_lim)/den
+             else
+                t = 1.0e30
+                delta_theta = 0
              endif
           endif
-       endif ! signe delta
-
-       ! Selection limite theta
-       if (t1 < t2) then
-          t=t1
-          delta_theta = 1
-          if (thetaj0 == nz) delta_theta = 0
-       else
-          t=t2
-          delta_theta = -1
-          if (thetaj0 == 1) delta_theta = 0
-       endif
+          if (t < 0.0) then
+             t = 1.0e30
+             delta_theta = 0
+          endif
+       endif !dotprod = 0.0
 
        ! 3) position interface azimuthale
        if (l3D) then
@@ -348,7 +321,6 @@ end subroutine indice_cellule_sph_theta
           t_phi = huge_real
        endif
     endif ! ri0==0
-
 
     ! 4) interface en r ou theta ou phi ?
     if ((s < t).and.(s < t_phi)) then ! r
@@ -392,6 +364,8 @@ end subroutine indice_cellule_sph_theta
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
     if (z1 == 0.0_db) z1 = prec_grille
+
+    if (z1*thetaj1 < 0) z1 = -z1
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell =  cell_map(ri1,thetaj1,phik1)
@@ -551,15 +525,17 @@ end subroutine indice_cellule_sph_theta
   r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
 
   ! Position theta
-  if (aleat2 > 0.5_db) then
-     theta=theta_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(theta_lim(thetaj)-theta_lim(thetaj-1))
+  if (l3D) then
+     theta = theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
+     theta = 0.
+     !if (thetaj < 0) theta = - theta
   else
-     theta=-(theta_lim(thetaj-1)+(2.0_db*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
+     if (aleat2 > 0.5_db) then
+        theta = theta_lim(thetaj-1)+(2.0_db*(aleat2-0.5_db))*(theta_lim(thetaj)-theta_lim(thetaj-1))
+     else
+        theta = -(theta_lim(thetaj-1)+(2.0_db*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
+     endif
   endif
-
-  theta=theta_lim(thetaj-1)+aleat2*(theta_lim(thetaj)-theta_lim(thetaj-1))
-
-
   ! BUG ??? : ca doit etre uniforme en w, non ??
 
 
@@ -571,8 +547,6 @@ end subroutine indice_cellule_sph_theta
   r_cos_theta = r*cos(theta)
   x=r_cos_theta*cos(phi)
   y=r_cos_theta*sin(phi)
-
-
 
 !!$  ! Position theta
 !!$  if (aleat2 > 0.5) then
