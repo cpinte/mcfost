@@ -31,24 +31,30 @@ contains
 
   end subroutine write_temperature_for_phantom
 
-!--  subroutine init_mcfost_phantom(mcfost_filename, ierr,  np, nptmass, ntypes, ndusttypes, npoftype)
-!--
-!--    ! This routine should be in mcfost2phantom
-!--    character(len=*), intent(in) :: mcfost_filename
-!--    integer, intent(out) :: ierr
-!--
-!--    ! options
-!--    write(*,*) "INIT MCFOST"
-!--
-!--    ! parameter file
-!--
-!--    ! dust properties
-!--
-!--    ierr = 0
-!--    return
-!--
-!--  end subroutine init_mcfost_phantom
-!--
+  subroutine init_mcfost_phantom(mcfost_para_filename, ierr) !,  np, nptmass, ntypes, ndusttypes, npoftype)
+
+    use read_params, only : read_para
+
+    ! This routine should be in mcfost2phantom
+    character(len=*), intent(in) :: mcfost_para_filename
+    integer, intent(out) :: ierr
+
+    ! options
+    write(*,*) "INIT MCFOST"
+
+    ! parameter file
+    call read_para(mcfost_para_filename)
+
+    ! Setting option for the mcfost2phantom interface
+    ltemp = .true. ; lsed = .false. ; lsed_complete = .false.
+
+    ! dust properties
+
+    ierr = 0
+    return
+
+  end subroutine init_mcfost_phantom
+
   !*************************************************************************
 
 !--  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,npoftype,xyzh,iphase,grainsize,&

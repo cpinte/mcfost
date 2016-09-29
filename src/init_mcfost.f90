@@ -167,7 +167,7 @@ subroutine initialisation_mcfost()
   real(kind=db) :: wvl
   real :: opt_zoom, utils_version, PA
 
-  character(len=512) :: cmd, s, str_seed
+  character(len=512) :: cmd, s, str_seed, para
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
@@ -935,9 +935,9 @@ subroutine initialisation_mcfost()
 
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
-     call read_mcfost2ProDiMo()
+     call read_mcfost2ProDiMo(para)
   else
-     call read_para()
+     call read_para(para)
   endif
 
   if (lemission_mol.and.para_version < 2.11) then
@@ -1003,14 +1003,14 @@ subroutine initialisation_mcfost()
 
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data()
+     call save_data(para)
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data()
+     call save_data(para)
   endif
 
   if (ln_zone) then
@@ -1202,7 +1202,7 @@ subroutine initialisation_mcfost()
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
 
-  call save_data()
+  call save_data(para)
 
   if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
@@ -1410,12 +1410,15 @@ end subroutine display_disclaimer
 
 !********************************************************************
 
-subroutine save_data
+subroutine save_data(para)
   !*************************************************
   ! Si le dossier data existe on le sauve
   !*************************************************
 
   implicit none
+
+  character(len=*), intent(in) :: para
+
   integer :: syst_status
   character(len=1024) :: cmd
 

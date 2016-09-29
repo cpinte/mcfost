@@ -14,9 +14,11 @@ module read_params
 
 contains
 
-  subroutine read_para()
+  subroutine read_para(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -58,55 +60,55 @@ contains
           write(*,*) "Trying to read 2.20 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para220()
+          call read_para220(para)
           return
        else if (abs(para_version-2.19) < 1.e-4) then
           write(*,*) "Trying to read 2.19 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para219()
+          call read_para219(para)
           return
     else if (abs(para_version-2.18) < 1.e-4) then
           write(*,*) "Trying to read 2.18 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para218()
+          call read_para218(para)
           return
        else if (abs(para_version-2.17) < 1.e-4) then
           write(*,*) "Trying to read 2.17 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para217()
+          call read_para217(para)
           return
        else if (abs(para_version-2.16) < 1.e-4) then
           write(*,*) "Trying to read 2.16 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para216()
+          call read_para216(para)
           return
        else if (abs(para_version-2.15) < 1.e-4) then
           write(*,*) "Trying to read 2.15 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para215()
+          call read_para215(para)
           return
        else if (abs(para_version-2.14) < 1.e-4) then
           write(*,*) "Trying to read 2.14 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para214()
+          call read_para214(para)
           return
        else if (abs(para_version-2.13) < 1.e-4) then
           write(*,*) "Trying to read 2.13 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para213()
+          call read_para213(para)
           return
        else if (abs(para_version-2.12) < 1.e-4) then
           write(*,*) "Trying to read 2.12 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
-          call read_para212()
+          call read_para212(para)
           return
        else
           close(unit=1)
@@ -533,9 +535,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para220()
+  subroutine read_para220(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -978,9 +982,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para219()
+  subroutine read_para219(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -1394,9 +1400,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para218()
+  subroutine read_para218(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -1800,9 +1808,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para217()
+  subroutine read_para217(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -2203,9 +2213,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para216()
+  subroutine read_para216(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -2609,9 +2621,11 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para215()
+  subroutine read_para215(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: somme, V_somme
@@ -3003,12 +3017,13 @@ contains
 
 end subroutine read_para215
 
-
 !**********************************************************************
 
- subroutine read_para214()
+ subroutine read_para214(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
@@ -3404,9 +3419,11 @@ end subroutine read_para215
 
   !**********************************************************************
 
- subroutine read_para213()
+ subroutine read_para213(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme, V_somme
@@ -3793,9 +3810,11 @@ end subroutine read_para215
 
   !**********************************************************************
 
-  subroutine read_para212()
+  subroutine read_para212(para)
 
     implicit none
+
+    character(len=*), intent(in) :: para
 
     integer :: i, j, alloc_status, ios, ind_pop, imol, status
     real(kind=db) :: size_neb_tmp, somme

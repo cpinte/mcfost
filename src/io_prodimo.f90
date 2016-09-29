@@ -409,6 +409,7 @@ contains
     real, dimension(n_lambda) :: spectre
     integer, dimension(n_rad) :: which_region
 
+    character(len=512) :: para
 
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
     real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
@@ -419,6 +420,8 @@ contains
     real, dimension(:,:,:), allocatable :: TPAH_eq
     logical, dimension(n_grains_tot) :: mask_not_PAH
     real, dimension(:,:,:,:), allocatable :: P_TPAH
+
+    call get_command_argument(1,para)
 
     lPAH_nRE = .false.
     test_PAH_nRE : do i=1, n_pop
@@ -1294,7 +1297,7 @@ contains
 
   !********************************************************************
 
-  subroutine read_mcfost2ProDiMo()
+  subroutine read_mcfost2ProDiMo(para)
     ! Relit le fichier for ProDiMo.fits.gz cree par mcfost pour ProDiMo
     ! afin de redemarrer dessus pour le transfert dans les raies
     ! Lit les parametres et la structure en temperature
@@ -1303,6 +1306,8 @@ contains
     !
     ! C.Pinte
     ! 12/07/09
+
+    character(len=*) :: para
 
     integer :: status, readwrite, unit, blocksize, nfound, group, firstpix, npixels, hdutype
     integer :: imol, syst_status, n_files, n_rad_m2p, nz_m2p, n_lambda_m2p, i, j, l
@@ -1313,14 +1318,11 @@ contains
 
     character(len=30) :: errtext
     character (len=80) :: errmessage
-    character(len=512) :: filename, mol_para, cmd
+    character(len=512) :: filename, cmd
 
     !**************************************************************
     ! 1) Lecture des parametres dans le fichier .para de data_th
     !**************************************************************
-
-    ! Sauvegarde du nom du fichier de parametres pour les raies
-    mol_para = para
 
     ! Copie temporaire et lecture du fichier de parametres
     ! car je ne connais pas le nom du fichier .par dans data_th
@@ -1341,11 +1343,8 @@ contains
     endif
 
     cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
-    para = "data_th/forMCFOST.par" ; call read_para()
+    call read_para("data_th/forMCFOST.par")
     cmd = "rm -rf data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
-
-    ! Restaure nom fichier parametres
-    para = mol_para
 
     ! Parametres par defaut
     ltemp = .false.
