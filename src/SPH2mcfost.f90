@@ -27,7 +27,7 @@ contains
     integer, parameter :: iunit = 1
 
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
-    real(db), allocatable, dimension(:,:) :: rhodust, dustfrac
+    real(db), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
     real :: graindens, f
@@ -43,7 +43,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,dustfrac,rho,rhodust,ndusttypes,grainsize,n_SPH,ierr)
+       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,massdust,rho,rhodust,ndusttypes,grainsize,n_SPH,ierr)
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
           stop
@@ -240,12 +240,14 @@ contains
              densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
 
              Mtot = Mtot +  masse_gaz(icell)
-             Mtot_dust = Mtot_dust + masse_gaz(icell)* (sum(dustfrac(:,iSPH)))
+             !Mtot_dust = Mtot_dust + masse_gaz(icell)* (sum(dustfrac(:,iSPH)))
+             Mtot_dust = Mtot_dust + sum(massdust(:,icell))
           else ! star
              masse_gaz(icell)    = 0.
              densite_gaz(icell)  = 0.
           endif
        enddo
+       Mtot_dust = Mtot_dust / g_to_Msun
 
        ! Remark : you may want to had a factor here if there are only a few grainsize
        ! in the SPH dump
@@ -254,20 +256,18 @@ contains
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
-
              ! mass & density indices are shifted by 1
              do l=1, ndusttypes+1
                 if (l==1) then
                    ! small grains follow the gas, we do not care about normalization here
-                   rho_dust(l) = massgas(iSPH) / volume(icell)
+                   rho_dust(l) = massgas(iSPH) / (100. * volume(icell))
                 else
-                   rho_dust(l) = massgas(iSPH) * dustfrac(l-1,iSPH) / volume(icell)
+                   rho_dust(l) = massdust(l-1,iSPH) / volume(icell)
                 endif
-             enddo
+             enddo ! l
 
              l=1
              do k=1,n_grains_tot
-                !write(*,*) k, r_grain(k), l
                 if (r_grain(k) < a_SPH(1)) then ! small grains
                    densite_pouss(k,icell) = rho_dust(1)
                 else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
@@ -285,19 +285,15 @@ contains
        enddo ! icell
 
        ! Normalisation : on a 1 grain de chaque taille dans le disque
+       ! Normalisation : on a 1 grain en tout dans le disque
        do l=1,n_grains_tot
           somme=0.0
           do icell=1,n_cells
              if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
              somme=somme+densite_pouss(l,icell)*volume(icell)
           enddo !icell
-          densite_pouss(l,:) = (densite_pouss(l,:)/somme)
-       enddo !l
-
-       ! Normalisation : on a 1 grain en tout dans le disque
-       do l=1,n_grains_tot
           densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
-       enddo
+       enddo !l
 
        ! Normalisation : Calcul masse totale
        mass = 0.0
@@ -308,7 +304,6 @@ contains
        enddo !icell
        mass =  mass !/Msun_to_g
        densite_pouss(:,:) = densite_pouss(:,:) * sum(masse_gaz)/mass * dust_to_gas
-
 
        do icell=1,n_cells
           masse(icell) = 0.
