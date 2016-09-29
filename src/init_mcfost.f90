@@ -121,11 +121,48 @@ end subroutine set_default_variables
 
 !**********************************************
 
+subroutine get_mcfost_utils_dir()
+
+  integer :: i, n_dir
+
+ ! Test if MCFOST_UTILS is defined
+  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
+  if (mcfost_utils == "") then
+     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
+     write(*,*) "Exiting."
+     stop
+  endif
+  call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
+
+  ! Directories to search (ordered)
+  if (my_mcfost_utils == "") then
+     allocate(search_dir(2)) ; n_dir = 2
+     search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
+  else
+     allocate(search_dir(3)) ; n_dir = 3
+     search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
+  endif
+
+  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
+  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
+  do i=2,n_dir
+     dust_dir(i)   = trim(search_dir(i))//"/Dust/"
+     mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
+     star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
+     lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
+  enddo
+
+  return
+
+end subroutine get_mcfost_utils_dir
+
+!**********************************************
+
 subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, n_dir, i
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer
   integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
   real(kind=db) :: wvl
   real :: opt_zoom, utils_version, PA
@@ -155,24 +192,8 @@ subroutine initialisation_mcfost()
   ! Global logical variables
   call set_default_variables()
 
-  call get_environment_variable('HOME',home)
-  if (home == "") then
-     home="./"
-  else
-     home=trim(home)//"/"
-  endif
-
-  ! Test if MCFOST_UTILS is defined
-  call get_environment_variable('MCFOST_UTILS',mcfost_utils)
-  if (mcfost_utils == "") then
-     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
-     write(*,*) "Exiting."
-     stop
-  endif
-  call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
-
-  ! Ligne de commande
-  call get_command(cmd_opt)
+  ! Looking for the mcfost utils directory
+  call get_mcfost_utils_dir()
 
   ! Do we need to search for an update ?
   mcfost_auto_update = 7
@@ -212,24 +233,8 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  ! Directories to search (ordered)
-  if (my_mcfost_utils == "") then
-     !write(*,*) "WARNING: environnement variable MY_MCFOST_UTILS is not defined."
-     allocate(search_dir(2)) ; n_dir = 2
-     search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
-  else
-     allocate(search_dir(3)) ; n_dir = 3
-     search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
-  endif
-
-  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
-  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
-  do i=2,n_dir
-     dust_dir(i)   = trim(search_dir(i))//"/Dust/"
-     mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
-     star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
-     lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
-  enddo
+  ! Ligne de commande
+  call get_command(cmd_opt)
 
   ! Nbre d'arguments
   nbr_arg = command_argument_count()
@@ -1353,7 +1358,7 @@ end subroutine display_help
 subroutine display_disclaimer()
 
   character(len=10) :: accept
-  character(len=512) :: cmd
+  character(len=512) :: cmd, home
   integer :: syst_status
 
   write(*,*) "*******************************************"
@@ -1369,6 +1374,13 @@ subroutine display_disclaimer()
   write(*,*) "* explicit agreement.                     *"
   write(*,*) "*  - contact us if you initiate a new     *"
   write(*,*) "* scientific project with MCFOST.         *"
+
+  call get_environment_variable('HOME',home)
+  if (home == "") then
+     home="./"
+  else
+     home=trim(home)//"/"
+  endif
 
   if (.not.is_file(trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release)) then
      write(*,*) "*                                         *"
