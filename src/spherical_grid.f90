@@ -169,9 +169,6 @@ end subroutine indice_cellule_sph_theta
 
     integer :: phik0, phik1, delta_phi, phik0m1
 
-    real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
-    real(kind=db) :: t1_1, t1_2, t2_1, t2_2, a_theta_m1
-
     ! Todo : can be calculated outside
 
     ! Petit delta pour franchir la limite de la cellule
