@@ -503,6 +503,7 @@ subroutine define_cylindrical_grid()
      V(:) = V(:) * 0.5 / real(n_az)
 
      do j=1,nz
+        r_grid_tmp(:,-j) = r_grid_tmp(:,j)
         z_grid_tmp(:,-j) = -z_grid_tmp(:,j)
      enddo
   endif
