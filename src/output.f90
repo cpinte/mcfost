@@ -3061,4 +3061,27 @@ subroutine write_dust_prop()
 
 end subroutine write_dust_prop
 
+!**********************************************************************
+
+subroutine write_temperature_for_phantom(n_SPH)
+
+    integer, intent(in) :: n_SPH
+    integer :: i_SPH, icell
+    real, dimension(n_SPH) :: T_SPH
+
+    T_SPH = -1.0 ;
+
+    do icell=1, n_cells
+       i_SPH = Voronoi(icell)%id
+       if (i_SPH > 0) T_SPH(i_SPH) = Temperature(icell)
+    enddo
+
+    open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
+    write(1) T_SPH
+    close(unit=1)
+
+    return
+
+  end subroutine write_temperature_for_phantom
+
 end module output

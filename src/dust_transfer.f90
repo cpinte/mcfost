@@ -29,7 +29,6 @@ module dust_transfer
   use ProDiMo
   use init_mcfost
   use SPH2mcfost
-  use mcfost2phantom
   !$ use omp_lib
 
   implicit none

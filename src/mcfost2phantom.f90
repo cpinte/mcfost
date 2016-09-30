@@ -10,45 +10,42 @@ module mcfost2phantom
 
 contains
 
-  subroutine write_temperature_for_phantom(n_SPH)
-
-    integer, intent(in) :: n_SPH
-    integer :: i_SPH, icell
-    real, dimension(n_SPH) :: T_SPH
-
-    T_SPH = -1.0 ;
-
-    do icell=1, n_cells
-       i_SPH = Voronoi(icell)%id
-       if (i_SPH > 0) T_SPH(i_SPH) = Temperature(icell)
-    enddo
-
-    open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
-    write(1) T_SPH
-    close(unit=1)
-
-    return
-
-  end subroutine write_temperature_for_phantom
-
   subroutine init_mcfost_phantom(mcfost_para_filename, ierr) !,  np, nptmass, ntypes, ndusttypes, npoftype)
 
+    use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
+    use disk, only : n_zones
+    use dust_transfer, only : transfert_poussiere
+
 
     ! This routine should be in mcfost2phantom
     character(len=*), intent(in) :: mcfost_para_filename
     integer, intent(out) :: ierr
 
-    ! options
-    write(*,*) "INIT MCFOST"
+    ! Global logical variables
+    call set_default_variables()
+
+    ! Looking for the mcfost utils directory
+    call get_mcfost_utils_dir()
 
     ! parameter file
     call read_para(mcfost_para_filename)
 
     ! Setting option for the mcfost2phantom interface
     ltemp = .true. ; lsed = .false. ; lsed_complete = .false.
+    lVoronoi = .true. ; l3D = .true.
+
+    if (n_zones > 1) then
+       write(*,*) "ERROR: mcfost2phantom only works with a 1zone parameter file"
+       write(*,*) "Exiting"
+       ierr = 1
+       return
+    endif
 
     ! dust properties
+
+    ! making the MC run
+    call transfert_poussiere()
 
     ierr = 0
     return
