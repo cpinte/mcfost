@@ -370,8 +370,17 @@ end subroutine indice_cellule_sph_theta
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
     if (z1 == 0.0_db) z1 = -sign(prec_grille,z0) ! we are on the other sign of z=0 interface
 
+    ! Make sure we are on the correct size of the z=0 plane
     if (l3D) then
        if (z1*thetaj1 < 0) z1 = -z1
+    else
+       if (thetaj1 == 1) then
+          if (z0 > 0) then
+             z1 = -abs(z1)
+          else
+             z1 = abs(z1)
+          endif
+       endif
     endif
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
