@@ -143,7 +143,9 @@ subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out)
   enddo
   thetaj_out=thetaj+1
 
-  if (zin < 0) thetaj_out = - thetaj_out
+  if (l3D) then
+     if (zin < 0) thetaj_out = - thetaj_out
+  endif
 
   return
 
@@ -253,14 +255,20 @@ end subroutine indice_cellule_sph_theta
           else
              tan_angle_lim = tan_theta_lim(abs(thetaj0)-1)
              if (abs(thetaj0) == 1) then
-                delta_theta = - sign(2, thetaj0) ! on passe de l'autre cote du plan median
+                if (l3D) then
+                   delta_theta = - sign(2, thetaj0) ! on passe de l'autre cote du plan median
+                else
+                   delta_theta = 0
+                endif
              else
                 delta_theta= - sign(1,thetaj0) ! we decrease the absolute value
              endif
           endif
 
+          if (z0 < 0.) tan_angle_lim = - tan_angle_lim
+
           ! Longueur av interserction
-          if (tan_angle_lim > 1.0d299) then
+          if (abs(tan_angle_lim) > 1.0d299) then
              t = -r0/uv
              delta_theta=0
           else
@@ -360,9 +368,20 @@ end subroutine indice_cellule_sph_theta
     endif
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-    if (z1 == 0.0_db) z1 = prec_grille
+    if (z1 == 0.0_db) z1 = -sign(prec_grille,z0) ! we are on the other sign of z=0 interface
 
-    if (z1*thetaj1 < 0) z1 = -z1
+    ! Make sure we are on the correct size of the z=0 plane
+    if (l3D) then
+       if (z1*thetaj1 < 0) z1 = -z1
+    else
+       if (thetaj1 == 1) then
+          if (z0 > 0) then
+             z1 = -abs(z1)
+          else
+             z1 = abs(z1)
+          endif
+       endif
+    endif
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell =  cell_map(ri1,thetaj1,phik1)
@@ -401,8 +420,10 @@ end subroutine indice_cellule_sph_theta
 
        ! On verifie que c'est OK maintenant
        call indice_cellule_sph(x,y,z, icell)
+       ri = cell_map_i(icell)
        if (ri==0) then
           write(*,*) "BUG in verif_cell_position_sph"
+          write(*,*) x,y,z, sqrt(x*x+y*y+z*z)
           write(*,*) "Exiting"
           stop
        endif
