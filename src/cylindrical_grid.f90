@@ -449,7 +449,7 @@ subroutine define_cylindrical_grid()
      ! tab_r est en spherique ici
      w_lim(0) = 0.0_db
      theta_lim(0) = 0.0_db
-     tan_theta_lim(0) = 1.0e-10_db
+     tan_theta_lim(0) = 0.0_db !1.0e-10_db
 
      w_lim(nz) = 1.0_db
      theta_lim(nz) = pi/2.

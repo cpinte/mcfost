@@ -140,13 +140,14 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         ! TODO : here
         if (.not.lVoronoi) then
            if (l3D) then
-              call indice_cellule(xio,yio,zio, icell)
-           else
-              if (lcylindrical) then
-                 call verif_cell_position_cyl(icell0, xio, yio, zio)
-              else if (lspherical) then
-                 call verif_cell_position_sph(icell0, xio, yio, zio)
-              endif
+              if (lcylindrical) call indice_cellule(xio,yio,zio, icell)
+            ! following lines are useless --> icell0 is not returned
+           !else
+           !   if (lcylindrical) then
+           !      call verif_cell_position_cyl(icell0, xio, yio, zio)
+           !   else if (lspherical) then
+           !      call verif_cell_position_sph(icell0, xio, yio, zio)
+           !   endif
            endif
         endif ! todo : on ne fait rien dans la cas Voronoi ???
 

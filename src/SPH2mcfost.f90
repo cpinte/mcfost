@@ -333,7 +333,11 @@ contains
 
     write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-    deallocate(massgas,rho,rhodust,a_SPH)
+
+    deallocate(massgas,rho)
+    if (ndusttypes > 0) then
+       deallocate(rhodust,massdust,a_SPH)
+    endif
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
