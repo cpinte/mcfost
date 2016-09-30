@@ -336,7 +336,7 @@ contains
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
-       deallocate(rhodust,a_SPH)
+       deallocate(rhodust,massdust,a_SPH)
     endif
 
     search_not_empty : do k=1,n_grains_tot
