@@ -13,32 +13,16 @@ contains
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
-    use Voronoi_grid
-    use opacity, only : densite_pouss, masse
-    use molecular_emission, only : densite_gaz, masse_gaz
-    use grains, only : n_grains_tot, M_grain
-    use disk_physics, only : compute_othin_sublimation_radius
-    use mem
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
 
-    real, parameter :: limit_threshold = 0.01
     integer, parameter :: iunit = 1
 
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
     real(db), allocatable, dimension(:,:) :: rhodust, massdust
-    real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
-    real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
-    real :: graindens, f
-    integer :: ierr, ndusttypes, icell, l, k, ios, iSPH
 
-    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
-
-    character(len=100) :: line_buffer
-    real(db), dimension(6) :: limits
-
-    icell_ref = 1
+    integer :: ndusttypes, ierr
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -57,8 +41,51 @@ contains
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
        call read_ascii_SPH_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     endif
+    write(*,*) "Done"
 
     if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
+
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits_file)
+
+    deallocate(massgas,rho)
+    if (ndusttypes > 0) then
+       deallocate(rhodust,massdust)
+    endif
+
+    return
+
+  end subroutine setup_SPH2mcfost
+
+  !*********************************************************
+
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits_file)
+
+    use Voronoi_grid
+    use opacity, only : densite_pouss, masse
+    use molecular_emission, only : densite_gaz, masse_gaz
+    use grains, only : n_grains_tot, M_grain
+    use disk_physics, only : compute_othin_sublimation_radius
+    use mem
+
+    integer, intent(in) :: n_SPH, ndusttypes
+    real(db), dimension(n_SPH) :: x,y,z,rho,massgas
+    real(db), dimension(ndusttypes,n_SPH) :: rhodust, massdust
+    real(db), dimension(ndusttypes) :: grainsize
+
+    character(len=512), intent(in) :: SPH_limits_file
+
+    real, parameter :: limit_threshold = 0.01
+
+    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
+
+    real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
+    real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
+    real :: graindens, f
+    integer :: ierr, icell, l, k, ios, iSPH
+    character(len=100) :: line_buffer
+    real(db), dimension(6) :: limits
+
+    icell_ref = 1
 
     write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)
@@ -161,7 +188,7 @@ contains
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
     call Voronoi_tesselation(n_SPH, x,y,z, limits)
-    deallocate(x,y,z)
+    !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 
     !*************************
@@ -334,11 +361,6 @@ contains
     write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
 
-    deallocate(massgas,rho)
-    if (ndusttypes > 0) then
-       deallocate(rhodust,massdust,a_SPH)
-    endif
-
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
           if (densite_pouss(k,icell) > 0.0_db) then
@@ -348,9 +370,11 @@ contains
        enddo !icell
     enddo search_not_empty
 
+    if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
+
     return
 
-  end subroutine setup_SPH2mcfost
+  end subroutine SPH_to_Voronoi
 
   !*********************************************************
 
