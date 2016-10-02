@@ -1699,4 +1699,15 @@ end function select_absorbing_grain
 
 !**********************************************************************
 
+subroutine reset_radiation_field()
+
+  if (lRE_LTE) xKJ_abs(:,:) = 0.0_db
+  if (lxJ_abs) xJ_abs(:,:,:) = 0.0_db
+
+  return
+
+end subroutine reset_radiation_field
+
+!**********************************************************************
+
 end module thermal_emission

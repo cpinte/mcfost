@@ -438,7 +438,7 @@ subroutine transfert_poussiere()
            enddo !n
            if (lcompute_dust_prop) call save_dust_prop(letape_th)
            write(*,*) "Done"
-        endif
+        endif ! ind_etape==first_etape_obs
 
         lambda = ind_etape - first_etape_obs + 1
 
@@ -473,6 +473,7 @@ subroutine transfert_poussiere()
 
      if (letape_th) write(*,*) "Computing temperature structure ..."
      if (lmono0)    write(*,*) "Computing MC radiation field ..."
+
      if (laffichage) call progress_bar(0)
 
      if ((ind_etape >= first_etape_obs).and.(.not.lmono0)) then
@@ -721,7 +722,6 @@ subroutine transfert_poussiere()
            sed_star=0.0 ; sed_star_scat=0.0 ; sed_disk=0.0 ; sed_disk_scat=0.0
            if (loutput_UV_field) xJ_abs = 0.0
         endif ! .not.letape_th
-
 
         call system_clock(time_end)
         if (time_end < time_begin) then
