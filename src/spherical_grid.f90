@@ -153,6 +153,7 @@ end subroutine indice_cellule_sph_theta
 
 !******************************************************************************
 
+
   subroutine cross_spherical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
     integer, intent(in) :: cell, previous_cell
@@ -164,12 +165,15 @@ end subroutine indice_cellule_sph_theta
     real(kind=db), intent(out) :: l
 
 
-    real(kind=db) :: correct_moins, correct_plus, uv, precision, r0
+    real(kind=db) :: correct_moins, correct_plus, uv, precision
     real(kind=db) :: b, c, s, rac, t, delta, r0_2, r0_cyl, r0_2_cyl
     real(kind=db) :: delta_vol, dotprod, t_phi, tan_angle_lim, den
     integer :: ri0, thetaj0, ri1, thetaj1, delta_rad, delta_theta
 
     integer :: phik0, phik1, delta_phi, phik0m1
+
+    real(kind=db) :: a_theta, b_theta, c_theta, tan2, tan_angle_lim1, tan_angle_lim2, t1, t2
+    real(kind=db) :: t1_1, t1_2, t2_1, t2_2, a_theta_m1
 
     ! Todo : can be calculated outside
 
@@ -232,59 +236,84 @@ end subroutine indice_cellule_sph_theta
        endif
 
        ! 2) position interface inclinaison
-       r0 = sqrt(x0*x0 + y0*y0)
-       dotprod =  r0*w - z0*uv
-
-       ! on fait le meme calcul a l'envers
-       ! on inverse z0 et w
-       if (z0 < 0.) dotprod = -dotprod
-
-       if (abs(dotprod) < 1.0e-10) then
-          ! on ne franchit pas d'interface azimuthale
-          t = 1.0e30
-          delta_theta = 0
+       if (z0 >= 0.0_db) then ! on est dans le bon sens
+          tan_angle_lim1 = tan_theta_lim(abs(thetaj0)) * correct_plus
+          tan_angle_lim2 = tan_theta_lim(abs(thetaj0)-1) * correct_moins
        else
-          ! Quelle cellule on va franchir
-          if (dotprod > 0.0) then ! limite sup : on s'eloigne du plan median
-             tan_angle_lim = tan_theta_lim(abs(thetaj0))
-             if (abs(thetaj0)==nz) then
-                delta_theta = 0 ! on passe de l'autre cote de la verticale
-             else
-                delta_theta = sign(1,thetaj0) ! we increase the absolute value
+          tan_angle_lim1 = - tan_theta_lim(abs(thetaj0)) * correct_plus
+          tan_angle_lim2 = - tan_theta_lim(abs(thetaj0)-1) * correct_moins
+       endif ! z0
+
+       ! Premiere limite theta
+       tan2 = tan_angle_lim1 * tan_angle_lim1
+       a_theta = w*w - tan2 * (u*u + v*v)
+       a_theta_m1 = 1.0_db/a_theta
+       b_theta = w*z0 - tan2 * (x0*u + y0*v)
+       c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
+
+       delta = b_theta * b_theta - a_theta * c_theta
+       if (delta < 0.0_db) then ! Pas de sol reelle
+          t1 = 1.0e30_db
+       else ! Au moins une sol reelle
+          rac = sqrt(delta)
+          t1_1 = (- b_theta - rac) * a_theta_m1
+          t1_2 = (- b_theta + rac) * a_theta_m1
+
+          if (t1_1 <= precision) then
+             if (t1_2 <= precision) then ! les 2 sont <0
+                t1=1.0e30_db
+             else   ! Seul t1_2 > 0
+                t1 = t1_2
              endif
           else
-             tan_angle_lim = tan_theta_lim(abs(thetaj0)-1)
-             if (abs(thetaj0) == 1) then
-                if (l3D) then
-                   delta_theta = - sign(2, thetaj0) ! on passe de l'autre cote du plan median
-                else
-                   delta_theta = 0
-                endif
-             else
-                delta_theta= - sign(1,thetaj0) ! we decrease the absolute value
+             if (t1_2 <= precision) then ! Seul t1_1 >0
+                t1 = t1_1
+             else ! les 2 sont > 0
+                t1 = min(t1_1,t1_2)
              endif
           endif
+       endif ! signe delta
 
-          if (z0 < 0.) tan_angle_lim = - tan_angle_lim
+       ! Deuxieme limite theta
+       tan2 = tan_angle_lim2 * tan_angle_lim2
+       a_theta = w*w - tan2 * (u*u + v*v)
+       a_theta_m1 = 1.0_db/a_theta
+       b_theta = w*z0 - tan2 * (x0*u + y0*v)
+       c_theta = z0*z0 - tan2 * (x0*x0 + y0*y0)
 
-          ! Longueur av interserction
-          if (abs(tan_angle_lim) > 1.0d299) then
-             t = -r0/uv
-             delta_theta=0
+       delta = b_theta * b_theta - a_theta * c_theta
+       if (delta < 0.0_db) then ! Pas de sol reelle
+          t2 = 1.0e30_db
+       else ! Au moins une sol reelle
+          rac = sqrt(delta)
+          t2_1 = (- b_theta - rac) * a_theta_m1
+          t2_2 = (- b_theta + rac) * a_theta_m1
+
+          if (t2_1 <= precision) then
+             if (t2_2 <= precision) then ! les 2 sont <0
+                t2=1.0e30_db
+             else   ! Seul t2_2 > 0
+                t2 = t2_2
+             endif
           else
-             den= w-uv*tan_angle_lim
-             if (abs(den) > 1.0e-6) then
-                t = -(z0-r0*tan_angle_lim)/den
-             else
-                t = 1.0e30
-                delta_theta = 0
+             if (t2_2 <= precision) then ! Seul t2_1 >0
+                t2 = t2_1
+             else ! les 2 sont > 0
+                t2 = min(t2_1,t2_2)
              endif
           endif
-          if (t < 0.0) then
-             t = 1.0e30
-             delta_theta = 0
-          endif
-       endif !dotprod = 0.0
+       endif ! signe delta
+
+       ! Selection limite theta
+       if (t1 < t2) then
+          t=t1
+          delta_theta = 1
+          if (abs(thetaj0) == nz) delta_theta = 0
+       else
+          t=t2
+          delta_theta = -1
+          if (abs(thetaj0) == 1) delta_theta = 0
+       endif
 
        ! 3) position interface azimuthale
        if (l3D) then
@@ -327,6 +356,7 @@ end subroutine indice_cellule_sph_theta
        endif
     endif ! ri0==0
 
+
     ! 4) interface en r ou theta ou phi ?
     if ((s < t).and.(s < t_phi)) then ! r
        l=s
@@ -351,7 +381,10 @@ end subroutine indice_cellule_sph_theta
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
        ri1=ri0
-       thetaj1=thetaj0+delta_theta
+       thetaj1=abs(thetaj0)+delta_theta
+       if (l3D) then
+          if (z1<0) thetaj1 = -thetaj1
+       endif
        phik1=phik0
     else
        l=t_phi
@@ -368,20 +401,7 @@ end subroutine indice_cellule_sph_theta
     endif
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-    if (z1 == 0.0_db) z1 = -sign(prec_grille,z0) ! we are on the other sign of z=0 interface
-
-    ! Make sure we are on the correct size of the z=0 plane
-    if (l3D) then
-       if (z1*thetaj1 < 0) z1 = -z1
-    else
-       if (thetaj1 == 1) then
-          if (z0 > 0) then
-             z1 = -abs(z1)
-          else
-             z1 = abs(z1)
-          endif
-       endif
-    endif
+    if (z1 == 0.0_db) z1 = prec_grille
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell =  cell_map(ri1,thetaj1,phik1)
