@@ -32,7 +32,6 @@ contains
     ! parameter file
     call read_para(mcfost_para_filename)
 
-
     if (lnRE) then
        write(*,*) "Non-equilibrium grains are not yet implemented in libmcfost"
        write(*,*) "Exiting"
@@ -103,7 +102,8 @@ contains
     use read_phantom
     use em_th, only : E_abs_nRE, frac_E_stars
     use thermal_emission, only : reset_radiation_field
-    use SPH2mcfost, only : SPH_to_Voronoi
+    use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
+    use mem, only : alloc_dynamique
     !$ use omp_lib
 
 #include "sprng_f.h"
@@ -165,7 +165,8 @@ contains
     call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits_file)
 
     ! Allocation dynamique
-    if (lfirst_time) call alloc_dynamique()
+    ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
+    if (lfirst_time) call alloc_dynamique(n_cells_max= n_SPH + n_etoiles)
 
     ! init random number generator
     stream = 0.0
@@ -186,8 +187,6 @@ contains
     enddo
     !$omp end do
     !$omp end parallel
-
-    !call setup_mcfost_Voronoi_grid()
 
     letape_th = .true.
     nbre_phot2 = nbre_photons_eq_th

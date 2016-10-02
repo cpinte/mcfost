@@ -15,25 +15,34 @@ module mem
 
   contains
 
-subroutine allocate_densities()
+subroutine allocate_densities(n_cells_max)
 
-  integer ::  alloc_status
+  integer, intent(in), optional :: n_cells_max
 
-  allocate(masse(n_cells), stat=alloc_status)
+  integer ::  alloc_status, Nc
+
+  if (present(n_cells_max)) then
+     Nc = n_cells_max
+  else
+     Nc = n_cells
+  endif
+
+
+  allocate(masse(Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error mass'
      stop
   endif
   masse = 0.0
 
-  allocate(densite_pouss(n_grains_tot,n_cells), stat=alloc_status)
+  allocate(densite_pouss(n_grains_tot,Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_pouss'
      stop
   endif
   densite_pouss = 0.0
 
-  allocate(densite_gaz(n_cells), densite_gaz_midplane(n_rad), masse_gaz(n_cells), stat=alloc_status)
+  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad), masse_gaz(Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error densite_gaz'
      stop
@@ -44,15 +53,36 @@ end subroutine allocate_densities
 
 !*****************************************************************
 
-subroutine alloc_dynamique()
+subroutine alloc_dynamique(n_cells_max)
   ! Alloue les tableaux dynamiquement en fonction de l'organisation
   ! des calculs, de la presence de stratification ...
   ! Permet d'optimiser la taille mémoire
   ! C. Pinte
   ! 12/05/05
 
-  integer ::  alloc_status
+  integer, intent(in), optional :: n_cells_max
+
+  integer ::  alloc_status, Nc, p_Nc
   real :: mem_size
+
+  if (present(n_cells_max)) then
+     if (n_cells_max < n_cells) then
+        write(*,*) "ERROR in alloc_dynamique : n_cells_max must be larger than n_cells"
+        write(*,*) n_cells_max, n_cells
+        write(*,*) "Exiting"
+        stop
+     endif
+
+     Nc = n_cells_max
+     if (p_n_cells == n_cells) then
+        p_Nc = Nc
+     else
+        p_Nc = 1
+     endif
+  else
+     Nc = n_cells
+     p_Nc = p_n_cells
+  endif
 
   allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
@@ -78,7 +108,7 @@ subroutine alloc_dynamique()
      Surface_density = 0.0_db
   endif
 
-  allocate(l_dark_zone(n_cells), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
+  allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error l_dark_zone'
@@ -143,13 +173,13 @@ subroutine alloc_dynamique()
   spectre_emission_cumul = 0.0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), kappa_abs_LTE(n_cells,n_lambda), stat=alloc_status)
+  allocate(kappa(Nc,n_lambda), kappa_sca(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
 
   if (.not.lonly_LTE .or. .not.lonly_nLTE) then
-     allocate(proba_abs_RE_LTE(n_cells,n_lambda),  stat=alloc_status)
-     if (lRE_nLTE)  allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
+     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
+     if (lRE_nLTE)  allocate(kappa_abs_nLTE(Nc,n_lambda), stat=alloc_status)
+     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status)
+     if (lnRE) allocate(proba_abs_RE(Nc,n_lambda), kappa_abs_RE(Nc,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error kappa'
         stop
@@ -164,8 +194,8 @@ subroutine alloc_dynamique()
      endif
   endif
 
-  ! todo : could be p_n_cells ...
-  allocate(tab_albedo_pos(n_cells,n_lambda), tab_g_pos(n_cells,n_lambda),stat=alloc_status)
+  ! todo : could be p_Nc ...
+  allocate(tab_albedo_pos(Nc,n_lambda), tab_g_pos(Nc,n_lambda),stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_albedo_pos, tab_g_pos'
      stop
@@ -177,20 +207,20 @@ subroutine alloc_dynamique()
   ! **************************************************
   if (scattering_method == 2) then ! prop par cellule
      if (lsepar_pola) then
-        mem_size = (5. * nang_scatt) * p_n_cells * p_n_lambda_pos * 4. / 1024.**3
+        mem_size = (5. * nang_scatt) * p_Nc * p_n_lambda_pos * 4. / 1024.**3
      else
-        mem_size = (2. * nang_scatt) * p_n_cells * p_n_lambda_pos * 4. / 1024.**3
+        mem_size = (2. * nang_scatt) * p_Nc * p_n_lambda_pos * 4. / 1024.**3
      endif
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering matrices"
 
-     allocate(tab_s11_pos(0:nang_scatt, p_n_cells, p_n_lambda_pos), stat=alloc_status)
+     allocate(tab_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_s11_pos'
         stop
      endif
      tab_s11_pos = 0
 
-     allocate(prob_s11_pos(0:nang_scatt, p_n_cells, p_n_lambda_pos), stat=alloc_status)
+     allocate(prob_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_s11_pos'
         stop
@@ -198,9 +228,9 @@ subroutine alloc_dynamique()
      prob_s11_pos = 0
 
      if (lsepar_pola) then
-        allocate(tab_s12_o_s11_pos(0:nang_scatt, p_n_cells, p_n_lambda_pos), &
-             tab_s33_o_s11_pos(0:nang_scatt, p_n_cells, p_n_lambda_pos), &
-             tab_s34_o_s11_pos(0:nang_scatt, p_n_cells, p_n_lambda_pos), &
+        allocate(tab_s12_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
+             tab_s33_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
+             tab_s34_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error tab_s12_o_s11_pos'
@@ -211,12 +241,12 @@ subroutine alloc_dynamique()
         tab_s34_o_s11_pos = 0
      endif
   else ! scattering method==1 --> prop par grains
-     mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**3
+     mem_size = (1.0 * n_grains_tot) * p_Nc * n_lambda * 4. / 1024.**3
      if (mem_size < max_mem) then
         low_mem_scattering = .false.
         if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
 
-        allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
+        allocate(ksca_CDF(0:n_grains_tot,p_Nc,n_lambda), stat=alloc_status)
 
         if (alloc_status > 0) then
            write(*,*) 'Allocation error ksca_CDF'
@@ -287,7 +317,7 @@ subroutine alloc_dynamique()
   l_emission_pah = .false.
 
 
-  allocate(prob_E_cell(0:n_cells,n_lambda), stat=alloc_status)
+  allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error prob_E_cell'
      stop
@@ -295,7 +325,7 @@ subroutine alloc_dynamique()
   prob_E_cell = 0.0
 
   if (lweight_emission) then
-     allocate(weight_proba_emission(n_cells), correct_E_emission(n_cells), stat=alloc_status)
+     allocate(weight_proba_emission(Nc), correct_E_emission(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error prob_E_cell'
         stop
@@ -306,7 +336,7 @@ subroutine alloc_dynamique()
 
 
   if (lorigine) then
-     allocate(disk_origin(n_lambda, n_cells, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
+     allocate(disk_origin(n_lambda, Nc, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error disk_origin'
         stop
@@ -318,7 +348,7 @@ subroutine alloc_dynamique()
   ! **************************************************
   ! Tableaux de temperature
   ! **************************************************
-  allocate(Temperature(n_cells), Temperature_old(n_cells), stat=alloc_status)
+  allocate(Temperature(Nc), Temperature_old(Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Temperature'
      stop
@@ -327,7 +357,7 @@ subroutine alloc_dynamique()
 
 
   if (lRE_nLTE) then
-     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
+     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Temperature_1grain'
         stop
@@ -345,8 +375,8 @@ subroutine alloc_dynamique()
         tab_Temp = 0.0
      endif
 
-     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,n_cells), &
-          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
+     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,Nc), &
+          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Proba_Temperature'
         stop
@@ -354,7 +384,7 @@ subroutine alloc_dynamique()
      Proba_Temperature=0.0
      Temperature_1grain_nRE=0.0
 
-     allocate(l_RE(grain_nRE_start:grain_nRE_end,n_cells), lchange_nRE(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
+     allocate(l_RE(grain_nRE_start:grain_nRE_end,Nc), lchange_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error l_RE'
         stop
@@ -373,7 +403,7 @@ subroutine alloc_dynamique()
      endif
      tab_Temp = 0.0
 
-     allocate(log_frac_E_em(n_T,n_cells), stat=alloc_status)
+     allocate(log_frac_E_em(n_T,Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error log_frac_E_em'
         stop
@@ -388,7 +418,7 @@ subroutine alloc_dynamique()
      DensE = 0.0 ; DensE_m1 = 0.0
 
      if (lRE_LTE) then
-        allocate(xKJ_abs(n_cells,nb_proc), E0(n_cells), stat=alloc_status)
+        allocate(xKJ_abs(Nc,nb_proc), E0(Nc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xKJ_abs'
            stop
@@ -398,7 +428,7 @@ subroutine alloc_dynamique()
 
      lxJ_abs = loutput_J .or. lRE_nLTE .or. lnRE .or. loutput_UV_field
      if (lxJ_abs) then
-        allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status) ! BIG array
+        allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xJ_abs'
            stop
@@ -406,7 +436,7 @@ subroutine alloc_dynamique()
         xJ_abs=0.0 ; J0 = 0.0
      endif
 
-     allocate(xT_ech(n_cells,nb_proc), stat=alloc_status)
+     allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xT_ech'
         stop
@@ -414,7 +444,7 @@ subroutine alloc_dynamique()
      xT_ech = 2
 
      if (lreemission_stats) then
-        allocate(nbre_reemission(n_cells,nb_proc), stat=alloc_status)
+        allocate(nbre_reemission(Nc,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error nbre_reemission'
            stop
@@ -422,11 +452,11 @@ subroutine alloc_dynamique()
         nbre_reemission = 0.0
      endif
 
-     mem_size = (1.0 * p_n_cells) * n_T * n_lambda * 4. / 1024.**3
+     mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
      if (mem_size < max_mem) then
         low_mem_th_emission = .false.
         if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
-        allocate(kdB_dT_CDF(n_lambda,n_T,p_n_cells), stat=alloc_status)
+        allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error kdB_dT_CDF'
            stop
@@ -445,11 +475,11 @@ subroutine alloc_dynamique()
 
      if (lRE_nLTE) then
 
-        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_n_cells * n_lambda * 4. / 1024.**3
+        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
         if (mem_size < max_mem) then
            low_mem_th_emission_nLTE = .false.
            if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
-           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,n_cells,n_lambda),stat=alloc_status)
+           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error kabs_nLTE_CDF'
               stop
@@ -474,7 +504,7 @@ subroutine alloc_dynamique()
         endif
         log_frac_E_em_1grain=0.0
 
-        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells,nb_proc),stat=alloc_status)
+        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain'
            stop
@@ -493,15 +523,15 @@ subroutine alloc_dynamique()
         frac_E_em_1grain_nRE=0.0
         log_frac_E_em_1grain_nRE=0.0
 
-        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
+        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Temperature_1grain_nRE_old'
            stop
         endif
         Temperature_1grain_nRE_old =0.0
 
-        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,n_cells), &
-             maxP_old(grain_nRE_start:grain_nRE_end,n_cells), &
+        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
+             maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
              stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Tpeak'
@@ -510,7 +540,7 @@ subroutine alloc_dynamique()
         Tpeak_old=0
         maxP_old=0.
 
-        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,n_cells,nb_proc),stat=alloc_status)
+        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xT_ech_1grain_nRE'
            stop
@@ -525,7 +555,7 @@ subroutine alloc_dynamique()
         kdB_dT_1grain_nRE_CDF=0.0
 
         if (lRE_nlTE) then
-           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,n_cells),stat=alloc_status)
+           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
            if (alloc_status > 0) then
               write(*,*) 'Allocation error Temperature_1grain_old'
               stop
@@ -537,7 +567,7 @@ subroutine alloc_dynamique()
   endif ! lTemp
 
   if (lnRE) then
-     allocate(Emissivite_nRE_old(n_cells,n_lambda), stat=alloc_status)
+     allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Emissivite_nRE_old'
         stop
@@ -700,7 +730,7 @@ subroutine alloc_dynamique()
   ! Tableaux relatifs a l'emission moleculaire
   ! **************************************************
   if (lemission_mol) then
-     allocate(tab_abundance(n_cells), Tcin(n_cells), lcompute_molRT(n_cells), stat=alloc_status)
+     allocate(tab_abundance(Nc), Tcin(Nc), lcompute_molRT(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error Tcin & tab_abundance'
         stop
@@ -709,28 +739,28 @@ subroutine alloc_dynamique()
      lcompute_molRT = .true.
      Tcin=0.0
 
-     allocate(vfield(n_cells), stat=alloc_status)
+     allocate(vfield(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error vfield'
         stop
      endif
      vfield=0.0 !; vx=0.0 ; vy=0.0
 
-     allocate(v_turb(n_cells), v_line(n_cells), deltaVmax(n_cells), stat=alloc_status)
+     allocate(v_turb(Nc), v_line(Nc), deltaVmax(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error sigma2'
         stop
      endif
      v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
 
-     allocate(tab_dnu_o_freq(n_cells), stat=alloc_status)
+     allocate(tab_dnu_o_freq(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error tab_dnu'
         stop
      endif
      tab_dnu_o_freq=0.0
 
-     allocate(norme_phiProf_m1(n_cells), sigma2_phiProf_m1(n_cells), stat=alloc_status)
+     allocate(norme_phiProf_m1(Nc), sigma2_phiProf_m1(Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error norme_phiProf_m1'
         stop
