@@ -194,7 +194,7 @@ contains
     !*************************
     ! Densities
     !*************************
-    call allocate_densities()
+    call allocate_densities(n_cells_max = n_SPH + n_etoiles) ! we allocate all the SPH particule for libmcfost
     ! Tableau de densite et masse de gaz
     !do icell=1,n_cells
     !   densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
