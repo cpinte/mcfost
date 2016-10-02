@@ -318,8 +318,8 @@ contains
        lvariable_dust = .false.
        write(*,*) "Using gas to dust ratio in mcfost parameter file"
 
-       masse(icell) = 0.
        do icell=1,n_cells
+          masse(icell) = 0.
           do k=1,n_grains_tot
              densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
              masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
