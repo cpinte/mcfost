@@ -1,10 +1,6 @@
 module mcfost2phantom
 
-  use parametres
-  use constantes
-  use utils
-  use Voronoi_grid
-  use em_th, only : temperature
+!  use parametres
 
   implicit none
 
@@ -12,6 +8,7 @@ contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, ierr) !,  np, nptmass, ntypes, ndusttypes, npoftype)
 
+    use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
     use disk, only : n_zones
@@ -99,11 +96,16 @@ contains
        compute_Frad,SPH_limits_file, & ! options
        Tdust,Frad,mu_gas,ierr) ! intent(out)
 
+    use parametres
+    use constantes, only : mu
     use read_phantom
-    use em_th, only : E_abs_nRE, frac_E_stars
+    use prop_star, only : n_etoiles
+    use em_th, only : temperature, E_abs_nRE, frac_E_stars
     use thermal_emission, only : reset_radiation_field
-    use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
     use mem, only : alloc_dynamique
+    use naleat, only : seed, stream, gtype
+    use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
+    use Voronoi_grid, only : Voronoi
     !$ use omp_lib
 
 #include "sprng_f.h"
@@ -136,7 +138,7 @@ contains
     real(kind=db) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: ncells, n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i
-    integer :: itime, time_begin, time_end, time_tick, time_max
+    integer :: itime !, time_begin, time_end, time_tick, time_max
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
