@@ -1,7 +1,5 @@
 module mcfost2phantom
 
-!  use parametres
-
   implicit none
 
 contains
@@ -12,7 +10,9 @@ contains
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
     use disk, only : n_zones
-    use dust_transfer, only : transfert_poussiere
+    use dust, only : build_grain_size_distribution, init_indices_optiques, opacite, prop_grains
+    use grid, only : define_physical_zones, order_zones, init_lambda
+    use optical_depth, only : no_dark_zone
 
     character(len=*), intent(in) :: mcfost_para_filename
     integer, intent(out) :: ierr
@@ -101,11 +101,13 @@ contains
     use read_phantom
     use prop_star, only : n_etoiles
     use em_th, only : temperature, E_abs_nRE, frac_E_stars
-    use thermal_emission, only : reset_radiation_field
+    use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie
     use mem, only : alloc_dynamique
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
     use Voronoi_grid, only : Voronoi
+    use dust_transfer, only : emit_packet, propagate_packet
+    use utils, only : progress_bar
     !$ use omp_lib
 
 #include "sprng_f.h"
