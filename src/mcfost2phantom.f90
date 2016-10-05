@@ -91,8 +91,8 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,&
-       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens, &
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,graindens,&
+       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist, &
        compute_Frad,SPH_limits, & ! options
        Tdust,Frad,mu_gas,ierr) ! intent(out)
 
