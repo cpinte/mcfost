@@ -22,7 +22,9 @@ contains
     real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
     real(db), allocatable, dimension(:,:) :: rhodust, massdust
 
-    integer :: ndusttypes, ierr
+    real(db), dimension(6) :: SPH_limits
+    integer :: ndusttypes, ierr, ios
+    character(len=100) :: line_buffer
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -45,7 +47,27 @@ contains
 
     if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits_file)
+    !*******************************
+    ! Model limits
+    !*******************************
+    write(*,*) " "
+    if (llimits_file) then
+       write(*,*) "Reading limits file: "//trim(SPH_limits_file)
+       open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
+       if (ios/=0) then
+          write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
+          write(*,*) "Exiting"
+          stop
+       endif
+       read(1,*) line_buffer
+       read(1,*) SPH_limits(1), SPH_limits(3), SPH_limits(5)
+       read(1,*) SPH_limits(2), SPH_limits(4), SPH_limits(6)
+       close(unit=1)
+    else
+       SPH_limits(:) = 0
+    endif
+
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits)
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
@@ -58,7 +80,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits_file)
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits)
 
     use Voronoi_grid
     use opacity, only : densite_pouss, masse
@@ -72,7 +94,7 @@ contains
     real(db), dimension(ndusttypes,n_SPH) :: rhodust, massdust
     real(db), dimension(ndusttypes) :: grainsize
 
-    character(len=512), intent(in) :: SPH_limits_file
+    real(db), dimension(6), intent(in) :: SPH_limits
 
     real, parameter :: limit_threshold = 0.01
 
@@ -81,9 +103,10 @@ contains
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
     real :: graindens, f
-    integer :: ierr, icell, l, k, ios, iSPH
-    character(len=100) :: line_buffer
+    integer :: ierr, icell, l, k, iSPH
+
     real(db), dimension(6) :: limits
+
 
     icell_ref = 1
 
@@ -146,23 +169,7 @@ contains
        close(unit=1)
     endif
 
-    !*******************************
-    ! Model limits
-    !*******************************
-    write(*,*) " "
-    if (llimits_file) then
-       write(*,*) "Reading limits file: "//trim(SPH_limits_file)
-       open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
-       if (ios/=0) then
-          write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
-          write(*,*) "Exiting"
-          stop
-       endif
-       read(1,*) line_buffer
-       read(1,*) limits(1), limits(3), limits(5)
-       read(1,*) limits(2), limits(4), limits(6)
-       close(unit=1)
-    else
+    if (abs(maxval(SPH_limits)) < tiny_real) then
        write(*,*) "Selecting spatial range which contains"
        write(*,*) 1.0-2*limit_threshold, "particles in each dimension"
 
@@ -175,12 +182,15 @@ contains
        limits(2) = select_inplace(k,real(x))
        limits(4) = select_inplace(k,real(y))
        limits(6) = select_inplace(k,real(z))
+    else
+       limits(:) = SPH_limits(:)
     endif
 
     write(*,*) "# Model limits :"
     write(*,*) "x =", limits(1), limits(2)
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
+
 
     !*******************************
     ! Voronoi tesselation

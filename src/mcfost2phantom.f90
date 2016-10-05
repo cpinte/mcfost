@@ -93,7 +93,7 @@ contains
 
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,&
        dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens, &
-       compute_Frad,SPH_limits_file, & ! options
+       compute_Frad,SPH_limits, & ! options
        Tdust,Frad,mu_gas,ierr) ! intent(out)
 
     use parametres
@@ -121,8 +121,7 @@ contains
     integer, dimension(ntypes), intent(in) :: npoftype
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
-    character(len=512), intent(in) :: SPH_limits_file ! not used yet, llimits_file is set to false
-
+    real(db), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
 
     real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not db
     real, dimension(3,ndusttypes,np), intent(out) :: Frad
@@ -164,7 +163,7 @@ contains
     call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
-    call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits_file)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits)
 
     ! Allocation dynamique
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
