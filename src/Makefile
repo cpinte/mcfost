@@ -207,20 +207,20 @@ main : mcfost
 # Code séquentiel et parallèle
 #*************************************************************
 mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
-	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o $(COMP_FITS)  $(LIBS_NR_EQDIFF) $(LIBS_SPLINE) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
+	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o   $(LIBS_NR_EQDIFF) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
-	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
+	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o mcfost2phantom.o $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a  $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/sort/libnr_sort.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
 	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
+	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG)
 
 # Fichier compile sans optimisation
 mem.o : mem.f90  modules.o
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG) $(COMP_FITS)
+	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG)
 
 io_phantom_utils.o : io_phantom_utils.f90
 	$(FF) $(FFLAGS) $(FFLAGS_R8) io_phantom_utils.f90
@@ -230,7 +230,7 @@ voro++_wrapper.o : voro++_wrapper.cpp
 
 # defaut
 %.o : %.f90  modules.o
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG) $(COMP_FITS)
+	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG)
 
 
 
@@ -251,7 +251,7 @@ system.f90 : sha.o
 	printf "end module system\n" >> system.f90
 
 mcfost2prodimo : mcfost mcfost2prodimo.o
-	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(COMP_FITS) $(LIBS_FITS)
+	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
 
 #voronoi : Voronoi.o
 #	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
