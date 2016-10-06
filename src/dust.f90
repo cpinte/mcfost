@@ -1,4 +1,4 @@
-module dust
+module dust_prop
 
   use parametres
   use grains
@@ -1145,4 +1145,4 @@ end subroutine calc_local_scattering_matrices
 
 !******************************************************************************
 
-end module dust
+end module dust_prop

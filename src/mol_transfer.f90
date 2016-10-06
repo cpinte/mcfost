@@ -14,7 +14,7 @@ module mol_transfer
   use benchmarks
   use output
   use molecules
-  use dust
+  use dust_prop
   use scattering
   use optical_depth
   use ProDiMo, only: read_ProDiMo2mcfost
