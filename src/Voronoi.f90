@@ -241,8 +241,8 @@ module Voronoi_grid
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
-    real(kind=db), dimension(n_points+n_etoiles) :: x_tmp, y_tmp, z_tmp
-    integer, dimension(n_points+n_etoiles) :: SPH_id
+    real(kind=db), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
+    integer, dimension(:), allocatable :: SPH_id
     real :: time
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
@@ -255,6 +255,14 @@ module Voronoi_grid
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
+
+    allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), &
+         SPH_id(n_points+n_etoiles),stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error Voronoi temp arrays"
+       write(*,*) "Exiting"
+       stop
+    endif
 
     do istar=1, n_etoiles
        deuxr2_star(istar) = (2*etoile(istar)%r)**2
@@ -402,9 +410,9 @@ module Voronoi_grid
     write(*,*) "Found", n_in, "cells"
 
     if (n_in /= n_cells) then
-       write(*,*) "*****************************************"
-       write(*,*) "ERROR : some particles are not the mesh"
-       write(*,*) "*****************************************"
+       write(*,*) "*******************************************"
+       write(*,*) "ERROR : some particles are not in the mesh"
+       write(*,*) "*******************************************"
        stop
     endif
 
@@ -412,6 +420,7 @@ module Voronoi_grid
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
     write(*,*) "Voronoi volume =", sum(volume)
 
+    deallocate(x_tmp, y_tmp, z_tmp, SPH_id)
     !i = 1
     !write(*,*) i, real(Voronoi(i)%xyz(1)), real(Voronoi(i)%xyz(2)), real(Voronoi(i)%xyz(3)), real(volume(i)), Voronoi(i)%last_neighbour-Voronoi(i)%first_neighbour+1, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 

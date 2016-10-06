@@ -73,9 +73,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  endif
 
  allocate(xyzh(4,np),itype(np),tmp(np))
- if (ndusttypes > 0) then
-    allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
- endif
+ allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
+
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
 
@@ -275,9 +274,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- if (ndusttypes > 0) then
-    allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH))
- endif
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH))
  allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
