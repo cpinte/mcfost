@@ -137,7 +137,7 @@ FFLAGS = -c $(PREC)
 FFLAGS_EXE = $(PREC)
 
 LIBS = $(MCFOST_INSTALL)/lib/gfortran64/
-LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
+LIBS_VORO =  -L$(LIBS) -lvoro++ -lc++
 
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif
@@ -210,17 +210,12 @@ mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o   $(LIBS_NR_EQDIFF) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
-	mkdir ../lib/artmp
-	cp ../lib/lib/libcfitsio.a ../lib/lib/libsprng.a ../lib/lib/libvoro++.a ../lib/lib/nr/libnr.a ../lib/lib/nr/eq_diff/libnr_eq_diff.a ../lib/lib/nr/sort/libnr_sort.a ../lib/artmp
-	ar x ../lib/artmp/libcfitsio.a
-	ar x ../lib/artmp/libnr.a
-	ar x ../lib/artmp/libnr_eq_diff.a
-	ar x ../lib/artmp/libnr_sort.a
-	ar x ../lib/artmp/libsprng.a
-	ar x ../lib/artmp/libvoro++.a
-	ar r ../lib/artmp/libmcfost.a *.o
-	mv ../lib/artmp/libmcfost.a .
-	rm -r ../lib/artmp
+	mkdir -p libtmp
+	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a $(LIBS)/nr/sort/libnr_sort.a libtmp
+	cd libtmp/ ; ar x libcfitsio.a ; ar x libnr.a ; ar x libnr_eq_diff.a ; ar x libnr_sort.a ; ar x libsprng.a ; ar x libvoro++.a
+	rm -f mcfost.o
+	ar vr libmcfost.a *.o libtmp/*.o
+	rm -r libtmp
 	ranlib libmcfost.a
 
 # Fichiers necessaires aux suivants
