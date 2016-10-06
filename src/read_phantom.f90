@@ -57,7 +57,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  call extract('nparttot',np,hdr,ierr)
  call extract('ntypes',ntypes,hdr,ierr)
  call extract('npartoftype',npartoftype(1:ntypes),hdr,ierr)
- call extract('ndusttypes',ndusttypes,hdr,ierr,default=1)
+ call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
  call extract('nptmass',nptmass,hdr,ierr,default=0)
  !call extract('isink',isink,hdr,ierr,default=0)
 
