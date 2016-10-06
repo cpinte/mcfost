@@ -22,7 +22,7 @@ module dust_transfer
   use input
   use benchmarks
   use diffusion
-  use dust
+  use dust_prop
   use stars
   use mem
   use utils

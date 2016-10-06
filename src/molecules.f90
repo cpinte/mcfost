@@ -6,7 +6,7 @@ module molecules
   use opacity
   use prop_star
   use grid
-  use dust
+  use dust_prop
   use mem
 
   use ProDiMo, only : m2p ! to get the continuum radiation field
