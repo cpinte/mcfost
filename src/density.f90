@@ -775,7 +775,7 @@ subroutine define_dust_density()
   if (lcavity) then
      do icell=1,n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
-        if (z_grid(icell) > surface) then
+        if (abs(z_grid(icell)) > surface) then
            densite_pouss(:,icell) = 0.0_db
         endif
      enddo
