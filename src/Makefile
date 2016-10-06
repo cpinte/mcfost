@@ -210,7 +210,18 @@ mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o   $(LIBS_NR_EQDIFF) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
-	libtool -static -o ${@} $(OBJECTS) voro++_wrapper.o mcfost2phantom.o $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a  $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/sort/libnr_sort.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a
+	mkdir ../lib/artmp
+	cp ../lib/lib/libcfitsio.a ../lib/lib/libsprng.a ../lib/lib/libvoro++.a ../lib/lib/nr/libnr.a ../lib/lib/nr/eq_diff/libnr_eq_diff.a ../lib/lib/nr/sort/libnr_sort.a ../lib/artmp
+	ar x ../lib/artmp/libcfitsio.a
+	ar x ../lib/artmp/libnr.a
+	ar x ../lib/artmp/libnr_eq_diff.a
+	ar x ../lib/artmp/libnr_sort.a
+	ar x ../lib/artmp/libsprng.a
+	ar x ../lib/artmp/libvoro++.a
+	ar r ../lib/artmp/libmcfost.a *.o
+	mv ../lib/artmp/libmcfost.a .
+	rm -r ../lib/artmp
+	ranlib libmcfost.a
 
 # Fichiers necessaires aux suivants
 modules.o : modules.f90
