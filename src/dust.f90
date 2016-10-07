@@ -848,6 +848,7 @@ subroutine opacite(lambda, p_lambda)
   do icell=1, n_cells  ! this can be long when there are many cells
      kappa(icell,lambda) = 0.0
      kappa_sca(icell,lambda) = 0.0
+     tab_g_pos(icell,lambda) = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
 
