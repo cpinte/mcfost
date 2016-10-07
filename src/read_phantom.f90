@@ -19,14 +19,14 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  integer :: nblocks,narraylengths,nblockarrays,number
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
- integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype
+ integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
  real(db) :: massoftype(maxtypes),hfact,umass,utime,udist
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
  real(db) :: graindens
- real(db), allocatable, dimension(:) :: luminosity
+ real(db), allocatable, dimension(:) :: dudt
  real(db), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
@@ -75,7 +75,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
 
  allocate(xyzh(4,np),itype(np),tmp(np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
- allocate(luminosity(np))
+ allocate(dudt(np))
 
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
@@ -103,6 +103,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  ! skip each block that is too small
  nblockarrays = narraylengths*nblocks
 
+ ndudt = 0
  ngrains = 0
  do iblock = 1,nblocks
     call read_blockheader(iunit,narraylengths,number8,nums,ierr)
@@ -147,7 +148,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
                       got_dustfrac = .true.
                    case('luminosity')
                       read(iunit,iostat=ierr) tmp(1:np)
-                      luminosity(1:np) = real(tmp(1:np),kind=db)
+                      dudt(1:np) = real(tmp(1:np),kind=db)
+                      ndudt = np
                    case default
                       matched = .false.
                       read(iunit,iostat=ierr)
@@ -219,11 +221,16 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
     dustfrac = 0.
  endif
 
+ if (ndudt == 0) then
+    dudt = 0.
+ endif
+
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
+         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
+         x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -239,7 +246,7 @@ end subroutine read_phantom_file
 !*************************************************************************
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
+     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -257,15 +264,21 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   real(db), dimension(ntypes), intent(in) :: massoftype
   real(db), intent(in) :: hfact,umass,utime,udist
   real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
+  integer, intent(in) :: ndudt
+  real(db), dimension(:), intent(in) :: dudt
 
   real(db), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
   real(db), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   integer, intent(out) :: n_SPH
 
   integer :: i,j,k,itypei, alloc_status, i_etoiles
-  real(db) :: xi, yi, zi, hi, rhoi, udens, ulength_au, usolarmass, dustfraci, Mtot
+  real(db) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, ulength_au, usolarmass, &
+              dustfraci, Mtot, totlum, qtermi
+
+  real(db), parameter :: Lsun = 3.839d33
 
   udens = umass/udist**3
+  uerg_per_s = umass*udist**2/utime**3
   ulength_au = udist/ (au_to_cm ) ! * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
@@ -317,6 +330,22 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  n_SPH = j
 
  write(*,*) "Total mass is", Mtot * usolarmass
+
+ if (ndudt == np) then
+
+    write(*,*) "Computing energy input"
+
+    totlum = 0.
+    do i=1,np
+       qtermi = dudt(i)*massoftype(1)*uerg_per_s
+       totlum = totlum + qtermi
+       !dudt(i) = qterm
+    enddo
+
+    write(*,*) "Total energy input = ",totlum,' erg/s'
+    write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
+
+ endif
 
  if (nptmass > 0) then
 
