@@ -845,7 +845,7 @@ subroutine opacite(lambda, p_lambda)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, n_cells  ! this can be log when there are many cells
+  do icell=1, n_cells  ! this can be long when there are many cells
      kappa(icell,lambda) = 0.0
      kappa_sca(icell,lambda) = 0.0
      k_abs_tot = 0.0

@@ -137,7 +137,7 @@ FFLAGS = -c $(PREC)
 FFLAGS_EXE = $(PREC)
 
 LIBS = $(MCFOST_INSTALL)/lib/gfortran64/
-LIBS_VORO =  -L$(LIBS) -lvoro++ -lc++
+LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
 
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif

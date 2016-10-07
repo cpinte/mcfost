@@ -1701,8 +1701,33 @@ end function select_absorbing_grain
 
 subroutine reset_radiation_field()
 
-  if (lRE_LTE) xKJ_abs(:,:) = 0.0_db
+  if (lRE_LTE) then
+     xKJ_abs(:,:) = 0.0_db
+     E0 = 0.0_db
+  endif
   if (lxJ_abs) xJ_abs(:,:,:) = 0.0_db
+
+  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
+
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+
+  spectre_etoiles_cumul = 0.0
+  spectre_etoiles = 0.0
+  spectre_emission_cumul = 0.0
+
+  kappa = 0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE = 0.0
+
+  tab_albedo_pos = 0 ; tab_g_pos = 0.0
+  tab_s11_pos = 0  ; prob_s11_pos = 0
+
+  prob_E_cell = 0.0
+
+  Temperature = 1.0
+  log_frac_E_em = 0.0
+
+  xT_ech = 2
+
+  kdB_dT_CDF = 0
 
   return
 
