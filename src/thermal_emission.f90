@@ -1706,23 +1706,24 @@ subroutine reset_radiation_field()
      E0 = 0.0_db
   endif
   if (lxJ_abs) xJ_abs(:,:,:) = 0.0_db
-
-  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
-
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
-
-  spectre_etoiles_cumul = 0.0
-  spectre_etoiles = 0.0
-  spectre_emission_cumul = 0.0
-
-  prob_E_cell = 0.0
-
-  Temperature = 1.0
-  log_frac_E_em = 0.0
-
   xT_ech = 2
+  Temperature = 1.0
 
-  kdB_dT_CDF = 0
+
+!  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
+!
+!  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+!
+!  spectre_etoiles_cumul = 0.0
+!  spectre_etoiles = 0.0
+!  spectre_emission_cumul = 0.0
+!
+!  prob_E_cell = 0.0
+!
+!  log_frac_E_em = 0.0
+!
+!
+!  kdB_dT_CDF = 0
 
   return
 
