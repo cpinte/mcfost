@@ -10,15 +10,18 @@ contains
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
     use disk, only : n_zones
-    use dust_prop, only : build_grain_size_distribution, init_indices_optiques, opacite, prop_grains
+    use dust_prop, only : build_grain_size_distribution, init_indices_optiques, prop_grains
     use grid, only : define_physical_zones, order_zones, init_lambda
     use optical_depth, only : no_dark_zone
+    use mem, only : alloc_dust_prop
 
     character(len=*), intent(in) :: mcfost_para_filename
     integer, intent(out) :: ierr
 
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
+
+    write(*,*) "Initializing MCFOST library"
 
     ! Global logical variables
     call set_default_variables()
@@ -62,6 +65,7 @@ contains
 
     ! Dust properties
     write(*,'(a30, $)') "Computing dust properties ..."
+
     if (lscattering_method1) then
        lambda = 1
        p_lambda => lambda
@@ -75,14 +79,19 @@ contains
        endif
     endif
 
+    call alloc_dust_prop()
     do lambda=1,n_lambda
        call prop_grains(lambda)
-       call opacite(lambda, p_lambda)
     enddo !n
     write(*,*) "Done"
 
     call no_dark_zone()
     lapprox_diffusion=.false.
+
+    lonly_LTE = .false.
+    lonly_nLTE = .false.
+    if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
+    if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
 
     ierr = 0
     return
@@ -101,14 +110,19 @@ contains
     use read_phantom
     use prop_star, only : n_etoiles
     use em_th, only : temperature, E_abs_nRE, frac_E_stars
-    use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie
-    use mem, only : alloc_dynamique
+    use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
+         chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em
+    use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
-    use Voronoi_grid, only : Voronoi
+    use Voronoi_grid, only : Voronoi, deallocate_Voronoi
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
+    use dust_prop, only : opacite
+    use stars, only : repartition_energie_etoiles
+    use grid,only : setup_grid
     !$ use omp_lib
+
 
 #include "sprng_f.h"
 
@@ -138,14 +152,15 @@ contains
     real(kind=db) :: nnfot2
     real(kind=db) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
-    integer :: ncells, n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i
+    integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i
     integer :: itime !, time_begin, time_end, time_tick, time_max
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
 
-    logical, save :: lfirst_time
+    logical, save :: lfirst_time = .true.
 
+    write(*,*) "Running mcfost via the library"
 
     ! debut de l'execution
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -157,19 +172,19 @@ contains
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,XX,YY,ZZ,massgas,massdust,rhogas,rhodust,n_SPH)
-    if (ncells <= 0) then
-       ierr = 1
-       return
-    endif
 
     call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits)
 
+    call setup_grid()
     ! Allocation dynamique
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
-    if (lfirst_time) call alloc_dynamique(n_cells_max= n_SPH + n_etoiles)
+    if (lfirst_time) then
+       call alloc_dynamique(n_cells_max= n_SPH + n_etoiles)
+       lfirst_time = .false.
+    endif
 
     ! init random number generator
     stream = 0.0
@@ -177,8 +192,27 @@ contains
        stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     enddo
 
+    if (lscattering_method1) then
+       write(*,*) "testA1"
+       lambda = 1
+       p_lambda => lambda
+    else
+       if (p_n_lambda_pos == n_lambda) then
+          lambda = 1
+          p_lambda => lambda
+       else
+          lambda0 = 1
+          p_lambda => lambda0
+       endif
+    endif
+
+   do lambda=1,n_lambda
+      call opacite(lambda, p_lambda)
+   enddo !n
+
     frac_E_stars=1.0 ! tous les photons partent de l'etoile
     call repartition_energie_etoiles()
+    call repartition_wl_em()
 
     call init_reemission()
     call chauffage_interne()
@@ -192,24 +226,9 @@ contains
     !$omp end parallel
 
     letape_th = .true.
+    laffichage=.true.
     nbre_phot2 = nbre_photons_eq_th
 
-    if (lscattering_method1) then
-       lambda = 1
-       p_lambda => lambda
-    else
-       if (p_n_lambda_pos == n_lambda) then
-          lambda = 1
-          p_lambda => lambda
-       else
-          lambda0 = 1
-          p_lambda => lambda0
-       endif
-    endif
-
-    lambda=1
-    laffichage=.true.
-    nbre_phot2 = nbre_photons_lambda
 
     write(*,*) "Computing temperature structure ..."
     ! Making the MC run
@@ -241,6 +260,7 @@ contains
 
           ! Emission du paquet
           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
+          Stokes = 0.0_db ; Stokes(1) = 1.0_db
           lpacket_alive = .true.
 
           ! Propagation du packet
@@ -281,6 +301,8 @@ contains
        if (i_SPH > 0) Tdust(i_SPH) = Temperature(icell)
     enddo
 
+    call deallocate_Voronoi()
+    call deallocate_densities()
 
     ! Temps d'execution
     call system_clock(time_end)
