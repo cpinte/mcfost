@@ -26,6 +26,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
  real(db) :: graindens
+ real(db), allocatable, dimension(:) :: luminosity
  real(db), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
@@ -74,6 +75,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
 
  allocate(xyzh(4,np),itype(np),tmp(np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
+ allocate(luminosity(np))
 
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
  itype = 1
@@ -143,6 +145,9 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
                       read(iunit,iostat=ierr) tmp(1:np)
                       dustfrac(ngrains,1:np) = real(tmp(1:np),kind=db)
                       got_dustfrac = .true.
+                   case('luminosity')
+                      read(iunit,iostat=ierr) tmp(1:np)
+                      luminosity(1:np) = real(tmp(1:np),kind=db)
                    case default
                       matched = .false.
                       read(iunit,iostat=ierr)
