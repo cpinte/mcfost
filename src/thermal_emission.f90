@@ -1715,11 +1715,6 @@ subroutine reset_radiation_field()
   spectre_etoiles = 0.0
   spectre_emission_cumul = 0.0
 
-  kappa = 0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE = 0.0
-
-  tab_albedo_pos = 0 ; tab_g_pos = 0.0
-  tab_s11_pos = 0  ; prob_s11_pos = 0
-
   prob_E_cell = 0.0
 
   Temperature = 1.0

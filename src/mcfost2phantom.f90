@@ -90,6 +90,12 @@ contains
     if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
     if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
 
+    if (aniso_method==1) then
+       lmethod_aniso1 = .true.
+    else
+       lmethod_aniso1 = .false.
+    endif
+
     ierr = 0
     return
 
