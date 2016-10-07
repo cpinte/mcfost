@@ -85,9 +85,6 @@ contains
     enddo !n
     write(*,*) "Done"
 
-    call no_dark_zone()
-    lapprox_diffusion=.false.
-
     lonly_LTE = .false.
     lonly_nLTE = .false.
     if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
@@ -109,7 +106,7 @@ contains
     use constantes, only : mu
     use read_phantom
     use prop_star, only : n_etoiles
-    use em_th, only : temperature, E_abs_nRE, frac_E_stars
+    use em_th, only : temperature, E_abs_nRE, frac_E_stars, xKJ_abs, E0, xT_ech, log_frac_E_em
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
          chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em
     use mem, only : alloc_dynamique, deallocate_densities
@@ -121,6 +118,8 @@ contains
     use dust_prop, only : opacite
     use stars, only : repartition_energie_etoiles
     use grid,only : setup_grid
+    use optical_depth, only : no_dark_zone, integ_tau
+    use grains, only : tab_lambda
     !$ use omp_lib
 
 
@@ -152,7 +151,7 @@ contains
     real(kind=db) :: nnfot2
     real(kind=db) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
-    integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i
+    integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
     integer :: itime !, time_begin, time_end, time_tick, time_max
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
@@ -175,6 +174,8 @@ contains
 
     call compute_stellar_parameters()
 
+    write(*,*) "SPH2Voro"
+
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits)
 
@@ -185,6 +186,8 @@ contains
        call alloc_dynamique(n_cells_max= n_SPH + n_etoiles)
        lfirst_time = .false.
     endif
+    call no_dark_zone()
+    lapprox_diffusion=.false.
 
     ! init random number generator
     stream = 0.0
@@ -193,7 +196,6 @@ contains
     enddo
 
     if (lscattering_method1) then
-       write(*,*) "testA1"
        lambda = 1
        p_lambda => lambda
     else
@@ -206,9 +208,9 @@ contains
        endif
     endif
 
-   do lambda=1,n_lambda
-      call opacite(lambda, p_lambda)
-   enddo !n
+    do lambda=1,n_lambda
+       call opacite(lambda, p_lambda)
+    enddo !n
 
     frac_E_stars=1.0 ! tous les photons partent de l'etoile
     call repartition_energie_etoiles()
@@ -229,6 +231,15 @@ contains
     laffichage=.true.
     nbre_phot2 = nbre_photons_eq_th
 
+
+    test_tau : do lambda=1,n_lambda
+       if (tab_lambda(lambda) > wl_seuil) then
+          lambda_seuil=lambda
+          exit test_tau
+       endif
+    enddo test_tau
+    write(*,*) "lambda =", tab_lambda(lambda_seuil)
+    call integ_tau(lambda_seuil)
 
     write(*,*) "Computing temperature structure ..."
     ! Making the MC run
@@ -303,6 +314,9 @@ contains
 
     call deallocate_Voronoi()
     call deallocate_densities()
+
+    ! reset energy and temperature arrays
+    call reset_radiation_field()
 
     ! Temps d'execution
     call system_clock(time_end)
