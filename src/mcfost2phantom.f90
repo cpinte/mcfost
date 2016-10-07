@@ -92,9 +92,9 @@ contains
   !*************************************************************************
 
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,graindens,&
-       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist, &
+       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt, &
        compute_Frad,SPH_limits, & ! options
-       Tdust,Frad,mu_gas,ierr) ! intent(out)
+       Tdust,Frad,mu_gas,ierr)   ! intent(out)
 
     use parametres
     use constantes, only : mu
@@ -125,11 +125,13 @@ contains
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
     real(db), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
 
+    integer, intent(in) :: ndudt
+    real(db), dimension(ndudt), intent(in) :: dudt
+
     real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not db
     real, dimension(3,ndusttypes,np), intent(out) :: Frad
     real(db), intent(out) :: mu_gas
     integer, intent(out) :: ierr
-
 
     real(db), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
     real(db), dimension(:,:), allocatable :: rhodust, massdust
@@ -156,7 +158,8 @@ contains
     Frad = 0.
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,XX,YY,ZZ,massgas,massdust,rhogas,rhodust,n_SPH)
+         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
+         XX,YY,ZZ,massgas,massdust,rhogas,rhodust,n_SPH)
     if (ncells <= 0) then
        ierr = 1
        return
