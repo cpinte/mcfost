@@ -103,6 +103,7 @@ subroutine transfert_poussiere()
   endif
 
   ! Allocation dynamique de tous les autres tableaux
+  call alloc_dust_prop()
   call alloc_dynamique()
 
   laffichage=.true.
