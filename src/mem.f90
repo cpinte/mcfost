@@ -27,7 +27,6 @@ subroutine allocate_densities(n_cells_max)
      Nc = n_cells
   endif
 
-
   allocate(masse(Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error mass'
@@ -50,6 +49,96 @@ subroutine allocate_densities(n_cells_max)
   densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
 end subroutine allocate_densities
+
+!*****************************************************************
+
+subroutine deallocate_densities
+
+  deallocate(masse, densite_pouss, densite_gaz, densite_gaz_midplane, masse_gaz)
+
+  return
+
+end subroutine deallocate_densities
+
+!*****************************************************************
+
+subroutine alloc_dust_prop()
+
+  integer ::  alloc_status
+
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_albedo'
+     stop
+  endif
+  tab_albedo = 0
+
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda), C_abs_norm(n_grains_tot,n_lambda), stat=alloc_status) !  C_geo(n_grains_tot)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error q_ext'
+     stop
+  endif
+  C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm =0
+
+
+  allocate(tab_g(n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_g'
+     stop
+  endif
+  tab_g = 0
+
+    ! **************************************************
+  ! tableaux relatifs aux prop optiques des grains
+  ! **************************************************
+  allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_s11'
+     stop
+  endif
+  tab_s11 = 0
+
+  allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_s12'
+     stop
+  endif
+  tab_s12 = 0
+
+  allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_s33'
+     stop
+  endif
+  tab_s33 = 0
+
+  allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_s34'
+     stop
+  endif
+  tab_s34 = 0
+
+  if (laggregate) then
+     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tab_mueller'
+        stop
+     endif
+     tab_mueller = 0
+  endif
+
+  allocate(prob_s11(n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error prob_s11'
+     stop
+  endif
+  prob_s11 = 0
+
+  return
+
+end subroutine alloc_dust_prop
 
 !*****************************************************************
 
@@ -120,29 +209,6 @@ subroutine alloc_dynamique(n_cells_max)
   ri_out_dark_zone=0
   zj_sup_dark_zone=0
   if (l3D) zj_inf_dark_zone=0
-
-  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo'
-     stop
-  endif
-  tab_albedo = 0
-
-  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
-       C_abs(n_grains_tot,n_lambda), C_abs_norm(n_grains_tot,n_lambda), stat=alloc_status) !  C_geo(n_grains_tot)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error q_ext'
-     stop
-  endif
-  C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm =0
-
-
-  allocate(tab_g(n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_g'
-     stop
-  endif
-  tab_g = 0
 
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
@@ -258,53 +324,6 @@ subroutine alloc_dynamique(n_cells_max)
         write(*,*) "Using low memory mode for scattering properties"
      endif
   endif ! method
-
-  ! **************************************************
-  ! tableaux relatifs aux prop optiques des grains
-  ! **************************************************
-  allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s11'
-     stop
-  endif
-  tab_s11 = 0
-
-  allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s12'
-     stop
-  endif
-  tab_s12 = 0
-
-  allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s33'
-     stop
-  endif
-  tab_s33 = 0
-
-  allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s34'
-     stop
-  endif
-  tab_s34 = 0
-
-  if (laggregate) then
-     allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_mueller'
-        stop
-     endif
-     tab_mueller = 0
-  endif
-
-  allocate(prob_s11(n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_s11'
-     stop
-  endif
-  prob_s11 = 0
 
   ! **************************************************
   ! Tableaux relatifs aux prop d'emission des cellules
