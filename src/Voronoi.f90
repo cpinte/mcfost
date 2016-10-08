@@ -356,8 +356,9 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-         lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    !call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
+    !     lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    lcompute = .true.
     if (lcompute) then
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
@@ -366,7 +367,7 @@ module Voronoi_grid
           write(*,*) "Exiting"
           stop
        endif
-       call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+       !call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
     else
        write(*,*) "Reading previous Voronoi tesselation"
     endif
@@ -1019,5 +1020,17 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
     return
 
   end subroutine indice_cellule_Voronoi
+
+!----------------------------------------
+  subroutine deallocate_Voronoi()
+
+    if (allocated(Voronoi)) deallocate(Voronoi)
+    if (allocated(volume)) deallocate(volume)
+    if (allocated(neighbours_list)) deallocate(neighbours_list)
+    if (allocated(wall)) deallocate(wall)
+
+    return
+
+  end subroutine deallocate_Voronoi
 
 end module Voronoi_grid

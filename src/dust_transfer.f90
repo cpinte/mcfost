@@ -103,6 +103,7 @@ subroutine transfert_poussiere()
   endif
 
   ! Allocation dynamique de tous les autres tableaux
+  call alloc_dust_prop()
   call alloc_dynamique()
 
   laffichage=.true.
@@ -1099,8 +1100,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
         ! Choix longueur d'onde
         if (lonly_LTE) then
+           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
            call im_reemission_LTE(id,icell,p_icell,rand,rand2,lambda)
         else if (lonly_NLTE) then
+           rand = sprng(stream(id)) ; rand2 = sprng(stream(id))
            call im_reemission_NLTE(id,icell,p_icell,rand,rand2,lambda)
         else
            ! We need to select which type of dust grain will re-emit
