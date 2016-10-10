@@ -524,10 +524,10 @@ subroutine Temp_finale()
   !KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
   KJ_abs(:) = 0.0
   do i=1,nb_proc
-     KJ_abs(:) = KJ_abs(:) + xKJ_abs(:,i)
+     KJ_abs(:) = KJ_abs(:) + xKJ_abs(1:n_cells,i)
   enddo
 
-  KJ_abs(:)= KJ_abs(:)*n_phot_L_tot + E0(:) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+  KJ_abs(:)= KJ_abs(:)*n_phot_L_tot + E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
   !$omp parallel &
   !$omp default(none) &
@@ -1352,9 +1352,9 @@ subroutine emission_nRE()
      frac_E_stars(lambda) = 0.0
 
      if (prob_E_cell(n_cells,lambda) > tiny_real) then
-        prob_E_cell(:,lambda)=prob_E_cell(:,lambda)/prob_E_cell(n_cells,lambda)
+        prob_E_cell(1:n_cells,lambda)=prob_E_cell(1:n_cells,lambda)/prob_E_cell(n_cells,lambda)
      else
-        prob_E_cell(:,lambda)=0.0
+        prob_E_cell(1:n_cells,lambda)=0.0
      endif
   enddo ! lambda
 
@@ -1593,7 +1593,7 @@ subroutine chauffage_interne()
 
   if (lRE_LTE) then
      ! Energie venant de l'equilibre avec nuage à T_min
-     E0(:) = exp(log_frac_E_em(1,:))
+     E0(1:n_cells) = exp(log_frac_E_em(1,1:n_cells))
 
 !!$  ! Energie venant du chauffage visqueux
 !!$  do i=1,n_rad
