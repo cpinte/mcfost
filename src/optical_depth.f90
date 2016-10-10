@@ -1032,10 +1032,10 @@ subroutine define_proba_weight_emission(lambda)
   enddo ! icell
 
 
-  weight_proba_emission(:) =  exp(-tau_min(:))
+  weight_proba_emission(1:n_cells) =  exp(-tau_min(:))
 
   ! correct_E_emission sera normalise dans repartition energie
-  correct_E_emission(:) = 1.0_db / weight_proba_emission(:)
+  correct_E_emission(1:n_cells) = 1.0_db / weight_proba_emission(1:n_cells)
 
   return
 

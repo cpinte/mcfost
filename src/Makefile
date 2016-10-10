@@ -125,7 +125,7 @@ CC_SER = g++ -Wall -ansi -pedantic -m64
 CC_OMP = g++ -Wall -ansi -pedantic -m64
 OPTS = -O3 -funroll-loops -ffinite-math-only -fno-trapping-math #-ffast-math : -funsafe-math-optimizations make mcfost stall, rest not much faster than 03
 #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized #-Wconversion -Warray-temporaries
+DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -fbacktrace #-Wconversion -Warray-temporaries
 #-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
 #-g -C -ggdb -ftrace=full  -fimplicit-none
 # -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
