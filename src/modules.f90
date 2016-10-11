@@ -575,18 +575,6 @@ end module em_th
 
 !********************************************************************
 
-module ode_data
-
-  implicit none
-  save
-
-  real :: coeff_exp, coeff1, coeff2, rcyl
-
-
-end module ode_data
-
-!***********************************************************
-
 module constantes
 
   use parametres

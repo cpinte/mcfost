@@ -10,12 +10,13 @@ module density
   use disk
   use nr, only : rkqs
   use nrtype, only : sp
-  use ode_data
   use grid
   use utils
   use output
 
   implicit none
+
+  real :: coeff_exp, coeff1, coeff2, rcyl
 
   contains
 
