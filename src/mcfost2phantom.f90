@@ -63,9 +63,6 @@ contains
     call order_zones()
     call define_physical_zones()
 
-    ! Dust properties
-    write(*,'(a30, $)') "Computing dust properties ..."
-
     if (lscattering_method1) then
        lambda = 1
        p_lambda => lambda
@@ -79,6 +76,8 @@ contains
        endif
     endif
 
+    ! Dust properties
+    write(*,'(a30, $)') "Computing dust properties ..."
     call alloc_dust_prop()
     do lambda=1,n_lambda
        call prop_grains(lambda)
