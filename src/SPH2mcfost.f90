@@ -67,7 +67,7 @@ contains
        SPH_limits(:) = 0
     endif
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
@@ -80,7 +80,8 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits)
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, &
+       SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
     use opacity, only : densite_pouss, masse
@@ -90,11 +91,11 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(db), dimension(n_SPH) :: x,y,z,rho,massgas
-    real(db), dimension(ndusttypes,n_SPH) :: rhodust, massdust
-    real(db), dimension(ndusttypes) :: grainsize
-
+    real(db), dimension(n_SPH), intent(in) :: x,y,z,rho,massgas
+    real(db), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
+    real(db), dimension(ndusttypes), intent(in) :: grainsize
     real(db), dimension(6), intent(in) :: SPH_limits
+    logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: limit_threshold = 0.01
 
@@ -197,7 +198,7 @@ contains
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
-    call Voronoi_tesselation(n_SPH, x,y,z, limits)
+    call Voronoi_tesselation(n_SPH, x,y,z, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 

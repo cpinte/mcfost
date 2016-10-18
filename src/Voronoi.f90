@@ -233,18 +233,19 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,  limits)
+  subroutine Voronoi_tesselation(n_points, x,y,z,  limits, check_previous_tesselation)
 
     integer, intent(in) :: n_points
     real(kind=db), dimension(n_points), intent(in) :: x, y, z
     real(kind=db), dimension(6), intent(in) :: limits
+    logical, intent(in) :: check_previous_tesselation
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=db), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
     integer, dimension(:), allocatable :: SPH_id
     real :: time
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
 
     logical :: is_outside_stars, lcompute
@@ -356,9 +357,12 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    !call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-    !     lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
-    lcompute = .true.
+    if (check_previous_tesselation) then
+       call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
+            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
+    else
+       lcompute = .true.
+    endif
     if (lcompute) then
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
@@ -367,7 +371,9 @@ module Voronoi_grid
           write(*,*) "Exiting"
           stop
        endif
-       !call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+       if (check_previous_tesselation) then
+          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
+       endif
     else
        write(*,*) "Reading previous Voronoi tesselation"
     endif
@@ -378,9 +384,10 @@ module Voronoi_grid
     deallocate(first_neighbours,last_neighbours)
 
     ! Setting-up the walls
+    n_missing_cells = 0
     do icell=1, n_cells
        if (volume(icell) < tiny_real) then
-          write(*,*) "icell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          n_missing_cells = n_missing_cells + 1
        endif
 
        ! todo : find the cells touching the walls
@@ -399,6 +406,13 @@ module Voronoi_grid
           endif ! wall
        enddo ! k
     enddo ! i
+
+    if (n_missing_cells > 0) then
+       write(*,*) "*******************************************"
+       write(*,*) "WARNING:", n_missing_cells, "are missing"
+       write(*,*) "*******************************************"
+    endif
+    !write(*,*) "icell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
 
     call system_clock(time2)
     time=(time2 - time1)/real(time_tick)
