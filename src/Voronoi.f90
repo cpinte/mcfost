@@ -7,6 +7,7 @@ module Voronoi_grid
   use opacity, only : volume
   use disk, only : density_file
   use prop_star
+  use kdtree2_module
 
   implicit none
 
@@ -14,7 +15,7 @@ module Voronoi_grid
   real(kind=db), parameter :: prec = 1.e-6_db
 
   type Voronoi_cell
-     real, dimension(3) :: xyz
+     real(kind=db), dimension(3) :: xyz
      integer :: id, first_neighbour, last_neighbour
      logical :: exist
   end type Voronoi_cell
@@ -25,11 +26,15 @@ module Voronoi_grid
      integer :: n_neighbours
      integer, dimension(max_wall_neighbours) :: neighbour_list ! Warning hard coded
 
+     ! Fortran trick to make an array of pointers
+     type(kdtree2), pointer :: tree
+
      ! Plane wall :
      ! x1, x2, x3 : normal
      ! x4 : displacement along the normal
   end type Voronoi_wall
 
+  real(kind=db), dimension(:,:,:), allocatable :: wall_cells ! 3, n_cells_wall, n_walls
 
   type(Voronoi_cell), dimension(:), allocatable :: Voronoi
   type(Voronoi_wall), dimension(:), allocatable :: wall
@@ -407,6 +412,9 @@ module Voronoi_grid
        enddo ! k
     enddo ! i
 
+    write(*,*) "Building the kd-trees for the model walls"
+    call build_wall_kdtrees()
+
     if (n_missing_cells > 0) then
        write(*,*) "*******************************************"
        write(*,*) "WARNING:", n_missing_cells, "are missing"
@@ -774,7 +782,6 @@ module Voronoi_grid
     real(kind=db) :: s, l, x_test, y_test, z_test
     integer :: i, iwall
 
-
     ! Find out which plane we are crossing first
     ! and test boundaries of the plane
     s_walls(:) = huge(1.0)
@@ -943,7 +950,7 @@ end function is_in_volume
 
 !----------------------------------------
 
-integer function find_Voronoi_cell(iwall, x,y,z)
+integer function find_Voronoi_cell_brute_force(iwall, x,y,z)
   ! Methode debile : boucle sur toutes les cellules pour test
 
   integer, intent(in) :: iwall
@@ -963,11 +970,11 @@ integer function find_Voronoi_cell(iwall, x,y,z)
      endif
   enddo
 
-  find_Voronoi_cell = icell_min
+  find_Voronoi_cell_brute_force = icell_min
 
   return
 
-end function find_Voronoi_cell
+end function find_Voronoi_cell_brute_force
 
 !----------------------------------------
 
@@ -1036,15 +1043,110 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
   end subroutine indice_cellule_Voronoi
 
 !----------------------------------------
-  subroutine deallocate_Voronoi()
 
-    if (allocated(Voronoi)) deallocate(Voronoi)
-    if (allocated(volume)) deallocate(volume)
-    if (allocated(neighbours_list)) deallocate(neighbours_list)
-    if (allocated(wall)) deallocate(wall)
+subroutine deallocate_Voronoi()
 
-    return
+  if (allocated(Voronoi)) deallocate(Voronoi)
+  if (allocated(volume)) deallocate(volume)
+  if (allocated(neighbours_list)) deallocate(neighbours_list)
+  if (allocated(wall)) deallocate(wall)
 
-  end subroutine deallocate_Voronoi
+  return
+
+end subroutine deallocate_Voronoi
+
+!----------------------------------------
+
+subroutine build_wall_kdtrees()
+
+  integer :: iwall, i, icell, alloc_status
+
+  allocate(wall_cells(3,maxval(wall(:)%n_neighbours),n_walls), stat=alloc_status)
+  if (alloc_status /=0) then
+     write(*,*) "Allocation error wall kdtrees"
+     write(*,*) "Exiting"
+     stop
+  endif
+  wall_cells = 0.
+
+  do iwall=1, n_walls
+     ! Filling up the data array for the kdtree
+     do i=1, wall(iwall)%n_neighbours
+        icell = wall(iwall)%neighbour_list(i)
+        wall_cells(:,i,iwall) = Voronoi(icell)%xyz(:)
+     enddo
+  enddo
+
+  do iwall=1, n_walls
+     ! Create the tree, ask for internally rearranged data for speed,
+     ! and for output NOT sorted by increasing distance from the query vector
+     wall(iwall)%tree => wall_kdtree2_create(wall_cells,iwall,n_points=wall(iwall)%n_neighbours,&
+          rearrange=.false.,sort=.false.)
+  end do
+
+  return
+
+end subroutine build_wall_kdtrees
+
+!----------------------------------------
+
+integer function find_Voronoi_cell(iwall, x,y,z)
+
+  integer, intent(in) :: iwall
+  real(kind=db), intent(in) :: x, y, z
+
+  real(kind=db), dimension(3), target :: qv
+  integer, parameter :: NN = 1 ! we only need the closest neighbour
+
+  type(kdtree2_result), dimension(NN) :: results
+
+  qv(1) = x ; qv(2) = y ; qv(3) = z
+
+  ! Find the first vectors in the tree nearest to 'qv' in euclidean norm
+  call kdtree2_n_nearest(wall(iwall)%tree,qv,NN,results)
+
+  ! Convert the neighbour index to a Voronoi cell index
+  find_Voronoi_cell = wall(iwall)%neighbour_list(results(1)%idx)
+
+  return
+
+end function find_Voronoi_cell
+
+!----------------------------------------
+
+
+!  subroutine kdtree2_example
+!
+!    !type(kdtree2), pointer :: tree
+!    integer :: N,d
+!    real(kind=db), allocatable :: mydata(:,:)
+!
+!    type(kdtree2_result), allocatable :: results(:)
+!    ! user sets d, the dimensionality of the Euclidean space
+!    ! and N, the number of points in the set.
+!    allocate(mydata(d,N))
+!    ! note order, d is first, N second.
+!    ! read in vectors into mydata(j,i) for j=1..d, i=1..N
+!
+!    allocate(wall_tree(6))
+!
+!    wall_tree(1)%tree => kdtree2_create(mydata,rearrange=.true.,sort=.true.)
+!    ! Create the tree, ask for internally rearranged data for speed,
+!    ! and for output sorted by increasing distance from the
+!    ! query vector
+!    allocate(results(20))
+!    !call kdtree2_n_nearest_around_point(tree,idxin=100,nn=20,correltime=50,results)
+!    !call kdtree2_n_nearest_around_point(tree,100,20,50,results)
+!
+!
+!    ! Now the 20 nearest neighbors to mydata(*,100) are in results(:) except
+!    ! that points within 50 time units of idxin=50 are not considered as valid neighbors.
+!    !
+!    write (*,*) "The first 10 near neighbor distances are: ", results(1:10)%dis
+!    write (*,*) "The first 10 near neighbor indexes   are: ", results(1:10)%idx
+!
+!    return
+!
+!  end subroutine kdtree2_example
 
 end module Voronoi_grid

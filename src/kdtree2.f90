@@ -17,8 +17,8 @@ module kdtree2_precision_module
   ! and if you comment out kdkind = dp
   ! you get double precision.
 
-  integer, parameter :: kdkind = sp
-  !integer, parameter :: kdkind = dp
+  !integer, parameter :: kdkind = sp
+  integer, parameter :: kdkind = dp
   public :: kdkind
 
 end module kdtree2_precision_module
@@ -490,6 +490,7 @@ module kdtree2_module
   !-------------DATA TYPE, CREATION, DELETION---------------------
   public :: kdkind
   public :: kdtree2, kdtree2_result, tree_node, kdtree2_create, kdtree2_destroy
+  public :: wall_kdtree2_create
   !---------------------------------------------------------------
   !-------------------SEARCH ROUTINES-----------------------------
   public :: kdtree2_n_nearest,kdtree2_n_nearest_around_point
@@ -676,7 +677,7 @@ contains
        allocate(mr%rearranged_data(mr%dimen,mr%n))
        do i=1,mr%n
           mr%rearranged_data(:,i) = mr%the_data(:, &
-           mr%ind(i))
+               mr%ind(i))
        enddo
     else
        nullify(mr%rearranged_data)
@@ -1894,5 +1895,98 @@ contains
        a(i)=value
     end do
   end subroutine heapsort_struct
+
+
+  function wall_kdtree2_create(input_data,iwall,dim,n_points,sort,rearrange) result (mr)
+    !
+    ! create the actual tree structure, given an input array of data.
+    !
+    ! Note, input data is input_data(1:d,1:N), NOT the other way around.
+    ! THIS IS THE REVERSE OF THE PREVIOUS VERSION OF THIS MODULE.
+    ! The reason for it is cache friendliness, improving performance.
+    !
+    ! Optional arguments:  If 'dim' is specified, then the tree
+    !                      will only search the first 'dim' components
+    !                      of input_data, otherwise, dim is inferred
+    !                      from SIZE(input_data,1).
+    !
+    !                      if sort .eqv. .true. then output results
+    !                      will be sorted by increasing distance.
+    !                      default=.false., as it is faster to not sort.
+    !
+    !                      if rearrange .eqv. .true. then an internal
+    !                      copy of the data, rearranged by terminal node,
+    !                      will be made for cache friendliness.
+    !                      default=.true., as it speeds searches, but
+    !                      building takes longer, and extra memory is used.
+    !
+    ! C. Pinte : this routine is derived from kdtree2_create to allow to create
+    ! several kdtree from a single data array (which combines several data sets for
+    ! various walls)
+    !
+    ! .. Function Return Cut_value ..
+    type (kdtree2), pointer :: mr
+    integer, intent(in), optional      :: dim, n_points
+    logical, intent(in), optional      :: sort
+    logical, intent(in), optional      :: rearrange
+    integer, intent(in)                :: iwall
+    ! ..
+    ! .. Array Arguments ..
+    real(kdkind), target :: input_data(:,:,:)
+    !
+    integer :: i
+    ! ..
+    allocate (mr)
+    mr%the_data => input_data(:,:,iwall)
+    ! pointer assignment
+
+    if (present(dim)) then
+       mr%dimen = dim
+    else
+       mr%dimen = size(input_data,1)
+    end if
+
+    if (present(n_points)) then
+       mr%n = n_points
+    else
+       mr%n = size(input_data,2)
+    endif
+
+    if (mr%dimen > mr%n) then
+       !  unlikely to be correct
+       write (*,*) 'KD_TREE_TRANS: likely user error.'
+       write (*,*) 'KD_TREE_TRANS: You passed in matrix with D=',mr%dimen
+       write (*,*) 'KD_TREE_TRANS: and N=',mr%n
+       write (*,*) 'KD_TREE_TRANS: note, that new format is data(1:D,1:N)'
+       write (*,*) 'KD_TREE_TRANS: with usually N >> D.   If N =approx= D, then a k-d tree'
+       write (*,*) 'KD_TREE_TRANS: is not an appropriate data structure.'
+       stop
+    end if
+
+    call build_tree(mr)
+
+    if (present(sort)) then
+       mr%sort = sort
+    else
+       mr%sort = .false.
+    endif
+
+    if (present(rearrange)) then
+       mr%rearrange = rearrange
+    else
+       mr%rearrange = .true.
+    endif
+
+    if (mr%rearrange) then
+       allocate(mr%rearranged_data(mr%dimen,mr%n))
+       do i=1,mr%n
+          mr%rearranged_data(:,i) = mr%the_data(:, &
+               mr%ind(i))
+       enddo
+    else
+       nullify(mr%rearranged_data)
+    endif
+
+  end function wall_kdtree2_create
 
 end module kdtree2_module
