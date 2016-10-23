@@ -1381,13 +1381,13 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
        / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
 
   ! Test si etoile est resolue
-  n_ray_star(:) = n_ray_star_SED
+  n_ray_star(:) = n_ray_star_SED / n_etoiles
 
   if (lmono0) then
      pix_size = map_size/zoom / max(igridx,igridy)
      do istar=1, n_etoiles
         if (2*etoile(istar)%r > pix_size) then
-           n_ray_star(istar) = n_ray_star_SED * 8 * int(max(etoile(istar)%r/pix_size**2,1.))
+           n_ray_star(istar) = n_ray_star_SED / n_etoiles * 8 * int(max(etoile(istar)%r/pix_size**2,1.))
            if (istar==1) write(*,*) ""
            write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
         endif
