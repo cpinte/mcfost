@@ -1099,7 +1099,7 @@ end subroutine define_cylindrical_grid
 
 !**********************************************************************
 
-  subroutine move_to_grid_cyl(x,y,z,u,v,w, icell,lintersect)
+  subroutine move_to_grid_cyl(id, x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
     ! la direction donnee pour grille cylindrique
     ! C. Pinte
@@ -1107,6 +1107,7 @@ end subroutine define_cylindrical_grid
 
     implicit none
 
+    integer, intent(in) :: id
     real(kind=db), intent(inout) :: x,y,z
     real(kind=db), intent(in) :: u,v,w
     integer, intent(out) :: icell

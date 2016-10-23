@@ -767,8 +767,9 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine move_to_grid_Voronoi(x,y,z, u,v,w, icell, lintersect)
+  subroutine move_to_grid_Voronoi(id, x,y,z, u,v,w, icell, lintersect)
 
+    integer, intent(in) :: id
     real(kind=db), intent(inout) :: x,y,z
     real(kind=db), intent(in) :: u,v,w
 
@@ -825,7 +826,7 @@ module Voronoi_grid
     x = x_test ; y = y_test ; z = z_test
 
     ! Find out the closest cell
-    icell = find_Voronoi_cell(iwall, x, y, z)
+    icell = find_Voronoi_cell(id, iwall, x, y, z)
 
     return
 
@@ -950,10 +951,10 @@ end function is_in_volume
 
 !----------------------------------------
 
-integer function find_Voronoi_cell_brute_force(iwall, x,y,z)
+integer function find_Voronoi_cell_brute_force(id, iwall, x,y,z)
   ! Methode debile : boucle sur toutes les cellules pour test
 
-  integer, intent(in) :: iwall
+  integer, intent(in) :: id, iwall
   real(kind=db), intent(in) :: x, y, z
 
   real :: dist2, dist2_min
@@ -1061,6 +1062,8 @@ subroutine build_wall_kdtrees()
 
   integer :: iwall, i, icell, alloc_status
 
+  call allocate_kdtree2_search(nb_proc)
+
   allocate(wall_cells(3,maxval(wall(:)%n_neighbours),n_walls), stat=alloc_status)
   if (alloc_status /=0) then
      write(*,*) "Allocation error wall kdtrees"
@@ -1090,9 +1093,9 @@ end subroutine build_wall_kdtrees
 
 !----------------------------------------
 
-integer function find_Voronoi_cell(iwall, x,y,z)
+integer function find_Voronoi_cell(id, iwall, x,y,z)
 
-  integer, intent(in) :: iwall
+  integer, intent(in) :: id, iwall
   real(kind=db), intent(in) :: x, y, z
 
   real(kind=db), dimension(3), target :: qv
@@ -1103,7 +1106,7 @@ integer function find_Voronoi_cell(iwall, x,y,z)
   qv(1) = x ; qv(2) = y ; qv(3) = z
 
   ! Find the first vectors in the tree nearest to 'qv' in euclidean norm
-  call kdtree2_n_nearest(wall(iwall)%tree,qv,NN,results)
+  call kdtree2_n_nearest(id, wall(iwall)%tree,qv,NN,results)
 
   ! Convert the neighbour index to a Voronoi cell index
   find_Voronoi_cell = wall(iwall)%neighbour_list(results(1)%idx)

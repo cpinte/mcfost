@@ -787,7 +787,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)
+           call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
