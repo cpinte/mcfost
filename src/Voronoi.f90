@@ -14,7 +14,7 @@ module Voronoi_grid
   real(kind=db), parameter :: prec = 1.e-6_db
 
   type Voronoi_cell
-     real, dimension(3) :: xyz
+     real(kind=db), dimension(3) :: xyz
      integer :: id, first_neighbour, last_neighbour
      logical :: exist
   end type Voronoi_cell
