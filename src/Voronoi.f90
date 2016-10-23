@@ -262,6 +262,9 @@ module Voronoi_grid
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
 
+    ! For initial poistion of rays in ray-tracing mode
+    Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
+
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles),stat=alloc_status)
     if (alloc_status /=0) then
