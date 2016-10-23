@@ -840,7 +840,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
      rand4 = sprng(stream(id))
-     call em_sphere_uniforme(i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
+     call em_sphere_uniforme(id, i_star,rand,rand2,rand3,rand4, icell,x0,y0,z0,u0,v0,w0,w02,lintersect)
      ! Lumiere non polarisee emanant de l'etoile
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
@@ -1195,6 +1195,7 @@ subroutine dust_map(lambda,ibin,iaz)
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
   l = 10.*Rmax  ! on se met loin
+
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
@@ -1566,7 +1567,7 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
            z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
-           call move_to_grid(x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG
+           call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG
 
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
               ! Flux recu dans le pixel

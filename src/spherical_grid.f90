@@ -473,7 +473,7 @@ end subroutine indice_cellule_sph_theta
 
 !***********************************************************
 
-  subroutine move_to_grid_sph(x,y,z,u,v,w, icell,lintersect)
+  subroutine move_to_grid_sph(id, x,y,z,u,v,w, icell,lintersect)
     ! Calcule la position au bord de la grille dans
     ! la direction donnee pour grille spherique
     ! C. Pinte
@@ -481,6 +481,7 @@ end subroutine indice_cellule_sph_theta
 
     implicit none
 
+    integer, intent(in) :: id
     real(kind=db), intent(inout) :: x,y,z
     real(kind=db), intent(in) :: u,v,w
     integer, intent(out) :: icell

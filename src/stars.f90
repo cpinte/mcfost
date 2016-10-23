@@ -44,7 +44,7 @@ end subroutine select_etoile
 
 !**********************************************************************
 
-subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
+subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,v,w,w2,lintersect)
 ! Choisit la position d'emission uniformement
 ! sur la surface de l'etoile et la direction de vol
 ! suivant le cos de l'angle / normale
@@ -53,7 +53,7 @@ subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
 
   implicit none
 
-  integer, intent(in) :: i_star
+  integer, intent(in) :: id, i_star
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
   integer, intent(out) :: icell
 
@@ -97,7 +97,7 @@ subroutine em_sphere_uniforme(i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,z,u,
   endif
 
   if (etoile(i_star)%out_model) then
-     call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+     call move_to_grid(id, x,y,z,u,v,w, icell,lintersect)
   else
      lintersect = .true.
   endif
@@ -649,7 +649,7 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   y = y * l
   z = z * l
 
-  call move_to_grid(x,y,z,u,v,w, icell,lintersect)
+  call move_to_grid(id, x,y,z,u,v,w, icell,lintersect)
 
   return
 
