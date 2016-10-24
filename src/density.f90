@@ -278,9 +278,9 @@ subroutine define_gas_density()
 
   ! Ajout cavite vide
   if (lcavity) then
-     do i=1, n_cells
+     do icell=1, n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
-        if (z_grid(icell) > surface) then
+        if (abs(z_grid(icell)) > surface) then
            densite_gaz(icell) = 0.0_db
         endif
      enddo
