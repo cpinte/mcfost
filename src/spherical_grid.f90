@@ -334,9 +334,8 @@ end subroutine indice_cellule_sph_theta
                 delta_phi=-1
              endif
              ! Longueur av interserction
-             if (tan_angle_lim > 1.0d299) then
+             if (tan_angle_lim > 1.0d299) then ! inclus le cas 90 deg
                 t_phi = -x0/u
-                delta_phi=0
              else
                 den= v-u*tan_angle_lim
                 if (abs(den) > 1.0e-6) then
