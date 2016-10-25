@@ -1776,37 +1776,24 @@ subroutine ecriture_J()
   implicit none
 
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(3) :: naxes
+  integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, lambda, ri, zj, phik, icell
 
   logical :: simple, extend
   character(len=512) :: filename
 
-  real(kind=db), dimension(n_lambda,n_rad,nz) :: J
-  real, dimension(n_rad,nz,n_lambda) :: Jio
+  real, dimension(n_cells,n_lambda) :: Jio
 
   filename = trim(data_dir)//"/J.fits.gz"
 
-  ! 1/4pi est inclus dans n_phot_l_tot
-  do ri=1, n_rad
-     do zj=j_start,nz
-        if (zj==0) cycle
-        phik=1
-        icell = cell_map(ri,zj,phik)
-        J(:,ri,zj) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
-     enddo
-  enddo
-
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
+  ! 1/4pi est inclus dans n_phot_l_tot
   ! teste OK par rapport a fct bb de yorick
   do lambda=1, n_lambda
-     J(lambda,:,:) = J(lambda,:,:) * tab_lambda(lambda) / tab_delta_lambda(lambda)
-     ! Inversion de l'ordre des dimensions + passage en simple precision
-     do ri=1, n_rad
-        do zj=1,nz
-           Jio(ri,zj,lambda) = J(lambda,ri,zj)
-        enddo
+     do icell=1, n_cells
+        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
+             * tab_lambda(lambda) / tab_delta_lambda(lambda)
      enddo
   enddo
 
@@ -1824,10 +1811,20 @@ subroutine ecriture_J()
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=n_lambda
+  if (l3D) then
+     naxis=4
+     naxes(1)=n_rad
+     naxes(2)=2*nz
+     naxes(3)=n_az
+     naxes(4)=n_lambda
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  else
+     naxis=3
+     naxes(1)=n_rad
+     naxes(2)=nz
+     naxes(3)=n_lambda
+     nelements=naxes(1)*naxes(2)*naxes(3)
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1836,7 +1833,6 @@ subroutine ecriture_J()
   !  Write the array to the FITS file.
   group=1
   fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
