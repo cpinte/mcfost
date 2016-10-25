@@ -95,7 +95,7 @@ subroutine alloc_ray_tracing()
      write(*,*) 'Allocation error J_th'
      stop
   endif
-  J_th = 0.0_db
+  J_th = 0.0_dp
 
   if (lscatt_ray_tracing1) then
      mem_size = (1.0*N_type_flux + 2) * RT_n_incl * RT_n_az * n_cells * n_az_rt * n_theta_rt * nb_proc * 4 / 1024.**3
@@ -106,21 +106,21 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error xI_scatt'
         stop
      endif
-     xI_scatt = 0.0_db
+     xI_scatt = 0.0_dp
 
      allocate(I_scatt(n_az_rt,n_theta_rt,N_type_flux), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error I_scatt'
         stop
      endif
-     I_scatt = 0.0_db
+     I_scatt = 0.0_dp
 
      allocate(eps_dust1(n_az_rt,n_theta_rt,N_type_flux,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust1'
         stop
      endif
-     eps_dust1 =0._db
+     eps_dust1 =0._dp
 
      allocate(itheta_rt1(RT_n_incl,RT_n_az,nb_proc), sin_scatt_rt1(RT_n_incl,RT_n_az,nb_proc), &
           sin_omega_rt1(RT_n_incl,RT_n_az,nb_proc), cos_omega_rt1(RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
@@ -139,7 +139,7 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error I_spec_star'
         stop
      endif
-     I_spec_star = 0.0_db
+     I_spec_star = 0.0_dp
 
      allocate(eps_dust2(N_type_flux,nang_ray_tracing,0:1,n_cells), &
           I_sca2(N_type_flux,nang_ray_tracing,0:1,n_cells), stat=alloc_status)
@@ -147,14 +147,14 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error eps_dust2'
         stop
      endif
-     eps_dust2 =0.0_db ; I_sca2 = 0.0_db ;
+     eps_dust2 =0.0_dp ; I_sca2 = 0.0_dp ;
 
      allocate(eps_dust2_star(4,nang_ray_tracing_star,0:1,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust2_star'
         stop
      endif
-     eps_dust2_star =0.0_db
+     eps_dust2_star =0.0_dp
 
 
      allocate(cos_thet_ray_tracing(nang_ray_tracing,0:1,nb_proc), omega_ray_tracing(nang_ray_tracing,0:1,nb_proc),&
@@ -163,8 +163,8 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error cos_thet_ray_tracing'
         stop
      endif
-     cos_thet_ray_tracing = 0._db
-     omega_ray_tracing = 0._db
+     cos_thet_ray_tracing = 0._dp
+     omega_ray_tracing = 0._dp
 
      allocate(cos_thet_ray_tracing_star(nang_ray_tracing_star,0:1,nb_proc), &
           omega_ray_tracing_star(nang_ray_tracing_star,0:1,nb_proc),&
@@ -173,15 +173,15 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error cos_thet_ray_tracing_star'
         stop
      endif
-     cos_thet_ray_tracing_star = 0._db
-     omega_ray_tracing_star = 0._db
+     cos_thet_ray_tracing_star = 0._dp
+     omega_ray_tracing_star = 0._dp
 
      allocate(I_spec(N_type_flux,n_theta_I,n_phi_I,n_cells,nb_proc),stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xI'
         stop
      endif
-     I_spec = 0.0_db
+     I_spec = 0.0_dp
   endif !lscatt_ray_tracing1
 
   return
@@ -216,7 +216,7 @@ subroutine init_directions_ray_tracing()
   ! C. Pinte
   ! 09/09/08
 
-  real(kind=db) :: cos_min, cos_max
+  real(kind=dp) :: cos_min, cos_max
   integer :: ibin, iaz
 
   allocate(tab_RT_incl(RT_n_incl),tab_RT_az(RT_n_az), tab_uv_rt(RT_n_incl), &
@@ -225,16 +225,16 @@ subroutine init_directions_ray_tracing()
   if (RT_n_incl==1) then
      tab_RT_incl(1) = RT_imin
   else
-     cos_min = cos(RT_imin / 180.0_db * pi)
-     cos_max = cos(RT_imax / 180.0_db * pi)
+     cos_min = cos(RT_imin / 180.0_dp * pi)
+     cos_max = cos(RT_imax / 180.0_dp * pi)
 
      if (lRT_i_centered) then
         do ibin=1, RT_n_incl
-           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) -0.5)/real(RT_n_incl) * (cos_max - cos_min) ) /pi * 180.0_db
+           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) -0.5)/real(RT_n_incl) * (cos_max - cos_min) ) /pi * 180.0_dp
         enddo
      else
         do ibin=1, RT_n_incl
-           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) - 1)/(real(RT_n_incl) -1) * (cos_max - cos_min) ) /pi * 180.0_db
+           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) - 1)/(real(RT_n_incl) -1) * (cos_max - cos_min) ) /pi * 180.0_dp
         enddo
      endif
   endif
@@ -252,7 +252,7 @@ subroutine init_directions_ray_tracing()
      ! 0 est remplace par un epsilon car il faut donner un axe de reference
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
      tab_uv_rt(ibin) = sin(max(tab_RT_incl(ibin),1e-20)*deg_to_rad) ! uv_rt mais v_rt = 0 ici
-     tab_w_rt(ibin) = sqrt(1.0_db - tab_uv_rt(ibin)*tab_uv_rt(ibin))
+     tab_w_rt(ibin) = sqrt(1.0_dp - tab_uv_rt(ibin)*tab_uv_rt(ibin))
      do iaz =1, RT_n_az
         tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
         tab_v_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz)*deg_to_rad)
@@ -277,10 +277,10 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
   ! TODO: cos_thet_ray_tracing n'est plus utilise depuis le super-echantillonage
 
   integer, intent(in) :: id, ibin ! RT2 : la direction d'azimuth n'a pas d'importance ici
-  real(kind=db), intent(in) :: x,y,z, u, v, w  ! z est inutilise
+  real(kind=dp), intent(in) :: x,y,z, u, v, w  ! z est inutilise
   logical, intent(in) :: lstar
-  real(kind=db) :: uv0, w0, phi, phi_pos,u_ray_tracing,  v_ray_tracing, w_ray_tracing, prod1, prod2
-  real(kind=db) :: w2, v1pi, v1pj, v1pk, xnyp, costhet, theta, omega
+  real(kind=dp) :: uv0, w0, phi, phi_pos,u_ray_tracing,  v_ray_tracing, w_ray_tracing, prod1, prod2
+  real(kind=dp) :: w2, v1pi, v1pj, v1pk, xnyp, costhet, theta, omega
   integer :: iscatt, direction, N
 
   ! Direction observateur dans repere refence
@@ -349,10 +349,10 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
            !theta = theta  + pi_sur_deux
 
            !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-           omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
+           omega = 2.0_dp * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
            !     prochain if car l'arccos va de 0 a pi seulement
            !     le +/- pour faire la difference dans le sens de rotation
-           if (v1pk < 0.0) omega = -1.0_db * omega
+           if (v1pk < 0.0) omega = -1.0_dp * omega
 
            if (lstar) then
               omega_ray_tracing_star(iscatt,direction,id) = omega
@@ -382,9 +382,9 @@ subroutine angles_scatt_rt1(id,u,v,w)
   ! 13/09/09, version intiale  19/01/08
 
   integer, intent(in) :: id
-  real(kind=db), intent(in) :: u, v, w
+  real(kind=dp), intent(in) :: u, v, w
 
-  real(kind=db) :: v1pi, v1pj, v1pk, xnyp, costhet, theta, omega, cosw, sinw
+  real(kind=dp) :: v1pi, v1pj, v1pk, xnyp, costhet, theta, omega, cosw, sinw
   real :: cos_scatt
   integer :: k, ibin, iaz
 
@@ -404,29 +404,29 @@ subroutine angles_scatt_rt1(id,u,v,w)
            call rotation(u,v,w,-tab_u_rt(ibin,iaz),-tab_v_rt(ibin,iaz),-tab_w_rt(ibin),v1pi,v1pj,v1pk)
            xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
            if (xnyp < 1e-10) then
-              xnyp = 0.0_db
-              costhet = 1.0_db
+              xnyp = 0.0_dp
+              costhet = 1.0_dp
            else
-              costhet = -1.0_db*v1pj / xnyp
+              costhet = -1.0_dp*v1pj / xnyp
            endif
 
            ! calcul de l'angle entre la normale et l'axe z (theta)
            theta = acos(costhet)
-           if (theta >= pi) theta = 0.0_db
+           if (theta >= pi) theta = 0.0_dp
 
            !     le plan de diffusion est a +ou- 90deg de la normale
            theta = theta + pi_sur_deux
 
            !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-           omega = 2.0_db * theta
+           omega = 2.0_dp * theta
            !     prochain if car l'arccos va de 0 a pi seulement
            !     le +/- pour faire la difference dans le sens de rotation
-           if (v1pk < 0.0) omega = -1.0_db * omega
+           if (v1pk < 0.0) omega = -1.0_dp * omega
 
            cosw = cos(omega)
            sinw = sin(omega)
-           if (abs(cosw) < 1e-06) cosw = 0.0_db
-           if (abs(sinw) < 1e-06) sinw = 0.0_db
+           if (abs(cosw) < 1e-06) cosw = 0.0_dp
+           if (abs(sinw) < 1e-06) sinw = 0.0_dp
 
            cos_omega_rt1(ibin,iaz,id) = cosw
            sin_omega_rt1(ibin,iaz,id) = sinw
@@ -456,11 +456,11 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
   ! pour le ray-tracing, il ne faut plus interpoler entre les directions de ray-tracing
   ! mais entre les positions dans le disque
 
-  real(kind=db), intent(in) :: Stokes, l
+  real(kind=dp), intent(in) :: Stokes, l
   logical, intent(in) :: flag_star
   integer, intent(in) :: id, lambda, p_lambda, icell, phik, psup
 
-  real(kind=db) :: flux
+  real(kind=dp) :: flux
   integer :: ibin, iaz, iRT, it, p_icell
 
   if (lvariable_dust) then
@@ -507,26 +507,26 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
 
   implicit none
 
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db), intent(in) :: l
+  real(kind=dp), dimension(4), intent(in) :: Stokes
+  real(kind=dp), intent(in) :: l
   logical, intent(in) :: flag_star
   integer, intent(in) :: id, lambda, p_lambda, icell, phik, psup
 
-  real(kind=db), dimension(4) :: C, D, S
-  real(kind=db), dimension(4,4) ::  M, ROP, RPO
-  real(kind=db) :: cosw, sinw, flux
+  real(kind=dp), dimension(4) :: C, D, S
+  real(kind=dp), dimension(4,4) ::  M, ROP, RPO
+  real(kind=dp) :: cosw, sinw, flux
   real :: s11, s12, s33, s34
   integer :: ibin, iaz, iRT, it, p_icell
 
 
-  ROP = 0.0_db
-  RPO = 0.0_db
-  RPO(1,1) = 1.0_db
-  ROP(1,1) = 1.0_db
-  RPO(4,4) = 1.0_db
-  ROP(4,4) = 1.0_db
+  ROP = 0.0_dp
+  RPO = 0.0_dp
+  RPO(1,1) = 1.0_dp
+  ROP(1,1) = 1.0_dp
+  RPO(4,4) = 1.0_dp
+  ROP(4,4) = 1.0_dp
 
-  M = 0.0_db
+  M = 0.0_dp
 
   if (lvariable_dust) then
      p_icell = icell
@@ -606,12 +606,12 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   integer, intent(in) :: lambda, ibin, iaz
 
   integer :: itype, iRT, icell
-  real(kind=db) :: facteur, energie_photon, n_photons_envoyes
+  real(kind=dp) :: facteur, energie_photon, n_photons_envoyes
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
   iRT = RT2d_to_RT1d(ibin, iaz)
 
-  eps_dust1(:,:,:,:) = 0.0_db
+  eps_dust1(:,:,:,:) = 0.0_dp
 
   ! Contribution emission thermique directe
   call calc_Jth(lambda)
@@ -647,7 +647,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   do icell=1, n_cells
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
-     if (kappa(icell,lambda) > tiny_db) then
+     if (kappa(icell,lambda) > tiny_dp) then
         do itype=1,N_type_flux
            I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca(icell,lambda)
         enddo ! itype
@@ -665,7 +665,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
            eps_dust1(:,:,n_Stokes+4,icell) =    I_scatt(:,:,n_Stokes+4) / kappa(icell,lambda)
         endif ! lsepar_contrib
      else
-        eps_dust1(:,:,:,icell) = 0.0_db
+        eps_dust1(:,:,:,icell) = 0.0_dp
      endif ! kappa > 0
   enddo ! icell
   !$omp enddo
@@ -691,9 +691,9 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
 
-  I_sca2 = 0.0_db
-  eps_dust2_star = 0.0_db
-  eps_dust2 = 0.0_db
+  I_sca2 = 0.0_dp
+  eps_dust2_star = 0.0_dp
+  eps_dust2 = 0.0_dp
 
   ! Ajout du champ de radiation stellaire diffuse 1 seule fois
   call calc_Isca_rt2_star(lambda, p_lambda, ibin) ! this is the slow line  : 1.6s sur 2.4s  ---> 0.54s apres parallelization
@@ -712,7 +712,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp private(icell,dir,iscatt)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
-     if (kappa(icell,lambda) > tiny_db) then
+     if (kappa(icell,lambda) > tiny_dp) then
         ! Boucle sur les directions de ray-tracing
         do dir=0,1
            do iscatt = 1, nang_ray_tracing
@@ -734,8 +734,8 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
            enddo ! iscatt
         enddo ! dir
      else
-        eps_dust2(:,:,:,icell) = 0.0_db
-        eps_dust2_star(:,:,:,icell) = 0.0_db
+        eps_dust2(:,:,:,icell) = 0.0_dp
+        eps_dust2_star(:,:,:,icell) = 0.0_dp
      endif
   enddo !icell
   !$omp end do
@@ -756,7 +756,7 @@ subroutine calc_Jth(lambda)
 
   integer, intent(in) :: lambda
   integer :: icell, l, T
-  real(kind=db) ::  Temp, cst_wl, wl, coeff_exp, cst_E
+  real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
@@ -779,7 +779,7 @@ subroutine calc_Jth(lambda)
               coeff_exp=exp(cst_wl)
               J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_LTE(icell,lambda) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
            else
-              J_th(icell) = 0.0_db
+              J_th(icell) = 0.0_dp
            endif
         enddo ! icell
         !$omp end do
@@ -840,17 +840,17 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   integer, intent(in) :: lambda, p_lambda, ibin
 
-  real(kind=db), dimension(4) :: Stokes, S, C, D
-  real(kind=db) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon
-  real(kind=db) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
+  real(kind=dp), dimension(4) :: Stokes, S, C, D
+  real(kind=dp) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon
+  real(kind=dp) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: Inu ! sum of I_spec over cpus
-  real(kind=db), dimension(4,4) ::  M, ROP, RPO
+  real(kind=dp), dimension(:,:,:,:), allocatable :: Inu ! sum of I_spec over cpus
+  real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
   integer :: theta_I, phi_I, dir, iscatt, id
   integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
-  real(kind=db) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
+  real(kind=dp) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
   integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 cree un leger surcout dans le cas avec strat (qq 10 sec par inclinaison et par lambda)
@@ -863,7 +863,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
 
   real, dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
-  real(kind=db), dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
+  real(kind=dp), dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
 
 
   ! Direction observateur dans repere refence
@@ -875,7 +875,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
      write(*,*) 'Allocation error I_nu'
      stop
   endif
-  Inu = 0.0_db
+  Inu = 0.0_dp
 
   id = 1
 
@@ -889,9 +889,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   endif
 
   ! Position : virtuelle !!
-  x = 1.0_db ! doit juste etre non nul
-  y = 0.0_db
-  z = 1.0_db ! sert a rien
+  x = 1.0_dp ! doit juste etre non nul
+  y = 0.0_dp
+  z = 1.0_dp ! sert a rien
 
   ! Champ de radiation
   do icell=1, n_cells
@@ -924,10 +924,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     f1 = real(i1) / (N_super + 1)
                     f2 = real(i2) / (N_super + 1)
 
-                    w = 2.0_db * ((real(theta_I,kind=db) - f1) / real(n_theta_I,kind=db) ) - 1.0_db
-                    phi = deux_pi * (real(phi_I,kind=db) - f2) / real(n_phi_I,kind=db)
+                    w = 2.0_dp * ((real(theta_I,kind=dp) - f1) / real(n_theta_I,kind=dp) ) - 1.0_dp
+                    phi = deux_pi * (real(phi_I,kind=dp) - f2) / real(n_phi_I,kind=dp)
 
-                    w02 = sqrt(1.0_db-w*w)
+                    w02 = sqrt(1.0_dp-w*w)
                     u = w02 * cos(phi)
                     v = w02 * sin(phi)
                     ! BUG : u_ray_tracing
@@ -940,7 +940,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     if (k < 0) k = 0
                     tab_k(i1,i2,dir,iscatt,theta_I,phi_I) = k
 
-                    sin_scatt = sqrt(1.0_db - cos_scatt*cos_scatt)
+                    sin_scatt = sqrt(1.0_dp - cos_scatt*cos_scatt)
                     tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I) = sin_scatt
 
                     sum_sin = sum_sin + sin_scatt
@@ -954,10 +954,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
               if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
 
                  ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
-                 w = 2.0_db * ((real(theta_I,kind=db) - 0.5) / real(n_theta_I,kind=db) ) - 1.0_db
-                 phi = deux_pi * (real(phi_I,kind=db) - 0.5) / real(n_phi_I,kind=db)
+                 w = 2.0_dp * ((real(theta_I,kind=dp) - 0.5) / real(n_theta_I,kind=dp) ) - 1.0_dp
+                 phi = deux_pi * (real(phi_I,kind=dp) - 0.5) / real(n_phi_I,kind=dp)
 
-                 w02 = sqrt(1.0_db-w*w)
+                 w02 = sqrt(1.0_dp-w*w)
                  u = w02 * cos(phi)
                  v = w02 * sin(phi)
 
@@ -987,16 +987,16 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  !theta = theta  + pi_sur_deux
 
                  !----dans les matrices de rotation l'angle est omega = 2 * theta-----
-                 omega = 2.0_db * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
+                 omega = 2.0_dp * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
                  !     prochain if car l'arccos va de 0 a pi seulement
                  !     le +/- pour faire la difference dans le sens de rotation
-                 if (v1pk < 0.0) omega = -1.0_db * omega
+                 if (v1pk < 0.0) omega = -1.0_dp * omega
 
                  ! Matrices de rotations
                  cosw = cos(omega)
                  sinw = sin(omega)
-                 if (abs(cosw) < 1e-06) cosw = 0.0_db
-                 if (abs(sinw) < 1e-06) sinw = 0.0_db
+                 if (abs(cosw) < 1e-06) cosw = 0.0_dp
+                 if (abs(sinw) < 1e-06) sinw = 0.0_dp
 
                  tab_cosw(dir,iscatt,phi_I,theta_I) = cosw
                  tab_sinw(dir,iscatt,phi_I,theta_I) = sinw
@@ -1020,16 +1020,16 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   id = 1 ! pour code sequentiel
 
   ! Matrice de Mueller
-  M = 0.0_db
+  M = 0.0_dp
 
   ! matrices de rotation
-  ROP = 0.0_db
-  RPO = 0.0_db
+  ROP = 0.0_dp
+  RPO = 0.0_dp
 
-  RPO(1,1) = 1.0_db
-  ROP(1,1) = 1.0_db
-  RPO(4,4) = 1.0_db
-  ROP(4,4) = 1.0_db
+  RPO(1,1) = 1.0_dp
+  ROP(1,1) = 1.0_dp
+  RPO(4,4) = 1.0_dp
+  ROP(4,4) = 1.0_dp
 
 
   if (.not.lvariable_dust) then   ! we precalculate the s11 as they are all the same
@@ -1101,8 +1101,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     RPO(2,2) = cosw
                     ROP(2,2) = cosw
                     RPO(2,3) = sinw
-                    ROP(2,3) = -1.0_db * sinw
-                    RPO(3,2) = -1.0_db * sinw
+                    ROP(2,3) = -1.0_dp * sinw
+                    RPO(3,2) = -1.0_dp * sinw
                     ROP(3,2) = sinw
                     RPO(3,3) = cosw
                     ROP(3,3) = cosw
@@ -1184,16 +1184,16 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   integer, intent(in) :: lambda, p_lambda, ibin
 
   integer :: p_ri, p_zj, dir, iscatt, id
-  real(kind=db), dimension(4) :: Stokes, S, C, D
-  real(kind=db) :: x, y, z, u, v, w, facteur
+  real(kind=dp), dimension(4) :: Stokes, S, C, D
+  real(kind=dp) :: x, y, z, u, v, w, facteur
 
-  real(kind=db), dimension(4,4) ::  M, ROP, RPO
+  real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
   integer :: k, icell, p_icell
   real :: s11, s12, s33, s34, cos_scatt
-  real(kind=db) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
+  real(kind=dp) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
 
-  real(kind=db), parameter :: prec = 0._db
+  real(kind=dp), parameter :: prec = 0._dp
 
   if (lmono0) then ! image
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
@@ -1205,18 +1205,18 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   endif
 
   ! Matrice de Mueller
-  M = 0.0_db
+  M = 0.0_dp
 
   ! matrices de rotation
-  ROP = 0.0_db
-  RPO = 0.0_db
+  ROP = 0.0_dp
+  RPO = 0.0_dp
 
-  RPO(1,1) = 1.0_db
-  ROP(1,1) = 1.0_db
-  RPO(4,4) = 1.0_db
-  ROP(4,4) = 1.0_db
+  RPO(1,1) = 1.0_dp
+  ROP(1,1) = 1.0_dp
+  RPO(4,4) = 1.0_dp
+  ROP(4,4) = 1.0_dp
 
-  stokes(:) = 0.0_db
+  stokes(:) = 0.0_dp
   p_ri = 1
   p_zj = 1
 
@@ -1244,16 +1244,16 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
      ! Champ de radiation
      stokes(1) = sum(I_spec_star(icell,:))
 
-     if (stokes(1) < 1.e-30_db) cycle
+     if (stokes(1) < 1.e-30_dp) cycle
 
      ! Direction de vol
      x = r_grid(icell) ! doit juste etre non nul
-     y = 0.0_db
+     y = 0.0_dp
      z = z_grid(icell) ! sert a rien
 
      norme = sqrt(x**2 + z**2)
      u = x / norme
-     v = 0.0_db
+     v = 0.0_dp
      w = z / norme
 
      ! cos_scatt_ray_tracing correspondants
@@ -1280,7 +1280,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 !!$
 !!$      ! Interpolation lineaire (en cos) des elements de la matrice de Mueller
 !!$      frac =  (tab_cos_scatt(k-1) - cos_scatt) / (tab_cos_scatt(k-1) - tab_cos_scatt(k))
-!!$      frac_m1 = 1.0_db - frac
+!!$      frac_m1 = 1.0_dp - frac
 
            ! 2 methode ---> semble OK
            ! Plus propre que l'interpolation avec la dicotomie ci-dessus
@@ -1314,13 +1314,13 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
               cosw = cos(omega)
               sinw = sin(omega)
-              if (abs(cosw) < 1e-06) cosw = 0.0_db
-              if (abs(sinw) < 1e-06) sinw = 0.0_db
+              if (abs(cosw) < 1e-06) cosw = 0.0_dp
+              if (abs(sinw) < 1e-06) sinw = 0.0_dp
 
               RPO(2,2) = COSW
               ROP(2,2) = COSW
               RPO(2,3) = SINW
-              ROP(2,3) = -1.0_db * SINW
+              ROP(2,3) = -1.0_dp * SINW
               RPO(3,2) = SINW
               ROP(3,2) = SINW
               RPO(3,3) = -COSW
@@ -1388,11 +1388,11 @@ function dust_source_fct(icell, x,y,z)
   ! l'angle de diffusion ne depend que de la position x, y, z
 
   integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x, y, z
+  real(kind=dp), intent(in) :: x, y, z
 
-  real(kind=db), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
+  real(kind=dp), dimension(N_type_flux) :: dust_source_fct, SF1, SF2, SF3, SF4
 
-  real(kind=db) :: phi_pos, frac, un_m_frac, xiscatt, frac_r, frac_z, r
+  real(kind=dp) :: phi_pos, frac, un_m_frac, xiscatt, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, psup, ri1, zj1, ri2, zj2
   integer :: k, n_pola, icell_tmp, ri, zj, phik
 
@@ -1404,7 +1404,7 @@ function dust_source_fct(icell, x,y,z)
         psup = 1
         k = 1
      else
-        if (z > 0.0_db) then
+        if (z > 0.0_dp) then
            psup=1
         else
            psup=2
@@ -1419,7 +1419,7 @@ function dust_source_fct(icell, x,y,z)
 !---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
 !---     phi_k =  floor(xi_az)
 !---     frac = xi_az - phi_k
-!---     un_m_frac = 1.0_db - frac
+!---     un_m_frac = 1.0_dp - frac
 !---
 !---     phi_k_p1 = phi_k + 1
 !---     if (phi_k <=0) phi_k = 1
@@ -1454,10 +1454,10 @@ function dust_source_fct(icell, x,y,z)
 
      if (ri2 > n_rad) then
         ri2 = n_rad
-        frac_r = 0._db
+        frac_r = 0._dp
      else  if (ri1 < 1) then
         ri1 = 1
-        frac_r = 0._db
+        frac_r = 0._dp
      else
         frac_r = (log(r_grid(cell_map(ri2,zj,phik))) - log(r)) / &
              (log(r_grid(cell_map(ri2,zj,phik))) - log(r_grid(cell_map(ri1,zj,phik))))
@@ -1465,10 +1465,10 @@ function dust_source_fct(icell, x,y,z)
 
      if (zj2 > nz) then
         zj2 = nz
-        frac_z = 1.0_db
+        frac_z = 1.0_dp
      else  if (zj1 < 1) then
         zj1 = 1
-        frac_z = 1.0_db
+        frac_z = 1.0_dp
      else
         frac_z = (z_grid(cell_map(ri,zj2,phik)) - abs(z)) / &
              (z_grid(cell_map(ri,zj2,phik)) - z_grid(cell_map(ri,zj1,phik)))
@@ -1488,7 +1488,7 @@ function dust_source_fct(icell, x,y,z)
      ! Calcul angle phi a la position
      phi_pos = modulo(atan2(y,x) + deux_pi,deux_pi)
 
-     if (z > 0.0_db) then
+     if (z > 0.0_dp) then
         dir=1
      else
         dir=0
@@ -1497,11 +1497,11 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ diffuse plusieurs fois
      !----------------------------------------------------
-     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing, 0.0_db)
+     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
-     un_m_frac = 1.0_db - frac
+     un_m_frac = 1.0_dp - frac
      iscatt2 = iscatt1 + 1
 
      ! Les limites periodiques
@@ -1526,11 +1526,11 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ stellaire diffuse 1 fois
      !----------------------------------------------------
-     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing_star, 0.0_db)
+     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing_star, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
-     un_m_frac = 1.0_db - frac
+     un_m_frac = 1.0_dp - frac
      iscatt2 = iscatt1 + 1
 
      ! Les limites periodiques
@@ -1585,9 +1585,9 @@ function dust_source_fct(icell, x,y,z)
      ! Fct source interpolee
      dust_source_fct(:) = &
           frac_r * frac_z * SF1(:) + &
-          (1.0_db - frac_r) * frac_z * SF2(:) + &
-          frac_r * (1.0_db - frac_z) * SF3(:) + &
-          (1.0_db - frac_r) * (1.0_db - frac_z) * SF4(:)
+          (1.0_dp - frac_r) * frac_z * SF2(:) + &
+          frac_r * (1.0_dp - frac_z) * SF3(:) + &
+          (1.0_dp - frac_r) * (1.0_dp - frac_z) * SF4(:)
 
   endif !lscatt_ray_tracing
 

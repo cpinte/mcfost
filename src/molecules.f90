@@ -110,9 +110,9 @@ subroutine init_benchmark_vanZadelhoff1()
 
   ldust_mol = .false.
 
-  v_turb = 150._db !m.s-1
+  v_turb = 150._dp !m.s-1
   Temperature = 20.
-  Tcin = 20._db
+  Tcin = 20._dp
   vfield(:) = 0.0
 
   masse_mol = 1.0
@@ -444,7 +444,7 @@ subroutine init_Doppler_profiles(imol)
 
   integer, intent(in) :: imol
 
-  real(kind=db) :: sigma2, sigma2_m1, vmax
+  real(kind=dp) :: sigma2, sigma2_m1, vmax
   integer :: icell, iv, n_speed
 
   n_speed = mol(imol)%n_speed_rt
@@ -453,11 +453,11 @@ subroutine init_Doppler_profiles(imol)
      ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
-     sigma2 =  2.0_db * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
+     sigma2 =  2.0_dp * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
      v_line(icell) = sqrt(sigma2)
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
-     sigma2_m1 = 1.0_db / sigma2
+     sigma2_m1 = 1.0_dp / sigma2
      sigma2_phiProf_m1(icell) = sigma2_m1
      ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
      ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
@@ -469,9 +469,9 @@ subroutine init_Doppler_profiles(imol)
      vmax = sqrt(sigma2)
      tab_dnu_o_freq(icell) = largeur_profile * vmax / (real(n_speed))
      do iv=-n_speed, n_speed
-        tab_deltaV(iv,icell) = largeur_profile * real(iv,kind=db)/real(n_speed,kind=db) * vmax
+        tab_deltaV(iv,icell) = largeur_profile * real(iv,kind=dp)/real(n_speed,kind=dp) * vmax
      enddo ! iv
-     deltaVmax(icell) = largeur_profile * vmax !* 2.0_db  ! facteur 2 pour tirage aleatoire
+     deltaVmax(icell) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
   enddo !icell
 
   return
@@ -491,11 +491,11 @@ function phiProf(icell,ispeed,tab_speed)
 
   integer, dimension(2), intent(in) :: ispeed
   integer, intent(in) :: icell
-  real(kind=db), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+  real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
-  real(kind=db), dimension(ispeed(1):ispeed(2)) :: phiProf
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: phiProf
 
-  real(kind=db) :: norme_m1, sigma2_m1
+  real(kind=dp) :: norme_m1, sigma2_m1
 
   norme_m1 = norme_phiProf_m1(icell) ! ATTENTION : il manque la frequence ici !!!!
   sigma2_m1 = sigma2_phiProf_m1(icell)
@@ -518,27 +518,27 @@ end function phiProf
 ! ---   implicit none
 ! ---
 ! ---   integer, dimension(2), intent(in) :: ispeed
-! ---   real(kind=db), dimension(ispeed(1):ispeed(2)),intent(in) :: tab_speed
+! ---   real(kind=dp), dimension(ispeed(1):ispeed(2)),intent(in) :: tab_speed
 ! ---
-! ---   real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: Cmb
+! ---   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: Cmb
 ! ---
 ! ---
 ! ---   integer :: iTrans, iv, iiTrans
-! ---   real(kind=db) :: cst, cst_nu, nu
+! ---   real(kind=dp) :: cst, cst_nu, nu
 ! ---
-! ---   cst = 2.0_db*hp/c_light**2
+! ---   cst = 2.0_dp*hp/c_light**2
 ! ---
 ! ---   ! On ne calcule le Cmb qu'aux frequences specifiees
 ! ---   do iTrans=1,nTrans
 ! ---      iiTrans = indice_Trans(iTrans)
 ! ---      do iv=ispeed(1),ispeed(2)
-! ---         nu = Transfreq(iiTrans) * (1.0_db + tab_speed(iv)/c_light)
+! ---         nu = Transfreq(iiTrans) * (1.0_dp + tab_speed(iv)/c_light)
 ! ---
 ! ---         cst_nu = (hp * nu) / (kb * T_min)
-! ---         if (cst_nu > 100._db) then
-! ---            Cmb(iv,iTrans) = 0.0_db
+! ---         if (cst_nu > 100._dp) then
+! ---            Cmb(iv,iTrans) = 0.0_dp
 ! ---         else
-! ---            Cmb(iv,iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_db)
+! ---            Cmb(iv,iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_dp)
 ! ---         endif
 ! ---      enddo ! iv
 ! ---   enddo ! iTrans
@@ -560,18 +560,18 @@ subroutine init_tab_Cmb_mol()
   implicit none
 
   integer :: iTrans
-  real(kind=db) :: cst, cst_nu, nu
+  real(kind=dp) :: cst, cst_nu, nu
 
-  cst = 2.0_db*hp/c_light**2
+  cst = 2.0_dp*hp/c_light**2
 
   do iTrans=1,nTrans
      nu = Transfreq(iTrans)
 
      cst_nu = (hp * nu) / (kb * T_Cmb)
-     if (cst_nu > 100._db) then
-        tab_Cmb_mol(iTrans) = 0.0_db
+     if (cst_nu > 100._dp) then
+        tab_Cmb_mol(iTrans) = 0.0_dp
      else
-        tab_Cmb_mol(iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_db)
+        tab_Cmb_mol(iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_dp)
      endif
   enddo
 
@@ -613,7 +613,7 @@ subroutine opacite_mol_loc(icell,imol)
   integer, intent(in) :: icell, imol
 
   integer :: iTrans, iiTrans
-  real(kind=db) :: nu, nl, kap, eps
+  real(kind=dp) :: nu, nl, kap, eps
 
   logical, save :: lmaser = .false.
 
@@ -691,10 +691,10 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
   integer :: iTrans, p_lambda, icell
-  real(kind=db) :: freq!, Jnu
+  real(kind=dp) :: freq!, Jnu
   real :: T, wl, kap
 
-  real(kind=db) :: cst_E
+  real(kind=dp) :: cst_E
 
   real, parameter :: gas_dust = 100
   real, parameter :: delta_lambda = 0.025
@@ -856,13 +856,13 @@ subroutine equilibre_rad_mol_loc(id,icell)
   integer, intent(in) :: id, icell
 
   real :: Temp, Tdust
-  real(kind=db), dimension(nLevels,nLevels) :: A, C
-  real(kind=db), dimension(nLevels) :: B
-  real(kind=db), dimension(nLevels) :: cTot
-  real(kind=db) :: boltzFac, JJmol
+  real(kind=dp), dimension(nLevels,nLevels) :: A, C
+  real(kind=dp), dimension(nLevels) :: B
+  real(kind=dp), dimension(nLevels) :: cTot
+  real(kind=dp) :: boltzFac, JJmol
   integer :: i, j, eq, n_eq
   integer :: itrans, l, k, iPart
-  real(kind=db) :: collEx, colldeEx
+  real(kind=dp) :: collEx, colldeEx
 
   if (ldouble_RT) then
      n_eq = 2
@@ -877,7 +877,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
   ! Pour test
   Tdust = Temperature(icell)
 
-  C = 0._db
+  C = 0._dp
   do iPart = 1, nCollPart
      do iTrans = 1, nCollTrans(iPart)
         k = iCollUpper(iPart, iTrans)
@@ -908,8 +908,8 @@ subroutine equilibre_rad_mol_loc(id,icell)
   do eq=1,n_eq
 
      ! Matrice de transitions radiatives
-     B = 0.0_db
-     A = 0.0_db
+     B = 0.0_dp
+     A = 0.0_dp
      do iTrans = 1, nTrans ! toutes les transition ici : pas de iiTrans
 
         k = iTransUpper(iTrans)
@@ -946,8 +946,8 @@ subroutine equilibre_rad_mol_loc(id,icell)
 
      ! On remplace la derniere equations (qui est une CL des autres)
      ! par l'equation de conservation
-     A(nLevels,:) = 1.0_db ! la somme de toutes les pops
-     B(nLevels) = 1.0_db   ! = 1
+     A(nLevels,:) = 1.0_dp ! la somme de toutes les pops
+     B(nLevels) = 1.0_dp   ! = 1
 
      ! Resolution systeme matriciel par methode Gauss-Jordan
      call GaussSlv(A, B, nLevels)
@@ -976,7 +976,7 @@ subroutine equilibre_othin_mol()
 
   integer :: icell, id
 
-  Jmol(:,:) = 0.0_db
+  Jmol(:,:) = 0.0_dp
 
   id = 1 ! TODO : parallelisation
 
@@ -1004,10 +1004,10 @@ subroutine equilibre_othin_mol_pop2()
 
   implicit none
 
-  real(kind=db) :: tab_nLevel_tmp(n_cells,nLevels)  ! pas 3D
+  real(kind=dp) :: tab_nLevel_tmp(n_cells,nLevels)  ! pas 3D
   logical :: ldouble_RT_tmp
 
-  Jmol(:,:) = 0.0_db
+  Jmol(:,:) = 0.0_dp
 
   ! Par securite : sauvegarde population 1
   tab_nLevel_tmp(:,:) =  tab_nLevel(:,:)
@@ -1038,25 +1038,25 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
   integer, intent(in) :: id, icell, n_rayons
   integer, dimension(2), intent(in) :: ispeed
 
-  real(kind=db), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
-  real(kind=db) :: somme, J
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
+  real(kind=dp) :: somme, J
 
   integer :: iTrans, iray
 
-  Jmol(:,id) = 0.0_db
+  Jmol(:,id) = 0.0_dp
 
   do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
-     somme = 0.0_db
-     J = 0.0_db
+     somme = 0.0_dp
+     J = 0.0_dp
      do iray=1, n_rayons
         P(:) =  Doppler_P_x_freq(:,iray,id)
         opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
         etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) + &
-             emissivite_dust(iTrans,icell) ) / (opacite(:) + 1.0e-30_db)
+             emissivite_dust(iTrans,icell) ) / (opacite(:) + 1.0e-30_dp)
 
-        J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) * P(:))
+        J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) * P(:))
         somme = somme + sum(P(:))
      enddo ! iray
      Jmol(iTrans,id) =  J / somme
@@ -1067,7 +1067,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 !  Jmol(:,id) = Jmol(:,id) / n_rayons
 
   if (ldouble_RT) then
-     Jmol2(:,id) = 0.0_db
+     Jmol2(:,id) = 0.0_dp
 
      do iray=1, n_rayons
         do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
@@ -1076,8 +1076,8 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
            etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
            Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + emissivite_dust(icell,iTrans) ) &
-                / (opacite(:) + 1.0e-30_db)
-           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_db - etau(:))) &
+                / (opacite(:) + 1.0e-30_dp)
+           J = sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) &
                 * P(:)) / sum(P(:))
 
            Jmol2(iTrans,id) = Jmol2(iTrans,id) + J
@@ -1101,35 +1101,35 @@ function v_proj(icell,x,y,z,u,v,w) !
 
   implicit none
 
-  real(kind=db) :: v_proj
+  real(kind=dp) :: v_proj
   integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x,y,z,u,v,w
+  real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=db) :: vitesse, vx, vy, vz, norme, r
+  real(kind=dp) :: vitesse, vx, vy, vz, norme, r
 
   vitesse = vfield(icell)
 
   if (linfall) then
      r = sqrt(x*x+y*y+z*z)
      !  if (lbenchmark_water2)  vitesse = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
-     if (r > tiny_db) then
-        norme = 1.0_db/r
+     if (r > tiny_dp) then
+        norme = 1.0_dp/r
         vx = x * norme * vitesse
         vy = y * norme * vitesse
         vz = z * norme * vitesse
         v_proj = vx * u + vy * v + vz * w
      else
-        v_proj = 0.0_db
+        v_proj = 0.0_dp
      endif
   else if (lkeplerian) then
      r = sqrt(x*x+y*y)
-     if (r > tiny_db) then
-        norme = 1.0_db/r
+     if (r > tiny_dp) then
+        norme = 1.0_dp/r
         vx = -y * norme * vitesse
         vy = x * norme * vitesse
         v_proj = vx * u + vy * v
    else
-        v_proj = 0.0_db
+        v_proj = 0.0_dp
      endif
   else
      write(*,*) "Error : velocity field not defined"
@@ -1142,7 +1142,7 @@ end function v_proj
 
 !***********************************************************
 
-real(kind=db) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
+real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
   ! Differentiel de vitesse projete entre 2 points
   ! au sein d'une cellule
   ! C. Pinte
@@ -1151,21 +1151,21 @@ real(kind=db) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
   implicit none
 
   integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w
+  real(kind=dp), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w
 
-  real(kind=db) :: vitesse, vx0, vy0, vz0, vx1, vy1, vz1, norme
+  real(kind=dp) :: vitesse, vx0, vy0, vz0, vx1, vy1, vz1, norme
 
   vitesse = vfield(icell)
 
   if (linfall) then
      ! Champ de vitesse au point 0
-     norme = 1.0_db/sqrt(x0*x0+y0*y0+z0*z0)
+     norme = 1.0_dp/sqrt(x0*x0+y0*y0+z0*z0)
      vx0 = x0 * norme * vitesse
      vy0 = y0 * norme * vitesse
      vz0 = z0 * norme * vitesse
 
      ! Champ de vitesse au point 1
-     norme = 1.0_db/sqrt(x1*x1+y1*y1+z1*z1)
+     norme = 1.0_dp/sqrt(x1*x1+y1*y1+z1*z1)
      vx1 = x1 * norme * vitesse
      vy1 = y1 * norme * vitesse
      vz1 = z1 * norme * vitesse
@@ -1173,12 +1173,12 @@ real(kind=db) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
      dv_proj = (vx1 - vx0) * u + (vy1 - vy0) * v + (vz1 - vz0) * w
   else if (lkeplerian) then
       ! Champ de vitesse au point 0
-     norme = 1.0_db/sqrt(x0*x0+y0*y0)
+     norme = 1.0_dp/sqrt(x0*x0+y0*y0)
      vx0 = -y0 * norme * vitesse
      vy0 = x0 * norme * vitesse
 
      ! Champ de vitesse au point 1
-     norme = 1.0_db/sqrt(x1*x1+y1*y1)
+     norme = 1.0_dp/sqrt(x1*x1+y1*y1)
      vx1 = -y1 * norme * vitesse
      vy1 = x1 * norme * vitesse
 

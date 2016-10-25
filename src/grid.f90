@@ -70,7 +70,7 @@ subroutine define_physical_zones()
 
   integer :: i, j, index, i_region, iter, ir, k
   logical, dimension(n_zones) :: zone_scanned
-  real(kind=db) :: r1, r2, minR, maxR
+  real(kind=dp) :: r1, r2, minR, maxR
   character(len=10) :: n1, n2
 
   logical :: test_j_in_i, test_i_in_j
@@ -348,7 +348,7 @@ subroutine init_lambda()
   else
      ! Initialisation longueurs d'onde
      !delta_lambda = (lambda_max/lambda_min)**(1.0/real(n_lambda))
-     delta_lambda =  exp( (1.0_db/real(n_lambda,kind=db)) * log(lambda_max/lambda_min) )
+     delta_lambda =  exp( (1.0_dp/real(n_lambda,kind=dp)) * log(lambda_max/lambda_min) )
 
      tab_lambda_inf(1) = lambda_min
      tab_lambda(1)=lambda_min*sqrt(delta_lambda)

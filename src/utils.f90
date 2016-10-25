@@ -64,8 +64,8 @@ end function spanl
 !-- #include "sprng_f.h"
 !--
 !--   integer, intent(in) :: id
-!--   real(kind=db) :: gauss_random
-!--   real(kind=db) :: rsq,rand1,rand2
+!--   real(kind=dp) :: gauss_random
+!--   real(kind=dp) :: rsq,rand1,rand2
 !--
 !--   if (lgauss_random_saved(id)) then
 !--      gauss_random=gauss_random_saved(id)
@@ -74,12 +74,12 @@ end function spanl
 !--      loop : do
 !--         rand1 = sprng(stream(id))
 !--         rand2 = sprng(stream(id))
-!--         rand1 = 2.0_db * rand1 - 1.0_db
-!--         rand2 = 2.0_db * rand2 - 1.0_db
+!--         rand1 = 2.0_dp * rand1 - 1.0_dp
+!--         rand2 = 2.0_dp * rand2 - 1.0_dp
 !--         rsq=rand1**2+rand2**2
-!--         if (rsq > 0.0_db .and. rsq < 1.0_db) exit loop
+!--         if (rsq > 0.0_dp .and. rsq < 1.0_dp) exit loop
 !--      enddo loop
-!--      rsq=sqrt(-2.0_db*log(rsq)/rsq)
+!--      rsq=sqrt(-2.0_dp*log(rsq)/rsq)
 !--      gauss_random = rand1 * rsq
 !--      gauss_random_saved(id)= rand2 * rsq
 !--      lgauss_random_saved(id)=.true.
@@ -149,7 +149,7 @@ end subroutine polint
 
 !***************************************************
 
-real(kind=sl) function interp_sp(y, x, xp)
+real(kind=sp) function interp_sp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
@@ -159,8 +159,8 @@ real(kind=sl) function interp_sp(y, x, xp)
 
   implicit none
 
-  real(kind=sl), dimension(:), intent(in) :: x, y
-  real(kind=sl) :: xp, frac
+  real(kind=sp), dimension(:), intent(in) :: x, y
+  real(kind=sp) :: xp, frac
 
   integer :: n, j
 
@@ -209,7 +209,7 @@ end function interp_sp
 
 !----------------------------
 
-real(kind=db) function interp_dp(y, x, xp)
+real(kind=dp) function interp_dp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
 ! en cas de point cp en dehors de x
@@ -219,8 +219,8 @@ real(kind=db) function interp_dp(y, x, xp)
 
   implicit none
 
-  real(kind=db), dimension(:), intent(in) :: x, y
-  real(kind=db) :: xp, frac
+  real(kind=dp), dimension(:), intent(in) :: x, y
+  real(kind=dp) :: xp, frac
 
   integer :: n, j
 
@@ -279,10 +279,10 @@ subroutine GaussSlv(a, b, n)
   implicit none
 
   integer, intent(in) :: n
-  real(kind=db), dimension(n,n), intent(inout) :: a
-  real(kind=db), dimension(n), intent(inout) :: b
+  real(kind=dp), dimension(n,n), intent(inout) :: a
+  real(kind=dp), dimension(n), intent(inout) :: b
 
-  real(kind=db) :: factor
+  real(kind=dp) :: factor
   integer :: i, j, k, l
 
   if (n == 1) then
@@ -330,19 +330,19 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
 
   implicit none
 
-  real(kind=db), intent(in) ::  xinit, yinit, zinit, u1, v1, w1
-  real(kind=db), intent(out) :: xfin, yfin, zfin
+  real(kind=dp), intent(in) ::  xinit, yinit, zinit, u1, v1, w1
+  real(kind=dp), intent(out) :: xfin, yfin, zfin
 
-  real(kind=db) :: cost, sint, sing, prod, theta
+  real(kind=dp) :: cost, sint, sing, prod, theta
 
-  if (w1 > 0.999999999_db) then
-     cost = 1.0_db
-     sint = 0.0_db
-     sing = 0.0_db
+  if (w1 > 0.999999999_dp) then
+     cost = 1.0_dp
+     sint = 0.0_dp
+     sing = 0.0_dp
   else
      if (abs(u1) < tiny_real) then
-        cost=0.0_db
-        sint=1.0_db
+        cost=0.0_dp
+        sint=1.0_dp
         sing=sqrt(1.0 - w1*w1)
      else
    !     x=v1/u1
@@ -353,7 +353,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
          theta=atan2(v1,u1)
          cost=cos(theta)
          sint=sin(theta)
-         sing = sqrt(1.0_db - w1*w1)
+         sing = sqrt(1.0_dp - w1*w1)
       endif
   endif
 
@@ -376,46 +376,46 @@ function calc_mu0(mu,a)
   ! C. Pinte
   ! 01/09/08
 
-  real(kind=db), intent(in) :: mu, a
-  real(kind=db) :: calc_mu0
+  real(kind=dp), intent(in) :: mu, a
+  real(kind=dp) :: calc_mu0
 
-  real(kind=db) :: a1, a2, a3, q, r, q3, qh, denom, theta, mu01, mu02, mu03, factor, factor3
+  real(kind=dp) :: a1, a2, a3, q, r, q3, qh, denom, theta, mu01, mu02, mu03, factor, factor3
 
 
-  a1 = 0.0_db
-  a2 = a - 1.0_db
+  a1 = 0.0_dp
+  a2 = a - 1.0_dp
   a3 = -a * mu
 
-  q = (a1**2 - 3.0_db*a2)/9.0_db
-  r = (2.0_db*a1**3 - 9.0_db*a1*a2 + 27.0_db*a3)/54.0_db
+  q = (a1**2 - 3.0_dp*a2)/9.0_dp
+  r = (2.0_dp*a1**3 - 9.0_dp*a1*a2 + 27.0_dp*a3)/54.0_dp
   q3 = q**3
 
-  if ((q3 - r**2) >= 0.0_db) then
+  if ((q3 - r**2) >= 0.0_dp) then
      qh = sqrt(q)
      denom = sqrt(q3)
      theta = acos(r/denom)
-     mu01 = -2.0_db*qh*cos(theta/3.0_db) - a1/3.0_db
-     mu02 = -2.d0*qh*cos((theta + deux_pi)/3.0_db) - a1/3.0_db
-     mu03 = -2.d0*qh*cos((theta + quatre_pi)/3.0_db) - a1/3.0_db
-     if ((mu01 > 0.0_db).and.(mu02 > 0.0_db)) then
+     mu01 = -2.0_dp*qh*cos(theta/3.0_dp) - a1/3.0_dp
+     mu02 = -2.d0*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
+     mu03 = -2.d0*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
+     if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu02",mu01,mu02
         stop
-     else if ((mu01 > 0.0_db).and.(mu03 > 0.0_db)) then
+     else if ((mu01 > 0.0_dp).and.(mu03 > 0.0_dp)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu03",mu01,mu03
         stop
-     elseif ((mu02 > 0.0_db).and.(mu03 > 0.0_db)) then
+     elseif ((mu02 > 0.0_dp).and.(mu03 > 0.0_dp)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu02,mu03",mu02,mu03
         stop
      endif
 
-     if (mu01 > 0.0_db) calc_mu0 = mu01
-     if (mu02 > 0.0_db) calc_mu0 = mu02
-     if (mu03 > 0.0_db) calc_mu0 = mu03
+     if (mu01 > 0.0_dp) calc_mu0 = mu01
+     if (mu02 > 0.0_dp) calc_mu0 = mu02
+     if (mu03 > 0.0_dp) calc_mu0 = mu03
 
   else
      factor = sqrt(r**2 - q3) + abs(r)
      factor3 = factor**un_tiers
-     calc_mu0 = -1.0_db*sign(1.0_db,r)*(factor3 + q/factor3) - a1/3.0_db
+     calc_mu0 = -1.0_dp*sign(1.0_dp,r)*(factor3 + q/factor3) - a1/3.0_dp
   endif
 
   return
@@ -433,18 +433,18 @@ function Bnu(nu,T)
 
   implicit none
 
-  real(kind=db) ,intent(in) :: nu
+  real(kind=dp) ,intent(in) :: nu
   real, intent(in) :: T
-  real(kind=db) :: Bnu
+  real(kind=dp) :: Bnu
 
-  real(kind=db) :: hnu_kT
+  real(kind=dp) :: hnu_kT
 
   hnu_kT = (hp * nu) / (kb * T)
 
-  if (hnu_kT > 100._db) then
-     Bnu = 0.0_db
+  if (hnu_kT > 100._dp) then
+     Bnu = 0.0_dp
   else
-     Bnu = 2.0_db*hp/c_light**2 * nu**3 / (exp(hnu_kT)-1.0_db)
+     Bnu = 2.0_dp*hp/c_light**2 * nu**3 / (exp(hnu_kT)-1.0_dp)
   endif
 
   return
@@ -466,7 +466,7 @@ function Blambda(wl,T)
   real, intent(in) :: T
   real :: Blambda
 
-  real(kind=db) :: hnu_kT
+  real(kind=dp) :: hnu_kT
 
   hnu_kT = (hp * c_light)/ (kb * T * wl)
 
@@ -481,7 +481,7 @@ function Blambda(wl,T)
 end function Blambda
 
 
-function Blambda_db(wl,T)
+function Blambda_dp(wl,T)
 ! Loi de Planck
 ! Blambda en SI : W.m-2.s-1.sr-1
 ! wl en m
@@ -490,23 +490,23 @@ function Blambda_db(wl,T)
 
   implicit none
 
-  real(kind=db) ,intent(in) :: wl
+  real(kind=dp) ,intent(in) :: wl
   real, intent(in) :: T
-  real(kind=db) :: Blambda_db
+  real(kind=dp) :: Blambda_dp
 
-  real(kind=db) :: hnu_kT
+  real(kind=dp) :: hnu_kT
 
   hnu_kT = (hp * c_light)/ (kb * T * wl)
 
   if (hnu_kT > 700.) then
-     Blambda_db = 0.0_db
+     Blambda_dp = 0.0_dp
   else
-     Blambda_db = 2.0_db*hp*c_light**2 / wl**5 / (exp(hnu_kT)-1.0_db)
+     Blambda_dp = 2.0_dp*hp*c_light**2 / wl**5 / (exp(hnu_kT)-1.0_dp)
   endif
 
   return
 
-end function Blambda_db
+end function Blambda_dp
 
 !******************************************************
 
@@ -1094,13 +1094,13 @@ function bubble_sort(data_in)
   ! C. Pinte
   ! 02/05/11
 
-  real(kind=db), dimension(:), intent(in) :: data_in
-  real(kind=db), dimension(:), allocatable :: data
+  real(kind=dp), dimension(:), intent(in) :: data_in
+  real(kind=dp), dimension(:), allocatable :: data
   integer, dimension(:), allocatable :: bubble_sort ! indices
 
   integer :: i, pass, n, tmp_i
   logical :: sorted
-  real(kind=db) ::  temp
+  real(kind=dp) ::  temp
 
   n = size(data_in)
   allocate(bubble_sort(n),data(n))
@@ -1141,7 +1141,7 @@ end function bubble_sort
 function is_diff(a,b)
 
   logical is_diff
-  real(kind=db), intent(in) :: a,b
+  real(kind=dp), intent(in) :: a,b
 
   if (abs(a-b) > 0.5e-5 * abs(a+b)) then
      is_diff = .true.
@@ -1165,12 +1165,12 @@ subroutine lgnd(lmax,x,p)
   ! 29/08/11 : C. Pinte : translated in fortran 90 TODO : regarder NR
 
   integer, intent(in) :: lmax
-  real(kind=db), intent(in) :: x
-  real(kind=db), dimension(0:lmax), intent(out) :: P
+  real(kind=dp), intent(in) :: x
+  real(kind=dp), dimension(0:lmax), intent(out) :: P
 
   integer :: l
 
-  P(0) = 1._db
+  P(0) = 1._dp
   P(1) = x
   do l = 1, lmax-1
      P(l+1) = ((2.0*l+1)*x*P(l)-l*P(l-1))/(l+1)
@@ -1275,11 +1275,11 @@ subroutine GauLeg(x1,x2,x,w,n)
 
   integer, intent(in) :: n  ! Order of the quadrature
 
-  real(kind=db), intent(in) :: x1, x2 ! Lower and upper integration limit
-  real(kind=db), dimension(n), intent(out) :: x, w ! abscissas and weights
+  real(kind=dp), intent(in) :: x1, x2 ! Lower and upper integration limit
+  real(kind=dp), dimension(n), intent(out) :: x, w ! abscissas and weights
 
-  real(kind=db), parameter :: eps = 3.0d-14
-  real(kind=db) :: dj, p1, p2, p3, pp, xl, xm, z, z1
+  real(kind=dp), parameter :: eps = 3.0d-14
+  real(kind=dp) :: dj, p1, p2, p3, pp, xl, xm, z, z1
   integer :: i, j, m
   logical :: conv
 
@@ -1289,7 +1289,7 @@ subroutine GauLeg(x1,x2,x,w,n)
   xl = 0.5d0 * (x2-x1)
 
   do i=1,m ! Loop over the desired roots
-     z = cos(pi*(dble(i)-0.25d0)/(dble(n)+0.5d0))
+     z = cos(pi*(real(i,kind=dp)-0.25d0)/(real(n,kind=dp)+0.5d0))
      ! Starting with the above approximation to the ith root, we
      ! enter the main loop of refinement by Newton's method
      conv = .false.
@@ -1299,7 +1299,7 @@ subroutine GauLeg(x1,x2,x,w,n)
 
         !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
-           dj=dble(j)
+           dj=real(j,kind=dp)
            p3 = p2
            p2 = p1
            p1 = ((2.0d0*dj-1.0d0)*z*p2 - (dj-1.0d0)*p3)/dj
@@ -1308,7 +1308,7 @@ subroutine GauLeg(x1,x2,x,w,n)
         ! p1 is now the desired Legendre polynomial. We next compute pp, its
         ! derivative, by a standard relation involving also p2, the
         ! polynomial of one lower order.
-        pp = dble(n) * (z * p1 - p2) / (z * z - 1.0d0)
+        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0d0)
 
         ! Newton's method.
         z1 = z
@@ -1362,12 +1362,12 @@ function rotation_3d(axis,angle,v)
   ! C. Pinte 17/07/14
 
 
-  real(kind=db), dimension(3), intent(in) :: axis, v
-  real(kind=db), intent(in) :: angle
-  real(kind=db), dimension(3) :: rotation_3d
+  real(kind=dp), dimension(3), intent(in) :: axis, v
+  real(kind=dp), intent(in) :: angle
+  real(kind=dp), dimension(3) :: rotation_3d
 
-  real(kind=db), dimension(3) :: vn, vn2, vp
-  real(kind=db) :: norm
+  real(kind=dp), dimension(3) :: vn, vn2, vp
+  real(kind=dp) :: norm
 
   ! Compute the parallel component of the vector.
   vp(:) = dot_product(v, axis) * axis(:)
@@ -1376,7 +1376,7 @@ function rotation_3d(axis,angle,v)
   vn(:) = v(:) - vp(:)
 
   norm = sqrt(sum(vn*vn))
-  if (norm < tiny_db) then
+  if (norm < tiny_dp) then
      rotation_3d(:) = vp(:)
      return
   endif
@@ -1400,8 +1400,8 @@ end function rotation_3d
 
 function cross_product(v1, v2)
 
-  real(kind=db), dimension(3), intent(in) :: v1, v2
-  real(kind=db), dimension(3) :: cross_product
+  real(kind=dp), dimension(3), intent(in) :: v1, v2
+  real(kind=dp), dimension(3) :: cross_product
 
   cross_product(1) = v1(2) * v2(3) - v1(3) * v2(2)
   cross_product(2) = v1(3) * v2(1) - v1(1) * v2(3)
@@ -1534,13 +1534,13 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 
   implicit none
 
-  real(kind=db), intent(in) :: cospsi, phi, u0, v0, w0
-  real(kind=db), intent(out) :: u1, v1, w1
+  real(kind=dp), intent(in) :: cospsi, phi, u0, v0, w0
+  real(kind=dp), intent(out) :: u1, v1, w1
 
-  real(kind=db) :: cpsi, spsi, cphi, sphi, a, b,c, Aw0, Cm1
+  real(kind=dp) :: cpsi, spsi, cphi, sphi, a, b,c, Aw0, Cm1
 
   cpsi = cospsi
-  spsi = sqrt(1.0_db - cpsi*cpsi)
+  spsi = sqrt(1.0_dp - cpsi*cpsi)
   sphi = sin(phi)
   cphi = cos(phi)
 
@@ -1549,8 +1549,8 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 
   ! Calcul de u1,v1 et w1
   if ( abs(w0) <= 0.999999 ) then
-     c = sqrt(1.0_db - w0*w0)
-     cm1 = 1.0_db/c
+     c = sqrt(1.0_dp - w0*w0)
+     cm1 = 1.0_dp/c
      aw0 = a*w0
      u1 = ( aw0*u0 - b*v0 ) * cm1 + cpsi*u0
      v1 = ( aw0*v0 + b*u0 ) * cm1 + cpsi*v0

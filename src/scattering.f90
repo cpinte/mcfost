@@ -32,7 +32,7 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
   ! defaut : NMXX=20000
   ! On peut passer a  NMXX=2000000 : ca marche jusque a=10cm en bande B
   ! mais faut pas etre presse
-  integer, parameter :: db = selected_real_kind(p=13,r=200)
+  integer, parameter :: dp = selected_real_kind(p=13,r=200)
 
 ! Arguments:
   integer, intent(in) :: nang
@@ -43,12 +43,12 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 
 ! Local variables:
   integer :: J,JJ,N,NSTOP,NMX,NN
-  real (kind =db) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD
-  real (kind =db), dimension(NANG) :: AMU,PI,PI0,PI1,TAU
-!  real (kind =db) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0
-  complex (kind=db) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y
-!  complex (kind=db), dimension(nmxx):: D
-  complex (kind=db), dimension(:), allocatable :: D
+  real (kind =dp) :: CHI,CHI0,CHI1,DANG,DX,EN,FN,P,PII,PSI,PSI0,PSI1,THETA,XSTOP,YMOD
+  real (kind =dp), dimension(NANG) :: AMU,PI,PI0,PI1,TAU
+!  real (kind =dp) :: AMU_0,PI_0,PI0_0,PI1_0,TAU_0
+  complex (kind=dp) :: AN,AN1,BN,BN1,DREFRL,XI,XI1,Y
+!  complex (kind=dp), dimension(nmxx):: D
+  complex (kind=dp), dimension(:), allocatable :: D
   integer :: alloc_status
 
   ! Allocation dynamique sinon ca plante quand nmxx devient trop grand,
@@ -164,10 +164,10 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 !*** Require NANG.GE.1 in order to calculate scattering intensities
   DANG=0.
   if (NANG > 1) then
-     DANG=.5*PII/dble(NANG-1)
+     DANG=.5*PII/real(NANG-1,kind=dp)
   endif
   do J=1,NANG
-     THETA=(dble(J)-1.0)*DANG
+     THETA=(real(J,kind=dp)-1.0)*DANG
      AMU(J)=cos(THETA)
   end do
 
@@ -178,8 +178,8 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 
   NN=2*NANG-1
   do J=1,NN
-     S1(J)=(0._db,0._db)
-     S2(J)=(0._db,0._db)
+     S1(J)=(0._dp,0._dp)
+     S2(J)=(0._dp,0._dp)
   end do
 !
 !*** Logarithmic derivative D(J) calculated by downward recurrence
@@ -199,7 +199,7 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
   PSI1=sin(DX)
   CHI0=-sin(DX)
   CHI1=cos(DX)
-  XI1=CMPLX(PSI1,-CHI1,db)
+  XI1=CMPLX(PSI1,-CHI1,dp)
   QSCA=0.E0
   GSCA=0.E0
   P=-1.
@@ -212,7 +212,7 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 ! Calculate psi_n and chi_n
      PSI=(2.E0*EN-1.)*PSI1/DX-PSI0
      CHI=(2.E0*EN-1.)*CHI1/DX-CHI0
-     XI=CMPLX(PSI,-CHI,db)
+     XI=CMPLX(PSI,-CHI,dp)
 
 !*** Store previous values of AN and BN for use
 !    in computation of g=<cos(theta)>
@@ -257,7 +257,7 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
      PSI1=PSI
      CHI0=CHI1
      CHI1=CHI
-     XI1=CMPLX(PSI1,-CHI1,db)
+     XI1=CMPLX(PSI1,-CHI1,dp)
 !
 !*** Compute pi_n for next value of n
 !    For each angle J, compute pi_n+1
@@ -844,15 +844,15 @@ subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
   implicit none
 
   real, intent(in) :: frac
-  real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=db), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4), intent(inout) :: stok
 
   real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
-  real(kind=db) :: v1pi, v1pj, v1pk
+  real(kind=dp) :: v1pi, v1pj, v1pk
   integer :: i
-  real(kind=db), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=db), dimension(4) :: C, D
+  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
+  real(kind=dp), dimension(4) :: C, D
 
   frac_m1 = 1.0 - frac
 
@@ -1018,15 +1018,15 @@ subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok
   implicit none
 
   real, intent(in) :: frac
-  real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=db), dimension(4,1), intent(inout) :: stok
+  real(kind=dp), dimension(4,1), intent(inout) :: stok
 
   real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=db) ::  v1pi, v1pj, v1pk
+  real(kind=dp) ::  v1pi, v1pj, v1pk
   integer :: i
-  real(kind=db), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=db), dimension(4,1) :: C, D
+  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
+  real(kind=dp), dimension(4,1) :: C, D
 
   frac_m1 = 1.0 - frac
 
@@ -1175,15 +1175,15 @@ subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
   implicit none
 
   real, intent(in) :: frac
-  real(kind=db), intent(in) ::  u0,v0,w0,u1,v1,w1
+  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda, itheta, icell
-  real(kind=db), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4), intent(inout) :: stok
 
   real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=db) :: v1pi, v1pj, v1pk
+  real(kind=dp) :: v1pi, v1pj, v1pk
   integer :: i
-  real(kind=db), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=db), dimension(4) :: C, D
+  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
+  real(kind=dp), dimension(4) :: C, D
 
   frac_m1 = 1.0 - frac
 
@@ -1361,14 +1361,14 @@ subroutine isotrope(aleat1,aleat2,u,v,w)
   implicit none
 
   real, intent(in) :: aleat1, aleat2
-  real(kind=db), intent(out) :: u,v,w
+  real(kind=dp), intent(out) :: u,v,w
 
-  real(kind=db) :: SRW02, ARGMT, w02
+  real(kind=dp) :: SRW02, ARGMT, w02
 
-  w = 2.0_db*aleat1-1.0_db
-  W02 =  1.0_db - w*w
+  w = 2.0_dp*aleat1-1.0_dp
+  W02 =  1.0_dp - w*w
   SRW02 = sqrt(W02)
-  ARGMT = PI * ( 2.0_db * aleat2 - 1.0_db )
+  ARGMT = PI * ( 2.0_dp * aleat2 - 1.0_dp )
   u = SRW02 * cos(ARGMT)
   v = SRW02 * sin(ARGMT)
 
@@ -1394,29 +1394,29 @@ subroutine hg(g, aleat, itheta, cospsi)
 
   ! Le calcul de cospsi se fait en double precision mais on
   ! renvoie cospsi en simple precision
-  ! Passage cospsi en db lors passage physical_length en db
+  ! Passage cospsi en dp lors passage physical_length en dp
   real, intent(in) :: g
   real, intent(in) :: aleat
-  real(kind=db), intent(out) :: cospsi
+  real(kind=dp), intent(out) :: cospsi
   integer, intent(out) :: itheta
-  real (kind=db) :: g1, g2, a, b, c, d, rand
+  real (kind=dp) :: g1, g2, a, b, c, d, rand
 
-  rand = min(real(aleat,kind=db), 1.0_db-1e-6_db)
+  rand = min(real(aleat,kind=dp), 1.0_dp-1e-6_dp)
 
   if (abs(g) > tiny_real) then
      g1 = g
      g2 = g1*g1
-     a = 1.0_db + g2
-     b = 1.0_db - g2
-     c = 1.0_db - g1 + 2.0_db*g1*rand
+     a = 1.0_dp + g2
+     b = 1.0_dp - g2
+     c = 1.0_dp - g1 + 2.0_dp*g1*rand
      d = b / c
-     cospsi = ( (a - d*d) / (2.0_db * g1) )
+     cospsi = ( (a - d*d) / (2.0_dp * g1) )
   else ! g=0 --> diffusion isotrope
-     cospsi=2.0_db*rand-1.0_db
+     cospsi=2.0_dp*rand-1.0_dp
   endif
 
-  if (cospsi > 1.0_db) write(*,*) g1, rand
-  itheta = floor(acos(cospsi)*180.0_db/pi)+1
+  if (cospsi > 1.0_dp) write(*,*) g1, rand
+  itheta = floor(acos(cospsi)*180.0_dp/pi)+1
   if (itheta > nang_scatt) itheta = nang_scatt
 
   return
@@ -1438,7 +1438,7 @@ subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
   integer, intent(in) :: lambda, taille_grain
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
-  real(kind=db), intent(out) :: cospsi
+  real(kind=dp), intent(out) :: cospsi
 
   integer :: k, kmin, kmax
 
@@ -1484,7 +1484,7 @@ subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
   integer, intent(in) :: lambda,icell
   real, intent(in) :: aleat, aleat2
   integer, intent(out) :: itheta
-  real(kind=db), intent(out) :: cospsi
+  real(kind=dp), intent(out) :: cospsi
 
   integer :: k, kmin, kmax
 
@@ -1507,8 +1507,8 @@ subroutine angle_diff_theta_pos(lambda, icell, aleat, aleat2, itheta, cospsi)
 
    ! Tirage aleatoire de l'angle de diffusion entre l'angle k et l'angle k-1
    ! diffusion uniforme (lineaire en cos)
-   cospsi=cos((real(k,kind=db)-1.0_db)*pi/real(nang_scatt,kind=db)) + &
-        aleat2*(cos((real(k,kind=db))*pi/real(nang_scatt,kind=db))-cos((real(k,kind=db)-1.0_db)*pi/real(nang_scatt,kind=db)))
+   cospsi=cos((real(k,kind=dp)-1.0_dp)*pi/real(nang_scatt,kind=dp)) + &
+        aleat2*(cos((real(k,kind=dp))*pi/real(nang_scatt,kind=dp))-cos((real(k,kind=dp)-1.0_dp)*pi/real(nang_scatt,kind=dp)))
 
    return
 
@@ -1547,19 +1547,19 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
 
   integer, intent(in) :: lambda,taille_grain, itheta
   real, intent(in) :: frac, I, Q, U, aleat
-  real(kind=db), intent(out) :: phi
+  real(kind=dp), intent(out) :: phi
 
   real :: p, pp, ppp, phi1, phi2, frac_m1
 
-  real(kind=db) :: Q_db, U_db, Ip
+  real(kind=dp) :: Q_dp, U_dp, Ip
 
   frac_m1 = 1.0 - frac
 
 !  write(*,*) 'in',l, itheta, I, Q, U, aleat
 
   ! Flux polarisé et taux de pola
-  Q_db=Q;U_db=U
-  Ip=sqrt(Q_db*Q_db+U_db*U_db)
+  Q_dp=Q;U_dp=U
+  Ip=sqrt(Q_dp*Q_dp+U_dp*U_dp)
   p=Ip/I
 
   ! polarisabilite
@@ -1571,7 +1571,7 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
 
   if (abs(ppp) > 1.e-3) then
      ! Mesure de l'angle du plan de pola par rapport au Nord céleste
-     phi1=0.5*acos(Q_db/Ip) ! C'est ici qu'on a besoin du db
+     phi1=0.5*acos(Q_dp/Ip) ! C'est ici qu'on a besoin du dp
      if (U < 0.0) then
         phi1= -phi1
      endif
@@ -1583,7 +1583,7 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
      if (phi > pi) phi = phi -2*pi
      if (phi < -pi) phi = phi +2*pi
   else ! Tirage uniforme
-     phi= pi * (2._db*aleat -1.0_db)
+     phi= pi * (2._dp*aleat -1.0_dp)
   endif
 !  write(*,*) phi/pi
 

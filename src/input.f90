@@ -976,13 +976,13 @@ end subroutine lect_lambda
 
 subroutine init_tab_Temp()
 
-  real(kind=db) :: delta_T
+  real(kind=dp) :: delta_T
   integer :: t
 
   tab_Temp=0.0
   ! Echantillonage temperature
   !delta_T=(T_max)**(1.0/(n_T-1))
-  delta_T=exp((1.0_db/(real(n_T,kind=db)))*log(T_max/T_min))
+  delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
   tab_Temp(1)=T_min*sqrt(delta_T)
    do t=2,n_T
      tab_Temp(t)=delta_T*tab_Temp(t-1)

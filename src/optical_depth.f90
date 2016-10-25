@@ -29,16 +29,16 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   integer, intent(in) :: id,lambda, p_lambda
   integer, intent(inout) :: icell
-  real(kind=db), dimension(4), intent(in) :: Stokes
+  real(kind=dp), dimension(4), intent(in) :: Stokes
   logical, intent(in) :: flag_star, flag_direct_star
-  real(kind=db), intent(inout) :: u,v,w
+  real(kind=dp), intent(inout) :: u,v,w
   real, intent(in) :: extrin
-  real(kind=db), intent(inout) :: xio,yio,zio
+  real(kind=dp), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
-  real(kind=db) :: l, tau, opacite
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
+  real(kind=dp) :: l, tau, opacite
   integer :: icell_in, icell0, icell_old, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
@@ -92,7 +92,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         endif
      else
         lcellule_non_vide=.false.
-        opacite = 0.0_db
+        opacite = 0.0_dp
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
@@ -165,12 +165,12 @@ end subroutine physical_length
 subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
   integer, intent(in) :: id,lambda,p_lambda,icell0
-  real(kind=db), dimension(4), intent(in) :: Stokes
-  real(kind=db) :: l, x0,y0,z0, x1,y1,z1, u,v,w
+  real(kind=dp), dimension(4), intent(in) :: Stokes
+  real(kind=dp) :: l, x0,y0,z0, x1,y1,z1, u,v,w
   logical, intent(in) :: flag_star, flag_direct_star
 
 
-  real(kind=db) :: xm,ym,zm, phi_pos, phi_vol
+  real(kind=dp) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
   if (letape_th) then
@@ -186,9 +186,9 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
      if (loutput_UV_field) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
 
      if (lscatt_ray_tracing1) then
-        xm = 0.5_db * (x0 + x1)
-        ym = 0.5_db * (y0 + y1)
-        zm = 0.5_db * (z0 + z1)
+        xm = 0.5_dp * (x0 + x1)
+        ym = 0.5_dp * (y0 + y1)
+        zm = 0.5_dp * (z0 + z1)
 
         if (l3D) then ! phik & psup=1 in 3D
            phi_k = 1
@@ -198,7 +198,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
            if (phi_k > n_az_rt) phi_k=n_az_rt
 
-           if (zm > 0.0_db) then
+           if (zm > 0.0_dp) then
               psup = 1
            else
               psup = 2
@@ -217,9 +217,9 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
         if (flag_direct_star) then
            I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
         else
-           xm = 0.5_db * (x0 + x1)
-           ym = 0.5_db * (y0 + y1)
-           zm = 0.5_db * (z0 + z1)
+           xm = 0.5_dp * (x0 + x1)
+           ym = 0.5_dp * (y0 + y1)
+           zm = 0.5_dp * (z0 + z1)
            phi_pos = atan2(ym,xm)
 
            phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
@@ -235,10 +235,10 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            if (phi_I > n_phi_I) phi_I = 1
            !  endif
 
-           if (zm > 0.0_db) then
-              theta_I = floor(0.5_db*( w + 1.0_db) * n_theta_I) + 1
+           if (zm > 0.0_dp) then
+              theta_I = floor(0.5_dp*( w + 1.0_dp) * n_theta_I) + 1
            else
-              theta_I = floor(0.5_db*(-w + 1.0_db) * n_theta_I) + 1
+              theta_I = floor(0.5_dp*(-w + 1.0_dp) * n_theta_I) + 1
            endif
            if (theta_I > n_theta_I) theta_I = n_theta_I
 
@@ -270,17 +270,17 @@ subroutine integ_tau(lambda)
 
   integer :: icell!, i
 
-  real(kind=db), dimension(4) :: Stokes
+  real(kind=dp), dimension(4) :: Stokes
   ! angle de visee en deg
   real :: angle
-  real(kind=db) :: x0, y0, z0, u0, v0, w0
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0
   real :: tau
-  real(kind=db) :: lmin, lmax
+  real(kind=dp) :: lmin, lmax
 
   angle=angle_interet
 
   x0=0.0 ; y0=0.0 ; z0=0.0
-  Stokes = 0.0_db ; Stokes(1) = 1.0_db
+  Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
 
@@ -301,7 +301,7 @@ subroutine integ_tau(lambda)
      endif
   endif
 
-  Stokes = 0.0_db ; Stokes(1) = 1.0_db
+  Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
   w0 = cos((angle)*pi/180.)
   u0 = sqrt(1.0-w0*w0)
   v0 = 0.0
@@ -335,25 +335,25 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   implicit none
 
   integer, intent(in) :: id,lambda, icell
-  real(kind=db),dimension(4), intent(in) :: Stokes
-  real(kind=db), intent(in) :: u,v,w
-  real(kind=db), intent(in) :: xi,yi,zi
+  real(kind=dp),dimension(4), intent(in) :: Stokes
+  real(kind=dp), intent(in) :: u,v,w
+  real(kind=dp), intent(in) :: xi,yi,zi
   real, intent(out) :: tau_tot_out
-  real(kind=db), intent(out) :: lmin,lmax
+  real(kind=dp), intent(out) :: lmin,lmax
 
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins
   integer :: icell0, previous_cell, next_cell
 
-  correct_plus = 1.0_db + prec_grille
-  correct_moins = 1.0_db - prec_grille
+  correct_plus = 1.0_dp + prec_grille
+  correct_moins = 1.0_dp - prec_grille
 
   x1=xi;y1=yi;z1=zi
 
-  tau_tot=0.0_db
+  tau_tot=0.0_dp
 
-  lmin=0.0_db
-  ltot=0.0_db
+  lmin=0.0_dp
+  ltot=0.0_dp
 
   next_cell = icell
   icell0 = 0 ! for previous_cell, just for Voronoi
@@ -375,7 +375,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      if (icell0 <= n_cells) then
         opacite=kappa(icell0,lambda)
      else
-        opacite = 0.0_db
+        opacite = 0.0_dp
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
@@ -411,19 +411,19 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
   implicit none
 
   integer, intent(in) :: id, icell_in, iray
-  real(kind=db), intent(in) :: u,v,w
-  real(kind=db), intent(in) :: x,y,z
+  real(kind=dp), intent(in) :: u,v,w
+  real(kind=dp), intent(in) :: x,y,z
   logical, intent(in) :: labs
   integer, dimension(2), intent(in) :: ispeed
-  real(kind=db), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+  real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
-  real(kind=db), dimension(ispeed(1):ispeed(2)) :: tspeed
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
-  real(kind=db) :: delta_vol, l, delta_vol_phi, v0, v1, v_avg0
-  real(kind=db), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
-  real(kind=db), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
-  real(kind=db) :: dtau_c, Snu_c
-  real(kind=db), dimension(nTrans) :: tau_c
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: tspeed
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
+  real(kind=dp) :: delta_vol, l, delta_vol_phi, v0, v1, v_avg0
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
+  real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
+  real(kind=dp) :: dtau_c, Snu_c
+  real(kind=dp), dimension(nTrans) :: tau_c
   integer :: iTrans, ivpoint, iiTrans, n_vpoints, nbr_cell, icell, next_cell, previous_cell
 
   real :: facteur_tau
@@ -431,7 +431,7 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
   logical :: lcellule_non_vide
 
   integer, parameter :: n_vpoints_max = 200 ! pas super critique, presque OK avec 2 pour la simu Herbig de Peter (2x plus vite)
-  real(kind=db), dimension(n_vpoints_max) :: vitesse
+  real(kind=dp), dimension(n_vpoints_max) :: vitesse
 
 
   x1=x;y1=y;z1=z
@@ -439,12 +439,12 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
   next_cell = icell_in
   nbr_cell = 0
 
-  tau(:,:) = 0.0_db
-  I0(:,:,iray,id) = 0.0_db
-  v_avg0 = 0.0_db
+  tau(:,:) = 0.0_dp
+  I0(:,:,iray,id) = 0.0_dp
+  v_avg0 = 0.0_dp
 
-  tau_c(:) = 0.0_db
-  I0c(:,iray,id) = 0.0_db
+  tau_c(:) = 0.0_dp
+  I0c(:,iray,id) = 0.0_dp
 
   !*** propagation dans la grille
 
@@ -485,7 +485,7 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
 
         ! Vitesse projete le long du trajet dans la cellule
         do ivpoint=2, n_vpoints-1
-           delta_vol_phi = (real(ivpoint,kind=db))/(real(n_vpoints,kind=db)) * delta_vol
+           delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * delta_vol
            xphi=x0+delta_vol_phi*u
            yphi=y0+delta_vol_phi*v
            zphi=z0+delta_vol_phi*w
@@ -495,15 +495,15 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
         vitesse(n_vpoints) = v1
 
         if ((nbr_cell == 1).and.labs) then
-           v_avg0 = 0.0_db
+           v_avg0 = 0.0_dp
            do ivpoint=1,n_vpoints
               v_avg0 = v_avg0 + vitesse(ivpoint)
            enddo
-           v_avg0 = v_avg0 / real(n_vpoints,kind=db)
+           v_avg0 = v_avg0 / real(n_vpoints,kind=dp)
         endif
 
         ! Profil de raie local integre a multiplie par la frequence de la transition
-        P(:) = 0.0_db
+        P(:) = 0.0_dp
         do ivpoint=1,n_vpoints
            tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
            P(:) = P(:) + phiProf(icell,ispeed,tspeed)
@@ -526,8 +526,8 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
 
            ! Fonction source
            Snu(:) = ( emissivite_mol_o_freq(icell,iiTrans) * P(:) &
-                + emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-300_db)
-           Snu_c = emissivite_dust(icell,iiTrans) / (kappa(icell,iiTrans) + 1.0e-300_db)
+                + emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-300_dp)
+           Snu_c = emissivite_dust(icell,iiTrans) / (kappa(icell,iiTrans) + 1.0e-300_dp)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
@@ -539,13 +539,13 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
            !---write(*,*) minval(dtau(:)), maxval(dtau(:))
            !---write(*,*) minval(Snu(:)), maxval(Snu(:))
            I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + &
-                exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
+                exp(-tau(:,iTrans)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            I0c(iTrans,iray,id) = I0c(iTrans,iray,id) + &
-                exp(-tau_c(iTrans)) * (1.0_db - exp(-dtau_c)) * Snu_c
+                exp(-tau_c(iTrans)) * (1.0_dp - exp(-dtau_c)) * Snu_c
 
            if (lorigine.and.(.not.labs)) then
               origine_mol(:,iiTrans,icell,id) = origine_mol(:,iiTrans,icell,id) + &
-                   exp(-tau(:,iTrans)) * (1.0_db - exp(-dtau(:))) * Snu(:)
+                   exp(-tau(:,iTrans)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            endif
 
            ! surface superieure ou inf
@@ -567,9 +567,9 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
               Snu(:) = ( emissivite_mol_o_freq2(icell,iiTrans) * P(:) + &
-                   emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-30_db)
+                   emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-30_dp)
               I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
-                   exp(-tau2(:,iTrans)) * (1.0_db - exp(-dtau2(:))) * Snu(:)
+                   exp(-tau2(:,iTrans)) * (1.0_dp - exp(-dtau2(:))) * Snu(:)
 
               ! Mise a jour profondeur optique pour cellule suivante
               tau2(:,iTrans) = tau2(:,iTrans) + dtau2(:)
@@ -615,7 +615,7 @@ subroutine integ_tau_mol(imol)
   integer :: i, j, iTrans, n_speed, icell
 
   integer, dimension(2) :: ispeed
-  real(kind=db), dimension(:), allocatable :: tab_speed, P
+  real(kind=dp), dimension(:), allocatable :: tab_speed, P
 
 
   n_speed = mol(imol)%n_speed_rt
@@ -681,15 +681,15 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   implicit none
 
   integer, intent(in) :: lambda, icell_in
-  real(kind=db), intent(in) :: u,v,w
-  real(kind=db), intent(in) :: x,y,z
+  real(kind=dp), intent(in) :: u,v,w
+  real(kind=dp), intent(in) :: x,y,z
 
-  real(kind=db), dimension(N_type_flux) :: integ_ray_dust
+  real(kind=dp), dimension(N_type_flux) :: integ_ray_dust
 
-  real(kind=db) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l
   integer :: icell, previous_cell, next_cell
 
-  real(kind=db) :: tau, dtau
+  real(kind=dp) :: tau, dtau
 
   logical :: lcellule_non_vide
 
@@ -697,8 +697,8 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   x0=x;y0=y;z0=z
   next_cell = icell_in
 
-  tau = 0.0_db
-  integ_ray_dust(:) = 0.0_db
+  tau = 0.0_dp
+  integ_ray_dust(:) = 0.0_dp
 
 
   !*** propagation dans la grille
@@ -736,7 +736,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
         ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
         ! la profondeur optique jusqu'a la cellule
         integ_ray_dust(:) = integ_ray_dust(:) + &
-             exp(-tau) * (1.0_db - exp(-dtau)) * dust_source_fct(icell, xm,ym,zm)
+             exp(-tau) * (1.0_dp - exp(-dtau)) * dust_source_fct(icell, xm,ym,zm)
 
         ! Mise a jour profondeur optique pour cellule suivante
         tau = tau + dtau
@@ -768,14 +768,14 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
   integer :: i, j, pk, n, id, icell, jj
-  real(kind=db) :: x0, y0, z0, u0, v0, w0
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, phi, r0
 
   logical :: flag_direct_star = .false.
   logical :: flag_star = .false.
   logical :: flag_sortie
 
-  real(kind=db), dimension(4) :: Stokes
+  real(kind=dp), dimension(4) :: Stokes
 
   do pk=1, n_az
      ri_in_dark_zone(pk)=n_rad
@@ -852,7 +852,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               u0=cos(angle)
               v0=0.0
               w0=sin(angle)
-              Stokes(:) = 0.0_db ; !Stokes(1) = 1.0_db ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
+              Stokes(:) = 0.0_dp ; !Stokes(1) = 1.0_dp ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
               call physical_length(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
                    flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
               if (.not.flag_sortie) then ! le photon ne sort pas
@@ -885,7 +885,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
-                 Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
+                 Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
@@ -915,7 +915,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  u0=cos(angle)
                  v0=0.0
                  w0=sin(angle)
-                 Stokes(:) = 0.0_db ; Stokes(1) = 1.0_db ;
+                 Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                       flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
                  if (.not.flag_sortie) then ! le photon ne sort pas
@@ -998,8 +998,8 @@ subroutine define_proba_weight_emission(lambda)
   integer, intent(in) :: lambda
 
   real, dimension(n_cells) :: tau_min
-  real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
+  real(kind=dp), dimension(4) :: Stokes
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
   real :: tau
   integer :: i, j, n, id, icell
   integer, parameter :: nbre_angle = 101
@@ -1020,7 +1020,7 @@ subroutine define_proba_weight_emission(lambda)
         v0=0.0
         w0=sin(angle)
 
-        Stokes(:) = 0.0_db ;
+        Stokes(:) = 0.0_dp ;
         call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
         if (tau < tau_min(icell)) tau_min(icell) = tau
 
@@ -1035,7 +1035,7 @@ subroutine define_proba_weight_emission(lambda)
   weight_proba_emission(1:n_cells) =  exp(-tau_min(:))
 
   ! correct_E_emission sera normalise dans repartition energie
-  correct_E_emission(1:n_cells) = 1.0_db / weight_proba_emission(1:n_cells)
+  correct_E_emission(1:n_cells) = 1.0_dp / weight_proba_emission(1:n_cells)
 
   return
 

@@ -19,8 +19,8 @@ module parametres
   integer :: nb_proc
   integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
   logical :: lpara, lstop_after_init
-  integer, parameter :: sl = selected_real_kind(p=6,r=37)
-  integer, parameter :: db = selected_real_kind(p=13,r=200)
+  integer, parameter :: sp = selected_real_kind(p=6,r=37)
+  integer, parameter :: dp = selected_real_kind(p=13,r=200)
   integer, parameter :: limite_stack = 5000000
   integer :: indice_etape, etape_i, etape_f
   integer :: time_begin, time_end, time_tick, time_max
@@ -33,7 +33,7 @@ module parametres
   integer :: nbre_photons_loop, nbre_photons_eq_th, nbre_photons_lambda, nbre_photons_image, nbre_photons_spectre
   real :: nbre_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
   integer :: nnfot1
-  real(kind=db) :: E_paquet
+  real(kind=dp) :: E_paquet
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
   real :: tau_dark_zone_obs = 100 ! idem que 1000 si 1500. ci-dessus
@@ -79,8 +79,8 @@ module parametres
   ! les flux sont I, (Q,U,V), (star, scatt, disk th, disk th scatt.)
 
   ! rotation du plan du disque en deg., sens trigo.
-  real(kind=db) :: ang_disque
-  real(kind=db) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
+  real(kind=dp) :: ang_disque
+  real(kind=dp) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
@@ -150,34 +150,34 @@ module disk
   save
 
   real :: distance ! Distance du disque en pc
-  real(kind=db) :: map_size
+  real(kind=dp) :: map_size
 
   ! Disque decrit en une ou n zones
   integer :: n_zones, n_regions
 
   type disk_zone_type
-     real(kind=db) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
-     real(kind=db) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
+     real(kind=dp) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
+     real(kind=dp) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
      integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
      integer :: region
   end type disk_zone_type
 
   type disk_region_type
      integer :: n_zones
-     real(kind=db) :: Rmin, Rmax
+     real(kind=dp) :: Rmin, Rmax
      integer :: iRmin, iRmax
      integer, dimension(:), allocatable :: zones
   end type disk_region_type
 
   type cavity_type
-     real(kind=db) ::  exp_beta, sclht, Rref
+     real(kind=dp) ::  exp_beta, sclht, Rref
   end type cavity_type
 
   type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
   type(disk_region_type), dimension(:), allocatable, target :: regions
   type(cavity_type) :: cavity
 
-  real(kind=db) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
+  real(kind=dp) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
 
   real :: r_subdivide
   logical :: lr_subdivide
@@ -199,12 +199,12 @@ module disk
 !!  real, parameter :: fact_strat = 0.3
 
   ! Grille
-  real(kind=db), parameter :: prec_grille=1.0e-14_db
-  real(kind=db), parameter :: prec_grille_sph=1.0e-10_db
+  real(kind=dp), parameter :: prec_grille=1.0e-14_dp
+  real(kind=dp), parameter :: prec_grille_sph=1.0e-10_dp
 
-  real(kind=db), dimension(:,:,:), allocatable :: disk_origin
-  real(kind=db), dimension(:,:), allocatable :: star_origin
-  real(kind=db) :: frac_star_origin
+  real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
+  real(kind=dp), dimension(:,:), allocatable :: star_origin
+  real(kind=dp) :: frac_star_origin
 
   real, dimension(:), allocatable :: E_disk !n_lambda
 
@@ -245,7 +245,7 @@ module prop_star
 
   type star_type
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
-     real(kind=db) :: x,y,z
+     real(kind=dp) :: x,y,z
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
@@ -325,12 +325,12 @@ module grains
   real, dimension(:,:), allocatable :: op_file_log_r_grain ! op_file_na, n_pop
   real, dimension(:,:), allocatable :: op_file_lambda, op_file_delta_lambda ! op_file_n_lambda, n_pop
   integer, dimension(:), allocatable :: file_sh_nT
-  real(kind=db), dimension(:,:), allocatable :: file_sh_T, file_sh ! nT, n_pop
+  real(kind=dp), dimension(:,:), allocatable :: file_sh_T, file_sh ! nT, n_pop
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
   ! Tab de lambda
-  real(kind=db), dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
+  real(kind=dp), dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
   real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
   real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
   real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2
@@ -359,10 +359,10 @@ module naleat
 ! Parametres des nombres aleatoires
 !**********************************************************
 ! SPRNG renvoie un nbre aleatoire dans [0,1[
-! faire attention a conversion db -> sl sur machine 64 bits
+! faire attention a conversion dp -> sp sur machine 64 bits
 ! qui peut donner 1.0 -> BUG
 !**********************************************************
-  use parametres, only : db
+  use parametres, only : dp
 
   implicit none
   save
@@ -381,14 +381,14 @@ module naleat
   SPRNG_POINTER, dimension(:), allocatable :: stream
 
   ! Generateur gaussien
-  real(kind=db), dimension(:), allocatable:: gauss_random_saved
+  real(kind=dp), dimension(:), allocatable:: gauss_random_saved
   logical, dimension(:), allocatable :: lgauss_random_saved
 
   interface
      function gauss_random(id)
        use parametres
        integer, intent(in) :: id
-       real(kind=db) :: gauss_random
+       real(kind=dp) :: gauss_random
      end function gauss_random
   end interface
 
@@ -405,32 +405,32 @@ module opacity
   implicit none
   save
 
-  real(kind=db) :: zmaxmax
+  real(kind=dp) :: zmaxmax
   integer, dimension(:), allocatable :: lexit_cell
-  real(kind=db), dimension(:), allocatable :: zmax !n_rad
-  real(kind=db), dimension(:), allocatable :: volume !n_rad en AU^3
-  real(kind=db), dimension(:), allocatable :: masse  !en g ! n_cells
-  real(kind=db), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
-  real(kind=db), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
-  real(kind=db), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
-  real(kind=db), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
-  real(kind=db), dimension(:), allocatable :: phi_grid
-  real(kind=db), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
-  real(kind=db), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
-  real(kind=db), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
-  real(kind=db), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
+  real(kind=dp), dimension(:), allocatable :: zmax !n_rad
+  real(kind=dp), dimension(:), allocatable :: volume !n_rad en AU^3
+  real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
+  real(kind=dp), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
+  real(kind=dp), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
+  real(kind=dp), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
+  real(kind=dp), dimension(:), allocatable :: phi_grid
+  real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
+  real(kind=dp), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
+  real(kind=dp), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
+  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
   integer, dimension(:,:,:), allocatable :: cell_map
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
-  real(kind=db), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
+  real(kind=dp), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_LTE, kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
-  real(kind=db), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
-  real(kind=db), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  real(kind=dp), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   integer :: icell_not_empty
 
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
@@ -449,7 +449,7 @@ module opacity
 
   logical, dimension(:,:), allocatable :: l_emission_pah !0:n_rad+1,0:nz+1
 
-  real(kind=db), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
+  real(kind=dp), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
   real, dimension(:,:,:), allocatable :: DensE, DensE_m1 !n_rad, 0:n_z, n_az
 
 end module opacity
@@ -468,16 +468,16 @@ module resultats
   integer :: ntot = 0, nkill = 0
   real :: flux_etoile, flux_direct
 
-  real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
-  real(kind=db), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
+  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
+  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
   real, dimension(:,:,:,:,:), allocatable :: stoke_io ! x,y, theta, phi, type
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
-  real(kind=db), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
+  real(kind=dp), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
+  real(kind=dp), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
   real, dimension(:,:,:), allocatable :: sed1_io
   real, dimension(:,:,:,:), allocatable :: sed2_io
   real, dimension(:,:), allocatable :: wave2_io
-  real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes
+  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes
 
   ! Line transfer
   real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
@@ -504,7 +504,7 @@ module em_th
   real :: lambda_min, lambda_max = 3000.0
   ! Echelle_log
   ! Nbre d'intervalle de longueur d'onde
-  real(kind=db) :: delta_lambda
+  real(kind=dp) :: delta_lambda
 
   ! Proba cumulee en lambda d'emettre selon un coprs noir
   real, dimension(:), allocatable :: spectre_etoiles_cumul, spectre_etoiles !(0:n_lambda)
@@ -523,26 +523,26 @@ module em_th
   real, dimension(:,:), allocatable :: frac_E_em_1grain_nRE, log_frac_E_em_1grain_nRE !n_grains,0:n_T
 
   ! Probabilite cumulee en lambda d'emissivite de la poussiere
-  ! avec correction de temperature (dB/dT)
+  ! avec correction de temperature (dp/dT)
   ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
   real, dimension(:,:,:), allocatable :: kdB_dT_CDF ! 0:n_T,n_cells,n_lambda
   real, dimension(:,:,:), allocatable :: kdB_dT_1grain_LTE_CDF, kdB_dT_1grain_nLTE_CDF, kdB_dT_1grain_nRE_CDF ! n_grains,0:n_T,n_lambda
 
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
-  real(kind=db), dimension(:,:), allocatable :: xKJ_abs, nbre_reemission ! n_cells, id
-  real(kind=db), dimension(:), allocatable :: E0 ! n_cells
-  real(kind=db), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
+  real(kind=dp), dimension(:,:), allocatable :: xKJ_abs, nbre_reemission ! n_cells, id
+  real(kind=dp), dimension(:), allocatable :: E0 ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
-  real(kind=db), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
+  real(kind=dp), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
   real, dimension(:,:,:), allocatable :: xN_abs ! n_cells, n_lambda, nb_proc
 
   integer, dimension(:,:), allocatable :: xT_ech ! n_cells, id
   integer, dimension(:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE ! n_grains, n_cells, id
 
-  real(kind=db) :: E_abs_nRE, E_abs_nREm1
+  real(kind=dp) :: E_abs_nRE, E_abs_nREm1
   ! emissivite en unite qq (manque une cst mais travail en relatif)
-  real(kind=db), dimension(:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
+  real(kind=dp), dimension(:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
 
   real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
   real, dimension(:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
@@ -554,7 +554,7 @@ module em_th
 
 
   ! Choix cellule d'emission pour cas monochromatique
-  real(kind=db), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
+  real(kind=dp), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
   real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
   ! Biais de l'emission vers la surface du disque
@@ -583,13 +583,13 @@ module constantes
   save
 
   ! Quelques reels utiles
-  real(kind=db), parameter :: pi =3.141592653589793238462643383279502884197_db ! ca devrait etre bon la
-  real(kind=db), parameter :: deux_pi = 2.0_db * pi
-  real(kind=db), parameter :: un_sur_deux_pi = 1.0_db/deux_pi
-  real(kind=db), parameter :: quatre_pi = 4.0_db * pi
-  real(kind=db), parameter :: quatre_tiers_pi = 4.0_db/3.0_db * pi
-  real(kind=db), parameter :: pi_sur_deux = 0.5_db * pi
-  real(kind=db), parameter :: un_tiers = 1.0_db / 3.0_db
+  real(kind=dp), parameter :: pi =3.141592653589793238462643383279502884197_dp ! ca devrait etre bon la
+  real(kind=dp), parameter :: deux_pi = 2.0_dp * pi
+  real(kind=dp), parameter :: un_sur_deux_pi = 1.0_dp/deux_pi
+  real(kind=dp), parameter :: quatre_pi = 4.0_dp * pi
+  real(kind=dp), parameter :: quatre_tiers_pi = 4.0_dp/3.0_dp * pi
+  real(kind=dp), parameter :: pi_sur_deux = 0.5_dp * pi
+  real(kind=dp), parameter :: un_tiers = 1.0_dp / 3.0_dp
 
   ! Constantes en SI !!!!!!!!
   real, parameter :: hp = 6.6260693e-34  ! Planck (J.Hz-1)
@@ -607,64 +607,64 @@ module constantes
 
   ! Changements d'unites
   ! Angles
-  real(kind=db), parameter :: deg_to_rad = pi/180.0_db
-  real(kind=db), parameter :: rad_to_deg = 1.0/deg_to_rad
-  real(kind=db), parameter :: arcsec_to_rad = deg_to_rad / 3600.
-  real(kind=db), parameter :: rad_to_arcsec = 1.0/arcsec_to_rad
-  real(kind=db), parameter :: arcsec_to_deg = 1. / 3600.
-  real(kind=db), parameter :: deg_to_arcsec = 3600.
+  real(kind=dp), parameter :: deg_to_rad = pi/180.0_dp
+  real(kind=dp), parameter :: rad_to_deg = 1.0/deg_to_rad
+  real(kind=dp), parameter :: arcsec_to_rad = deg_to_rad / 3600.
+  real(kind=dp), parameter :: rad_to_arcsec = 1.0/arcsec_to_rad
+  real(kind=dp), parameter :: arcsec_to_deg = 1. / 3600.
+  real(kind=dp), parameter :: deg_to_arcsec = 3600.
 
   ! Longueurs
-  real(kind=db), parameter :: AU_to_m = 149597870700._db ! IAU 2012 definition
-  real(kind=db), parameter :: m_to_AU = 1.0_db/AU_to_m
+  real(kind=dp), parameter :: AU_to_m = 149597870700._dp ! IAU 2012 definition
+  real(kind=dp), parameter :: m_to_AU = 1.0_dp/AU_to_m
 
-  real(kind=db), parameter :: AU_to_cm = AU_to_m * 100._db
-  real(kind=db), parameter :: cm_to_AU = 1.0_db/AU_to_cm
+  real(kind=dp), parameter :: AU_to_cm = AU_to_m * 100._dp
+  real(kind=dp), parameter :: cm_to_AU = 1.0_dp/AU_to_cm
 
-  real(kind=db), parameter :: AU3_to_m3 = AU_to_m**3
-  real(kind=db), parameter :: AU3_to_cm3 = AU_to_cm**3
+  real(kind=dp), parameter :: AU3_to_m3 = AU_to_m**3
+  real(kind=dp), parameter :: AU3_to_cm3 = AU_to_cm**3
 
-  real(kind=db), parameter :: mum_to_m = 1.0e-6_db
-  real(kind=db), parameter :: m_to_mum = 1.0e6_db
-  real(kind=db), parameter :: mum_to_cm = 1.0e-4_db
-  real(kind=db), parameter :: cm_to_mum = 1.0e4_db
+  real(kind=dp), parameter :: mum_to_m = 1.0e-6_dp
+  real(kind=dp), parameter :: m_to_mum = 1.0e6_dp
+  real(kind=dp), parameter :: mum_to_cm = 1.0e-4_dp
+  real(kind=dp), parameter :: cm_to_mum = 1.0e4_dp
 
-  real(kind=db), parameter :: A_to_mum = 1.0e-4_db
+  real(kind=dp), parameter :: A_to_mum = 1.0e-4_dp
 
-  real(kind=db), parameter :: m_to_cm = 1.0e2_db
-  real(kind=db), parameter :: m3_to_cm3 = m_to_cm**3
-  real(kind=db), parameter :: cm_to_m = 1.0e-2_db
-  real(kind=db), parameter :: m_to_km = 1.0e-3_db
-  real(kind=db), parameter :: km_to_m = 1.0e3_db
+  real(kind=dp), parameter :: m_to_cm = 1.0e2_dp
+  real(kind=dp), parameter :: m3_to_cm3 = m_to_cm**3
+  real(kind=dp), parameter :: cm_to_m = 1.0e-2_dp
+  real(kind=dp), parameter :: m_to_km = 1.0e-3_dp
+  real(kind=dp), parameter :: km_to_m = 1.0e3_dp
 
-  real(kind=db), parameter :: Rsun_to_AU = 0.00466666666_db
-  real(kind=db), parameter :: Au_to_Rsun = 1.0_db/Rsun_to_AU
+  real(kind=dp), parameter :: Rsun_to_AU = 0.00466666666_dp
+  real(kind=dp), parameter :: Au_to_Rsun = 1.0_dp/Rsun_to_AU
 
-  real(kind=db), parameter :: pc_to_AU = 206264.81_db
-  real(kind=db), parameter :: rad_to_sec = pc_to_AU
-  real(kind=db), parameter :: AU_to_pc = 1.0/pc_to_AU
-  real(kind=db), parameter :: sec_to_rad = AU_to_pc
+  real(kind=dp), parameter :: pc_to_AU = 206264.81_dp
+  real(kind=dp), parameter :: rad_to_sec = pc_to_AU
+  real(kind=dp), parameter :: AU_to_pc = 1.0/pc_to_AU
+  real(kind=dp), parameter :: sec_to_rad = AU_to_pc
 
   ! Energies
-  real(kind=db), parameter :: eV_to_J = 1.60217653e-19_db
-  real(kind=db), parameter :: erg_to_J = 1.0e-7_db
+  real(kind=dp), parameter :: eV_to_J = 1.60217653e-19_dp
+  real(kind=dp), parameter :: erg_to_J = 1.0e-7_dp
   real, parameter :: jansky = 1.0e-26 ! W.m^-2.Hz-1 (F_nu en jansky)
 
   ! Masses
-  real(kind=db), parameter :: Msun_to_g = 1.9891e33_db
-  real(kind=db), parameter :: g_to_Msun = 1.0_db/Msun_to_g
+  real(kind=dp), parameter :: Msun_to_g = 1.9891e33_dp
+  real(kind=dp), parameter :: g_to_Msun = 1.0_dp/Msun_to_g
 
-  real(kind=db), parameter :: Msun_to_kg = 1.9891e30_db
-  real(kind=db), parameter :: kg_to_Msun = 1.0/Msun_to_kg
+  real(kind=dp), parameter :: Msun_to_kg = 1.9891e30_dp
+  real(kind=dp), parameter :: kg_to_Msun = 1.0/Msun_to_kg
 
-  real(kind=db), parameter :: g_to_kg = 1.0e-3_db
-  real(kind=db), parameter :: kg_to_g = 1.0e3_db
+  real(kind=dp), parameter :: g_to_kg = 1.0e-3_dp
+  real(kind=dp), parameter :: kg_to_g = 1.0e3_dp
 
   ! Limites de precision numerique
   real, parameter :: tiny_real = tiny(0.0)
   real, parameter :: huge_real = huge(1.0)
-  real(kind=db), parameter :: tiny_db = tiny(0.0_db)
-  real(kind=db), parameter :: huge_db = huge(1.0_db)
+  real(kind=dp), parameter :: tiny_dp = tiny(0.0_dp)
+  real(kind=dp), parameter :: huge_dp = huge(1.0_dp)
 
   real, parameter ::  tiny_real_x1e6 =  tiny_real * 1.0e6
 
@@ -689,14 +689,14 @@ module molecular_emission
   real :: molecularweight
   real :: abundance
   integer :: nLevels
-  real(kind=db) :: largeur_profile
+  real(kind=dp) :: largeur_profile
   real, dimension(:), allocatable :: Level_energy, j_qnb
-  ! g est db car les calculs utilisant g sont en db
-  real(kind=db), dimension(:), allocatable :: poids_stat_g
+  ! g est dp car les calculs utilisant g sont en dp
+  real(kind=dp), dimension(:), allocatable :: poids_stat_g
   integer :: nTrans_tot, nTrans
   integer, dimension(:), allocatable :: indice_Trans
 
-  real(kind=db), dimension(:), allocatable :: Aul, Blu, Bul, fAul, fBlu, fBul, transfreq
+  real(kind=dp), dimension(:), allocatable :: Aul, Blu, Bul, fAul, fBlu, fBul, transfreq
   integer, dimension(:), allocatable :: itransUpper, itransLower
   integer :: nCollPart
   character(len=512), dimension(:), allocatable :: collBetween
@@ -712,8 +712,8 @@ module molecular_emission
 
   real :: nH2, masse_mol
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
-  real(kind=db), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
-  real(kind=db), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
+  real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
   real, dimension(:), allocatable :: vfield ! n_cells
 !  real, dimension(:,:,:), allocatable :: vx, vy
   real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_cells, nLevels
@@ -722,27 +722,27 @@ module molecular_emission
 
   real ::  vitesse_turb, dv, dnu
   integer, parameter :: n_largeur_Doppler = 15
-  real(kind=db), dimension(:), allocatable :: tab_v ! n_speed
+  real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
 
   ! densite_gaz gives the midplane density for j=0
-  real(kind=db), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
-  real(kind=db), dimension(:), allocatable :: densite_gaz_midplane
-  real(kind=db), dimension(:), allocatable :: Surface_density
+  real(kind=dp), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane
+  real(kind=dp), dimension(:), allocatable :: Surface_density
 
-  real(kind=db), dimension(:,:), allocatable :: ds
-  real(kind=db), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus
-  real(kind=db), dimension(:,:,:), allocatable :: I0c ! Intensite dans le continu: nTrans,iray,ncpus
-  real(kind=db), dimension(:,:,:), allocatable :: Doppler_P_x_freq
+  real(kind=dp), dimension(:,:), allocatable :: ds
+  real(kind=dp), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus
+  real(kind=dp), dimension(:,:,:), allocatable :: I0c ! Intensite dans le continu: nTrans,iray,ncpus
+  real(kind=dp), dimension(:,:,:), allocatable :: Doppler_P_x_freq
 
-  real(kind=db), dimension(:,:), allocatable :: Jmol, Jmol2 ! nTrans, n_cpu
-  real(kind=db), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
+  real(kind=dp), dimension(:,:), allocatable :: Jmol, Jmol2 ! nTrans, n_cpu
+  real(kind=dp), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
 
   logical :: linfall, lkeplerian
 
-  real(kind=db), dimension(:), allocatable :: deltaVmax ! n_cells
-  real(kind=db), dimension(:,:), allocatable :: tab_deltaV ! n_speed, n_cells
-  real(kind=db), dimension(:), allocatable :: tab_dnu_o_freq ! n_cells
-  real(kind=db), dimension(:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_cells
+  real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: tab_deltaV ! n_speed, n_cells
+  real(kind=dp), dimension(:), allocatable :: tab_dnu_o_freq ! n_cells
+  real(kind=dp), dimension(:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_cells
 
   real, dimension(:), allocatable :: tab_abundance ! n_cells
   logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
@@ -750,7 +750,7 @@ module molecular_emission
   logical ::  lfreeze_out
   real :: T_freeze_out
 
-  real(kind=db), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
+  real(kind=dp), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
   integer :: RT_line_method, n_molecules
 
@@ -765,7 +765,7 @@ module molecular_emission
 
   type(molecule), dimension(:), allocatable :: mol
 
-  real(kind=db), dimension(:), allocatable :: tab_speed_rt
+  real(kind=dp), dimension(:), allocatable :: tab_speed_rt
 
   real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
 
@@ -776,7 +776,7 @@ end module molecular_emission
 
 module ray_tracing
 
-  use parametres, only : db
+  use parametres, only : dp
   use grains, only : nang_scatt
 
   implicit none
@@ -792,8 +792,8 @@ module ray_tracing
   integer ::  RT_n_incl, RT_n_az
   logical :: lRT_i_centered
   real, dimension(:), allocatable :: tab_RT_incl, tab_RT_az
-  real(kind=db), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
-  real(kind=db), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt
+  real(kind=dp), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
+  real(kind=dp), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt
 
   ! Sauvegarde champ de radiation pour rt2
   integer ::  n_phi_I,  n_theta_I ! 15 et 9 ok avec 30 et 30 en mode SED
@@ -815,10 +815,10 @@ module ray_tracing
   ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
   integer :: n_az_rt, n_theta_rt
   real, dimension(:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
-  real(kind=db), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
+  real(kind=dp), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
   integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=db), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=db), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
+  real(kind=dp), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=dp), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
 
   ! methode RT 2 : saving specific intensity (image 2D)
   real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus

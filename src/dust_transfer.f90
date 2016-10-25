@@ -42,7 +42,7 @@ subroutine transfert_poussiere()
 #include "sprng_f.h"
 
   ! Energie des paquets
-  real(kind=db), dimension(4) :: Stokes
+  real(kind=dp), dimension(4) :: Stokes
 
   ! Parametres simu
   integer :: itime, lambda_seuil, nbre_phot2
@@ -59,7 +59,7 @@ subroutine transfert_poussiere()
   integer, pointer, save :: p_lambda
   integer :: capt
 
-  real(kind=db) :: x,y,z, u,v,w, lmin, lmax
+  real(kind=dp) :: x,y,z, u,v,w, lmin, lmax
   real :: rand, tau
   integer :: i, icell, p_icell, n_SPH
   logical :: flag_star, flag_scatt, flag_ISM
@@ -69,18 +69,18 @@ subroutine transfert_poussiere()
   ! Paramètres parallelisation
   integer :: id=1
 
-  real(kind=db), target :: nnfot2, n_phot_sed2
-  real(kind=db), pointer :: p_nnfot2
-  real(kind=db) :: n_phot_envoyes_in_loop
+  real(kind=dp), target :: nnfot2, n_phot_sed2
+  real(kind=dp), pointer :: p_nnfot2
+  real(kind=dp) :: n_phot_envoyes_in_loop
 
   integer :: time_1, time_2, time_RT, time_source_fct
 
   time_source_fct = 0 ; time_RT = 0
 
-  lambda0 = -99 ; nnfot2=0.0_db ; n_phot_sed2 = 0.0_db
+  lambda0 = -99 ; nnfot2=0.0_dp ; n_phot_sed2 = 0.0_dp
 
   ! Energie des paquets mise a 1
-  E_paquet = 1.0_db
+  E_paquet = 1.0_dp
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()
@@ -362,7 +362,7 @@ subroutine transfert_poussiere()
      else ! calcul des observables
         ! on devient monochromatique
         lmono=.true.
-        E_paquet = 1.0_db
+        E_paquet = 1.0_dp
 
         !Todo: maybe we can use a variable lscatt_method2_mono
         if (lscattering_method1) then
@@ -481,7 +481,7 @@ subroutine transfert_poussiere()
         if (ind_etape == first_etape_obs) write(*,*) "# Wavelength [mum]  frac. E star     tau midplane"
         ! Optical depth along midplane
         x=0.0 ; y=0.0 ; z=0.0
-        Stokes = 0.0_db ; Stokes(1) = 1.0_db
+        Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
         w = 0.0 ; u = 1.0 ; v = 0.0
         call indice_cellule(x,y,z, icell)
         call optical_length_tot(1,lambda,Stokes,icell,x,y,y,u,v,w,tau,lmin,lmax)
@@ -522,12 +522,12 @@ subroutine transfert_poussiere()
 
      !$omp do schedule(dynamic,1)
      do nnfot1=nnfot1_start,nbre_photons_loop
-        p_nnfot2 = 0.0_db
-        n_phot_envoyes_in_loop = 0.0_db
+        p_nnfot2 = 0.0_dp
+        n_phot_envoyes_in_loop = 0.0_dp
         photon : do while ((p_nnfot2 < nbre_phot2).and.(n_phot_envoyes_in_loop < n_phot_lim))
-           nnfot2=nnfot2+1.0_db
-           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_db
-           n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_db
+           nnfot2=nnfot2+1.0_dp
+           n_phot_envoyes(lambda,id) = n_phot_envoyes(lambda,id) + 1.0_dp
+           n_phot_envoyes_in_loop = n_phot_envoyes_in_loop + 1.0_dp
 
            ! Choix longueur d'onde
            if (.not.lmono) then
@@ -546,7 +546,7 @@ subroutine transfert_poussiere()
            ! La paquet est maintenant sorti : on le met dans le bon capteur
            if (lpacket_alive.and.(.not.flag_ISM)) then
               call capteur(id,lambda,icell,x,y,z,u,v,w,Stokes,flag_star,flag_scatt,capt)
-              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_db ! nbre de photons recus pour etape 2
+              if (capt == capt_sup) n_phot_sed2 = n_phot_sed2 + 1.0_dp ! nbre de photons recus pour etape 2
            endif
         enddo photon !nnfot2
 
@@ -587,9 +587,9 @@ subroutine transfert_poussiere()
         !$omp do schedule(dynamic,1)
         do nnfot1=1,nbre_photons_loop
            !$ id = omp_get_thread_num() + 1
-           nnfot2 = 0.0_db
+           nnfot2 = 0.0_dp
            photon_ISM : do while (nnfot2 < nbre_photons_lambda)
-              n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_db
+              n_phot_envoyes_ISM(lambda,id) = n_phot_envoyes_ISM(lambda,id) + 1.0_dp
 
               ! Emission du paquet
               call emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
@@ -599,7 +599,7 @@ subroutine transfert_poussiere()
               if (.not.lintersect) then
                  cycle photon_ISM
               else
-                 nnfot2 = nnfot2 + 1.0_db
+                 nnfot2 = nnfot2 + 1.0_dp
                  ! Propagation du packet
                  call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
               endif
@@ -770,9 +770,9 @@ subroutine transfert_poussiere()
 
            ! Pour longeur d'onde suivante
            if (lscatt_ray_tracing1) then
-              xI_scatt = 0.0_db
+              xI_scatt = 0.0_dp
            else
-              I_spec = 0.0_db ; I_spec_star = 0.0_db
+              I_spec = 0.0_dp ; I_spec_star = 0.0_dp
            endif
         endif
 
@@ -808,8 +808,8 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
 
   ! Position et direction du packet
   integer, intent(out) :: icell
-  real(kind=db), intent(out) :: x0,y0,z0,u0,v0,w0
-  real(kind=db), dimension(4), intent(out) :: Stokes
+  real(kind=dp), intent(out) :: x0,y0,z0,u0,v0,w0
+  real(kind=dp), dimension(4), intent(out) :: Stokes
   logical, intent(out) :: lintersect
 
   ! Proprietes du packet
@@ -817,7 +817,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
   real :: rand, rand2, rand3, rand4
   integer :: i_star
 
-  real(kind=db) :: w02, srw02
+  real(kind=dp) :: w02, srw02
   real :: argmt
 
   real :: hc_lk, correct_spot, cos_thet_spot, x_spot, y_spot, z_spot
@@ -927,13 +927,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   integer, intent(in) :: id
   integer, intent(inout) :: lambda, p_lambda, icell
-  real(kind=db), intent(inout) :: x,y,z,u,v,w
-  real(kind=db), dimension(4), intent(inout) :: stokes
+  real(kind=dp), intent(inout) :: x,y,z,u,v,w
+  real(kind=dp), dimension(4), intent(inout) :: stokes
 
   logical, intent(inout) :: flag_star, flag_ISM
   logical, intent(out) :: flag_scatt, lpacket_alive
 
-  real(kind=db) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
+  real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: p_icell, taille_grain, itheta
   real :: rand, rand2, tau, dvol
 
@@ -1083,7 +1083,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
-           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_db - proba_abs_RE(icell,lambda))
+           E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_dp - proba_abs_RE(icell,lambda))
            ! Multiplication par proba abs sur grain en eq. radiatif
            Stokes = Stokes * proba_abs_RE(icell,lambda)
 
@@ -1157,18 +1157,18 @@ subroutine dust_map(lambda,ibin,iaz)
 #include "sprng_f.h"
 
   integer, intent(in) :: lambda, ibin, iaz
-  real(kind=db) :: u,v,w
+  real(kind=dp) :: u,v,w
 
-  real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
-  real(kind=db), dimension(3,nb_proc) :: pixelcorner
+  real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
+  real(kind=dp), dimension(3,nb_proc) :: pixelcorner
 
-  real(kind=db) :: taille_pix, l, x0, y0, z0
+  real(kind=dp) :: taille_pix, l, x0, y0, z0
   integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
 
 
   integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
-  real(kind=db), dimension(n_rad_RT) :: tab_r
-  real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
+  real(kind=dp), dimension(n_rad_RT) :: tab_r
+  real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
 
   if (lmono0) write(*,'(a16, $)') " Ray-tracing ..."
 
@@ -1179,7 +1179,7 @@ subroutine dust_map(lambda,ibin,iaz)
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._db/)
+  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -1213,27 +1213,27 @@ subroutine dust_map(lambda,ibin,iaz)
      n_iter_min = 1
      n_iter_max = 1
 
-     dx(:) = 0.0_db
-     dy(:) = 0.0_db
+     dx(:) = 0.0_dp
+     dy(:) = 0.0_dp
      i = 1
      j = 1
 
-     rmin_RT = 0.01_db * Rmin
-     rmax_RT = 2.0_db * Rmax
+     rmin_RT = 0.01_dp * Rmin
+     rmax_RT = 2.0_dp * Rmax
 
      tab_r(1) = rmin_RT
-     fact_r = exp( (1.0_db/(real(n_rad_RT,kind=db) -1))*log(rmax_RT/rmin_RT) )
+     fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
 
      do ri_RT = 2, n_rad_RT
         tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
      enddo
 
-     fact_A = sqrt(pi * (fact_r - 1.0_db/fact_r)  / n_phi_RT )
+     fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
      if (l_sym_ima) then
-        cst_phi = pi  / real(n_phi_RT,kind=db)
+        cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
-        cst_phi = deux_pi  / real(n_phi_RT,kind=db)
+        cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
      endif
 
      ! Boucle sur les rayons d'echantillonnage
@@ -1252,7 +1252,7 @@ subroutine dust_map(lambda,ibin,iaz)
         taille_pix =  fact_A * r ! racine carree de l'aire du pixel
 
         do phi_RT=1,n_phi_RT ! de 0 a pi
-           phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
+           phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
            ! this is of course the expensive line:
@@ -1265,7 +1265,7 @@ subroutine dust_map(lambda,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=db) ! en AU
+     taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
@@ -1337,12 +1337,12 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   use utils, only : interp
 
   integer, intent(in) :: lambda, iaz
-  real(kind=db), intent(in) :: u,v,w
+  real(kind=dp), intent(in) :: u,v,w
 
   integer, parameter :: n_ray_star_SED = 1024
 
-  real(kind=db), dimension(4) :: Stokes
-  real(kind=db) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
+  real(kind=dp), dimension(4) :: Stokes
+  real(kind=dp) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
   real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
@@ -1401,11 +1401,11 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         Q_1star(:,:,:) = 0.0
         U_1star(:,:,:) = 0.0
      endif
-     norme = 0.0_db
+     norme = 0.0_dp
 
      ! Etoile ponctuelle
-     !  x0=0.0_db ;  y0= 0.0_db ; z0= 0.0_db
-     !  Stokes = 0.0_db
+     !  x0=0.0_dp ;  y0= 0.0_dp ; z0= 0.0_dp
+     !  Stokes = 0.0_dp
      !  call optical_length_tot(1,lambda,Stokes,i,j,x0,y0,z0,u,v,w,tau,lmin,lmax)
      !  Flux_etoile =  exp(-tau)
      !  write(*,*)  "F0", Flux_etoile
@@ -1432,9 +1432,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
         rand2 = sprng(stream(id))
 
         ! Position de depart aleatoire sur une sphere de rayon 1
-        z = 2.0_db * rand - 1.0_db
+        z = 2.0_dp * rand - 1.0_dp
         srw02 = sqrt(1.0-z*z)
-        argmt = pi*(2.0_db*rand2-1.0_db)
+        argmt = pi*(2.0_dp*rand2-1.0_dp)
         x = srw02 * cos(argmt)
         y = srw02 * sin(argmt)
 
@@ -1461,7 +1461,7 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
            y0 = y1
         endif
 
-        Stokes = 0.0_db
+        Stokes = 0.0_dp
         call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
@@ -1522,15 +1522,15 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
   implicit none
 
   integer, intent(in) :: lambda, ibin, iaz,ipix,jpix,id, n_iter_min, n_iter_max
-  real(kind=db), dimension(3), intent(in) :: pixelcorner,dx,dy
-  real(kind=db), intent(in) :: pixelsize,u,v,w
+  real(kind=dp), dimension(3), intent(in) :: pixelcorner,dx,dy
+  real(kind=dp), intent(in) :: pixelsize,u,v,w
 
-  real(kind=db), dimension(N_type_flux) :: Stokes, Stokes_old
+  real(kind=dp), dimension(N_type_flux) :: Stokes, Stokes_old
 
-  real(kind=db) :: x0,y0,z0,u0,v0,w0, npix2
-  real(kind=db), dimension(3) :: sdx, sdy
+  real(kind=dp) :: x0,y0,z0,u0,v0,w0, npix2
+  real(kind=dp), dimension(3) :: sdx, sdy
 
-  real(kind=db), parameter :: precision = 1.e-2_db
+  real(kind=dp), parameter :: precision = 1.e-2_dp
   integer :: i, j, subpixels, ri, zj, phik, iter, icell
 
   logical :: lintersect
@@ -1548,11 +1548,11 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
 
      npix2 =  real(subpixels)**2
      Stokes_old(:) = Stokes(:)
-     Stokes(:) = 0.0_db
+     Stokes(:) = 0.0_dp
 
      ! Vecteurs definissant les sous-pixels
-     sdx(:) = dx(:) / real(subpixels,kind=db)
-     sdy(:) = dy(:) / real(subpixels,kind=db)
+     sdx(:) = dx(:) / real(subpixels,kind=dp)
+     sdy(:) = dy(:) / real(subpixels,kind=dp)
 
      ! L'obs est en dehors de la grille
      ri = 2*n_rad ; zj=1 ; phik=1
@@ -1562,9 +1562,9 @@ subroutine intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,ipix,jp
      do i = 1,subpixels
         do j = 1,subpixels
            ! Centre du sous-pixel
-           x0 = pixelcorner(1) + (i - 0.5_db) * sdx(1) + (j-0.5_db) * sdy(1)
-           y0 = pixelcorner(2) + (i - 0.5_db) * sdx(2) + (j-0.5_db) * sdy(2)
-           z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
+           x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
+           y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
+           z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)  !BUG

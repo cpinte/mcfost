@@ -31,7 +31,7 @@ subroutine mol_line_transfer()
 
   implicit none
 
-  real(kind=db) :: u0, v0, w0
+  real(kind=dp) :: u0, v0, w0
   integer :: iTrans, imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
@@ -128,7 +128,7 @@ subroutine mol_line_transfer()
            enddo
         endif
 
-        u0 = sin(angle_interet/180._db*pi) ;  v0=0.0_db ; w0 = sqrt(1.0_db - u0*u0)
+        u0 = sin(angle_interet/180._dp*pi) ;  v0=0.0_dp ; w0 = sqrt(1.0_dp - u0*u0)
 
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
@@ -185,14 +185,14 @@ subroutine NLTE_mol_line_transfer(imol)
 
   real :: rand, rand2, rand3, fac_etape
 
-  real(kind=db) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
 
-  real(kind=db), dimension(nLevels,nb_proc)  :: pop, pop_old
+  real(kind=dp), dimension(nLevels,nb_proc)  :: pop, pop_old
 
   logical :: labs
 
   integer, dimension(2) :: ispeed
-  real(kind=db), dimension(:,:), allocatable :: tab_speed
+  real(kind=dp), dimension(:,:), allocatable :: tab_speed
 
 
   labs = .true.
@@ -221,7 +221,7 @@ subroutine NLTE_mol_line_transfer(imol)
      write(*,*) 'Allocation error tab_speed'
      stop
   endif
-  tab_speed = 0.0_db
+  tab_speed = 0.0_dp
 
   allocate(I0(-n_speed:n_speed,nTrans,n_rayons_start,nb_proc), &
        I0c(nTrans,n_rayons_start,nb_proc), stat=alloc_status)
@@ -229,8 +229,8 @@ subroutine NLTE_mol_line_transfer(imol)
      write(*,*) 'Allocation error I0'
      stop
   endif
-  I0 = 0.0_db
-  I0c = 0.0_db
+  I0 = 0.0_dp
+  I0c = 0.0_dp
 
   if (ldouble_RT) then
      allocate(I02(-n_speed:n_speed,nTrans,n_rayons_start,nb_proc), stat=alloc_status)
@@ -238,7 +238,7 @@ subroutine NLTE_mol_line_transfer(imol)
         write(*,*) 'Allocation error I0'
         stop
      endif
-     I02 = 0.0_db
+     I02 = 0.0_dp
   endif
 
   allocate(ds(n_rayons_start,nb_proc), stat=alloc_status)
@@ -246,14 +246,14 @@ subroutine NLTE_mol_line_transfer(imol)
      write(*,*) 'Allocation error ds'
      stop
   endif
-  ds = 0.0_db
+  ds = 0.0_dp
 
   allocate(Doppler_P_x_freq(-n_speed:n_speed,n_rayons_start,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error Doppler_P_x_freq'
      stop
   endif
-  Doppler_P_x_freq = 0.0_db
+  Doppler_P_x_freq = 0.0_dp
 
   ! 2 etapes : 1) direction des rayons fixee pour eliminer les fluctuations aletoires
   ! et 2) direction aleatoire pour assurer un echantillonnage suffisant
@@ -285,7 +285,7 @@ subroutine NLTE_mol_line_transfer(imol)
            write(*,*) 'Allocation error tab_speed'
            stop
         endif
-        tab_speed = 0.0_db
+        tab_speed = 0.0_dp
 
         allocate(I0(ispeed(1):ispeed(2),nTrans,n_rayons_max,nb_proc), &
              I0c(nTrans,n_rayons_start,nb_proc), stat=alloc_status)
@@ -293,22 +293,22 @@ subroutine NLTE_mol_line_transfer(imol)
            write(*,*) 'Allocation error I0'
            stop
         endif
-        I0 = 0.0_db
-        I0c = 0.0_db
+        I0 = 0.0_dp
+        I0c = 0.0_dp
 
         allocate(ds(n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error ds'
            stop
         endif
-        ds = 0.0_db
+        ds = 0.0_dp
 
         allocate(Doppler_P_x_freq(ispeed(1):ispeed(2),n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error Doppler_P_x_freq'
            stop
         endif
-        Doppler_P_x_freq = 0.0_db
+        Doppler_P_x_freq = 0.0_dp
      endif
 
      lnotfixed_Rays = .not.lfixed_Rays
@@ -363,18 +363,18 @@ subroutine NLTE_mol_line_transfer(imol)
                  if (etape==1) then
                     ! Position = milieu de la cellule
                     x0 = r_grid(icell)
-                    y0 = 0.0_db
+                    y0 = 0.0_dp
                     z0 = z_grid(icell)
 
                     if (lkeplerian) then
                        ! Direction verticale
                        if (iray==1) then
-                          w0=1.0_db
+                          w0=1.0_dp
                        else
-                          w0=-1.0_db
+                          w0=-1.0_dp
                        endif
-                       u0 = 0.0_db
-                       v0 = 0.0_db
+                       u0 = 0.0_dp
+                       v0 = 0.0_dp
                     else
                        norme = sqrt(x0*x0 + y0*y0 + z0*z0)
                        if (iray==1) then
@@ -396,11 +396,11 @@ subroutine NLTE_mol_line_transfer(imol)
 
                     ! Direction de propagation aleatoire
                     rand = sprng(stream(id))
-                    W0 = 2.0_db * rand - 1.0_db
-                    W02 =  1.0_db - W0*W0
+                    W0 = 2.0_dp * rand - 1.0_dp
+                    W02 =  1.0_dp - W0*W0
                     SRW02 = sqrt(W02)
                     rand = sprng(stream(id))
-                    ARGMT = PI * (2.0_db * rand - 1.0_db)
+                    ARGMT = PI * (2.0_dp * rand - 1.0_dp)
                     U0 = SRW02 * cos(ARGMT)
                     V0 = SRW02 * sin(ARGMT)
                  endif
@@ -409,7 +409,7 @@ subroutine NLTE_mol_line_transfer(imol)
                  if (lnotfixed_Rays) then
                     do iv=ispeed(1),ispeed(2)
                        !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
-                       rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_db * (rand - 0.5_db) * deltaVmax(icell)
+                       rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_dp * (rand - 0.5_dp) * deltaVmax(icell)
                     enddo
                  endif
 
@@ -461,7 +461,7 @@ subroutine NLTE_mol_line_transfer(imol)
         do icell = 1, n_cells
            if (lcompute_molRT(icell)) then
               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
-                   tab_nLevel_old(icell,1:n_level_comp) + 1e-300_db)
+                   tab_nLevel_old(icell,1:n_level_comp) + 1e-300_dp)
               if (diff > maxdiff) maxdiff = diff
            endif
         enddo ! icell
@@ -518,17 +518,17 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   integer, intent(in) :: imol, ibin, iaz
 
-  real(kind=db) :: x0,y0,z0,l, u,v,w
+  real(kind=dp) :: x0,y0,z0,l, u,v,w
 
-  real(kind=db), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
-  real(kind=db), dimension(3,nb_proc) :: pixelcorner
-  real(kind=db) :: taille_pix
+  real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
+  real(kind=dp), dimension(3,nb_proc) :: pixelcorner
+  real(kind=dp) :: taille_pix
   integer :: i,j, id, igridx_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
   integer, parameter :: n_ray_star = 1000
-  real(kind=db), dimension(n_rad_RT) :: tab_r
-  real(kind=db) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
+  real(kind=dp), dimension(n_rad_RT) :: tab_r
+  real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
   integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, lambda, iv
@@ -567,8 +567,8 @@ subroutine emission_line_map(imol,ibin,iaz)
      endif
   endif
 
-  I0 = 0.0_db
-  I0c = 0.0_db
+  I0 = 0.0_dp
+  I0c = 0.0_dp
   if (lorigine) origine_mol = 0.0
 
   ! Definition des vecteurs de base du plan image dans le repere universel
@@ -576,7 +576,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._db/)
+  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -605,22 +605,22 @@ subroutine emission_line_map(imol,ibin,iaz)
      n_iter_min = 1
      n_iter_max = 1
 
-     dx(:) = 0.0_db
-     dy(:) = 0.0_db
+     dx(:) = 0.0_dp
+     dy(:) = 0.0_dp
      i = 1
      j = 1
 
-     rmin_RT = max(w*0.9_db,0.05_db) * rmin
-     rmax_RT = 2.0_db * Rmax
+     rmin_RT = max(w*0.9_dp,0.05_dp) * rmin
+     rmax_RT = 2.0_dp * Rmax
 
      tab_r(1) = rmin_RT
-     fact_r = exp( (1.0_db/(real(n_rad_RT,kind=db) -1))*log(rmax_RT/rmin_RT) )
+     fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
 
      do ri_RT = 2, n_rad_RT
         tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
      enddo
 
-     fact_A = sqrt(pi * (fact_r - 1.0_db/fact_r)  / n_phi_RT )
+     fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
 
      ! Boucle sur les rayons d'echantillonnage
@@ -632,9 +632,9 @@ subroutine emission_line_map(imol,ibin,iaz)
      id =1 ! pour code sequentiel
 
      if (l_sym_ima) then
-        cst_phi = pi  / real(n_phi_RT,kind=db)
+        cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
-        cst_phi = deux_pi  / real(n_phi_RT,kind=db)
+        cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
      endif
 
 
@@ -646,7 +646,7 @@ subroutine emission_line_map(imol,ibin,iaz)
         taille_pix =  fact_A * r ! racine carree de l'aire du pixel
 
         do phi_RT=1,n_phi_RT ! de 0 a pi
-           phi = cst_phi * (real(phi_RT,kind=db) -0.5_db)
+           phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
 
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image ! C'est le centre en fait car dx = dy = 0.
            call intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
@@ -658,7 +658,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = map_size / real(max(igridx,igridy),kind=db) ! en AU
+     taille_pix = map_size / real(max(igridx,igridy),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
@@ -725,15 +725,15 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   implicit none
 
   integer, intent(in) :: ipix,jpix,id, imol, n_iter_min, n_iter_max, ibin, iaz
-  real(kind=db), dimension(3), intent(in) :: pixelcorner,dx,dy
-  real(kind=db), intent(in) :: pixelsize,u,v,w
-  real(kind=db), dimension(:,:), allocatable :: IP, IP_old
-  real(kind=db), dimension(:), allocatable :: IPc
+  real(kind=dp), dimension(3), intent(in) :: pixelcorner,dx,dy
+  real(kind=dp), intent(in) :: pixelsize,u,v,w
+  real(kind=dp), dimension(:,:), allocatable :: IP, IP_old
+  real(kind=dp), dimension(:), allocatable :: IPc
 
   integer, parameter :: maxSubPixels = 32
 
-  real(kind=db) :: x0,y0,z0,u0,v0,w0
-  real(kind=db), dimension(3) :: sdx, sdy
+  real(kind=dp) :: x0,y0,z0,u0,v0,w0
+  real(kind=dp), dimension(3) :: sdx, sdy
   real :: npix2, diff
 
   real, parameter :: precision = 1.e-2
@@ -755,8 +755,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   ! Ray tracing : on se propage dans l'autre sens
   u0 = -u ; v0 = -v ; w0 = -w
 
-  IP = 0.0_db
-  IPc = 0.0_db
+  IP = 0.0_dp
+  IPc = 0.0_dp
 
   ! le nbre de subpixel en x est 2^(iter-1)
   subpixels = 1
@@ -765,12 +765,12 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   infinie : do ! Boucle infinie tant que le pixel n'est pas converge
      npix2 =  real(subpixels)**2
      IP_old = IP
-     IP = 0.0_db
-     IPc = 0.0_db
+     IP = 0.0_dp
+     IPc = 0.0_dp
 
      ! Vecteurs definissant les sous-pixels
-     sdx(:) = dx(:) / real(subpixels,kind=db)
-     sdy(:) = dy(:) / real(subpixels,kind=db)
+     sdx(:) = dx(:) / real(subpixels,kind=dp)
+     sdy(:) = dy(:) / real(subpixels,kind=dp)
 
      iray = 1
 
@@ -782,9 +782,9 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
      do i = 1,subpixels
         do j = 1,subpixels
            ! Centre du sous-pixel
-           x0 = pixelcorner(1) + (i - 0.5_db) * sdx(1) + (j-0.5_db) * sdy(1)
-           y0 = pixelcorner(2) + (i - 0.5_db) * sdx(2) + (j-0.5_db) * sdy(2)
-           z0 = pixelcorner(3) + (i - 0.5_db) * sdx(3) + (j-0.5_db) * sdy(3)
+           x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
+           y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
+           z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
 
            ! On se met au bord de la grille : propagation a l'envers
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
@@ -815,7 +815,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
         exit infinie
      else
         ! On fait le test sur a difference
-        diff = maxval( abs(IP - IP_old) / (IP + 1e-300_db) )
+        diff = maxval( abs(IP - IP_old) / (IP + 1e-300_dp) )
         if (diff > precision ) then
            ! On est pas converge
            subpixels = subpixels * 2

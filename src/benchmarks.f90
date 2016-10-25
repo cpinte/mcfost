@@ -85,7 +85,7 @@ subroutine readMolecule_benchmark1()
    implicit none
 
   character(len=80) :: junk
-  real(kind=db) :: Delta_E, Kul
+  real(kind=dp) :: Delta_E, Kul
 
   mol(1)%filename = "mol_benchmark.dat"
 
@@ -104,15 +104,15 @@ subroutine readMolecule_benchmark1()
   allocate(itransUpper(1:nTrans_tot))
   allocate(itransLower(1:nTrans_tot))
 
-  poids_stat_g(1) = 1.0_db
+  poids_stat_g(1) = 1.0_dp
 
   read(1,*) Delta_E, poids_stat_g(2), Aul(1), Kul
 
-  Level_energy(1) = 0.0_db
+  Level_energy(1) = 0.0_dp
   Level_energy(2) = Delta_E  / 8065.541  ! per cm to ev
 
 
-  transfreq(1) = c_light * (Delta_E * 100_db) ! en Hz
+  transfreq(1) = c_light * (Delta_E * 100_dp) ! en Hz
   itransUpper(1) = 2
   itransLower(1) = 1
 
@@ -136,7 +136,7 @@ subroutine readMolecule_benchmark1()
   nCollTrans(1) = 1
   nCollTemps(1) = 1
 
-  collTemps = 1.0_db
+  collTemps = 1.0_dp
 
   allocate(collRates(1:nCollPart, 1:nCollTrans(1), 1:nCollTemps(1))) ! TODO : passage par des pointeurs, c'est crade
   allocate(iCollUpper(1:nCollPart, 1:nCollTrans(1)))
@@ -164,8 +164,8 @@ subroutine readMolecule_benchmark2()
 
   implicit none
 
-  real(kind=db), parameter :: ergToEv = 6.24145d11
-  real(kind=db), parameter :: hCgs = 6.626205d-27
+  real(kind=dp), parameter :: ergToEv = 6.24145d11
+  real(kind=dp), parameter :: hCgs = 6.626205d-27
 
   character(len=80) :: junk
   integer :: i, iPart

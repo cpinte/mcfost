@@ -21,7 +21,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -57,7 +57,7 @@ contains
        stop
     endif
 
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     lmigration = .false.
     lhydrostatic = .false.
     lread_Misselt=.false.
@@ -550,7 +550,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -997,7 +997,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1415,7 +1415,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -1823,7 +1823,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2228,7 +2228,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2240,7 +2240,7 @@ contains
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%dhs_maxf = 0.9
 
     ! -------------------------
@@ -2636,7 +2636,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: somme, V_somme
+    real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
     integer, dimension(100) :: n_especes
@@ -2648,7 +2648,7 @@ contains
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3034,7 +3034,7 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
+    real(kind=dp) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -3045,7 +3045,7 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3434,7 +3434,7 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme, V_somme
+    real(kind=dp) :: size_neb_tmp, somme, V_somme
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -3445,7 +3445,7 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
     ! -------------------------
@@ -3825,7 +3825,7 @@ end subroutine read_para215
     character(len=*), intent(in) :: para
 
     integer :: i, j, alloc_status, ios, ind_pop, imol, status
-    real(kind=db) :: size_neb_tmp, somme
+    real(kind=dp) :: size_neb_tmp, somme
     real :: gas_dust
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -3836,7 +3836,7 @@ end subroutine read_para215
     open(unit=1, file=para, status='old')
 
     read(1,*) para_version
-    correct_Rsub = 1.0_db
+    correct_Rsub = 1.0_dp
     dust_pop_tmp(:)%type = "Mie"
 
 

@@ -177,21 +177,21 @@ subroutine define_cylindrical_grid()
   ! 03/05/11, version 3 :  27/04/05
 
   real, parameter :: pi = 3.1415926535
-  real(kind=db) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
+  real(kind=dp) :: rcyl, puiss, rsph, w, uv, p, rcyl_min, rcyl_max, frac
   real :: phi
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
 
   !tab en cylindrique ou spherique suivant grille
-  real(kind=db), dimension(n_rad) :: V
-  real(kind=db), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
-  real(kind=db) ::   r_i, r_f, dr, fac, r0, H, hzone
-  real(kind=db) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
+  real(kind=dp), dimension(n_rad) :: V
+  real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
+  real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
+  real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
 
-  real(kind=db), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
-  real(kind=db), dimension(:), allocatable :: phi_grid_tmp
+  real(kind=dp), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
+  real(kind=dp), dimension(:), allocatable :: phi_grid_tmp
 
   if (l3D) then
      allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
@@ -263,7 +263,7 @@ subroutine define_cylindrical_grid()
   n_cells_tmp = 0
 
   istart = 1
-  tab_r(:) = 0.0_db
+  tab_r(:) = 0.0_dp
   do ir=1, n_regions
      regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
 
@@ -275,20 +275,20 @@ subroutine define_cylindrical_grid()
      R0 =  regions(ir)%Rmin
      if (ir > 1) then
         if (regions(ir)%Rmin == regions(ir-1)%Rmax) then
-           R0 =  regions(ir)%Rmin * 1.00001_db
+           R0 =  regions(ir)%Rmin * 1.00001_dp
         endif
      endif
 
      ! Grille log avec subdivision cellule interne
      !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-     ln_delta_r = (1.0_db/real(n_rad_region-n_rad_in_region+1,kind=db))*log(regions(ir)%Rmax/R0)
+     ln_delta_r = (1.0_dp/real(n_rad_region-n_rad_in_region+1,kind=dp))*log(regions(ir)%Rmax/R0)
      delta_r = exp(ln_delta_r)
 
-     ln_delta_r_in = (1.0_db/real(n_rad_in_region,kind=db))*log(delta_r)
+     ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
      delta_r_in = exp(ln_delta_r_in)
 
      ! Selection de la zone correpondante : pente la plus forte
-     puiss = 0.0_db
+     puiss = 0.0_dp
      do iz=1, n_zones
         if (disk_zone(iz)%region == ir) then
            p=1+dz%surf-dz%exp_beta
@@ -342,7 +342,7 @@ subroutine define_cylindrical_grid()
      ! Cellules vides
      if (ir < n_regions) then
         if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
-           ln_delta_r = (1.0_db/real(n_empty+1,kind=db))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
+           ln_delta_r = (1.0_dp/real(n_empty+1,kind=dp))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
            delta_r = exp(ln_delta_r)
            do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
               tab_r(i) = tab_r(i-1) * delta_r
@@ -420,12 +420,12 @@ subroutine define_cylindrical_grid()
 
      do i=1, n_rad
         if ((tab_r2(i+1)-tab_r2(i)) > 1.0e-6*tab_r2(i)) then
-           V(i)=2.0_db*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
+           V(i)=2.0_dp*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
            dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
         else
            rcyl = r_grid_tmp(i,1)
-           V(i)=4.0_db*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
-           dr2_grid(i) = 2.0_db * rcyl*(tab_r(i+1)-tab_r(i))
+           V(i)=4.0_dp*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
+           dr2_grid(i) = 2.0_dp * rcyl*(tab_r(i+1)-tab_r(i))
         endif
 
         delta_z(i)=zmax(i)/real(nz)
@@ -433,8 +433,8 @@ subroutine define_cylindrical_grid()
         z_lim(i,nz+1)=zmax(i)
 
         do j=1,nz
-           z_lim(i,j) = (real(j,kind=db)-1.0_db)*delta_z(i)
-           z_grid_tmp(i,j) = (real(j,kind=db)-0.5_db)*delta_z(i)
+           z_lim(i,j) = (real(j,kind=dp)-1.0_dp)*delta_z(i)
+           z_grid_tmp(i,j) = (real(j,kind=dp)-0.5_dp)*delta_z(i)
         enddo
      enddo
 
@@ -447,19 +447,19 @@ subroutine define_cylindrical_grid()
 
 
      ! tab_r est en spherique ici
-     w_lim(0) = 0.0_db
-     theta_lim(0) = 0.0_db
-     tan_theta_lim(0) = 1.0e-10_db
+     w_lim(0) = 0.0_dp
+     theta_lim(0) = 0.0_dp
+     tan_theta_lim(0) = 1.0e-10_dp
 
-     w_lim(nz) = 1.0_db
+     w_lim(nz) = 1.0_dp
      theta_lim(nz) = pi/2.
-     tan_theta_lim(nz) = 1.e30_db
+     tan_theta_lim(nz) = 1.e30_dp
 
      do j=1, nz-1
         ! repartition uniforme en cos
-        w= real(j,kind=db)/real(nz,kind=db)
+        w= real(j,kind=dp)/real(nz,kind=dp)
         w_lim(j) = w
-        tan_theta_lim(j) = w / sqrt(1.0_db - w*w)
+        tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
         theta_lim(j) = atan(tan_theta_lim(j))
      enddo
 
@@ -468,8 +468,8 @@ subroutine define_cylindrical_grid()
         rsph = sqrt(r_lim(i) * r_lim(i-1))
 
         do j=1,nz
-           w = (real(j,kind=db)-0.5_db)/real(nz,kind=db)
-           uv = sqrt(1.0_db - w*w)
+           w = (real(j,kind=dp)-0.5_dp)/real(nz,kind=dp)
+           uv = sqrt(1.0_dp - w*w)
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
         enddo
@@ -556,7 +556,7 @@ end subroutine define_cylindrical_grid
   pure logical function test_exit_grid_cyl(icell, x, y, z)
 
     integer, intent(in) :: icell
-    real(kind=db), intent(in) :: x,y,z
+    real(kind=dp), intent(in) :: x,y,z
 
     if (icell <= n_cells) then
        test_exit_grid_cyl = .false.
@@ -711,10 +711,10 @@ end subroutine define_cylindrical_grid
 
     implicit none
 
-    real(kind=db), intent(in) :: xin,yin,zin
+    real(kind=dp), intent(in) :: xin,yin,zin
     integer, intent(out) :: icell
 
-    real(kind=db) :: r2, phi
+    real(kind=dp) :: r2, phi
     integer :: ri, ri_min, ri_max, ri_out, zj_out, phik_out
 
     r2 = xin*xin+yin*yin
@@ -748,7 +748,7 @@ end subroutine define_cylindrical_grid
           if (zj_out > nz) zj_out = nz
           if (zin < 0.0)  zj_out = -zj_out
           if (zin /= 0.0) then
-             phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+             phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
              phik_out=floor(phi/(2*pi)*real(N_az))+1
              if (phik_out==n_az+1) phik_out=n_az
           else
@@ -773,13 +773,13 @@ end subroutine define_cylindrical_grid
 
     implicit none
 
-    real(kind=db), intent(in) :: xin,yin,zin
+    real(kind=dp), intent(in) :: xin,yin,zin
     integer, intent(out) :: phik_out
 
-    real(kind=db) :: phi
+    real(kind=dp) :: phi
 
     if (zin /= 0.0) then
-       phi=modulo(atan2(yin,xin),2*real(pi,kind=db))
+       phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
        phik_out=floor(phi/(2*pi)*real(N_az))+1
        if (phik_out==n_az+1) phik_out=n_az
     else
@@ -795,37 +795,37 @@ end subroutine define_cylindrical_grid
   subroutine cross_cylindrical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
 
     integer, intent(in) :: cell, previous_cell
-    real(kind=db), intent(in) :: x0,y0,z0
-    real(kind=db), intent(in) :: u,v,w ! Todo : check that
+    real(kind=dp), intent(in) :: x0,y0,z0
+    real(kind=dp), intent(in) :: u,v,w ! Todo : check that
 
-    real(kind=db), intent(out) :: x1, y1, z1
+    real(kind=dp), intent(out) :: x1, y1, z1
     integer, intent(out) :: next_cell
-    real(kind=db), intent(out) :: l
+    real(kind=dp), intent(out) :: l
 
     ! Variables to be sorted out
     integer :: ri0,zj0,k0, k0m1
     integer ::  delta_rad, delta_zj, delta_phi, ri1, zj1, k1
 
-    real(kind=db) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, den, tan_angle_lim
-    real(kind=db) :: phi, delta_vol, zlim, dotprod
-    real(kind=db) :: correct_moins, correct_plus
+    real(kind=dp) :: inv_a, a, b, c, s, rac, t, t_phi, delta, inv_w, r_2, den, tan_angle_lim
+    real(kind=dp) :: phi, delta_vol, zlim, dotprod
+    real(kind=dp) :: correct_moins, correct_plus
 
 
     ! TODO: Can be calculated outside
-    correct_moins = 1.0_db - prec_grille
-    correct_plus = 1.0_db + prec_grille
+    correct_moins = 1.0_dp - prec_grille
+    correct_plus = 1.0_dp + prec_grille
 
     a=u*u+v*v
     if (a > tiny_real) then
-       inv_a=1.0_db/a
+       inv_a=1.0_dp/a
     else
        inv_a=huge_real
     endif
 
     if (abs(w) > tiny_real) then
-       inv_w=1.0_db/w
+       inv_w=1.0_dp/w
     else
-       inv_w=sign(huge_db,w) ! huge_real avant
+       inv_w=sign(huge_dp,w) ! huge_real avant
     endif
     ! End : TODO : Can be calculated outside
 
@@ -850,14 +850,14 @@ end subroutine define_cylindrical_grid
        ! 1) position interface radiale
        ! on avance ou recule en r ? -> produit scalaire
        dotprod=u*x0+v*y0  ! ~ b
-       if (dotprod < 0.0_db) then
+       if (dotprod < 0.0_dp) then
           ! on recule : on cherche rayon inférieur
           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
           delta=b*b-c
-          if (delta < 0.0_db) then ! on ne rencontre pas le rayon inférieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
              ! on cherche le rayon supérieur
              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-             delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+             delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
           else
              delta_rad=-1
@@ -865,14 +865,14 @@ end subroutine define_cylindrical_grid
        else
           ! on avance : on cherche le rayon supérieur
           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
-          delta=max(b*b-c,0.0_db) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
+          delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
        endif !dotprod
        rac=sqrt(delta)
        s=(-b-rac) * correct_plus
-       if (s < 0.0_db) then
+       if (s < 0.0_dp) then
           s=(-b+rac) * correct_plus
-       else if (s==0.0_db) then
+       else if (s==0.0_dp) then
           s=prec_grille
        endif
 
@@ -880,14 +880,14 @@ end subroutine define_cylindrical_grid
        ! 2) position interface verticale
        ! on monte ou on descend par rapport au plan équatorial ?
        dotprod=w*z0
-       if (dotprod == 0.0_db) then
+       if (dotprod == 0.0_dp) then
           t=1.0e10
        else
-          if (dotprod > 0.0_db) then
+          if (dotprod > 0.0_dp) then
              ! on s'eloigne du midplane (ou on monte en 2D)
              if (abs(zj0)==nz+1) then
                 delta_zj=0
-                zlim=sign(1.0e10_db,z0)
+                zlim=sign(1.0e10_dp,z0)
              else
                 zlim= sign(z_lim(ri0,abs(zj0)+1)*correct_plus, z0)  ! BUUG HERE TODO
                 delta_zj=1
@@ -910,14 +910,14 @@ end subroutine define_cylindrical_grid
                    ! on traverse le plan eq donc on va remonter
                    ! et z va changer de signe
                    delta_zj=1
-                   if (z0 > 0.0_db) then
+                   if (z0 > 0.0_dp) then
                       zlim=-z_lim(ri0,2)*correct_moins
                    else
                       zlim=z_lim(ri0,2)*correct_moins
                    endif
                 else !(zj0==1)
                    ! on ne traverse pas z=0.
-                   if (z0 > 0.0_db) then
+                   if (z0 > 0.0_dp) then
                       zlim=z_lim(ri0,zj0)*correct_moins
                    else
                       zlim=-z_lim(ri0,zj0)*correct_moins
@@ -928,7 +928,7 @@ end subroutine define_cylindrical_grid
           endif ! monte ou descend
           t=(zlim-z0)*inv_w
           ! correct pb precision
-          if (t < 0.0_db) t=prec_grille
+          if (t < 0.0_dp) t=prec_grille
        endif !dotprod=0.0
 
 
@@ -991,7 +991,7 @@ end subroutine define_cylindrical_grid
           ! It can be different from the initial azimuth if the star is not centered
           ! so we need to compute it here
           if (ri0==0) then
-             phi=modulo(atan2(y1,x1),2*real(pi,kind=db))
+             phi=modulo(atan2(y1,x1),2*real(pi,kind=dp))
              k1=floor(phi*un_sur_deux_pi*real(N_az))+1
              if (k1==n_az+1) k1=n_az
           endif
@@ -1024,7 +1024,7 @@ end subroutine define_cylindrical_grid
     endif
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-    if (z1 == 0.0_db) then
+    if (z1 == 0.0_dp) then
        if (l3D) then
           z1 = sign(prec_grille,w)
        else
@@ -1043,14 +1043,14 @@ end subroutine define_cylindrical_grid
 
   subroutine verif_cell_position_cyl(icell, x, y, z)
 
-    real(kind=db), intent(inout) :: x,y,z
+    real(kind=dp), intent(inout) :: x,y,z
     integer, intent(inout) :: icell
 
     integer :: ri, zj, ri0, zj0, tmp_k
-    real(kind=db) :: factor, correct_moins, correct_plus
+    real(kind=dp) :: factor, correct_moins, correct_plus
 
-    correct_moins = 1.0_db - prec_grille
-    correct_plus = 1.0_db + prec_grille
+    correct_moins = 1.0_dp - prec_grille
+    correct_plus = 1.0_dp + prec_grille
 
     ! todo : tmp :
     call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
@@ -1108,30 +1108,30 @@ end subroutine define_cylindrical_grid
     implicit none
 
     integer, intent(in) :: id
-    real(kind=db), intent(inout) :: x,y,z
-    real(kind=db), intent(in) :: u,v,w
+    real(kind=dp), intent(inout) :: x,y,z
+    real(kind=dp), intent(in) :: u,v,w
     integer, intent(out) :: icell
     logical, intent(out) :: lintersect
 
-    real(kind=db) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t1, t2
-    real(kind=db) :: zlim, zlim2, delta_vol, inv_w, correct_moins, correct_plus
+    real(kind=dp) :: x0, y0, z0, z1, a, inv_a, r_2, b, c, delta, rac, s1, s2, dotprod, t1, t2
+    real(kind=dp) :: zlim, zlim2, delta_vol, inv_w, correct_moins, correct_plus
 
-    correct_moins = 1.0_db - 1.0e-10_db
-    correct_plus = 1.0_db + 1.0e-10_db
+    correct_moins = 1.0_dp - 1.0e-10_dp
+    correct_plus = 1.0_dp + 1.0e-10_dp
 
     x0=x ; y0=y ; z0=z
 
     a=u*u+v*v
     if (a > tiny_real) then
-       inv_a=1.0_db/a
+       inv_a=1.0_dp/a
     else
        inv_a=huge_real
     endif
 
     if (abs(w) > tiny_real) then
-       inv_w=1.0_db/w
+       inv_w=1.0_dp/w
     else
-       inv_w=sign(huge_db,w) ! huge_real avant
+       inv_w=sign(huge_dp,w) ! huge_real avant
     endif
 
     ! Longueur de vol pour atteindre le rayon cylindrique rout
@@ -1140,7 +1140,7 @@ end subroutine define_cylindrical_grid
 
     c=(r_2-r_lim_2(n_rad)*correct_moins)*inv_a
     delta=b*b-c
-    if (delta < 0.0_db) then
+    if (delta < 0.0_dp) then
        ! On ne rencontre pas le cylindre
        s1 = huge_real
        s2 = huge_real
@@ -1168,7 +1168,7 @@ end subroutine define_cylindrical_grid
        t1=huge_real
        t2=huge_real
     else
-       if (z0 > 0.0_db) then
+       if (z0 > 0.0_dp) then
           zlim=zmaxmax*correct_moins
           zlim2=-zmaxmax*correct_moins
        else
@@ -1241,9 +1241,9 @@ end subroutine define_cylindrical_grid
 
     integer, intent(in) :: icell
     real, intent(in) :: aleat1, aleat2, aleat3
-    real(kind=db), intent(out) :: x,y,z
+    real(kind=dp), intent(out) :: x,y,z
 
-    real(kind=db) :: r,phi
+    real(kind=dp) :: r,phi
     integer :: ri, zj, phik
 
     ri = cell_map_i(icell)
@@ -1264,16 +1264,16 @@ end subroutine define_cylindrical_grid
           z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
        endif
     else ! 2D : choix aléatoire du signe
-       if (aleat2 > 0.5_db) then
-          z=z_lim(ri,zj)+(2.0_db*(aleat2-0.5_db))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
+       if (aleat2 > 0.5_dp) then
+          z=z_lim(ri,zj)+(2.0_dp*(aleat2-0.5_dp))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
        else
-          z=-(z_lim(ri,zj)+(2.0_db*aleat2)*(z_lim(ri,zj+1)-z_lim(ri,zj)))
+          z=-(z_lim(ri,zj)+(2.0_dp*aleat2)*(z_lim(ri,zj+1)-z_lim(ri,zj)))
        endif
     endif
 
     ! Position azimuthale
     !phi=(2.0*aleat3-1.0)*pi
-    phi = 2.0_db*pi * (real(phik,kind=db)-1.0_db+aleat3)/real(n_az,kind=db)
+    phi = 2.0_dp*pi * (real(phik,kind=dp)-1.0_dp+aleat3)/real(n_az,kind=dp)
 
     ! x et y
     x=r*cos(phi)

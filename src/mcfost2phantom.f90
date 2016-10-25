@@ -131,32 +131,32 @@ contains
 #include "sprng_f.h"
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
-    real(db), dimension(4,np), intent(in) :: xyzh
+    real(dp), dimension(4,np), intent(in) :: xyzh
     integer(kind=1), dimension(np), intent(in) :: iphase
-    real(db), dimension(ndusttypes,np), intent(in) :: dustfrac
-    real(db), dimension(ndusttypes), intent(in) :: grainsize
-    real(db), dimension(ntypes), intent(in) :: massoftype
-    real(db), intent(in) :: hfact, umass, utime, udist, graindens
-    real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
+    real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
+    real(dp), dimension(ndusttypes), intent(in) :: grainsize
+    real(dp), dimension(ntypes), intent(in) :: massoftype
+    real(dp), intent(in) :: hfact, umass, utime, udist, graindens
+    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
-    real(db), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
+    real(dp), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
 
     integer, intent(in) :: ndudt
-    real(db), dimension(ndudt), intent(in) :: dudt
+    real(dp), dimension(ndudt), intent(in) :: dudt
 
-    real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not db
+    real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
     real, dimension(3,ndusttypes,np), intent(out) :: Frad
-    real(db), intent(out) :: mu_gas
+    real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
-    real(db), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
-    real(db), dimension(:,:), allocatable :: rhodust, massdust
+    real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
+    real(dp), dimension(:,:), allocatable :: rhodust, massdust
 
-    real(kind=db), dimension(4) :: Stokes
-    real(kind=db) :: nnfot2
-    real(kind=db) :: x,y,z, u,v,w
+    real(kind=dp), dimension(4) :: Stokes
+    real(kind=dp) :: nnfot2
+    real(kind=dp) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
     integer :: itime !, time_begin, time_end, time_tick, time_max
@@ -267,9 +267,9 @@ contains
 
     !$omp do schedule(dynamic,1)
     do nnfot1=1,nbre_photons_loop
-       nnfot2 = 0.0_db
+       nnfot2 = 0.0_dp
        photon : do while ((nnfot2 < nbre_phot2))
-          nnfot2=nnfot2+1.0_db
+          nnfot2=nnfot2+1.0_dp
 
           ! Choix longueur d'onde
           rand = sprng(stream(id))
@@ -277,7 +277,7 @@ contains
 
           ! Emission du paquet
           call emit_packet(id,lambda, icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,lintersect)
-          Stokes = 0.0_db ; Stokes(1) = 1.0_db
+          Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
           lpacket_alive = .true.
 
           ! Propagation du packet

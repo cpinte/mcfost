@@ -20,10 +20,10 @@ subroutine setDiffusion_coeff(i)
 
   integer, intent(in) :: i
 
-  real(kind=db) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
+  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
   integer :: j, k, lambda, icell
 
-  real(kind=db), parameter :: precision = 1.0e-1_db ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
+  real(kind=dp), parameter :: precision = 1.0e-1_dp ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
   ! le mettre a 0, evite le drole de BUG
 
   cst_Dcoeff = c_light*pi/(12.*sigma)
@@ -39,7 +39,7 @@ subroutine setDiffusion_coeff(i)
            Temp = DensE(i,j,k)**0.25
 
            cst=cst_th/Temp
-           somme=0.0_db
+           somme=0.0_dp
            do lambda=1, n_lambda
               ! longueur d'onde en metre
               wl = tab_lambda(lambda)*1.e-6
@@ -49,7 +49,7 @@ subroutine setDiffusion_coeff(i)
                  coeff_exp=exp(cst_wl)
                  dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
               else
-                 dB_dT = 0.0_db
+                 dB_dT = 0.0_dp
               endif
               somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
            enddo
@@ -80,7 +80,7 @@ subroutine setDiffusion_coeff0(i)
 
   integer, intent(in) :: i
 
-  real(kind=db) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
+  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
   integer :: j, k, lambda, icell
 
   cst_Dcoeff = c_light*pi/(12.*sigma)
@@ -91,7 +91,7 @@ subroutine setDiffusion_coeff0(i)
         icell = cell_map(i,j,k)
         Temp=Temperature(icell)
         cst=cst_th/Temp
-        somme=0.0_db
+        somme=0.0_dp
         do lambda=1, n_lambda
            ! longueur d'onde en metre
            wl = tab_lambda(lambda)*1.e-6
@@ -101,7 +101,7 @@ subroutine setDiffusion_coeff0(i)
               coeff_exp=exp(cst_wl)
               dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
            else
-              dB_dT = 0.0_db
+              dB_dT = 0.0_dp
            endif
            somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
         enddo
@@ -395,9 +395,9 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   real, intent(out) :: max_delta_E_r
   logical, intent(out) :: lconverge
 
-  real(kind=db) :: dt, dE_dr_m1, dE_dr_p1, d2E_dr2, d2E_dz2
-  real(kind=db) :: D_Laplacien_E, dr, dz, delta_E, delta_E_r
-  real(kind=db), dimension(n_rad,nz,n_az) :: tab_dt
+  real(kind=dp) :: dt, dE_dr_m1, dE_dr_p1, d2E_dr2, d2E_dz2
+  real(kind=dp) :: D_Laplacien_E, dr, dz, delta_E, delta_E_r
+  real(kind=dp), dimension(n_rad,nz,n_az) :: tab_dt
   integer :: i,j,k
 
   lconverge = .true.
@@ -405,14 +405,14 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   ! Determination du pas de temps pour respecter le critere de stabilite
 
   ! pas de temps pour chacune des cellules
-  tab_dt = huge_db ! pour ne pas selectionner les cellules hors zone de diff
+  tab_dt = huge_dp ! pour ne pas selectionner les cellules hors zone de diff
   do k=1, n_az
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
            dr = r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1))
            dz = delta_z(i)
            ! tab_dt(i,j,k) = min(dr,dz)**2/Dcoeff(i,j,k)
-           tab_dt(i,j,k) = 1.0_db/(Dcoeff(i,j,k)*(1.0_db/dr**2 + 1.0_db/dz**2))
+           tab_dt(i,j,k) = 1.0_dp/(Dcoeff(i,j,k)*(1.0_dp/dr**2 + 1.0_dp/dz**2))
         enddo !j
      enddo !i
   enddo !k
@@ -448,29 +448,29 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
            dE_dr_p1 = (DensE_m1(i+1,j,k) - DensE_m1(i,j,k))/(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i,j,k)))
 
            !    frac=(log(r_lim(i))-log(r_grid(i)))/(log(r_grid(i+1))-log(r_grid(i)))
-           !    Dcoeff_p=exp(log(Dcoeff(i,j,k))*frac+log(Dcoeff(i+1,j,k))*(1.0_db-frac))
+           !    Dcoeff_p=exp(log(Dcoeff(i,j,k))*frac+log(Dcoeff(i+1,j,k))*(1.0_dp-frac))
 
            !   frac=(log(r_lim(i-1))-log(r_grid(i-1)))/(log(r_grid(i))-log(r_grid(i-1)))
-           !   Dcoeff_m=exp(log(Dcoeff(i-1,j,k))*frac+log(Dcoeff(i,j,k))*(1.0_db-frac))
+           !   Dcoeff_m=exp(log(Dcoeff(i-1,j,k))*frac+log(Dcoeff(i,j,k))*(1.0_dp-frac))
 
 
-           !Dcoeff_p = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i+1,j,k))
-           !Dcoeff_m = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i-1,j,k))
+           !Dcoeff_p = 0.5_dp * (Dcoeff(i,j,k) + Dcoeff(i+1,j,k))
+           !Dcoeff_m = 0.5_dp * (Dcoeff(i,j,k) + Dcoeff(i-1,j,k))
 
-           !Dcoeff_p = 0.5_db * (Dcoeff(i,j,k) + interp(Dcoeff(i+1,:,k),z_grid(i+1,:),z_grid(i,j)))
-           !Dcoeff_m = 0.5_db * (Dcoeff(i,j,k) + interp(Dcoeff(i-1,:,k),z_grid(i-1,:),z_grid(i,j)))
+           !Dcoeff_p = 0.5_dp * (Dcoeff(i,j,k) + interp(Dcoeff(i+1,:,k),z_grid(i+1,:),z_grid(i,j)))
+           !Dcoeff_m = 0.5_dp * (Dcoeff(i,j,k) + interp(Dcoeff(i-1,:,k),z_grid(i-1,:),z_grid(i,j)))
 
-           !d2E_dr2  = (dE_dr_p1*Dcoeff_p  - dE_dr_m1*Dcoeff_m) / (2._db*(r_grid(i+1,j)-r_grid(i-1,j)))
+           !d2E_dr2  = (dE_dr_p1*Dcoeff_p  - dE_dr_m1*Dcoeff_m) / (2._dp*(r_grid(i+1,j)-r_grid(i-1,j)))
 
-           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._db*(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i-1,j,k))))
+           d2E_dr2  =  Dcoeff(i,j,k) * (dE_dr_p1 - dE_dr_m1) /(2._dp*(r_grid(cell_map(i+1,j,k))-r_grid(cell_map(i-1,j,k))))
 
-           !Dcoeff_p = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i,j+1,k))
-           !Dcoeff_m = 0.5_db * (Dcoeff(i,j,k) + Dcoeff(i-1,j-1,k))
+           !Dcoeff_p = 0.5_dp * (Dcoeff(i,j,k) + Dcoeff(i,j+1,k))
+           !Dcoeff_m = 0.5_dp * (Dcoeff(i,j,k) + Dcoeff(i-1,j-1,k))
 
            !dE_dz_p1 = (DensE_m1(i,j+1,k) - DensE_m1(i,j,k))
            !dE_dz_m1 = (DensE_m1(i,j,k) - DensE_m1(i,j-1,k))
 
-           !d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_db * delta_z(i)**2)
+           !d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(i)**2)
 
            d2E_dz2  =   Dcoeff(i,j,k) * (DensE_m1(i,j+1,k) + DensE_m1(i,j-1,k) - 2.0 * DensE(i,j,k)) / (2.0 * delta_z(i)**2)
 
@@ -524,9 +524,9 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   real, intent(out) :: max_delta_E_r
   logical, intent(out) :: lconverge
 
-  real(kind=db) :: dt, dE_dz_m1, dE_dz_p1, d2E_dz2
-  real(kind=db) :: D_Laplacien_E, dz, delta_E, delta_E_r
-  real(kind=db), dimension(nz) :: tab_dt
+  real(kind=dp) :: dt, dE_dz_m1, dE_dz_p1, d2E_dz2
+  real(kind=dp) :: D_Laplacien_E, dz, delta_E, delta_E_r
+  real(kind=dp), dimension(nz) :: tab_dt
   integer :: j,k
 
   lconverge = .true.
@@ -535,7 +535,7 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   ! Determination du pas de temps pour respecter le critere de stabilite
 
   ! pas de temps pour chacune des cellules
-  tab_dt = huge_db ! pour ne pas selectionner les cellules hors zone de diff
+  tab_dt = huge_dp ! pour ne pas selectionner les cellules hors zone de diff
   do j=1, zj_sup_dark_zone(ri,k) + delta_cell_dark_zone
      dz = delta_z(ri)
      tab_dt(j) = dz**2/Dcoeff(ri,j,k)
@@ -561,14 +561,14 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
 
 
      ! Ca rend le truc instable
-    ! Dcoeff_p = 0.5_db * (Dcoeff(ri,j,k) + Dcoeff(ri,j+1,k))
-    ! Dcoeff_m = 0.5_db * (Dcoeff(ri,j,k) + Dcoeff(ri-1,j-1,k))
+    ! Dcoeff_p = 0.5_dp * (Dcoeff(ri,j,k) + Dcoeff(ri,j+1,k))
+    ! Dcoeff_m = 0.5_dp * (Dcoeff(ri,j,k) + Dcoeff(ri-1,j-1,k))
      ! Plus stable
   !   Dcoeff_p = Dcoeff(ri,j,k)
   !   Dcoeff_m =  Dcoeff(ri,j,k)
-  !   d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_db * delta_z(ri)**2)
+  !   d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(ri)**2)
 
-     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_db * delta_z(ri)**2)
+     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_dp * delta_z(ri)**2)
 
 
   !   write(*,*) "****"

@@ -57,27 +57,27 @@ subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,
   real, intent(in) :: aleat1, aleat2, aleat3, aleat4
   integer, intent(out) :: icell
 
-  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
+  real(kind=dp), intent(out) :: x, y, z, u, v, w, w2
   logical, intent(out) :: lintersect
 
-  real(kind=db) :: srw02, argmt, r_etoile, cospsi, phi
+  real(kind=dp) :: srw02, argmt, r_etoile, cospsi, phi
 
   ! Position de depart aleatoire sur une sphere de rayon 1
-  z = 2.0_db * aleat1 - 1.0_db
+  z = 2.0_dp * aleat1 - 1.0_dp
   srw02 = sqrt(1.0-z*z)
-  argmt = pi*(2.0_db*aleat2-1.0_db)
+  argmt = pi*(2.0_dp*aleat2-1.0_dp)
   x = srw02 * cos(argmt)
   y = srw02 * sin(argmt)
 
   ! Choix direction de vol : sphere uniforme
   cospsi = sqrt(aleat3) ! !TODO : c'est bizarre ca. aleat3 marche avec le benchmark : mais pas la meme chose pour la surface stellaire dans RT. sqrt(aleat3) ~ OK avec TORUS en mode MC
-  phi = 2.0_db*pi*aleat4
+  phi = 2.0_dp*pi*aleat4
   ! (x,y,z) definit la normale (ici, il a encore une norme=1)
   ! cospsi et phi sont definis / cette normale
   ! il faut faire une rotation
   call cdapres(cospsi, phi, x, y, z, u, v, w)
 
-  w2=1.0_db-w*w
+  w2=1.0_dp-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
   r_etoile = etoile(i_star)%r
@@ -118,15 +118,15 @@ end subroutine em_sphere_uniforme
 !  integer, intent(in) :: n_star
 !  real, intent(in) :: aleat1, aleat2
 !  integer, intent(out) :: ri, zj, phik
-!  real(kind=db), intent(out) :: x, y, z, u, v, w, w2
+!  real(kind=dp), intent(out) :: x, y, z, u, v, w, w2
 !
-!  real(kind=db) :: srw02, argmt
+!  real(kind=dp) :: srw02, argmt
 !
 !  ! Emission isotrope
-!  w = 2.0_db * aleat1 - 1.0_db
-!  w2 = 1.0_db-w*w
+!  w = 2.0_dp * aleat1 - 1.0_dp
+!  w2 = 1.0_dp-w*w
 !  srw02 = sqrt(w2)
-!  argmt = pi*(2.0_db*aleat2-1.0_db)
+!  argmt = pi*(2.0_dp*aleat2-1.0_dp)
 !  u = srw02 * cos(argmt)
 !  v = srw02 * sin(argmt)
 !
@@ -188,19 +188,19 @@ subroutine repartition_energie_etoiles()
   implicit none
 
   real, dimension(n_lambda,n_etoiles) :: prob_E_star0
-  real(kind=db), dimension(n_lambda) :: log_lambda, spectre_etoiles0
-  real(kind=db), dimension(n_etoiles) ::  L_star0, correct_Luminosity
+  real(kind=dp), dimension(n_lambda) :: log_lambda, spectre_etoiles0
+  real(kind=dp), dimension(n_etoiles) ::  L_star0, correct_Luminosity
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
-  real(kind=db), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
+  real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   character(len=512) :: filename, dir
 
   integer :: lambda, i, n, n_lambda_spectre, l, ios
-  real(kind=db) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
+  real(kind=dp) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
   real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV
-  real(kind=db) :: fact_sup, fact_inf, cst_spectre_etoiles
+  real(kind=dp) :: fact_sup, fact_inf, cst_spectre_etoiles
 
-  real(kind=db) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
+  real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, naxes1_ref
   real :: nullval
@@ -217,11 +217,11 @@ subroutine repartition_energie_etoiles()
   cst_spectre_etoiles = 2.0*pi*hp*c_light**2 * (AU_to_m)**2 ! cst BB + r_etoile en AU
 
   if (letape_th) then
-     fact_sup = exp(0.5_db/real(n_lambda,kind=db)*log(lambda_max/lambda_min))
-     fact_inf = 1.0_db/fact_sup
+     fact_sup = exp(0.5_dp/real(n_lambda,kind=dp)*log(lambda_max/lambda_min))
+     fact_inf = 1.0_dp/fact_sup
   else
-     fact_sup = 1.0001_db ;
-     fact_inf = 0.9999_db ;
+     fact_sup = 1.0001_dp ;
+     fact_inf = 0.9999_dp ;
   endif
 
   ! Emission des etoiles
@@ -256,12 +256,12 @@ subroutine repartition_energie_etoiles()
            tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
            allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre))
         endif
-        tab_lambda_spectre(i,:) = 1.0_db * spanl(lambda_min, lambda_max, n_lambda_spectre)
+        tab_lambda_spectre(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre)
 
         do l=1, n_lambda_spectre
            wl = tab_lambda_spectre(i,l) *1.e-6
            cst_wl=cst_th/(etoile(i)%T*wl)
-           tab_spectre(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_db) ;
+           tab_spectre(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
         enddo ! l
 
      enddo !i
@@ -454,7 +454,7 @@ subroutine repartition_energie_etoiles()
         wl_deviation = wl_spectre_avg / tab_lambda(lambda) ! Deviation between bin center and averaged wl
 
         ! Correction eventuelles
-        if ((terme > tiny_db) .and. (N>3) .and. (abs(wl_deviation-1.0) < 3e-2)) then
+        if ((terme > tiny_dp) .and. (N>3) .and. (abs(wl_deviation-1.0) < 3e-2)) then
            terme = terme / N * (surface / Cst0)
            terme0 = terme0 / N * (surface / Cst0)
         else ! on est en dehors du spectre fournit
@@ -609,12 +609,12 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
 
   integer, intent(in) :: id
   integer, intent(out) :: icell
-  real(kind=db), intent(out) :: x, y, z, u, v, w
-  real(kind=db), dimension(4), intent(out) :: stokes
+  real(kind=dp), intent(out) :: x, y, z, u, v, w
+  real(kind=dp), dimension(4), intent(out) :: stokes
   logical, intent(out) :: lintersect
 
   real :: aleat1, aleat2, aleat3, aleat4
-  real(kind=db) :: srw02, argmt, cospsi, phi, l, w2
+  real(kind=dp) :: srw02, argmt, cospsi, phi, l, w2
 
   ! Energie a 1
   stokes(:) = 0. ; stokes(1)  = 1.
@@ -623,9 +623,9 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   aleat1 = sprng(stream(id))
   aleat2 = sprng(stream(id))
 
-  z = 2.0_db * aleat1 - 1.0_db
+  z = 2.0_dp * aleat1 - 1.0_dp
   srw02 = sqrt(1.0-z*z)
-  argmt = pi*(2.0_db*aleat2-1.0_db)
+  argmt = pi*(2.0_dp*aleat2-1.0_dp)
   x = srw02 * cos(argmt)
   y = srw02 * sin(argmt)
 
@@ -635,13 +635,13 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   aleat4 = sprng(stream(id))
 
   cospsi = -sqrt(aleat3)
-  phi = 2.0_db*pi*aleat4
+  phi = 2.0_dp*pi*aleat4
   ! (x,y,z) definit la normale (ici, il a encore une norme=1)
   ! cospsi et phi sont definis / cette normale
   ! il faut faire une rotation
   call cdapres(cospsi, phi, x, y, z, u, v, w)
 
-  w2=1.0_db-w*w
+  w2=1.0_dp-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
   l = R_ISM * Rmax
@@ -659,7 +659,7 @@ end subroutine emit_packet_ISM
 
 subroutine stars_cell_indices()
 
-  real(kind=db) :: x, y, z
+  real(kind=dp) :: x, y, z
   integer :: i_star, icell
 
   do i_star=1, n_etoiles
