@@ -5,7 +5,6 @@ module PAH
   use opacity
   use constantes
   use em_th
-  use nrtype, only : sp
   use nr, only : indexx, indexx_sp
 
   use dust_prop
@@ -21,8 +20,8 @@ function specific_heat(T, taille_grain)
   ! 30/01/07
 
   integer, intent(in) :: taille_grain ! indice taille de grain
-  real(kind=db), dimension(:), intent(in) :: T
-  real(kind=db), dimension(size(T)) :: specific_heat
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: specific_heat
 
   if (lread_Misselt) then
      specific_heat = file_specific_heat(T,taille_grain)
@@ -43,8 +42,8 @@ function astrosil_specific_heat(T, taille_grain)
   ! 26/01/07
 
   integer, intent(in) :: taille_grain ! indice taille de grain
-  real(kind=db), dimension(:), intent(in) :: T
-  real(kind=db), dimension(size(T)) :: astrosil_specific_heat
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: astrosil_specific_heat
 
   real :: Na
 
@@ -65,18 +64,18 @@ function PAH_specific_heat(T,taille_grain)
   ! 30/01/07
 
   integer, intent(in) :: taille_grain
-  real(kind=db), dimension(:), intent(in) :: T
-  real(kind=db), dimension(size(T)) :: PAH_specific_heat
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: PAH_specific_heat
 
-  real(kind=db), dimension(:), allocatable :: hbarw, g
+  real(kind=dp), dimension(:), allocatable :: hbarw, g
 
   integer :: NC, NH, n, Nm, i, nT
-  real(kind=db) :: ThetaD, beta, a
+  real(kind=dp) :: ThetaD, beta, a
 
   integer :: N_CCop, N_CCip, N_H, N_tot
 
 
-  real(kind=db), dimension(:), allocatable :: deltaj, g_CCop, g_CCip,  hbarw_CCop, hbarw_CCip, x
+  real(kind=dp), dimension(:), allocatable :: deltaj, g_CCop, g_CCip,  hbarw_CCop, hbarw_CCip, x
   integer, dimension(:), allocatable :: s
 
   real, dimension(3) :: wavenum, hbarw_CH, g_CH
@@ -209,7 +208,7 @@ subroutine test_PAH_specific_heat()
 
   integer :: nc
   real :: a
-  real(kind=db), dimension(1) :: T, C
+  real(kind=dp), dimension(1) :: T, C
 
   nc=24
   a=1d-3*(nc/468.)**(1/3.)
@@ -228,8 +227,8 @@ function file_specific_heat(T,taille_grain)
   ! return the specific heat capacity in [erg/K]
 
   integer, intent(in) :: taille_grain ! indice taille de grain
-  real(kind=db), dimension(:), intent(in) :: T
-  real(kind=db), dimension(size(T)) :: file_specific_heat
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: file_specific_heat
 
   integer :: k, pop
 
@@ -273,10 +272,10 @@ function mode_spectrum(ThetaD,Nm,beta,deltaj)
 
   implicit none
 
-  real(kind=db), intent(in) :: ThetaD, beta
+  real(kind=dp), intent(in) :: ThetaD, beta
   integer, intent(in) :: Nm
-  real(kind=db), dimension(Nm) :: mode_spectrum
-  real(kind=db), dimension(Nm), intent(in) :: deltaj
+  real(kind=dp), dimension(Nm) :: mode_spectrum
+  real(kind=dp), dimension(Nm), intent(in) :: deltaj
 
   integer :: j
   real :: fact
@@ -325,7 +324,7 @@ function sh_helper(x, n)
 
   implicit none
 
-  real(kind=db), dimension(:), intent(in) :: x
+  real(kind=dp), dimension(:), intent(in) :: x
   integer, intent(in) :: n
   real, dimension(size(x)) :: sh_helper
 
@@ -333,7 +332,7 @@ function sh_helper(x, n)
   integer :: i, nx, j
   real :: dy
   real, dimension(nn) :: y
-  real(kind=db) :: eyx, yx
+  real(kind=dp) :: eyx, yx
 
   do j=1, nn
      y(j)=(real(j)-0.5)/real(nn);

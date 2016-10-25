@@ -17,7 +17,7 @@ subroutine compute_othin_sublimation_radius()
 
   implicit none
 
-  real(kind=db) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
+  real(kind=dp) :: E_dust, E_etoile, coeff_exp, cst_wl, sublimation_radius
   real :: cst, wl, delta_wl
   integer :: lambda, icell, i
 
@@ -76,7 +76,7 @@ end subroutine compute_othin_sublimation_radius
 
 subroutine set_sublimation_radius(sublimation_radius)
 
-  real(kind=db), intent(in) :: sublimation_radius
+  real(kind=dp), intent(in) :: sublimation_radius
 
   integer :: i
 
@@ -102,7 +102,7 @@ end subroutine set_sublimation_radius
 
 subroutine read_sublimation_radius()
 
-  real(kind=db) :: sublimation_radius
+  real(kind=dp) :: sublimation_radius
 
   write(*,*) "Reading sublimation file : ./data_th/"//trim(sublimationfile)
 

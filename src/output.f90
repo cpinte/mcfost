@@ -21,14 +21,14 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
 
   implicit none
 
-  real(kind=db), intent(in) ::  xin,yin,zin, uin,vin,win
+  real(kind=dp), intent(in) ::  xin,yin,zin, uin,vin,win
   integer, intent(in) :: id, lambda, icell
-  real(kind=db), dimension(4), intent(in)  :: stokin
+  real(kind=dp), dimension(4), intent(in)  :: stokin
   logical, intent(in) :: flag_star, flag_scatt
   integer, intent(out) :: capt
 
-  real(kind=db), dimension(4)  :: stok
-  real(kind=db) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp
+  real(kind=dp), dimension(4)  :: stok
+  real(kind=dp) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp
   integer :: c_phi, imap1, jmap1, imap2, jmap2
 
   x1=xin ; y1=yin ; z1=zin
@@ -94,7 +94,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      if (w1==1.0) then
         c_phi=1
      else
-        c_phi = int(modulo(atan2(U1,V1)+pi/2,2*real(pi,kind=db))/(2*pi)*N_phi) + 1
+        c_phi = int(modulo(atan2(U1,V1)+pi/2,2*real(pi,kind=dp))/(2*pi)*N_phi) + 1
      endif
   endif !l_sym_axiale
 
@@ -285,7 +285,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      sed_q(lambda,capt,c_phi,id) = sed_q(lambda,capt,c_phi,id) + stok(2)
      sed_u(lambda,capt,c_phi,id) = sed_u(lambda,capt,c_phi,id) + stok(3)
      sed_v(lambda,capt,c_phi,id) = sed_v(lambda,capt,c_phi,id) + stok(4)
-     n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_db
+     n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_dp
      if (flag_star) then ! photon étoile
         if (flag_scatt) then
            sed_star_scat(lambda,capt,c_phi,id) = sed_star_scat(lambda,capt,c_phi,id) + stok(1)
@@ -309,11 +309,11 @@ end subroutine capteur
 
 subroutine find_pixel(x,y,z,u,v,w, i, j, in_map)
 
-  real(kind=db), intent(in) :: x,y,z,u,v,w
+  real(kind=dp), intent(in) :: x,y,z,u,v,w
   integer, intent(out) :: i,j
   logical, intent(out) :: in_map
 
-  real(kind=db) :: x2,y2,z2, y_map,z_map
+  real(kind=dp) :: x2,y2,z2, y_map,z_map
 
   !*****************************************************
   !*----DETERMINATION DE LA POSITION SUR LA CARTE
@@ -803,7 +803,7 @@ subroutine ecriture_sed_ray_tracing()
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
-  sed_rt = 0.0_db
+  sed_rt = 0.0_dp
   if (RT_sed_method == 1) then
      sed_rt(:,:,:,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:,:),dim=5)
   else
@@ -837,7 +837,7 @@ subroutine ecriture_sed_ray_tracing()
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1003,7 +1003,7 @@ subroutine calc_optical_depth_map(lambda)
      enddo
   endif
 
-  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sl), "microns"
+  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
   filename = "!optical_depth_map.fits.gz"
 
   status=0
@@ -1068,7 +1068,7 @@ subroutine write_column_density()
   logical :: simple, extend
   character(len=512) :: filename
 
-  real(kind=db) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
+  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
 
   CD(:,:) = 0.0
   do direction = 1, 2
@@ -1255,9 +1255,9 @@ subroutine write_disk_struct()
   character(len=512) :: filename
 
   real, dimension(:,:,:), allocatable :: dens
-  real(kind=db), dimension(:,:,:,:), allocatable :: dust_dens
+  real(kind=dp), dimension(:,:,:,:), allocatable :: dust_dens
   real, dimension(:,:,:), allocatable :: vol
-  real(kind=db), dimension(:,:,:,:), allocatable :: grid
+  real(kind=dp), dimension(:,:,:,:), allocatable :: grid
 
 
 
@@ -1868,11 +1868,11 @@ subroutine ecriture_UV_field()
 
   integer, parameter :: n=200
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: J
-  real(kind=db), dimension(:,:,:), allocatable :: G
-  real(kind=db), dimension(n) :: wl, J_interp
-  real(kind=db), dimension(n_lambda) :: lamb
-  real(kind=db) :: delta_wl
+  real(kind=dp), dimension(:,:,:,:), allocatable :: J
+  real(kind=dp), dimension(:,:,:), allocatable :: G
+  real(kind=dp), dimension(n) :: wl, J_interp
+  real(kind=dp), dimension(n_lambda) :: lamb
+  real(kind=dp) :: delta_wl
 
   real, dimension(:,:,:), allocatable :: Gio
 
@@ -2313,7 +2313,7 @@ subroutine ecriture_Tex(imol)
   integer, intent(in) :: imol
 
   integer :: iTrans, iUp, iLow, k, icell
-  real(kind=db) :: nUp, nLow, cst
+  real(kind=dp) :: nUp, nLow, cst
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -2400,7 +2400,7 @@ subroutine taille_moyenne_grains()
 
   implicit none
 
-  real(kind=db) :: somme
+  real(kind=dp) :: somme
   integer :: l, icell
   real, dimension(n_cells) :: a_moyen
 
@@ -2611,7 +2611,7 @@ subroutine ecriture_sed(ised)
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)

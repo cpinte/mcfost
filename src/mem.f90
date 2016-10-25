@@ -178,7 +178,7 @@ subroutine alloc_dynamique(n_cells_max)
      write(*,*) 'Allocation error random number stream'
      stop
   endif
-  gauss_random_saved = 0.0_db
+  gauss_random_saved = 0.0_dp
   lgauss_random_saved = .false.
 
   allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
@@ -194,7 +194,7 @@ subroutine alloc_dynamique(n_cells_max)
         write(*,*) 'Allocation error Sigma'
         stop
      endif
-     Surface_density = 0.0_db
+     Surface_density = 0.0_dp
   endif
 
   allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
@@ -1511,7 +1511,7 @@ subroutine alloc_emission_mol(imol)
       write(*,*) 'Allocation error Jmol'
       stop
    endif
-   Jmol = 0.0_db
+   Jmol = 0.0_dp
 
   if (ldouble_RT) then
      allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
@@ -1535,7 +1535,7 @@ subroutine alloc_emission_mol(imol)
         write(*,*) 'Allocation error Jmol2'
         stop
      endif
-     Jmol2 = 0.0_db
+     Jmol2 = 0.0_dp
   endif
 
   ! Methode d'echantillonnage

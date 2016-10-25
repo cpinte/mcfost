@@ -12,10 +12,10 @@ module Voronoi_grid
   implicit none
 
   integer, parameter :: max_wall_neighbours = 100000
-  real(kind=db), parameter :: prec = 1.e-6_db
+  real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
-     real(kind=db), dimension(3) :: xyz
+     real(kind=dp), dimension(3) :: xyz
      integer :: id, first_neighbour, last_neighbour
      logical :: exist
   end type Voronoi_cell
@@ -34,7 +34,7 @@ module Voronoi_grid
      ! x4 : displacement along the normal
   end type Voronoi_wall
 
-  real(kind=db), dimension(:,:,:), allocatable :: wall_cells ! 3, n_cells_wall, n_walls
+  real(kind=dp), dimension(:,:,:), allocatable :: wall_cells ! 3, n_cells_wall, n_walls
 
   type(Voronoi_cell), dimension(:), allocatable :: Voronoi
   type(Voronoi_wall), dimension(:), allocatable :: wall
@@ -73,14 +73,14 @@ module Voronoi_grid
   subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  limits)
 
     integer, intent(in) :: n_points
-    real(kind=db), dimension(n_points), intent(in) :: x, y, z
-    real(kind=db), dimension(6), intent(in) :: limits
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z
+    real(kind=dp), dimension(6), intent(in) :: limits
 
     character(len=512) :: cmd
     integer :: i, syst_status, time1, time2, itime, iVoronoi, alloc_status, ios, icell
     integer :: n_neighbours, n_neighbours_tot, first_neighbour, last_neighbour, k, j, nVoronoi
     real :: time
-    real(kind=db) :: x_tmp, y_tmp, z_tmp, vol
+    real(kind=dp) :: x_tmp, y_tmp, z_tmp, vol
 
     character(len=128) :: slimits
 
@@ -241,13 +241,13 @@ module Voronoi_grid
   subroutine Voronoi_tesselation(n_points, x,y,z,  limits, check_previous_tesselation)
 
     integer, intent(in) :: n_points
-    real(kind=db), dimension(n_points), intent(in) :: x, y, z
-    real(kind=db), dimension(6), intent(in) :: limits
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z
+    real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
-    real(kind=db), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
+    real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
     integer, dimension(:), allocatable :: SPH_id
     real :: time
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells
@@ -255,8 +255,8 @@ module Voronoi_grid
 
     logical :: is_outside_stars, lcompute
 
-    real(kind=db), dimension(n_etoiles) :: deuxr2_star
-    real(kind=db) :: dx, dy, dz, dist2
+    real(kind=dp), dimension(n_etoiles) :: deuxr2_star
+    real(kind=dp) :: dx, dy, dz, dist2
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
@@ -458,7 +458,7 @@ module Voronoi_grid
 
   subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list)
 
-    real(kind=db), intent(in), dimension(6) :: limits
+    real(kind=dp), intent(in), dimension(6) :: limits
     integer, intent(in) :: n_in, n_neighbours_tot
     integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
     character(len=512) :: filename
@@ -483,7 +483,7 @@ module Voronoi_grid
        lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)
 
     integer, intent(in) :: n_cells,max_neighbours
-    real(kind=db), intent(in), dimension(6) :: limits
+    real(kind=dp), intent(in), dimension(6) :: limits
 
     logical, intent(out) :: lcompute
     integer, intent(out) :: n_in, n_neighbours_tot
@@ -494,7 +494,7 @@ module Voronoi_grid
     integer :: ios
 
     character(len=40) :: voronoi_sha1, voronoi_sha1_saved
-    real(kind=db), dimension(6) :: limits_saved
+    real(kind=dp), dimension(6) :: limits_saved
 
     lcompute = .true.
 
@@ -582,7 +582,7 @@ module Voronoi_grid
     integer, parameter :: n_sample = 10000000
 
     real :: rand, rand2, rand3
-    real(kind=db) :: x, y, z
+    real(kind=dp) :: x, y, z
     integer :: icell, i, id, k
 
 
@@ -617,15 +617,15 @@ module Voronoi_grid
   subroutine cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s)
 
     integer, intent(in) :: icell, previous_cell
-    real(kind=db), intent(in) :: x,y,z, u,v,w
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
 
-    real(kind=db), intent(out) ::  s
+    real(kind=dp), intent(out) ::  s
     integer, intent(out) :: next_cell
 
-    real(kind=db) :: s_tmp, den
+    real(kind=dp) :: s_tmp, den
     integer :: i, id_n
 
-    real(kind=db), intent(out) :: x1, y1, z1
+    real(kind=dp), intent(out) :: x1, y1, z1
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k
@@ -695,7 +695,7 @@ module Voronoi_grid
   subroutine init_Voronoi_walls(n_walls, limits)
 
     integer, intent(in) :: n_walls
-    real(kind=db), dimension(n_walls), intent(in) :: limits
+    real(kind=dp), dimension(n_walls), intent(in) :: limits
     integer :: iwall
 
     if (n_walls /= 6) then
@@ -738,14 +738,14 @@ module Voronoi_grid
   !----------------------------------------
 
 
-  real(kind=db) function distance_to_wall(x,y,z, u,v,w, iwall)
+  real(kind=dp) function distance_to_wall(x,y,z, u,v,w, iwall)
     ! Mur plan pour le moment : meme algorithme que cross Voronoi cell
 
-    real(kind=db), intent(in) :: x,y,z, u,v,w
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
     integer, intent(in) :: iwall
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real(kind=db), dimension(3) :: n, p, r, k
+    real(kind=dp), dimension(3) :: n, p, r, k
 
     real :: den
 
@@ -773,17 +773,17 @@ module Voronoi_grid
   subroutine move_to_grid_Voronoi(id, x,y,z, u,v,w, icell, lintersect)
 
     integer, intent(in) :: id
-    real(kind=db), intent(inout) :: x,y,z
-    real(kind=db), intent(in) :: u,v,w
+    real(kind=dp), intent(inout) :: x,y,z
+    real(kind=dp), intent(in) :: u,v,w
 
     integer, intent(out) :: icell
     logical, intent(out) :: lintersect
 
     logical, dimension(n_walls) :: intersect
-    real(kind=db), dimension(n_walls) :: s_walls
+    real(kind=dp), dimension(n_walls) :: s_walls
     integer, dimension(n_walls) :: order
 
-    real(kind=db) :: s, l, x_test, y_test, z_test
+    real(kind=dp) :: s, l, x_test, y_test, z_test
     integer :: i, iwall
 
     ! Find out which plane we are crossing first
@@ -795,13 +795,13 @@ module Voronoi_grid
 
        if (l >= 0) then
           intersect(iwall) = .true.
-          s_walls(iwall) = l * (1.0_db + prec)
+          s_walls(iwall) = l * (1.0_dp + prec)
        else
           s_walls(iwall) = huge(1.0)
        endif
     enddo
 
-    order = bubble_sort(real(s_walls,kind=db))
+    order = bubble_sort(real(s_walls,kind=dp))
 
     ! Move to the closest plane & check that the packet is in the model
     check_wall : do i = 1, n_walls
@@ -843,24 +843,24 @@ module Voronoi_grid
 
     integer, intent(in) :: id,lambda
     integer, intent(inout) :: cell_io
-    real(kind=db), dimension(4), intent(in) :: Stokes
+    real(kind=dp), dimension(4), intent(in) :: Stokes
     logical, intent(in) :: flag_star, flag_direct_star
-    real(kind=db), intent(inout) :: u,v,w
-    real(kind=db), intent(in) :: extrin
-    real(kind=db), intent(inout) :: xio,yio,zio
-    real(kind=db), intent(out) :: ltot
+    real(kind=dp), intent(inout) :: u,v,w
+    real(kind=dp), intent(in) :: extrin
+    real(kind=dp), intent(inout) :: xio,yio,zio
+    real(kind=dp), intent(out) :: ltot
     logical, intent(out) :: flag_sortie
 
 
     logical :: lstop
 
-    real(kind=db) :: extr, tau, opacite !, correct_moins, correct_plus
+    real(kind=dp) :: extr, tau, opacite !, correct_moins, correct_plus
     integer :: previous_cell, cell, next_cell
 
-    real(kind=db) :: x, y, z, l, x1,y1,z1
+    real(kind=dp) :: x, y, z, l, x1,y1,z1
 
-    !correct_moins = 1.0_db - prec_grille
-    !correct_plus = 1.0_db + prec_grille
+    !correct_moins = 1.0_dp - prec_grille
+    !correct_plus = 1.0_dp + prec_grille
 
     extr = extrin
 
@@ -921,7 +921,7 @@ module Voronoi_grid
 pure logical function test_exit_grid_Voronoi(icell, x,y,z)
 
   integer, intent(in) :: icell
-  real(kind=db), intent(in) :: x,y,z
+  real(kind=dp), intent(in) :: x,y,z
 
   if (icell < 0) then
      test_exit_grid_Voronoi = .true.
@@ -937,7 +937,7 @@ end function test_exit_grid_Voronoi
 
 pure logical function is_in_volume(x,y,z)
 
-  real(kind=db), intent(in) :: x,y,z
+  real(kind=dp), intent(in) :: x,y,z
 
   is_in_volume  = .false.
   if ((x > wall(1)%x4).and.(x < wall(2)%x4)) then
@@ -958,7 +958,7 @@ integer function find_Voronoi_cell_brute_force(id, iwall, x,y,z)
   ! Methode debile : boucle sur toutes les cellules pour test
 
   integer, intent(in) :: id, iwall
-  real(kind=db), intent(in) :: x, y, z
+  real(kind=dp), intent(in) :: x, y, z
 
   real :: dist2, dist2_min
   integer :: icell, icell_min, i
@@ -991,16 +991,16 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 
   integer, intent(in) :: icell
   real, intent(in) :: aleat1, aleat2, aleat3
-  real(kind=db), intent(out) :: x,y,z
+  real(kind=dp), intent(out) :: x,y,z
 
-  real(kind=db) :: u, v, w, srw2, argmt, x1,y1,z1
+  real(kind=dp) :: u, v, w, srw2, argmt, x1,y1,z1
   integer :: previous_cell, next_cell
-  real(kind=db) :: l
+  real(kind=dp) :: l
 
   ! Direction aleatoire
-  w = 2.0_db * aleat1 - 1.0_db
-  srw2 = sqrt(1.0_db-w*w)
-  argmt = pi*(2.0_db*aleat2-1.0_db)
+  w = 2.0_dp * aleat1 - 1.0_dp
+  srw2 = sqrt(1.0_dp-w*w)
+  argmt = pi*(2.0_dp*aleat2-1.0_dp)
   u = srw2 * cos(argmt)
   v = srw2 * sin(argmt)
 
@@ -1024,7 +1024,7 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
 
     implicit none
 
-    real(kind=db), intent(in) :: xin,yin,zin
+    real(kind=dp), intent(in) :: xin,yin,zin
     integer, intent(out) :: icell
 
     integer :: i
@@ -1099,9 +1099,9 @@ end subroutine build_wall_kdtrees
 integer function find_Voronoi_cell(id, iwall, x,y,z)
 
   integer, intent(in) :: id, iwall
-  real(kind=db), intent(in) :: x, y, z
+  real(kind=dp), intent(in) :: x, y, z
 
-  real(kind=db), dimension(3), target :: qv
+  real(kind=dp), dimension(3), target :: qv
   integer, parameter :: NN = 1 ! we only need the closest neighbour
 
   type(kdtree2_result), dimension(NN) :: results
@@ -1125,7 +1125,7 @@ end function find_Voronoi_cell
 !
 !    !type(kdtree2), pointer :: tree
 !    integer :: N,d
-!    real(kind=db), allocatable :: mydata(:,:)
+!    real(kind=dp), allocatable :: mydata(:,:)
 !
 !    type(kdtree2_result), allocatable :: results(:)
 !    ! user sets d, the dimensionality of the Euclidean space

@@ -27,11 +27,11 @@ subroutine build_grain_size_distribution()
 
   integer :: k, pop
   real :: a, nbre_tot_grains
-  real(kind=db) :: exp_grains, sqrt_exp_grains
+  real(kind=dp) :: exp_grains, sqrt_exp_grains
   real :: masse_pop
   real :: correct_fact_r
 
-  type(dust_pop_type), pointer :: dp
+  type(dust_pop_type), pointer :: d_p
 
   integer :: ios, status, n_comment, n_grains, alloc_status
   real :: fbuffer
@@ -50,7 +50,7 @@ subroutine build_grain_size_distribution()
 
   ! Boucle sur les populations de grains
   do pop=1, n_pop
-     dp => dust_pop(pop)
+     d_p => dust_pop(pop)
 
       if (lread_grain_size_distrib) then
         if (n_pop > 1) then
@@ -107,64 +107,64 @@ subroutine build_grain_size_distribution()
 
            r_grain(k) = a ! micron
            S_grain(k) = pi * a**2 ! micron^2
-           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! masse en g
 
            ! Multiplication par a car da = a.dln(a)
            nbre_grains(k) =  nbre_grains(k) * a
-           grain(k)%methode_chauffage = dp%methode_chauffage
-           grain(k)%zone = dp%zone
+           grain(k)%methode_chauffage = d_p%methode_chauffage
+           grain(k)%zone = d_p%zone
            grain(k)%pop = pop
            masse_pop = masse_pop + nbre_grains(k)
 
-           if (dp%is_PAH) grain(k)%is_PAH = .true.
+           if (d_p%is_PAH) grain(k)%is_PAH = .true.
         enddo ! k
 
-        dp%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+        d_p%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
 
      else ! lread_grain_size_distribution
 
-        if (dp%aexp < 0) then
+        if (d_p%aexp < 0) then
            write(*,*) "****************************************"
            write(*,*) "Warning: slope grains size negative !!!!"
            write(*,*) "****************************************"
         endif
 
-        if (abs(dp%amin - dp%amax) < 1.0e-5 * dp%amax) then
-           a=dp%amin
-           dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * dp%rho1g_avg
+        if (abs(d_p%amin - d_p%amax) < 1.0e-5 * d_p%amax) then
+           a=d_p%amin
+           d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * d_p%rho1g_avg
         else
-           if (abs(dp%aexp - 4.) > 1.0e-5) then
-              if (abs(dp%aexp - 1.) > 1.0e-5) then
-                 dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg * &
-                      (1-dp%aexp)/(4-dp%aexp)*(dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                      (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+           if (abs(d_p%aexp - 4.) > 1.0e-5) then
+              if (abs(d_p%aexp - 1.) > 1.0e-5) then
+                 d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg * &
+                      (1-d_p%aexp)/(4-d_p%aexp)*(d_p%amax**(4-d_p%aexp)-d_p%amin**(4-d_p%aexp)) / &
+                      (d_p%amax**(1-d_p%aexp)-d_p%amin**(1-d_p%aexp))
               else
-                 dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg /(4-dp%aexp) * &
-                      (dp%amax**(4-dp%aexp)-dp%amin**(4-dp%aexp)) / &
-                      (log(dp%amax)-log(dp%amin))
+                 d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg /(4-d_p%aexp) * &
+                      (d_p%amax**(4-d_p%aexp)-d_p%amin**(4-d_p%aexp)) / &
+                      (log(d_p%amax)-log(d_p%amin))
               endif
            else
-              dp%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * dp%rho1g_avg *&
-                   (1-dp%aexp)*(log(dp%amax)-log(dp%amin)) / &
-                   (dp%amax**(1-dp%aexp)-dp%amin**(1-dp%aexp))
+              d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg *&
+                   (1-d_p%aexp)*(log(d_p%amax)-log(d_p%amin)) / &
+                   (d_p%amax**(1-d_p%aexp)-d_p%amin**(1-d_p%aexp))
            endif
         endif
 
         ! Proprietes des grains
         !exp_grains = (amax/amin)**(1./real(n_grains_tot))
-        if ((dp%n_grains==1).and.(abs(dp%amax-dp%amin) > 1.0e-3 * dp%amin)) then
+        if ((d_p%n_grains==1).and.(abs(d_p%amax-d_p%amin) > 1.0e-3 * d_p%amin)) then
            write(*,*) "You have specified 1 grain size but amin != amax. Are you sure ?"
            write(*,*) "If yes, press return"
            read(*,*)
         endif
 
         ! Taille des grains (recursif)
-        masse_pop = nbre_grains(dp%ind_debut)
-        exp_grains =  exp((1.0_db/real(dp%n_grains,kind=db)) * log(dp%amax/dp%amin))
+        masse_pop = nbre_grains(d_p%ind_debut)
+        exp_grains =  exp((1.0_dp/real(d_p%n_grains,kind=dp)) * log(d_p%amax/d_p%amin))
         sqrt_exp_grains = sqrt(exp_grains)
-        do  k=dp%ind_debut, dp%ind_fin
-           if (k==dp%ind_debut) then
-              a = dp%amin*sqrt_exp_grains
+        do  k=d_p%ind_debut, d_p%ind_fin
+           if (k==d_p%ind_debut) then
+              a = d_p%amin*sqrt_exp_grains
            else
               a= r_grain(k-1) * exp_grains
            endif
@@ -174,41 +174,41 @@ subroutine build_grain_size_distribution()
            r_grain_max(k) = a*sqrt_exp_grains ! taille max
 
            S_grain(k) = pi * a**2 ! micron^2
-           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * dp%rho1g_avg ! masse en g
+           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! masse en g
 
            ! Multiplication par a car da = a.dln(a)
-           nbre_grains(k) = a**(-dp%aexp) * a
-           grain(k)%methode_chauffage = dp%methode_chauffage
-           grain(k)%zone = dp%zone
+           nbre_grains(k) = a**(-d_p%aexp) * a
+           grain(k)%methode_chauffage = d_p%methode_chauffage
+           grain(k)%zone = d_p%zone
            grain(k)%pop = pop
            masse_pop = masse_pop + nbre_grains(k)
 
-           if (dp%is_PAH) grain(k)%is_PAH = .true.
+           if (d_p%is_PAH) grain(k)%is_PAH = .true.
         enddo !k
 
      endif ! lread_grain_size_distribution
 
-     masse_pop = masse_pop * dp%avg_grain_mass
+     masse_pop = masse_pop * d_p%avg_grain_mass
 
 
      ! Normalisation du nombre de grains pour atteindre la bonne masse
-     nbre_grains(dp%ind_debut:dp%ind_fin) = nbre_grains(dp%ind_debut:dp%ind_fin) * dp%masse/masse_pop
+     nbre_grains(d_p%ind_debut:d_p%ind_fin) = nbre_grains(d_p%ind_debut:d_p%ind_fin) * d_p%masse/masse_pop
 
      ! Normalisation de tous les grains au sein d'une pop
      nbre_tot_grains = 0.0
-     do k=dp%ind_debut,dp%ind_fin
+     do k=d_p%ind_debut,d_p%ind_fin
         nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
      enddo
 
      ! Fraction de grains de taille k au sein d'une pop
-     do  k=dp%ind_debut,dp%ind_fin
+     do  k=d_p%ind_debut,d_p%ind_fin
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
 
      ! Total radius is kept constant with coating
-     if (dp%lcoating) then
-        correct_fact_r =  (1-dp%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
-        do k=dp%ind_debut,dp%ind_fin
+     if (d_p%lcoating) then
+        correct_fact_r =  (1-d_p%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
+        do k=d_p%ind_debut,d_p%ind_fin
            r_core(k) = r_grain(k)  * correct_fact_r
         enddo ! k
      endif
@@ -392,8 +392,8 @@ subroutine init_indices_optiques()
 
         ! Add vacuum as last component
         if (dust_pop(pop)%porosity > tiny_real) then
-           tab_tmp_amu1(:,n_components) = 1.0_db
-           tab_tmp_amu2(:,n_components) = 0.0_db
+           tab_tmp_amu1(:,n_components) = 1.0_dp
+           tab_tmp_amu2(:,n_components) = 0.0_dp
         endif
 
         if (n_components == 1) then
@@ -409,7 +409,7 @@ subroutine init_indices_optiques()
               do i=1, n_lambda
                  m = cmplx(tab_tmp_amu1(i,:),tab_tmp_amu2(i,:))
                  f(1:dust_pop(pop)%n_components) = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components) &
-                      * (1.0_db - dust_pop(pop)%porosity)
+                      * (1.0_dp - dust_pop(pop)%porosity)
                  if (dust_pop(pop)%porosity > tiny_real)  f(n_components) = dust_pop(pop)%porosity
 
 
@@ -819,7 +819,7 @@ subroutine opacite(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
 
   integer :: icell, k, thetaj
-  real(kind=db) ::  density, fact, k_abs_RE, k_abs_tot, angle
+  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, angle
   logical :: lcompute_obs,  ldens0
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
@@ -881,12 +881,12 @@ subroutine opacite(lambda, p_lambda)
      endif
 
      if (letape_th) then
-        if (lnRE.and.(k_abs_tot > tiny_db)) then
+        if (lnRE.and.(k_abs_tot > tiny_dp)) then
            kappa_abs_RE(icell,lambda) = k_abs_RE
            proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
         endif
 
-        if (k_abs_RE > tiny_db) then
+        if (k_abs_RE > tiny_dp) then
            Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
         else ! the cell is probably empty
            Proba_abs_RE_LTE(icell,lambda) = 1.0
@@ -964,25 +964,25 @@ subroutine opacite(lambda, p_lambda)
   ! Supression scattering
   if (lno_scattering) then
      kappa = kappa_abs_LTE
-     tab_albedo_pos = 0.0_db
+     tab_albedo_pos = 0.0_dp
   endif
 
   ! scattering = abs
   if (lqsca_equal_qabs) then
-     kappa = 2.0_db * kappa_abs_LTE
-     tab_albedo_pos = 0.5_db
+     kappa = 2.0_dp * kappa_abs_LTE
+     tab_albedo_pos = 0.5_dp
   endif
 
   ! On remet la densite à zéro si besoin
   if (ldens0) then
      icell = icell_ref
-     densite_pouss(:,icell) = 0.0_db
-     kappa(icell,lambda) = 0.0_db
+     densite_pouss(:,icell) = 0.0_dp
+     kappa(icell,lambda) = 0.0_dp
      if (lRE_LTE) then
-        kappa_abs_LTE(icell,lambda) = 0.0_db
+        kappa_abs_LTE(icell,lambda) = 0.0_dp
      endif
      if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
-        kappa_sca(icell,lambda) = 0.0_db
+        kappa_sca(icell,lambda) = 0.0_dp
      endif
      if (lRE_nLTE) then
         kabs_nLTE_CDF(:,icell,lambda) = 0.0
@@ -1014,8 +1014,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
 
-  real(kind=db), parameter :: dtheta = pi/real(nang_scatt)
-  real(kind=db) :: density, theta, norme, fact, k_sca_tot
+  real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
+  real(kind=dp) :: density, theta, norme, fact, k_sca_tot
 
   integer :: icell, k, l
 

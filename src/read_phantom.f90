@@ -10,8 +10,8 @@ module read_phantom
 subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodust,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
- real(db), intent(out), dimension(:,:), allocatable :: rhodust, massdust
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
+ real(dp), intent(out), dimension(:,:), allocatable :: rhodust, massdust
  integer, intent(out) :: ndusttypes,n_SPH,ierr
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
@@ -22,12 +22,12 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
  integer, parameter :: maxtypes = 10
  integer :: npartoftype(maxtypes)
- real(db) :: massoftype(maxtypes),hfact,umass,utime,udist
+ real(dp) :: massoftype(maxtypes),hfact,umass,utime,udist
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
- real(db) :: graindens
- real(db), allocatable, dimension(:) :: dudt
- real(db), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
+ real(dp) :: graindens
+ real(dp), allocatable, dimension(:) :: dudt
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
 
@@ -139,16 +139,16 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
                    select case(trim(tag))
                    case('h')
                       read(iunit,iostat=ierr) tmp(1:np)
-                      xyzh(4,1:np) = real(tmp(1:np),kind=db)
+                      xyzh(4,1:np) = real(tmp(1:np),kind=dp)
                       got_h = .true.
                    case('dustfrac')
                       ngrains = ngrains + 1
                       read(iunit,iostat=ierr) tmp(1:np)
-                      dustfrac(ngrains,1:np) = real(tmp(1:np),kind=db)
+                      dustfrac(ngrains,1:np) = real(tmp(1:np),kind=dp)
                       got_dustfrac = .true.
                    case('luminosity')
                       read(iunit,iostat=ierr) tmp(1:np)
-                      dudt(1:np) = real(tmp(1:np),kind=db)
+                      dudt(1:np) = real(tmp(1:np),kind=dp)
                       ndudt = np
                    case default
                       matched = .false.
@@ -256,26 +256,26 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   use prop_star
 
   integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
-  real(db), dimension(4,np), intent(in) :: xyzh
+  real(dp), dimension(4,np), intent(in) :: xyzh
   integer(kind=1), dimension(np), intent(in) :: iphase
-  real(db), dimension(ndusttypes,np), intent(in) :: dustfrac
-  real(db), dimension(ndusttypes),    intent(in) :: grainsize
-  real(db), intent(in) :: graindens
-  real(db), dimension(ntypes), intent(in) :: massoftype
-  real(db), intent(in) :: hfact,umass,utime,udist
-  real(db), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
+  real(dp), dimension(ndusttypes),    intent(in) :: grainsize
+  real(dp), intent(in) :: graindens
+  real(dp), dimension(ntypes), intent(in) :: massoftype
+  real(dp), intent(in) :: hfact,umass,utime,udist
+  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
-  real(db), dimension(:), intent(in) :: dudt
+  real(dp), dimension(:), intent(in) :: dudt
 
-  real(db), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
-  real(db), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
+  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
+  real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   integer, intent(out) :: n_SPH
 
   integer :: i,j,k,itypei, alloc_status, i_etoiles
-  real(db) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, ulength_au, usolarmass, &
+  real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, ulength_au, usolarmass, &
               dustfraci, Mtot, totlum, qtermi
 
-  real(db), parameter :: Lsun = 3.839d33
+  real(dp), parameter :: Lsun = 3.839d33
 
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3

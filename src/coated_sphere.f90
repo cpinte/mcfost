@@ -7,8 +7,8 @@ module coated_sphere
 
   implicit none
 
-  complex(kind=db), parameter :: czero = (0.0_db,0.0_db)
-  complex(kind=db), parameter :: ci = (0.0_db,1.0_db)
+  complex(kind=dp), parameter :: czero = (0.0_dp,0.0_dp)
+  complex(kind=dp), parameter :: ci = (0.0_dp,1.0_dp)
 
   integer, save ::   maxmsg = 0, nummsg = 100
   logical, save :: msglim = .false.
@@ -153,7 +153,7 @@ contains
     real, dimension(0:nang_scatt) :: S11,S12,S33,S34
 
     integer :: N_vf
-    real(kind=db), dimension(:), allocatable :: f, wf
+    real(kind=dp), dimension(:), allocatable :: f, wf
 
     N_vf = min(max(20., deux_pi * r_grain(taille_grain)/tab_lambda(lambda)), 100.)
     allocate(f(N_vf), wf(N_vf))
@@ -183,7 +183,7 @@ contains
     ipop = grain(taille_grain)%pop
 
     ! Calcul des poids pour integration de Gauss-Legendre
-    call GauLeg(0.0_db,real(dust_pop(ipop)%dhs_maxf,kind=db),f,wf,N_vf) ; wf = wf/sum(wf)
+    call GauLeg(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),f,wf,N_vf) ; wf = wf/sum(wf)
     ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
 
     cext=0 ; csca=0 ; gsca=0 ; s1=0 ; s2=0
@@ -194,8 +194,8 @@ contains
        call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext_HS,qsca_HS,qbs_HS,gqsc_HS,s1_HS,s2_HS)
        gsca_HS = gqsc_HS / qsca_HS ! dmilay return gsca * qsca
 
-       if(qext_HS < 0_db) qext_HS = 0_db
-       if(qsca_HS < 0_db) qsca_HS = 0_db
+       if(qext_HS < 0_dp) qext_HS = 0_dp
+       if(qsca_HS < 0_dp) qsca_HS = 0_dp
 
        factor = pi*rshell**2 * wf(i)
        cext = cext + factor * qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
@@ -546,10 +546,10 @@ contains
     !    integer, parameter ::   mxang = 100
     !  integer, parameter :: ll = 500000
 
-    real(kind=db), parameter :: zero = 0.0_db
-    real(kind=db), parameter :: one = 1.0_db
-    real(kind=db), parameter :: two = 2.0_db
-    real(kind=db), parameter :: toler = 1.0e-6_db
+    real(kind=dp), parameter :: zero = 0.0_dp
+    real(kind=dp), parameter :: one = 1.0_dp
+    real(kind=dp), parameter :: two = 2.0_dp
+    real(kind=dp), parameter :: toler = 1.0e-6_dp
 
     ! .. Scalar Arguments ..
     integer, intent(in) ::   numang
@@ -565,28 +565,28 @@ contains
     logical ::   inperr
     integer ::   j, m, n, nmx1, nmx2, nn, jj, ll, alloc_status
 
-    real(kind=db) :: aa, aim, am1im, am1re, are, bb, bim, bm1im, bm1re, bre, cc, cosx1, cosx4
-    real(kind=db) :: dd, denom, dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4
-    real(kind=db) :: rmm, rx, sinx1, sinx4, x1, x4, xcore, xshell, y1, y4
+    real(kind=dp) :: aa, aim, am1im, am1re, are, bb, bim, bm1im, bm1re, bre, cc, cosx1, cosx4
+    real(kind=dp) :: dd, denom, dgqsc, dqext, dqsca, e2y1, ey1, ey1my4, ey1py4, ey4
+    real(kind=dp) :: rmm, rx, sinx1, sinx4, x1, x4, xcore, xshell, y1, y4
 
-    complex(kind=db) :: ac, acoe, acoem1, bc, bcoe, bcoem1, dh1, dh2, dh4, dummy, dumsq
-    complex(kind=db) :: k1, k2, k3, p24h21, p24h24, rrfx, sback, wm1
+    complex(kind=dp) :: ac, acoe, acoem1, bc, bcoe, bcoem1, dh1, dh2, dh4, dummy, dumsq
+    complex(kind=dp) :: k1, k2, k3, p24h21, p24h24, rrfx, sback, wm1
 
     ! .. Local Arrays ..
-    real(kind=db), dimension(numang) ::   AMU
-    real(kind=db) :: THETA
-    real(kind=db), dimension(numang,3) ::  tau, pi_tab
-    real(kind=db), dimension(numang) :: SI2THT
-    real(kind=db), dimension(5) :: T
-    real(kind=db), dimension(5) :: TA
-    real(kind=db) :: DANG, PII
+    real(kind=dp), dimension(numang) ::   AMU
+    real(kind=dp) :: THETA
+    real(kind=dp), dimension(numang,3) ::  tau, pi_tab
+    real(kind=dp), dimension(numang) :: SI2THT
+    real(kind=dp), dimension(5) :: T
+    real(kind=dp), dimension(5) :: TA
+    real(kind=dp) :: DANG, PII
 
-    complex(kind=db), dimension(8) :: U
-    complex(kind=db), dimension(2) :: wfn
-    complex(kind=db), dimension(4) :: z
+    complex(kind=dp), dimension(8) :: U
+    complex(kind=dp), dimension(2) :: wfn
+    complex(kind=dp), dimension(4) :: z
 
-    complex(kind=db), dimension(:), allocatable :: acap
-    complex(kind=db), dimension(:,:), allocatable :: W
+    complex(kind=dp), dimension(:), allocatable :: acap
+    complex(kind=dp), dimension(:,:), allocatable :: W
 
     !    write(*,*) wvno,rcore,rshell,numang,rindco,rindsh
 
@@ -597,17 +597,17 @@ contains
     PII=4.*atan(1.D0)
     DANG=0.
     if (numang > 1) then
-       DANG=.5*PII/dble(numang-1)
+       DANG=.5*PII/real(numang-1,kind=dp)
     endif
     do J=1,numang
-       THETA=(dble(J)-1.0)*dang
+       THETA=(real(J,kind=dp)-1.0)*dang
        AMU(J)=cos(THETA)
     end do
 
     NN=2*numang-1
     do J=1,NN
-       S1(J)=(0._db,0._db)
-       S2(J)=(0._db,0._db)
+       S1(J)=(0._dp,0._dp)
+       S2(J)=(0._dp,0._dp)
     end do
 
     xshell = rshell*wvno
@@ -651,9 +651,9 @@ contains
     Z(2) = XSHELL
     Z(3) = RINDCO*XCORE
     Z(4) = RINDSH*XCORE
-    X1   =  DBLE(Z(1))
+    X1   =  real(Z(1),kind=dp)
     Y1   = DIMAG(Z(1))
-    X4   =  DBLE(Z(4))
+    X4   =  real(Z(4),kind=dp)
     Y4   = DIMAG(Z(4))
     RX   = ONE / XSHELL
 
@@ -687,7 +687,7 @@ contains
     TA(1) = T(2)
     TA(2) = T(1)
     WFN(2) = RX*WFN(1) - WM1
-    TA(3) =  DBLE(WFN(2))
+    TA(3) =  real(WFN(2),kind=dp)
     TA(4) = DIMAG(WFN(2))
 
     ! ** Initialization procedure for stratified sphere
@@ -739,9 +739,9 @@ contains
 
     ACOEM1 = ACOE
     BCOEM1 = BCOE
-    ARE    =  DBLE(ACOE)
+    ARE    =  real(ACOE,kind=dp)
     AIM    = DIMAG(ACOE)
-    BRE    =  DBLE(BCOE)
+    BRE    =  real(BCOE,kind=dp)
     BIM    = DIMAG(BCOE)
 
     DQEXT  = 3.D0*(ARE + BRE)
@@ -780,9 +780,9 @@ contains
        WM1    = WFN(1)
        WFN(1) = WFN(2)
        WFN(2) = T(1)*RX*WFN(1) - WM1
-       TA(1) =  DBLE(WFN(1))
+       TA(1) =  real(WFN(1),kind=dp)
        TA(2) = DIMAG(WFN(1))
-       TA(3) =  DBLE(WFN(2))
+       TA(3) =  real(WFN(2),kind=dp)
        TA(4) = DIMAG(WFN(2))
 
        ! ** Here set up stratified sphere
@@ -806,15 +806,15 @@ contains
        ACOE  = U(8)*(U(1)*U(5)*U(7) + K1*U(1) - DUMSQ*K3*U(5)) / (U(2)*U(5)*U(7) + K1*U(2) - DUMSQ*K3*U(5))
 
        BCOE  = U(8)*(U(3)*U(6)*U(7) + K2*U(3) - DUMSQ*K2*U(6)) / (U(4)*U(6)*U(7) + K2*U(4) - DUMSQ*K2*U(6))
-       ARE  =  DBLE(ACOE)
+       ARE  =  real(ACOE,kind=dp)
        AIM  = DIMAG(ACOE)
-       BRE  =  DBLE(BCOE)
+       BRE  =  real(BCOE,kind=dp)
        BIM  = DIMAG(BCOE)
 
        ! ** Increment sums for efficiency factors
-       AM1RE  =  DBLE(ACOEM1)
+       AM1RE  =  real(ACOEM1,kind=dp)
        AM1IM  = DIMAG(ACOEM1)
-       BM1RE  =  DBLE(BCOEM1)
+       BM1RE  =  real(BCOEM1,kind=dp)
        BM1IM  = DIMAG(BCOEM1)
        T(4) = (2*N - ONE) / (N*(N - ONE))
        T(2) = (N - ONE)*(N + ONE) / N
@@ -855,7 +855,7 @@ contains
        endif
 
        ! ** Test for convergence of sums
-       if (T(4) >= 1.0e-14_db) then
+       if (T(4) >= 1.0e-14_dp) then
           N  = N + 1
           if (N > NMX2) then
              write(*,*) 2*pii/wvno,rcore,rshell
@@ -900,7 +900,7 @@ contains
     QSCA   = T(1)*DQSCA
     GQSC   = TWO*T(1)*DGQSC
     SBACK  = 0.5*SBACK
-    QBS    = (DBLE(SBACK)**2 + DIMAG(SBACK)**2) / (pi*XSHELL**2)
+    QBS    = (real(SBACK,kind=dp)**2 + DIMAG(SBACK)**2) / (pi*XSHELL**2)
 
     deallocate(acap,W)
 

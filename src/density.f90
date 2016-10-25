@@ -9,7 +9,6 @@ module density
   use grains
   use disk
   use nr, only : rkqs
-  use nrtype, only : sp
   use grid
   use utils
   use output
@@ -38,14 +37,14 @@ subroutine define_gas_density()
   implicit none
 
   integer :: i,j, k, izone, alloc_status, icell
-  real(kind=db), dimension(n_zones) :: cst_gaz
-  real(kind=db) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
+  real(kind=dp), dimension(n_zones) :: cst_gaz
+  real(kind=dp) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
 
   type(disk_zone_type) :: dz
 
   ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=db), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
+  real(kind=dp), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
 
 
   allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad), stat=alloc_status)
@@ -91,7 +90,7 @@ subroutine define_gas_density()
                  if (j==0) then
                     icell = cell_map(i,1,k)
                     rcyl = r_grid(icell)
-                    z = 0.0_db ! utilisation indice 0 pour densite plan median
+                    z = 0.0_dp ! utilisation indice 0 pour densite plan median
                  else
                     icell = cell_map(i,j,k)
                     rcyl = r_grid(icell)
@@ -111,7 +110,7 @@ subroutine define_gas_density()
                  if (dz%geometry == 1) then ! power-law
                     fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
                  else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
-                    if (dz%rc < tiny_db) then
+                    if (dz%rc < tiny_dp) then
                        write(*,*) "ERROR : tappered-edge structure with Rc = 0."
                        write(*,*) "Exiting"
                        stop
@@ -161,7 +160,7 @@ subroutine define_gas_density()
               bz2 : do j=min(1,j_start),nz
                  somme = somme + densite_gaz_tmp(cell_map(i,j,1)) *  (z_lim(i,j+1) - z_lim(i,j))
               enddo bz2
-              if (somme > tiny_db) then
+              if (somme > tiny_dp) then
                  do j=min(1,j_start),nz
                     densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i)/somme
                  enddo ! j
@@ -178,7 +177,7 @@ subroutine define_gas_density()
                  if (j==0) then
                     icell = cell_map(i,1,k)
                     rcyl = r_grid(icell)
-                    z = 0.0_db
+                    z = 0.0_dp
                  else
                     icell = cell_map(i,j,k)
                     rcyl = r_grid(icell)
@@ -281,7 +280,7 @@ subroutine define_gas_density()
      do icell=1, n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
-           densite_gaz(icell) = 0.0_db
+           densite_gaz(icell) = 0.0_dp
         endif
      enddo
   endif
@@ -318,17 +317,17 @@ subroutine define_dust_density()
   implicit none
 
   integer :: i,j, k, icell, l, izone, pop
-  real(kind=db), dimension(n_pop) :: cst, cst_pous
-  real(kind=db) :: rcyl, rsph, mass
-  real(kind=db) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
-  real(kind=db) :: puffed, facteur, z0, phi, surface, norme
+  real(kind=dp), dimension(n_pop) :: cst, cst_pous
+  real(kind=dp) :: rcyl, rsph, mass
+  real(kind=dp) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
+  real(kind=dp) :: puffed, facteur, z0, phi, surface, norme
 
-  real(kind=db), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
+  real(kind=dp), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=db) :: rho0, ztilde, Dtilde, h, s_opt, somme
+  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme
 
   type(disk_zone_type) :: dz
-  type(dust_pop_type), pointer :: dp
+  type(dust_pop_type), pointer :: d_p
 
   ! Pour simus Seb
   real, parameter :: Sc = 1.5 ! nbre de Schmidt
@@ -349,7 +348,7 @@ subroutine define_dust_density()
      izone=dust_pop(i)%zone
      dz=disk_zone(izone)
 
-     if ((1.0_db+1e-10_db) * dz%rin >=  dz%rmax) then
+     if ((1.0_dp+1e-10_dp) * dz%rin >=  dz%rmax) then
         write(*,*) "ERROR: Rout must be larger than than Rin in zone", izone
         write(*,*) "Exiting"
         stop
@@ -461,7 +460,7 @@ subroutine define_dust_density()
                     if (lvariable_dust.and.(settling_type == 2)) then
                        !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
                        !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
-                       if (rho0 > tiny_db) then
+                       if (rho0 > tiny_dp) then
                           OmegaTau = omega_tau(rho0,H,l)
                           h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
                           correct_strat(l) = (1 + h_H2) / h_H2 ! (h_gas/h_dust)^2
@@ -505,7 +504,7 @@ subroutine define_dust_density()
                        icell = cell_map(i,j,k)
                        somme = somme + densite_pouss(l,icell)  *  (z_lim(i,j+1) - z_lim(i,j))
                     enddo ! j
-                    if (somme > tiny_db) then
+                    if (somme > tiny_dp) then
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
@@ -538,10 +537,10 @@ subroutine define_dust_density()
                        enddo !j
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
-                       if (norme < 1.0e-200_db) then
+                       if (norme < 1.0e-200_dp) then
                           icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_db
-                          norme = 1.0_db
+                          densite_pouss(l,icell)  = 1.0_dp
+                          norme = 1.0_dp
 
                           write(*,*) "WARNING: Vertical settling unresolved for"
                           write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
@@ -550,7 +549,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
+                          if (norme > tiny_dp) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
                        enddo !j
                     enddo ! l
                  enddo ! k
@@ -609,10 +608,10 @@ subroutine define_dust_density()
                        enddo !j
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
-                       if (norme < 1e-200_db) then
+                       if (norme < 1e-200_dp) then
                           icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_db
-                          norme = 1.0_db
+                          densite_pouss(l,icell)  = 1.0_dp
+                          norme = 1.0_dp
 
                           if (lwarning) then
                              write(*,*)
@@ -625,7 +624,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          if (norme > tiny_db) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
+                          if (norme > tiny_dp) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
                        enddo !j
 
                     enddo ! l
@@ -660,7 +659,7 @@ subroutine define_dust_density()
                     write(*,*) "WARNING: a_migration = ", s_opt
                     write(*,*) "is smaller than amin for dust pop #", pop
                     write(*,*) "MCFOST will exit with an error as there are no smaller grains"
-                    if (s_opt < tiny_db) write(*,*) "is your gas-to-dust ratio = 0 ?"
+                    if (s_opt < tiny_dp) write(*,*) "is your gas-to-dust ratio = 0 ?"
                     lwarning = .false.
                  endif
 
@@ -685,7 +684,7 @@ subroutine define_dust_density()
 
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              if (N_tot2(l) > tiny_db) then
+              if (N_tot2(l) > tiny_dp) then
                  densite_pouss(l,:) = densite_pouss(l,:) * N_tot(l)/N_tot2(l)
               endif
            enddo ! l
@@ -777,7 +776,7 @@ subroutine define_dust_density()
      do icell=1,n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
-           densite_pouss(:,icell) = 0.0_db
+           densite_pouss(:,icell) = 0.0_dp
         endif
      enddo
   endif
@@ -791,7 +790,7 @@ subroutine define_dust_density()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1,n_cells
-        if (densite_pouss(l,icell) > 0.0_db) then
+        if (densite_pouss(l,icell) > 0.0_dp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -805,26 +804,26 @@ subroutine define_dust_density()
      dz=disk_zone(izone)
 
      if (dz%geometry /= 5) then ! pas de wall ici
-        dp => dust_pop(pop)
+        d_p => dust_pop(pop)
         mass = 0.0
 
         do icell=1,n_cells
-           do l=dp%ind_debut,dp%ind_fin
+           do l=d_p%ind_debut,d_p%ind_fin
               mass=mass + densite_pouss(l,icell) * M_grain(l) * volume(icell)
            enddo !l
         enddo !icell
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
-        if (mass < tiny_db) then
+        if (mass < tiny_dp) then
            write(*,*)
            write(*,*) "ERROR : something went wrong, there is no dust in the disk"
            write(*,*) "Exiting." ; stop
         endif
 
-        facteur = dp%masse / mass
+        facteur = d_p%masse / mass
 
         do icell=1,n_cells
-           do l=dp%ind_debut,dp%ind_fin
+           do l=d_p%ind_debut,d_p%ind_fin
               densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
               masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
            enddo !l
@@ -872,12 +871,12 @@ subroutine define_density_wall3D()
 
   integer :: pop, l, izone, alloc_status, icell
   type(disk_zone_type) :: dz
-  type(dust_pop_type), pointer :: dp
+  type(dust_pop_type), pointer :: d_p
 
-  real(kind=db) :: rcyl, z, phi, density, facteur, hh, mass, h_wall
+  real(kind=dp) :: rcyl, z, phi, density, facteur, hh, mass, h_wall
 
-  real(kind=db), dimension(:,:), allocatable :: density_wall
-  real(kind=db), dimension(:), allocatable :: masse_wall
+  real(kind=dp), dimension(:,:), allocatable :: density_wall
+  real(kind=dp), dimension(:), allocatable :: masse_wall
 
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
@@ -947,20 +946,20 @@ subroutine define_density_wall3D()
      dz=disk_zone(izone)
 
      if (dz%geometry == 3) then ! wall
-        dp => dust_pop(pop)
+        d_p => dust_pop(pop)
         mass = 0.0
 
         do icell=1,n_cells
-           do l=dp%ind_debut,dp%ind_fin
+           do l=d_p%ind_debut,d_p%ind_fin
               mass=mass + density_wall(icell,l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
            enddo !l
         enddo !icell
         mass =  mass*g_to_Msun
 
-        facteur = dp%masse / mass
+        facteur = d_p%masse / mass
 
         do icell=1,n_cells
-           do l=dp%ind_debut,dp%ind_fin
+           do l=d_p%ind_debut,d_p%ind_fin
               density_wall(icell,l) = density_wall(icell,l) * facteur
               masse_wall(icell) = masse_wall(icell) + density_wall(icell,l) * M_grain(l) * volume(icell)
            enddo !l
@@ -1179,15 +1178,15 @@ subroutine densite_file()
   character(len=80) :: comment
 
   integer :: k, l, i, n_a, read_n_a, jj, icell, phik
-  real(kind=db) :: somme, mass, facteur
+  real(kind=dp) :: somme, mass, facteur
   real :: a, tmp
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
 
-  real(kind=db), dimension(:,:,:,:), allocatable :: sph_dens_db
-  real(kind=db), dimension(:), allocatable :: a_sph_db
-  real(kind=db) :: f
+  real(kind=dp), dimension(:,:,:,:), allocatable :: sph_dens_dp
+  real(kind=dp), dimension(:), allocatable :: a_sph_dp
+  real(kind=dp) :: f
 
   type(disk_zone_type) :: dz
 
@@ -1255,14 +1254,14 @@ subroutine densite_file()
      call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
   else if (bitpix==-64) then
      if (l3D_file) then
-        allocate(sph_dens_db(n_rad,-nz:nz,n_az,n_a))
+        allocate(sph_dens_dp(n_rad,-nz:nz,n_az,n_a))
      else
-        allocate(sph_dens_db(n_rad,nz,n_az,n_a))
+        allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
      endif
-     sph_dens_db = 0.0_db
-     call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_db,anynull,status)
-     sph_dens = real(sph_dens_db,kind=sl)
-     deallocate(sph_dens_db)
+     sph_dens_dp = 0.0_dp
+     call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_dp,anynull,status)
+     sph_dens = real(sph_dens_dp,kind=sp)
+     deallocate(sph_dens_dp)
   else
      write(*,*) "ERROR: cannot read bitpix in fits file"
      stop
@@ -1312,10 +1311,10 @@ subroutine densite_file()
      if (bitpix==-32) then
         call ftgpve(unit,group,firstpix,npixels,nullval,a_sph,anynull,status)
      else if (bitpix==-64) then
-        allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
-        call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
-        a_sph = real(a_sph_db,kind=sl)
-        deallocate(a_sph_db)
+        allocate(a_sph_dp(n_a)) ; a_sph_dp = 0.0_dp
+        call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_dp,anynull,status)
+        a_sph = real(a_sph_dp,kind=sp)
+        deallocate(a_sph_dp)
      else
         write(*,*) "ERROR: cannot read bitpix in fits file"
         stop
@@ -1371,10 +1370,10 @@ subroutine densite_file()
         if (bitpix==-32) then
            call ftgpve(unit,group,firstpix,npixels,nullval,n_a_sph,anynull,status)
         else if (bitpix==-64) then
-           allocate(a_sph_db(n_a)) ; a_sph_db = 0.0_db
-           call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_db,anynull,status)
-           n_a_sph = real(a_sph_db,kind=sl)
-           deallocate(a_sph_db)
+           allocate(a_sph_dp(n_a)) ; a_sph_dp = 0.0_dp
+           call ftgpvd(unit,group,firstpix,npixels,nullval,a_sph_dp,anynull,status)
+           n_a_sph = real(a_sph_dp,kind=sp)
+           deallocate(a_sph_dp)
         else
            write(*,*) "ERROR: cannot read bitpix in fits file"
            stop
@@ -1542,7 +1541,7 @@ subroutine densite_file()
      somme=0.0
 
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
+        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_dp
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)
@@ -1555,7 +1554,7 @@ subroutine densite_file()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_db) then
+        if (densite_pouss(l,icell) > 0.0_dp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -1605,7 +1604,7 @@ subroutine read_Sigma_file()
   integer, dimension(1) :: naxes
   logical :: anynull
   character(len=80) :: comment
-  real, dimension(:), allocatable :: sigma_sl
+  real, dimension(:), allocatable :: sigma_sp
 
   ! Lecture donnees
   status=0
@@ -1652,11 +1651,11 @@ subroutine read_Sigma_file()
 
   ! read_image
   if (bitpix==-32) then
-     allocate(sigma_sl(n_rad))
-     sigma_sl = 0.0_db
-     call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sl,anynull,status)
-     surface_density = real(sigma_sl,kind=db)
-     deallocate(sigma_sl)
+     allocate(sigma_sp(n_rad))
+     sigma_sp = 0.0_dp
+     call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sp,anynull,status)
+     surface_density = real(sigma_sp,kind=dp)
+     deallocate(sigma_sp)
   else if (bitpix==-64) then
      call ftgpvd(unit,group,firstpix,npixels,nullval,surface_density,anynull,status)
   else
@@ -1665,7 +1664,7 @@ subroutine read_Sigma_file()
   endif
 
   ! Au cas ou
-  surface_density = max(surface_density,tiny_db)
+  surface_density = max(surface_density,tiny_dp)
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1676,21 +1675,21 @@ end subroutine read_Sigma_file
 
 !**********************************************************************
 
-real(kind=db) function omega_tau(rho,H,l)
+real(kind=dp) function omega_tau(rho,H,l)
   ! Pour les calculs de Sebastien Fromang
   ! rho doit etre en g.cm-3
 
-  real(kind=db), intent(in) :: rho, H
+  real(kind=dp), intent(in) :: rho, H
   integer, intent(in) :: l
 
   integer :: ipop
 
   ipop = grain(l)%pop
   !write(*,*) ipop, dust_pop(ipop)%rho1g_avg, rho
-  if (rho > tiny_db) then
+  if (rho > tiny_dp) then
      omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
   else
-     omega_tau = huge_db
+     omega_tau = huge_dp
   endif
 
   return
@@ -1702,11 +1701,11 @@ end function omega_tau
 subroutine densite_Seb_Charnoz()
 
   integer :: Nr_Seb, Nz_Seb, Na_Seb
-  real(kind=db), dimension(n_grains_tot) :: density_Seb, taille_grains_Seb, N_grains
-  real(kind=db) :: Rmin, Dr, Zmin, Dz
-  real(kind=db) :: Rmin_mcfost, Dr_mcfost, Zmin_mcfost, Dz_mcfost
+  real(kind=dp), dimension(n_grains_tot) :: density_Seb, taille_grains_Seb, N_grains
+  real(kind=dp) :: Rmin, Dr, Zmin, Dz
+  real(kind=dp) :: Rmin_mcfost, Dr_mcfost, Zmin_mcfost, Dz_mcfost
 
-  real(kind=db) :: Somme
+  real(kind=dp) :: Somme
   integer :: ii, jj, i, j, k, l, icell
 
   write(*,*) "***********************************************"
@@ -1756,7 +1755,7 @@ subroutine densite_Seb_Charnoz()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_db) then
+        if (densite_pouss(l,icell) > 0.0_dp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -1799,7 +1798,7 @@ subroutine densite_Seb_Charnoz2()
   logical :: anynull
 
   integer :: k, l, i, icell
-  real(kind=db) :: somme, somme2
+  real(kind=dp) :: somme, somme2
 
   real, dimension(n_rad,nz) :: dens
 
@@ -1886,7 +1885,7 @@ subroutine densite_Seb_Charnoz2()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_db) then
+        if (densite_pouss(l,icell) > 0.0_dp) then
            icell_not_empty = icell
            exit search_not_empty
         endif

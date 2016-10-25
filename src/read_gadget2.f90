@@ -14,8 +14,8 @@ contains
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
-    real(db), intent(out), dimension(:,:), allocatable :: rhodust
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
     integer, intent(out) :: ndusttypes,n_SPH
 
     ! dump number, error flag

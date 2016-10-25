@@ -19,10 +19,10 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(db), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
-    real(db), allocatable, dimension(:,:) :: rhodust, massdust
+    real(dp), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
+    real(dp), allocatable, dimension(:,:) :: rhodust, massdust
 
-    real(db), dimension(6) :: SPH_limits
+    real(dp), dimension(6) :: SPH_limits
     integer :: ndusttypes, ierr, ios
     character(len=100) :: line_buffer
 
@@ -91,10 +91,10 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(db), dimension(n_SPH), intent(in) :: x,y,z,rho,massgas
-    real(db), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-    real(db), dimension(ndusttypes), intent(in) :: grainsize
-    real(db), dimension(6), intent(in) :: SPH_limits
+    real(dp), dimension(n_SPH), intent(in) :: x,y,z,rho,massgas
+    real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
+    real(dp), dimension(ndusttypes), intent(in) :: grainsize
+    real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: limit_threshold = 0.01
@@ -102,11 +102,11 @@ contains
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
-    real(db) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
+    real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
     real :: graindens, f
     integer :: ierr, icell, l, k, iSPH
 
-    real(db), dimension(6) :: limits
+    real(dp), dimension(6) :: limits
 
 
     icell_ref = 1
@@ -327,7 +327,7 @@ contains
        do l=1,n_grains_tot
           somme=0.0
           do icell=1,n_cells
-             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_db
+             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_dp
              somme=somme+densite_pouss(l,icell)*volume(icell)
           enddo !icell
           densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
@@ -374,7 +374,7 @@ contains
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
-          if (densite_pouss(k,icell) > 0.0_db) then
+          if (densite_pouss(k,icell) > 0.0_dp) then
              icell_not_empty = icell
              exit search_not_empty
           endif
@@ -449,8 +449,8 @@ contains
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(db), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
-    real(db), intent(out), dimension(:,:), allocatable :: rhodust
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
     integer, intent(out) :: ndusttypes, n_SPH,ierr
 
     integer :: syst_status, alloc_status, ios, i

@@ -43,8 +43,8 @@ module ProDiMo
   real, parameter :: T_ISM_stars = 20000.
   real, parameter :: chi_ISM = 1.0
 
-  real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
-  real(kind=db), dimension(:,:), allocatable :: n_phot_envoyes_ISM
+  real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
+  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes_ISM
 
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
@@ -311,7 +311,7 @@ contains
 
     integer, intent(in) :: lambda
     integer :: ri, zj, phik, icell
-    real (kind=db) :: n_photons_envoyes, energie_photon, facteur
+    real (kind=dp) :: n_photons_envoyes, energie_photon, facteur
 
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
@@ -396,14 +396,14 @@ contains
     integer, dimension(5) :: naxes
     integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k
     integer :: iPAH_start, iPAH_end, n_grains_PAH
-    real (kind=db) :: n_photons_envoyes, energie_photon, facteur, N
+    real (kind=dp) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme, Ttmp
 
     logical :: simple, extend, lPAH_nRE
     character(len=512) :: filename
     character :: s
 
-    real(kind=db), dimension(n_rad,nz,2) :: grid
+    real(kind=dp), dimension(n_rad,nz,2) :: grid
     real, dimension(n_rad,nz) :: dens
     real, dimension(n_rad,nz,0:3) :: N_grains
     real, dimension(n_lambda) :: spectre
@@ -412,7 +412,7 @@ contains
     character(len=512) :: para
 
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
-    real(kind=db), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
+    real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
     real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
 
@@ -642,7 +642,7 @@ contains
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
     ! Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sl),status)
+    call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
     !------------------------------------------------------------------------------
     ! HDU 4 : Spectre stellaire
@@ -1608,7 +1608,7 @@ contains
           Tdust = m2p%Tdust(i,j)
           do l=1,n_lambda_m2p
              if (m2p%nJ(i,j,l) < 10) then
-                m2p%lamJlamStar(i,j,l) = m2p%nu(l) * Bnu(m2p%nu(l)*1.0_db,Tdust)
+                m2p%lamJlamStar(i,j,l) = m2p%nu(l) * Bnu(m2p%nu(l)*1.0_dp,Tdust)
                 m2p%lamJlamISM(i,j,l) = 0.0
           endif
         enddo  !l
@@ -1651,8 +1651,8 @@ contains
 
     logical, save :: l_first_time = .true.
 
-    real(kind=db), dimension(MC_NSP,n_rad,nz) :: TMP
-    real(kind=db), dimension(n_rad,nz) :: Tgas ! Pas utilise pour le moment, pour futurs calculs NLTE
+    real(kind=dp), dimension(MC_NSP,n_rad,nz) :: TMP
+    real(kind=dp), dimension(n_rad,nz) :: Tgas ! Pas utilise pour le moment, pour futurs calculs NLTE
     real, dimension(n_rad,nz,2) :: grid ! Seulement pout test
     real, dimension(n_rad,nz) :: sum_pops
     real, dimension(:,:,:), allocatable :: MCpops
@@ -2104,7 +2104,7 @@ contains
              stop
           endif
 
-          sigma2_m1 = 1.0_db / sigma2
+          sigma2_m1 = 1.0_dp / sigma2
           sigma2_phiProf_m1(icell) = sigma2_m1
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
@@ -2116,9 +2116,9 @@ contains
 !----          vmax = sqrt(sigma2)
 !----          tab_dnu_o_freq(i,j) = largeur_profile * vmax / (real(n_speed) )
 !----          do iv=-n_speed, n_speed
-!----             tab_deltaV(iv,i,j) = largeur_profile * real(iv,kind=db)/real(n_speed,kind=db) * vmax
+!----             tab_deltaV(iv,i,j) = largeur_profile * real(iv,kind=dp)/real(n_speed,kind=dp) * vmax
 !----          enddo ! iv
-!----          deltaVmax(i,j) = largeur_profile * vmax !* 2.0_db  ! facteur 2 pour tirage aleatoire
+!----          deltaVmax(i,j) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
        enddo !i
     enddo !j
 

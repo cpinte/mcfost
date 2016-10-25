@@ -165,7 +165,7 @@ subroutine initialisation_mcfost()
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer
   integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
-  real(kind=db) :: wvl
+  real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
 
   character(len=512) :: cmd, s, str_seed, para
