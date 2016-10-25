@@ -64,6 +64,7 @@ subroutine set_default_variables()
   lpuffed_rim = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
+  loutput_J = .false.
   laverage_grain_size = .false.
   lr_subdivide=.false.
   lfreeze_out = .false.
@@ -527,8 +528,11 @@ subroutine initialisation_mcfost()
         ldisk_struct=.true.
         i_arg = i_arg+1
         lstop_after_init= .false.
-     case("-output_UV_field")
+     case("-output_UV","-output_UV_field")
         loutput_UV_field=.true.
+        i_arg = i_arg+1
+     case("-output_J")
+        loutput_J=.true.
         i_arg = i_arg+1
      case("-average_grain_size")
         laverage_grain_size=.true.
