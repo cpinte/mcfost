@@ -75,14 +75,17 @@ extern "C" {
     last_neighbour = -1 ;
     n_in = 0 ;
 
+
     float progress = 0.0 ;
-    float threshold = n/100. ;
+    float progress_bar_step = 0.01 ;
+    float threshold = progress_bar_step*n ;
+
     if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return false if the cell was removed
           n_in++ ;
 
           if (n_in > threshold) {
-            progress  += 0.01 ;
-            threshold += n/100. ;
+            progress  += progress_bar_step ;
+            threshold += progress_bar_step * n ;
             progress_bar(progress) ;
           }
 
