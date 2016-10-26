@@ -222,7 +222,6 @@ subroutine transfert_poussiere()
 
 
      if (ltemp.or.lsed_complete) then
-        frac_E_stars=1.0 ! dans phase1 tous les photons partent de l'etoile
         call repartition_energie_etoiles()
         if (lISM_heating) then
            call repartition_energie_ISM()
@@ -314,7 +313,6 @@ subroutine transfert_poussiere()
            endif
 
         else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
-           frac_E_stars=1.0
            call lect_section_eff
            call repartition_energie_etoiles()
            E_ISM = 0.0
