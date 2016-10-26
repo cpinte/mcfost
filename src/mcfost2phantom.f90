@@ -111,7 +111,7 @@ contains
     use constantes, only : mu
     use read_phantom
     use prop_star, only : n_etoiles
-    use em_th, only : temperature, E_abs_nRE, frac_E_stars, xKJ_abs, E0, xT_ech, log_frac_E_em
+    use em_th, only : temperature, E_abs_nRE
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
          chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em
     use mem, only : alloc_dynamique, deallocate_densities
@@ -218,7 +218,6 @@ contains
        call opacite(lambda, p_lambda)
     enddo !n
 
-    frac_E_stars=1.0 ! tous les photons partent de l'etoile
     call repartition_energie_etoiles()
     call repartition_wl_em()
 
