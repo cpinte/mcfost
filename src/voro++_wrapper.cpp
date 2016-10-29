@@ -64,7 +64,7 @@ extern "C" {
     c_loop_order vlo(con,vo);
 
     // Perform the Voronoi tesselation
-    voronoicell_neighbor c;
+    voronoicell_neighbor c(con);
     int pid ;
     std::vector<int> vi;
 

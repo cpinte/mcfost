@@ -313,7 +313,7 @@ subroutine transfert_poussiere()
            endif
 
         else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
-           call lect_section_eff
+           call lect_section_eff()
            call repartition_energie_etoiles()
            E_ISM = 0.0
            if (lcylindrical) call integ_tau(15) !TODO
