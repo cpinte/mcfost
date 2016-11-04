@@ -1055,6 +1055,9 @@ subroutine deallocate_Voronoi()
   if (allocated(neighbours_list)) deallocate(neighbours_list)
   if (allocated(wall)) deallocate(wall)
 
+  if (allocated(wall_cells)) deallocate(wall_cells)
+  call deallocate_kdtree2_search()
+
   return
 
 end subroutine deallocate_Voronoi
