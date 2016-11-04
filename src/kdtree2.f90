@@ -6,6 +6,8 @@
 !
 module kdtree2_precision_module
 
+  implicit none
+
   integer, parameter :: sp = kind(0.0)
   integer, parameter :: dp = kind(0.0d0)
 
@@ -25,6 +27,8 @@ end module kdtree2_precision_module
 
 module kdtree2_priority_queue_module
   use kdtree2_precision_module
+
+  implicit none
   !
   ! maintain a priority queue (PQ) of data, pairs of 'priority/payload',
   ! implemented with a binary heap.  This is the type, and the 'dis' field
@@ -473,6 +477,8 @@ end module kdtree2_priority_queue_module
 module kdtree2_module
   use kdtree2_precision_module
   use kdtree2_priority_queue_module
+
+  implicit none
   ! K-D tree routines in Fortran 90 by Matt Kennel.
   ! Original program was written in Sather by Steve Omohundro and
   ! Matt Kennel.  Only the Euclidean metric is supported.
@@ -490,20 +496,20 @@ module kdtree2_module
   !-------------DATA TYPE, CREATION, DELETION---------------------
   public :: kdkind
   public :: kdtree2, kdtree2_result, tree_node, kdtree2_create, kdtree2_destroy
-  public :: wall_kdtree2_create, allocate_kdtree2_search
+  public :: wall_kdtree2_create, allocate_kdtree2_search, deallocate_kdtree2_search
   !---------------------------------------------------------------
   !-------------------SEARCH ROUTINES-----------------------------
-  public :: kdtree2_n_nearest,kdtree2_n_nearest_around_point
+  public :: kdtree2_n_nearest!,kdtree2_n_nearest_around_point
   ! Return fixed number of nearest neighbors around arbitrary vector,
   ! or extant point in dataset, with decorrelation window.
   !
-  public :: kdtree2_r_nearest, kdtree2_r_nearest_around_point
+  !public :: kdtree2_r_nearest, kdtree2_r_nearest_around_point
   ! Return points within a fixed ball of arb vector/extant point
   !
   public :: kdtree2_sort_results
   ! Sort, in order of increasing distance, rseults from above.
   !
-  public :: kdtree2_r_count, kdtree2_r_count_around_point
+  !public :: kdtree2_r_count, kdtree2_r_count_around_point
   ! Count points within a fixed ball of arb vector/extant point
   !
   public :: kdtree2_n_nearest_brute_force, kdtree2_r_nearest_brute_force
@@ -618,6 +624,13 @@ contains
     return
 
   end subroutine allocate_kdtree2_search
+
+  subroutine deallocate_kdtree2_search()
+
+    if (allocated(sr)) deallocate(sr)
+    return
+
+  end subroutine deallocate_kdtree2_search
 
 
   function kdtree2_create(input_data,dim,sort,rearrange) result (mr)
