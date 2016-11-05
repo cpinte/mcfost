@@ -3,26 +3,26 @@ ARFLAGS = cr
 #If your system has ranlib, then replace next statement with the one after it.
 #RANLIB = echo
 RANLIB = ranlib
-CC = gcc
+CC = icc
 CLD = $(CC)
 F77 = ifort -w95
 F77LD = $(F77)
 FFXN =  -DAdd_
 FSUFFIX = F
 
-MPIF77 = $(F77) 
+MPIF77 = $(F77)
 MPICC = $(CC)
 
-# To use MPI, set the MPIDIR to location of mpi library, and MPILIB 
+# To use MPI, set the MPIDIR to location of mpi library, and MPILIB
 # to name of mpi library. Remove # signs from beginning of next 3 lines.
 # Also, if the previous compilation was without MPI, type: make realclean
 # before compiling for mpi.
 #
-MPIDIR = 
-MPILIB = 
+MPIDIR =
+MPILIB =
 
 # If _LONG_LONG type is available, then you can use the addition flag
-# -D_LONG_LONG. Set F77 to echo to compile the C version alone. 
+# -D_LONG_LONG. Set F77 to echo to compile the C version alone.
 # Try adding: -DGENERIC to CFLAGS. This can improve speed, but may give
 # incorrect values. Check with 'checksprng' to see if it works.
 
@@ -32,4 +32,3 @@ FFLAGS = -O $(PMLCGDEF) $(MPIDEF) -DPOINTER_SIZE=8
 F77LDFLAGS = -O
 
 CPP = f77 -F
-

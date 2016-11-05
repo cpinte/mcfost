@@ -42,12 +42,12 @@ rm -rf voro++-0.4.6
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
 cd nr
-./compile_gfortran.com
+./compile_gfortran.sh
 cp libnr.a *.mod ../lib/nr
 cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
 cp spline/libnr_splin.a ../lib/nr/spline
 cp sort/libnr_sort.a ../lib/nr/sort
-./clean.com
+./clean.sh
 cd ..
 
 cp -r include $MCFOST_INSTALL
