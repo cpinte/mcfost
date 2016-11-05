@@ -13,19 +13,11 @@ PLATFORM =  $(shell uname -p)
 
 # Default is ifort
 COMPILO = ifort
-ifeq ($(g95),yes)
-COMPILO = g95
-endif
 ifeq ($(gfortran),yes)
 COMPILO = gfortran
 endif
-ifeq ($(gfortran32),yes)
-COMPILO = gfortran32
-endif
 
 BINARY = mcfost
-
-FFLAGS_R8 = -r8
 
 # Linux ou Mac x86, ifort 64 bits
 ifeq ($(COMPILO),ifort)
@@ -56,7 +48,7 @@ MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort >=13
 ifeq ($(fostino),yes)
 MACH = -xW -axP # for fostino and ifort 10
 endif
-FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static
+FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static # static does not work on froggy
 endif
 
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
@@ -77,46 +69,6 @@ LIBS_VORO =  -L$(LIBS) -lvoro++ -cxxlib
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
 endif
 
-# Linux ou Mac x86, g95 64 bits
-ifeq ($(COMPILO),g95)
-FC_SER = g95 -cpp
-FC_OMP = g95 -cpp
-OPTS = -O3 -ffast-math #-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -ftrace=full -fimplicit-none #-g -C -ggdb -ftrace=full
-# -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
-MACH = #-march=athlon
-PREC =
-FFLAGS = -c $(PREC)
-FFLAGS_EXE = $(PREC)
-
-LIBS = $(MCFOST_INSTALL)/lib/g95/
-
-# SPRNG
-FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
-endif
-
-# Linux ou Mac x86, gfortran 32 bits
-ifeq ($(COMPILO),gfortran32)
-FC_SER = gfortran -m32 -cpp
-FC_OMP = gfortran -m32 -cpp -fopenmp
-OPTS = -O3 -ffast-math  -funroll-loops
-FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
-#-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
-#-g -C -ggdb -ftrace=full  -fimplicit-none
-# -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
-MACH = #-march=athlon
-PREC =
-FFLAGS = -c $(PREC)
-FFLAGS_EXE = $(PREC)
-
-LIBS = $(MCFOST_INSTALL)/lib/gfortran32/
-
-# SPRNG
-FLAGS_SPRNG = $(FLAGS)
-endif
-
-
 # Linux ou Mac x86, gfortran64
 ifeq ($(COMPILO),gfortran)
 FC_SER = gfortran -m64 -cpp
@@ -136,7 +88,7 @@ PREC =
 FFLAGS = -c $(PREC)
 FFLAGS_EXE = $(PREC)
 
-LIBS = $(MCFOST_INSTALL)/lib/gfortran64/
+LIBS = $(MCFOST_INSTALL)/lib/gfortran/
 LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
 
 FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
