@@ -6,8 +6,8 @@ mkdir include
 # gcc-2.95 needed
 #wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
 tar xzvf sprng2.0b.tar.gz
-cp -f  linux/gfortran_64/make.CHOICES sprng2.0
-cp -f  linux/gfortran_64/make.INTEL sprng2.0/SRC
+cp -f  gfortran/make.CHOICES sprng2.0
+cp -f  gfortran/make.INTEL sprng2.0/SRC
 cd sprng2.0
 make -B
 mv lib/libsprng.a ../lib
@@ -42,7 +42,7 @@ rm -rf voro++-0.4.6
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
 cd nr
-./compile_gfortran64.com
+./compile_gfortran.com
 cp libnr.a *.mod ../lib/nr
 cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
 cp spline/libnr_splin.a ../lib/nr/spline
@@ -52,4 +52,4 @@ cd ..
 
 cp -r include $MCFOST_INSTALL
 mkdir $MCFOST_INSTALL/lib
-cp -r lib $MCFOST_INSTALL/lib/gfortran64
+cp -r lib $MCFOST_INSTALL/lib/gfortran
