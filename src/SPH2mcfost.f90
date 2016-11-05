@@ -407,7 +407,7 @@ contains
 
     write(*,*) ""
     write(*,*) "Reading isochrone file: "//trim(isochrone_file)
-    filename = trim(mcfost_utils)//"Isochrones/"//trim(isochrone_file)
+    filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
     open(unit=1,file=filename,status="old")
     do i=1,3
        read(1,*) line_buffer
