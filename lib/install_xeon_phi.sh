@@ -5,8 +5,8 @@ mkdir include
 # gcc-2.95 needed
 #wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
 tar xzvf sprng2.0b.tar.gz
-cp -f  linux/ifort_xeon_phi/make.CHOICES sprng2.0
-cp  linux/ifort_xeon_phi/make.IFORT64 sprng2.0/SRC
+cp -f  ifort_xeon_phi/make.CHOICES sprng2.0
+cp  ifort_xeon_phi/make.IFORT sprng2.0/SRC
 cd sprng2.0
 make
 mv lib/libsprng.a ../lib
