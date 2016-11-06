@@ -84,7 +84,7 @@ subroutine mol_line_transfer()
 
      ! Freeze-out & photo-dissociation eventuels
      if (lfreeze_out) call freeze_out()
-     if (lphoto_dissociate) call photo_dissociate()
+     if (lphoto_dissociation) call photo_dissociation()
 
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
 
