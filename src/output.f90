@@ -1075,9 +1075,10 @@ subroutine write_column_density()
      do icell=1,n_cells
 
         if (lVoronoi) then
-           write(*,*) "Column density option not omplemented in Voronoi"
+           write(*,*) "Column density option not implemented in Voronoi"
            write(*,*) "Exiting"
            ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
+           ! needs to be updated
            stop
            x1 = Voronoi(icell)%xyz(1)
            y1 = Voronoi(icell)%xyz(2)

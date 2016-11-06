@@ -68,6 +68,7 @@ subroutine set_default_variables()
   laverage_grain_size = .false.
   lr_subdivide=.false.
   lfreeze_out = .false.
+  lphoto_dissociate = .false.
   l_em_disk_image = .true.
   lisotropic = .false.
   lno_scattering = .false.
@@ -108,6 +109,7 @@ subroutine set_default_variables()
   llimb_darkening = .false.
   lVoronoi = .false.
   lcavity = .false.
+  freeze_out_depletion = 0.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -641,6 +643,14 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) T_freeze_out
+     case("-freeze_out_depletion","-freeze-out_depletion")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) freeze_out_depletion
+     case("-photodissociate","-photo_dissociate","-photo-dissociate")
+        i_arg = i_arg + 1
+        lphoto_dissociate=.true.
      case("-isotropic","-iso")
         i_arg = i_arg + 1
         lisotropic=.true.
@@ -1344,7 +1354,9 @@ subroutine display_help()
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
-  write(*,*) "        : -freeze_out <T>"
+  write(*,*) "        : -freeze-out <T>"
+  write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
+  write(*,*) "        : -photodissociate <T>"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"

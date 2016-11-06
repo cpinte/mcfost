@@ -747,8 +747,8 @@ module molecular_emission
   real, dimension(:), allocatable :: tab_abundance ! n_cells
   logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
 
-  logical ::  lfreeze_out
-  real :: T_freeze_out
+  logical ::  lfreeze_out, lphoto_dissociate
+  real :: T_freeze_out, freeze_out_depletion
 
   real(kind=dp), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
