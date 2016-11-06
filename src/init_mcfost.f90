@@ -68,7 +68,8 @@ subroutine set_default_variables()
   laverage_grain_size = .false.
   lr_subdivide=.false.
   lfreeze_out = .false.
-  lphoto_dissociate = .false.
+  lphoto_dissociation = .false.
+  lphoto_desorption = .false.
   l_em_disk_image = .true.
   lisotropic = .false.
   lno_scattering = .false.
@@ -648,9 +649,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         i_arg = i_arg + 1
         read(s,*) freeze_out_depletion
-     case("-photodissociate","-photo_dissociate","-photo-dissociate")
+     case("-photodissociation","-photo_dissociation","-photo-dissociation")
         i_arg = i_arg + 1
-        lphoto_dissociate=.true.
+        lphoto_dissociation=.true.
+     case("-photodesorption","-photo_desorption","-photo-desorption")
+        i_arg = i_arg + 1
+        lphoto_desorption=.true.
      case("-isotropic","-iso")
         i_arg = i_arg + 1
         lisotropic=.true.
@@ -1356,7 +1360,8 @@ subroutine display_help()
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
-  write(*,*) "        : -photodissociate <T>"
+  write(*,*) "        : -photo-dissociation"
+  write(*,*) "        : -photo-desorption"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"

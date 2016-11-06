@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.7"
+  character(8), parameter :: mcfost_release = "3.0.8"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -747,7 +747,7 @@ module molecular_emission
   real, dimension(:), allocatable :: tab_abundance ! n_cells
   logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
 
-  logical ::  lfreeze_out, lphoto_dissociate
+  logical ::  lfreeze_out, lphoto_dissociation, lphoto_desorption
   real :: T_freeze_out, freeze_out_depletion
 
   real(kind=dp), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
