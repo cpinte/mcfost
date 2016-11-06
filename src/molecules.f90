@@ -1195,15 +1195,18 @@ subroutine freeze_out()
   ! supprime une molecule si T < T_freeze_out
   ! C. Pinte
   ! 18/01/08
+  ! 6/11/16 : add a depletion factor
 
   implicit none
 
   integer :: icell
 
-  write (*,*) "Freezing out of molecules"
+  write (*,*) "Freezing-out of molecules"
 
   do icell=1,n_cells
-     if (Temperature(icell) < T_freeze_out)  tab_abundance(icell) = 0.
+     if (Temperature(icell) < T_freeze_out)  then
+        tab_abundance(icell) = tab_abundance(icell) * freeze_out_depletion
+     endif
   enddo
 
   return
@@ -1211,5 +1214,67 @@ subroutine freeze_out()
 end subroutine freeze_out
 
 !***********************************************************
+
+subroutine photo_dissociate()
+  ! supprime une molecule si cd < value
+  ! C. Pinte
+  ! 6/11/16
+
+  implicit none
+
+  integer :: icell, icell0, next_cell, previous_cell
+  real :: threshold_CD = 0.8 * 1.59e21 !cm^-2 ! Value from Qi et al 2011
+  ! It makes sense only for constant dust --> needs to be updated
+  real :: photo_dissocation_depletion = 1.e-6
+
+  real(kind=dp) :: CD, x0, y0, z0, x1, y1, z1, u,v,w, l
+
+  write (*,*) "Photo-dissociating molecules"
+
+  threshold_CD = threshold_CD / (cm_to_m**2) ! m^-2
+
+  do icell=1, n_cells
+     if (lVoronoi) then
+        write(*,*) "photo-dissociate/Column density option not implemented in Voronoi"
+        write(*,*) "Exiting"
+        ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
+        ! needs to be updated
+        stop
+        x1 = Voronoi(icell)%xyz(1)
+        y1 = Voronoi(icell)%xyz(2)
+        z1 = Voronoi(icell)%xyz(3)
+     else
+        x1 = r_grid(icell) * cos(phi_grid(icell))
+        y1 = r_grid(icell) * sin(phi_grid(icell))
+        z1 = z_grid(icell)
+     endif
+
+     u = 0.0 ; v = 0.0 ;
+     if (z1 >= 0) then
+        w = 1.0
+     else
+        w = -1.0
+     endif
+
+     next_cell = icell
+     icell0 = 0
+     CD = 0.0
+     do while(next_cell <= n_cells)
+        previous_cell = icell0
+        icell0 = next_cell
+        x0 = x1 ; y0 = y1 ; z0 = z1
+        call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+        CD = CD + (l * AU_to_m) * densite_gaz(icell) ! part.m^-2
+     enddo
+
+     if (CD < threshold_CD) then
+        tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
+     endif
+
+  enddo ! icell
+
+  return
+
+end subroutine photo_dissociate
 
 end module molecules

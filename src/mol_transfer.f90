@@ -82,8 +82,9 @@ subroutine mol_line_transfer()
         ! TODO : il manque le cas defaut pour geometrie spherique
      endif
 
-     ! Freeze out eventuel
+     ! Freeze-out & photo-dissociation eventuels
      if (lfreeze_out) call freeze_out()
+     if (lphoto_dissociate) call photo_dissociate()
 
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
 
