@@ -35,6 +35,8 @@ OPTS = $(OPTS2)
 endif
 DEBUG_OPTS = -check all  -C -g  -fpe0 -traceback -no-ftz  -warn uninitialized -warn unused -warn truncated_source # -no-ftz permet eviter bug dans conversion db -> sl
 
+FFLAGS_R8 = -r8
+
 PREC = #
 FFLAGS =-c $(PREC)
 
