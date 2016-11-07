@@ -264,11 +264,12 @@ module prop_star
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
 
-
   ! Limb darkening
   logical :: llimb_darkening
   character(len=512) :: limb_darkening_file
   real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
+
+  character(len=8) :: system_age
 
 end module prop_star
 

@@ -403,7 +403,7 @@ contains
     real :: L, R, T, M, minM, maxM
     real, dimension(nSpT) :: logL, logR, logTeff, logM
 
-    isochrone_file = "Siess/isochrone_3Myr.txt"
+    isochrone_file = "Siess/isochrone_"//trim(system_age)//".txt"
 
     write(*,*) ""
     write(*,*) "Reading isochrone file: "//trim(isochrone_file)

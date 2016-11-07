@@ -119,6 +119,8 @@ subroutine set_default_variables()
   ! Methodes par defaut
   RT_sed_method = 1
 
+  system_age = "3Myr"
+
   return
 
 end subroutine set_default_variables
@@ -940,6 +942,10 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) cavity%exp_beta
         i_arg = i_arg + 1
+     case("-age")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,system_age)
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1340,6 +1346,7 @@ subroutine display_help()
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
+  write(*,*) "        : -age <age>"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
