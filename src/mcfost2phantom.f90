@@ -113,7 +113,7 @@ contains
     use prop_star, only : n_etoiles
     use em_th, only : temperature, E_abs_nRE
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
-         chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em
+         chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
     use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
@@ -150,6 +150,8 @@ contains
     real, dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
+
+    real, parameter :: Tmin = 10.
 
     real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
@@ -310,6 +312,7 @@ contains
        ! TBD
     endif
 
+    call set_min_Temperature(Tmin)
     Tdust = -1.0 ;
 
     do icell=1, n_cells
