@@ -1276,7 +1276,10 @@ contains
           unchanged = .false.
        endif
 
-
+       if (INDEX(line,"! dist") > 0) then
+          write(2,*) distance, " ! dist : set by MCFOST"
+          unchanged = .false.
+       endif
 
        if (unchanged) then
           if (len(trim(line)) > 0) then
@@ -1287,6 +1290,12 @@ contains
           endif
        endif
     enddo read_loop
+
+    if (etoile(1)%lb_body) then
+       write(2,*) ".true.  ! PlanckSpec : set by MCFOST"
+    else
+       write(2,*) ".false.  ! PlanckSpec : set by MCFOST"
+    endif
 
     close(1)
     close(2)
