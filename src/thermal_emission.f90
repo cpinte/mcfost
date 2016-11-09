@@ -585,6 +585,28 @@ end subroutine Temp_finale
 
 !**********************************************************************
 
+subroutine set_min_temperature(Tmin)
+
+  real, intent(in) :: Tmin
+
+  integer :: icell, i
+
+  i=0
+  do icell=1, n_cells
+     if (Temperature(icell) < Tmin) then
+        Temperature(icell) = Tmin
+        i = i+1
+     endif
+  end do
+
+  write(*,*) "Temperature was set to ", Tmin, "in", i, "cells"
+
+  return
+
+end subroutine set_min_temperature
+
+!**********************************************************************
+
 subroutine Temp_finale_nLTE()
 ! Calcule la temperature finale du disque dans chaque cellule
 ! Cas de l'"absoprtion continue"
