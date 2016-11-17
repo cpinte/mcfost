@@ -1076,7 +1076,7 @@ subroutine write_column_density()
 
         if (lVoronoi) then
            write(*,*) "Column density option not implemented in Voronoi"
-           write(*,*) "Exiting"
+           write(*,*) "Not file will be written"
            ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
            ! needs to be updated
            stop
@@ -1114,10 +1114,7 @@ subroutine write_column_density()
   end do ! direction
   CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
 
-
-  filename = "!Column_density.fits.gz"
-
-  write(*,*) "Writing "//trim(filename)
+  filename = "data_disk/column_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1261,7 +1258,7 @@ subroutine write_disk_struct()
   real(kind=dp), dimension(:,:,:,:), allocatable :: grid
 
 
-
+  write(*,*) "Writing disk structucture files in data_disk ..."
   if (l3D) then
      allocate(dens(n_rad,-nz:nz,n_az), vol(n_rad,-nz:nz,n_az), dust_dens(n_rad,-nz:nz,n_az,n_grains_tot), stat = alloc_status)
   else
@@ -1762,6 +1759,10 @@ subroutine write_disk_struct()
      write(*,*) "Exiting"
      stop
   endif
+
+  ! Wrting the column density
+  call write_column_density()
+  write(*,*) "Done"
 
   return
 
