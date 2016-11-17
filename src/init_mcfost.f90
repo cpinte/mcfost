@@ -44,7 +44,6 @@ subroutine set_default_variables()
   lopacite_only=.false.
   lseed=.false.
   loptical_depth_map=.false.
-  lcolumn_density = .false.
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
@@ -589,9 +588,6 @@ subroutine initialisation_mcfost()
      case("-optical_depth_map","-od")
         i_arg = i_arg+1
         loptical_depth_map=.true.
-     case("-column_density","-cd","-CD")
-        i_arg = i_arg+1
-        lcolumn_density=.true.
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.
@@ -759,6 +755,12 @@ subroutine initialisation_mcfost()
         lprodimo = .true.
         mcfost2ProDiMo_version = 5
         lISM_heating=.true.
+     case("-astrochem","-Astrochem","-AstroChem")
+        i_arg = i_arg + 1
+        lastrochem = .true.
+        ldisk_struct=.true.
+        lstop_after_init=.false.
+        loutput_UV_field=.true.
      case("-prodimo4")
         i_arg = i_arg + 1
         lprodimo = .true.
@@ -1283,6 +1285,13 @@ subroutine display_help()
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
   write(*,*) "        : -mol : calculates molecular emission"
   write(*,*) "        : -prodimo : creates the files for ProDiMo"
+  write(*,*) " "
+  write(*,*) " Coupling with other codes"
+  write(*,*) "        : -prodimo : creates the files for ProDiMo"
+  write(*,*) "        : -p2m : read the results from ProDiMo"
+  write(*,*) "        : -astrochem : creates the files for astrochem"
+  write(*,*) "        : -phamtom : reads a phantom dump file"
+  write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
