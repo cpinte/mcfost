@@ -1401,7 +1401,6 @@ contains
 
     !lpop = .false. ; lprecise_pop = .false. ; lmol_LTE = .true. ! lmol_LTE force l'utilisation des pop de ProDiMo
 
-    write(*,*) "**************  TMP ", lpop, lmol_LTE
     if (lpop) then
        write(*,*) "Calculating level population"
     endif
@@ -1668,15 +1667,29 @@ contains
 
     logical :: lCII, lOI, lCO, loH2O, lpH2O
 
-    real :: sigma2, sigma2_m1, r_sph
+    real :: sigma2, sigma2_m1, r_sph, factor_CO
     integer :: i,j, ri, zj, n_speed_rt, l, keyword_status, icell
+
+    real, parameter :: ratio_12_13_CO = 70.
+    real, parameter :: ratio_12_18_CO = 500.
 
     n_speed_rt = mol(imol)%n_speed_rt
 
     lCII = .false. ; lOI = .false. ; lCO = .false. ; loH2O = .false. ;  lpH2O = .false. ;
     if (mol(imol)%name=="C+") lCII = .true.
     if (mol(imol)%name=="O") lOI = .true.
-    if (mol(imol)%name=="CO") lCO = .true.
+    if (mol(imol)%name=="CO") then
+       lCO = .true.
+       factor_CO = 1.
+    endif
+    if (mol(imol)%name=="13C16O") then
+       lCO = .true.
+       factor_CO = 1./ ratio_12_13_CO
+    endif
+    if (mol(imol)%name=="C18O") then
+       lCO = .true.
+       factor_CO = 1./ ratio_12_18_CO
+    endif
     if (mol(imol)%name=="o-H2O") loH2O = .true.
     if (mol(imol)%name=="p-H2O") lpH2O = .true.
 
@@ -1684,7 +1697,6 @@ contains
 
     if (l_first_time) then
        l_first_time = .false.
-
 
        filename = "data_ProDiMo/forMCFOST.fits.gz"
        write(*,*)
@@ -1815,7 +1827,6 @@ contains
           stop
        endif
        pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ;
-
 
        ! read_image : HDU 1 : MCgrid, to make a test inside mcfost
        call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,fits_status)
@@ -2002,6 +2013,13 @@ contains
           end do
        endif
 
+       ! Setting the kinetic temperature to Prodimo's Tgas
+       do i=1, n_rad
+          do j=1, nz
+             icell =cell_map(i,j,1)
+             Tcin(icell) = Tgas(i,j)
+          enddo
+       enddo
     endif ! l_first_time
 
     ! Niveaux et populations
@@ -2020,8 +2038,8 @@ contains
              tab_abundance(icell) = nOI(i,j)
           endif
           if (lCO) then
-             tab_nLevel(icell,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)
-             tab_abundance(icell) = nCO(i,j)
+             tab_nLevel(icell,1:nLevel_CO) = pop_CO(:,i,j) * nCO(i,j)  * factor_CO
+             tab_abundance(icell) = nCO(i,j)  * factor_CO
           endif
           if (loH2O) then
              tab_nLevel(icell,1:nLevel_oH2O) = pop_oH2O(:,i,j) * noH2O(i,j)
@@ -2031,7 +2049,6 @@ contains
              tab_nLevel(icell,1:nLevel_pH2O) = pop_pH2O(:,i,j) * npH2O(i,j)
              tab_abundance(icell) = npH2O(i,j)
           endif
-          Tcin(icell) = Tgas(i,j)
        enddo
     enddo
     do icell=1, n_cells
