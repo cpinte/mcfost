@@ -339,7 +339,6 @@ function sh_helper(x, n)
   enddo
   dy = 1.0/real(nn);
 
-
   nx=size(x)
 
   sh_helper=0.0

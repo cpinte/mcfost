@@ -1303,6 +1303,7 @@ subroutine display_help()
   write(*,*) "        : -rt1 or -rt2 : use ray-tracing method and force ray-tracing method"
   write(*,*) "        : -no-rt : do not output the ray-tracing results"
   write(*,*) "        : -mc :  keep Monte-Carlo output in ray-tracing mode"
+  write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
