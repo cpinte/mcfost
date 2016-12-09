@@ -1914,10 +1914,10 @@ subroutine ecriture_UV_field()
      J(lambda,:,:,:) = J(lambda,:,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
   enddo
 
-  lamb = tab_lambda
+  lamb = tab_lambda ! [micron]
 
-  wl(:) = span(0.0912,0.24,n)
-  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6
+  wl(:) = span(0.0912,0.24,n) ! [micron]
+  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6 ! [m]
 
   do ri=1,n_rad
      do zj=j_start,nz

@@ -411,6 +411,7 @@ subroutine init_molecular_disk(imol)
   ! En m.s-1
   do icell=1, n_cells
      vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+     vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_m) )
   enddo
 
   v_turb = vitesse_turb

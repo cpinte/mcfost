@@ -2110,6 +2110,9 @@ contains
           r_sph = sqrt(r_grid(icell)**2 + z_grid(icell)**2)
           !          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
+
+
+          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_m) )
        enddo
     enddo
 
