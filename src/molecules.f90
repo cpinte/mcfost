@@ -409,8 +409,11 @@ subroutine init_molecular_disk(imol)
   endif
 
   ! En m.s-1
+  ! Warning : assume all stars are at the center of the disk
   do icell=1, n_cells
-     vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+     !vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) ) ! Midplane Keplerian velocity
+     vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+          ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
   enddo
 
   v_turb = vitesse_turb
