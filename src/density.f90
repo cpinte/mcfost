@@ -756,7 +756,7 @@ subroutine define_dust_density()
                        density = 0.0
                     else
                        density = nbre_grains(l) * cst_pous(pop) * &
-                            ( (rcyl/dz%Rref)**(-2*dz%surf) + (rcyl/dz%Rref)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                            ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                             exp( - (abs(z -z0)/h)**dz%vert_exponent)
                     endif
                     densite_pouss(l,icell) = density
