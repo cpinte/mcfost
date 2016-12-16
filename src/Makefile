@@ -5,7 +5,6 @@
 #*************************************************************
 # 1er mac est en SSSE3
 # nouveau mac en SSE4.1 (SSE4.2 pour core i7)
-# -mmacosx-version-min=10.4 requis sur Snow Leopard
 
 # Choix du type de compilateur
 ARCH = $(shell uname | tr '[a-z]' '[A-Z]')
@@ -42,7 +41,7 @@ FFLAGS =-c $(PREC)
 
 ifeq ($(ARCH),DARWIN)
 MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
-FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.6 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
+FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.9 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
 endif
 
 ifeq ($(ARCH),LINUX)
