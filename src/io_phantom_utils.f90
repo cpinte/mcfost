@@ -1,6 +1,6 @@
 !--------------------------------------------------------------------------!
 ! The Phantom Smoothed Particle Hydrodynamics code, by Daniel Price et al. !
-! Copyright (c) 2007-2015 The Authors (see AUTHORS)                        !
+! Copyright (c) 2007-2017 The Authors (see AUTHORS)                        !
 ! See LICENCE file for usage and distribution conditions                   !
 ! http://users.monash.edu.au/~dprice/phantom                               !
 !--------------------------------------------------------------------------!
@@ -10,11 +10,14 @@
 !  DESCRIPTION: Utility routines used when reading and writing the
 !   sphNG/Phantom dump file format
 !
+!  "Every complex file format eventually turns into a
+!    badly-designed programming language." - Anon
+!
 !  REFERENCES: None
 !
 !  OWNER: Daniel Price
 !
-!  $Id: 46275e053845ccce42b676028be688c5d01b851c $
+!  $Id: 21f0fc8c669fe9cb9d7e4a7987dc705b324e386d $
 !
 !  RUNTIME PARAMETERS: None
 !
@@ -25,11 +28,13 @@ module dump_utils
  implicit none
  public :: open_dumpfile_w, open_dumpfile_r, get_error_text
  public :: tag,check_tag
- public :: skipblock,read_blockheader,skip_headerblock
+ public :: skipblock,skip_arrays,skip_headerblock
  public :: get_dumpname
  public :: add_to_header,add_to_rheader,add_to_iheader
  public :: num_in_header,reset_header,extract
  public :: read_array_from_file
+ public :: write_block_header, write_array
+ public :: read_block_header, read_array
  integer, parameter, public :: lentag = 16    ! tag length
  integer, parameter, public :: lenid  = 100
  integer, parameter, public :: maxphead = 256
@@ -123,6 +128,20 @@ module dump_utils
   module procedure reset_header_real
  end interface reset_header
 
+ ! generic interface for writing arrays to file
+ interface write_array
+  module procedure write_array_int1, &
+   write_array_real4, write_array_real4arr, &
+   write_array_real8, write_array_real8arr
+ end interface write_array
+
+ ! generic interface for writing arrays to file
+ interface read_array
+  module procedure read_array_int1, &
+   read_array_real4, read_array_real4arr, &
+   read_array_real8, read_array_real8arr
+ end interface read_array
+
  private
 
 contains
@@ -146,19 +165,40 @@ end function get_dumpname
 !  small utility to skip an entire block in a file
 !+
 !-------------------------------------------------------------------
-subroutine skipblock(iunit,nums1,nums2,nums3,nums4,ierr)
+subroutine skipblock(iunit,nums1,nums2,nums3,nums4,tagged,ierr)
  integer, intent(in)  :: iunit
  integer, intent(in)  :: nums1(ndatatypes),nums2(ndatatypes),nums3(ndatatypes),nums4(ndatatypes)
+ logical, intent(in)  :: tagged
  integer, intent(out) :: ierr
- integer :: i
+ integer :: nskip
 
  ierr = 0
- do i=1,sum(nums1)+sum(nums2)+sum(nums3)+sum(nums4)
-    read(iunit,iostat=ierr)
- enddo
+ nskip = sum(nums1)+sum(nums2)+sum(nums3)+sum(nums4)
+ call skip_arrays(iunit,nskip,tagged,ierr)
 
  return
 end subroutine skipblock
+
+!--------------------------------------------------------------------
+
+subroutine skip_arrays(iunit,nskip,tagged,ierr,verbose)
+ integer, intent(in)  :: iunit, nskip
+ logical, intent(in)  :: tagged
+ integer, intent(out) :: ierr
+ integer, intent(in), optional :: verbose
+ character(len=lentag) :: tag
+ integer :: i
+
+ ierr = 0
+ do i=1,nskip
+    if (tagged) read(iunit,iostat=ierr) tag
+    if (present(verbose)) then
+       if (verbose >= 2) print*,' skipping '//trim(tag)
+    endif
+    read(iunit,iostat=ierr)
+ enddo
+
+end subroutine skip_arrays
 
 !--------------------------------------------------------------------
 !+
@@ -208,6 +248,18 @@ subroutine check_tag(tag,expectedtag)
  endif
 
 end subroutine check_tag
+
+!-------------------------------------------
+!+
+!  check if two tags match
+!+
+!-------------------------------------------
+logical function match_tag(tag,expectedtag)
+ character(len=*), intent(in) :: tag, expectedtag
+
+ match_tag = (trim(tag)==trim(expectedtag))
+
+end function match_tag
 
 !------------------------------------------------
 !+
@@ -311,7 +363,7 @@ subroutine extracthdr_real8(tag,val,hdr,ierr,default)
  real(kind=8),     intent(in), optional :: default
  real(kind=8) :: def
  real :: rval,rdef
- 
+
  if (present(default)) then
     def = default
     rdef = default
@@ -1255,6 +1307,7 @@ function allocate_header(nint,nint1,nint2,nint4,nint8,nreal,nreal4,nreal8,err) r
  if (present(nint1))  size(i_int1) = nint1
  if (present(nint2))  size(i_int2) = nint2
  if (present(nint4))  size(i_int4) = nint4
+ if (present(nint8))  size(i_int8) = nint8
  if (present(nreal))  size(i_real) = nreal
  if (present(nreal4)) size(i_real4) = nreal4
  if (present(nreal8)) size(i_real8) = nreal8
@@ -1306,8 +1359,9 @@ end function allocate_header
 !-------------------------------------------------------
 subroutine free_header(hdr,ierr)
  type(dump_h), intent(inout) :: hdr
- integer,      intent(out)   :: ierr
+ integer,      intent(out), optional :: ierr
 
+ if (present(ierr)) ierr = 0
  if (allocated(hdr%inttags))   deallocate(hdr%inttags)
  if (allocated(hdr%int1tags))  deallocate(hdr%int1tags)
  if (allocated(hdr%int2tags))  deallocate(hdr%int2tags)
@@ -1337,7 +1391,8 @@ subroutine write_header(iunit,hdr,ierr,singleprec)
  type(dump_h), intent(in)  :: hdr
  integer,      intent(out) :: ierr
  logical,      intent(in), optional :: singleprec
- integer :: idum,number,i,j,ierrs(17)
+ integer :: number,i,j,ierrs(17)
+ integer,         parameter :: idum  = 0
  integer(kind=1), parameter :: idum1 = 0_1
  integer(kind=2), parameter :: idum2 = 0_2
  integer(kind=4), parameter :: idum4 = 0_4
@@ -1436,6 +1491,478 @@ subroutine write_header(iunit,hdr,ierr,singleprec)
 
 end subroutine write_header
 
+!---------------------------------------------------------------------
+!+
+!  Write int*1 array to block header (ipass=1) or to file (ipass=2)
+!+
+!---------------------------------------------------------------------
+subroutine write_array_int1(ib,iarr,my_tag,len,ikind,ipass,iunit,nums,ierr,func)
+ integer(kind=1),  intent(in) :: iarr(:)
+ character(len=*), intent(in) :: my_tag
+ integer, intent(in)    :: ib,len,ikind,ipass,iunit
+ integer, intent(inout) :: nums(:,:)
+ integer, intent(out)   :: ierr
+ !procedure(integer(kind=1)), pointer, optional :: func
+ interface
+   integer(kind=1) pure function func(x)
+     integer(kind=1), intent(in) :: x
+   end function
+ end interface
+ optional :: func
+ !integer(kind=1), optional :: func
+ integer :: i
+
+ ierr = 0
+ ! check if kind matches
+ if (ikind==i_int1) then
+    if (ipass==1) then
+       nums(i_int1,ib) = nums(i_int1,ib) + 1
+    elseif (ipass==2) then
+       write(iunit, iostat=ierr) tag(my_tag)
+       if (present(func)) then
+          write(iunit, iostat=ierr) (func(iarr(i)),i=1,len)
+       else
+          write(iunit, iostat=ierr) iarr(1:len)
+       endif
+    endif
+ endif
+
+end subroutine write_array_int1
+
+!---------------------------------------------------------------------
+!+
+!  Write real*4 array to block header (ipass=1) or to file (ipass=2)
+!+
+!---------------------------------------------------------------------
+subroutine write_array_real4(ib,arr,my_tag,len,ikind,ipass,iunit,nums,ierr,func,use_kind,singleprec)
+ real(kind=4),     intent(in) :: arr(:)
+ character(len=*), intent(in) :: my_tag
+ integer, intent(in)    :: ib,len,ikind,ipass,iunit
+ integer, intent(inout) :: nums(:,:)
+ integer, intent(out)   :: ierr
+ real(kind=4), optional :: func
+ integer, intent(in), optional :: use_kind
+ logical, intent(in), optional :: singleprec
+ integer :: i,imatch
+
+ ierr = 0
+ ! use default real if it matches, unless kind is specified
+ if (kind(0.)==4 .and. .not.present(use_kind)) then
+    imatch = i_real
+ else
+    imatch = i_real4
+ endif
+ ! check if kind matches
+ if (ikind==imatch) then
+    if (ipass==1) then
+       nums(imatch,ib) = nums(imatch,ib) + 1
+    elseif (ipass==2) then
+       write(iunit, iostat=ierr) tag(my_tag)
+       if (present(func)) then
+          write(iunit, iostat=ierr) (func(arr(i)),i=1,len)
+       else
+          write(iunit, iostat=ierr) arr(1:len)
+       endif
+    endif
+ endif
+
+end subroutine write_array_real4
+
+!---------------------------------------------------------------------
+!+
+!  Write real*4 array to block header (ipass=1) or to file (ipass=2)
+!+
+!---------------------------------------------------------------------
+subroutine write_array_real8(ib,arr,my_tag,len,ikind,ipass,iunit,nums,ierr,func,use_kind,singleprec)
+ real(kind=8),     intent(in) :: arr(:)
+ character(len=*), intent(in) :: my_tag
+ integer, intent(in)    :: ib,len,ikind,ipass,iunit
+ integer, intent(inout) :: nums(:,:)
+ integer, intent(out)   :: ierr
+ real(kind=8), optional :: func
+ integer, intent(in), optional :: use_kind
+ logical, intent(in), optional :: singleprec
+ integer :: i,imatch
+ logical :: use_singleprec
+
+ ierr = 0
+ use_singleprec = .false.
+ if (present(singleprec)) use_singleprec = singleprec
+ ! use default real if it matches, unless kind is specified
+ if ((kind(0.)==8 .or. use_singleprec).and.(.not.present(use_kind))) then
+    imatch = i_real
+ elseif (present(use_kind)) then
+    if (use_kind==4) then
+       imatch = i_real4
+    else
+       imatch = i_real8
+    endif
+ else
+    imatch = i_real8
+ endif
+ ! check if kind matches
+ if (ikind==imatch) then
+    !print*,ipass,' WRITING ',my_tag,' as ',imatch,use_singleprec
+    if (ipass==1) then
+       nums(imatch,ib) = nums(imatch,ib) + 1
+    elseif (ipass==2) then
+       write(iunit, iostat=ierr) tag(my_tag)
+       if (present(func)) then
+          write(iunit, iostat=ierr) (func(arr(i)),i=1,len)
+       else
+          if (imatch==i_real4 .or. use_singleprec) then
+             write(iunit, iostat=ierr) real(arr(1:len),kind=4)
+          else
+             write(iunit, iostat=ierr) arr(1:len)
+          endif
+       endif
+    endif
+ endif
+
+end subroutine write_array_real8
+
+!---------------------------------------------------------------------
+!+
+!  Write multidimensional real*4 array arr(len1,len2)
+!  to block header (ipass=1) or to file (ipass=2)
+!+
+!---------------------------------------------------------------------
+subroutine write_array_real4arr(ib,arr,my_tag,len1,len2,ikind,ipass,iunit,nums,ierr,use_kind,index,singleprec)
+ real(kind=4),     intent(in) :: arr(:,:)
+ character(len=*), intent(in) :: my_tag(:)
+ integer, intent(in)    :: ib,len1,len2,ikind,ipass,iunit
+ integer, intent(inout) :: nums(:,:)
+ integer, intent(out)   :: ierr
+ integer, intent(in), optional :: use_kind,index
+ logical, intent(in), optional :: singleprec
+ integer :: j,imatch,istart,iend
+
+ ierr = 0
+ ! use default real if it matches, unless kind is specified
+ if (kind(0.)==4 .and. .not.present(use_kind)) then
+    imatch = i_real
+ else
+    imatch = i_real4
+ endif
+ if (present(index)) then
+    istart = index
+    iend   = index
+ else
+    istart = 1
+    iend   = len1
+ endif
+ ! check if kind matches
+ if (ikind==imatch) then
+    !print*,ipass,' WRITING ',my_tag(istart:iend),' as ',imatch
+    if (ipass==1) then
+       nums(imatch,ib) = nums(imatch,ib) + (iend - istart) + 1
+    elseif (ipass==2) then
+       do j=istart,iend
+          write(iunit, iostat=ierr) tag(my_tag(j))
+          write(iunit, iostat=ierr) arr(j,1:len2)
+       enddo
+    endif
+ endif
+
+end subroutine write_array_real4arr
+
+!---------------------------------------------------------------------
+!+
+!  Write multidimensional real*8 array arr(len1,len2)
+!  to block header (ipass=1) or to file (ipass=2)
+!+
+!---------------------------------------------------------------------
+subroutine write_array_real8arr(ib,arr,my_tag,len1,len2,ikind,ipass,iunit,nums,ierr,use_kind,index,singleprec)
+ real(kind=8),     intent(in) :: arr(:,:)
+ character(len=*), intent(in) :: my_tag(:)
+ integer, intent(in)    :: ib,len1,len2,ikind,ipass,iunit
+ integer, intent(inout) :: nums(:,:)
+ integer, intent(out)   :: ierr
+ integer, intent(in), optional :: use_kind,index
+ logical, intent(in), optional :: singleprec
+ integer :: j,imatch,istart,iend
+ logical :: use_singleprec
+
+ ierr = 0
+ use_singleprec = .false.
+ if (present(singleprec)) use_singleprec = singleprec
+ ! use default real if it matches, unless kind is specified
+ if ((kind(0.)==8 .or. use_singleprec) .and. .not.present(use_kind)) then
+    imatch = i_real
+ elseif (present(use_kind)) then
+    if (use_kind==4) then
+       imatch = i_real4
+    else
+       imatch = i_real8
+    endif
+ else
+    imatch = i_real8
+ endif
+ if (present(index)) then
+    istart = index
+    iend   = index
+ else
+    istart = 1
+    iend   = len1
+ endif
+ ! check if kind matches
+ if (ikind==imatch) then
+    !print*,ipass,' WRITING ',my_tag(istart:iend),' as ',imatch,(iend-istart)+1,istart,iend,use_singleprec
+    if (ipass==1) then
+       nums(imatch,ib) = nums(imatch,ib) + (iend - istart) + 1
+    elseif (ipass==2) then
+       do j=istart,iend
+          write(iunit, iostat=ierr) tag(my_tag(j))
+          if (imatch==i_real4 .or. use_singleprec) then
+             write(iunit, iostat=ierr) real(arr(j,1:len2),kind=4)
+          else
+             write(iunit, iostat=ierr) arr(j,1:len2)
+          endif
+       enddo
+    endif
+ endif
+
+end subroutine write_array_real8arr
+
+!---------------------------------------------------
+!+
+!  Write the actual header for each block to disk
+!+
+!---------------------------------------------------
+subroutine write_block_header(nblocks,number,nums,iunit,ierr)
+ integer,         intent(in)  :: nblocks
+ integer(kind=8), intent(in)  :: number(nblocks)
+ integer,         intent(in)  :: nums(ndatatypes,nblocks),iunit
+ integer,         intent(out) :: ierr
+ integer :: iblock
+
+ do iblock=1,nblocks
+    write(iunit, iostat=ierr) number(iblock), nums(1:ndatatypes,iblock)
+ enddo
+
+end subroutine write_block_header
+
+!---------------------------------------------------
+!+
+!  read the header for each block from disk
+!+
+!---------------------------------------------------
+subroutine read_block_header(nblocks,number,nums,iunit,ierr)
+ integer,         intent(in)  :: nblocks
+ integer(kind=8), intent(out) :: number(nblocks)
+ integer,         intent(out) :: nums(ndatatypes,nblocks)
+ integer,         intent(in)  :: iunit
+ integer,         intent(out) :: ierr
+ integer :: iblock
+
+ do iblock=1,nblocks
+    read(iunit, iostat=ierr) number(iblock), nums(1:ndatatypes,iblock)
+ enddo
+
+end subroutine read_block_header
+
+!--------------------------------------------------------------------
+!+
+!  Routine for extracting int*1 array from main block in dump files
+!+
+!--------------------------------------------------------------------
+subroutine read_array_int1(iarr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,matched,ierr)
+ integer(kind=1),  intent(inout) :: iarr(:)
+ character(len=*), intent(in)    :: arr_tag,tag
+ logical,          intent(inout) :: got_arr
+ integer,          intent(in)    :: ikind,i1,i2,noffset,iunit
+ logical,          intent(inout) :: matched
+ integer,          intent(out)   :: ierr
+ integer      :: i
+ real(kind=4) :: dum
+ logical      :: match_datatype
+
+ if (matched) return
+ match_datatype = (ikind==i_int1)
+
+ if (match_tag(tag,arr_tag) .and. .not.matched) then
+    matched    = .true.
+    if (match_datatype) then
+       got_arr = .true.
+       read(iunit,iostat=ierr) (dum,i=1,noffset),iarr(i1:i2)
+    else
+       print*,'ERROR: wrong datatype for '//trim(tag)
+       read(iunit,iostat=ierr)
+    endif
+ endif
+
+end subroutine read_array_int1
+
+!--------------------------------------------------------------------
+!+
+!  Routine for extracting real*4 array from main block in dump files
+!+
+!--------------------------------------------------------------------
+subroutine read_array_real4(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,matched,ierr)
+ real(kind=4),     intent(inout) :: arr(:)
+ character(len=*), intent(in)    :: arr_tag,tag
+ logical,          intent(inout) :: got_arr
+ integer,          intent(in)    :: ikind,i1,i2,noffset,iunit
+ logical,          intent(inout) :: matched
+ integer,          intent(out)   :: ierr
+ integer      :: i
+ real(kind=4) :: dum
+ logical      :: match_datatype
+
+ if (matched .or. ikind < i_real) return
+ match_datatype = (ikind==i_real4 .or. (kind(0.)==4 .and. ikind==i_real))
+
+ if (match_tag(tag,arr_tag) .and. .not.matched) then
+    matched    = .true.
+    if (match_datatype) then
+       got_arr = .true.
+       read(iunit,iostat=ierr) (dum,i=1,noffset),arr(i1:i2)
+    else
+       print*,'ERROR: wrong datatype for '//trim(tag)
+       read(iunit,iostat=ierr)
+    endif
+ endif
+
+end subroutine read_array_real4
+
+!--------------------------------------------------------------------
+!+
+!  Routine for extracting multi-d real*4 array from
+!  main block in dump files
+!+
+!--------------------------------------------------------------------
+subroutine read_array_real4arr(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,matched,ierr)
+ real(kind=4),     intent(inout) :: arr(:,:)
+ character(len=*), intent(in)    :: arr_tag(size(arr(1,:))),tag
+ logical,          intent(inout) :: got_arr(size(arr(1,:)))
+ integer,          intent(in)    :: ikind,i1,i2,noffset,iunit
+ logical,          intent(inout) :: matched
+ integer,          intent(out)   :: ierr
+ integer      :: i,j,nread
+ real(kind=4) :: dum
+ real(kind=8) :: dumr8
+ real(kind=8), allocatable :: dummyr8(:)
+ logical      :: match_datatype
+
+ if (matched .or. ikind < i_real) return
+ match_datatype = (ikind==i_real4 .or. (kind(0.)==4 .and. ikind==i_real))
+
+ do j=1,size(arr(:,1))
+    if (match_tag(tag,arr_tag(j)) .and. .not.matched) then
+       matched    = .true.
+       if (match_datatype) then
+          got_arr(j) = .true.
+          read(iunit,iostat=ierr) (dum,i=1,noffset),arr(j,i1:i2)
+       elseif (ikind==i_real4) then
+          got_arr(j) = .true.
+          print*,'WARNING: converting '//trim(tag)//' from real*8->real*4'
+          nread = i2-i1+1
+          allocate(dummyr8(nread))
+          read(iunit,iostat=ierr) (dumr8,i=1,noffset),dummyr8(1:nread)
+          arr(j,i1:i2) = real(dummyr8(:),kind=4)
+          deallocate(dummyr8)
+       else
+          print*,'ERROR: wrong datatype for '//trim(tag)
+          read(iunit,iostat=ierr)
+       endif
+    endif
+ enddo
+
+end subroutine read_array_real4arr
+
+!--------------------------------------------------------------------
+!+
+!  Routine for extracting real*8 array from main block in dump files
+!+
+!--------------------------------------------------------------------
+subroutine read_array_real8(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,matched,ierr)
+ real(kind=8),     intent(inout) :: arr(:)
+ character(len=*), intent(in)    :: arr_tag,tag
+ logical,          intent(inout) :: got_arr
+ integer,          intent(in)    :: ikind,i1,i2,noffset,iunit
+ logical,          intent(inout) :: matched
+ integer,          intent(out)   :: ierr
+ integer      :: i,nread
+ real(kind=8) :: dum
+ real(kind=4) :: dumr4
+ real(kind=4), allocatable :: dummyr4(:)
+ logical      :: match_datatype
+
+ if (matched .or. ikind < i_real) return
+ match_datatype = (ikind==i_real8 .or. (kind(0.)==8 .and. ikind==i_real))
+
+ if (match_tag(tag,arr_tag) .and. .not.matched) then
+    matched    = .true.
+    if (match_datatype) then
+       got_arr = .true.
+       read(iunit,iostat=ierr) (dum,i=1,noffset),arr(i1:i2)
+    elseif (ikind==i_real4) then
+       got_arr = .true.
+       print*,'WARNING: converting '//trim(tag)//' from real*4'
+       nread = i2-i1+1
+       allocate(dummyr4(nread))
+       read(iunit,iostat=ierr) (dumr4,i=1,noffset),dummyr4(1:nread)
+       arr(i1:i2) = real(dummyr4(1:nread),kind=8)
+       deallocate(dummyr4)
+    else
+       print*,'ERROR: wrong datatype for '//trim(tag)
+       read(iunit,iostat=ierr)
+    endif
+ endif
+
+end subroutine read_array_real8
+
+!--------------------------------------------------------------------
+!+
+!  Routine for extracting multi-d real*8 array from
+!  main block in dump files
+!+
+!--------------------------------------------------------------------
+subroutine read_array_real8arr(arr,arr_tag,got_arr,ikind,i1,i2,noffset,iunit,tag,matched,ierr)
+ real(kind=8),     intent(inout) :: arr(:,:)
+ character(len=*), intent(in)    :: arr_tag(size(arr(1,:))),tag
+ logical,          intent(inout) :: got_arr(size(arr(1,:)))
+ integer,          intent(in)    :: ikind,i1,i2,noffset,iunit
+ logical,          intent(inout) :: matched
+ integer,          intent(out)   :: ierr
+ integer      :: i,j,nread
+ real(kind=8) :: dum
+ real(kind=4) :: dumr4
+ real(kind=4), allocatable :: dummyr4(:)
+ real(kind=8), allocatable :: dummyr8(:)
+ logical      :: match_datatype
+
+ if (matched .or. ikind < i_real) return
+ match_datatype = (ikind==i_real8 .or. (kind(0.)==8 .and. ikind==i_real))
+
+ do j=1,size(arr(:,1))
+    if (match_tag(tag,arr_tag(j)) .and. .not.matched) then
+       matched    = .true.
+       if (match_datatype) then
+          got_arr(j) = .true.
+          !print*,'MATCHED '//trim(arr_tag(j))
+          nread = i2-i1+1
+          allocate(dummyr8(nread)) ! to avoid seg fault with ifort
+          read(iunit,iostat=ierr) (dum,i=1,noffset),dummyr8(1:nread)
+          arr(j,i1:i2) = dummyr8(:)
+          deallocate(dummyr8)
+       elseif (ikind==i_real4) then
+          got_arr(j) = .true.
+          print*,'WARNING: converting '//trim(tag)//' from real*4'
+          nread = i2-i1+1
+          allocate(dummyr4(nread))
+          read(iunit,iostat=ierr) (dumr4,i=1,noffset),dummyr4(1:nread)
+          arr(j,i1:i2) = real(dummyr4(:),kind=8)
+          deallocate(dummyr4)
+       else
+          print*,'ERROR: wrong datatype for '//trim(tag)
+          read(iunit,iostat=ierr)
+       endif
+    endif
+ enddo
+
+end subroutine read_array_real8arr
+
 !-----------------------------------------------------
 !+
 !  The following routine can be used to read a single
@@ -1443,20 +1970,26 @@ end subroutine write_header
 !  in the file
 !+
 !-----------------------------------------------------
-subroutine read_array_from_file(iunit,filename,tag,array,ierr)
+subroutine read_array_from_file(iunit,filename,tag,array,ierr,use_block)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  character(len=*),      intent(in) :: tag
  real,    intent(out) :: array(:)
  integer, intent(out) :: ierr
+ integer, intent(in), optional :: use_block
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
- integer :: nblocks,narraylengths,nblockarrays,number
+ integer :: nblocks,narraylengths,nblockarrays,number,my_block
  integer :: intarr(maxphead)
  character(len=lentag) :: tagarr(maxphead)
  character(len=lenid)  :: fileid
 
+ if (present(use_block)) then
+    my_block = use_block
+ else
+    my_block = 1 ! match from block 1 by default
+ endif
  array = 0.
 
  ! open file for read
@@ -1493,51 +2026,34 @@ subroutine read_array_from_file(iunit,filename,tag,array,ierr)
  ! skip each block that is too small
  nblockarrays = narraylengths*nblocks
  do iblock = 1,nblocks
-    call read_blockheader(iunit,narraylengths,number8,nums,ierr)
+    call read_block_header(narraylengths,number8,nums,iunit,ierr)
     do j=1,narraylengths
-       !print*,'block ',j
-       do i=1,ndatatypes
-          !print*,' data type ',i,' arrays = ',nums(i,j)
-          do k=1,nums(i,j)
-             if (i==i_real) then
-                read(iunit, iostat=ierr) tagarr(1)
-                if (trim(tagarr(1))==trim(tag)) then
-                   read(iunit, iostat=ierr) array(1:min(int(number8(j)),size(array)))
-                   print*,'->',tagarr(1)
+       if (j==my_block) then
+          do i=1,ndatatypes
+             !print*,' data type ',i,' arrays = ',nums(i,j)
+             do k=1,nums(i,j)
+                if (i==i_real) then
+                   read(iunit, iostat=ierr) tagarr(1)
+                   if (trim(tagarr(1))==trim(tag)) then
+                      read(iunit, iostat=ierr) array(1:min(int(number8(j)),size(array)))
+                      print*,'->',tagarr(1)
+                   else
+                      print*,'  ',tagarr(1)
+                      read(iunit, iostat=ierr)
+                   endif
                 else
-                   print*,'  ',tagarr(1)
-                   read(iunit, iostat=ierr)
+                   read(iunit, iostat=ierr) tagarr(1) ! tag
+                   !print*,tagarr(1)
+                   read(iunit, iostat=ierr) ! array
                 endif
-             else
-                read(iunit, iostat=ierr) tagarr(1) ! tag
-                !print*,tagarr(1)
-                read(iunit, iostat=ierr) ! array
-             endif
+             enddo
           enddo
-       enddo
+       endif
     enddo
  enddo
 
  close(iunit)
 
 end subroutine read_array_from_file
-
-!--------------------------------------------------------------
-!+
-!  internal routine to read the header arrays for each block
-!+
-!--------------------------------------------------------------
-subroutine read_blockheader(iunit,narraylengths,number8,nums,ierr)
- integer,         intent(in)  :: iunit,narraylengths
- integer(kind=8), intent(out) :: number8(narraylengths)
- integer,         intent(out) :: nums(ndatatypes,narraylengths)
- integer,         intent(out) :: ierr
- integer :: i,j
-
- do i=1,narraylengths
-    read(iunit,iostat=ierr) number8(i), (nums(j,i), j=1,ndatatypes)
- enddo
-
-end subroutine read_blockheader
 
 end module dump_utils

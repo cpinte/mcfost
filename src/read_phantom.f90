@@ -106,7 +106,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  ndudt = 0
  ngrains = 0
  do iblock = 1,nblocks
-    call read_blockheader(iunit,narraylengths,number8,nums,ierr)
+    call read_block_header(narraylengths,number8,nums,iunit,ierr)
     do j=1,narraylengths
        !write(*,*) 'block ',iblock, j, number8(j)
        do i=1,ndatatypes
