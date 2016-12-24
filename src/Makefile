@@ -166,7 +166,7 @@ libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	mkdir -p libtmp
 	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a $(LIBS)/nr/sort/libnr_sort.a libtmp
 	cd libtmp/ ; ar x libcfitsio.a ; ar x libnr.a ; ar x libnr_eq_diff.a ; ar x libnr_sort.a ; ar x libsprng.a ; ar x libvoro++.a
-	rm -f mcfost.o
+	rm -f mcfost.o io_phantom_utils.o libmcfost.a # io_phantom_utils.f90 is the same as phantom's utils_dumpfiles.f90
 	ar vr libmcfost.a *.o libtmp/*.o
 	rm -r libtmp
 	ranlib libmcfost.a
