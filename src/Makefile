@@ -156,6 +156,10 @@ OBJECTS = $(SOURCES:.f90=.o)
 
 main : mcfost
 
+all : mcfost libmcfost.a
+
+.PHONY : clean cleanall cleandata release release_utils fosti dmz wardlaw save checkmcfost err
+
 #*************************************************************
 # Code séquentiel et parallèle
 #*************************************************************
@@ -190,7 +194,6 @@ voro++_wrapper.o : voro++_wrapper.cpp
 # defaut
 %.o : %.f90  modules.o
 	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG)
-
 
 
 io_prodimo.o : sha.f90
