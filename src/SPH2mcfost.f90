@@ -430,13 +430,19 @@ contains
        endif
        etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
        etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
-       etoile(i)%lb_body = .true.
+
+       ! Pas de fUV et pas de spectre stellaire pour le moment
+       etoile(i)%fUV = 0.0 ; etoile(i)%slope_UV = 0.0 ;
+       etoile(i)%lb_body = .true. ; etoile(i)%spectre = "None"
+
        write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
     enddo
     write(*,*) ""
 
     ! Passage rayon en AU
     etoile(:)%r = etoile(:)%r * Rsun_to_AU
+
+
 
     return
 
