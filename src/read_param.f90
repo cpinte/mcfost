@@ -147,7 +147,6 @@ contains
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
 
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -584,7 +583,6 @@ contains
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
 
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -1030,7 +1028,6 @@ contains
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -1448,7 +1445,6 @@ contains
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -1856,7 +1852,6 @@ contains
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -2263,7 +2258,6 @@ contains
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -2671,7 +2665,6 @@ contains
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -3063,7 +3056,6 @@ end subroutine read_para215
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -3462,7 +3454,6 @@ end subroutine read_para215
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
@@ -3854,7 +3845,6 @@ end subroutine read_para215
     ! ----------
     read(1,*) line_buffer
     read(1,*) n_lambda, lambda_min, lambda_max
-    lmono0 = (n_lambda==1) ; lmono = lmono0
     read(1,*) ltemp, lsed, lsed_complete
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
