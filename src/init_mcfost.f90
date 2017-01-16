@@ -1060,12 +1060,6 @@ subroutine initialisation_mcfost()
   if (nz_opt > 0) nz = nz_opt
   if (n_T_opt > 0) n_T = n_T_opt
 
-  ! Discrimination type de run (image vs SED/Temp)
-  !                       et
-  ! verification cohérence du fichier de paramètres
-  n_lambda2 = n_lambda
-  if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
-
   if (limg) then
      npix_x = igridx ; npix_y = igridy
      if (l_em_disk_image) then
@@ -1076,7 +1070,6 @@ subroutine initialisation_mcfost()
      ltemp=.false.
      lsed=.false.
      lsed_complete=.false.
-     lmono=.true.
      lmono0=.true.
      n_lambda=1
      if (wvl <= 1.0) then ! mcfost fait meme les accords grammaticaux 8-)
@@ -1091,6 +1084,20 @@ subroutine initialisation_mcfost()
      endif
   else ! SED : we do not need pixels
      npix_x = 1 ; npix_y = 1
+     lmono0 = .false.
+  endif
+  lmono = lmono0
+
+  ! Discrimination type de run (image vs SED/Temp)
+  !                       et
+  ! verification coherence du fichier de parametres
+  n_lambda2 = n_lambda
+  if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
+
+  if ((.not.lmono0).and.llimb_darkening) then
+     write(*,*) "Limb darkening only implementing in imaging mode"
+     write(*,*) "Exiting"
+     stop
   endif
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
