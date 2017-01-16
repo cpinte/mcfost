@@ -696,7 +696,7 @@ module Voronoi_grid
 
     integer, intent(in) :: n_walls
     real(kind=dp), dimension(n_walls), intent(in) :: limits
-    integer :: iwall
+    integer :: iwall, alloc_status
 
     if (n_walls /= 6) then
        write(*,*) "ERROR: n_walls must be 6 in Voronoi grid"
@@ -704,7 +704,12 @@ module Voronoi_grid
        stop
     endif
 
-    allocate(wall(n_walls))
+    allocate(wall(n_walls),stat=alloc_status)
+    if (alloc_status /= 0) then
+       write(*,*) "Allocation error Voronoi wall"
+       write(*,*) "Exiting"
+       stop
+    endif
 
     ! initialise plane walls
     do iwall=1, n_walls

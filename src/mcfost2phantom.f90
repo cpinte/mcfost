@@ -146,8 +146,8 @@ contains
     integer, intent(in) :: ndudt
     real(dp), dimension(ndudt), intent(in) :: dudt
 
-    real, dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
-    real, dimension(3,ndusttypes,np), intent(out) :: Frad
+    real(sp), dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
+    real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
@@ -191,7 +191,7 @@ contains
     ! Allocation dynamique
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then
-       call alloc_dynamique(n_cells_max= n_SPH + n_etoiles)
+       call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
        lfirst_time = .false.
     endif
     call no_dark_zone()
@@ -347,6 +347,18 @@ contains
        write (*,'(" CPU time used          ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
     else
        write (*,'(" CPU time used          ", F5.2, "s")')  time
+    endif
+
+    ! Verifications et codes d'erreur
+    if (maxval(Tdust) < 0.) then
+       write(*,*) "***********************************************"
+       write(*,*) "ERROR : PB setting T_DUST", n_cells
+       write(*,*) minval(Temperature), maxval(Temperature)
+       write(*,*) "***********************************************"
+
+       ierr = 1
+       stop
+       return
     endif
 
     return

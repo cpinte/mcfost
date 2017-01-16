@@ -49,7 +49,7 @@ MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort >=13
 ifeq ($(fostino),yes)
 MACH = -xW -axP # for fostino and ifort 10
 endif
-FFLAGS_EXE = $(PREC)  -static #-static-libcxa -i-static # static does not work on froggy
+FFLAGS_EXE = $(PREC) -static-intel #-static-libcxa -i-static # static does not work on froggy
 endif
 
 LIBS = $(MCFOST_INSTALL)/lib/ifort/
@@ -167,12 +167,12 @@ mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o   $(LIBS_NR_EQDIFF) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
 
 libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
+	rm -rf libtmp
 	mkdir -p libtmp
 	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a $(LIBS)/nr/sort/libnr_sort.a libtmp
 	cd libtmp/ ; ar x libcfitsio.a ; ar x libnr.a ; ar x libnr_eq_diff.a ; ar x libnr_sort.a ; ar x libsprng.a ; ar x libvoro++.a
-	rm -f mcfost.o io_phantom_utils.o libmcfost.a # io_phantom_utils.f90 is the same as phantom's utils_dumpfiles.f90
+	rm -f mcfost.o io_phantom_utils.o io_phantom_infiles.o libtmp/pmlcg.o libmcfost.a # io_phantom_utils.f90 is the same as phantom's utils_dumpfiles.f90
 	ar vr libmcfost.a *.o libtmp/*.o
-	rm -r libtmp
 	ranlib libmcfost.a
 
 # Fichiers necessaires aux suivants
@@ -288,7 +288,7 @@ wardlaw :
 # Nettoyage
 #*************************************************************
 clean :
-	rm -rf *.o  *.mod _dust_prop*.tmp *.i90 system.f90 system.o
+	rm -rf *.o  *.mod _dust_prop*.tmp *.i90 system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
