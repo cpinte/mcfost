@@ -238,19 +238,18 @@ contains
     laffichage=.true.
     nbre_phot2 = nbre_photons_eq_th
 
-
     test_tau : do lambda=1,n_lambda
        if (tab_lambda(lambda) > wl_seuil) then
           lambda_seuil=lambda
           exit test_tau
        endif
     enddo test_tau
-    write(*,*) "lambda =", tab_lambda(lambda_seuil)
+    write(*,*) "lambda =", real(tab_lambda(lambda_seuil))
     call integ_tau(lambda_seuil)
 
     write(*,*) "Computing temperature structure ..."
     ! Making the MC run
-     if (laffichage) call progress_bar(0)
+    if (laffichage) call progress_bar(0)
     !$omp parallel &
     !$omp default(none) &
     !$omp firstprivate(lambda,p_lambda) &
