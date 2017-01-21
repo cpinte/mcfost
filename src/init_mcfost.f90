@@ -110,6 +110,8 @@ subroutine set_default_variables()
   lVoronoi = .false.
   lcavity = .false.
   freeze_out_depletion = 0.
+  lmono0 = .false.
+  lmono= .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
