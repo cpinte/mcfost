@@ -1788,6 +1788,8 @@ subroutine ecriture_J()
 
   filename = trim(data_dir)//"/J.fits.gz"
 
+  write(*,*) "Writing "//trim(filename)
+
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
   ! 1/4pi est inclus dans n_phot_l_tot
@@ -1879,13 +1881,16 @@ subroutine ecriture_UV_field()
   real, dimension(:,:,:), allocatable :: Gio
 
 
+  ! D'après van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
+  ! Soit 2.67e-6 W / m2
+  ! C'est entre 912 et 2000 Angströms (la borne supérieure varie un peu d'un papier à l'autre).
+
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
   write(*,*) "Writing "//trim(filename)
 
   if (l3D) then
      allocate(J(n_lambda2,n_rad,-nz:nz,n_az), G(n_rad,-nz:nz,n_az), Gio(n_rad,-nz:nz,n_az), stat=alloc_status)
-
   else
      allocate(J(n_lambda2,n_rad,1:nz,1), G(n_rad,1:nz,1), Gio(n_rad,1:nz,1), stat=alloc_status)
   endif
@@ -1896,7 +1901,6 @@ subroutine ecriture_UV_field()
   endif
   J = 0. ; G = 0. ; Gio = 0.
 
-  ! 1/4pi est inclus dans n_phot_l_tot
   ! 1/4pi est inclus dans n_phot_l_tot
   do ri=1, n_rad
      do zj=j_start,nz
@@ -1913,12 +1917,11 @@ subroutine ecriture_UV_field()
   do lambda=1, n_lambda2
      J(lambda,:,:,:) = J(lambda,:,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
   enddo
+  lamb = tab_lambda * 1e-6 ! en m
 
-  lamb = tab_lambda
-
-  wl(:) = span(0.0912,0.24,n)
-  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6
-
+  ! van Dischoeck 2008
+  wl(:) = span(0.0912,0.2,n) * 1e-6 ! en m
+  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6 ! en m
   do ri=1,n_rad
      do zj=j_start,nz
         do phik=1, n_az
@@ -1926,15 +1929,33 @@ subroutine ecriture_UV_field()
               J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
            enddo
 
-           ! Le Petit et al 2006 page 19-20
            ! integration trapeze
-           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
-                * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
-
-           Gio(ri,zj,phik) = G(ri,zj,phik) ! Teste OK par comparaison avec yorick
+           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
+           Gio(ri,zj,phik) = G(ri,zj,phik)
         enddo
      enddo
   enddo
+
+!---  ! Le petit et al
+!---  wl(:) = span(0.0912,0.24,n) * 1e-6 ! en m
+!---  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6  ! must be in AA ??
+!---
+!---  do ri=1,n_rad
+!---     do zj=j_start,nz
+!---        do phik=1, n_az
+!---           do l=1,n
+!---              J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
+!---           enddo
+!---
+!---           ! Le Petit et al 2006 page 19-20
+!---           ! integration trapeze
+!---           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
+!---                * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
+!---
+!---           Gio(ri,zj,phik) = G(ri,zj,phik) ! Teste OK par comparaison avec yorick
+!---        enddo
+!---     enddo
+!---  enddo
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
