@@ -1845,6 +1845,27 @@ subroutine ecriture_J()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
 
+  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+
+  ! Second HDU avec longueur d'onde
+  call FTCRHD(unit, status)
+  bitpix=-32
+  naxis=1
+  naxes(1)=n_lambda
+  nelements=naxes(1)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  !  Write the array to the FITS file.
+  group=1
+  fpixel=1
+
+  ! le e signifie real*4
+  call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
+
+  call ftpkys(unit,'BUNIT',"micron",' ',status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1998,6 +2019,8 @@ subroutine ecriture_UV_field()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Gio,status)
+
+  call ftpkys(unit,'BUNIT',"Habing",'[912-2000] AA, following formulae by van Dischoeck et al 2008',status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
