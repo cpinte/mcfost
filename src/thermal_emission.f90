@@ -1727,7 +1727,7 @@ subroutine reset_radiation_field()
      xKJ_abs(:,:) = 0.0_dp
      E0 = 0.0_dp
   endif
-  if (lxJ_abs) xJ_abs(:,:,:) = 0.0_dp
+  if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
   xT_ech = 2
   Temperature = 1.0
 
