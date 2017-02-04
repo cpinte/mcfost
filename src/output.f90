@@ -822,6 +822,8 @@ subroutine ecriture_sed_ray_tracing()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,sed_rt,status)
 
+  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
   bitpix=-32
@@ -838,6 +840,8 @@ subroutine ecriture_sed_ray_tracing()
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
+
+  call ftpkys(unit,'BUNIT',"micron",' ',status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -2636,6 +2640,8 @@ subroutine ecriture_sed(ised)
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
+  call ftpkys(unit,'BUNIT',"micron",' ',status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -2648,7 +2654,6 @@ subroutine ecriture_sed(ised)
 !  write(*,*) "Nbre paquets recus", real(nbre_photons_loop)*real(nbre_photons_eq_th), sum(sed), sum(sed)/(real(nbre_photons_loop)*real(nbre_photons_eq_th))
 
   return
-
 
 end subroutine ecriture_sed
 
