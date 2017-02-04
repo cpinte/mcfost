@@ -50,7 +50,7 @@ module parametres
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
-  logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE, loutput_J, loutput_UV_field, lxJ_abs, lxJ_abs2
+  logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE, loutput_J, loutput_UV_field, lxJ_abs
 
   ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
   ! 0 -> automatique

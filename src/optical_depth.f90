@@ -175,15 +175,13 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
 
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-     if (lxJ_abs) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+     if (lRE_nLTE .or. lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
   else
-     if (lProDiMo) then
+     if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
         xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
         ! Pour statistique: nbre de paquet contribuant a intensite specifique
-        xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
+        if (lProDiMo) xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
      endif ! lProDiMo
-
-     if (loutput_UV_field) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
 
      if (lscatt_ray_tracing1) then
         xm = 0.5_dp * (x0 + x1)
