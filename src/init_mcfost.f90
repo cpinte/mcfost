@@ -143,10 +143,12 @@ subroutine get_mcfost_utils_dir()
 
   ! Directories to search (ordered)
   if (my_mcfost_utils == "") then
-     allocate(search_dir(2)) ; n_dir = 2
+     n_dir = 2
+     allocate(search_dir(n_dir))
      search_dir(1) = "." ; search_dir(2) = mcfost_utils ;
   else
-     allocate(search_dir(3)) ; n_dir = 3
+     n_dir = 3
+     allocate(search_dir(n_dir))
      search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
   endif
 

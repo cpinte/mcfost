@@ -61,6 +61,7 @@ contains
     lmigration = .false.
     lhydrostatic = .false.
     lread_Misselt=.false.
+    lread_DustEM=.false.
 
     if (abs(para_version - 3.0) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
@@ -363,6 +364,7 @@ contains
           dust_pop_tmp(n_pop)%is_PAH = .false.
           dust_pop_tmp(n_pop)%is_opacity_file = .false.
           dust_pop_tmp(n_pop)%is_Misselt_opacity_file = .false.
+          dust_pop_tmp(n_pop)%is_DustEM_opacity_file = .false.
           if (dust_pop_tmp(n_pop)%indices(1)(1:3) == "PAH") then
              dust_pop_tmp(n_pop)%is_PAH = .true. ; dust_pop_tmp(n_pop)%is_opacity_file = .true.
           else  if (dust_pop_tmp(n_pop)%indices(1)(1:7) == "Misselt") then
@@ -372,8 +374,16 @@ contains
              if (dust_pop_tmp(n_pop)%indices(1)(9:11) == "PAH") then
                 dust_pop_tmp(n_pop)%is_PAH = .true.
              endif
+          else  if (dust_pop_tmp(n_pop)%indices(1)(1:6) == "DustEM") then
+             dust_pop_tmp(n_pop)%is_opacity_file = .true.
+             dust_pop_tmp(n_pop)%is_DustEM_opacity_file = .true.
+             lread_DustEM = .true.
+             if (dust_pop_tmp(n_pop)%indices(1)(8:10) == "PAH") then
+                dust_pop_tmp(n_pop)%is_PAH = .true.
+             endif
+             ! Removing DustEM prefix
+             dust_pop_tmp(n_pop)%indices(1) = trim(dust_pop_tmp(n_pop)%indices(1)(8:512))
           endif
-
        enddo
 
        ! renormalisation des fraction en masse

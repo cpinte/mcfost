@@ -6,6 +6,7 @@ module input
   use em_th
   use grains
   use disk
+  use read_DustEM
   use utils, only : in_dir
 
   implicit none
@@ -30,6 +31,8 @@ subroutine read_opacity_file(pop)
   ! load optical data from file
   if (dp%is_Misselt_opacity_file) then
      call misselt_load(filename, pop)
+  else if (dp%is_DustEM_opacity_file) then
+     call read_DustEM_cross_sections(pop)
   else
      dp%component_rho1g(1) = 2.5
      dp%rho1g_avg = 2.5
@@ -63,24 +66,31 @@ subroutine get_opacity_file_dim(pop)
 
   dp => dust_pop(pop)
 
+
   filename = trim(dp%indices(1))
-  dir = in_dir(filename, dust_dir,  status=ios)
-  if (ios /=0) then
-     write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-     write(*,*) "Exiting"
-     stop
-  endif
-  filename = trim(dir)//trim(filename) ;
 
-  ! Updating indice filename with directory
-  dp%indices(1) = filename ;
+  if (.not.dp%is_DustEM_opacity_file) then
+     dir = in_dir(filename, dust_dir,  status=ios)
+     if (ios /=0) then
+        write(*,*) "ERROR: dust file cannot be found:",trim(filename)
+        write(*,*) "Exiting"
+        stop
+     endif
+     filename = trim(dir)//trim(filename) ;
 
-  if (dp%is_Misselt_opacity_file) then
-     call get_misselt_dim(filename, pop)
-  else
-     dp%component_rho1g(1) = 2.5
-     dp%rho1g_avg = 2.5
-     call get_draine_dim(filename, pop)
+     ! Updating indice filename with directory
+     dp%indices(1) = filename ;
+
+     if (dp%is_Misselt_opacity_file) then
+        call get_misselt_dim(filename, pop)
+     else
+        dp%component_rho1g(1) = 2.5
+        dp%rho1g_avg = 2.5
+        call get_draine_dim(filename, pop)
+     endif
+
+  else ! DustEM file
+     call get_DustEM_dim(pop)
   endif
 
   return
@@ -106,7 +116,10 @@ subroutine alloc_mem_opacity_file()
 
   if (lnRE) then
      do pop = 1, n_pop
-        if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call get_file_specific_heat_dim(pop)
+        if (dust_pop(pop)%methode_chauffage == 3) then
+           if (dust_pop(pop)%is_Misselt_opacity_file) call get_Misselt_specific_heat_dim(pop)
+           if (dust_pop(pop)%is_DustEM_opacity_file) call get_DustEM_specific_heat_dim(pop)
+        endif
      enddo
 
      nT = maxval(file_sh_nT(:))
@@ -293,7 +306,7 @@ end subroutine get_misselt_dim
 
 !*************************************************************
 
-subroutine read_file_specific_heat(pop)
+subroutine read_Misselt_specific_heat(pop)
 
   integer, intent(in) :: pop
 
@@ -331,11 +344,11 @@ subroutine read_file_specific_heat(pop)
 
   return
 
-end subroutine read_file_specific_heat
+end subroutine read_Misselt_specific_heat
 
 !******************************************************
 
-subroutine get_file_specific_heat_dim(pop)
+subroutine get_Misselt_specific_heat_dim(pop)
 
   integer, intent(in) :: pop
 
@@ -372,7 +385,7 @@ subroutine get_file_specific_heat_dim(pop)
 
   return
 
-end subroutine get_file_specific_heat_dim
+end subroutine get_Misselt_specific_heat_dim
 
 !*************************************************************
 

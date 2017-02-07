@@ -22,9 +22,14 @@ function specific_heat(T, taille_grain)
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=dp), dimension(:), intent(in) :: T
   real(kind=dp), dimension(size(T)) :: specific_heat
+  integer :: pop
 
-  if (lread_Misselt) then
-     specific_heat = file_specific_heat(T,taille_grain)
+  pop =  grain(taille_grain)%pop
+
+  if (dust_pop(pop)%is_Misselt_opacity_file) then
+     specific_heat = Misselt_specific_heat(T,taille_grain)
+  else if (dust_pop(pop)%is_DustEM_opacity_file) then
+     specific_heat = DustEM_specific_heat(T,taille_grain)
   else if (grain(taille_grain)%is_PAH) then
      specific_heat = PAH_specific_heat(T, taille_grain)
   else
@@ -223,12 +228,12 @@ end subroutine test_PAH_specific_heat
 
 !******************************************************
 
-function file_specific_heat(T,taille_grain)
+function Misselt_specific_heat(T,taille_grain)
   ! return the specific heat capacity in [erg/K]
 
   integer, intent(in) :: taille_grain ! indice taille de grain
   real(kind=dp), dimension(:), intent(in) :: T
-  real(kind=dp), dimension(size(T)) :: file_specific_heat
+  real(kind=dp), dimension(size(T)) :: Misselt_specific_heat
 
   integer :: k, pop
 
@@ -236,13 +241,35 @@ function file_specific_heat(T,taille_grain)
 
   ! todo : interpoler a l'avance dans read_file_specific_heat
   do k=1,size(T)
-     file_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
+     Misselt_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)  / 1.e7  * 0.5  ! todo : c'est des Joules l'unite non ?
      ! todo 2 : facteur 0.5 ??? donne un meilleur accord mais je ne capte pas pourquoi
   enddo
 
   return
 
-end function file_specific_heat
+end function Misselt_specific_heat
+
+!**********************************************************************
+
+function DustEM_specific_heat(T,taille_grain)
+  ! return the specific heat capacity in [erg/K]
+
+  integer, intent(in) :: taille_grain ! indice taille de grain
+  real(kind=dp), dimension(:), intent(in) :: T
+  real(kind=dp), dimension(size(T)) :: DustEM_specific_heat
+
+  integer :: k, pop
+
+  pop =  grain(taille_grain)%pop
+
+  ! todo : interpoler a l'avance dans read_file_specific_heat
+  do k=1,size(T)
+     DustEM_specific_heat(k) = interp(file_sh(:,pop), file_sh_T(:,pop), T(k)) * M_grain(taille_grain)
+  enddo
+
+  return
+
+end function DustEM_specific_heat
 
 !**********************************************************************
 

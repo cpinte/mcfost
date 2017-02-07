@@ -133,7 +133,7 @@ module parametres
   logical, parameter :: ltest_rt3 = .false. ! marche pas
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
-  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_grain_size_distrib
+  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM, lread_grain_size_distrib
 
 end module parametres
 
@@ -304,7 +304,7 @@ module grains
      character(len=512), dimension(10) :: indices
      real, dimension(10) :: component_rho1g, component_volume_fraction, component_T_sub
 
-     logical :: is_opacity_file, is_PAH, is_Misselt_opacity_file, lcoating
+     logical :: is_opacity_file, is_PAH, is_Misselt_opacity_file, is_DustEM_opacity_file, lcoating
      integer :: ind_debut, ind_fin
   end type dust_pop_type
 

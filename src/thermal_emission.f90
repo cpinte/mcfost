@@ -307,7 +307,10 @@ subroutine init_reemission()
   enddo !t
 
   do pop=1, n_pop
-     if (lread_Misselt.and.dust_pop(pop)%is_opacity_file) call read_file_specific_heat(pop)
+     if (dust_pop(pop)%methode_chauffage == 3) then
+        if (dust_pop(pop)%is_Misselt_opacity_file) call read_Misselt_specific_heat(pop)
+        if (dust_pop(pop)%is_DustEM_opacity_file)  call read_DustEM_specific_heat(pop)
+     endif
   enddo
 
   write(*,*) "Done"
