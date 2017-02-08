@@ -400,9 +400,6 @@ subroutine init_indices_optiques()
            tab_amu1(:,pop) = tab_tmp_amu1(:,1)
            tab_amu2(:,pop) = tab_tmp_amu2(:,1)
            dust_pop(pop)%T_sub = dust_pop(pop)%component_T_sub(1)
-
-
-
         else
            if (dust_pop(pop)%mixing_rule == 1) then ! Regle de melange
               allocate(m(n_components), f(n_components))
@@ -411,7 +408,6 @@ subroutine init_indices_optiques()
                  f(1:dust_pop(pop)%n_components) = dust_pop(pop)%component_volume_fraction(1:dust_pop(pop)%n_components) &
                       * (1.0_dp - dust_pop(pop)%porosity)
                  if (dust_pop(pop)%porosity > tiny_real)  f(n_components) = dust_pop(pop)%porosity
-
 
                  mavg = Bruggeman_EMT(i, m, f)
 
