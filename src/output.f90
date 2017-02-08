@@ -1681,7 +1681,6 @@ subroutine write_disk_struct()
      call print_error(status)
   end if
 
-
   ! ********************************************************************************
   filename = "data_disk/grid.fits.gz"
 
