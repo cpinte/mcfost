@@ -1256,25 +1256,17 @@ subroutine write_disk_struct()
   logical :: simple, extend
   character(len=512) :: filename
 
-  real, dimension(:,:,:), allocatable :: dens
-  real(kind=dp), dimension(:,:,:,:), allocatable :: dust_dens
-  real, dimension(:,:,:), allocatable :: vol
+  real, dimension(:), allocatable :: dens, vol
+  real(kind=dp), dimension(:,:), allocatable :: dust_dens
   real(kind=dp), dimension(:,:,:,:), allocatable :: grid
 
-
   write(*,*) "Writing disk structucture files in data_disk ..."
-  if (l3D) then
-     allocate(dens(n_rad,-nz:nz,n_az), vol(n_rad,-nz:nz,n_az), dust_dens(n_rad,-nz:nz,n_az,n_grains_tot), stat = alloc_status)
-  else
-     allocate(dens(n_rad,nz,1), vol(n_rad,nz,1), dust_dens(n_rad,nz,1,n_grains_tot), stat = alloc_status)
-  endif
+  allocate(dens(n_cells), vol(n_cells), dust_dens(n_cells,n_grains_tot), stat = alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error density tables for fits file'
      stop
   endif
 
-
-  ! ********************************************************************************
   filename = "data_disk/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -1291,12 +1283,24 @@ subroutine write_disk_struct()
   bitpix=-32
   extend=.true.
 
-  naxis=3
-  naxes(1)=n_rad
-  naxes(2)=nz
-  if (l3D) naxes(2)=2*nz+1
-  naxes(3)=n_az
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  if (lVoronoi) then
+     naxis=1
+     naxes(1) = n_cells
+     nelements=naxes(1)
+  else
+     if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1310,15 +1314,8 @@ subroutine write_disk_struct()
   fpixel=1
 
   dens = 0.0
-  do k=1,n_az
-     bz3 : do j=j_start,nz
-        if (j==0) cycle bz3
-        do i=1,n_rad
-           icell =  cell_map(i,j,k)
-           dens(i,j,k) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
-        enddo !i
-     enddo bz3 !j
-  enddo !k
+  dens(:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -1350,14 +1347,27 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
-  naxis=4
-  naxes(1) = n_rad
-  naxes(2) = nz
-  naxes(3) = n_az
-  if (l3D) naxes(2)=2*nz+1
-  naxes(4) = n_grains_tot
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-
+  if (lVoronoi) then
+     naxis=2
+     naxes(1) = n_cells
+     naxes(2) = n_grains_tot
+     nelements=naxes(1)*naxes(2)
+  else
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4) = n_grains_tot
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3) = n_grains_tot
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1369,16 +1379,10 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dust_dens(:,:,:,:) = 0.0
-  do k=1,n_az
-     bz2 : do j=j_start,nz
-        if (j==0) cycle bz2
-        do i=1,n_rad
-           icell =  cell_map(i,j,k)
-           dust_dens(i,j,k,:) = densite_pouss(:,icell) * m3_to_cm3
-        enddo !i
-     enddo bz2 !j
-  enddo !k
+  dust_dens(:,:) = 0.0
+  do icell=1,n_cells
+     dust_dens(icell,:) = densite_pouss(:,icell) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
+  enddo !icell
   call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
   !  Close the file and free the unit number.
@@ -1409,12 +1413,24 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
-  naxis=3
-  naxes(1) = n_rad
-  naxes(2) = nz
-  if (l3D) naxes(2)=2*nz+1
-  naxes(3) = n_az
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  if (lVoronoi) then
+     naxis=1
+     naxes(1) = n_cells
+     nelements=naxes(1)
+  else
+     if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1426,16 +1442,10 @@ subroutine write_disk_struct()
   !  Write the array to the FITS file.
   !  dens =  densite_pouss
   ! le d signifie real*8
-  dens = 0.0
-  do k=1,n_az
-     bz : do j=j_start,nz
-        if (j==0) cycle bz
-        do i=1,n_rad
-           icell =  cell_map(i,j,k)
-           dens(i,j,k) = sum(densite_pouss(:,icell) * M_grain(:)) ! M_grain en g
-        enddo !i
-     enddo bz !j
-  enddo !k
+  dens(:) = 0.0
+  do icell=1,n_cells
+     dens(icell) = sum(densite_pouss(:,icell) * M_grain(:)) ! M_grain en g
+  enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
   !  Close the file and free the unit number.
@@ -1642,12 +1652,24 @@ subroutine write_disk_struct()
   group=1
   fpixel=1
 
-  naxis=3
-  naxes(1) = n_rad
-  naxes(2) = nz
-  if (l3D) naxes(2)=2*nz+1
-  naxes(3) = n_az
-  nelements=naxes(1)*naxes(2)*naxes(3)
+  if (lVoronoi) then
+     naxis=1
+     naxes(1) = n_cells
+     nelements=naxes(1)
+  else
+     if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1657,19 +1679,7 @@ subroutine write_disk_struct()
   call ftpkys(unit,'UNIT',"AU^3",' ',status)
 
   !  Write the array to the FITS file.
-  !  dens =  densite_pouss
-  ! le d signifie real*8
-  vol = 0.0
-
-  do k=1,n_az
-     bz_vol : do j=j_start,nz
-        if (j==0) cycle bz_vol
-        do i=1,n_rad
-           icell =  cell_map(i,j,k)
-           vol(i,j,k) = volume(icell)
-        enddo !i
-     enddo bz_vol !j
-  enddo !k
+  vol(:) = volume(:) ! conversion to single precision
   call ftppre(unit,group,fpixel,nelements,vol,status)
 
   !  Close the file and free the unit number.
@@ -1734,7 +1744,6 @@ subroutine write_disk_struct()
         enddo
      enddo
   endif
-
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
   !  Write the required header keywords.
