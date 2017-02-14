@@ -1237,7 +1237,7 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine write_disk_struct()
+subroutine write_disk_struct(lparticle_density)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
@@ -1246,6 +1246,8 @@ subroutine write_disk_struct()
 ! 3/06/06
 
   implicit none
+
+  logical, intent(in) :: lparticle_density
 
   integer :: i, j, k, icell
 
@@ -1329,70 +1331,70 @@ subroutine write_disk_struct()
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/dust_particule_density.fits.gz"
+  if (lparticle_density) then
+     filename = "data_disk/dust_particule_density.fits.gz"
 
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  status=0
-  call ftgiou (unit,status)
+     !  Get an unused Logical Unit Number to use to open the FITS file.
+     status=0
+     call ftgiou (unit,status)
 
-  !  Create the new empty FITS file.
-  blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
+     !  Create the new empty FITS file.
+     blocksize=1
+     call ftinit(unit,trim(filename),blocksize,status)
 
-  !  Initialize parameters about the FITS image
-  simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
-  bitpix=-64
-  extend=.true.
-  group=1
-  fpixel=1
+     !  Initialize parameters about the FITS image
+     simple=.true.
+     ! le signe - signifie que l'on ecrit des reels dans le fits
+     bitpix=-64
+     extend=.true.
+     group=1
+     fpixel=1
 
-  if (lVoronoi) then
-     naxis=2
-     naxes(1) = n_cells
-     naxes(2) = n_grains_tot
-     nelements=naxes(1)*naxes(2)
-  else
-     if (l3D) then
-        naxis=4
-        naxes(1)=n_rad
-        naxes(2)=2*nz
-        naxes(3)=n_az
-        naxes(4) = n_grains_tot
-        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     if (lVoronoi) then
+        naxis=2
+        naxes(1) = n_cells
+        naxes(2) = n_grains_tot
+        nelements=naxes(1)*naxes(2)
      else
-        naxis=3
-        naxes(1)=n_rad
-        naxes(2)=nz
-        naxes(3) = n_grains_tot
-        nelements=naxes(1)*naxes(2)*naxes(3)
+        if (l3D) then
+           naxis=4
+           naxes(1)=n_rad
+           naxes(2)=2*nz
+           naxes(3)=n_az
+           naxes(4) = n_grains_tot
+           nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+        else
+           naxis=3
+           naxes(1)=n_rad
+           naxes(2)=nz
+           naxes(3) = n_grains_tot
+           nelements=naxes(1)*naxes(2)*naxes(3)
+        endif
      endif
-  endif
 
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+     !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
-  ! Write  optional keywords to the header
-  call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
+     ! Write  optional keywords to the header
+     call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
 
-  !  Write the array to the FITS file.
-  !  dens =  densite_pouss
-  ! le d signifie real*8
-  dust_dens(:,:) = 0.0
-  do icell=1,n_cells
-     dust_dens(icell,:) = densite_pouss(:,icell) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
-  enddo !icell
-  call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
+     !  Write the array to the FITS file.
+     !  dens =  densite_pouss
+     ! le d signifie real*8
+     dust_dens(:,:) = 0.0
+     do icell=1,n_cells
+        dust_dens(icell,:) = densite_pouss(:,icell) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
+     enddo !icell
+     call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
-  !  Close the file and free the unit number.
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
+     !  Close the file and free the unit number.
+     call ftclos(unit, status)
+     call ftfiou(unit, status)
 
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+     !  Check for any error, and if so print out error messages
+     if (status > 0)  call print_error(status)
+  endif ! lparticle_density
 
   ! ********************************************************************************
   filename = "data_disk/dust_mass_density.fits.gz"
@@ -1711,52 +1713,76 @@ subroutine write_disk_struct()
   fpixel=1
 
 
-  naxis=4
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=1
-  naxes(4)=2
+  if (lVoronoi) then
+     naxis=2
+     naxes(1)=n_cells
+     naxes(2)=3 !xyz
+     nelements=naxes(1)*naxes(2)
 
-  if (l3D) then
-     naxes(2)=2*nz+1
-     naxes(3)=n_az
-     naxes(4)=3
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-     allocate(grid(n_rad,2*nz+1,n_az,3)) ; grid = 0.0
-     do i=1, n_rad
-        grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
-        do j=1,nz
-           grid(i,nz+1+j,:,2) = (real(j)-0.5)*delta_z(i)
-           grid(i,nz+1-j,:,2) = -(real(j)-0.5)*delta_z(i)
-        enddo
+     ! Write  optional keywords to the header
+     call ftpkys(unit,'UNIT',"AU",' ',status)
+     call ftpkys(unit,'DIM_1',"x",' ',status)
+     call ftpkys(unit,'DIM_2',"y",' ',status)
+     call ftpkys(unit,'DIM_3',"z",' ',status)
+
+     allocate(grid(n_cells,3,1,1))
+     do icell=1, n_cells
+        grid(icell,:,1,1) = Voronoi(icell)%xyz(:)
      enddo
 
-     do i=1, n_az
-        grid(:,:,i,3) = (i-0.5)/n_az * deux_pi
-     enddo
+     ! le d signifie real*8
+     call ftpprd(unit,group,fpixel,nelements,grid,status)
   else
-     allocate(grid(n_rad,nz,1,2))
+     naxis=4
+     naxes(1)=n_rad
+     naxes(2)=nz
+     naxes(3)=1
+     naxes(4)=2
 
-     do i=1, n_rad
-        grid(i,:,1,1) = sqrt(r_lim(i) * r_lim(i-1))
-        do j=1,nz
-           grid(i,j,1,2) = (real(j)-0.5)*delta_z(i)
+     if (l3D) then
+        naxes(2)=2*nz+1
+        naxes(3)=n_az
+        naxes(4)=3
+
+        allocate(grid(n_rad,2*nz+1,n_az,3)) ; grid = 0.0
+        do i=1, n_rad
+           grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
+           do j=1,nz
+              grid(i,nz+1+j,:,2) = (real(j)-0.5)*delta_z(i)
+              grid(i,nz+1-j,:,2) = -(real(j)-0.5)*delta_z(i)
+           enddo
         enddo
-     enddo
-  endif
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+        do i=1, n_az
+           grid(:,:,i,3) = (i-0.5)/n_az * deux_pi
+        enddo
+     else
+        allocate(grid(n_rad,nz,1,2))
 
-  ! Write  optional keywords to the header
-  call ftpkys(unit,'UNIT',"AU",' ',status)
-  call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
-  call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
-  if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
+        do i=1, n_rad
+           grid(i,:,1,1) = sqrt(r_lim(i) * r_lim(i-1))
+           do j=1,nz
+              grid(i,j,1,2) = (real(j)-0.5)*delta_z(i)
+           enddo
+        enddo
+     endif
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  ! le d signifie real*8
-  call ftpprd(unit,group,fpixel,nelements,grid,status)
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     ! Write  optional keywords to the header
+     call ftpkys(unit,'UNIT',"AU",' ',status)
+     call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
+     call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
+     if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
+
+     ! le d signifie real*8
+     call ftpprd(unit,group,fpixel,nelements,grid,status)
+  endif ! lVoronoi
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
