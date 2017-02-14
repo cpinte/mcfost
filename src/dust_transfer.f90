@@ -130,7 +130,7 @@ subroutine transfert_poussiere()
      if (lwall) call define_density_wall3D()
   endif
 
-  if (ldisk_struct) call write_disk_struct()
+  if (ldisk_struct) call write_disk_struct(.false.)
 
   if (lmono) then ! code monochromatique
      lambda=1
