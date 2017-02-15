@@ -29,7 +29,7 @@ subroutine repartition_wl_em()
   implicit none
 
   integer :: lambda
-  real :: E_star_tot, E_disk_tot, delta_wl
+  real :: E_star_tot, E_disk_tot, delta_wl, correct_E
 
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
@@ -42,7 +42,6 @@ subroutine repartition_wl_em()
      spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
   enddo
 
-
   ! Energie des paquets
   E_star_tot = 0.0
   E_disk_tot = 0.0
@@ -52,8 +51,8 @@ subroutine repartition_wl_em()
      E_disk_tot = E_disk_tot + E_disk(lambda) * delta_wl
   enddo
 
-  L_tot_E = (E_disk_tot + E_star_tot) / E_star_tot
-  L_tot = L_etoile *  L_tot_E
+  correct_E = (E_disk_tot + E_star_tot) / E_star_tot
+  L_tot = L_etoile *  correct_E
 
   if (l_sym_centrale) then
      E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
@@ -126,7 +125,7 @@ subroutine init_reemission()
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
-  !  cst_E=2.0*hp*c_light**2/L_etoile
+  ! cst_E=2.0*hp*c_light**2/L_etoile
   ! Depuis chauffage interne, L_etoile est sorti car il aurait du etre remplace par L_tot
   ! qui depend des temp et donc de log_frac_E_em
   ! La rourine reste indépendante des autres !
@@ -147,10 +146,9 @@ subroutine init_reemission()
         cst_wl=cst/wl
         if (cst_wl < 500.0) then
            coeff_exp=exp(cst_wl)
-           ! Les formules prennent en compte le * lambda de l'integ log
-           ! edit : non, mais delta_wl
+           ! Les formules prennent en compte le delta_wl de l'integration
            B(lambda) = 1.0/((wl**5)*(coeff_exp-1.0))*delta_wl
-           dB_dT(lambda) = B(lambda)*cst_wl*coeff_exp/(coeff_exp-1.0) !/Temp * temp a cause de dT mais ca change rien en pratique
+           dB_dT(lambda) = B(lambda) * cst_wl*coeff_exp/(coeff_exp-1.0) !/Temp * temp a cause de dT mais ca change rien en pratique
         else
            B(lambda)=0.0
            dB_dT(lambda)=0.0
