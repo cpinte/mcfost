@@ -639,13 +639,12 @@ subroutine prop_grains(lambda)
               write(*,*) "Exiting"
               stop
            endif
-           !           write(*,*) wavel, qext,qsca,gsca
         endif ! laggregate
         tab_albedo(k,lambda)=qsca/qext
         tab_g(k,lambda) = gsca
 
         ! section efficace
-        C_ext(k,lambda) = qext * S_grain(k)
+        C_ext(k,lambda) = qext * S_grain(k) ! micron^2
         C_sca(k,lambda) = qsca * S_grain(k)
         C_abs(k,lambda) = C_ext(k,lambda) - C_sca(k,lambda)
 
@@ -910,7 +909,7 @@ subroutine opacite(lambda, p_lambda)
      endif !.not.lmono
   endif !lnLTE
 
-  ! Normalisation des opacites pour etre en AU^-1
+  ! Normalisation des opacites kappa_abs pour etre en AU^-1
   ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
   ! a² microns² -> 1e-8 cm²             \
   ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0

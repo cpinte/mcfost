@@ -332,7 +332,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  write(*,*) "Total mass is", Mtot * usolarmass
 
  if (ndudt == np) then
-
     write(*,*) "Computing energy input"
 
     totlum = 0.
@@ -344,11 +343,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
 
     write(*,*) "Total energy input = ",totlum,' erg/s'
     write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
-
  endif
 
  if (nptmass > 0) then
-
     write(*,*) "Updating the stellar properties"
 
     n_etoiles = 0

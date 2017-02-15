@@ -216,13 +216,16 @@ contains
        endif
     endif
 
+    ! ToDo : needs to be made parallel
     do lambda=1,n_lambda
        call opacite(lambda, p_lambda)
     enddo !n
 
     call repartition_energie_etoiles()
+
     call repartition_wl_em()
 
+    ! ToDo : needs to be made parallel
     call init_reemission()
     call chauffage_interne()
 
