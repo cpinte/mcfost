@@ -497,7 +497,7 @@ module em_th
 
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
-  real :: L_bol0, L_bol1, L_bol2, L_tot, L_tot_E
+  real :: L_bol0, L_bol1, L_bol2, L_tot
 
   ! Energie d'un photon
   real :: E_photon
