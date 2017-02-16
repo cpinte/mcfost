@@ -183,7 +183,7 @@ subroutine repartition_energie_etoiles()
 ! - CDF_E_star, prob_E_star
 ! - E_stars
 ! - spectre_etoiles_cumul, spectre_etoiles
-! - L_etoile, E_photon
+! - L_etoile
 
   implicit none
 
@@ -540,20 +540,9 @@ subroutine repartition_energie_etoiles()
 
   !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
 
-  ! Energie d'un photon / Temps
-  ! Ca donne lambda Flambda a une distance = R_etoile
-  ! E_photon = sigma*T_etoile**4  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)) * real(N_thet)*real(N_phi)
-  ! Ca donne lambda Flambda sur le detecteur
-  if (l_sym_centrale) then
-     E_photon = L_etoile  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
-  else
-     E_photon = L_etoile  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(2*N_thet)*real(N_phi)
-  endif
-
   !L_bol0 = L_etoile  / ((distance*pc_to_AU)**2) * real(N_thet)*real(N_phi) ! A comparer a L_bol1 OK
 
   nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
-
 
   ! Proba cumulee
   if (n_lambda > 1) then
