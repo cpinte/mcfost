@@ -230,8 +230,8 @@ subroutine repartition_energie_etoiles()
   ! En particulier, on a enleve un pi partout
 
 
-  ! Luminosite etoile (le facteur 4Pi a ete simplifie TODO: avec quoi ???)
-  !  L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
+  ! Luminosite etoile (le facteur 4Pi a ete simplifie avec le 1/4pi de l'estimateur de Lucy 1999)
+  ! L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
   L_etoile=sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 )  ! tout en SI sauf R en AU
 
   do i=2, n_etoiles
@@ -550,7 +550,7 @@ subroutine repartition_energie_etoiles()
      E_photon = L_etoile  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(2*N_thet)*real(N_phi)
   endif
 
-  L_bol0 = L_etoile  / ((distance*pc_to_AU)**2) * real(N_thet)*real(N_phi) ! A comparer a L_bol1 OK
+  !L_bol0 = L_etoile  / ((distance*pc_to_AU)**2) * real(N_thet)*real(N_phi) ! A comparer a L_bol1 OK
 
   nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 

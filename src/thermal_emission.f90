@@ -29,7 +29,7 @@ subroutine repartition_wl_em()
   implicit none
 
   integer :: lambda
-  real :: E_star_tot, E_disk_tot, delta_wl, correct_E
+  real :: E_star_tot, E_disk_tot, delta_wl, correct_E, L_tot
 
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
@@ -60,8 +60,7 @@ subroutine repartition_wl_em()
      E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(2*N_thet)*real(N_phi)
   endif
 
-  n_phot_L_tot = (1.0/nbre_photons_tot) * L_tot
-  n_phot_L_tot0 = n_phot_L_tot
+  L_packet_th = (1.0/nbre_photons_tot) * L_tot
 
   return
 
@@ -164,13 +163,13 @@ subroutine init_reemission()
         do lambda=1, n_lambda
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir frac_E_em en SI
-           ! B en SI (cst_E)  /
-           ! R*-2 en AU-2    /   --> dans cst_E
-           integ = integ + kappa_abs_LTE(icell,lambda)* volume(icell) * B(lambda)
+           ! B * cst_E en SI  /
+           ! R*-2 en AU-2    /   --> dans cst_E, non il n'y est pas ???
+           integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
-
         ! Le coeff qui va bien
         integ = integ*cst_E
+
         if (integ > tiny_dp) then
            log_frac_E_em(T,icell)=log(integ)
         else
@@ -334,13 +333,13 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   ! Absorption d'un photon : on ajoute son energie dans la cellule
   !xE_abs(ri,zj,phik,id) = xE_abs(ri,zj,phik,id) + E
   !E_abs=sum(xE_abs(ri,zj,phik,:))
-  !log_frac_E_abs=log(E_abs*n_phot_L_tot + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+  !log_frac_E_abs=log(E_abs*L_packet_th + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
   if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_dp
 
   J_abs=sum(xKJ_abs(icell,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
   if (J_abs > 0.) then
-     log_frac_E_abs=log(J_abs*n_phot_L_tot + E0(icell)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+     log_frac_E_abs=log(J_abs*L_packet_th + E0(icell)) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
   else
      log_frac_E_abs = -300
   endif
@@ -455,7 +454,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,ilambda))
   enddo ! lambda
  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
-  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(icell) )
+  log_frac_E_abs=log(J_abs*L_packet_th/volume(icell) )
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
   T_int=maxval(xT_ech_1grain(k,icell,:))
@@ -522,13 +521,13 @@ subroutine Temp_finale()
 
   ! Somme sur differents processeurs
   ! boucle pour eviter des problemes d'allocation memoire en 3D
-  !KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
+  ! KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
   KJ_abs(:) = 0.0
   do i=1,nb_proc
      KJ_abs(:) = KJ_abs(:) + xKJ_abs(1:n_cells,i)
   enddo
 
-  KJ_abs(:)= KJ_abs(:)*n_phot_L_tot + E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
+  KJ_abs(:)= KJ_abs(:) * L_packet_th + E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de frac_E_em
 
   !$omp parallel &
   !$omp default(none) &
@@ -627,7 +626,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_frac_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,n_phot_L_tot,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
+  !$omp shared(J_absorbe,L_packet_th,xT_ech,log_frac_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_frac_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
@@ -640,7 +639,7 @@ subroutine Temp_finale_nLTE()
            enddo ! lambda
 
            ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
-           J_absorbe = J_absorbe*n_phot_L_tot/volume(icell)
+           J_absorbe = J_absorbe*L_packet_th/volume(icell)
            if (J_absorbe < tiny_dp) then
               Temperature_1grain(k,icell) = T_min
            else
@@ -796,7 +795,7 @@ subroutine Temp_nRE(lconverged)
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,log_frac_E_abs,icell) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
-     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, n_phot_L_tot, volume, n_T, disk_zone,etoile) &
+     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Temperature_1grain_nRE,log_frac_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
@@ -820,9 +819,9 @@ subroutine Temp_nRE(lconverged)
                  kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
               enddo ! lambda
 
-              lambda_Jlambda(:,id) =  lambda_Jlambda(:,id)*n_phot_L_tot * (1.0/volume(icell))
-              Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*n_phot_L_tot * (1.0/volume(icell))
-              kJnu(:,id) = kJnu(:,id)*n_phot_L_tot * (1.0/volume(icell))
+              lambda_Jlambda(:,id) =  lambda_Jlambda(:,id)*L_packet_th * (1.0/volume(icell))
+              Int_k_lambda_Jlambda = Int_k_lambda_Jlambda*L_packet_th * (1.0/volume(icell))
+              kJnu(:,id) = kJnu(:,id)*L_packet_th * (1.0/volume(icell))
 
               if (lbenchmark_SHG) then ! Adding TRUST radiation field
                  Int_k_lambda_Jlambda = 0.0
@@ -1145,7 +1144,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,lambda))
   enddo ! ilambda
   ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans frac_E_em_1grain
-  log_frac_E_abs=log(J_abs*n_phot_L_tot/volume(icell))
+  log_frac_E_abs=log(J_abs*L_packet_th/volume(icell))
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
   T_int=maxval(xT_ech_1grain_nRE(k,icell,:))

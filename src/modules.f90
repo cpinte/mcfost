@@ -497,8 +497,6 @@ module em_th
 
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
-  real :: L_bol0, L_bol1, L_bol2, L_tot
-
   ! Energie d'un photon
   real :: E_photon
 
@@ -552,7 +550,7 @@ module em_th
   integer, dimension(:,:), allocatable :: Tpeak_old
   real, dimension(:,:,:), allocatable :: Proba_Temperature !n_T, n_cells,, n_grains
   logical, dimension(:,:), allocatable :: l_RE, lchange_nRE ! n_grains, n_cells
-  real :: nbre_photons_tot, n_phot_L_tot,  n_phot_L_tot0
+  real :: nbre_photons_tot, L_packet_th
 
 
   ! Choix cellule d'emission pour cas monochromatique
