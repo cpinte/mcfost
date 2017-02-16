@@ -311,7 +311,7 @@ contains
 
     integer, intent(in) :: lambda
     integer :: ri, zj, phik, icell
-    real (kind=dp) :: n_photons_envoyes, energie_photon, facteur
+    real(kind=dp) :: n_photons_envoyes, energie_photon, facteur
 
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))

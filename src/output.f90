@@ -1823,19 +1823,30 @@ subroutine ecriture_J()
   character(len=512) :: filename
 
   real, dimension(n_cells,n_lambda) :: Jio
+  real(kind=dp) :: n_photons_envoyes, energie_photon
 
   filename = trim(data_dir)//"/J.fits.gz"
 
   write(*,*) "Writing "//trim(filename)
 
+  ! Step1
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
   ! 1/4pi est inclus dans n_phot_l_tot
   ! teste OK par rapport a fct bb de yorick
-  do lambda=1, n_lambda
+  !do lambda=1, n_lambda
+  !   do icell=1, n_cells
+  !      Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
+  !           * tab_lambda(lambda) / tab_delta_lambda(lambda)
+  !   enddo
+  !enddo
+
+  ! Step 2
+  do lambda=1, n_lambda2
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
+     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
      do icell=1, n_cells
-        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
-             * tab_lambda(lambda) / tab_delta_lambda(lambda)
+        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
      enddo
   enddo
 
@@ -1905,9 +1916,7 @@ subroutine ecriture_J()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1931,13 +1940,12 @@ subroutine ecriture_UV_field()
 
   integer, parameter :: n=200
 
-  real(kind=dp), dimension(:,:,:,:), allocatable :: J
-  real(kind=dp), dimension(:,:,:), allocatable :: G
+  real(kind=dp) :: n_photons_envoyes, energie_photon
+  real(kind=dp), dimension(n_lambda,n_cells) :: J
+  real, dimension(n_cells) :: G
   real(kind=dp), dimension(n) :: wl, J_interp
   real(kind=dp), dimension(n_lambda) :: lamb
   real(kind=dp) :: delta_wl
-
-  real, dimension(:,:,:), allocatable :: Gio
 
 
   ! D'après van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
@@ -1948,52 +1956,27 @@ subroutine ecriture_UV_field()
 
   write(*,*) "Writing "//trim(filename)
 
-  if (l3D) then
-     allocate(J(n_lambda2,n_rad,-nz:nz,n_az), G(n_rad,-nz:nz,n_az), Gio(n_rad,-nz:nz,n_az), stat=alloc_status)
-  else
-     allocate(J(n_lambda2,n_rad,1:nz,1), G(n_rad,1:nz,1), Gio(n_rad,1:nz,1), stat=alloc_status)
-  endif
-  if (alloc_status /= 0) then
-     write(*,*) "Allocation error in UV_field"
-     write(*,*) "Exiting"
-     stop
-  endif
-  J = 0. ; G = 0. ; Gio = 0.
-
-  ! 1/4pi est inclus dans n_phot_l_tot
-  do ri=1, n_rad
-     do zj=j_start,nz
-        if (zj==0) cycle
-        do phik=1, n_az
-           icell = cell_map(ri,zj,phik)
-           J(:,ri,zj,phik) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
-        enddo
+  ! Step 2
+  do lambda=1, n_lambda
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
+     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
+     do icell=1, n_cells
+        J(lambda,icell) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
      enddo
   enddo
-
-  ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
-  ! J en W.m-2.m-1 (F_lambda)
-  do lambda=1, n_lambda2
-     J(lambda,:,:,:) = J(lambda,:,:,:) / (tab_delta_lambda(lambda) * 1.0e-6)
-  enddo
-  lamb = tab_lambda * 1e-6 ! en m
+  lamb(:) = tab_lambda(:) * 1e-6 ! en m
 
   ! van Dischoeck 2008
   wl(:) = span(0.0912,0.2,n) * 1e-6 ! en m
-  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6 ! en m
-  do ri=1,n_rad
-     do zj=j_start,nz
-        do phik=1, n_az
-           do l=1,n
-              J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
-           enddo
-
-           ! integration trapeze
-           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
-           Gio(ri,zj,phik) = G(ri,zj,phik)
-        enddo
+  delta_wl = (wl(n) - wl(1))/(n-1.) ! en m
+  do icell=1,n_cells
+     do l=1,n
+        J_interp(l) = interp( J(:,icell),lamb(:),wl(l))
      enddo
-  enddo
+
+     ! integration trapeze
+     G(icell) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
+  enddo ! icell
 
 !---  ! Le petit et al
 !---  wl(:) = span(0.0912,0.24,n) * 1e-6 ! en m
@@ -2031,17 +2014,17 @@ subroutine ecriture_UV_field()
   extend=.true.
 
   if (l3D) then
-        naxis=3
-        naxes(1)=n_rad
-        naxes(2)=2*nz+1
-        naxes(3)=n_az
-        nelements=naxes(1)*naxes(2)*naxes(3)
-     else
-        naxis=2
-        naxes(1)=n_rad
-        naxes(2)=nz
-        nelements=naxes(1)*naxes(2)
-     endif
+     naxis=3
+     naxes(1)=n_rad
+     naxes(2)=2*nz+1
+     naxes(3)=n_az
+     nelements=naxes(1)*naxes(2)*naxes(3)
+  else
+     naxis=2
+     naxes(1)=n_rad
+     naxes(2)=nz
+     nelements=naxes(1)*naxes(2)
+  endif
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2052,7 +2035,7 @@ subroutine ecriture_UV_field()
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,Gio,status)
+  call ftppre(unit,group,fpixel,nelements,G,status)
 
   call ftpkys(unit,'BUNIT',"Habing",'[912-2000] AA, following formulae by van Dischoeck et al 2008',status)
 
@@ -2061,9 +2044,7 @@ subroutine ecriture_UV_field()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
