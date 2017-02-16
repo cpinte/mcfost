@@ -1834,7 +1834,7 @@ subroutine ecriture_J()
   ! teste OK par rapport a fct bb de yorick
   do lambda=1, n_lambda
      do icell=1, n_cells
-        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
+        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * L_packet_th / volume(icell) &
              * tab_lambda(lambda) / tab_delta_lambda(lambda)
      enddo
   enddo
@@ -1966,7 +1966,7 @@ subroutine ecriture_UV_field()
         if (zj==0) cycle
         do phik=1, n_az
            icell = cell_map(ri,zj,phik)
-           J(:,ri,zj,phik) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * n_phot_L_tot / volume(icell)
+           J(:,ri,zj,phik) = (sum(xJ_abs(icell,:,:),dim=2) + J0(icell,:)) * L_packet_th / volume(icell)
         enddo
      enddo
   enddo
@@ -2573,6 +2573,8 @@ subroutine ecriture_sed(ised)
   integer :: group,fpixel,nelements
 
   logical :: simple, extend
+
+  real :: L_bol1, L_bol2
 
   !! Ecriture SED
   if (ised ==1) then
