@@ -497,9 +497,6 @@ module em_th
 
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
-  ! Energie d'un photon
-  real :: E_photon
-
   ! Gamme de longueurs d'onde utilisees
   real :: lambda_min, lambda_max = 3000.0
   ! Echelle_log

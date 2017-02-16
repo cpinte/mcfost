@@ -54,13 +54,7 @@ subroutine repartition_wl_em()
   correct_E = (E_disk_tot + E_star_tot) / E_star_tot
   L_tot = L_etoile *  correct_E
 
-  if (l_sym_centrale) then
-     E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
-  else
-     E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(2*N_thet)*real(N_phi)
-  endif
-
-  L_packet_th = (1.0/nbre_photons_tot) * L_tot
+  L_packet_th = L_tot/nbre_photons_tot
 
   return
 

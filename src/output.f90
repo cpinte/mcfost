@@ -2574,7 +2574,8 @@ subroutine ecriture_sed(ised)
 
   logical :: simple, extend
 
-  real :: L_bol1, L_bol2
+  real, save :: L_bol1
+  real :: L_bol2, E_photon1
 
   !! Ecriture SED
   if (ised ==1) then
@@ -2600,8 +2601,20 @@ subroutine ecriture_sed(ised)
   group=1
   fpixel=1
 
+  ! Energie d'un photon / Temps
+  ! Ca donne lambda Flambda a une distance = R_etoile
+  ! E_photon = sigma*T_etoile**4  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)) * real(N_thet)*real(N_phi)
+  ! Ca donne lambda Flambda sur le detecteur
+  if (l_sym_centrale) then
+     !E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
+     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+  else
+     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+  endif
 
   if (ised == 1) then
+     ! Ca donne lambda Flambda sur le detecteur
+
      naxis=3
      naxes(1)=n_lambda
      naxes(2)=N_thet
@@ -2614,21 +2627,19 @@ subroutine ecriture_sed(ised)
      nelements=naxes(1)*naxes(2)*naxes(3)
 
      do lambda=1,n_lambda
-        facteur =  E_photon * tab_lambda(lambda)/tab_delta_lambda(lambda)
+        facteur =  E_photon1 * tab_lambda(lambda)/tab_delta_lambda(lambda)
         sed1_io(lambda,:,:) = sum(sed(lambda,:,:,:),dim=3) * facteur
      enddo
 
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,sed1_io,status)
 
-     L_bol1 = sum(sed) * E_photon
-
+     L_bol1 = sum(sed) * E_photon1
   else
      ! Energie totale emise a une distance emise egale au rayon stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
      do lambda=1, n_lambda2
         n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
-
         E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
      enddo
 
