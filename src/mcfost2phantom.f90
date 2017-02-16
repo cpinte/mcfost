@@ -223,8 +223,6 @@ contains
 
     call repartition_energie_etoiles()
 
-    call repartition_wl_em()
-
     ! ToDo : needs to be made parallel
     call init_reemission()
     call chauffage_interne()
@@ -236,6 +234,8 @@ contains
     enddo
     !$omp end do
     !$omp end parallel
+
+    call repartition_wl_em()
 
     letape_th = .true.
     laffichage=.true.
