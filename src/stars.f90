@@ -532,15 +532,12 @@ subroutine repartition_energie_etoiles()
      ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:) * 1e-6
   endif
 
-
   !  TODO : L_etoile doit etre recalcule
   ! L_etoile fixe le flux dans sed1
   ! E_stars fixe le flux dans sed2
   L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU
 
   !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
-
-  !L_bol0 = L_etoile  / ((distance*pc_to_AU)**2) * real(N_thet)*real(N_phi) ! A comparer a L_bol1 OK
 
   nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
