@@ -515,9 +515,9 @@ module em_th
 
   ! fraction d'energie reemise sur energie etoile
   ! (Opacite moyenne de Planck * coeff)
-  real, dimension(:,:), allocatable :: log_frac_E_em ! 0:n_T, n_cells
-  real, dimension(:,:), allocatable :: log_frac_E_em_1grain  !n_grains,0:n_T
-  real, dimension(:,:), allocatable :: frac_E_em_1grain_nRE, log_frac_E_em_1grain_nRE !n_grains,0:n_T
+  real, dimension(:,:), allocatable :: log_E_em ! 0:n_T, n_cells
+  real, dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
+  real, dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
 
   ! Probabilite cumulee en lambda d'emissivite de la poussiere
   ! avec correction de temperature (dp/dT)
