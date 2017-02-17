@@ -29,7 +29,7 @@ subroutine repartition_wl_em()
   implicit none
 
   integer :: lambda
-  real :: E_star_tot, E_disk_tot, delta_wl, correct_E, L_tot
+  real :: E_star_tot, E_disk_tot, delta_wl, L_tot
 
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
@@ -42,7 +42,7 @@ subroutine repartition_wl_em()
      spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
   enddo
 
-  ! Energie des paquets
+  ! Energie des paquets pour step 1
   E_star_tot = 0.0
   E_disk_tot = 0.0
   do lambda=1, n_lambda
@@ -50,9 +50,7 @@ subroutine repartition_wl_em()
      E_star_tot = E_star_tot + E_stars(lambda) * delta_wl
      E_disk_tot = E_disk_tot + E_disk(lambda) * delta_wl
   enddo
-
-  correct_E = (E_disk_tot + E_star_tot) / E_star_tot
-  L_tot = L_etoile *  correct_E
+  L_tot = L_etoile *  (E_disk_tot + E_star_tot) / E_star_tot
 
   L_packet_th = L_tot/nbre_photons_tot
 
@@ -157,13 +155,12 @@ subroutine init_reemission()
         do lambda=1, n_lambda
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
-           ! B * cst_E en SI  /
-           ! R*-2 en AU-2    /   --> dans cst_E, non,il n'y est pas ???
+           ! B * cst_E en SI  = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
            integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
-
         ! Le coeff qui va bien
-        integ = integ*cst_E
+        integ = integ*cst_E  ! Manque facteur 4pi  dans terme Q-
+
         if (integ > tiny_dp) then
            log_E_em(T,icell)=log(integ)
         else

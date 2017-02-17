@@ -455,7 +455,7 @@ end function Bnu
 
 function Blambda(wl,T)
 ! Loi de Planck
-! Blambda en SI : W.m-2.s-1.sr-1
+! Blambda en SI : W.m-2.m-1.sr-1
 ! wl en m
 ! C. Pinte
 ! 23/05/09

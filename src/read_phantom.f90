@@ -275,7 +275,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, ulength_au, usolarmass, &
               dustfraci, Mtot, totlum, qtermi
 
-  real(dp), parameter :: Lsun = 3.839d33
+  real(dp), parameter :: Lsun = 3.839d33 ! erg/s
 
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3
