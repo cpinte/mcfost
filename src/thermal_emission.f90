@@ -1597,16 +1597,29 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-subroutine chauffage_interne()
+subroutine internal_heating(lextra_heating,dudt)
   ! Calcule le temperature initiale du disque avant le step 1
   ! C. Pinte
   ! 27/02/06
 
   implicit none
 
+  logical, intent(in) :: lextra_heating
+  real, dimension(:), intent(in), optional :: dudt
+
+  integer :: icell
+
+  ! E0 = Q+/4pi en W (AU/m)^2
+
   if (lRE_LTE) then
      ! Energie venant de l'equilibre avec nuage à T_min
      E0(1:n_cells) = exp(log_E_em(1,1:n_cells))
+
+     if (lextra_heating) then
+        do icell=1, n_cells
+           E0(icell) = max(E0(icell), dudt(icell)/quatre_pi / AU_to_m**2 )
+        enddo
+     endif
 
 !!$  ! Energie venant du chauffage visqueux
 !!$  do i=1,n_rad
@@ -1614,17 +1627,6 @@ subroutine chauffage_interne()
 !!$        E0(i,j) = E0(i,j) !+ masse(i) * alpha *
 !!$     enddo
 !!$  enddo
-!!$
-!!$  ! Calcul temperature
-!!$  if (lLTE) then
-!!$     do i=1, nb_proc
-!!$        xKJ_abs(:,:,i) = E0(:,:)/nb_proc
-!!$     enddo
-!!$     call Temp_finale
-!!$  else
-!!$     write(*,*) "Coding in progress ..."
-!!$     stop
-!!$  endif
 
      ! Energie emise aux differente longueurs d'onde : repartition_energie
      call Temp_finale()
@@ -1632,7 +1634,7 @@ subroutine chauffage_interne()
 
   return
 
-end subroutine chauffage_interne
+end subroutine internal_heating
 
 !**********************************************************************
 
