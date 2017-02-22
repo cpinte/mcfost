@@ -254,6 +254,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
+  ! extra_heating is in W
 
   use constantes, only : au_to_cm, Msun_to_g, erg_to_J
   use prop_star
@@ -342,7 +343,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
        write(*,*) "Allocation error in phanton_2_mcfost"
        write(*,*) "Exiting"
     endif
-
 
     totlum = 0.
     do i=1,np
