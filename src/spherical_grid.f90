@@ -49,7 +49,7 @@ contains
      ri_out=0
      phik_out=1
   else if (r2 > Rmax2) then
-     ri_out=n_rad
+     ri_out=n_rad+1
      phik_out=1
   else
      ri_min=0

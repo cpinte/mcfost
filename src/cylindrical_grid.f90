@@ -721,10 +721,15 @@ end subroutine define_cylindrical_grid
 
     if (r2 < r_lim_2(0)) then
        ri_out=0
-       zj_out=1
+       if (abs(zin) > zmax(1)) then
+          zj_out = nz+1
+          if (zin < 0.0)  zj_out = -zj_out
+       else
+          zj_out=1
+       endif
        phik_out=1
     else if (r2 > Rmax2) then
-       ri_out=n_rad
+       ri_out=n_rad+1
        zj_out=1
        phik_out=1
     else
@@ -742,10 +747,10 @@ end subroutine define_cylindrical_grid
        enddo
        ri_out=ri+1
 
-       if (ri_out > 0) zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
+       zj_out = floor(min(real(abs(zin)/zmax(ri_out) * nz),max_int))+1
 
        if (l3D) then
-          if (zj_out > nz) zj_out = nz
+          if (zj_out > nz) zj_out = nz+1
           if (zin < 0.0)  zj_out = -zj_out
           if (zin /= 0.0) then
              phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
