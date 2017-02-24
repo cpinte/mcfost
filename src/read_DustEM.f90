@@ -52,6 +52,8 @@ contains
        material_density = 2.24
     case('PAH0_DL07')
        material_density = 2.24
+    case('PAH0_MC10')
+       material_density = 2.24
     case('PAH1')
        material_density = 2.24
     case('PAH1_DBP90')
@@ -60,14 +62,24 @@ contains
        material_density = 2.24
     case('PAH1_DL07')
        material_density = 2.24
+    case('PAH1_MC10')
+       material_density = 2.24
     case('VSG_DBP90')
        material_density = 2.30
     case('aSil')
        material_density = 3.5
+    case('aSilx')
+       material_density = 3.0
     case('amCBE')
        material_density = 1.81
     case('amCBEx')
        material_density = 1.81
+    case('CM20')
+       material_density = 1.6
+    case('aPyM5')
+       material_density = 2.19
+    case('aOlM5')
+       material_density = 2.19
     case default
        write(*,*) "Material density is unknown for the DustEM material: "//trim(dust_pop(pop)%indices(1))
        write(*,*) "Exiting"
