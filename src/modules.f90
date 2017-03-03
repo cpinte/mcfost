@@ -497,11 +497,6 @@ module em_th
 
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
-  real :: L_bol0, L_bol1, L_bol2, L_tot
-
-  ! Energie d'un photon
-  real :: E_photon
-
   ! Gamme de longueurs d'onde utilisees
   real :: lambda_min, lambda_max = 3000.0
   ! Echelle_log
@@ -520,9 +515,9 @@ module em_th
 
   ! fraction d'energie reemise sur energie etoile
   ! (Opacite moyenne de Planck * coeff)
-  real, dimension(:,:), allocatable :: log_frac_E_em ! 0:n_T, n_cells
-  real, dimension(:,:), allocatable :: log_frac_E_em_1grain  !n_grains,0:n_T
-  real, dimension(:,:), allocatable :: frac_E_em_1grain_nRE, log_frac_E_em_1grain_nRE !n_grains,0:n_T
+  real, dimension(:,:), allocatable :: log_E_em ! 0:n_T, n_cells
+  real, dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
+  real, dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
 
   ! Probabilite cumulee en lambda d'emissivite de la poussiere
   ! avec correction de temperature (dp/dT)
@@ -552,7 +547,7 @@ module em_th
   integer, dimension(:,:), allocatable :: Tpeak_old
   real, dimension(:,:,:), allocatable :: Proba_Temperature !n_T, n_cells,, n_grains
   logical, dimension(:,:), allocatable :: l_RE, lchange_nRE ! n_grains, n_cells
-  real :: nbre_photons_tot, n_phot_L_tot,  n_phot_L_tot0
+  real :: nbre_photons_tot, L_packet_th
 
 
   ! Choix cellule d'emission pour cas monochromatique

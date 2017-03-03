@@ -7,12 +7,14 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodust,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust, massdust
+ real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
+
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
@@ -230,7 +232,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
+         n_SPH,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -246,13 +248,15 @@ end subroutine read_phantom_file
 !*************************************************************************
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,x,y,z,massgas,massdust,rhogas,rhodust,n_SPH)
+     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
+     n_SPH,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
+  ! extra_heating is in W
 
-  use constantes, only : au_to_cm, Msun_to_g
+  use constantes, only : au_to_cm, Msun_to_g, erg_to_J
   use prop_star
 
   integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
@@ -269,16 +273,17 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
 
   real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
+  real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
 
   integer :: i,j,k,itypei, alloc_status, i_etoiles
-  real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, ulength_au, usolarmass, &
-              dustfraci, Mtot, totlum, qtermi
+  real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, uWatt, ulength_au, usolarmass, dustfraci, Mtot, totlum, qtermi
 
-  real(dp), parameter :: Lsun = 3.839d33
+  real, parameter :: Lsun = 3.839e26 ! W
 
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3
+  uWatt = uerg_per_s * erg_to_J
   ulength_au = udist/ (au_to_cm ) ! * 100.) ! todo : je ne capte pas ce factor --> Daniel
   usolarmass = umass/Msun_to_g
 
@@ -292,8 +297,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH))
- allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),&
+      x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
@@ -333,15 +338,20 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
 
  if (ndudt == np) then
     write(*,*) "Computing energy input"
+    allocate(extra_heating(n_SPH), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Allocation error in phanton_2_mcfost"
+       write(*,*) "Exiting"
+    endif
 
     totlum = 0.
     do i=1,np
-       qtermi = dudt(i)*massoftype(1)*uerg_per_s
+       qtermi = dudt(i) * massoftype(1) * uWatt
        totlum = totlum + qtermi
-       !dudt(i) = qterm
+       extra_heating(i) = qtermi
     enddo
 
-    write(*,*) "Total energy input = ",totlum,' erg/s'
+    write(*,*) "Total energy input = ",totlum,' W'
     write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
  endif
 

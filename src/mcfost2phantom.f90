@@ -113,7 +113,7 @@ contains
     use prop_star, only : n_etoiles
     use em_th, only : temperature, E_abs_nRE
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
-         chauffage_interne, temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
+         internal_heating, temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
     use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
@@ -155,6 +155,7 @@ contains
 
     real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
+    real, dimension(:), allocatable :: extra_heating
 
     real(kind=dp), dimension(4) :: Stokes
     real(kind=dp) :: nnfot2
@@ -167,6 +168,7 @@ contains
     integer, pointer, save :: p_lambda
 
     logical, save :: lfirst_time = .true.
+    logical :: lextra_heating
 
     write(*,*) "Running mcfost via the library"
 
@@ -180,7 +182,9 @@ contains
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         XX,YY,ZZ,massgas,massdust,rhogas,rhodust,n_SPH)
+         n_SPH,XX,YY,ZZ,massgas,massdust,rhogas,rhodust,extra_heating)
+
+    lextra_heating = (ndudt == np)
 
     call compute_stellar_parameters()
 
@@ -223,11 +227,9 @@ contains
 
     call repartition_energie_etoiles()
 
-    call repartition_wl_em()
-
     ! ToDo : needs to be made parallel
     call init_reemission()
-    call chauffage_interne()
+    call internal_heating(lextra_heating,extra_heating)
 
     !$omp parallel default(none) private(lambda) shared(n_lambda)
     !$omp do schedule(static,1)
@@ -236,6 +238,8 @@ contains
     enddo
     !$omp end do
     !$omp end parallel
+
+    call repartition_wl_em()
 
     letape_th = .true.
     laffichage=.true.
