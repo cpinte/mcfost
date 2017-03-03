@@ -319,7 +319,7 @@ subroutine transfert_poussiere()
 
         if (ltemp) then
            call init_reemission()
-           call chauffage_interne()
+           call internal_heating(.false.)
         endif
 
         !$omp parallel default(none) private(lambda) shared(n_lambda)
