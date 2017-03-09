@@ -105,7 +105,8 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,graindens,&
        dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt, &
        compute_Frad,SPH_limits, & ! options
-       Tdust,Frad,mu_gas,ierr)   ! intent(out)
+       Tdust,Frad,mu_gas,ierr,  & ! intent(out)
+       write_T_files)
 
     use parametres
     use constantes, only : mu
@@ -127,7 +128,6 @@ contains
     use grains, only : tab_lambda
     !$ use omp_lib
 
-
 #include "sprng_f.h"
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
@@ -139,6 +139,8 @@ contains
     real(dp), intent(in) :: hfact, umass, utime, udist, graindens
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
+
+    logical, intent(in), optional :: write_T_files
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
     real(dp), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
@@ -170,7 +172,13 @@ contains
     logical, save :: lfirst_time = .true.
     logical :: lextra_heating
 
-    write(*,*) "Running mcfost via the library"
+
+
+    write(*,*)
+    write(*,*) "------------------------------"
+    write(*,*) "Running MCFOST via the library"
+    write(*,*) "------------------------------"
+    write(*,*)
 
     ! debut de l'execution
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -321,6 +329,10 @@ contains
     call set_min_Temperature(Tmin)
     Tdust = -1.0 ;
 
+    if (present(write_T_files)) then
+       if (write_T_files) call write_mcfost2phantom_temperature()
+    endif
+
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) Tdust(i_SPH) = Temperature(icell)
@@ -367,10 +379,52 @@ contains
        return
     endif
 
+    write(*,*)
+    write(*,*) "------------------------------"
+    write(*,*) "End of MCFOST run"
+    write(*,*) "------------------------------"
+    write(*,*)
+
     return
 
   end subroutine run_mcfost_phantom
 
 !*************************************************************************
+
+  subroutine write_mcfost2phantom_temperature()
+
+    use parametres, only : data_dir
+    use utils, only : appel_syst
+    use output, only : ecriture_temperature, write_disk_struct
+
+    integer, save :: n_call = -1 ! to match phantom's dump numbers
+    character(len=1) :: s
+    integer :: syst_status
+
+    n_call = n_call + 1
+    if (n_call > 9) then
+       write(*,*) "STOPPING to write T files at dump #9"
+       stop
+    endif
+
+    syst_status = 0
+
+    write(s,'(i1)') n_call ; data_dir = "mcfost_"//s
+    write(*,*)
+    write(*,*) "**************************************************"
+    write(*,*) "Saving Temperature structure in "//trim(data_dir)
+    write(*,*) "**************************************************"
+    write(*,*)
+
+    call appel_syst("rm -rf "//trim(data_dir)//" ; mkdir -p "//trim(data_dir), syst_status)
+    call ecriture_temperature(1)
+
+    call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
+    call write_disk_struct(.false.)
+    call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
+
+    return
+
+  end subroutine write_mcfost2phantom_temperature
 
 end module mcfost2phantom
