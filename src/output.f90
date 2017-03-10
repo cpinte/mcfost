@@ -5,6 +5,8 @@ module output
   use disk
   use grains
   use em_th
+  use radiation_field, only : J0, xJ_abs
+  use thermal_emission, only : E_totale, nbre_reemission
   use constantes
   use opacity
   use molecular_emission
@@ -12,6 +14,7 @@ module output
   use utils
   use Voronoi_grid
   use grid
+  use fits_utils, only : cfitsWrite, print_error
 
   implicit none
 
@@ -914,34 +917,6 @@ subroutine write_origin()
 end subroutine write_origin
 
 !**********************************************************************
-
-subroutine print_error(status)
-  ! PRINT_ERROR prints out the FITSIO error messages to the user.
-
-  integer status
-  character ( len = 30 ) errtext
-  character ( len = 80 ) errmessage
-
-  !  Check if status is OK (no error); if so, simply return.
-  if (status <= 0) then
-     return
-  end if
-
-  !  Get the text string which describes the error
-  call ftgerr(status,errtext)
-  print *,'FITSIO Error Status =',status,': ',errtext
-
-  !  Read and print out all the error messages on the FITSIO stack
-  call ftgmsg(errmessage)
-  do while (errmessage .ne. ' ')
-     print *,errmessage
-     call ftgmsg(errmessage)
-  end do
-
-  return
-end subroutine print_error
-
-!***********************************************************
 
 subroutine calc_optical_depth_map(lambda)
 
@@ -3031,111 +3006,6 @@ subroutine ecriture_spectre(imol)
   return
 
 end subroutine ecriture_spectre
-
-!**********************************************************************
-
-subroutine cfitsWrite(filename,tab,dim)
-
-  implicit none
-
-  character(len=*), intent(in) :: filename
-  real, dimension(*), intent(in) :: tab
-  integer, dimension(:), intent(in) :: dim ! dim == shape(tab)
-
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer :: group,fpixel,nelements
-  logical :: simple, extend
-
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  status=0
-  call ftgiou (unit,status)
-
-  !  Create the new empty FITS file.
-  blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
-
-  simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
-  bitpix=-32
-  extend=.true.
-
-
-  !  Write the required header keywords.
-  naxis=size(dim)
-  call ftphpr(unit,simple,bitpix,naxis,dim,0,1,extend,status)
-
-  !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=product(dim)
-
-  call ftppre(unit,group,fpixel,nelements,tab,status)
-
-  !  Close the file and free the unit number.
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  endif
-
-  return
-
-end subroutine cfitsWrite
-
-!**********************************************************************
-
-subroutine write_dust_prop()
-
-  integer :: icell, l
-
-  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
-  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
-
-  write(*,*) "Writing dust properties"
-  ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
-
-  ! Only do it after the last pass through the wavelength table
-  ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
-  allocate(kappa_lambda(n_lambda))
-  allocate(albedo_lambda(n_lambda))
-  allocate(g_lambda(n_lambda))
-  allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
-  allocate(kappa_grain(n_lambda,n_grains_tot))
-
-  icell = icell_ref
-  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
-  albedo_lambda=tab_albedo_pos(icell,:)
-  g_lambda=tab_g_pos(icell,:)
-
-  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
-  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
-  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
-  call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-
-  do l=1, n_lambda
-     kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
-  enddo
-  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
-
-  do l=1, n_lambda
-     S11_lambda_theta(l,:)= tab_s11_pos(:,icell,l)
-  enddo
-  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
-
-  if (lsepar_pola) then
-     do l=1, n_lambda
-        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,icell,l) ! Deja normalise par S11
-     enddo
-     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
-  endif
-
-  deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
-
-  return
-
-end subroutine write_dust_prop
 
 !**********************************************************************
 

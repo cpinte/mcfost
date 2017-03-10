@@ -4,14 +4,13 @@ module init_mcfost
   use disk
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use em_th, only : specie_removed, T_rm, Tfile
+  use density, only : specie_removed, T_rm
   use molecular_emission
   use ray_tracing
   !$ use omp_lib
   use benchmarks
   use read_params
-  use input
-  use mem
+  use input, only : Tfile
   use ProdiMo
   use utils
 

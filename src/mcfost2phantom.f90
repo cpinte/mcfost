@@ -331,6 +331,7 @@ contains
 
     ! reset energy and temperature arrays
     call reset_radiation_field()
+    call reset_temperature()
 
     ! Temps d'execution
     call system_clock(time_end)

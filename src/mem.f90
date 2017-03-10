@@ -2,7 +2,6 @@ module mem
 
   use parametres
   use grains
-  use em_th
   use opacity
   use resultats
   use prop_star
@@ -149,6 +148,10 @@ subroutine alloc_dynamique(n_cells_max)
   ! C. Pinte
   ! 12/05/05
 
+  use stars, only : allocate_stellar_spectra
+  use thermal_emission, only : allocate_temperature, allocate_thermal_emission, allocate_weight_proba_emission
+
+
   integer, intent(in), optional :: n_cells_max
 
   integer ::  alloc_status, Nc, p_Nc
@@ -213,30 +216,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
   ! **************************************************
-  allocate(E_stars(n_lambda), E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error E_stars'
-     stop
-  endif
-  E_stars = 0.0
-  E_disk = 0.0
-  E_ISM = 0.0
-
-  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error frac_E_stars'
-     stop
-  endif
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
-
-  allocate(spectre_etoiles_cumul(0:n_lambda), spectre_etoiles(n_lambda), spectre_emission_cumul(0:n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error spectre_etoile'
-     stop
-  endif
-  spectre_etoiles_cumul = 0.0
-  spectre_etoiles = 0.0
-  spectre_emission_cumul = 0.0
+  call allocate_stellar_spectra()
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(Nc,n_lambda), kappa_sca(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
@@ -335,22 +315,8 @@ subroutine alloc_dynamique(n_cells_max)
   endif
   l_emission_pah = .false.
 
-
-  allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
-     stop
-  endif
-  prob_E_cell = 0.0
-
   if (lweight_emission) then
-     allocate(weight_proba_emission(Nc), correct_E_emission(Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error prob_E_cell'
-        stop
-     endif
-     weight_proba_emission = 1.0 ;
-     correct_E_emission = 1.0 ;
+     call allocate_weight_proba_emission(Nc)
   endif
 
 
@@ -367,232 +333,14 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux de temperature
   ! **************************************************
-  allocate(Temperature(Nc), Temperature_old(Nc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error Temperature'
-     stop
-  endif
-  Temperature = 0.0 ; Temperature_old=0.0
-
-
-  if (lRE_nLTE) then
-     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error Temperature_1grain'
-        stop
-     endif
-     Temperature_1grain = 0.0
-  endif
-
-  if (lnRE) then
-     if ( (.not.ltemp).and.(lsed.or.lmono0.or.lProDiMo.or.lProDiMo2mcfost) ) then ! si ltemp --> tableau alloue ci-dessous
-        allocate(tab_Temp(n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_Temp'
-           stop
-        endif
-        tab_Temp = 0.0
-     endif
-
-     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,Nc), &
-          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error Proba_Temperature'
-        stop
-     endif
-     Proba_Temperature=0.0
-     Temperature_1grain_nRE=0.0
-
-     allocate(l_RE(grain_nRE_start:grain_nRE_end,Nc), lchange_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error l_RE'
-        stop
-     endif
-     l_RE=.false. ; lchange_nRE = .false.
-  endif
+  call allocate_temperature(Nc)
 
   ! **************************************************
   ! Tableaux relatifs au *calcul* de la temperature
   ! **************************************************
   if (lTemp) then
-     allocate(tab_Temp(n_T), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_Temp'
-        stop
-     endif
-     tab_Temp = 0.0
-
-     allocate(log_E_em(n_T,Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error log_E_em'
-        stop
-     endif
-     log_E_em = 0.0
-
-     allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa_abs_1grain'
-        stop
-     endif
-     DensE = 0.0 ; DensE_m1 = 0.0
-
-     if (lRE_LTE) then
-        allocate(xKJ_abs(Nc,nb_proc), E0(Nc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xKJ_abs'
-           stop
-        endif
-        xKJ_abs = 0.0 ; E0 = 0.0
-     endif
-
-     lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
-     if (lRE_nLTE .or. lnRE .or. (lxJ_abs.and.lsed.and.lsed_complete)) then
-        allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xJ_abs'
-           stop
-        endif
-        xJ_abs=0.0 ; J0 = 0.0
-     endif
-
-     allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xT_ech'
-        stop
-     endif
-     xT_ech = 2
-
-     if (lreemission_stats) then
-        allocate(nbre_reemission(Nc,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error nbre_reemission'
-           stop
-        endif
-        nbre_reemission = 0.0
-     endif
-
-     mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
-     if (mem_size < max_mem) then
-        low_mem_th_emission = .false.
-        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
-        allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_CDF'
-           stop
-        endif
-        kdB_dT_CDF = 0
-     else
-        low_mem_th_emission = .true.
-        write(*,*) "Using low memory mode for thermal emission"
-        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
-           stop
-        endif
-        kdB_dT_1grain_LTE_CDF = 0
-     endif
-
-     if (lRE_nLTE) then
-
-        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
-        if (mem_size < max_mem) then
-           low_mem_th_emission_nLTE = .false.
-           if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
-           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
-           if (alloc_status > 0) then
-              write(*,*) 'Allocation error kabs_nLTE_CDF'
-              stop
-           endif
-           kabs_nLTE_CDF = 0.0
-        else
-           low_mem_th_emission_nLTE = .true.
-           write(*,*) "Using low memory mode for nLTE thermal emission"
-        endif
-
-        allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_nLTE_CDF'
-           stop
-        endif
-        kdB_dT_1grain_nLTE_CDF=0.0
-
-        allocate(log_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error log_E_em_1grain'
-           stop
-        endif
-        log_E_em_1grain=0.0
-
-        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xT_ech_1grain'
-           stop
-        endif
-        xT_ech_1grain = 2
-     endif
-
-
-     if (lnRE) then
-        allocate(E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T),&
-             log_E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error E_em_1grain'
-           stop
-        endif
-        E_em_1grain_nRE=0.0
-        log_E_em_1grain_nRE=0.0
-
-        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Temperature_1grain_nRE_old'
-           stop
-        endif
-        Temperature_1grain_nRE_old =0.0
-
-        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
-             maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
-             stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tpeak'
-           stop
-        endif
-        Tpeak_old=0
-        maxP_old=0.
-
-        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xT_ech_1grain_nRE'
-           stop
-        endif
-        xT_ech_1grain_nRE = 2
-
-        allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_nRE_CDF'
-           stop
-        endif
-        kdB_dT_1grain_nRE_CDF=0.0
-
-        if (lRE_nlTE) then
-           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-           if (alloc_status > 0) then
-              write(*,*) 'Allocation error Temperature_1grain_old'
-              stop
-           endif
-           Temperature_old=0.
-        endif
-     endif
-
+     call allocate_thermal_emission(Nc, p_Nc)
   endif ! lTemp
-
-  if (lnRE) then
-     allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error Emissivite_nRE_old'
-        stop
-     endif
-     Emissivite_nRE_old = 0.0
-  endif
 
   ! **************************************************
   ! Tableaux relatifs aux SEDs
@@ -803,14 +551,15 @@ end subroutine alloc_dynamique
 
 subroutine dealloc_em_th()
 
-  deallocate(n_phot_envoyes)
+  use thermal_emission, only : deallocate_thermal_emission
+  use stars, only : deallocate_stellar_spectra
 
+  deallocate(n_phot_envoyes)
 
   deallocate(tab_albedo,C_ext,C_sca,C_abs,C_abs_norm,tab_g) ! q_geo
 
   !deallocate(E_stars,E_disk,frac_E_stars,E_totale)
-
-  deallocate(spectre_etoiles_cumul,spectre_etoiles, spectre_emission_cumul, CDF_E_star, prob_E_star, E_stars)
+  call deallocate_stellar_spectra()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
@@ -835,32 +584,10 @@ subroutine dealloc_em_th()
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
 
   deallocate(l_emission_pah) ! OUTDATED
-  deallocate(prob_E_cell)
   if (lorigine) deallocate(disk_origin,star_origin)
 
   if (lTemp) then
-     deallocate(tab_Temp)
-     if (lsed_complete) then
-        deallocate(log_E_em)
-        deallocate(DensE, DensE_m1, Dcoeff)
-        if (allocated(xKJ_abs)) deallocate(xKJ_abs,E0)
-        if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
-        if (allocated(nbre_reemission)) deallocate(nbre_reemission)
-        if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
-     endif
-
-     if (lRE_nLTE) then
-        deallocate(kabs_nLTE_CDF,kdB_dT_1grain_nLTE_CDF,log_E_em_1grain)
-        deallocate(xT_ech_1grain)
-     endif
-
-     if (lnRE) then
-        deallocate(E_em_1grain_nRE,log_E_em_1grain_nRE)
-        deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
-        deallocate(Emissivite_nRE_old)
-        deallocate(Tpeak_old)
-        if (lRE_nlTE) deallocate(Temperature_1grain_old)
-     endif
+     call deallocate_thermal_emission()
   endif ! lTemp
 
   if (lTemp.or.lsed) then
@@ -877,6 +604,8 @@ end subroutine dealloc_em_th
 !******************************************************************************
 
 subroutine realloc_dust_mol()
+
+  use stars, only : allocate_stellar_spectra
 
   integer :: alloc_status, mem_size
 
@@ -988,23 +717,7 @@ subroutine realloc_dust_mol()
   tab_albedo_pos = 0
   tab_g_pos = 0.0
 
-  allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error spectre_etoile'
-     stop
-  endif
-  spectre_etoiles_cumul = 0.0
-  spectre_etoiles = 0.0
-
-  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_star'
-     stop
-  endif
-  CDF_E_star = 0.0
-  prob_E_star = 0.0
-  E_stars = 0.0
-
+  call allocate_stellar_spectra()
 
   return
 
@@ -1037,6 +750,10 @@ end subroutine clean_mem_dust_mol
 
 subroutine realloc_step2()
 
+  use radiation_field, only : allocate_radiation_field_step2
+  use stars, only : allocate_stellar_spectra, deallocate_stellar_spectra
+  use thermal_emission, only : deallocate_temperature_calculation, realloc_emitting_fractions
+
   integer :: alloc_status, mem_size, p_n_lambda2_pos
 
   if (ldust_prop) then
@@ -1059,22 +776,10 @@ subroutine realloc_step2()
 
   ! Liberation memoire
   if (ltemp) then
-     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_E_em, xT_ech,xKJ_abs)
-     if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
-     if (lreemission_stats) deallocate(nbre_reemission)
-     if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
-     if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
+     call deallocate_temperature_calculation()
   endif
 
-  lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
-  if (lxJ_abs) then
-     allocate(xJ_abs(n_cells,n_lambda2,nb_proc), J0(n_cells,n_lambda2), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xJ_abs in realloc_step2'
-        stop
-     endif
-     xJ_abs = 0.0
-  endif
+  call allocate_radiation_field_step2()
 
   ! Liberation memoire step1 et reallocation step 2
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
@@ -1178,49 +883,10 @@ subroutine realloc_step2()
   endif
   n_phot_envoyes = 0.0
 
-  deallocate(prob_E_cell)
-  allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
-     stop
-  endif
-  prob_E_cell = 0.0
+  call deallocate_stellar_spectra()
+  call allocate_stellar_spectra()
 
-  deallocate(CDF_E_star,prob_E_star)
-  allocate(CDF_E_star(n_lambda2,0:n_etoiles), prob_E_star(n_lambda2,n_etoiles), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_star'
-     stop
-  endif
-  CDF_E_star = 0.0 ; prob_E_star = 0.0
-
-  deallocate(spectre_etoiles_cumul, spectre_etoiles, spectre_emission_cumul)
-  allocate(spectre_etoiles_cumul(0:n_lambda2),spectre_etoiles(n_lambda2),spectre_emission_cumul(0:n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error spectre_etoile'
-     stop
-  endif
-  spectre_etoiles_cumul = 0.0
-  spectre_etoiles = 0.0
-  spectre_emission_cumul = 0.0
-
-  deallocate(E_stars, E_disk,E_ISM)
-  allocate(E_stars(n_lambda2), E_disk(n_lambda2), E_ISM(n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error E_stars'
-     stop
-  endif
-  E_stars = 0.0
-  E_disk = 0.0
-  E_ISM = 0.0
-
-  deallocate(frac_E_stars, frac_E_disk, E_totale)
-  allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error frac_E_stars'
-     stop
-  endif
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+  call realloc_emitting_fractions()
 
   deallocate(tab_albedo)
   allocate(tab_albedo(n_grains_tot,n_lambda2), stat=alloc_status)
@@ -1568,16 +1234,14 @@ end subroutine alloc_emission_mol
 
 subroutine dealloc_emission_mol()
 
+  use stars, only : deallocate_stellar_spectra
+
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa,emissivite_dust)
   if (allocated(kappa_sca)) deallocate(kappa_sca)
-  if (allocated(spectre_etoiles)) deallocate(spectre_etoiles)
-  if (allocated(spectre_etoiles_cumul)) deallocate(spectre_etoiles_cumul)
-  if (allocated(CDF_E_star)) deallocate(CDF_E_star)
-  if (allocated(prob_E_star)) deallocate(prob_E_star)
-  if (allocated(E_stars)) deallocate(E_stars)
-  if (allocated(E_ISM)) deallocate(E_ISM)
+
+  call deallocate_stellar_spectra()
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &

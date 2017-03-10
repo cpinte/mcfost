@@ -6,6 +6,7 @@ module disk_physics
   use prop_star
   use molecular_emission, only : densite_gaz
   use constantes
+  use stars, only : spectre_etoiles
 
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
 

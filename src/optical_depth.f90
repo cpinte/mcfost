@@ -13,7 +13,9 @@ module optical_depth
 
   use dust_ray_tracing
   use grid
-  use cylindrical_grid
+  use cylindrical_grid, only : prec_grille
+
+  use radiation_field, only : save_radiation_field
 
   implicit none
 
@@ -161,104 +163,6 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 end subroutine physical_length
 
 !********************************************************************
-
-subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
-
-  integer, intent(in) :: id,lambda,p_lambda,icell0
-  real(kind=dp), dimension(4), intent(in) :: Stokes
-  real(kind=dp) :: l, x0,y0,z0, x1,y1,z1, u,v,w
-  logical, intent(in) :: flag_star, flag_direct_star
-
-
-  real(kind=dp) :: xm,ym,zm, phi_pos, phi_vol
-  integer :: psup, phi_I, theta_I, phi_k
-
-  if (letape_th) then
-     if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-     if (lRE_nLTE .or. lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-  else
-     if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
-        xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
-        ! Pour statistique: nbre de paquet contribuant a intensite specifique
-        if (lProDiMo) xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
-     endif ! lProDiMo
-
-     if (lscatt_ray_tracing1) then
-        xm = 0.5_dp * (x0 + x1)
-        ym = 0.5_dp * (y0 + y1)
-        zm = 0.5_dp * (z0 + z1)
-
-        if (l3D) then ! phik & psup=1 in 3D
-           phi_k = 1
-           psup = 1
-        else
-           phi_pos = atan2(ym,xm)
-           phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
-           if (phi_k > n_az_rt) phi_k=n_az_rt
-
-           if (zm > 0.0_dp) then
-              psup = 1
-           else
-              psup = 2
-           endif
-        endif
-
-        if (lsepar_pola) then
-           call calc_xI_scatt_pola(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
-        else
-           ! ralentit d'un facteur 5 le calcul de SED
-           ! facteur limitant
-           call calc_xI_scatt(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
-        endif
-
-     else if (lscatt_ray_tracing2) then ! only 2D
-        if (flag_direct_star) then
-           I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
-        else
-           xm = 0.5_dp * (x0 + x1)
-           ym = 0.5_dp * (y0 + y1)
-           zm = 0.5_dp * (z0 + z1)
-           phi_pos = atan2(ym,xm)
-
-           phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
-
-
-           !  if (l_sym_ima) then
-           !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-           !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
-           !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
-           !     if (phi_I > n_phi_I) phi_I = n_phi_I
-           !  else
-           phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
-           if (phi_I > n_phi_I) phi_I = 1
-           !  endif
-
-           if (zm > 0.0_dp) then
-              theta_I = floor(0.5_dp*( w + 1.0_dp) * n_theta_I) + 1
-           else
-              theta_I = floor(0.5_dp*(-w + 1.0_dp) * n_theta_I) + 1
-           endif
-           if (theta_I > n_theta_I) theta_I = n_theta_I
-
-           I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
-
-           if (lsepar_contrib) then
-              if (flag_star) then
-                 I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
-              else
-                 I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
-              endif
-           endif ! lsepar_contrib
-
-        endif ! flag_direct_star
-     endif !lscatt_ray_tracing
-  endif !letape_th
-
-  return
-
-end subroutine save_radiation_field
-
-!*************************************************************************************
 
 subroutine integ_tau(lambda)
 
@@ -981,63 +885,6 @@ subroutine no_dark_zone()
   return
 
 end subroutine no_dark_zone
-
-!***********************************************************
-
-subroutine define_proba_weight_emission(lambda)
-  ! Augmente le poids des cellules pres de la surface
-  ! par exp(-tau)
-  ! Le poids est applique par weight_repartion_energie
-  ! C. Pinte
-  ! 19/11/08
-
-  implicit none
-
-  integer, intent(in) :: lambda
-
-  real, dimension(n_cells) :: tau_min
-  real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
-  real :: tau
-  integer :: i, j, n, id, icell
-  integer, parameter :: nbre_angle = 101
-
-  tau_min(:) = 1.e30 ;
-
-  do icell=1,n_cells
-     do n=1,nbre_angle
-        id=1
-        ! position et direction vol
-        angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
-        i = cell_map_i(icell)
-        j = cell_map_j(icell)
-        x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
-        y0=0.0
-        z0=0.99999*z_lim(i,j+1)
-        u0=cos(angle)
-        v0=0.0
-        w0=sin(angle)
-
-        Stokes(:) = 0.0_dp ;
-        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
-        if (tau < tau_min(icell)) tau_min(icell) = tau
-
-        x0 = 0.99999*r_lim(i)
-        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
-        if (tau < tau_min(icell)) tau_min(icell) = tau
-
-     enddo
-  enddo ! icell
-
-
-  weight_proba_emission(1:n_cells) =  exp(-tau_min(:))
-
-  ! correct_E_emission sera normalise dans repartition energie
-  correct_E_emission(1:n_cells) = 1.0_dp / weight_proba_emission(1:n_cells)
-
-  return
-
-end subroutine define_proba_weight_emission
 
 !***********************************************************
 

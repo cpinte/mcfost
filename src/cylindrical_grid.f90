@@ -1,8 +1,22 @@
 module cylindrical_grid
 
-  use mem
+  use constantes
+  use parametres !, only : dp, icell_ref
+  use disk, only : disk_zone_type, disk_zone
+  use opacity, only :  cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
+       delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
+       n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
 
   implicit none
+
+  public :: cell2cylindrical, cross_cylindrical_cell, pos_em_cellule_cyl, indice_cellule_cyl, test_exit_grid_cyl, &
+       move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping
+
+  real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
+
+  private
+
+  real(kind=dp) :: zmaxmax
 
 contains
 

@@ -12,10 +12,378 @@ module thermal_emission
   use utils
   use PAH
   use grid
+  use stars, only : spectre_etoiles
 
   implicit none
 
+  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk
+
+  public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
+       allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
+       define_proba_weight_emission, emission_nre, im_reemission_lte, im_reemission_nlte, &
+       im_reemission_qre, init_emissivite_nre, init_reemission, internal_heating, select_wl_em, &
+       select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
+       repartition_wl_em, repartition_energie
+
+  private
+
+  ! Choix cellule d'emission pour cas monochromatique
+  real(kind=dp), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
+  real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
+
+  ! fraction d'energie reemise sur energie etoile
+  ! (Opacite moyenne de Planck * coeff)
+  real, dimension(:,:), allocatable :: log_E_em ! 0:n_T, n_cells
+  real, dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
+  real, dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
+
+  ! Probabilite cumulee en lambda d'emissivite de la poussiere
+  ! avec correction de temperature (dp/dT)
+  ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
+  real, dimension(:,:,:), allocatable :: kdB_dT_CDF ! 0:n_T,n_cells,n_lambda
+  real, dimension(:,:,:), allocatable :: kdB_dT_1grain_LTE_CDF, kdB_dT_1grain_nLTE_CDF, kdB_dT_1grain_nRE_CDF ! n_grains,0:n_T,n_lambda
+
+  integer, dimension(:,:), allocatable :: xT_ech ! n_cells, id
+  integer, dimension(:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE ! n_grains, n_cells, id
+
+  ! Proba cumulee en lambda d'emettre selon un corps noir
+  real, dimension(:), allocatable :: spectre_emission_cumul !(0:n_lambda)
+
+  ! emissivite en unite qq (manque une cst mais travail en relatif)
+  real(kind=dp), dimension(:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
+
+  real(kind=dp), dimension(:,:), allocatable :: nbre_reemission ! n_cells, id
+
+
   contains
+
+subroutine allocate_thermal_emission(Nc,p_Nc)
+
+  use radiation_field, only : allocate_radiation_field_step1
+
+  integer, intent(in) :: Nc, p_Nc
+
+  integer :: alloc_status
+  real :: mem_size
+
+  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error frac_E_stars'
+     stop
+  endif
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+
+  allocate(spectre_emission_cumul(0:n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error spectre_etoile'
+     stop
+  endif
+  spectre_emission_cumul = 0.0
+
+  allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error prob_E_cell'
+     stop
+  endif
+  prob_E_cell = 0.0
+
+  allocate(tab_Temp(n_T), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tab_Temp'
+     stop
+  endif
+  tab_Temp = 0.0
+
+  allocate(log_E_em(n_T,Nc), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error log_E_em'
+     stop
+  endif
+  log_E_em = 0.0
+
+  allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error kappa_abs_1grain'
+     stop
+  endif
+  DensE = 0.0 ; DensE_m1 = 0.0
+
+  call allocate_radiation_field_step1(Nc)
+
+  allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error xT_ech'
+     stop
+  endif
+  xT_ech = 2
+
+  if (lreemission_stats) then
+     allocate(nbre_reemission(Nc,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error nbre_reemission'
+        stop
+     endif
+     nbre_reemission = 0.0
+  endif
+
+     mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
+     if (mem_size < max_mem) then
+        low_mem_th_emission = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
+        allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_CDF'
+           stop
+        endif
+        kdB_dT_CDF = 0
+     else
+        low_mem_th_emission = .true.
+        write(*,*) "Using low memory mode for thermal emission"
+        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
+           stop
+        endif
+        kdB_dT_1grain_LTE_CDF = 0
+     endif
+
+     if (lRE_nLTE) then
+
+        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
+        if (mem_size < max_mem) then
+           low_mem_th_emission_nLTE = .false.
+           if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
+           if (alloc_status > 0) then
+              write(*,*) 'Allocation error kabs_nLTE_CDF'
+              stop
+           endif
+           kabs_nLTE_CDF = 0.0
+        else
+           low_mem_th_emission_nLTE = .true.
+           write(*,*) "Using low memory mode for nLTE thermal emission"
+        endif
+
+        allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_1grain_nLTE_CDF'
+           stop
+        endif
+        kdB_dT_1grain_nLTE_CDF=0.0
+
+        allocate(log_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error log_E_em_1grain'
+           stop
+        endif
+        log_E_em_1grain=0.0
+
+        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xT_ech_1grain'
+           stop
+        endif
+        xT_ech_1grain = 2
+     endif
+
+
+     if (lnRE) then
+        allocate(E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T),&
+             log_E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error E_em_1grain'
+           stop
+        endif
+        E_em_1grain_nRE=0.0
+        log_E_em_1grain_nRE=0.0
+
+        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error Temperature_1grain_nRE_old'
+           stop
+        endif
+        Temperature_1grain_nRE_old =0.0
+
+        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
+             maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
+             stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error Tpeak'
+           stop
+        endif
+        Tpeak_old=0
+        maxP_old=0.
+
+        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error xT_ech_1grain_nRE'
+           stop
+        endif
+        xT_ech_1grain_nRE = 2
+
+        allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error kdB_dT_1grain_nRE_CDF'
+           stop
+        endif
+        kdB_dT_1grain_nRE_CDF=0.0
+
+        if (lRE_nlTE) then
+           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
+           if (alloc_status > 0) then
+              write(*,*) 'Allocation error Temperature_1grain_old'
+              stop
+           endif
+           Temperature_old=0.
+        endif
+     endif
+
+     if (lnRE) then
+        allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error Emissivite_nRE_old'
+           stop
+        endif
+        Emissivite_nRE_old = 0.0
+     endif
+
+     return
+
+end subroutine allocate_thermal_emission
+
+!***************************************************
+
+subroutine deallocate_thermal_emission()
+
+  use radiation_field, only : deallocate_radiation_field
+
+  deallocate(tab_Temp)
+  if (lsed_complete) then
+     deallocate(log_E_em)
+     deallocate(DensE, DensE_m1, Dcoeff)
+     call deallocate_radiation_field()
+     if (allocated(nbre_reemission)) deallocate(nbre_reemission)
+     if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
+  endif
+
+  deallocate(prob_E_cell)
+
+  if (lRE_nLTE) then
+     deallocate(kabs_nLTE_CDF,kdB_dT_1grain_nLTE_CDF,log_E_em_1grain)
+     deallocate(xT_ech_1grain)
+  endif
+
+  if (lnRE) then
+     deallocate(E_em_1grain_nRE,log_E_em_1grain_nRE)
+     deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
+     deallocate(Emissivite_nRE_old)
+     deallocate(Tpeak_old)
+     if (lRE_nlTE) deallocate(Temperature_1grain_old)
+  endif
+
+  return
+
+end subroutine deallocate_thermal_emission
+
+!***************************************************
+
+subroutine deallocate_temperature_calculation()
+
+  use radiation_field, only : deallocate_radiation_field
+
+  if (lRE_LTE)  deallocate(kdB_dT_CDF, log_E_em, xT_ech)
+  if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
+  if (lreemission_stats) deallocate(nbre_reemission)
+  if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
+  call deallocate_radiation_field()
+
+  return
+
+end subroutine deallocate_temperature_calculation
+
+!***************************************************
+
+subroutine realloc_emitting_fractions()
+
+  integer :: alloc_status
+
+  deallocate(frac_E_stars, frac_E_disk, E_totale)
+  allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error frac_E_stars'
+     stop
+  endif
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+
+  allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error prob_E_cell'
+     stop
+  endif
+  prob_E_cell = 0.0
+
+  return
+
+end subroutine realloc_emitting_fractions
+
+!***************************************************
+
+
+subroutine allocate_temperature(Nc)
+
+  integer, intent(in) :: Nc
+
+  integer :: alloc_status
+
+  allocate(Temperature(Nc), Temperature_old(Nc), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error Temperature'
+     stop
+  endif
+  Temperature = 0.0 ; Temperature_old=0.0
+
+
+  if (lRE_nLTE) then
+     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error Temperature_1grain'
+        stop
+     endif
+     Temperature_1grain = 0.0
+  endif
+
+  if (lnRE) then
+     if ( (.not.ltemp).and.(lsed.or.lmono0.or.lProDiMo.or.lProDiMo2mcfost) ) then ! si ltemp --> tableau alloue ci-dessous
+        allocate(tab_Temp(n_T), stat=alloc_status)
+        if (alloc_status > 0) then
+           write(*,*) 'Allocation error tab_Temp'
+           stop
+        endif
+        tab_Temp = 0.0
+     endif
+
+     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,Nc), &
+          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error Proba_Temperature'
+        stop
+     endif
+     Proba_Temperature=0.0
+     Temperature_1grain_nRE=0.0
+
+     allocate(l_RE(grain_nRE_start:grain_nRE_end,Nc), lchange_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error l_RE'
+        stop
+     endif
+     l_RE=.false. ; lchange_nRE = .false.
+  endif
+
+  return
+
+end subroutine allocate_temperature
+
+!***************************************************
 
 subroutine repartition_wl_em()
 ! Pour step 1
@@ -105,6 +473,8 @@ subroutine init_reemission()
 ! + les termes k dB/dT pour tirage de la longueur d'onde du photon emis
 ! avec correction de temperature
 ! C. Pinte 17/01/05
+
+  use radiation_field, only : J0
 
   implicit none
 
@@ -312,6 +682,8 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
+  use radiation_field, only : xKJ_abs, E0
+
   implicit none
 
   integer, intent(in) :: id, icell, p_icell
@@ -405,6 +777,8 @@ end subroutine im_reemission_LTE
 subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
+
+  use radiation_field, only : xJ_abs, J0
 
   implicit none
 
@@ -500,6 +874,8 @@ subroutine Temp_finale()
 ! Cas de l'"absoprtion continue"
 ! C. Pinte
 ! 24/01/05
+
+  use radiation_field, only : xKJ_abs, E0
 
   implicit none
 
@@ -604,6 +980,8 @@ subroutine Temp_finale_nLTE()
 ! C. Pinte
 ! 24/01/05
 
+  use radiation_field, only : xJ_abs, J0
+
   implicit none
 
   integer :: T_int, T1, T2, icell
@@ -684,6 +1062,8 @@ end subroutine Temp_finale_nLTE
 subroutine Temp_nRE(lconverged)
 ! C. Pinte
 ! 26/01/07
+
+  use radiation_field, only : xJ_abs, J0
 
   implicit none
 
@@ -1112,6 +1492,8 @@ end subroutine Temp_nRE
 subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule
 ! Reemission d'un photon a la bonne longeur d'onde
+
+  use radiation_field, only : xJ_abs, J0
 
   implicit none
 
@@ -1602,6 +1984,8 @@ subroutine internal_heating(lextra_heating,dudt)
   ! C. Pinte
   ! 27/02/06
 
+  use radiation_field, only : E0
+
   implicit none
 
   logical, intent(in) :: lextra_heating
@@ -1714,36 +2098,128 @@ end function select_absorbing_grain
 
 !**********************************************************************
 
-subroutine reset_radiation_field()
+subroutine select_cellule(lambda,aleat, icell)
+  ! Sélection de la cellule qui va émettre le photon
+  ! C. Pinte
+  ! 04/02/05
+  ! Modif 3D 10/06/05
 
-  if (lRE_LTE) then
-     xKJ_abs(:,:) = 0.0_dp
-     E0 = 0.0_dp
+  implicit none
+
+  integer, intent(in) :: lambda
+  real, intent(in) :: aleat
+  integer, intent(out) :: icell
+  integer :: k, kmin, kmax
+
+  ! Dichotomie
+  kmin=0
+  kmax=n_cells
+  k=(kmin+kmax)/2
+
+  do while ((kmax-kmin) > 1)
+     if (prob_E_cell(k,lambda) < aleat) then
+        kmin = k
+     else
+        kmax = k
+     endif
+     k = (kmin + kmax)/2
+   enddo   ! while
+   icell=kmax
+
+   return
+
+end subroutine select_cellule
+
+!***********************************************************
+
+subroutine define_proba_weight_emission(lambda)
+  ! Augmente le poids des cellules pres de la surface
+  ! par exp(-tau)
+  ! Le poids est applique par weight_repartion_energie
+  ! C. Pinte
+  ! 19/11/08
+
+  integer, intent(in) :: lambda
+
+!--  use optical_depth, only : optical_length_tot
+!--
+!--  implicit none
+!--
+!--
+!--
+!--  real, dimension(n_cells) :: tau_min
+!--  real(kind=dp), dimension(4) :: Stokes
+!--  real(kind=dp) :: x0, y0, z0, u0, v0, w0, angle, lmin, lmax
+!--  real :: tau
+!--  integer :: i, j, n, id, icell
+!--  integer, parameter :: nbre_angle = 101
+!--
+!--  tau_min(:) = 1.e30 ;
+!--
+!--  do icell=1,n_cells
+!--     do n=1,nbre_angle
+!--        id=1
+!--        ! position et direction vol
+!--        angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
+!--        i = cell_map_i(icell)
+!--        j = cell_map_j(icell)
+!--        x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
+!--        y0=0.0
+!--        z0=0.99999*z_lim(i,j+1)
+!--        u0=cos(angle)
+!--        v0=0.0
+!--        w0=sin(angle)
+!--
+!--        Stokes(:) = 0.0_dp ;
+!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+!--        if (tau < tau_min(icell)) tau_min(icell) = tau
+!--
+!--        x0 = 0.99999*r_lim(i)
+!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+!--        if (tau < tau_min(icell)) tau_min(icell) = tau
+!--
+!--     enddo
+!--  enddo ! icell
+!--
+!--
+!--  weight_proba_emission(1:n_cells) =  exp(-tau_min(:))
+!--
+!--  ! correct_E_emission sera normalise dans repartition energie
+!--  correct_E_emission(1:n_cells) = 1.0_dp / weight_proba_emission(1:n_cells)
+!--
+!--  return
+
+end subroutine define_proba_weight_emission
+
+!***********************************************************
+
+subroutine allocate_weight_proba_emission(Nc)
+
+  integer, intent(in) :: Nc
+
+  integer ::  alloc_status
+
+  allocate(weight_proba_emission(Nc), correct_E_emission(Nc), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error prob_E_cell'
+     stop
   endif
-  if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
-  xT_ech = 2
-  Temperature = 1.0
-
-
-!  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
-!
-!  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
-!
-!  spectre_etoiles_cumul = 0.0
-!  spectre_etoiles = 0.0
-!  spectre_emission_cumul = 0.0
-!
-!  prob_E_cell = 0.0
-!
-!  log_E_em = 0.0
-!
-!
-!  kdB_dT_CDF = 0
+  weight_proba_emission = 1.0 ;
+  correct_E_emission = 1.0 ;
 
   return
 
-end subroutine reset_radiation_field
+end subroutine allocate_weight_proba_emission
 
-!**********************************************************************
+!***********************************************************
+
+subroutine reset_temperature()
+
+  xT_ech = 2
+  Temperature = 1.0
+
+  return
+
+end subroutine reset_temperature
 
 end module thermal_emission

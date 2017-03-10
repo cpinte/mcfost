@@ -8,7 +8,6 @@ module PAH
   use nr, only : indexx, indexx_sp
 
   use dust_prop
-  use optical_depth
   use utils, only : interp
 
   implicit none

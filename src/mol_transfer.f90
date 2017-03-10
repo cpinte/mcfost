@@ -23,6 +23,8 @@ module mol_transfer
   use stars
   use grid
 
+  use mem
+
   implicit none
 
   contains
