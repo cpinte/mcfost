@@ -198,10 +198,6 @@ module disk
   !! Loi exp (Garaud , Barriere 2004)
 !!  real, parameter :: fact_strat = 0.3
 
-  ! Grille
-  real(kind=dp), parameter :: prec_grille=1.0e-14_dp
-  real(kind=dp), parameter :: prec_grille_sph=1.0e-10_dp
-
   real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
   real(kind=dp), dimension(:,:), allocatable :: star_origin
   real(kind=dp) :: frac_star_origin
@@ -270,6 +266,8 @@ module prop_star
   real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
 
   character(len=8) :: system_age
+
+  real, dimension(:), allocatable :: spectre_etoiles_cumul, spectre_etoiles !(0:n_lambda)
 
 end module prop_star
 
@@ -406,7 +404,6 @@ module opacity
   implicit none
   save
 
-  real(kind=dp) :: zmaxmax
   integer, dimension(:), allocatable :: lexit_cell
   real(kind=dp), dimension(:), allocatable :: zmax !n_rad
   real(kind=dp), dimension(:), allocatable :: volume !n_rad en AU^3
@@ -459,7 +456,7 @@ end module opacity
 !********************************************************************
 
 module resultats
-  use parametres
+
   use parametres
   use opacity, only : zmax
 
@@ -498,48 +495,18 @@ module em_th
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
   ! Gamme de longueurs d'onde utilisees
-  real :: lambda_min, lambda_max = 3000.0
+  real :: lambda_min, lambda_max
   ! Echelle_log
   ! Nbre d'intervalle de longueur d'onde
   real(kind=dp) :: delta_lambda
-
-  ! Proba cumulee en lambda d'emettre selon un coprs noir
-  real, dimension(:), allocatable :: spectre_etoiles_cumul, spectre_etoiles !(0:n_lambda)
-  real, dimension(:), allocatable :: spectre_emission_cumul !(0:n_lambda)
 
   ! Nbre de temperatures utilisee pour pretabule kplanck et prob_delta_T
   ! et temperature echantillonee
   integer  :: n_T
   real, dimension(:), allocatable :: tab_Temp
-!  real, dimension(n_rad,nz,n_T) :: spline_Temp
+  ! real, dimension(n_rad,nz,n_T) :: spline_Temp
 
-  ! fraction d'energie reemise sur energie etoile
-  ! (Opacite moyenne de Planck * coeff)
-  real, dimension(:,:), allocatable :: log_E_em ! 0:n_T, n_cells
-  real, dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
-  real, dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
-
-  ! Probabilite cumulee en lambda d'emissivite de la poussiere
-  ! avec correction de temperature (dp/dT)
-  ! (Bjorkman & Wood 2001, A&A 554-615 -- eq 9)
-  real, dimension(:,:,:), allocatable :: kdB_dT_CDF ! 0:n_T,n_cells,n_lambda
-  real, dimension(:,:,:), allocatable :: kdB_dT_1grain_LTE_CDF, kdB_dT_1grain_nLTE_CDF, kdB_dT_1grain_nRE_CDF ! n_grains,0:n_T,n_lambda
-
-  ! pour stockage des cellules par lequelles on passe
-  ! longueur de vol cumulee dans la cellule
-  real(kind=dp), dimension(:,:), allocatable :: xKJ_abs, nbre_reemission ! n_cells, id
-  real(kind=dp), dimension(:), allocatable :: E0 ! n_cells
-  real(kind=dp), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
-  ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
-  real(kind=dp), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
-  real, dimension(:,:,:), allocatable :: xN_abs ! n_cells, n_lambda, nb_proc
-
-  integer, dimension(:,:), allocatable :: xT_ech ! n_cells, id
-  integer, dimension(:,:,:), allocatable :: xT_ech_1grain, xT_ech_1grain_nRE ! n_grains, n_cells, id
-
-  real(kind=dp) :: E_abs_nRE, E_abs_nREm1
-  ! emissivite en unite qq (manque une cst mais travail en relatif)
-  real(kind=dp), dimension(:,:), allocatable :: Emissivite_nRE_old ! n_lambda, n_rad, nz, n_az
+  real(kind=dp) :: E_abs_nRE
 
   real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
   real, dimension(:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
@@ -547,26 +514,11 @@ module em_th
   integer, dimension(:,:), allocatable :: Tpeak_old
   real, dimension(:,:,:), allocatable :: Proba_Temperature !n_T, n_cells,, n_grains
   logical, dimension(:,:), allocatable :: l_RE, lchange_nRE ! n_grains, n_cells
+
   real :: nbre_photons_tot, L_packet_th
-
-
-  ! Choix cellule d'emission pour cas monochromatique
-  real(kind=dp), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
-  real, dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
   ! Biais de l'emission vers la surface du disque
   real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
-
-  ! Suppresion de grains
-  integer :: specie_removed
-  real :: T_rm
-
-  character(len=512) :: Tfile = "./data_th/Temperature.fits.gz"
-  character(len=512) :: Tfile_nLTE = "./data_th/Temperature_nLTE.fits.gz"
-  character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_Diff_approx.fits.gz"
-  character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
-
-  real, dimension(:,:,:), allocatable :: kappa_abs_tmp
 
 end module em_th
 

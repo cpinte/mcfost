@@ -11,9 +11,17 @@ module density
   use nr, only : rkqs
   use grid
   use utils
-  use output
 
   implicit none
+
+  ! Suppresion de grains
+  integer, public :: specie_removed
+  real, public :: T_rm
+
+  public :: define_density, define_density_wall3d, define_dust_density, densite_file, &
+       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file
+
+  private
 
   real :: coeff_exp, coeff1, coeff2, rcyl
 

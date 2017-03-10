@@ -7,9 +7,7 @@ module molecules
   use prop_star
   use grid
   use dust_prop
-  use mem
-
-  use ProDiMo, only : m2p ! to get the continuum radiation field
+  !use ProDiMo, only : m2p ! to get the continuum radiation field
 
   implicit none
 
@@ -686,6 +684,8 @@ subroutine init_dust_mol(imol)
   ! C. Pinte
   ! 17/10/07
   ! TODO : gerer le cas ou l'albedo (et donc scattering) non negligeable
+
+  use mem, only : realloc_dust_mol, clean_mem_dust_mol
 
   implicit none
 

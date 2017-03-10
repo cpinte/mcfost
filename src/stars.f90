@@ -9,7 +9,67 @@ module stars
 
   implicit none
 
+  public :: spectre_etoiles
+
+  public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices
+
+  private
+
+
   contains
+
+subroutine allocate_stellar_spectra()
+
+  integer :: alloc_status
+
+  if (ltemp) then ! Step 1
+     allocate(E_stars(n_lambda), E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error E_stars'
+        stop
+     endif
+     E_stars = 0.0
+     E_disk = 0.0
+     E_ISM = 0.0
+  else ! Step 2
+     allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda),  &
+          E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error prob_E_star'
+        stop
+     endif
+     CDF_E_star = 0.0
+     prob_E_star = 0.0
+     E_stars = 0.0
+     E_disk = 0.0
+     E_ISM = 0.0
+  endif
+
+  allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error spectre_etoile'
+     stop
+  endif
+  spectre_etoiles_cumul = 0.0
+  spectre_etoiles = 0.0
+
+  return
+
+end subroutine allocate_stellar_spectra
+
+!**********************************************************************
+
+subroutine deallocate_stellar_spectra()
+
+  if (allocated(spectre_etoiles)) deallocate(spectre_etoiles,spectre_etoiles_cumul)
+  if (allocated(CDF_E_star)) deallocate(CDF_E_star,prob_E_star,E_stars,E_disk,E_ISM)
+
+  return
+
+end subroutine deallocate_stellar_spectra
+
+!**********************************************************************
 
 subroutine select_etoile(lambda,aleat,n_star)
 ! Sélection d'étoile qui va émettre le photon

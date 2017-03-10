@@ -5,14 +5,15 @@ module ProDiMo
   use em_th
   use constantes
   use molecular_emission
-  use output, only: print_error
   use disk
-  use prop_star
   use resultats
-  use utils
+  use utils, only: get_NH, Blambda, Bnu
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
+  use radiation_field, only : xN_abs, xJ_abs
+  use prop_star, only : spectre_etoiles
   use read_params
   use sha
+  use utils, only : appel_syst
 
   implicit none
 
@@ -391,6 +392,8 @@ contains
     ! - zero, first et second moment of the grain size distribution
     !  N = int f(a) da   <a^i> = 1/N * int int f(a) a^i da
     ! - separation of constribution
+
+    use fits_utils, only : print_error
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes

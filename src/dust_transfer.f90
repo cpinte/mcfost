@@ -37,6 +37,8 @@ module dust_transfer
 
 subroutine transfert_poussiere()
 
+  use thermal_emission, only : frac_E_stars, frac_E_disk
+
   implicit none
 
 #include "sprng_f.h"
@@ -409,6 +411,9 @@ subroutine transfert_poussiere()
            else
               lambda0 = 1 ; p_lambda => lambda0
            endif
+
+           ! reorganisation memoire
+           call realloc_step2()
 
            call init_lambda2()
            call init_indices_optiques()

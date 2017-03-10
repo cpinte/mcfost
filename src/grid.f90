@@ -7,11 +7,11 @@ module grid
   use grains
   use em_th
   use prop_star
-  use mem
   use utils
   use cylindrical_grid
   use spherical_grid
   use Voronoi_grid
+  use ray_tracing, only : lscatt_ray_tracing
 
   implicit none
 
@@ -337,7 +337,6 @@ subroutine init_lambda()
   endif
   tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
-
   if (lmono0) then
      ! Lecture longueur d'onde
      read(band,*) tab_lambda(1)
@@ -376,9 +375,6 @@ subroutine init_lambda2()
 
   integer :: i
 
-  ! reorganisation memoire
-  call realloc_step2()
-
   n_lambda=n_lambda2
   do i=1, n_lambda2
      tab_lambda(i)= tab_lambda2(i)
@@ -392,42 +388,6 @@ subroutine init_lambda2()
 end subroutine init_lambda2
 
 !**********************************************************************
-
-subroutine select_cellule(lambda,aleat, icell)
-  ! Sélection de la cellule qui va émettre le photon
-! C. Pinte
-! 04/02/05
-! Modif 3D 10/06/05
-
-  implicit none
-
-  integer, intent(in) :: lambda
-  real, intent(in) :: aleat
-  integer, intent(out) :: icell
-  integer :: k, kmin, kmax
-
-
-  ! Dichotomie
-  kmin=0
-  kmax=n_cells
-  k=(kmin+kmax)/2
-
-  do while ((kmax-kmin) > 1)
-     if (prob_E_cell(k,lambda) < aleat) then
-        kmin = k
-     else
-        kmax = k
-     endif
-     k = (kmin + kmax)/2
-   enddo   ! while
-   icell=kmax
-
-   return
-
-end subroutine select_cellule
-
-!***********************************************************
-
 
 
 end module grid

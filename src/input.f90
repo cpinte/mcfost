@@ -11,6 +11,11 @@ module input
 
   implicit none
 
+  character(len=512) :: Tfile = "./data_th/Temperature.fits.gz"
+  character(len=512) :: Tfile_nLTE = "./data_th/Temperature_nLTE.fits.gz"
+  character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_DA.fits.gz"
+  character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
+
   contains
 
 subroutine read_opacity_file(pop)
