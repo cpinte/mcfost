@@ -156,6 +156,7 @@ contains
     real, parameter :: Tmin = 10.
 
     real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
+    integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
 
@@ -172,7 +173,7 @@ contains
     logical, save :: lfirst_time = .true.
     logical :: lextra_heating
 
-
+    integer :: i_Phantom
 
     write(*,*)
     write(*,*) "------------------------------"
@@ -190,7 +191,7 @@ contains
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         n_SPH,XX,YY,ZZ,massgas,massdust,rhogas,rhodust,extra_heating)
+         n_SPH,XX,YY,ZZ, particle_id, massgas,massdust,rhogas,rhodust,extra_heating)
 
     lextra_heating = (ndudt == np)
 
@@ -335,7 +336,10 @@ contains
 
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
-       if (i_SPH > 0) Tdust(i_SPH) = Temperature(icell)
+       if (i_SPH > 0) then
+          i_Phantom = particle_id(i_SPH)
+          Tdust(i_Phantom) = Temperature(icell)
+       endif
     enddo
 
     call deallocate_Voronoi()
