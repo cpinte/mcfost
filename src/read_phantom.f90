@@ -7,10 +7,11 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
+ integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust, massdust
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
@@ -232,11 +233,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,massgas,massdust,rhogas,rhodus
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         n_SPH,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating)
+         n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
-    write(*,*) ' ERROR reading h from file'
+    write(*,*) "ERROR reading h from file"
  endif
 
  write(*,*) "Phantom dump file processed ok"
@@ -249,7 +250,7 @@ end subroutine read_phantom_file
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
      massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-     n_SPH,x,y,z,massgas,massdust,rhogas,rhodust,extra_heating)
+     n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -272,6 +273,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   real(dp), dimension(:), intent(in) :: dudt
 
   real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,rhogas,massgas
+  integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
@@ -297,7 +299,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),&
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH), particle_id(n_SPH), &
       x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
@@ -314,6 +316,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
     itypei = abs(iphase(i))
     if (hi > 0. .and. itypei==1) then
        j = j + 1
+       particle_id(j) = i
        x(j) = xi * ulength_au
        y(j) = yi * ulength_au
        z(j) = zi * ulength_au
