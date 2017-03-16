@@ -20,6 +20,7 @@ contains
     integer, parameter :: iunit = 1
 
     real(dp), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
+    integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
 
@@ -30,7 +31,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file, x,y,z,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+       call read_phantom_file(iunit,SPH_file, x,y,z,particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
