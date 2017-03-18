@@ -1,0 +1,15 @@
+if ! [ -f $6 ]
+then
+  cat $5 > $6 
+fi
+
+s=`grep -c "$2     --- $3" $6`
+
+if [ $s = "0" ]
+then
+#  echo -e "        $1   $2     --- $3 $4" >> $6
+# on some systems use echo without '-e'
+# uncomment the next line
+  echo "        $1   $2     --- $3 $4" >> $6
+
+fi

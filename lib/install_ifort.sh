@@ -6,10 +6,13 @@ mkdir include
 
 # SPRNG
 # gcc-2.95 needed
-#wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
+# wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
 tar xzvf sprng2.0b.tar.gz
-\cp -f  ifort/make.CHOICES sprng2.0
-\cp  ifort/make.IFORT sprng2.0/SRC
+\cp -f ifort/make.CHOICES sprng2.0
+\cp -f ifort/make.IFORT sprng2.0/SRC
+if [ $(uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN) -eq 1 ]; then
+  \cp insertmenu.mac sprng2.0/SRC/insertmenu
+fi
 cd sprng2.0
 make -B
 \cp lib/libsprng.a ../lib
@@ -18,7 +21,8 @@ cd ..
 rm -rf sprng2.0
 
 # cfitsio
-# g77 ou f77 needed by configure to set up the fotran wrapper in Makefile
+# g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
+# wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
 ./configure
@@ -28,15 +32,15 @@ cd ..
 rm -rf cfitsio
 
 # voro++
-tar xzvf voro++-0.4.6.tar.gz
-\cp -f  ifort/config.mk voro++-0.4.6
-cd voro++-0.4.6
+tar xzvf voro++_594.tgz
+\cp -f  ifort/config.mk trunk
+cd trunk
 make
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
 \cp src/*.hh ../include/voro++/
 cd ..
-rm -rf voro++-0.4.6
+rm -rf trunk
 
 # Numerical recipes
 mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
@@ -49,6 +53,7 @@ cd nr
 ./clean.sh
 cd ..
 
+# Put in directory
 mkdir -p $MCFOST_INSTALL/include
 \cp -r include/* $MCFOST_INSTALL/include
 mkdir -p $MCFOST_INSTALL/lib/ifort
