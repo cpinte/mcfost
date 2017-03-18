@@ -5,9 +5,18 @@
 */*/*~
 *.a
 *.i90
-src/sha.f90
-lib/include
+include/*
+lib/gfortran/lib*
+lib/gfortran/nr/*
+lib/ifort/lib*
+lib/ifort/nr/*
+lib/include/*
+lib/lib/*
+src/libtmp/*
+src/.make_lastsystem
 src/mcfost
+src/sha.f90
+src/system.f90
 utils/.last_update
 utils/Version
 
