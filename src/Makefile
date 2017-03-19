@@ -1,143 +1,135 @@
-#*************************************************************
-# Makefile code transfert radiatif Monte Carlo MCFOST
-# Multi-systemes
-# Versions sequentielle et parallele (OpenMP)
-#*************************************************************
-# 1er mac est en SSSE3
-# nouveau mac en SSE4.1 (SSE4.2 pour core i7)
+#------------------------------------------------------------------------------#
+# Makefile for Monte Carlo radiative transfer code MCFOST
+#------------------------------------------------------------------------------#
 
-# Choix du type de compilateur
-ARCH = $(shell uname | tr '[a-z]' '[A-Z]')
-PLATFORM =  $(shell uname -p)
 
-# Default is ifort
-COMPILO = ifort
-ifeq ($(gfortran),yes)
-COMPILO = gfortran
+#------------------------------------------------------------------------------#
+# Initialization
+
+KNOWN_SYSTEM= no
+
+LIB= $(MCFOST_INSTALL)/lib
+
+LDFLAGS=
+INCLUDE=
+
+ifndef OPENMP
+    OPENMP= yes
 endif
 
-BINARY = mcfost
-
-# Linux ou Mac x86, ifort 64 bits
-ifeq ($(COMPILO),ifort)
-FC_SER = ifort -fpp -traceback
-FC_OMP = ifort -fpp -openmp -traceback
-
-CC_SER = icc -traceback
-CC_OMP = icc -openmp -traceback
-
-OPTS = -mdynamic-no-pic -O3 -no-prec-div #-fast (because -fast implies -xHOST and -ipo)
-OPTS = -O3 -no-prec-div
-ifeq ($(ipo),yes)
-OPTS2 = $(OPTS) -ipo
-OPTS = $(OPTS2)
-endif
-DEBUG_OPTS = -check all  -C -g  -fpe0 -traceback -no-ftz  -warn uninitialized -warn unused -warn truncated_source # -no-ftz permet eviter bug dans conversion db -> sl
-
-FFLAGS_R8 = -r8
-
-PREC = #
-FFLAGS =-c $(PREC)
-
-ifeq ($(ARCH),DARWIN)
-MACH =  -axSSSE3,SSE4.1,SSE4.2  #-tpp7 #-xW -tune pn4 # - arch i386 ou x86_64
-FFLAGS_EXE = $(PREC) -static-intel -mmacosx-version-min=10.9 #-static-intel #-static-libgcc #problem -static-intel avec Xcode 3.2.2
+ifndef SYSTEM
+    SYSTEM= ifort
 endif
 
-ifeq ($(ARCH),LINUX)
-MACH =  -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX # for froggy, dmz and ifort >=13
-ifeq ($(fostino),yes)
-MACH = -xW -axP # for fostino and ifort 10
-endif
-FFLAGS_EXE = $(PREC) -static-intel #-static-libcxa -i-static # static does not work on froggy
-endif
+#------------------------------------------------------------------------------#
+# System dependent compiler flags
 
-LIBS = $(MCFOST_INSTALL)/lib/ifort/
-
-# Modification de quelques variables pour les xeon phi
-ifeq ($(phi),yes)
-LIBS = $(MCFOST_INSTALL)/lib/xeon-phi/
-OPTS = -O3 -no-prec-div
-MACH = -mmic
-FFLAGS_EXE = $(PREC)  -static-intel
-BINARY = mcfost.phi
-endif
-
-LIBS_FITS = -L $(LIBS) -lcfitsio
-LIBS_VORO =  -L$(LIBS) -lvoro++ -cxxlib
-
-# SPRNG
-FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
+ifeq ($(SYSTEM), ifort)
+    ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
+        ARCH= -axSSSE3,SSE4.1,SSE4.2 -mmacosx-version-min=10.9
+    else
+        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
+    endif
+    FC= ifort
+    FFLAGS= -fpp -O3 -no-prec-div -traceback -static-intel $(ARCH)
+    DBLFLAG= -r8
+    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
+               -warn uninitialized -warn unused -warn truncated_source
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -qopenmp
+    IPOFLAGS= -ipo
+    CC= icc
+    CCFLAGS= -O3 -no-prec-div -traceback $(ARCH)
+    COMPFLAGS= -qopenmp
+    LIBCXX= -cxxlib
+    LIBS= $(LIB)/ifort
 endif
 
-# Linux ou Mac x86, gfortran64
-ifeq ($(COMPILO),gfortran)
-FC_SER = gfortran -m64 -cpp
-FC_OMP = gfortran -m64 -cpp -fopenmp
-CC_SER = g++ -Wall -ansi -pedantic -m64
-CC_OMP = g++ -Wall -ansi -pedantic -m64
-OPTS = -O3 -funroll-loops -ffinite-math-only -fno-trapping-math #-ffast-math : -funsafe-math-optimizations make mcfost stall, rest not much faster than 03
-#-mtune=athlon -mcpu=athlon -mfpmath=sse -msse
-DEBUG_OPTS =  -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -fbacktrace #-Wconversion -Warray-temporaries
-#-Wunused-variable -Wunused-function -Wuninitialized -Wconversion -Warray-temporaries
-#-g -C -ggdb -ftrace=full  -fimplicit-none
-# -Wall -Wextra -Wimplicit-none -Werror=113,115,137,146,147,159,163 -ftrace=full -fbounds-check -freal=nan -finteger=-2109876543 -fmodule-private
-FFLAGS_R8 = -fdefault-real-8 -fdefault-double-8
-
-MACH = #-march=athlon
-PREC =
-FFLAGS = -c $(PREC)
-FFLAGS_EXE = $(PREC)
-
-LIBS = $(MCFOST_INSTALL)/lib/gfortran/
-LIBS_VORO =  -L$(LIBS) -lvoro++ -lstdc++
-
-FLAGS_SPRNG = $(FLAGS) -DPOINTER_SIZE=8
+ifeq ($(SYSTEM), fostino)
+    FC= ifort
+    FFLAGS= -fpp -O3 -no-prec-div -traceback -axP -xW -static-intel
+    DBLFLAG= -r8
+    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
+               -warn uninitialized -warn unused -warn truncated_source
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -qopenmp
+    IPOFLAGS= -ipo
+    CC= icc
+    CCFLAGS= -O3 -no-prev-div -traceback -axP -xW
+    COMPFLAGS= -qopenmp
+    LIBCXX= -cxxlib
+    LIBS= $(LIB)/ifort
 endif
 
-LIBS_FITS = -L$(LIBS) -lcfitsio
+ifeq ($(SYSTEM), xeonphi)
+    FC= ifort
+    FFLAGS= -fpp -O3 -no-prec-div -traceback -mmic -static-intel
+    DBLFLAG= -r8
+    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
+               -warn uninitialized -warn unused -warn truncated_source
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -qopenmp
+    IPOFLAGS= -ipo
+    CC= icc
+    CCFLAGS= -O3 -no-prev-div -traceback -mmic
+    COMPFLAGS= -qopenmp
+    LIBCXX= -cxxlib
+    LIBS= $(LIB)/xeon-phi
+endif
 
-# Numerical Recipes
-MODS_NR = -I$(LIBS)/nr
-LIBS_NR =  -L$(LIBS)/nr -lnr
-LIBS_NR_EQDIFF = -L$(LIBS)/nr/eq_diff -lnr_eq_diff
-LIBS_SPLINE =  -L$(LIBS)/nr/spline -lnr_splin
-LIBS_SORT = -L$(LIBS)/nr/sort -lnr_sort
-LIBS_LU = -L $(LIBS)/nr/LU -lnr_LU
+ifeq ($(SYSTEM), gfortran)
+    FC= gfortran
+    FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
+             -fno-trapping-math -ffree-line-length-none
+    DBLFLAG= -fdefault-real-8 -fdefault-double-8
+    DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function \
+               -Wuninitialized -fbacktrace
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -fopenmp
+    CC= g++
+    CCFLAGS= -Wall -ansi -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
+             -fno-trapping-math
+    COMPFLAGS=
+    LIBCXX= -lstdc++
+    ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
+        COMPFLAGS=
+        LIBCXX= -lc++
+    endif
+    LIBS= $(LIB)/gfortran
+endif
 
-# SPRNG
-INCLUDE_SPRNG = -I$(MCFOST_INSTALL)/include
-LIBS_SPRNG =  -L$(LIBS) -lsprng
+#------------------------------------------------------------------------------#
+# Set other optional flags depending on system settings
 
-#Voro++
-INCLUDE_VORO = -I$(MCFOST_INSTALL)/include/voro++
+ifeq ($(DEBUG), yes)
+    FFLAGS+= ${DEBUGFLAG}
+    FFLAGS:= $(FFLAGS:-O3=-O0)
+endif
 
-FF = $(FC_OMP)  $(MACH) $(OPTS)
-CC = $(CC_OMP)  $(MACH) $(OPTS)
-ifeq ($(debugp), yes)
-FF = $(FC_OMP)  $(DEBUG_OPTS)
-CC = $(CC_OMP)
+ifeq ($(OPENMP), yes)
+    FFLAGS+= ${FOMPFLAGS}
+    CCFLAGS+= ${COMPFLAGS}
 endif
-ifeq ($(debug), yes)
-FF = $(FC_SER) $(DEBUG_OPTS)
-CC = $(CC_SER)
+
+ifeq ($(IPO), yes)
+    FFLAGS+= ${IPOFLAGS}
+    CCFLAGS+= ${IPOFLAGS}
 endif
-ifeq ($(mono), yes)
-FF = $(FC_SER)  $(MACH) $(OPTS)
-CC = $(CC_SER)  $(MACH) $(OPTS)
-endif
-ifeq ($(prof), yes)
-FF = $(FC_SER) -O0 -g
-CC = $(CC_SER) -O0 -g
-endif
-ifeq ($(dev), yes)
-FF = $(FC_SER) -O1
-CC = $(CC_SER) -O1
-endif
-ifeq ($(devp), yes)
-FF = $(FC_OMP) -O1
-CC = $(CC_OMP) -O1
-endif
+
+#------------------------------------------------------------------------------#
+# Library flags
+
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ \
+          -I$(LIBS)/nr
+
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
+LDFLAGS+= -L$(LIBS)/nr -lnr
+LDFLAGS+= -L$(LIBS)/nr/eq_diff -lnr_eq_diff
+LDFLAGS+= -L$(LIBS)/nr/spline -lnr_splin
+LDFLAGS+= -L$(LIBS)/nr/sort -lnr_sort
+
+#------------------------------------------------------------------------------#
+# Sources and objects
 
 SOURCES = modules.f90 sha.f90 system.f90 utils.f90 fits_utils.f90 \
 	read_DustEM.f90 input.f90 benchmarks.f90 read_param.f90 \
@@ -151,77 +143,84 @@ SOURCES = modules.f90 sha.f90 system.f90 utils.f90 fits_utils.f90 \
 	read_gadget2.f90 SPH2mcfost.f90 \
 	dust_transfer.f90 mol_transfer.f90
 
-CC_SOURCES = voro++_wrapper.cpp
+OBJECTS= $(SOURCES:.f90=.o)
 
-OBJECTS = $(SOURCES:.f90=.o)
+#------------------------------------------------------------------------------#
+# Compile
 
 main : mcfost
 
 all : mcfost libmcfost.a
 
-.PHONY : clean cleanall cleandata release release_utils fosti dmz wardlaw save checkmcfost err
+mcfost : checksys $(OBJECTS) voro++_wrapper.o mcfost.o
+	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o mcfost.o $(LDFLAGS)
 
-#*************************************************************
-# Code séquentiel et parallèle
-#*************************************************************
-mcfost : $(OBJECTS) voro++_wrapper.o mcfost.o
-	$(FF) $(FFLAGS_EXE) -o $(BINARY)  $(OBJECTS) voro++_wrapper.o mcfost.o   $(LIBS_NR_EQDIFF) $(LIBS_SORT) $(LIBS_NR) $(LIBS_SPRNG) $(LIBS_FITS) $(LIBS_VORO) $(INCLUDE_SPRNG) $(INCLUDE_VORO)
-
-libmcfost.a : checkmcfost $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
+libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
 	mkdir -p libtmp
-	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/nr/libnr.a $(LIBS)/nr/eq_diff/libnr_eq_diff.a $(LIBS)/nr/sort/libnr_sort.a libtmp
-	cd libtmp/ ; ar x libcfitsio.a ; ar x libnr.a ; ar x libnr_eq_diff.a ; ar x libnr_sort.a ; ar x libsprng.a ; ar x libvoro++.a
-	rm -f mcfost.o io_phantom_utils.o io_phantom_infiles.o libtmp/pmlcg.o libmcfost.a # io_phantom_utils.f90 is the same as phantom's utils_dumpfiles.f90
+	cp $(LIBS)/libcfitsio.a libtmp
+	cp $(LIBS)/libsprng.a libtmp
+	cp $(LIBS)/libvoro++.a libtmp
+	cp $(LIBS)/nr/libnr.a libtmp
+	cp $(LIBS)/nr/eq_diff/libnr_eq_diff.a libtmp
+	cp $(LIBS)/nr/sort/libnr_sort.a libtmp
+	cd libtmp; \
+	ar x libcfitsio.a; \
+	ar x libnr.a; \
+	ar x libnr_eq_diff.a; \
+	ar x libnr_sort.a; \
+	ar x libsprng.a; \
+	ar x libvoro++.a
+	rm -f mcfost.o io_phantom_utils.o io_phantom_infiles.o libtmp/pmlcg.o \
+		libmcfost.a
 	ar vr libmcfost.a *.o libtmp/*.o
 	ranlib libmcfost.a
 
-# Fichiers necessaires aux suivants
-modules.o : modules.f90
-	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk '{print $$6}' > ../utils/Version
+modules.o : checksys modules.f90
+	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk \
+		'{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) modules.f90 $(INCLUDE_SPRNG)
+	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 modules.f90 $(INCLUDE)
 
-# Fichier compile sans optimisation
-mem.o : mem.f90  modules.o
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) mem.f90 $(INCLUDE_SPRNG)
+mem.o : checksys mem.f90 modules.o
+	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mem.f90 $(INCLUDE)
 
-io_phantom_utils.o : io_phantom_utils.f90
-	$(FF) $(FFLAGS) $(FFLAGS_R8) io_phantom_utils.f90
+io_phantom_utils.o : checksys io_phantom_utils.f90
+	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
-voro++_wrapper.o : voro++_wrapper.cpp
-	$(CC) $(FFLAGS) voro++_wrapper.cpp $(INCLUDE_VORO)
+voro++_wrapper.o : checksys voro++_wrapper.cpp
+	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
 
-# defaut
-%.o : %.f90  modules.o
-	$(FF) $(FFLAGS) $(FLAGS_SPRNG) $< -o $@ $(MODS_NR) $(INCLUDE_SPRNG)
-
+%.o : %.f90 checksys modules.o
+	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
 
 io_prodimo.o : sha.f90
-utils.o :      sha.f90
 
-# Le fichier sha.f90 n'est cree que sur mon mac
+utils.o : sha.f90
+
 ifeq ($(MCFOST_GIT),1)
 sha.f90 : ../.git/objects modules.o
 	printf "module sha\n  implicit none\n" > sha.f90
-	git log --pretty=format:"%H %d" | grep \(HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> sha.f90
+	git log --pretty=format:"%H %d" | grep \(HEAD | awk \
+		'{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' \
+		>> sha.f90
 	printf "end module sha\n" >> sha.f90
 endif
 
 system.f90 : sha.o
 	printf "module system\n  implicit none\n" > system.f90
-	uname | awk '{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' >> system.f90
+	uname | awk \
+		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
+		>> system.f90
 	printf "end module system\n" >> system.f90
 
-mcfost2prodimo : mcfost mcfost2prodimo.o
+mcfost2prodimo : checksys mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
 
-#voronoi : Voronoi.o
-#	$(FF) $(FFLAGS_EXE) -o voronoi Voronoi.o utils.o modules.o $(LIBS_SPRNG) $(INCLUDE_SPRNG)
-
-#*************************************************************
+#------------------------------------------------------------------------------#
 # Release
-#*************************************************************
+
+.PHONY : release release_mac release_utils fosti dmz wardlaw
 
 release : main
 	- git tag -d release
@@ -247,7 +246,6 @@ release : main
 	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; "
 	rm -rf yorick web
 	git tag release
-
 
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
@@ -285,11 +283,13 @@ wardlaw :
 	rsync -Pur *.f90 Makefile wardlaw:mcfost/src
 	ssh wardlaw "source .login ; cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/bin/"
 
-#*************************************************************
-# Nettoyage
-#*************************************************************
+#------------------------------------------------------------------------------#
+# Cleaning
+
+.PHONY : clean cleandata cleandata_dust cleanall
+
 clean :
-	rm -rf *.o  *.mod _dust_prop*.tmp *.i90 system.f90 system.o libmcfost.a
+	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
@@ -301,24 +301,50 @@ cleandata_dust :
 cleanall : clean cleandata
 	rm -rf mcfost
 
-#*************************************************************
-# Sauvergarde
-#*************************************************************
+#------------------------------------------------------------------------------#
+# Backup
+
+.PHONY : save
+
 save :
 	git push phare
 	git push bitbucket
 	git push github
 	git push riri
 
-#*************************************************************
-# test
-#*************************************************************
+#------------------------------------------------------------------------------#
+# Testing
+
+LASTSYSTEM = ${shell if [ -e .make_lastsystem ]; then cat .make_lastsystem; fi}
+
+.PHONY : checkmcfost checksys err
+
 checkmcfost:
    ifdef MCFOST_INSTALL
 	@echo "MCFOST directory is "$(MCFOST_INSTALL);
    else
-	@echo; echo "ERROR: cannot find MCFOST installation directory - set this using MCFOST_INSTALL"; echo; ${MAKE} err
+	@echo; echo "ERROR: cannot find MCFOST installation directory"
+	@echo "- set this using MCFOST_INSTALL"; echo; ${MAKE} err
    endif
 
 err:
 	$(error aborting);
+
+checksys:
+   ifeq ($(KNOWN_SYSTEM), yes)
+	@echo ""
+	@echo "Compiling MCFOST for $(SYSTEM) system..........."
+	@echo ""
+       ifneq ($(SYSTEM),$(LASTSYSTEM))
+	    @echo system changed from ${LASTSYSTEM} to ${SYSTEM}
+	    @${MAKE} clean
+       endif
+	@echo $(SYSTEM) > .make_lastsystem
+   else
+	@echo ""
+	@echo "make: ERROR: value of SYSTEM = $(SYSTEM) not recognised..."
+	@echo "=> set the environment variable SYSTEM to one listed "
+	@echo "   in src/Makefile and try again"
+	@echo ""
+	@${MAKE} err;
+   endif

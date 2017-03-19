@@ -863,7 +863,7 @@ subroutine mcfost_v()
   write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
 #endif
 #if defined (__GFORTRAN__)
-  write(*,fmt='(" with GFORTAN compiler version ",i1,".",i1,"."i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
+  write(*,fmt='(" with GFORTRAN compiler version ",i1,".",i1,"."i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
 #endif
 #if defined (__G95__)
   write(*,fmt='(" with G95 compiler version ",i1,".",i2)') __G95__, __G95_MINOR__

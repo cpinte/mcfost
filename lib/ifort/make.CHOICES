@@ -38,7 +38,7 @@
 # For T3D, Use PLAT=T3E instead
 #PLAT =  T3E
 #PLAT  = GENERIC
-PLAT = IFORT
+PLAT = INTEL
 
 ############################################################################
 
