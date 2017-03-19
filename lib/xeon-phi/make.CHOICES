@@ -10,18 +10,18 @@
 #
 #		1. Platform
 #
-# We have set variables giving information on the archiver, the C compiler 
-# and the FORTRAN compiler for certain machines in SRC/make.xxx, where xxx 
-# is your machine name. In the lines that state: PLAT = ... , exactly one of 
+# We have set variables giving information on the archiver, the C compiler
+# and the FORTRAN compiler for certain machines in SRC/make.xxx, where xxx
+# is your machine name. In the lines that state: PLAT = ... , exactly one of
 # the lines must not be commented out. This line corresponds to the machine
-# you are on. For example, if you are on a Cray T3E, remove the '#' sign from 
+# you are on. For example, if you are on a Cray T3E, remove the '#' sign from
 # the beginning of the corresponding line. Change the following line:
 #      #PLAT = T3E		# Cray T3E
 # to:
 #      PLAT = T3E		# Cray T3E
-#	
-# If the machine you are on is not in the list, please send mail to: 
-# ashoks@ncsa.uiuc.edu stating the machine you are on. You may also modify 
+#
+# If the machine you are on is not in the list, please send mail to:
+# ashoks@ncsa.uiuc.edu stating the machine you are on. You may also modify
 # the make.GENERIC file to suit your machine and continue with the 'make'
 # process.
 #
@@ -38,7 +38,7 @@
 # For T3D, Use PLAT=T3E instead
 #PLAT =  T3E
 #PLAT  = GENERIC
-PLAT = IFORT64
+PLAT = INTEL
 
 ############################################################################
 
@@ -46,10 +46,10 @@ PLAT = IFORT64
 #
 #		2. MPI version or Non-MPI version
 #
-#	MPI version: uncomment the following line and 
+#	MPI version: uncomment the following line and
 #		modify appropriate make.(PLAT) file
 #
-#	Non-MPI version: comment out the following line 
+#	Non-MPI version: comment out the following line
 #---------------------------------------------------------------------------
 
 #MPIDEF = -DSPRNG_MPI
@@ -60,7 +60,7 @@ PLAT = IFORT64
 #---------------------------------------------------------------------------
 #		3. Is libgmp.a available
 #
-# comment out if you want to exclude generator pmlcg which needs libgmp 
+# comment out if you want to exclude generator pmlcg which needs libgmp
 #---------------------------------------------------------------------------
 
 #PMLCGDEF = -DUSE_PMLCG
