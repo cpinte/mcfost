@@ -287,7 +287,7 @@ wardlaw :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o *.mod _dust_prop*.tmp *.i90 system.f90 system.o libmcfost.a
+	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
 
 cleandata :
@@ -312,6 +312,8 @@ save :
 
 #------------------------------------------------------------------------------#
 # Testing
+
+LASTSYSTEM = ${shell if [ -e .make_lastsystem ]; then cat .make_lastsystem; fi}
 
 .PHONY : checkmcfost checksys err
 
