@@ -8,6 +8,10 @@ elif [ "$SYSTEM" = "gfortran" ] ; then
     echo "Building MCFOST's libraries with gfortran"
     export CC=gcc
 
+elif [ "$SYSTEM" = "xeon-phi" ] ; then
+    echo "Building MCFOST's libraries with ifort for Xeon-Phi"
+    export CC=icc
+
 else
     echo "Unknown system to build mcfost:"
     echo $SYSTEM
@@ -27,7 +31,7 @@ tar xzvf sprng2.0b.tar.gz
 \cp -f $SYSTEM/make.CHOICES sprng2.0
 \cp -f $SYSTEM/make.INTEL sprng2.0/SRC
 if [ $(uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN) -eq 1 ]; then
-  \cp macos/insertmenu.mac sprng2.0/SRC/insertmenu
+  \cp -f macos/insertmenu.mac sprng2.0/SRC/insertmenu
 fi
 cd sprng2.0
 make -B
@@ -44,8 +48,13 @@ cd cfitsio
 if [ "$SYSTEM" = "gfortran" ] ; then
     export CFLAGS="-m64"
     export FC="gfortran"
+elif [ "$SYSTEM" = "xeon-phi" ] ; then
+    export CFLAGS=-mmic
 fi
 ./configure
+if [ "$SYSTEM" = "xeon-phi" ] ; then
+    \cp -f ../Makefile_cfitsio.xeon_phi Makefile
+fi
 make
 \cp libcfitsio.a ../lib
 cd ..
@@ -58,6 +67,8 @@ rm -rf cfitsio
 git clone https://cpinte@bitbucket.org/cpinte/voro.git
 if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
+elif [ "$SYSTEM" = "xeon-phi" ] ; then
+    \cp -f  ifort/config.mk voro # To be tested
 fi
 cd voro
 make
@@ -74,6 +85,8 @@ if [ "$SYSTEM" = "ifort" ] ; then
     ./compile_ifort.sh
 elif [ "$SYSTEM" = "gfortran" ] ; then
     ./compile_gfortran.sh
+elif [ "$SYSTEM" = "xeon-phi" ] ; then
+    ./compile_xeon_phi.sh
 fi
 \cp libnr.a *.mod ../lib/nr
 \cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
@@ -82,7 +95,7 @@ fi
 ./clean.sh
 cd ..
 
-# Put in directory
+# Put in final directory
 mkdir -p $MCFOST_INSTALL/include
 \cp -r include/* $MCFOST_INSTALL/include
 mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
