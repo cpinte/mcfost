@@ -19,6 +19,7 @@ src/sha.f90
 src/system.f90
 utils/.last_update
 utils/Version
+my_utils/
 
 #parameter files
 *.para
