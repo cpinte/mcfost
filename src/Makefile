@@ -152,7 +152,7 @@ main : mcfost
 
 all : mcfost libmcfost.a
 
-mcfost : checksys $(OBJECTS) voro++_wrapper.o mcfost.o
+mcfost :  $(OBJECTS) voro++_wrapper.o mcfost.o
 	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
@@ -176,22 +176,22 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	ar vr libmcfost.a *.o libtmp/*.o
 	ranlib libmcfost.a
 
-modules.o : checksys modules.f90
+modules.o : .make_lastsystem modules.f90
 	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk \
 		'{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 modules.f90 $(INCLUDE)
 
-mem.o : checksys mem.f90 modules.o
+mem.o :  mem.f90 modules.o
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mem.f90 $(INCLUDE)
 
-io_phantom_utils.o : checksys io_phantom_utils.f90
+io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
-voro++_wrapper.o : checksys voro++_wrapper.cpp
+voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
 
-%.o : %.f90 checksys modules.o
+%.o : %.f90  modules.o
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
 
 io_prodimo.o : sha.f90
@@ -214,7 +214,7 @@ system.f90 : sha.o
 		>> system.f90
 	printf "end module system\n" >> system.f90
 
-mcfost2prodimo : checksys mcfost mcfost2prodimo.o
+mcfost2prodimo :  mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
 
 #------------------------------------------------------------------------------#
@@ -330,6 +330,8 @@ checkmcfost:
 err:
 	$(error aborting);
 
+.make_lastsystem : checksys
+
 checksys:
    ifeq ($(KNOWN_SYSTEM), yes)
 	@echo ""
@@ -338,8 +340,8 @@ checksys:
        ifneq ($(SYSTEM),$(LASTSYSTEM))
 	    @echo system changed from ${LASTSYSTEM} to ${SYSTEM}
 	    @${MAKE} clean
+	    @echo $(SYSTEM) > .make_lastsystem
        endif
-	@echo $(SYSTEM) > .make_lastsystem
    else
 	@echo ""
 	@echo "make: ERROR: value of SYSTEM = $(SYSTEM) not recognised..."
