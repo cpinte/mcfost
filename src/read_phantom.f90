@@ -7,7 +7,8 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+    subroutine read_phantom_file(iunit,filename,x,y,z,&
+         particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
