@@ -13,12 +13,41 @@ LIB= $(MCFOST_INSTALL)/lib
 LDFLAGS=
 INCLUDE=
 
+ifndef SYSTEM
+    SYSTEM= ifort
+endif
+
+ifeq ($(gfortran), yes)
+    SYSTEM=gfortran
+endif
+
 ifndef OPENMP
     OPENMP= yes
 endif
 
-ifndef SYSTEM
-    SYSTEM= ifort
+ifeq ($(dev), yes)
+    DEV=yes # faster compilation
+endif
+
+ifeq ($(debug), yes)
+    DEBUG=yes
+endif
+
+ifeq ($(mono), yes)
+    OPENMP=no
+endif
+
+ifeq ($(DEBUG), yes)
+    OPENMP=no
+endif
+
+ifeq ($(debugp), yes)
+    DEBUGp=yes
+endif
+
+ifeq ($(DEBUGP), yes)
+    DEBUG=yes
+    OPENMP=yes
 endif
 
 #------------------------------------------------------------------------------#
@@ -104,6 +133,10 @@ endif
 ifeq ($(DEBUG), yes)
     FFLAGS+= ${DEBUGFLAG}
     FFLAGS:= $(FFLAGS:-O3=-O0)
+endif
+
+ifeq ($(DEV), yes)
+   FFLAGS:= $(FFLAGS:-O3=-O1)
 endif
 
 ifeq ($(OPENMP), yes)
@@ -308,7 +341,7 @@ save :
 	git push phare
 	git push bitbucket
 	git push github
-	git push riri
+	#git push riri
 
 #------------------------------------------------------------------------------#
 # Testing
