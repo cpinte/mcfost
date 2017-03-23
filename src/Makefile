@@ -268,7 +268,7 @@ release : main
 	scp dmz:mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
@@ -341,7 +341,7 @@ save :
 	git push phare
 	git push bitbucket
 	git push github
-	#git push riri
+	git push dmz
 
 #------------------------------------------------------------------------------#
 # Testing
