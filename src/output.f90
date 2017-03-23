@@ -2843,6 +2843,15 @@ subroutine ecriture_spectre(imol)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
+  call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
+  call ftpkye(unit,'CRVAL3',0.,-7,'',status)
+  call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
+  call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
+
+  write(*,*) mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km
+
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
   if (l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave

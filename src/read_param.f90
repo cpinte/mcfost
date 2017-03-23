@@ -481,13 +481,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -927,13 +927,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -1352,13 +1352,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -1759,13 +1759,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -2163,13 +2163,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -2570,13 +2570,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -2966,13 +2966,13 @@ contains
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -3364,13 +3364,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -3756,13 +3756,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
@@ -4128,13 +4128,13 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) lpop, lprecise_pop, lmol_LTE, largeur_profile
     read(1,*) vitesse_turb
-    vitesse_turb = vitesse_turb * 1.e3 ! Conversion en m.s-1
+    vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
     read(1,*) n_molecules
     allocate(mol(n_molecules))
     do imol=1,n_molecules
        read(1,*) mol(imol)%filename, mol(imol)%iLevel_max
        read(1,*) mol(imol)%vmax_center_rt, mol(imol)%n_speed_rt
-       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * 1.e3 ! Conversion en m.s-1
+       mol(imol)%vmax_center_rt = mol(imol)%vmax_center_rt * km_to_m ! Conversion en m.s-1
        read(1,*) mol(imol)%lcst_abundance, mol(imol)%abundance, mol(imol)%abundance_file
        read(1,*) mol(imol)%lline, mol(imol)%nTrans_raytracing
        read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
