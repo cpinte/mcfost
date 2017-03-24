@@ -496,7 +496,7 @@ subroutine write_stokes_fits()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
   if (lsepar_pola) then
@@ -629,7 +629,7 @@ subroutine ecriture_map_ray_tracing()
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
-     call ftpkys(unit,'BUNIT',"JY/PIXEL",' ',status)
+     call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
      call ftpkyd(unit,'RESTFREQ',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
 
@@ -645,7 +645,7 @@ subroutine ecriture_map_ray_tracing()
      call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
      call ftpkyj(unit,'CRPIX4',0,'',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
   endif
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -822,7 +822,7 @@ subroutine ecriture_sed_ray_tracing()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,sed_rt,status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -1890,7 +1890,7 @@ subroutine ecriture_J()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -2673,7 +2673,7 @@ subroutine ecriture_sed(ised)
 
   endif ! ised
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -2846,7 +2846,7 @@ subroutine ecriture_spectre(imol)
   call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
   call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
 
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
