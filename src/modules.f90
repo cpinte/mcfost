@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.11"
+  character(8), parameter :: mcfost_release = "3.0.12"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -690,8 +690,7 @@ module molecular_emission
   real, dimension(:), allocatable :: Level_energy, j_qnb
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
-  integer :: nTrans_tot, nTrans
-  integer, dimension(:), allocatable :: indice_Trans
+  integer :: nTrans_tot
 
   real(kind=dp), dimension(:), allocatable :: Aul, Blu, Bul, fAul, fBlu, fBul, transfreq
   integer, dimension(:), allocatable :: itransUpper, itransLower

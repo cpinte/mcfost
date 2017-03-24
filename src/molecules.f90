@@ -523,25 +523,25 @@ end function phiProf
 ! ---   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: Cmb
 ! ---
 ! ---
-! ---   integer :: iTrans, iv, iiTrans
+! ---   integer :: i, iv, iTrans
 ! ---   real(kind=dp) :: cst, cst_nu, nu
 ! ---
 ! ---   cst = 2.0_dp*hp/c_light**2
 ! ---
 ! ---   ! On ne calcule le Cmb qu'aux frequences specifiees
-! ---   do iTrans=1,nTrans
-! ---      iiTrans = indice_Trans(iTrans)
+! ---   do i=1,nTrans
+! ---      iTrans = indice_Trans(i)
 ! ---      do iv=ispeed(1),ispeed(2)
-! ---         nu = Transfreq(iiTrans) * (1.0_dp + tab_speed(iv)/c_light)
+! ---         nu = Transfreq(iTrans) * (1.0_dp + tab_speed(iv)/c_light)
 ! ---
 ! ---         cst_nu = (hp * nu) / (kb * T_min)
 ! ---         if (cst_nu > 100._dp) then
-! ---            Cmb(iv,iTrans) = 0.0_dp
+! ---            Cmb(iv,i) = 0.0_dp
 ! ---         else
-! ---            Cmb(iv,iTrans) = cst * nu**3 / (exp(cst_nu)-1.0_dp)
+! ---            Cmb(iv,i) = cst * nu**3 / (exp(cst_nu)-1.0_dp)
 ! ---         endif
 ! ---      enddo ! iv
-! ---   enddo ! iTrans
+! ---   enddo ! i
 ! ---
 ! ---   return
 ! ---
@@ -564,7 +564,7 @@ subroutine init_tab_Cmb_mol()
 
   cst = 2.0_dp*hp/c_light**2
 
-  do iTrans=1,nTrans
+  do iTrans=1,nTrans_tot
      nu = Transfreq(iTrans)
 
      cst_nu = (hp * nu) / (kb * T_Cmb)
@@ -612,7 +612,7 @@ subroutine opacite_mol_loc(icell,imol)
 
   integer, intent(in) :: icell, imol
 
-  integer :: iTrans, iiTrans
+  integer :: iTrans
   real(kind=dp) :: nu, nl, kap, eps
 
   logical, save :: lmaser = .false.
@@ -621,27 +621,26 @@ subroutine opacite_mol_loc(icell,imol)
 
   filename = trim(data_dir2(imol))//"/maser_map.fits.gz"
 
-  do iTrans=1,nTrans
-     iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
-     nu = tab_nLevel(icell,iTransUpper(iiTrans))
-     nl = tab_nLevel(icell,iTransLower(iiTrans))
+  do iTrans=1,nTrans_tot
+     nu = tab_nLevel(icell,iTransUpper(iTrans))
+     nl = tab_nLevel(icell,iTransLower(iTrans))
 
 
      ! Opacite et emissivite raie
-     kap = (nl*fBlu(iiTrans) - nu*fBul(iiTrans))
-     eps =  nu*fAul(iiTrans)
+     kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
+     eps =  nu*fAul(iTrans)
 
      if (kap < 0.) then
         lmaser = .true.
         ! inversion value (inversion population is > 1 )
-        maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iiTrans))) / &
-             (poids_stat_g(iTransUpper(iiTrans)) * nl)
+        maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iTrans))) / &
+             (poids_stat_g(iTransUpper(iTrans)) * nl)
         kap = 0.
      endif
 
      ! longueur de vol en AU, a multiplier par le profil de raie
-     kappa_mol_o_freq(icell,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
-     emissivite_mol_o_freq(icell,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
+     kappa_mol_o_freq(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
+     emissivite_mol_o_freq(icell,iTrans) = eps /  Transfreq(iTrans) * AU_to_m
   enddo
 
 !  if ( (lmaser) .and. (ri==n_rad) .and. (zj==nz) ) then
@@ -657,18 +656,17 @@ subroutine opacite_mol_loc(icell,imol)
 
 
   if (ldouble_RT) then
-     do iTrans=1,nTrans
-        iiTrans = indice_Trans(iTrans) ! Pas fondamental ici mais bon ...
-        nu = tab_nLevel2(icell,iTransUpper(iiTrans))
-        nl = tab_nLevel2(icell,iTransLower(iiTrans))
+     do iTrans=1,nTrans_tot
+        nu = tab_nLevel2(icell,iTransUpper(iTrans))
+        nl = tab_nLevel2(icell,iTransLower(iTrans))
 
         ! Opacite et emissivite raie
-        kap = (nl*fBlu(iiTrans) - nu*fBul(iiTrans))
-        eps =  nu*fAul(iiTrans)
+        kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
+        eps =  nu*fAul(iTrans)
 
         ! longueur de vol en AU, a multiplier par la profil de raie
-        kappa_mol_o_freq2(icell,iiTrans) = kap / Transfreq(iiTrans) * AU_to_m
-        emissivite_mol_o_freq2(icell,iiTrans) = eps /  Transfreq(iiTrans) * AU_to_m
+        kappa_mol_o_freq2(icell,iTrans) = kap / Transfreq(iTrans) * AU_to_m
+        emissivite_mol_o_freq2(icell,iTrans) = eps /  Transfreq(iTrans) * AU_to_m
      enddo
   endif ! ldouble_RT
 
@@ -702,13 +700,13 @@ subroutine init_dust_mol(imol)
   cst_E=2.0*hp*c_light**2
 
   ! Reallocation des tableaux de proprietes de poussiere
- ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
-  n_lambda =   nTrans ! opacites dust considerees cst sur le profil de raie
+  ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
+  n_lambda =   nTrans_tot ! opacites dust considerees cst sur le profil de raie
   call realloc_dust_mol()
 
   if (ldust_mol) then
      ! Tableau de longeur d'onde
-     do iTrans=1,nTrans
+     do iTrans=1,nTrans_tot
         tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
         tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
         tab_lambda_sup(iTrans)= tab_lambda(iTrans)/delta_lambda
@@ -718,7 +716,7 @@ subroutine init_dust_mol(imol)
      if (lbenchmark_water3) then ! opacite en loi de puissance
         write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
 
-        do iTrans=1,mol(imol)%nTrans_raytracing
+        do iTrans=1,nTrans_tot
            wl = tab_lambda(iTrans)
 
            ! Loi d'opacite (cm^2 par g de poussiere)
@@ -744,6 +742,7 @@ subroutine init_dust_mol(imol)
         call init_indices_optiques()
 
         ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
+        ! -> pas de polarisation, on utilise une HG
         scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
         aniso_method = 2 ; lmethod_aniso1 = .false.
 
@@ -752,8 +751,8 @@ subroutine init_dust_mol(imol)
         lmono = .true. ! equivalent au mode sed2
 
         ! On recalcule les proprietes optiques
-        write(*,*) "Computing dust properties for", nTrans, "wavelength"
-        do iTrans=1,nTrans
+        write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
+        do iTrans=1,nTrans_tot
            call prop_grains(iTrans)
            call opacite(iTrans, iTrans)
         enddo
@@ -766,7 +765,7 @@ subroutine init_dust_mol(imol)
      !kappa_abs_eg = kappa_abs_eg * m_to_AU
 
      ! calcul de l'emissivite de la poussiere
-     do iTrans=1,nTrans
+     do iTrans=1,nTrans_tot
         freq = Transfreq(iTrans)
 
         ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
@@ -910,8 +909,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
      ! Matrice de transitions radiatives
      B = 0.0_dp
      A = 0.0_dp
-     do iTrans = 1, nTrans ! toutes les transition ici : pas de iiTrans
-
+     do iTrans = 1, nTrans_tot
         k = iTransUpper(iTrans)
         l = iTransLower(iTrans)
 
@@ -1045,7 +1043,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 
   Jmol(:,id) = 0.0_dp
 
-  do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
+  do iTrans=1, nTrans_tot
      somme = 0.0_dp
      J = 0.0_dp
      do iray=1, n_rayons
@@ -1070,7 +1068,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
      Jmol2(:,id) = 0.0_dp
 
      do iray=1, n_rayons
-        do iTrans=1, nTrans ! Toutes les transitions ici : pas de iiTrans
+        do iTrans=1, nTrans_tot
            P(:) =  Doppler_P_x_freq(:,iray,id)
            opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
            etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)

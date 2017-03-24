@@ -1581,7 +1581,7 @@ subroutine dealloc_emission_mol()
 
   deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
-       iCollUpper,iCollLower,indice_Trans)
+       iCollUpper,iCollLower)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
        tab_v, tab_deltaV, spectre,continu, stars_map, tab_Cmb_mol, Jmol, maser_map)
