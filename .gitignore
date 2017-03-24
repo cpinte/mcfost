@@ -17,6 +17,8 @@ src/.make_lastsystem
 src/mcfost
 src/sha.f90
 src/system.f90
+src/Doc/
+src/web/
 utils/.last_update
 utils/Version
 my_utils/

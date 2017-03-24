@@ -65,11 +65,11 @@ ifeq ($(SYSTEM), ifort)
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
     KNOWN_SYSTEM= yes
-    FOMPFLAGS= -qopenmp
+    FOMPFLAGS= -fopenmp
     IPOFLAGS= -ipo
     CC= icc
     CCFLAGS= -O3 -no-prec-div -traceback $(ARCH)
-    COMPFLAGS= -qopenmp
+    COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
 endif
