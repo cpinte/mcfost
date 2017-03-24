@@ -1173,11 +1173,6 @@ subroutine initialisation_mcfost()
         basename_data_dir2(imol) = "data_"//trim(mol(imol)%name)
      enddo
 
-     if (para_version < 2.07) then
-        nTrans = nTrans_tot
-        mol(1)%nTrans_raytracing = nTrans_tot
-     endif
-
      if (lmol_LTE) then
         write(*,*) "Molecular line transfer under LTE approximation"
      else
