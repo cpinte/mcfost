@@ -543,9 +543,9 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
            ! Warning I0, I0c (and origine_mol) are smaller array (dimension nTrans)
            I0(:,i,iray,id) = I0(:,i,iray,id) + &
-                exp(-tau(:,iTrans)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
+                exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            I0c(i,iray,id) = I0c(i,iray,id) + &
-                exp(-tau_c(iTrans)) * (1.0_dp - exp(-dtau_c)) * Snu_c
+                exp(-tau_c(i)) * (1.0_dp - exp(-dtau_c)) * Snu_c
 
            if (lorigine.and.(.not.labs)) then
               origine_mol(:,i,icell,id) = origine_mol(:,i,icell,id) + &
