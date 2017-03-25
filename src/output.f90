@@ -2929,7 +2929,7 @@ subroutine ecriture_spectre(imol)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  do iTrans=1, mol(imol)%nTrans_rayTracing
+  do i=1, mol(imol)%nTrans_rayTracing
      indice_Trans(i) = mol(imol)%indice_Trans_rayTracing(i)
   enddo
 
