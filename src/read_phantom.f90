@@ -133,6 +133,11 @@ module read_phantom
                       got_h = .true.
                    case('dustfrac')
                       ngrains = ngrains + 1
+                      if (ngrains > ndusttypes) then
+                         write(*,*) "ERROR ngrains > ndusttypes:", ngrains, ndusttypes
+                         ierr = 1 ;
+                         return
+                      endif
                       read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
                       got_dustfrac = .true.
                    case default
