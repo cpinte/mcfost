@@ -54,12 +54,6 @@ subroutine mol_line_transfer()
 
      call alloc_emission_mol(imol) ! ne prend pas bcp de memoire
 
-     nTrans = nTrans_tot
-     allocate(indice_Trans(nTrans_tot))
-     do iTrans=1,nTrans
-        indice_Trans(iTrans) = iTrans
-     enddo
-
      ! Champ externe
      call init_tab_Cmb_mol()
 
@@ -96,7 +90,7 @@ subroutine mol_line_transfer()
      ! recalcul des flux stellaires aux nouvelles longeurs d'onde
      call repartition_energie_etoiles()
 
-     call init_Doppler_profiles(imol)  ! ne depend pas de nTrans
+     call init_Doppler_profiles(imol)  ! ne depend pas de nTrans_tot
 
      ! Population des niveaux initiale
      if (.not.lProDiMo2mcfost) then
@@ -118,19 +112,6 @@ subroutine mol_line_transfer()
 
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
-        ! Selection des transitions
-        if (mol(imol)%nTrans_raytracing /= nTrans_tot) then
-           deallocate(indice_Trans)
-           nTrans = mol(imol)%nTrans_raytracing
-           allocate(indice_Trans(mol(imol)%nTrans_raytracing))
-
-           !write(*,*) shape(indice_Trans)
-           !write(*,*) shape(mol(imol)%indice_Trans_raytracing(:))
-           do iTrans=1, mol(imol)%nTrans_raytracing
-              indice_Trans(iTrans) = mol(imol)%indice_Trans_raytracing(iTrans)
-           enddo
-        endif
-
         u0 = sin(angle_interet/180._dp*pi) ;  v0=0.0_dp ; w0 = sqrt(1.0_dp - u0*u0)
 
         do ibin=1,RT_n_incl
@@ -174,7 +155,6 @@ subroutine NLTE_mol_line_transfer(imol)
   integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
-  integer, parameter :: n_speed3 = 1
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp
   real, parameter :: precision_sub = 1.0e-3
@@ -197,6 +177,7 @@ subroutine NLTE_mol_line_transfer(imol)
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
 
+  integer, dimension(nTrans_tot) :: tab_Trans
 
   labs = .true.
 
@@ -204,6 +185,10 @@ subroutine NLTE_mol_line_transfer(imol)
 
   n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
+
+  do i=1, nTrans_tot
+     tab_Trans(i) = 1 ! we use all the transitions here
+  enddo
 
   if (n_level_comp < 2) then
      write(*,*) "ERROR : n_level_comp must be > 2"
@@ -226,8 +211,8 @@ subroutine NLTE_mol_line_transfer(imol)
   endif
   tab_speed = 0.0_dp
 
-  allocate(I0(-n_speed:n_speed,nTrans,n_rayons_start,nb_proc), &
-       I0c(nTrans,n_rayons_start,nb_proc), stat=alloc_status)
+  allocate(I0(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), &
+       I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error I0'
      stop
@@ -236,7 +221,7 @@ subroutine NLTE_mol_line_transfer(imol)
   I0c = 0.0_dp
 
   if (ldouble_RT) then
-     allocate(I02(-n_speed:n_speed,nTrans,n_rayons_start,nb_proc), stat=alloc_status)
+     allocate(I02(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error I0'
         stop
@@ -275,7 +260,7 @@ subroutine NLTE_mol_line_transfer(imol)
         fac_etape = 1.0
         lprevious_converged = .false.
      else if (etape==3) then
-        lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = n_speed3
+        lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
         fac_etape = 1.
         lprevious_converged = .false.
@@ -290,8 +275,8 @@ subroutine NLTE_mol_line_transfer(imol)
         endif
         tab_speed = 0.0_dp
 
-        allocate(I0(ispeed(1):ispeed(2),nTrans,n_rayons_max,nb_proc), &
-             I0c(nTrans,n_rayons_start,nb_proc), stat=alloc_status)
+        allocate(I0(ispeed(1):ispeed(2),nTrans_tot,n_rayons_max,nb_proc), &
+             I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error I0'
            stop
@@ -348,7 +333,8 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
-        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule)
+        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
+        !$omp shared(nTrans_tot,tab_Trans)
         !$omp do schedule(static,1)
         do icell=1, n_cells
            !$ id = omp_get_thread_num() + 1
@@ -417,7 +403,8 @@ subroutine NLTE_mol_line_transfer(imol)
                  endif
 
                  ! Integration le long du rayon
-                 call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed(:,id))
+                 call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs, ispeed,tab_speed(:,id), &
+                      nTrans_tot, tab_Trans)
 
               enddo ! iray
 
@@ -700,13 +687,14 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   ! Ajout flux etoile
   ! --------------------------
-  do lambda = 1, mol(imol)%nTrans_raytracing
+  do i = 1, mol(imol)%nTrans_raytracing
+     lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
      call compute_stars_map(lambda,ibin, u, v, w)
 
      do iv =  -n_speed_rt, n_speed_rt
-        spectre(:,:,iv,lambda,ibin,iaz) = spectre(:,:,iv,lambda,ibin,iaz) + stars_map(:,:,1)
+        spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
      enddo
-     continu(:,:,lambda,ibin,iaz) = continu(:,:,lambda,ibin,iaz) + stars_map(:,:,1)
+     continu(:,:,i,ibin,iaz) = continu(:,:,i,ibin,iaz) + stars_map(:,:,1)
   enddo
 
   return
@@ -740,7 +728,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   real :: npix2, diff
 
   real, parameter :: precision = 1.e-2
-  integer :: i, j, subpixels, iray, ri, zj, phik, icell, iTrans, iiTrans, iter, n_speed_rt, nTrans_raytracing
+  integer :: i, j, subpixels, iray, ri, zj, phik, icell, iTrans, iter, n_speed_rt, nTrans_raytracing
 
   logical :: lintersect, labs
 
@@ -752,6 +740,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   allocate(IP(-n_speed_rt:n_speed_rt,nTrans_raytracing), IP_old(-n_speed_rt:n_speed_rt,nTrans_raytracing), IPc(nTrans_raytracing))
 
   ispeed(1) = -n_speed_rt ; ispeed(2) = n_speed_rt
+
 
   labs = .false.
 
@@ -793,7 +782,8 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-              call integ_ray_mol(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt)
+              call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt, &
+                   nTrans_raytracing, mol(imol)%indice_Trans_raytracing)
               ! Flux recu dans le pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
               IPc(:) = IPc(:) +  I0c(:,iray,id)
@@ -850,10 +840,12 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   IPc = IPc * (pixelsize / (distance*pc_to_AU) )**2
 
   ! et multiplication par la frequence pour avoir du nu.F_nu
-  do iTrans=1,nTrans
-     iiTrans = indice_Trans(iTrans)
-     IP(:,iTrans) = IP(:,iTrans) * transfreq(iiTrans)
-     IPc(iTrans) = IPc(iTrans) * transfreq(iiTrans)
+
+  ! Warning IP, IPc are smaller array (dimension mol(imol)%nTrans_raytracin)
+  do i=1,mol(imol)%nTrans_raytracing
+     iTrans = mol(imol)%indice_Trans_raytracing(i)
+     IP(:,i) = IP(:,i) * transfreq(iTrans)
+     IPc(i) = IPc(i) * transfreq(iTrans)
   enddo
   ! Unite teste OK pour le Cmb
   ! profil de raie non convolue teste ok avec torus

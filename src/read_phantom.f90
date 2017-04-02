@@ -7,7 +7,8 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+    subroutine read_phantom_file(iunit,filename,x,y,z,&
+         particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
@@ -132,6 +133,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,r
                       got_h = .true.
                    case('dustfrac')
                       ngrains = ngrains + 1
+                      if (ngrains > ndusttypes) then
+                         write(*,*) "ERROR ngrains > ndusttypes:", ngrains, ndusttypes
+                         ierr = 1 ;
+                         return
+                      endif
                       read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
                       got_dustfrac = .true.
                    case default

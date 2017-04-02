@@ -499,7 +499,7 @@ subroutine write_stokes_fits()
   call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
   if (lsepar_pola) then
@@ -632,7 +632,7 @@ subroutine ecriture_map_ray_tracing()
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
-     call ftpkys(unit,'BUNIT',"JY/PIXEL",' ',status)
+     call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
      call ftpkyd(unit,'RESTFREQ',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
 
@@ -648,7 +648,7 @@ subroutine ecriture_map_ray_tracing()
      call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
      call ftpkyj(unit,'CRPIX4',0,'',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",' ',status)
+     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
   endif
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -825,7 +825,7 @@ subroutine ecriture_sed_ray_tracing()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,sed_rt,status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -1865,7 +1865,7 @@ subroutine ecriture_J()
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,Jio,status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -2648,7 +2648,7 @@ subroutine ecriture_sed(ised)
 
   endif ! ised
 
-  call ftpkys(unit,'BUNIT',"W.m-2",' ',status)
+  call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
   ! Second HDU avec longueur d'onde
   call FTCRHD(unit, status)
@@ -2754,19 +2754,17 @@ subroutine ecriture_spectre(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
-  integer :: group,fpixel,nelements, iv, xcenter,i, iiTrans
+  integer :: group,fpixel,nelements, iv, xcenter,i, iTrans
   logical :: simple, extend
 
   real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
-  real, dimension(nTrans) :: freq
+  real, dimension(mol(imol)%nTrans_rayTracing) :: freq
+  integer, dimension(mol(imol)%nTrans_rayTracing) :: indice_Trans
 
-  integer :: n_speed_rt, nTrans_raytracing
+
   real :: pixel_scale_x, pixel_scale_y
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
-
-  n_speed_rt = mol(imol)%n_speed_rt
-  nTrans_raytracing = mol(imol)%nTrans_raytracing
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -2793,8 +2791,8 @@ subroutine ecriture_spectre(imol)
      naxes(1)=igridx
      naxes(2)=igridy
   endif
-  naxes(3)=2*n_speed_rt+1
-  naxes(4)=ntrans
+  naxes(3)=2*mol(imol)%n_speed_rt+1
+  naxes(4)=mol(imol)%nTrans_rayTracing
   naxes(5)=RT_n_incl
   naxes(6)=RT_n_az
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
@@ -2818,16 +2816,23 @@ subroutine ecriture_spectre(imol)
   pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
+  call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
+  call ftpkye(unit,'CRVAL3',0.,-7,'',status)
+  call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
+  call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
+
+  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+
 !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
   if (l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave
      if (RT_line_method==1) then
         ! On ajoute les 2 parties du spectres
-        do iv = -n_speed_rt, -1
+        do iv = -mol(imol)%n_speed_rt, -1
            spectre(1,1,iv,:,:,:) = spectre(1,1,iv,:,:,:) + spectre(1,1,-iv,:,:,:)
         enddo
         ! On symetrise
-        do iv =1, n_speed_rt
+        do iv =1, mol(imol)%n_speed_rt
            spectre(1,1,iv,:,:,:) = spectre(1,1,-iv,:,:,:)
         enddo
         spectre(1,1,0,:,:,:) = spectre(1,1,0,:,:,:) * 2.
@@ -2837,7 +2842,7 @@ subroutine ecriture_spectre(imol)
         xcenter = igridx/2 + modulo(igridx,2)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
            do i=xcenter+1,igridx
-              do iv=-n_speed_rt,n_speed_rt
+              do iv=-mol(imol)%n_speed_rt,mol(imol)%n_speed_rt
                  spectre(i,:,iv,:,:,:) = spectre(igridx-i+1,:,-iv,:,:,:)
               enddo
            enddo
@@ -2864,7 +2869,7 @@ subroutine ecriture_spectre(imol)
      naxes(1)=igridx
      naxes(2)=igridy
   endif
-  naxes(3)=ntrans
+  naxes(3)=mol(imol)%nTrans_rayTracing
   naxes(4)=RT_n_incl
   naxes(5)=RT_n_az
   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
@@ -2890,7 +2895,7 @@ subroutine ecriture_spectre(imol)
   !------------------------------------------------------------------------------
   bitpix=32
   naxis = 1
-  naxes(1) = ntrans
+  naxes(1) = mol(imol)%nTrans_rayTracing
   nelements = naxes(1)
 
   ! create new hdu
@@ -2898,6 +2903,10 @@ subroutine ecriture_spectre(imol)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  do i=1, mol(imol)%nTrans_rayTracing
+     indice_Trans(i) = mol(imol)%indice_Trans_rayTracing(i)
+  enddo
 
   !  Write the array to the FITS file.
   call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
@@ -2907,7 +2916,7 @@ subroutine ecriture_spectre(imol)
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1
-  naxes(1) = ntrans
+  naxes(1) = mol(imol)%nTrans_rayTracing
   nelements = naxes(1)
 
   ! create new hdu
@@ -2916,9 +2925,8 @@ subroutine ecriture_spectre(imol)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  do i=1,ntrans
-     iiTrans= indice_Trans(i)
-     freq(i) = Transfreq(iiTrans)
+  do i=1,mol(imol)%nTrans_rayTracing
+     freq(i) = Transfreq(mol(imol)%indice_Trans_rayTracing(i))
   enddo
 
   !  Write the array to the FITS file.
@@ -2929,7 +2937,7 @@ subroutine ecriture_spectre(imol)
   !------------------------------------------------------------------------------
   bitpix=-32
   naxis = 1
-  naxes(1) = 2*n_speed_rt+1
+  naxes(1) = 2*mol(imol)%n_speed_rt+1
   nelements = naxes(1)
 
   ! create new hdu
@@ -2956,7 +2964,7 @@ subroutine ecriture_spectre(imol)
   ! Origine
   !------------------------------------------------------------------------------
   if (lorigine) then
-     allocate(O(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells))
+     allocate(O(-mol(imol)%n_speed_rt:mol(imol)%n_speed_rt,mol(imol)%nTrans_rayTracing,n_cells))
      O = 0.0;
      do i=1, nb_proc
         O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
@@ -2978,8 +2986,8 @@ subroutine ecriture_spectre(imol)
      extend=.true.
 
      naxis=4
-     naxes(1)=2*n_speed_rt+1
-     naxes(2)=ntrans
+     naxes(1)=2*mol(imol)%n_speed_rt+1
+     naxes(2)=mol(imol)%nTrans_rayTracing
      naxes(3)=n_cells
 
      !  Write the required header keywords.
