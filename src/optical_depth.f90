@@ -299,7 +299,7 @@ end subroutine optical_length_tot
 
 !***********************************************************
 
-subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
+subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_speed, nTrans, tab_Trans)
   ! Generalisation de la routine physical_length
   ! pour le cas du transfert dans les raies
   ! Propage un paquet depuis un point d'origine donne
@@ -312,21 +312,25 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
 
   implicit none
 
-  integer, intent(in) :: id, icell_in, iray
+  integer, intent(in) :: id, imol,icell_in, iray
   real(kind=dp), intent(in) :: u,v,w
   real(kind=dp), intent(in) :: x,y,z
   logical, intent(in) :: labs
+
   integer, dimension(2), intent(in) :: ispeed
   real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+
+  integer, intent(in) :: nTrans
+  integer, dimension(nTrans), intent(in) :: tab_Trans
 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: tspeed
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
   real(kind=dp) :: delta_vol, l, delta_vol_phi, v0, v1, v_avg0
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
-  real(kind=dp) :: dtau_c, Snu_c
   real(kind=dp), dimension(nTrans) :: tau_c
-  integer :: iTrans, ivpoint, iiTrans, n_vpoints, nbr_cell, icell, next_cell, previous_cell
+  real(kind=dp) :: dtau_c, Snu_c
+  integer :: i, ivpoint, iTrans, n_vpoints, nbr_cell, icell, next_cell, previous_cell
 
   real :: facteur_tau
 
@@ -417,37 +421,39 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
-        do iTrans=1,nTrans
-           iiTrans = indice_Trans(iTrans)
+        do i=1,nTrans
+           iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-           opacite(:) = kappa_mol_o_freq(icell,iiTrans) * P(:) + kappa(icell,iiTrans)
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
 
            ! Epaisseur optique
            dtau(:) =  l * opacite(:)
-           dtau_c = l * kappa(icell,iiTrans)
+           dtau_c = l * kappa(icell,iTrans)
 
            ! Fonction source
-           Snu(:) = ( emissivite_mol_o_freq(icell,iiTrans) * P(:) &
-                + emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-300_dp)
-           Snu_c = emissivite_dust(icell,iiTrans) / (kappa(icell,iiTrans) + 1.0e-300_dp)
+           Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
+                + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
+           Snu_c = emissivite_dust(icell,iTrans) / (kappa(icell,iTrans) + 1.0e-300_dp)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
            !---write(*,*) ri0, zj0
-           !---write(*,*) "kappa", kappa_mol_o_freq(ri0,zj0,iiTrans), kappa(iiTrans,ri0,zj0,1)
-           !---write(*,*) "eps", emissivite_mol_o_freq(ri0,zj0,iiTrans)
+           !---write(*,*) "kappa", kappa_mol_o_freq(ri0,zj0,iTrans), kappa(iTrans,ri0,zj0,1)
+           !---write(*,*) "eps", emissivite_mol_o_freq(ri0,zj0,iTrans)
            !---
            !---write(*,*) minval(tau(:,iTrans)), maxval(tau(:,iTrans))
            !---write(*,*) minval(dtau(:)), maxval(dtau(:))
            !---write(*,*) minval(Snu(:)), maxval(Snu(:))
-           I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + &
-                exp(-tau(:,iTrans)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
-           I0c(iTrans,iray,id) = I0c(iTrans,iray,id) + &
-                exp(-tau_c(iTrans)) * (1.0_dp - exp(-dtau_c)) * Snu_c
+
+           ! Warning I0, I0c (and origine_mol) are smaller array (dimension nTrans)
+           I0(:,i,iray,id) = I0(:,i,iray,id) + &
+                exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
+           I0c(i,iray,id) = I0c(i,iray,id) + &
+                exp(-tau_c(i)) * (1.0_dp - exp(-dtau_c)) * Snu_c
 
            if (lorigine.and.(.not.labs)) then
-              origine_mol(:,iiTrans,icell,id) = origine_mol(:,iiTrans,icell,id) + &
-                   exp(-tau(:,iTrans)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
+              origine_mol(:,i,icell,id) = origine_mol(:,i,icell,id) + &
+                   exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            endif
 
            ! surface superieure ou inf
@@ -456,25 +462,28 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
            if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
 
            ! Mise a jour profondeur optique pour cellule suivante
-           tau(:,iTrans) = tau(:,iTrans) + dtau(:) * facteur_tau
-           tau_c(iTrans) = tau_c(iTrans) + dtau_c
-        enddo
+           ! Warning tau and  tau_c are smaller array (dimension nTrans)
+           tau(:,i) = tau(:,i) + dtau(:) * facteur_tau
+           tau_c(i) = tau_c(i) + dtau_c
+        enddo ! i
 
         if (ldouble_RT) then
-           do iTrans=1,nTrans
-              iiTrans = indice_Trans(iTrans)
-              opacite(:) = kappa_mol_o_freq2(icell,iiTrans) * P(:) + kappa(icell,iiTrans)
+           do i=1,nTrans
+              iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
+
+              opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
               dtau(:) =  l * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
-              Snu(:) = ( emissivite_mol_o_freq2(icell,iiTrans) * P(:) + &
-                   emissivite_dust(icell,iiTrans) ) / (opacite(:) + 1.0e-30_dp)
+              Snu(:) = ( emissivite_mol_o_freq2(icell,iTrans) * P(:) + &
+                   emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-30_dp)
               I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + &
                    exp(-tau2(:,iTrans)) * (1.0_dp - exp(-dtau2(:))) * Snu(:)
 
               ! Mise a jour profondeur optique pour cellule suivante
-              tau2(:,iTrans) = tau2(:,iTrans) + dtau2(:)
+              ! Warning tau2 is a smaller array (dimension nTrans)
+              tau2(:,i) = tau2(:,i) + dtau2(:)
            enddo
         endif
 
@@ -483,21 +492,21 @@ subroutine integ_ray_mol(id,icell_in,x,y,z,u,v,w,iray,labs,ispeed,tab_speed)
   enddo infinie
 
   ! Ajout cmb, pondere par la profondeur optique totale
-!  tspeed(:) = tab_speed(:) + v_avg0
-!  I0(:,:,iray,id) = I0(:,:,iray,id) + Cmb(ispeed,tspeed) * exp(-tau(:,:))
-!  if (ldouble_RT) then
-!     I02(:,:,iray,id) = I02(:,:,iray,id) + Cmb(ispeed,tspeed) * exp(-tau2(:,:))
-!  endif
+  !  tspeed(:) = tab_speed(:) + v_avg0
+  !  I0(:,:,iray,id) = I0(:,:,iray,id) + Cmb(ispeed,tspeed) * exp(-tau(:,:))
+  !  if (ldouble_RT) then
+  !     I02(:,:,iray,id) = I02(:,:,iray,id) + Cmb(ispeed,tspeed) * exp(-tau2(:,:))
+  !  endif
 
-  do iTrans=1,nTrans
-     iiTrans = indice_Trans(iTrans)
-     !I0(:,iTrans,iray,id) = I0(:,iTrans,iray,id) + tab_Cmb_mol(iiTrans) * exp(-tau(:,iTrans))
+  do i=1,nTrans
+     iTrans = tab_Trans(i)
+     I0(:,i,iray,id) = I0(:,i,iray,id) + tab_Cmb_mol(iTrans) * exp(-tau(:,i))
   enddo
 
   if (ldouble_RT) then
-     do iTrans=1,nTrans
-        iiTrans = indice_Trans(iTrans)
-        I02(:,iTrans,iray,id) = I02(:,iTrans,iray,id) + tab_Cmb_mol(iiTrans) * exp(-tau2(:,iTrans))
+     do i=1,nTrans
+        iTrans = tab_Trans(i)
+        I02(:,i,iray,id) = I02(:,i,iray,id) + tab_Cmb_mol(iTrans) * exp(-tau2(:,i))
      enddo
   endif
 

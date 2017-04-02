@@ -2111,7 +2111,7 @@ contains
        do j=1, nz
           icell = cell_map(i,j,1)
           r_sph = sqrt(r_grid(icell)**2 + z_grid(icell)**2)
-          !          vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) )
+          ! vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) ) ! Midplane Keplerian velocity
           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
        enddo
     enddo

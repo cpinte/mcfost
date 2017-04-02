@@ -13,12 +13,41 @@ LIB= $(MCFOST_INSTALL)/lib
 LDFLAGS=
 INCLUDE=
 
+ifndef SYSTEM
+    SYSTEM= ifort
+endif
+
+ifeq ($(gfortran), yes)
+    SYSTEM=gfortran
+endif
+
 ifndef OPENMP
     OPENMP= yes
 endif
 
-ifndef SYSTEM
-    SYSTEM= ifort
+ifeq ($(dev), yes)
+    DEV=yes # faster compilation
+endif
+
+ifeq ($(debug), yes)
+    DEBUG=yes
+endif
+
+ifeq ($(mono), yes)
+    OPENMP=no
+endif
+
+ifeq ($(DEBUG), yes)
+    OPENMP=no
+endif
+
+ifeq ($(debugp), yes)
+    DEBUGp=yes
+endif
+
+ifeq ($(DEBUGP), yes)
+    DEBUG=yes
+    OPENMP=yes
 endif
 
 #------------------------------------------------------------------------------#
@@ -36,11 +65,11 @@ ifeq ($(SYSTEM), ifort)
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
     KNOWN_SYSTEM= yes
-    FOMPFLAGS= -qopenmp
+    FOMPFLAGS= -fopenmp
     IPOFLAGS= -ipo
     CC= icc
     CCFLAGS= -O3 -no-prec-div -traceback $(ARCH)
-    COMPFLAGS= -qopenmp
+    COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
 endif
@@ -104,6 +133,10 @@ endif
 ifeq ($(DEBUG), yes)
     FFLAGS+= ${DEBUGFLAG}
     FFLAGS:= $(FFLAGS:-O3=-O0)
+endif
+
+ifeq ($(DEV), yes)
+   FFLAGS:= $(FFLAGS:-O3=-O1)
 endif
 
 ifeq ($(OPENMP), yes)
@@ -237,7 +270,7 @@ release : main
 	scp dmz:mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"riri\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
@@ -310,7 +343,7 @@ save :
 	git push phare
 	git push bitbucket
 	git push github
-	git push riri
+	git push dmz
 
 #------------------------------------------------------------------------------#
 # Testing

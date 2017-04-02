@@ -1609,7 +1609,7 @@ subroutine read_Sigma_file()
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels, bitpix
   integer :: nullval
-  integer, dimension(1) :: naxes
+  integer, dimension(2) :: naxes
   logical :: anynull
   character(len=80) :: comment
   real, dimension(:), allocatable :: sigma_sp
@@ -1648,11 +1648,23 @@ subroutine read_Sigma_file()
   if ((naxes(1) /= n_rad)) then
      write(*,*) "Error : "//trim(sigma_file)//" does not have the"
      write(*,*) "right dimensions. Exiting."
-     write(*,*) "# fits_file vs mcfost_grid"
+     write(*,*) "Axis #1 (radius) :  fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      stop
   endif
-  npixels=naxes(1)
+
+  if (nfound==2) then
+     if ((naxes(2) /= n_az)) then
+        write(*,*) "Error : "//trim(sigma_file)//" does not have the"
+        write(*,*) "right dimensions. Exiting."
+        write(*,*) "Axis #2 (azimuth):  fits_file vs mcfost_grid"
+        write(*,*) naxes(1), n_az
+        stop
+     endif
+     npixels = naxes(1) * naxes(2)
+  else
+     npixels = naxes(1)
+  endif
 
   bitpix = 0
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
