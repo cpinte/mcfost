@@ -7,8 +7,8 @@ module read_phantom
 
   contains
 
-    subroutine read_phantom_file(iunit,filename,x,y,z,&
-         particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,&
+           particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
@@ -31,7 +31,7 @@ module read_phantom
  real(4),  allocatable, dimension(:) :: tmp
  real(dp) :: graindens
  real(dp), allocatable, dimension(:) :: dudt
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac, vxyz
  type(dump_h) :: hdr
  logical :: got_h, got_dustfrac, tagged, matched
 
@@ -77,7 +77,7 @@ module read_phantom
     dustfluidtype = 1
  endif
 
- allocate(xyzh(4,np),itype(np),tmp(np))
+ allocate(xyzh(4,np),itype(np),tmp(np), vxyz(3,np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
  allocate(dudt(np))
 
@@ -131,6 +131,12 @@ module read_phantom
                    case('h')
                       read(iunit,iostat=ierr) xyzh(4,1:np)
                       got_h = .true.
+                   case('vx')
+                      read(iunit,iostat=ierr) vxyz(1,1:np)
+                   case('vy')
+                      read(iunit,iostat=ierr) vxyz(2,1:np)
+                   case('vz')
+                      read(iunit,iostat=ierr) vxyz(3,1:np)
                    case('dustfrac')
                       ngrains = ngrains + 1
                       if (ngrains > ndusttypes) then
@@ -237,7 +243,7 @@ module read_phantom
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz,itype,grainsize,dustfrac,&
          massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
          n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
@@ -247,14 +253,14 @@ module read_phantom
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp)
+ deallocate(xyzh,itype,tmp,vxyz)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_file
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz,iphase,grainsize,dustfrac,&
      massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
      n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
 
@@ -268,6 +274,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
 
   integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
   real(dp), dimension(4,np), intent(in) :: xyzh
+  real(dp), dimension(3,np), intent(in) :: vxyz
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize
@@ -292,7 +299,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist/ (au_to_cm ) ! * 100.) ! todo : je ne capte pas ce factor --> Daniel
+  ulength_au = udist/ (au_to_cm )
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
