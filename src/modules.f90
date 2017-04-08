@@ -187,16 +187,10 @@ module disk
   ! Dullemond et Dubrulle
   real :: alpha
 
-  ! Vitesses (en m/s) (Dullemond et Dubrulle)
-  real, parameter :: v_sound = 380.0
-!  real, parameter :: dv_gaz = 0.02
-  ! Rayon de definition des vitesses
-  real, parameter :: rref_v = 50.
-
   !! Loi de puissance
   real :: exp_strat, a_strat! = 0.7
   !! Loi exp (Garaud , Barriere 2004)
-!!  real, parameter :: fact_strat = 0.3
+  !!  real, parameter :: fact_strat = 0.3
 
   ! Grille
   real(kind=dp), parameter :: prec_grille=1.0e-14_dp
