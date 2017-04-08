@@ -1007,6 +1007,12 @@ subroutine densite_eqdiff()
 
   type(disk_zone_type) :: dz
 
+  ! Vitesses (en m/s) (Dullemond et Dubrulle)
+  real, parameter :: v_sound = 380.0 ! m/s
+  ! Rayon de definition des vitesses
+  real, parameter :: rref_v = 50. ! au
+
+
   if (n_zones > 1) then
      write(*,*) "Error : n_zones must be set to 1 when using densite_eqdiff"
      stop
