@@ -102,11 +102,10 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,xyzh,iphase,grainsize,graindens,&
-       dustfrac, massoftype,xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt, &
-       compute_Frad,SPH_limits, & ! options
-       Tdust,Frad,mu_gas,ierr,  & ! intent(out)
-       write_T_files)
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
+    npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
+    xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
+    Tdust,Frad,mu_gas,ierr,write_T_files)
 
     use parametres
     use constantes, only : mu
@@ -132,6 +131,7 @@ contains
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
     real(dp), dimension(4,np), intent(in) :: xyzh
+    real(dp), dimension(4,np), intent(in) :: vxyzu
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize
@@ -189,9 +189,10 @@ contains
     mu_gas = mu ! Molecular weight
     Frad = 0.
 
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         n_SPH,XX,YY,ZZ, particle_id, massgas,massdust,rhogas,rhodust,extra_heating)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyzu,&
+      iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
+      umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,particle_id,&
+      massgas,massdust,rhogas,rhodust,extra_heating)
 
     lextra_heating = (ndudt == np)
 
