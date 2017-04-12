@@ -130,8 +130,7 @@ contains
 #include "sprng_f.h"
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
-    real(dp), dimension(4,np), intent(in) :: xyzh
-    real(dp), dimension(4,np), intent(in) :: vxyzu
+    real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize

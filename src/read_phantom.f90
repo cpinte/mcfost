@@ -7,13 +7,14 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,&
-           particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
+      rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
  integer,  intent(out), dimension(:),   allocatable :: particle_id
- real(dp), intent(out), dimension(:,:), allocatable :: rhodust, massdust
+ real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -31,9 +32,9 @@ subroutine read_phantom_file(iunit,filename,x,y,z,&
  real(4),  allocatable, dimension(:) :: tmp
  real(dp) :: graindens
  real(dp), allocatable, dimension(:) :: dudt
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac, vxyz
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
- logical :: got_h, got_dustfrac, tagged, matched
+ logical :: got_h,got_dustfrac,tagged,matched
 
  ! open file for read
  call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
@@ -77,7 +78,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,&
     dustfluidtype = 1
  endif
 
- allocate(xyzh(4,np),itype(np),tmp(np), vxyz(3,np))
+ allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
  allocate(dudt(np))
 
@@ -132,11 +133,11 @@ subroutine read_phantom_file(iunit,filename,x,y,z,&
                       read(iunit,iostat=ierr) xyzh(4,1:np)
                       got_h = .true.
                    case('vx')
-                      read(iunit,iostat=ierr) vxyz(1,1:np)
+                      read(iunit,iostat=ierr) vxyzu(1,1:np)
                    case('vy')
-                      read(iunit,iostat=ierr) vxyz(2,1:np)
+                      read(iunit,iostat=ierr) vxyzu(2,1:np)
                    case('vz')
-                      read(iunit,iostat=ierr) vxyz(3,1:np)
+                      read(iunit,iostat=ierr) vxyzu(3,1:np)
                    case('dustfrac')
                       ngrains = ngrains + 1
                       if (ngrains > ndusttypes) then
@@ -243,9 +244,10 @@ subroutine read_phantom_file(iunit,filename,x,y,z,&
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz,itype,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+         vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,&
+         hfact,umass,utime,udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,&
+         massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -253,28 +255,28 @@ subroutine read_phantom_file(iunit,filename,x,y,z,&
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp,vxyz)
+ deallocate(xyzh,itype,tmp,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_file
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-     n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass,utime,&
+     udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,massgas,massdust,&
+     rhogas,rhodust,extra_heating)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm, Msun_to_g, erg_to_J
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J
   use prop_star
 
-  integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
-  real(dp), dimension(4,np), intent(in) :: xyzh
-  real(dp), dimension(3,np), intent(in) :: vxyz
+  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
+  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize
@@ -291,8 +293,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz
   real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
 
-  integer :: i,j,k,itypei, alloc_status, i_etoiles
-  real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, uWatt, ulength_au, usolarmass, dustfraci, Mtot, totlum, qtermi
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles
+  real(dp) :: xi,yi,zi,hi,rhoi,udens,uerg_per_s,uWatt,ulength_au,usolarmass
+  real(dp) :: dustfraci,Mtot,totlum,qtermi
 
   real, parameter :: Lsun = 3.839e26 ! W
 
@@ -312,7 +315,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyz
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH), particle_id(n_SPH), &
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),particle_id(n_SPH),&
       x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
