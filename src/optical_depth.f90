@@ -619,7 +619,7 @@ subroutine integ_tau_mol(imol)
   integer, intent(in) :: imol
 
   real ::  norme, norme1, vmax, angle
-  integer :: i, j, iTrans, n_speed, icell
+  integer :: i, j, iTrans, n_speed, icell, it
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:), allocatable :: tab_speed, P
@@ -637,34 +637,41 @@ subroutine integ_tau_mol(imol)
 
   iTrans = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
 
-  norme=0.0
-  norme1=0.0
-  do i=1, n_rad
-     icell = cell_map(i,1,1)
-     P(:) = phiProf(icell,ispeed,tab_speed)
-     norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
-     norme1=norme1 + kappa(icell,1) * (r_lim(i)-r_lim(i-1))
+  do it=1, mol(imol)%nTrans_rayTracing
+     iTrans = mol(imol)%indice_Trans_rayTracing(it)
+
+     write(*,*) "-------------------------------"
+     write(*,*) "Transition #", iTrans
+
+     norme=0.0
+     norme1=0.0
+     do i=1, n_rad
+        icell = cell_map(i,1,1)
+        P(:) = phiProf(icell,ispeed,tab_speed)
+        norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
+        norme1=norme1 + kappa(icell,iTrans) * (r_lim(i)-r_lim(i-1))
+     enddo
+     write(*,*) "tau_mol = ", norme
+     write(*,*) "tau_dust=", norme1
+
+     loop_r : do i=1,n_rad
+        icell = cell_map(i,1,1)
+        if (r_grid(icell) > 100.0) then
+           norme=0.0
+           loop_z : do j=nz, 1, -1
+              icell = cell_map(i,j,1)
+              P(:) = phiProf(icell,ispeed,tab_speed)
+              norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+              if (norme > 1.0) then
+                 write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(icell), "AU"
+                 exit loop_z
+              endif
+           enddo loop_z
+           exit loop_r
+        endif
+     enddo loop_r
+
   enddo
-  write(*,*) "tau_mol = ", norme
-  write(*,*) "tau_dust=", norme1
-
-  loop_r : do i=1,n_rad
-     icell = cell_map(i,1,1)
-     if (r_grid(icell) > 100.0) then
-        norme=0.0
-        loop_z : do j=nz, 1, -1
-           icell = cell_map(i,j,1)
-           P(:) = phiProf(icell,ispeed,tab_speed)
-           norme=norme+kappa_mol_o_freq(icell,1)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
-           if (norme > 1.0) then
-              write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(icell), "AU"
-              exit loop_z
-           endif
-        enddo loop_z
-        exit loop_r
-     endif
-  enddo loop_r
-
   !read(*,*)
 
   return
