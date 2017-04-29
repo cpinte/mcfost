@@ -723,7 +723,9 @@ end subroutine define_cylindrical_grid
        ri_out=0
        if (abs(zin) > zmax(1)) then
           zj_out = nz+1
-          if (zin < 0.0)  zj_out = -zj_out
+          if (l3D) then
+             if (zin < 0.0)  zj_out = -zj_out
+          endif
        else
           zj_out=1
        endif
