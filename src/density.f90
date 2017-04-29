@@ -576,8 +576,8 @@ subroutine define_dust_density()
               stop
            endif
 
+           lwarning = .true.
            do i=1, n_rad
-              lwarning = .true.
               rho0 = densite_gaz_midplane(i) ! pour dependance en R : pb en coord sperique
               icell = cell_map(i,1,1)
               rcyl = r_grid(icell)
@@ -659,7 +659,7 @@ subroutine define_dust_density()
                  H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
                  s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
-                 write(*,*) "r=", rcyl, "a_migration =", s_opt
+                 !write(*,*) "r=", rcyl, "a_migration =", s_opt
 
                  if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
                     write(*,*)
