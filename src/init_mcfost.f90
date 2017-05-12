@@ -897,6 +897,12 @@ subroutine initialisation_mcfost()
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
+     case("-chi_ISM")
+        i_arg = i_arg + 1
+        lISM_heating=.true.
+        call get_command_argument(i_arg,s)
+        read(s,*) chi_ISM
+        i_arg = i_arg + 1
      case("-casa")
         i_arg = i_arg + 1
         lcasa=.true.
@@ -1335,6 +1341,7 @@ subroutine display_help()
   write(*,*) "        : -force_PAH_out_equilibrium : mainly for testing purposes"
   write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
   write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
+  write(*,*) "        : -chi_ISM <chi> : changes the chi of ISM radiation (default: 1)"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
