@@ -1241,13 +1241,12 @@ subroutine photo_dissociation()
   integer :: icell
   real(kind=dp) :: CD
 
-  real :: threshold_CD = 0.8 * 1.59e21 !cm^-2 ! Value from Qi et al 2011
+  real :: threshold_CD = 0.8 * 1.59e21 * 0.65 !cm^-2 ! Value from Qi et al 2011
   ! It makes sense only for constant dust --> needs to be updated
   real :: photo_dissocation_depletion = 1.e-6
 
 
-
-  write (*,*) "Photo-dissociating molecules"
+  write (*,*) "Photo-dissociating molecules", threshold_CD
 
   threshold_CD = threshold_CD / (cm_to_m**2) ! m^-2
 
