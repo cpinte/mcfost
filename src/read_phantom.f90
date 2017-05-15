@@ -239,6 +239,12 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
 
  if (ndudt == 0) then
     dudt = 0.
+ else
+    write(*,*) "Phantom dump contains internal energy"
+    if (lno_internal_energy) then
+       write(*,*) "Forcing it to 0"
+       dudt = 0.
+    endif
  endif
 
  write(*,*) "Found", nptmass, "point masses in the phantom file"

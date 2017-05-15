@@ -111,7 +111,8 @@ subroutine set_default_variables()
   lcavity = .false.
   freeze_out_depletion = 0.
   lmono0 = .false.
-  lmono= .false.
+  lmono = .false.
+  lno_internal_energy = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -958,6 +959,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,system_age)
         i_arg = i_arg + 1
+     case("-no_internal_energy")
+        i_arg = i_arg + 1
+        lno_internal_energy = .true.
      case default
         call display_help()
      end select
@@ -1342,6 +1346,7 @@ subroutine display_help()
   write(*,*) "        : -Tmax_PAH <T> : changes the maximum temperature allowed for PAH (default: 2500)"
   write(*,*) "        : -ISM_heating : includes heating by ISM radiation"
   write(*,*) "        : -chi_ISM <chi> : changes the chi of ISM radiation (default: 1)"
+  write(*,*) "        : -no_internal_energy : ignoring internal energy in Phantom dumps"
   write(*,*) " "
   write(*,*) " Options related to disk structure"
   write(*,*) "        : -disk_struct : computes the density structure and stops:"
