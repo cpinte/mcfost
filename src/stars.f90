@@ -541,8 +541,6 @@ subroutine repartition_energie_etoiles()
 
   !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
 
-  nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
-
   ! Proba cumulee
   if (n_lambda > 1) then
      ! Normalisation a 1 du spectre
