@@ -379,7 +379,6 @@ contains
        write(*,*) "***********************************************"
 
        ierr = 1
-       stop
        return
     endif
 
