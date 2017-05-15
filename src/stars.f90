@@ -207,6 +207,8 @@ subroutine repartition_energie_etoiles()
   integer, dimension(2) :: naxes
   logical :: anynull
 
+  if (n_etoiles < 1) return
+
   ! pour obtenir un spectre normalise a 1 Rsun et 1pc
   ! Cst0 sert a remormaliser le corps noir pour l'aligner sur les spectres
   Cst0 =  2.0*hp*c_light**2 * 1e-6
