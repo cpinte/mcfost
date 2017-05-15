@@ -66,7 +66,7 @@ module parametres
   integer :: RT_sed_method ! cf routine dust_map pour def
 
   ! Etapes de l'émission thermique
-  logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int
+  logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
 
