@@ -1348,6 +1348,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! allacatable array as it can be big and not fit in stack memory
   real, dimension(:,:,:), allocatable :: map_1star, Q_1star, U_1star
 
+  stars_map(:,:,:) = 0.0
+  if (n_etoiles < 1) return
+
   alloc_status = 0
   allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
   map_1star = 0.0
@@ -1364,8 +1367,6 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      write(*,*) "Exiting"
      stop
   endif
-
-  stars_map(:,:,:) = 0.0 ;
 
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1
