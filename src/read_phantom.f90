@@ -371,8 +371,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
        extra_heating(i) = qtermi
     enddo
 
-    write(*,*) "Total energy input = ",totlum,' W'
-    write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
+    write(*,*) "Total energy input = ",real(totlum),' W'
+    write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
  endif
 
  write(*,*) "Updating the stellar properties"
