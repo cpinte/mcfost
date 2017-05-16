@@ -8,7 +8,7 @@ module SPH2mcfost
 
 contains
 
-  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH)
+  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file

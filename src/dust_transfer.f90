@@ -75,6 +75,8 @@ subroutine transfert_poussiere()
 
   integer :: time_1, time_2, time_RT, time_source_fct
 
+  real, allocatable, dimension(:) :: extra_heating
+
   time_source_fct = 0 ; time_RT = 0
 
   lambda0 = -99 ; nnfot2=0.0_dp ; n_phot_sed2 = 0.0_dp
@@ -94,7 +96,7 @@ subroutine transfert_poussiere()
   call define_physical_zones()
 
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file, n_SPH)
+     call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else
      call setup_grid()
@@ -319,7 +321,7 @@ subroutine transfert_poussiere()
 
         if (ltemp) then
            call init_reemission()
-           call internal_heating(.false.)
+           call internal_heating(lextra_heating,extra_heating)
         endif
 
         !$omp parallel default(none) private(lambda) shared(n_lambda)

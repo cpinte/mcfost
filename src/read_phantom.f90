@@ -239,12 +239,6 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
 
  if (ndudt == 0) then
     dudt = 0.
- else
-    write(*,*) "Phantom dump contains internal energy"
-    if (lno_internal_energy) then
-       write(*,*) "Forcing it to 0"
-       dudt = 0.
-    endif
  endif
 
  write(*,*) "Found", nptmass, "point masses in the phantom file"
@@ -363,6 +357,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
  if (ndudt == np) then
     write(*,*) "Computing energy input"
+    lextra_heating = .true.
     allocate(extra_heating(n_SPH), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Allocation error in phanton_2_mcfost"

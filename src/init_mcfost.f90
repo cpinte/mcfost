@@ -112,6 +112,7 @@ subroutine set_default_variables()
   freeze_out_depletion = 0.
   lmono0 = .false.
   lmono = .false.
+  lextra_heating = .false.
   lno_internal_energy = .false.
 
   ! Geometrie Grille
