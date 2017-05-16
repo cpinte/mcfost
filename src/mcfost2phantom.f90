@@ -105,12 +105,12 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
     npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tdust,Frad,mu_gas,ierr,write_T_files)
+    Tdust,Frad,mu_gas,ierr,write_T_files,ISM)
 
     use parametres
     use constantes, only : mu
     use read_phantom
-    use prop_star, only : n_etoiles
+    use prop_star, only : n_etoiles, E_ISM
     use em_th, only : temperature, E_abs_nRE
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
          internal_heating, temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
@@ -121,7 +121,7 @@ contains
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
     use dust_prop, only : opacite
-    use stars, only : repartition_energie_etoiles
+    use stars, only : repartition_energie_etoiles, repartition_energie_ISM
     use grid,only : setup_grid
     use optical_depth, only : no_dark_zone, integ_tau
     use grains, only : tab_lambda
@@ -147,12 +147,14 @@ contains
     integer, intent(in) :: ndudt
     real(dp), dimension(ndudt), intent(in) :: dudt
 
+    logical, intent(in) :: ISM ! does mcfost need to add ISM heating
+
     real(sp), dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
     real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
-    real, parameter :: Tmin = 10.
+    real, parameter :: Tmin = 1.
 
     real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
     integer, dimension(:), allocatable :: particle_id
@@ -232,6 +234,11 @@ contains
     enddo !n
 
     call repartition_energie_etoiles()
+    if (ISM) then
+       call repartition_energie_ISM()
+    else
+       E_ISM = 0.0 ;
+    endif
 
     ! ToDo : needs to be made parallel
     call init_reemission()
