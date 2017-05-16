@@ -1611,14 +1611,14 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-subroutine internal_heating(lextra_heating,dudt)
+subroutine internal_heating(lheating,dudt)
   ! Calcule le temperature initiale du disque avant le step 1
   ! C. Pinte
   ! 27/02/06
 
   implicit none
 
-  logical, intent(in) :: lextra_heating
+  logical, intent(in) :: lheating
   real, dimension(:), intent(in), optional :: dudt
 
   integer :: icell
@@ -1629,7 +1629,14 @@ subroutine internal_heating(lextra_heating,dudt)
      ! Energie venant de l'equilibre avec nuage à T_min
      E0(1:n_cells) = exp(log_E_em(1,1:n_cells))
 
-     if (lextra_heating) then
+     if (lheating) then
+        write(*,*) "Computing heating from internal energy"
+        if (.not.present(dudt)) then
+           write(*,*) "ERROR: internal energy must be provided"
+           write(*,*) "Exiting"
+           stop
+        endif
+
         do icell=1, n_cells
            E0(icell) = max(E0(icell), dudt(icell)/quatre_pi / AU_to_m**2 )
         enddo

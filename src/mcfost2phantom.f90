@@ -170,7 +170,6 @@ contains
     integer, pointer, save :: p_lambda
 
     logical, save :: lfirst_time = .true.
-    logical :: lextra_heating
 
     integer :: i_Phantom
 
@@ -192,8 +191,6 @@ contains
       iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
       umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,particle_id,&
       massgas,massdust,rhogas,rhodust,extra_heating)
-
-    lextra_heating = (ndudt == np)
 
     call compute_stellar_parameters()
 
