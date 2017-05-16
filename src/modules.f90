@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.12"
+  character(8), parameter :: mcfost_release = "3.0.13"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -66,7 +66,7 @@ module parametres
   integer :: RT_sed_method ! cf routine dust_map pour def
 
   ! Etapes de l'émission thermique
-  logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int
+  logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
 
@@ -187,16 +187,10 @@ module disk
   ! Dullemond et Dubrulle
   real :: alpha
 
-  ! Vitesses (en m/s) (Dullemond et Dubrulle)
-  real, parameter :: v_sound = 380.0
-!  real, parameter :: dv_gaz = 0.02
-  ! Rayon de definition des vitesses
-  real, parameter :: rref_v = 50.
-
   !! Loi de puissance
   real :: exp_strat, a_strat! = 0.7
   !! Loi exp (Garaud , Barriere 2004)
-!!  real, parameter :: fact_strat = 0.3
+  !!  real, parameter :: fact_strat = 0.3
 
   real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
   real(kind=dp), dimension(:,:), allocatable :: star_origin
@@ -256,6 +250,7 @@ module prop_star
 
   real, dimension(:), allocatable :: E_ISM
   real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
+  real :: chi_ISM = 1.0
 
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot

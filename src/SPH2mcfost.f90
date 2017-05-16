@@ -8,7 +8,7 @@ module SPH2mcfost
 
 contains
 
-  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH)
+  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file
@@ -407,6 +407,8 @@ contains
     real :: L, R, T, M, minM, maxM
     real, dimension(nSpT) :: logL, logR, logTeff, logM
 
+    if (n_etoiles < 1) return
+
     isochrone_file = "Siess/isochrone_"//trim(system_age)//".txt"
 
     write(*,*) ""
@@ -446,14 +448,11 @@ contains
     ! Passage rayon en AU
     etoile(:)%r = etoile(:)%r * Rsun_to_AU
 
-
-
     return
 
   end subroutine compute_stellar_parameters
 
   !*********************************************************
-
 
   subroutine read_ascii_SPH_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 

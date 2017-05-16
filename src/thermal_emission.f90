@@ -397,29 +397,36 @@ subroutine repartition_wl_em()
   implicit none
 
   integer :: lambda
-  real :: E_star_tot, E_disk_tot, delta_wl, L_tot
+  real :: E_star_tot, E_disk_tot, E_ISM_tot, delta_wl, L_tot
+
+  real :: surface, C
 
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
   do lambda=1,n_lambda
-     spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda-1) + spectre_etoiles(lambda)/frac_E_stars(lambda)
+     delta_wl=tab_delta_lambda(lambda)*1.e-6
+     spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda-1) + &
+          (E_stars(lambda) + E_disk(lambda) + E_ISM(lambda)) * delta_wl
   enddo
 
   ! Normalisation
-   do lambda=1,n_lambda
+  do lambda=1,n_lambda
      spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
   enddo
 
   ! Energie des paquets pour step 1
   E_star_tot = 0.0
   E_disk_tot = 0.0
+  E_ISM_tot = 0.0
   do lambda=1, n_lambda
      delta_wl=tab_delta_lambda(lambda)*1.e-6
      E_star_tot = E_star_tot + E_stars(lambda) * delta_wl
-     E_disk_tot = E_disk_tot + E_disk(lambda) * delta_wl
+     E_disk_tot = E_disk_tot + E_disk(lambda)  * delta_wl
+     E_ISM_tot  = E_ISM_tot  + E_ISM(lambda)   * delta_wl
   enddo
-  L_tot = L_etoile *  (E_disk_tot + E_star_tot) / E_star_tot
 
+  C = 2.0*pi*hp*c_light**2 / quatre_pi
+  L_tot = C * (E_star_tot + E_disk_tot + E_ISM_tot)
   L_packet_th = L_tot/nbre_photons_tot
 
   return
@@ -1938,6 +1945,13 @@ subroutine repartition_energie(lambda)
   endif
 
   E_disk(lambda) = sum(E_cell)
+
+  if (E_star+E_disk(lambda)+E_ISM(lambda) < tiny_real) then
+     write(*,*) "Error: wl #", lambda, " No energy"
+     write(*,*) "Exiting"
+     stop
+  endif
+
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda)+E_ISM(lambda))
   frac_E_disk(lambda)=(E_star+E_disk(lambda))/(E_star+E_disk(lambda)+E_ISM(lambda))
 
@@ -1979,7 +1993,7 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-subroutine internal_heating(lextra_heating,dudt)
+subroutine internal_heating(lheating,dudt)
   ! Calcule le temperature initiale du disque avant le step 1
   ! C. Pinte
   ! 27/02/06
@@ -1988,7 +2002,7 @@ subroutine internal_heating(lextra_heating,dudt)
 
   implicit none
 
-  logical, intent(in) :: lextra_heating
+  logical, intent(in) :: lheating
   real, dimension(:), intent(in), optional :: dudt
 
   integer :: icell
@@ -1999,7 +2013,14 @@ subroutine internal_heating(lextra_heating,dudt)
      ! Energie venant de l'equilibre avec nuage à T_min
      E0(1:n_cells) = exp(log_E_em(1,1:n_cells))
 
-     if (lextra_heating) then
+     if (lheating) then
+        write(*,*) "Computing heating from internal energy"
+        if (.not.present(dudt)) then
+           write(*,*) "ERROR: internal energy must be provided"
+           write(*,*) "Exiting"
+           stop
+        endif
+
         do icell=1, n_cells
            E0(icell) = max(E0(icell), dudt(icell)/quatre_pi / AU_to_m**2 )
         enddo

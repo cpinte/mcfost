@@ -7,13 +7,14 @@ module read_phantom
 
   contains
 
-    subroutine read_phantom_file(iunit,filename,x,y,z,&
-         particle_id,massgas,massdust,rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
+      rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas,grainsize
  integer,  intent(out), dimension(:),   allocatable :: particle_id
- real(dp), intent(out), dimension(:,:), allocatable :: rhodust, massdust
+ real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -31,9 +32,9 @@ module read_phantom
  real(4),  allocatable, dimension(:) :: tmp
  real(dp) :: graindens
  real(dp), allocatable, dimension(:) :: dudt
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass, dustfrac
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
- logical :: got_h, got_dustfrac, tagged, matched
+ logical :: got_h,got_dustfrac,tagged,matched
 
  ! open file for read
  call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
@@ -77,7 +78,7 @@ module read_phantom
     dustfluidtype = 1
  endif
 
- allocate(xyzh(4,np),itype(np),tmp(np))
+ allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
  allocate(dudt(np))
 
@@ -131,6 +132,12 @@ module read_phantom
                    case('h')
                       read(iunit,iostat=ierr) xyzh(4,1:np)
                       got_h = .true.
+                   case('vx')
+                      read(iunit,iostat=ierr) vxyzu(1,1:np)
+                   case('vy')
+                      read(iunit,iostat=ierr) vxyzu(2,1:np)
+                   case('vz')
+                      read(iunit,iostat=ierr) vxyzu(3,1:np)
                    case('dustfrac')
                       ngrains = ngrains + 1
                       if (ngrains > ndusttypes) then
@@ -237,9 +244,10 @@ module read_phantom
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,itype,grainsize,dustfrac,&
-         massoftype(1:ntypes),xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-         n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+         vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,&
+         hfact,umass,utime,udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,&
+         massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -247,27 +255,28 @@ module read_phantom
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp)
+ deallocate(xyzh,itype,tmp,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_file
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,iphase,grainsize,dustfrac,&
-     massoftype,xyzmh_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,&
-     n_SPH,x,y,z,particle_id,massgas,massdust,rhogas,rhodust,extra_heating)
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass,utime,&
+     udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,massgas,massdust,&
+     rhogas,rhodust,extra_heating)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm, Msun_to_g, erg_to_J
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J
   use prop_star
 
-  integer, intent(in) :: np, nptmass, ntypes, ndusttypes, dustfluidtype
-  real(dp), dimension(4,np), intent(in) :: xyzh
+  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
+  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize
@@ -284,15 +293,16 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
   real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
 
-  integer :: i,j,k,itypei, alloc_status, i_etoiles
-  real(dp) :: xi, yi, zi, hi, rhoi, udens, uerg_per_s, uWatt, ulength_au, usolarmass, dustfraci, Mtot, totlum, qtermi
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles
+  real(dp) :: xi,yi,zi,hi,rhoi,udens,uerg_per_s,uWatt,ulength_au,usolarmass
+  real(dp) :: dustfraci,Mtot,totlum,qtermi
 
   real, parameter :: Lsun = 3.839e26 ! W
 
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist/ (au_to_cm ) ! * 100.) ! todo : je ne capte pas ce factor --> Daniel
+  ulength_au = udist/ (au_to_cm )
   usolarmass = umass/Msun_to_g
 
  ! convert to dust and gas density
@@ -305,7 +315,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH), particle_id(n_SPH), &
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),particle_id(n_SPH),&
       x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
@@ -347,6 +357,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
 
  if (ndudt == np) then
     write(*,*) "Computing energy input"
+    lextra_heating = .true.
     allocate(extra_heating(n_SPH), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Allocation error in phanton_2_mcfost"
@@ -364,30 +375,27 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,ipha
     write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
  endif
 
- if (nptmass > 0) then
-    write(*,*) "Updating the stellar properties"
+ write(*,*) "Updating the stellar properties"
+ n_etoiles = 0
+ do i=1,nptmass
+    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+       n_etoiles = n_etoiles + 1
+    endif
+ enddo
 
-    n_etoiles = 0
-    do i=1,nptmass
-       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          n_etoiles = n_etoiles + 1
-       endif
-    enddo
+ if (allocated(etoile)) deallocate(etoile)
+ allocate(etoile(n_etoiles))
 
-    if (allocated(etoile)) deallocate(etoile)
-    allocate(etoile(n_etoiles))
-
-    i_etoiles = 0
-    do i=1,nptmass
-       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          i_etoiles = i_etoiles + 1
-          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
-          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
-          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
-          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
-       endif
-    enddo
- endif
+ i_etoiles = 0
+ do i=1,nptmass
+    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+       i_etoiles = i_etoiles + 1
+       etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
+       etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
+       etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
+       etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
+    endif
+ enddo
 
  return
 

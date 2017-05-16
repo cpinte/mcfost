@@ -138,6 +138,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -583,6 +584,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -1029,6 +1031,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -1446,6 +1449,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -1853,6 +1857,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -2259,6 +2264,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -2666,6 +2672,7 @@ contains
     nbre_photons_eq_th = max(fnbre_photons_eq_th / nbre_photons_loop,1.)
     nbre_photons_lambda = max(fnbre_photons_lambda / nbre_photons_loop,1.)
     nbre_photons_image = max(fnbre_photons_image / nbre_photons_loop,1.)
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
@@ -3057,6 +3064,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -3456,6 +3464,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 
@@ -3847,6 +3856,7 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*) nbre_photons_loop ;  read(1,*) nbre_photons_eq_th ; read(1,*) nbre_photons_lambda ;
     read(1,*) nbre_photons_image
+    nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
     tau_seuil  = 1.0e31
     wl_seuil = 0.81
 

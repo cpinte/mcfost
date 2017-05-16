@@ -6,6 +6,9 @@
 #------------------------------------------------------------------------------#
 # Initialization
 
+# Linux compiling server
+LINUX_SERVER= froggy
+
 KNOWN_SYSTEM= no
 
 LIB= $(MCFOST_INSTALL)/lib
@@ -25,8 +28,9 @@ ifndef OPENMP
     OPENMP= yes
 endif
 
+# faster compilation
 ifeq ($(dev), yes)
-    DEV=yes # faster compilation
+    DEV=yes
 endif
 
 ifeq ($(debug), yes)
@@ -264,13 +268,13 @@ release : main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
-	rsync -Pu *.f90 Makefile dmz:mcfost/src
-	ssh dmz "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
-	scp dmz:mcfost/src/mcfost_bin.tgz web/linux/
-	scp dmz:mcfost/src/mcfost.sha1 web/linux/
+	rsync -Pu *.f90 Makefile $(LINUX_SERVER):mcfost/src
+	ssh $(LINUX_SERVER) "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
+	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
-	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, dropbox\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
+	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	cp -r Doc web/
 	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/

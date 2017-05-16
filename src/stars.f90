@@ -267,6 +267,8 @@ subroutine repartition_energie_etoiles()
   integer, dimension(2) :: naxes
   logical :: anynull
 
+  if (n_etoiles < 1) return
+
   ! pour obtenir un spectre normalise a 1 Rsun et 1pc
   ! Cst0 sert a remormaliser le corps noir pour l'aligner sur les spectres
   Cst0 =  2.0*hp*c_light**2 * 1e-6
@@ -598,8 +600,6 @@ subroutine repartition_energie_etoiles()
   L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU
 
   !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
-
-  nbre_photons_tot=real(nbre_photons_loop)*real(nbre_photons_eq_th)
 
   ! Proba cumulee
   if (n_lambda > 1) then
