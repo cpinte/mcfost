@@ -46,6 +46,9 @@ rm -rf sprng2.0
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
 if [ "$SYSTEM" = "gfortran" ] ; then
+    export CC="icc"
+    export FC="ifort"
+elif [ "$SYSTEM" = "gfortran" ] ; then
     export CFLAGS="-m64"
     export FC="gfortran"
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
