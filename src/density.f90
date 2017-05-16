@@ -253,6 +253,13 @@ subroutine define_gas_density()
 
      endif ! dz%geometry
 
+     if (lgap_Gaussian) then
+        do icell=1, n_cells
+           densite_gaz_tmp(icell) = densite_gaz_tmp(icell) * (1.0 - f_gap_Gaussian * &
+                exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
+        enddo
+     endif
+
      !----------------------------------------
      ! Normalisation masse de gaz par zone
      !----------------------------------------
@@ -577,8 +584,8 @@ subroutine define_dust_density()
               stop
            endif
 
+           lwarning = .true.
            do i=1, n_rad
-              lwarning = .true.
               rho0 = densite_gaz_midplane(i) ! pour dependance en R : pb en coord sperique
               icell = cell_map(i,1,1)
               rcyl = r_grid(icell)
@@ -660,7 +667,7 @@ subroutine define_dust_density()
                  H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
                  s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
-                 write(*,*) "r=", rcyl, "a_migration =", s_opt
+                 !write(*,*) "r=", rcyl, "a_migration =", s_opt
 
                  if ((s_opt < dust_pop(pop)%amin).and.(lwarning)) then
                     write(*,*)
@@ -1014,6 +1021,12 @@ subroutine densite_eqdiff()
   real, dimension(nz) :: rho
 
   type(disk_zone_type) :: dz
+
+  ! Vitesses (en m/s) (Dullemond et Dubrulle)
+  real, parameter :: v_sound = 380.0 ! m/s
+  ! Rayon de definition des vitesses
+  real, parameter :: rref_v = 50. ! au
+
 
   if (n_zones > 1) then
      write(*,*) "Error : n_zones must be set to 1 when using densite_eqdiff"

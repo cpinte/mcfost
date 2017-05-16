@@ -42,7 +42,6 @@ module ProDiMo
   real, parameter :: Wdil =  9.85357e-17
   real, parameter :: TCmb = 2.73
   real, parameter :: T_ISM_stars = 20000.
-  real, parameter :: chi_ISM = 1.0
 
   real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes_ISM
