@@ -64,6 +64,7 @@ subroutine set_default_variables()
   lno_backup = .false.
   loutput_UV_field = .false.
   loutput_J = .false.
+  loutput_J_step1 = .false.
   laverage_grain_size = .false.
   lr_subdivide=.false.
   lfreeze_out = .false.
@@ -543,6 +544,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
      case("-output_J")
         loutput_J=.true.
+        i_arg = i_arg+1
+     case("-output_J1","-output_J_step1","-output_J_step_th")
+        loutput_J_step1=.true.
         i_arg = i_arg+1
      case("-average_grain_size")
         laverage_grain_size=.true.

@@ -1809,12 +1809,14 @@ end subroutine write_disk_struct
 
 !********************************************************************
 
-subroutine ecriture_J()
+subroutine ecriture_J(step)
 ! Ecrit la table du champ de radiation
 ! C. Pinte
 ! 26/09/07
 
   implicit none
+
+  integer, intent(in) :: step
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1826,30 +1828,33 @@ subroutine ecriture_J()
   real, dimension(n_cells,n_lambda) :: Jio
   real(kind=dp) :: n_photons_envoyes, energie_photon
 
-  filename = trim(data_dir)//"/J.fits.gz"
-
-  write(*,*) "Writing "//trim(filename)
 
   ! Step1
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
   ! 1/4pi est inclus dans n_phot_l_tot
   ! teste OK par rapport a fct bb de yorick
-  !do lambda=1, n_lambda
-  !   do icell=1, n_cells
-  !      Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
-  !           * tab_lambda(lambda) / tab_delta_lambda(lambda)
-  !   enddo
-  !enddo
-
-  ! Step 2
-  do lambda=1, n_lambda2
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
-     do icell=1, n_cells
-        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+  if (step==1) then
+     filename = trim(data_dir)//"/J_step1.fits.gz"
+     do lambda=1, n_lambda
+        do icell=1, n_cells
+           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * L_packet_th / volume(icell) &
+                * tab_lambda(lambda) / tab_delta_lambda(lambda)
+        enddo
      enddo
-  enddo
+  else
+     ! Step 2
+     filename = trim(data_dir)//"/J.fits.gz"
+     do lambda=1, n_lambda2
+        n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
+        energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
+        do icell=1, n_cells
+           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+        enddo
+     enddo
+  endif
+
+  write(*,*) "Writing "//trim(filename)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
