@@ -162,7 +162,7 @@ subroutine init_reemission()
         do lambda=1, n_lambda
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
-           ! B * cst_E en SI  = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
+           ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
            integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
         ! Le coeff qui va bien
