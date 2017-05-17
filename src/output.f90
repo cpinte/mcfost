@@ -1865,19 +1865,26 @@ subroutine ecriture_J()
   bitpix=-32
   extend=.true.
 
-  if (l3D) then
-     naxis=4
-     naxes(1)=n_rad
-     naxes(2)=2*nz
-     naxes(3)=n_az
-     naxes(4)=n_lambda
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  if (lVoronoi) then
+     naxis=2
+     naxes(1)=n_cells
+     naxes(2)=n_lambda
+     nelements=naxes(1)*naxes(2)
   else
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_lambda
-     nelements=naxes(1)*naxes(2)*naxes(3)
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4)=n_lambda
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=n_lambda
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
   endif
 
   !  Write the required header keywords.
