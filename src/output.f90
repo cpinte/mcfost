@@ -1316,7 +1316,8 @@ subroutine write_disk_struct(lparticle_density)
   fpixel=1
 
   dens = 0.0
-  dens(:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+
+  dens(:) = densite_gaz(1:n_cells) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
