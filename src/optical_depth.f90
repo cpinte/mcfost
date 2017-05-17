@@ -175,7 +175,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
 
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-     if (lRE_nLTE .or. lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+     if (lxJ_abs_step1) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
   else
      if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
         xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)

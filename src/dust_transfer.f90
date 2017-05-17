@@ -732,6 +732,8 @@ subroutine transfert_poussiere()
         else
            write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
         endif
+        if (loutput_J_step1) call ecriture_J(1)
+
      else ! Etape 2 SED
 
         ! SED ray-tracing
@@ -776,7 +778,7 @@ subroutine transfert_poussiere()
            if (lscatt_ray_tracing) call ecriture_sed_ray_tracing()
            if (lProDiMo) call mcfost2ProDiMo()
            if (loutput_UV_field) call ecriture_UV_field()
-           if (loutput_J) call ecriture_J()
+           if (loutput_J) call ecriture_J(2)
         endif
 
      endif
