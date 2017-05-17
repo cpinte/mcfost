@@ -365,8 +365,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
     endif
 
     totlum = 0.
-    do i=1,np
-       qtermi = dudt(i) * massoftype(1) * uWatt
+    do i=1,n_SPH
+       qtermi = dudt(particle_id(i)) * massoftype(1) * uWatt
        totlum = totlum + qtermi
        extra_heating(i) = qtermi
     enddo
