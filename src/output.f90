@@ -2669,7 +2669,12 @@ subroutine ecriture_sed(ised)
      enddo
 
      if ((lsed_complete).and.(ltemp)) then
-        write(*,*) "Flux conservation to within ",  (L_bol2-L_bol1)/L_bol1 * 100, "%  between the two methods"
+        if (L_bol1 > 0.) then
+           write(*,*) "Flux conservation to within ",  (L_bol2-L_bol1)/L_bol1 * 100, "%  between the two methods"
+        else
+           write(*,*) "Lbol1=", L_bol1
+           write(*,*) "Lbol2=", L_bol2
+        endif
      endif
 
   endif ! ised
