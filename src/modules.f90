@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.13"
+  character(8), parameter :: mcfost_release = "3.0.14"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -423,7 +423,8 @@ module opacity
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
   real(kind=dp), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
-  real, dimension(:,:), allocatable :: kappa_abs_LTE, kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
+  real(kind=dp), dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
+  real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
