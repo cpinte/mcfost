@@ -117,6 +117,7 @@ module parametres
   logical :: ldensity_file, lsigma_file, lphantom_file, lgadget2_file, lascii_SPH_file, llimits_file
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt
@@ -591,6 +592,7 @@ module constantes
   real, parameter :: cst_th=c_light*hp/kb   ! pour calcul de (h c)/(lambda k T)
   real, parameter :: sigma = 5.6697e-8 ! Stefan (en W/(m^2.K^4))
   real, parameter :: Ggrav = 6.672e-11 ! (m^3.s^-2.kg^-1)    e-8 en cgs
+  real, parameter :: electron_charge = 1.6021766208e-19  ! Coulombs
 
   real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
   real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g

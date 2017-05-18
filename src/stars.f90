@@ -565,22 +565,74 @@ end subroutine repartition_energie_etoiles
 
 !***********************************************************
 
-subroutine repartition_energie_ISM
+subroutine repartition_energie_ISM(ISM_model)
 
-  real :: wl
-  integer :: lambda
+  integer, intent(in) :: ISM_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
 
-  do lambda=1, n_lambda
-     wl = tab_lambda(lambda) * 1e-6
+  real :: wl, nu, ev_to_Hz, E, nu_p_MIR, Jnu, E_ev
+  integer :: lambda, k
 
-     E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) &
-          * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2) * 0.4
-  enddo
+  real, dimension(5) :: wavelengths, power, W, T
+
+
+  eV_to_Hz = electron_charge/hp
+  nu_p_MIR = c_light/100.e-6
+
+  if (ISM_model==0) then
+     E_ISM(:) = 0.
+  else if (ISM_model==1) then ! ProdiMo
+     do lambda=1, n_lambda
+        wl = tab_lambda(lambda) * 1e-6
+        E_ISM(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb))
+     enddo
+  else if (ISM_model==2) then ! Bate & Keto
+     ! Interstellar Radiation (ISR) field from Zucconi et al. (2001), following Black (1994)
+     ! But adds Draine (1978) UV field (equation 11) which is similar to
+     ! Black (1994) but doesn't seem to be included in Zucconi.
+     ! Code adapted from sphNG routine
+     wavelengths = (/0.4E-4,0.75E-4,1.0E-4,140.0E-4,1.06E-1/) * cm_to_m
+     power = (/0.,0.,0.,1.65,0./)
+     W = (/1e-14,1e-13,4e-13,2e-4,1/)
+     T = (/7500.,4000.,3000.,23.3,2.728/)
+
+     do lambda=1, n_lambda
+        wl = tab_lambda(lambda) * 1e-6 ; nu = c_light/wl
+
+        E = 0.
+        ! Sum of black-bodies
+        do k=1,5
+           E = E + (wavelengths(k)/wl)**power(k) * W(k) * Blambda(wl,T(k))
+        enddo
+
+        ! Add mid-infrared which has a cut-off longer than 100 microns
+        if (tab_lambda(lambda) < 100) then
+           Jnu = 5.0E-7* (2.0*hp*nu_p_MIR**3/c_light**2) * (tab_lambda(lambda)/100.)**1.8
+
+           E = E + c_light/wl**2 * Jnu ! Adding J_lambda
+        endif
+
+        ! Add Draine 1978 UV
+        if ((nu > 5*ev_to_Hz).and.(nu < 13.6*eV_to_Hz)) then
+           E_eV = nu/ev_to_Hz
+           E = E + (1.658e6*E_eV - 2.152e5*E_eV**2 + 6.919e3*E_eV**3) * hp*E_eV
+        endif
+
+        E_ISM(lambda) = E
+     enddo
+  else
+     write(*,*) "Unknown ISM model"
+     write(*,*) "Exiting"
+     stop
+  endif
+
+  ! Normalization for MCFOST
+  E_ISM(:) = E_ISM(:) * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2) * 0.4
+
+  return
 
 end subroutine repartition_energie_ISM
 
 !***********************************************************
-
 
 subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
 ! Choisit la position d'emission uniformement

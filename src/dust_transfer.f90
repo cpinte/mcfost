@@ -224,7 +224,7 @@ subroutine transfert_poussiere()
      if (ltemp.or.lsed_complete) then
         call repartition_energie_etoiles()
         if (lISM_heating) then
-           call repartition_energie_ISM()
+           call repartition_energie_ISM(ISR_model)
         else
            E_ISM = 0.0 ;
         endif

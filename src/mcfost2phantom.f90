@@ -147,7 +147,7 @@ contains
     integer, intent(in) :: ndudt
     real(dp), dimension(ndudt), intent(in) :: dudt
 
-    logical, intent(in) :: ISM ! does mcfost need to add ISM heating
+    integer, intent(in) :: ISM ! ISM heating: 0 -> no ISM radiation field, 1 -> ProDiMo, 2 -> Bate & Keto
 
     real(sp), dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
     real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
@@ -234,11 +234,7 @@ contains
     enddo !n
 
     call repartition_energie_etoiles()
-    if (ISM) then
-       call repartition_energie_ISM()
-    else
-       E_ISM = 0.0 ;
-    endif
+    call repartition_energie_ISM(ISM)
 
     ! ToDo : needs to be made parallel
     call init_reemission()
