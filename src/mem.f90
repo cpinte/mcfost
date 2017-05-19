@@ -149,8 +149,8 @@ subroutine alloc_dynamique(n_cells_max)
   ! 12/05/05
 
   use stars, only : allocate_stellar_spectra
-  use thermal_emission, only : allocate_temperature, allocate_thermal_emission, allocate_weight_proba_emission
-
+  use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
+       allocate_weight_proba_emission, allocate_thermal_energy
 
   integer, intent(in), optional :: n_cells_max
 
@@ -217,6 +217,8 @@ subroutine alloc_dynamique(n_cells_max)
   ! Tableaux relatifs aux prop en fct de lambda
   ! **************************************************
   call allocate_stellar_spectra()
+
+  call allocate_thermal_energy()
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(Nc,n_lambda), kappa_sca(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
@@ -535,13 +537,6 @@ subroutine alloc_dynamique(n_cells_max)
      norme_phiProf_m1 = 0.0 ; sigma2_phiProf_m1 = 0.0
 
   endif ! lemission_mol
-
-  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error CDF_E_star'
-     stop
-  endif
-  CDF_E_star = 0.0 ; prob_E_star = 0.0
 
   return
 

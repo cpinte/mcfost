@@ -23,28 +23,17 @@ subroutine allocate_stellar_spectra()
 
   integer :: alloc_status
 
-  if (ltemp) then ! Step 1
-     allocate(E_stars(n_lambda), E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error E_stars'
-        stop
-     endif
-     E_stars = 0.0
-     E_disk = 0.0
-     E_ISM = 0.0
-  else ! Step 2
-     allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda),  &
-          E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error prob_E_star'
-        stop
-     endif
-     CDF_E_star = 0.0
-     prob_E_star = 0.0
-     E_stars = 0.0
-     E_disk = 0.0
-     E_ISM = 0.0
+  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda),  &
+       E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error CDF_E_star'
+     stop
   endif
+  CDF_E_star = 0.0
+  prob_E_star = 0.0
+  E_stars = 0.0
+  E_disk = 0.0
+  E_ISM = 0.0
 
   allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
