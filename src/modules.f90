@@ -255,7 +255,8 @@ module prop_star
   real :: L_etoile
 
   real, dimension(:), allocatable :: E_ISM
-  real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
+  real(kind=dp) :: R_ISM = 0._dp ! radius of the sphere from which the ISM radiation is emitted
+  real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
   real :: chi_ISM = 1.0
 
   ! Spot
