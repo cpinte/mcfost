@@ -23,7 +23,7 @@ module thermal_emission
        define_proba_weight_emission, emission_nre, im_reemission_lte, im_reemission_nlte, &
        im_reemission_qre, init_emissivite_nre, init_reemission, internal_heating, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
-       repartition_wl_em, repartition_energie
+       repartition_wl_em, repartition_energie, allocate_thermal_energy
 
   private
 
@@ -57,6 +57,23 @@ module thermal_emission
 
   contains
 
+subroutine allocate_thermal_energy()
+
+  integer :: alloc_status
+
+  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error frac_E_stars'
+     stop
+  endif
+  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+
+  return
+
+end subroutine allocate_thermal_energy
+
+!***************************************************
+
 subroutine allocate_thermal_emission(Nc,p_Nc)
 
   use radiation_field, only : allocate_radiation_field_step1
@@ -65,13 +82,6 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
 
   integer :: alloc_status
   real :: mem_size
-
-  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error frac_E_stars'
-     stop
-  endif
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   allocate(spectre_emission_cumul(0:n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
