@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.13"
+  character(8), parameter :: mcfost_release = "3.0.14"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -50,7 +50,8 @@ module parametres
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
-  logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE, loutput_J, loutput_UV_field, lxJ_abs
+  logical :: lRE_LTE, lRE_nLTE, lnRE, lonly_LTE, lonly_nLTE
+  logical :: loutput_J, loutput_J_step1, loutput_UV_field, lxJ_abs, lxJ_abs_step1
 
   ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
   ! 0 -> automatique
@@ -116,6 +117,7 @@ module parametres
   logical :: ldensity_file, lsigma_file, lphantom_file, lgadget2_file, lascii_SPH_file, llimits_file
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
 
   character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt
@@ -418,7 +420,8 @@ module opacity
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
   real(kind=dp), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
-  real, dimension(:,:), allocatable :: kappa_abs_LTE, kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
+  real(kind=dp), dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
+  real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_sca, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
@@ -542,6 +545,7 @@ module constantes
   real, parameter :: cst_th=c_light*hp/kb   ! pour calcul de (h c)/(lambda k T)
   real, parameter :: sigma = 5.6697e-8 ! Stefan (en W/(m^2.K^4))
   real, parameter :: Ggrav = 6.672e-11 ! (m^3.s^-2.kg^-1)    e-8 en cgs
+  real, parameter :: electron_charge = 1.6021766208e-19  ! Coulombs
 
   real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
   real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g

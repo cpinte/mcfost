@@ -226,7 +226,7 @@ subroutine transfert_poussiere()
      if (ltemp.or.lsed_complete) then
         call repartition_energie_etoiles()
         if (lISM_heating) then
-           call repartition_energie_ISM()
+           call repartition_energie_ISM(ISR_model)
         else
            E_ISM = 0.0 ;
         endif
@@ -737,6 +737,8 @@ subroutine transfert_poussiere()
         else
            write (*,'(" Temperature calculation complete in ", F5.2, "s")')  time
         endif
+        if (loutput_J_step1) call ecriture_J(1)
+
      else ! Etape 2 SED
 
         ! SED ray-tracing
@@ -781,7 +783,7 @@ subroutine transfert_poussiere()
            if (lscatt_ray_tracing) call ecriture_sed_ray_tracing()
            if (lProDiMo) call mcfost2ProDiMo()
            if (loutput_UV_field) call ecriture_UV_field()
-           if (loutput_J) call ecriture_J()
+           if (loutput_J) call ecriture_J(2)
         endif
 
      endif
@@ -1353,6 +1355,9 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   ! allacatable array as it can be big and not fit in stack memory
   real, dimension(:,:,:), allocatable :: map_1star, Q_1star, U_1star
 
+  stars_map(:,:,:) = 0.0
+  if (n_etoiles < 1) return
+
   alloc_status = 0
   allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
   map_1star = 0.0
@@ -1369,8 +1374,6 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      write(*,*) "Exiting"
      stop
   endif
-
-  stars_map(:,:,:) = 0.0 ;
 
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1

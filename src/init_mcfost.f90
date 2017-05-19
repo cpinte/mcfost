@@ -63,6 +63,7 @@ subroutine set_default_variables()
   lno_backup = .false.
   loutput_UV_field = .false.
   loutput_J = .false.
+  loutput_J_step1 = .false.
   laverage_grain_size = .false.
   lr_subdivide=.false.
   lfreeze_out = .false.
@@ -104,7 +105,7 @@ subroutine set_default_variables()
   lread_grain_size_distrib=.false.
   lMathis_field = .false.
   lchange_Tmax_PAH=.false.
-  lISM_heating = .false.
+  lISM_heating = .false. ; ISR_model = 0
   llimb_darkening = .false.
   lVoronoi = .false.
   lcavity = .false.
@@ -543,6 +544,9 @@ subroutine initialisation_mcfost()
      case("-output_J")
         loutput_J=.true.
         i_arg = i_arg+1
+     case("-output_J1","-output_J_step1","-output_J_step_th")
+        loutput_J_step1=.true.
+        i_arg = i_arg+1
      case("-average_grain_size")
         laverage_grain_size=.true.
         i_arg = i_arg+1
@@ -760,6 +764,7 @@ subroutine initialisation_mcfost()
         lprodimo = .true.
         mcfost2ProDiMo_version = 5
         lISM_heating=.true.
+        ISR_model = 1
      case("-astrochem","-Astrochem","-AstroChem")
         i_arg = i_arg + 1
         lastrochem = .true.
@@ -898,12 +903,18 @@ subroutine initialisation_mcfost()
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
+        ISR_model = 1
      case("-chi_ISM")
         i_arg = i_arg + 1
         lISM_heating=.true.
         call get_command_argument(i_arg,s)
         read(s,*) chi_ISM
         i_arg = i_arg + 1
+        ISR_model = 1
+     case("-ISM_heating_Bate")
+        i_arg = i_arg + 1
+        lISM_heating=.true.
+        ISR_model = 2
      case("-casa")
         i_arg = i_arg + 1
         lcasa=.true.

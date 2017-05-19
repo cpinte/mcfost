@@ -42,7 +42,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
 
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-     if (lRE_nLTE .or. lnRE) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+     if (lxJ_abs_step1) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
   else
      if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
         xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
@@ -142,7 +142,8 @@ subroutine allocate_radiation_field_step1(Nc)
   endif
 
   lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
-  if (lRE_nLTE .or. lnRE .or. (lxJ_abs.and.lsed.and.lsed_complete)) then
+  lxJ_abs_step1 = lRE_nLTE .or. lnRE .or. loutput_J_step1
+  if (lxJ_abs_step1 .or. (lxJ_abs.and.lsed.and.lsed_complete)) then
      allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
      if (alloc_status > 0) then
         write(*,*) 'Allocation error xJ_abs'
