@@ -1291,7 +1291,8 @@ subroutine write_disk_struct(lparticle_density)
   fpixel=1
 
   dens = 0.0
-  dens(:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+
+  dens(:) = densite_gaz(1:n_cells) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1783,12 +1784,14 @@ end subroutine write_disk_struct
 
 !********************************************************************
 
-subroutine ecriture_J()
+subroutine ecriture_J(step)
 ! Ecrit la table du champ de radiation
 ! C. Pinte
 ! 26/09/07
 
   implicit none
+
+  integer, intent(in) :: step
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1800,30 +1803,33 @@ subroutine ecriture_J()
   real, dimension(n_cells,n_lambda) :: Jio
   real(kind=dp) :: n_photons_envoyes, energie_photon
 
-  filename = trim(data_dir)//"/J.fits.gz"
-
-  write(*,*) "Writing "//trim(filename)
 
   ! Step1
   ! xJ_abs est par bin de lambda donc Delta_lambda.F_lambda
   ! Jio en W.m-2 (lambda.F_lambda)
   ! 1/4pi est inclus dans n_phot_l_tot
   ! teste OK par rapport a fct bb de yorick
-  !do lambda=1, n_lambda
-  !   do icell=1, n_cells
-  !      Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * n_phot_L_tot / volume(icell) &
-  !           * tab_lambda(lambda) / tab_delta_lambda(lambda)
-  !   enddo
-  !enddo
-
-  ! Step 2
-  do lambda=1, n_lambda2
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
-     do icell=1, n_cells
-        Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+  if (step==1) then
+     filename = trim(data_dir)//"/J_step1.fits.gz"
+     do lambda=1, n_lambda
+        do icell=1, n_cells
+           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * L_packet_th / volume(icell) &
+                * tab_lambda(lambda) / tab_delta_lambda(lambda)
+        enddo
      enddo
-  enddo
+  else
+     ! Step 2
+     filename = trim(data_dir)//"/J.fits.gz"
+     do lambda=1, n_lambda2
+        n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
+        energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
+        do icell=1, n_cells
+           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+        enddo
+     enddo
+  endif
+
+  write(*,*) "Writing "//trim(filename)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1839,19 +1845,26 @@ subroutine ecriture_J()
   bitpix=-32
   extend=.true.
 
-  if (l3D) then
-     naxis=4
-     naxes(1)=n_rad
-     naxes(2)=2*nz
-     naxes(3)=n_az
-     naxes(4)=n_lambda
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  if (lVoronoi) then
+     naxis=2
+     naxes(1)=n_cells
+     naxes(2)=n_lambda
+     nelements=naxes(1)*naxes(2)
   else
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=n_lambda
-     nelements=naxes(1)*naxes(2)*naxes(3)
+     if (l3D) then
+        naxis=4
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        naxes(4)=n_lambda
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     else
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=nz
+        naxes(3)=n_lambda
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     endif
   endif
 
   !  Write the required header keywords.
@@ -2643,7 +2656,12 @@ subroutine ecriture_sed(ised)
      enddo
 
      if ((lsed_complete).and.(ltemp)) then
-        write(*,*) "Flux conservation to within ",  (L_bol2-L_bol1)/L_bol1 * 100, "%  between the two methods"
+        if (L_bol1 > 0.) then
+           write(*,*) "Flux conservation to within ",  (L_bol2-L_bol1)/L_bol1 * 100, "%  between the two methods"
+        else
+           write(*,*) "Lbol1=", L_bol1
+           write(*,*) "Lbol2=", L_bol2
+        endif
      endif
 
   endif ! ised

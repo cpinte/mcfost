@@ -355,24 +355,26 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
  write(*,*) "Total mass is", Mtot * usolarmass
 
- if (ndudt == np) then
-    write(*,*) "Computing energy input"
-    lextra_heating = .true.
-    allocate(extra_heating(n_SPH), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error in phanton_2_mcfost"
-       write(*,*) "Exiting"
+ if (.not.lno_internal_energy) then
+    if (ndudt == np) then
+       write(*,*) "Computing energy input"
+       lextra_heating = .true.
+       allocate(extra_heating(n_SPH), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Allocation error in phanton_2_mcfost"
+          write(*,*) "Exiting"
+       endif
+
+       totlum = 0.
+       do i=1,n_SPH
+          qtermi = dudt(particle_id(i)) * massoftype(1) * uWatt
+          totlum = totlum + qtermi
+          extra_heating(i) = qtermi
+       enddo
+
+       write(*,*) "Total energy input = ",real(totlum),' W'
+       write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
     endif
-
-    totlum = 0.
-    do i=1,np
-       qtermi = dudt(i) * massoftype(1) * uWatt
-       totlum = totlum + qtermi
-       extra_heating(i) = qtermi
-    enddo
-
-    write(*,*) "Total energy input = ",totlum,' W'
-    write(*,*) "Total energy input = ",totlum/Lsun,' Lsun'
  endif
 
  write(*,*) "Updating the stellar properties"
