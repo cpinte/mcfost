@@ -574,9 +574,14 @@ subroutine repartition_energie_ISM(ISM_model)
 
   real, dimension(5) :: wavelengths, power, W, T
 
-
   eV_to_Hz = electron_charge/hp
   nu_p_MIR = c_light/100.e-6
+
+  if (R_ISM < tiny_dp) then
+     write(*,*) "Error : the ISM emitting sphere is nor defined"
+     write(*,*) "Exiting"
+     stop
+  endif
 
   if (ISM_model==0) then
      E_ISM(:) = 0.
@@ -626,7 +631,7 @@ subroutine repartition_energie_ISM(ISM_model)
   endif
 
   ! Normalization for MCFOST
-  E_ISM(:) = E_ISM(:) * (4.*(R_ISM*Rmax)**2) * 2.0/(hp *c_light**2) * 0.4
+  E_ISM(:) = E_ISM(:) * (4.*R_ISM**2) * 2.0/(hp *c_light**2) * 0.4
 
   return
 
@@ -682,10 +687,10 @@ subroutine emit_packet_ISM(id, icell,x,y,z,u,v,w,stokes,lintersect)
   w2=1.0_dp-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  l = R_ISM * Rmax
-  x = x * l
-  y = y * l
-  z = z * l
+  l = R_ISM
+  x = centre_ISM(1) + x * l
+  y = centre_ISM(2) + y * l
+  z = centre_ISM(3) + z * l
 
   call move_to_grid(id, x,y,z,u,v,w, icell,lintersect)
 
