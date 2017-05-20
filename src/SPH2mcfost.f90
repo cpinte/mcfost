@@ -107,8 +107,8 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
-    real :: graindens, f
-    integer :: ierr, icell, l, k, iSPH
+    real :: f
+    integer :: icell, l, k, iSPH
 
     real(dp), dimension(6) :: limits
 
