@@ -663,10 +663,11 @@ subroutine integ_tau_mol(imol)
               P(:) = phiProf(icell,ispeed,tab_speed)
               norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
               if (norme > 1.0) then
-                 write(*,*) "Vertical Tau_mol=1 (for r=100AU) at z=", z_grid(icell), "AU"
+                 write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
                  exit loop_z
               endif
            enddo loop_z
+           if (norme < 1.0) write(*,*) "Vertical Tau_mol=1 (for r=100 au) not reached, tau_max=", norme
            exit loop_r
         endif
      enddo loop_r
