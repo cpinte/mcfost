@@ -1200,7 +1200,7 @@ subroutine freeze_out()
 
   implicit none
 
-  real :: threshold_CD = 0.8 * 1.59e21 * 1e4 !cm^-2
+  real, parameter :: threshold_CD = 0.8 * 1.59e21  / (cm_to_m**2) ! m^-2
   ! 1e4x photodissociation from Qi et al 2011, ajsuted by hand for IM Lupi
 
   integer :: icell
@@ -1210,6 +1210,7 @@ subroutine freeze_out()
   write (*,*) "Freezing-out of molecules"
 
   do icell=1,n_cells
+     ldeplete = .false.
      if (Temperature(icell) < T_freeze_out)  then
         if (lphoto_desorption) then
            CD = compute_vertical_CD(icell)
@@ -1241,22 +1242,17 @@ subroutine photo_dissociation()
   integer :: icell
   real(kind=dp) :: CD
 
-  real :: threshold_CD = 0.8 * 1.59e21 * 0.65 !cm^-2 ! Value from Qi et al 2011
+  real, parameter :: threshold_CD = 0.8 * 1.59e21 * 0.65  / (cm_to_m**2) ! m^-2 ! Value from Qi et al 2011
   ! It makes sense only for constant dust --> needs to be updated
-  real :: photo_dissocation_depletion = 1.e-6
-
+  real, parameter :: photo_dissocation_depletion = 1.e-6
 
   write (*,*) "Photo-dissociating molecules", threshold_CD
 
-  threshold_CD = threshold_CD / (cm_to_m**2) ! m^-2
-
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
-
      if (CD < threshold_CD) then
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
-
   enddo ! icell
 
   return
