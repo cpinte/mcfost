@@ -1249,7 +1249,7 @@ subroutine write_disk_struct(lparticle_density)
 
   logical, intent(in) :: lparticle_density
 
-  integer :: i, j, k, icell
+  integer :: i, j, icell
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1820,7 +1820,7 @@ subroutine ecriture_J(step)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, phik, icell
+  integer :: group,fpixel,nelements, lambda, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1946,7 +1946,7 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, l, phik, icell, alloc_status
+  integer :: group,fpixel,nelements, lambda, l, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2797,7 +2797,7 @@ subroutine ecriture_spectre(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
-  integer :: group,fpixel,nelements, iv, xcenter,i, iTrans
+  integer :: group,fpixel,nelements, iv, xcenter,i
   logical :: simple, extend
 
   real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells

@@ -597,7 +597,7 @@ subroutine repartition_energie_ISM(ISM_model)
      ! Code adapted from sphNG routine
      wavelengths = (/0.4E-4,0.75E-4,1.0E-4,140.0E-4,1.06E-1/) * cm_to_m
      power = (/0.,0.,0.,1.65,0./)
-     W = (/1e-14,1e-13,4e-13,2e-4,1/)
+     W = (/1e-14,1e-13,4e-13,2e-4,1./)
      T = (/7500.,4000.,3000.,23.3,2.728/)
 
      do lambda=1, n_lambda

@@ -29,9 +29,7 @@ subroutine repartition_wl_em()
   implicit none
 
   integer :: lambda
-  real :: E_star_tot, E_disk_tot, E_ISM_tot, delta_wl, L_tot
-
-  real :: surface, C
+  real :: E_star_tot, E_disk_tot, E_ISM_tot, delta_wl, L_tot, Cst
 
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
@@ -57,8 +55,8 @@ subroutine repartition_wl_em()
      E_ISM_tot  = E_ISM_tot  + E_ISM(lambda)   * delta_wl
   enddo
 
-  C = 2.0*pi*hp*c_light**2 / quatre_pi
-  L_tot = C * (E_star_tot + E_disk_tot + E_ISM_tot)
+  Cst = 2.0*pi*hp*c_light**2 / quatre_pi
+  L_tot = Cst * (E_star_tot + E_disk_tot + E_ISM_tot)
   L_packet_th = L_tot/nbre_photons_tot
 
   return
