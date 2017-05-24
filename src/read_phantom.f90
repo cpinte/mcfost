@@ -83,7 +83,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
  allocate(dudt(np))
 
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
- itype = 1
+ ! itype = 1
 
  ! extract info from real header
  call extract('massoftype',massoftype(1:ntypes),hdr,ierr)
@@ -172,7 +172,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
                    end select
                 elseif (i==i_int1) then
                    select case(trim(tag))
-                   case('iphase')
+                   case('itype')
                       matched = .true.
                       read(iunit,iostat=ierr) itype(1:np)
                    case default
