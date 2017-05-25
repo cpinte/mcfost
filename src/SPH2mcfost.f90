@@ -13,6 +13,7 @@ contains
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
+    use utils, only : read_comments
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
@@ -63,7 +64,7 @@ contains
           write(*,*) "Exiting"
           stop
        endif
-       read(1,*) line_buffer
+       call read_comments(1)
        read(1,*) SPH_limits(1), SPH_limits(3), SPH_limits(5)
        read(1,*) SPH_limits(2), SPH_limits(4), SPH_limits(6)
        close(unit=1)
