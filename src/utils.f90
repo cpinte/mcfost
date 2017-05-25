@@ -1568,4 +1568,25 @@ end subroutine cdapres
 
 !***************************************************
 
+subroutine read_comments(iunit)
+  ! Skip comment lines starting with a #
+
+  integer, intent(in) :: iunit
+  logical :: comment_found
+  character(len=128) :: line
+
+  comment_found = .true.
+  do while(comment_found)
+     read (iunit, fmt=*) line
+     line = adjustl(line)
+     if (line(1:1) /= '#') comment_found = .false.
+  enddo
+  backspace(iunit)
+
+  return
+
+end subroutine read_comments
+
+!***************************************************
+
 end module utils
