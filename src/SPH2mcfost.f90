@@ -63,7 +63,6 @@ contains
           write(*,*) "Exiting"
           stop
        endif
-       read(1,*) line_buffer
        read(1,*) SPH_limits(1), SPH_limits(3), SPH_limits(5)
        read(1,*) SPH_limits(2), SPH_limits(4), SPH_limits(6)
        close(unit=1)
