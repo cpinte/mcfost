@@ -267,7 +267,7 @@ release : main
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
 	rsync -Pu *.f90 Makefile $(LINUX_SERVER):mcfost/src
-	ssh $(LINUX_SERVER) "cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src ; MCFOST_GIT=0 ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
@@ -278,7 +278,7 @@ release : main
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; "
+	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update"
 	rm -rf yorick web
 	git tag release
 
@@ -325,7 +325,7 @@ wardlaw :
 
 clean :
 	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 system.f90 system.o libmcfost.a
-	if test $(MCFOST_GIT) ; then rm -rf sha.f90; fi
+	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :
 	rm -rf data* seed*
