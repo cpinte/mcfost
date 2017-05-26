@@ -102,7 +102,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: limit_threshold = 0.01
+    real, parameter :: limit_threshold = 0.005
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 

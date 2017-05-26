@@ -105,7 +105,7 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
     npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tdust,Frad,mu_gas,ierr,write_T_files,ISM)
+    Tdust,Frad,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
     use constantes, only : mu
@@ -135,7 +135,7 @@ contains
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize
     real(dp), dimension(ntypes), intent(in) :: massoftype
-    real(dp), intent(in) :: hfact, umass, utime, udist, graindens
+    real(dp), intent(in) :: hfact, umass, utime, udist, graindens, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
 
@@ -192,7 +192,7 @@ contains
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyzu,&
       iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
       umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,particle_id,&
-      massgas,massdust,rhogas,rhodust,extra_heating)
+      massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
 
     call compute_stellar_parameters()
 
