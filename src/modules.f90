@@ -137,6 +137,10 @@ module parametres
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM, lread_grain_size_distrib
 
+  ! Phantom
+  logical :: ldudt_implicit
+  real(kind=dp) :: ufac_implicit
+
 end module parametres
 
 !********************************************************************

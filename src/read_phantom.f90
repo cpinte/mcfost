@@ -164,7 +164,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
                       got_dustfrac = .true.
                    case('luminosity')
                       read(iunit,iostat=ierr) tmp(1:np)
-                      dudt(1:np) = real(tmp(1:np),kind=dp)
+                      dudt(1:np) =  real(tmp(1:np),kind=dp)
                       ndudt = np
                    case default
                       matched = .false.
@@ -265,7 +265,7 @@ end subroutine read_phantom_file
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass,utime,&
      udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,massgas,massdust,&
-     rhogas,rhodust,extra_heating)
+     rhogas,rhodust,extra_heating,T_to_u)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -274,6 +274,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J
   use prop_star
+  use parametres, only : ldudt_implicit,ufac_implicit
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
@@ -292,7 +293,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
-
+  real(dp), intent(in), optional :: T_to_u
   integer  :: i,j,k,itypei,alloc_status,i_etoiles
   real(dp) :: xi,yi,zi,hi,rhoi,udens,uerg_per_s,uWatt,ulength_au,usolarmass
   real(dp) :: dustfraci,Mtot,totlum,qtermi
@@ -375,6 +376,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
        write(*,*) "Total energy input = ",real(totlum),' W'
        write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
     endif
+ endif
+ if (present( T_to_u )) then
+   ufac_implicit = T_to_u * uWatt
+   ldudt_implicit = .true.
+ else
+   ufac_implicit = 0.
+   ldudt_implicit = .false.
  endif
 
  write(*,*) "Updating the stellar properties:"

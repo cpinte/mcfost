@@ -115,6 +115,7 @@ subroutine set_default_variables()
   lmono = .false.
   lextra_heating = .false.
   lno_internal_energy = .false.
+  ldudt_implicit = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
