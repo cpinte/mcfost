@@ -164,7 +164,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
                       got_dustfrac = .true.
                    case('luminosity')
                       read(iunit,iostat=ierr) tmp(1:np)
-                      dudt(1:np) =  real(tmp(1:np),kind=dp)
+                      dudt(1:np) = real(tmp(1:np),kind=dp)
                       ndudt = np
                    case default
                       matched = .false.

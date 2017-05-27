@@ -2601,9 +2601,9 @@ subroutine ecriture_sed(ised)
   ! Ca donne lambda Flambda sur le detecteur
   if (l_sym_centrale) then
      !E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
-     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
   else
-     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
   endif
 
   if (ised == 1) then
