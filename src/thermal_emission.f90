@@ -104,7 +104,7 @@ end subroutine select_wl_em
 
 !***************************************************
 
-subroutine init_reemission()
+subroutine init_reemission(lheating,dudt)
 ! Pretabule les opacites de Planck en fonction de T et de la position
 ! + les termes k dB/dT pour tirage de la longueur d'onde du photon emis
 ! avec correction de temperature
@@ -112,11 +112,18 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: k,lambda,t, pop, icell, p_icell
+  logical, intent(in) :: lheating
+  real, dimension(:), intent(in), optional :: dudt
+
+  integer :: k,lambda,t, pop, icell, p_icell, id
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
   real(kind=dp), dimension(n_lambda) :: B, dB_dT
+
+  real(kind=dp) :: Qcool, extra_heating, u, Qcool_minus_extra_heating
+  real(kind=dp), dimension(n_cells) :: Qcool0
+
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
@@ -158,13 +165,36 @@ subroutine init_reemission()
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
            integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
-        ! Le coeff qui va bien
-        integ = integ * cst_E
 
-        if (integ > tiny_dp) then
-           log_E_em(T,icell)=log(integ)
+        ! Proper normalization
+        ! At this stage, this is Q- in W / (AU/m)^2
+        Qcool = integ * cst_E
+        if (T==1) Qcool0(icell) = Qcool
+
+        ! Non radiative heating :
+        ! We solve Q+ = int kappa.Jnu.dnu = Q- - extra_heating = int kappa.Bnu.dnu - extra_heating
+        ! Here we conpute the extra_heating term
+        if (.not.lextra_heating) then
+           ! Energie venant de l'equilibre avec nuage à T_min
+           extra_heating = Qcool0(icell)
         else
-           log_E_em(T,icell)=-1000.
+           if (ldudt_implicit) then
+              u = ufac_implicit * Temp ! u(T) : TODO : I assume you need some kind of density here
+              ! dudt is meant to be u^n/dt here
+              extra_heating = max(Qcool0(icell), u - dudt(icell) / AU_to_m**2 )
+           else
+              extra_heating = max(Qcool0(icell), dudt(icell) / AU_to_m**2 )
+           endif
+        endif
+
+        Qcool_minus_extra_heating = Qcool - extra_heating
+        if (Qcool_minus_extra_heating > tiny_dp) then
+           ! ToDO : I will need to correct the log interpolation as it should now broken to to the shift in energy
+           log_Qcool_minus_extra_heating(T,icell)=log(Qcool_minus_extra_heating)
+        else
+           ! This sets the initial disk temperature
+           id = 1 ! not openmp yet
+           xT_ech(icell,id)=T+1
         endif
 
         if (lRE_nLTE.and.(T==1)) then
@@ -292,7 +322,22 @@ subroutine init_reemission()
         enddo !k
      endif !lnRE
 
-  enddo !t
+  enddo !T
+
+  if (lextra_heating .and. ldudt_implicit) then
+     ! as u(T) depends on T, we need to check that int kappa_nu.Bnu(T).dnu - (u(T) - u_n)/dt
+     ! is still an increasing function of T
+     do icell=1, n_cells
+        do T=1,n_T-1
+           if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T+1,icell)) then
+              write(*,*) "ERROR : Qrad_minus_dudt is an increasing function of T"
+              write(*,*) "Exiting"
+              stop
+           endif
+        enddo
+     enddo
+  endif
+
 
   do pop=1, n_pop
      if (dust_pop(pop)%methode_chauffage == 3) then
@@ -339,7 +384,7 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   T_int=maxval(xT_ech(icell,:))
 
   ! On incremente eventuellement la zone de temperature
-  do while((log_E_em(T_int,icell) < log_E_abs).and.(T_int < n_T))
+  do while((log_Qcool_minus_extra_heating(T_int,icell) < log_E_abs).and.(T_int < n_T))
      T_int=T_int+1
   enddo  ! limite max
 
@@ -353,7 +398,7 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   T1=T_int-1
   Temp1=tab_Temp(T1)
 
-  frac=(log_E_abs-log_E_em(T1,icell))/(log_E_em(T2,icell)-log_E_em(T1,icell))
+  frac=(log_E_abs-log_Qcool_minus_extra_heating(T1,icell))/(log_Qcool_minus_extra_heating(T2,icell)-log_Qcool_minus_extra_heating(T1,icell))
   Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
   !**********************************************************************
@@ -518,19 +563,19 @@ subroutine Temp_finale()
      KJ_abs(:) = KJ_abs(:) + xKJ_abs(1:n_cells,i)
   enddo
 
-  KJ_abs(:)= KJ_abs(:)*L_packet_th + E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de E_em
+  KJ_abs(:)= KJ_abs(:)*L_packet_th !+ E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de E_em
 
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(KJ_abs,xT_ech,log_E_em,Temperature,tab_Temp,n_cells,T_min,n_T)
+  !$omp shared(KJ_abs,xT_ech,log_Qcool_minus_extra_heating,Temperature,tab_Temp,n_cells,T_min,n_T)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      if (KJ_abs(icell) < tiny_real) then
         Temperature(icell) = T_min
      else
         log_E_abs=log(KJ_abs(icell))
-        if (log_E_abs <  log_E_em(1,icell)) then
+        if (log_E_abs <  log_Qcool_minus_extra_heating(1,icell)) then
            Temperature(icell) = T_min
         else
            ! Temperature echantillonee juste sup. a la temperature de la cellule
@@ -539,7 +584,7 @@ subroutine Temp_finale()
            T_int=maxval(xT_ech(icell,:))
 
            ! On incremente eventuellement la zone de temperature
-           do while((log_E_em(T_int,icell) < log_E_abs).and.(T_int < n_T))
+           do while((log_Qcool_minus_extra_heating(T_int,icell) < log_E_abs).and.(T_int < n_T))
               T_int=T_int+1
            enddo  ! LIMITE MAX
 
@@ -549,7 +594,7 @@ subroutine Temp_finale()
            Temp2=tab_Temp(T2)
            T1=T_int-1
            Temp1=tab_Temp(T1)
-           frac=(log_E_abs-log_E_em(T1,icell))/(log_E_em(T2,icell)-log_E_em(T1,icell))
+           frac=(log_E_abs-log_Qcool_minus_extra_heating(T1,icell))/(log_Qcool_minus_extra_heating(T2,icell)-log_Qcool_minus_extra_heating(T1,icell))
            Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
            ! Save
@@ -617,7 +662,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,L_packet_th,xT_ech,log_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
+  !$omp shared(J_absorbe,L_packet_th,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
@@ -1601,54 +1646,6 @@ subroutine repartition_energie(lambda)
   return
 
 end subroutine repartition_energie
-
-!**********************************************************************
-
-subroutine internal_heating(lheating,dudt)
-  ! Calcule le temperature initiale du disque avant le step 1
-  ! C. Pinte
-  ! 27/02/06
-
-  implicit none
-
-  logical, intent(in) :: lheating
-  real, dimension(:), intent(in), optional :: dudt
-
-  integer :: icell
-
-  ! E0 = Q+ en W (AU/m)^2
-
-  if (lRE_LTE) then
-     ! Energie venant de l'equilibre avec nuage à T_min
-     E0(1:n_cells) = exp(log_E_em(1,1:n_cells))
-
-     if (lheating) then
-        write(*,*) "Computing heating from internal energy"
-        if (.not.present(dudt)) then
-           write(*,*) "ERROR: internal energy must be provided"
-           write(*,*) "Exiting"
-           stop
-        endif
-
-        do icell=1, n_cells
-           E0(icell) = max(E0(icell), dudt(icell) / AU_to_m**2 )
-        enddo
-     endif
-
-!!$  ! Energie venant du chauffage visqueux
-!!$  do i=1,n_rad
-!!$     do j=1,nz
-!!$        E0(i,j) = E0(i,j) !+ masse(i) * alpha *
-!!$     enddo
-!!$  enddo
-
-     ! Energie emise aux differente longueurs d'onde : repartition_energie
-     call Temp_finale()
-  endif
-
-  return
-
-end subroutine internal_heating
 
 !**********************************************************************
 
