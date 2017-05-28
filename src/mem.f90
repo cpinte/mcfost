@@ -422,12 +422,12 @@ subroutine alloc_dynamique(n_cells_max)
      endif
      tab_Temp = 0.0
 
-     allocate(log_E_em(n_T,Nc), stat=alloc_status)
+     allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error log_E_em'
         stop
      endif
-     log_E_em = 0.0
+     log_Qcool_minus_extra_heating = 0.0
 
      allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
      if (alloc_status > 0) then
@@ -842,7 +842,7 @@ subroutine dealloc_em_th()
   if (lTemp) then
      deallocate(tab_Temp)
      if (lsed_complete) then
-        deallocate(log_E_em)
+        deallocate(log_Qcool_minus_extra_heating)
         deallocate(DensE, DensE_m1, Dcoeff)
         if (allocated(xKJ_abs)) deallocate(xKJ_abs,E0)
         if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
@@ -1060,7 +1060,7 @@ subroutine realloc_step2()
 
   ! Liberation memoire
   if (ltemp) then
-     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_E_em, xT_ech,xKJ_abs)
+     if (lRE_LTE)  deallocate(kdB_dT_CDF, log_Qcool_minus_extra_heating, xT_ech,xKJ_abs)
      if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
      if (lreemission_stats) deallocate(nbre_reemission)
      if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
