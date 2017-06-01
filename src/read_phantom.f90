@@ -386,13 +386,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
  endif
 
  write(*,*) "Updating the stellar properties:"
- write(*,*) "There are", n_etoiles, "stars in the model"
  n_etoiles = 0
  do i=1,nptmass
     if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
        n_etoiles = n_etoiles + 1
     endif
  enddo
+ write(*,*) "There are", n_etoiles, "stars in the model"
 
  if (allocated(etoile)) deallocate(etoile)
  allocate(etoile(n_etoiles))
