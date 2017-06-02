@@ -437,12 +437,12 @@ subroutine alloc_dynamique(n_cells_max)
      DensE = 0.0 ; DensE_m1 = 0.0
 
      if (lRE_LTE) then
-        allocate(xKJ_abs(Nc,nb_proc), E0(Nc), stat=alloc_status)
+        allocate(xKJ_abs(Nc,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error xKJ_abs'
            stop
         endif
-        xKJ_abs = 0.0 ; E0 = 0.0
+        xKJ_abs = 0.0 ;
      endif
 
      lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
@@ -844,7 +844,7 @@ subroutine dealloc_em_th()
      if (lsed_complete) then
         deallocate(log_Qcool_minus_extra_heating)
         deallocate(DensE, DensE_m1, Dcoeff)
-        if (allocated(xKJ_abs)) deallocate(xKJ_abs,E0)
+        if (allocated(xKJ_abs)) deallocate(xKJ_abs)
         if (allocated(xJ_abs)) deallocate(xJ_abs,J0)
         if (allocated(nbre_reemission)) deallocate(nbre_reemission)
         if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
