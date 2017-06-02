@@ -121,7 +121,7 @@ subroutine init_reemission(lheating,dudt)
   real(kind=dp), dimension(0:n_lambda) :: integ3
   real(kind=dp), dimension(n_lambda) :: B, dB_dT
 
-  real(kind=dp) :: Qcool, extra_heating, u, Qcool_minus_extra_heating
+  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating
   real(kind=dp), dimension(n_cells) :: Qcool0
 
 
@@ -179,9 +179,9 @@ subroutine init_reemission(lheating,dudt)
            extra_heating = Qcool0(icell)
         else
            if (ldudt_implicit) then
-              u = ufac_implicit * Temp ! u(T) : TODO : I assume you need some kind of density here
+              u_o_dt = ufac_implicit * Temp ! u(T)/dt
               ! dudt is meant to be u^n/dt here
-              extra_heating = max(Qcool0(icell), u - dudt(icell) / AU_to_m**2 )
+              extra_heating = max(Qcool0(icell), (u_o_dt - dudt(icell)) / AU_to_m**2 )
            else
               extra_heating = max(Qcool0(icell), dudt(icell) / AU_to_m**2 )
            endif
@@ -195,6 +195,7 @@ subroutine init_reemission(lheating,dudt)
            ! This sets the initial disk temperature
            id = 1 ! not openmp yet
            xT_ech(icell,id)=T+1
+           log_Qcool_minus_extra_heating(T,icell)=-1000.
         endif
 
         if (lRE_nLTE.and.(T==1)) then
@@ -351,6 +352,46 @@ subroutine init_reemission(lheating,dudt)
 
 end subroutine init_reemission
 
+
+!********************************************************************
+
+subroutine Temp_LTE(icell, Ti, Temp)
+
+  integer, intent(in) :: icell
+  integer, intent(out) :: Ti
+  real, intent(out) :: Temp
+
+  real :: Qheat, log_Qheat, frac
+
+  Qheat=sum(xKJ_abs(icell,:))
+  if (Qheat < 0.) then
+     Temp = T_min ; Ti = 2
+  else
+     log_Qheat = log(Qheat*L_packet_th)
+
+     if (log_Qheat <  log_Qcool_minus_extra_heating(1,icell)) then
+        Temp = T_min ; Ti = 2
+     else
+        ! Temperature echantillonee juste sup. a la temperature de la cellule
+        Ti = maxval(xT_ech(icell,:))
+
+        ! On incremente eventuellement la zone de temperature
+        do while((log_Qcool_minus_extra_heating(Ti,icell) < log_Qheat).and.(Ti < n_T))
+           Ti=Ti+1
+        enddo  ! LIMITE MAX
+
+        ! Interpolation lineaire entre energies emises pour des
+        ! temperatures echantillonees voisines
+        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,icell)) / &
+             (log_Qcool_minus_extra_heating(Ti,icell)-log_Qcool_minus_extra_heating(Ti-1,icell))
+        Temp=exp(log(tab_Temp(Ti))*frac+log(tab_Temp(Ti-1))*(1.0-frac))
+     endif
+  endif
+
+  return
+
+end subroutine Temp_LTE
+
 !********************************************************************
 
 subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
@@ -363,48 +404,21 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   real, intent(in) ::  aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, heating_method
-  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_E_abs, J_abs
-
-  ! Absorption d'un photon : on ajoute son energie dans la cellule
-  !xE_abs(ri,zj,phik,id) = xE_abs(ri,zj,phik,id) + E
-  !E_abs=sum(xE_abs(ri,zj,phik,:))
-  !log_E_abs=log(E_abs*L_packet_th + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de E_em
+  integer :: l, l1, l2, Ti, T1, T2, k, heating_method
+  real :: Temp, frac_T1, frac_T2, proba
 
   if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_dp
 
-  J_abs=sum(xKJ_abs(icell,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
-  if (J_abs > 0.) then
-     log_E_abs=log(J_abs*L_packet_th + E0(icell)) ! le E0 comprend le L_tot car il est calcule a partir de E_em
-  else
-     log_E_abs = -300
-  endif
-
-  ! Temperature echantillonee juste sup. a la temperature de la cellule
-  T_int=maxval(xT_ech(icell,:))
-
-  ! On incremente eventuellement la zone de temperature
-  do while((log_Qcool_minus_extra_heating(T_int,icell) < log_E_abs).and.(T_int < n_T))
-     T_int=T_int+1
-  enddo  ! limite max
+  call Temp_LTE(icell, Ti, Temp)
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech(icell,id)=T_int
-
-  ! Interpolation lineaire entre energies emises pour des
-  ! temperatures echantillonees voisines
-  T2=T_int
-  Temp2=tab_Temp(T2)
-  T1=T_int-1
-  Temp1=tab_Temp(T1)
-
-  frac=(log_E_abs-log_Qcool_minus_extra_heating(T1,icell))/(log_Qcool_minus_extra_heating(T2,icell)-log_Qcool_minus_extra_heating(T1,icell))
-  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
+  xT_ech(icell,id) = Ti
 
   !**********************************************************************
   ! Choix de la longeur d'onde de reemission
   ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
-  frac_T2=(Temp-Temp1)/(Temp2-Temp1)
+  T2 = Ti ; T1 = Ti-1
+  Frac_T2=(Temp-tab_Temp(T1))/(tab_temp(T2)-tab_Temp(T1))
   frac_T1=1.0-frac_T2
 
   l1=0
@@ -548,59 +562,17 @@ subroutine Temp_finale()
 
   implicit none
 
-  real, dimension(n_cells) :: KJ_abs
-  real :: Temp, Temp1, Temp2, frac, log_E_abs
-  integer :: T_int, T1, T2, icell, i
-
-  ! Calcul de la temperature de la cellule et stokage energie recue + T
-  ! Utilisation temperature precedente
-
-  ! Somme sur differents processeurs
-  ! boucle pour eviter des problemes d'allocation memoire en 3D
-  !KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
-  KJ_abs(:) = 0.0
-  do i=1,nb_proc
-     KJ_abs(:) = KJ_abs(:) + xKJ_abs(1:n_cells,i)
-  enddo
-
-  KJ_abs(:)= KJ_abs(:)*L_packet_th !+ E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de E_em
+  real :: Temp
+  integer :: Ti, icell
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(KJ_abs,xT_ech,log_Qcool_minus_extra_heating,Temperature,tab_Temp,n_cells,T_min,n_T)
+  !$omp private(icell,Temp,Ti) &
+  !$omp shared(Temperature,n_cells)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
-     if (KJ_abs(icell) < tiny_real) then
-        Temperature(icell) = T_min
-     else
-        log_E_abs=log(KJ_abs(icell))
-        if (log_E_abs <  log_Qcool_minus_extra_heating(1,icell)) then
-           Temperature(icell) = T_min
-        else
-           ! Temperature echantillonee juste sup. a la temperature de la cellule
-           !          xT_int(:)=xT_ech(:,i,j)
-           !          T_int=maxval(xT_int)
-           T_int=maxval(xT_ech(icell,:))
-
-           ! On incremente eventuellement la zone de temperature
-           do while((log_Qcool_minus_extra_heating(T_int,icell) < log_E_abs).and.(T_int < n_T))
-              T_int=T_int+1
-           enddo  ! LIMITE MAX
-
-           ! Interpolation lineaire entre energies emises pour des
-           ! temperatures echantillonees voisines
-           T2=T_int
-           Temp2=tab_Temp(T2)
-           T1=T_int-1
-           Temp1=tab_Temp(T1)
-           frac=(log_E_abs-log_Qcool_minus_extra_heating(T1,icell))/(log_Qcool_minus_extra_heating(T2,icell)-log_Qcool_minus_extra_heating(T1,icell))
-           Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
-
-           ! Save
-           Temperature(icell)=Temp
-        endif
-     endif
+     call Temp_LTE(icell, Ti, Temp)
+     Temperature(icell) = Temp
   enddo !icell
   !$omp enddo
   !$omp end parallel
@@ -1729,7 +1701,6 @@ subroutine reset_radiation_field()
 
   if (lRE_LTE) then
      xKJ_abs(:,:) = 0.0_dp
-     E0 = 0.0_dp
   endif
   if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
   xT_ech = 2

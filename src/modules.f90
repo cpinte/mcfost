@@ -531,7 +531,6 @@ module em_th
   ! pour stockage des cellules par lequelles on passe
   ! longueur de vol cumulee dans la cellule
   real(kind=dp), dimension(:,:), allocatable :: xKJ_abs, nbre_reemission ! n_cells, id
-  real(kind=dp), dimension(:), allocatable :: E0 ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
   real(kind=dp), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
