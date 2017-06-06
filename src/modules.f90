@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.14"
+  character(8), parameter :: mcfost_release = "3.0.15"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -738,6 +738,7 @@ module molecular_emission
   real(kind=dp), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
 
   logical :: linfall, lkeplerian
+  real :: chi_infall
 
   real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: tab_deltaV ! n_speed, n_cells
