@@ -116,6 +116,7 @@ subroutine set_default_variables()
   lextra_heating = .false.
   lno_internal_energy = .false.
   ldudt_implicit = .false.
+  linfall = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -975,6 +976,12 @@ subroutine initialisation_mcfost()
      case("-no_internal_energy")
         i_arg = i_arg + 1
         lno_internal_energy = .true.
+     case("-chi_infall")
+        i_arg = i_arg + 1
+        linfall = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) chi_infall
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1415,6 +1422,7 @@ subroutine display_help()
   write(*,*) "        : -only_top : molecular emssion from the top half of the disk"
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
+  write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
 
   stop
 

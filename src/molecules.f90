@@ -398,7 +398,6 @@ subroutine init_molecular_disk(imol)
 
   ldust_mol  = .true.
   lkeplerian = .true.
-  linfall = .false.
 
   ! Temperature gaz = poussiere
   if (lcorrect_Tgas) then
@@ -1110,7 +1109,25 @@ function v_proj(icell,x,y,z,u,v,w) !
 
   vitesse = vfield(icell)
 
-  if (linfall) then
+
+  if (lkeplerian) then
+     r = sqrt(x*x+y*y)
+     if (r > tiny_dp) then
+        norme = 1.0_dp/r
+        vx = -y * norme * vitesse
+        vy = x * norme * vitesse
+        vz = 0.
+        if (linfall) then
+           r = sqrt(x*x+y*y+z*z) ; norme = 1.0_dp/r
+           vx = vx - chi_infall * x * norme * vitesse
+           vy = vy - chi_infall * y * norme * vitesse
+           vz = vz - chi_infall * z * norme * vitesse
+        endif
+        v_proj = vx * u + vy * v
+     else
+        v_proj = 0.0_dp
+     endif
+  else if (linfall) then
      r = sqrt(x*x+y*y+z*z)
      !  if (lbenchmark_water2)  vitesse = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
      if (r > tiny_dp) then
@@ -1120,16 +1137,6 @@ function v_proj(icell,x,y,z,u,v,w) !
         vz = z * norme * vitesse
         v_proj = vx * u + vy * v + vz * w
      else
-        v_proj = 0.0_dp
-     endif
-  else if (lkeplerian) then
-     r = sqrt(x*x+y*y)
-     if (r > tiny_dp) then
-        norme = 1.0_dp/r
-        vx = -y * norme * vitesse
-        vy = x * norme * vitesse
-        v_proj = vx * u + vy * v
-   else
         v_proj = 0.0_dp
      endif
   else
