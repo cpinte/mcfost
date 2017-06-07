@@ -319,10 +319,7 @@ subroutine transfert_poussiere()
            if (lcylindrical) call integ_tau(15) !TODO
         endif ! Fin bench
 
-        if (ltemp) then
-           call init_reemission()
-           call internal_heating(lextra_heating,extra_heating)
-        endif
+        if (ltemp) call init_reemission(lextra_heating,extra_heating)
 
         !$omp parallel default(none) private(lambda) shared(n_lambda)
         !$omp do schedule(static,1)

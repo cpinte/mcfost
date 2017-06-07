@@ -113,7 +113,7 @@ contains
     use prop_star, only : n_etoiles, E_ISM
     use em_th, only : temperature, E_abs_nRE
     use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
-         internal_heating, temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
+         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
     use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
@@ -237,8 +237,7 @@ contains
     call repartition_energie_ISM(ISM)
 
     ! ToDo : needs to be made parallel
-    call init_reemission()
-    call internal_heating(lextra_heating,extra_heating)
+    call init_reemission(lextra_heating,extra_heating)
 
     !$omp parallel default(none) private(lambda) shared(n_lambda)
     !$omp do schedule(static,1)
