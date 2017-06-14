@@ -34,7 +34,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
  real(dp), allocatable, dimension(:) :: dudt
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
- logical :: got_h,got_dustfrac,tagged,matched
+ logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
  ! open file for read
  call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
@@ -73,7 +73,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
 
  if (npartoftype(2) > 0) then
     dustfluidtype = 2
-    write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, will be discarded ***'
+    write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
  else
     dustfluidtype = 1
  endif
@@ -105,6 +105,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
 
  got_h = .false.
  got_dustfrac = .false.
+ got_itype = .false.
  ! skip each block that is too small
  nblockarrays = narraylengths*nblocks
 
@@ -174,6 +175,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
                    select case(trim(tag))
                    case('itype')
                       matched = .true.
+                      got_itype = .true.
                       read(iunit,iostat=ierr) itype(1:np)
                    case default
                       read(iunit,iostat=ierr)
@@ -232,6 +234,10 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
  enddo
 
  close(iunit)
+
+ if (.not. got_itype) then
+    itype = 1
+ endif
 
  if ((ndusttypes > 0) .and. .not. got_dustfrac) then
     dustfrac = 0.
@@ -295,8 +301,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   integer, intent(out) :: n_SPH
   real(dp), intent(in), optional :: T_to_u
   integer  :: i,j,k,itypei,alloc_status,i_etoiles
-  real(dp) :: xi,yi,zi,hi,rhoi,udens,uerg_per_s,uWatt,ulength_au,usolarmass
-  real(dp) :: dustfraci,Mtot,totlum,qtermi
+  real(dp) :: xi,yi,zi,hi,rhogasi,rhodusti,udens,uerg_per_s,uWatt,ulength_au,usolarmass
+  real(dp) :: gasfraci,dustfraci,totlum,qtermi
+
+  logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust particles for Voronoi mesh
 
   real, parameter :: Lsun = 3.839e26 ! W
 
@@ -306,10 +314,25 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   ulength_au = udist/ (au_to_cm )
   usolarmass = umass/Msun_to_g
 
+ if (dustfluidtype == 1) then
+    ! 1-fluid: always use gas particles for Voronoi mesh
+    use_dust_particles = .false.
+ endif
+
+ write(*,*) ''
+ if (use_dust_particles) then
+    write(*,*) '*** Using dust particles for Voronoi mesh ***'
+ else
+    write(*,*) '*** Using gas particles for Voronoi mesh ***'
+ endif
+
  ! convert to dust and gas density
  j = 0
  do i=1,np
-    if (xyzh(4,i) > 0. .and. abs(iphase(i))==1)  j = j + 1
+    if (xyzh(4,i) > 0.) then
+       if (.not. use_dust_particles .and. abs(iphase(i))==1)  j = j + 1
+       if (      use_dust_particles .and. abs(iphase(i))==2)  j = j + 1
+    endif
  enddo
  n_SPH = j
 
@@ -324,37 +347,61 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
  endif
 
  j = 0
- Mtot = 0.0
  do i=1,np
     xi = xyzh(1,i)
     yi = xyzh(2,i)
     zi = xyzh(3,i)
     hi = xyzh(4,i)
     itypei = abs(iphase(i))
-    if (hi > 0. .and. itypei==1) then
-       j = j + 1
-       particle_id(j) = i
-       x(j) = xi * ulength_au
-       y(j) = yi * ulength_au
-       z(j) = zi * ulength_au
-       rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
-       dustfraci = sum(dustfrac(:,i))
-       if (dustfluidtype==2) then
-          rhogas(j) = rhoi
-       else
-          rhogas(j) = (1 - dustfraci)*rhoi
+    if (hi > 0.) then
+       if (use_dust_particles .and. &
+           dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
+          j = j + 1
+          particle_id(j) = i
+          x(j) = xi * ulength_au
+          y(j) = yi * ulength_au
+          z(j) = zi * ulength_au
+          rhodusti = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          gasfraci = dustfrac(1,i)
+          rhodust(1,j) = rhodusti
+          massdust(1,j) = massoftype(itypei) * usolarmass ! Msun
+          rhogas(j) = gasfraci*rhodusti
+          massgas(j) = gasfraci*massdust(1,j)
+       elseif (.not. use_dust_particles .and. itypei==1) then
+          j = j + 1
+          particle_id(j) = i
+          x(j) = xi * ulength_au
+          y(j) = yi * ulength_au
+          z(j) = zi * ulength_au
+          rhogasi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          dustfraci = sum(dustfrac(:,i))
+          if (dustfluidtype==2) then
+             rhogas(j) = rhogasi
+          else
+             rhogas(j) = (1 - dustfraci)*rhogasi
+          endif
+          massgas(j) =  massoftype(itypei) * usolarmass ! Msun
+          do k=1,ndusttypes
+             rhodust(k,j) = dustfrac(k,i)*rhogasi
+             massdust(k,j) = dustfrac(k,i)*massgas(j)
+          enddo
        endif
-       Mtot = Mtot + massoftype(itypei)
-       massgas(j) =  massoftype(itypei) * usolarmass ! Msun
-       do k=1,ndusttypes
-          rhodust(k,j) = dustfrac(k,i)*rhoi
-          massdust(k,j) = dustfrac(k,i)*massgas(j)
-       enddo
     endif
  enddo
  n_SPH = j
 
- write(*,*) "Total mass is", Mtot * usolarmass
+ if (sum(massgas) == 0.) then
+    write(*,*) ''
+    write(*,*) 'Using old phantom dumpfile without gas-to-dust ratio on dust particles.'
+    write(*,*) 'Set use_dust_particles = .false. (read_phantom.f90) and compile and run again.'
+    write(*,*) 'Exiting...'
+    stop
+ endif
+
+ write(*,*) ''
+ write(*,*) 'Gas mass is      ', sum(massgas)
+ write(*,*) 'SPH dust mass is ', sum(massdust)
+ write(*,*) ''
 
  if (.not.lno_internal_energy) then
     if (ndudt == np) then
