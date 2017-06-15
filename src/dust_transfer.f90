@@ -199,7 +199,7 @@ subroutine transfert_poussiere()
 
      first_etape_obs=2
      ! Nbre d'étapes à déterminer pour code thermique
-     if (ltemp) then
+     if (lTemp) then
         etape_i=1
         letape_th=.true.
      else
@@ -221,7 +221,7 @@ subroutine transfert_poussiere()
      endif
 
 
-     if (ltemp.or.lsed_complete) then
+     if (lTemp.or.lsed_complete) then
         call repartition_energie_etoiles()
         if (lISM_heating) then
            call repartition_energie_ISM(ISR_model)
@@ -319,7 +319,7 @@ subroutine transfert_poussiere()
            if (lcylindrical) call integ_tau(15) !TODO
         endif ! Fin bench
 
-        if (ltemp) call init_reemission(lextra_heating,extra_heating)
+        if (lTemp) call init_reemission(lextra_heating,extra_heating)
 
         !$omp parallel default(none) private(lambda) shared(n_lambda)
         !$omp do schedule(static,1)
@@ -333,7 +333,7 @@ subroutine transfert_poussiere()
 
         if (lnRE) call init_emissivite_nRE()
 
-     endif ! ltemp.or.lsed_complete
+     endif ! lTemp.or.lsed_complete
 
   endif ! lmono
 
@@ -386,7 +386,7 @@ subroutine transfert_poussiere()
 
         if ((ind_etape==first_etape_obs).and.lremove) then
            call remove_specie
-           if (ltemp.and.lsed_complete) then
+           if (lTemp.and.lsed_complete) then
               write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda
                  call prop_grains(lambda) ! recalcul pour opacite

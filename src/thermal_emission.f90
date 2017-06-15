@@ -113,7 +113,7 @@ subroutine init_reemission(lheating,dudt)
   implicit none
 
   logical, intent(in) :: lheating
-  real, dimension(:), intent(in), optional :: dudt
+  real, dimension(:), allocatable, intent(in), optional :: dudt
 
   integer :: k,lambda,t, pop, icell, p_icell, id
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
