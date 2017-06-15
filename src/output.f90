@@ -2741,8 +2741,6 @@ subroutine ecriture_pops(imol)
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  real, dimension(n_cells,nLevels) :: tab_nLevel_io
-
   filename = trim(data_dir2(imol))//'/populations.fits.gz'
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
@@ -2770,10 +2768,7 @@ subroutine ecriture_pops(imol)
   fpixel=1
   nelements=naxes(1)*naxes(2)
 
-  do icell=1, n_cells
-     tab_nLevel_io(icell,:) = tab_nLevel(icell,:)
-  enddo
-  call ftppre(unit,group,fpixel,nelements,tab_nLevel_io,status)
+  call ftppre(unit,group,fpixel,nelements,tab_nLevel,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
