@@ -103,10 +103,11 @@ subroutine mol_line_transfer()
      call integ_tau_mol(imol)
 
      ! Resolution population des niveaux nLTE
-     if (.not.lmol_LTE) call NLTE_mol_line_transfer(imol)
-
-     call ecriture_pops(imol)
-     call ecriture_Tex(imol)
+     if (.not.lmol_LTE) then
+        call NLTE_mol_line_transfer(imol)
+        call ecriture_pops(imol)
+        call ecriture_Tex(imol)
+     endif
 
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
