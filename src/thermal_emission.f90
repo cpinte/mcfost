@@ -121,9 +121,7 @@ subroutine init_reemission(lheating,dudt)
   real(kind=dp), dimension(0:n_lambda) :: integ3
   real(kind=dp), dimension(n_lambda,n_T) :: B, dB_dT
 
-  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating
-  real(kind=dp), dimension(n_cells) :: Qcool0
-
+  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating, Qcool0
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
@@ -154,8 +152,17 @@ subroutine init_reemission(lheating,dudt)
      enddo !lambda
   enddo ! T
 
+
   ! produit par opacite (abs seule) massique
   ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
+  !$omp parallel default(none) &
+  !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
+  !$omp shared(cst_E,kappa_abs_LTE,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
+  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE)
+
+  !$ id = omp_get_thread_num() + 1
+
+  !$omp do
   do icell=1,n_cells
      ! this multiple loop is not needed when the dust grains are the same everywhere
 
@@ -172,21 +179,21 @@ subroutine init_reemission(lheating,dudt)
         ! Proper normalization
         ! At this stage, this is Q- in W / (AU/m)^2
         Qcool = integ * cst_E
-        if (T==1) Qcool0(icell) = Qcool
+        if (T==1) Qcool0 = Qcool
 
         ! Non radiative heating :
         ! We solve Q+ = int kappa.Jnu.dnu = Q- - extra_heating = int kappa.Bnu.dnu - extra_heating
         ! Here we conpute the extra_heating term
         if (.not.lextra_heating) then
            ! Energie venant de l'equilibre avec nuage à T_min
-           extra_heating = Qcool0(icell)
+           extra_heating = Qcool0
         else
            if (ldudt_implicit) then
               u_o_dt = ufac_implicit * Temp ! u(T)/dt
               ! dudt is meant to be u^n/dt here
-              extra_heating = max(Qcool0(icell), (u_o_dt - dudt(icell)) / AU_to_m**2 )
+              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / AU_to_m**2 )
            else
-              extra_heating = max(Qcool0(icell), dudt(icell) / AU_to_m**2 )
+              extra_heating = max(Qcool0, dudt(icell) / AU_to_m**2 )
            endif
         endif
 
@@ -196,7 +203,6 @@ subroutine init_reemission(lheating,dudt)
            log_Qcool_minus_extra_heating(T,icell)=log(Qcool_minus_extra_heating)
         else
            ! This sets the initial disk temperature
-           id = 1 ! not openmp yet
            xT_ech(icell,id)=T+1
            log_Qcool_minus_extra_heating(T,icell)=-1000.
         endif
@@ -209,6 +215,8 @@ subroutine init_reemission(lheating,dudt)
      enddo ! T
 
   enddo !icell
+  !$omp enddo
+  !$omp end parallel
 
 
   if (low_mem_th_emission) then
