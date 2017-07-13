@@ -1174,7 +1174,7 @@ subroutine dust_map(lambda,ibin,iaz)
   ! Definition des vecteurs de base du plan image dans le repere universel
 
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._dp/)
+  x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -1185,12 +1185,11 @@ subroutine dust_map(lambda,ibin,iaz)
   endif
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
-  y_plan_image = cross_product(x_plan_image, uvw)
+  y_plan_image = -cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
   l = 10.*Rmax  ! on se met loin
-
 
   x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
@@ -1260,12 +1259,12 @@ subroutine dust_map(lambda,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/ zoom) / real(max(igridx,igridy),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(igridx,igridy),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
      ! Coin en bas gauche de l'image
-     Icorner(:) = center(:) - ( 0.5* igridx * dx(:) +  0.5* igridy * dy(:))
+     Icorner(:) = center(:) - ( 0.5 * igridx * dx(:) +  0.5 * igridy * dy(:))
 
      if (l_sym_ima) then
         igridx_max = igridx/2 + modulo(igridx,2)
@@ -1305,7 +1304,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda, iaz, u, v, w)
+  call compute_stars_map(lambda, u,v,w, dx,dy)
 
   id = 1
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
@@ -1326,19 +1325,20 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda,iaz, u,v,w)
+subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
   ! Make a ray-traced map of the stars
 
   use utils, only : interp
 
-  integer, intent(in) :: lambda, iaz
+  integer, intent(in) :: lambda
   real(kind=dp), intent(in) :: u,v,w
+   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map
 
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp) :: facteur, facteur2, x0,y0,z0, x1, y1, lmin, lmax, norme, x, y, z, argmt, srw02
-  real :: cos_thet, cos_RT_az, sin_RT_az, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
+  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02
+  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
@@ -1369,9 +1369,6 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
 
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1
-
-  cos_RT_az = cos(tab_RT_az(iaz) * deg_to_rad)
-  sin_RT_az = sin(tab_RT_az(iaz) * deg_to_rad)
 
   ! Energie
   facteur = E_stars(lambda) * tab_lambda(lambda) * 1.0e-6 &
@@ -1411,8 +1408,8 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
-     !$omp shared(x_center,y_center,nb_proc,map_1star,Q_1star,U_1star,cos_RT_az,sin_RT_az) &
-     !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,x0,y0,z0,x1,y1,Stokes) &
+     !$omp shared(x_center,y_center,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star) &
+     !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme)
      in_map = .true. ! for SED
@@ -1442,29 +1439,22 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
               Pola_LimbDarkening = interp(pola_limb_darkening, mu_limb_darkening, cos_thet)
            endif
         endif
+
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
-        x1 = etoile(istar)%x + x * etoile(istar)%r
-        y1 = etoile(istar)%y + y * etoile(istar)%r
-        z0 = etoile(istar)%z + z * etoile(istar)%r
+        x = etoile(istar)%x + x * etoile(istar)%r
+        y = etoile(istar)%y + y * etoile(istar)%r
+        z = etoile(istar)%z + z * etoile(istar)%r
 
         icell = etoile(istar)%icell
 
-        if (abs(w -1) < tiny_real) then ! rotating the position as the old "rotation" routine does not deal properly with case w==1
-           x0 = x1 * cos_RT_az + y1 * sin_RT_az
-           y0 = x1 * sin_RT_az - y1 * cos_RT_az
-        else ! the rotation information is already incoded in u,v,w
-           x0 = -x1
-           y0 = y1
-        endif
-
         Stokes = 0.0_dp
-        call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u,v,w,tau,lmin,lmax)
+        call optical_length_tot(1,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
          if (lsed.and.(RT_sed_method == 1)) then
            i=1 ; j=1
         else
-           call find_pixel(x0,y0,z0, u,v,w, i,j,in_map)
+           call find_pixel(x,y,z, dx_map, dy_map, i,j,in_map)
         endif
 
         if (in_map) then
@@ -1502,6 +1492,36 @@ subroutine compute_stars_map(lambda,iaz, u,v,w)
   return
 
 end subroutine compute_stars_map
+
+!***********************************************************
+
+subroutine find_pixel(x,y,z,dx_map,dy_map, i, j, in_map)
+
+  real(kind=dp), intent(in) :: x,y,z
+  real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map
+  integer, intent(out) :: i,j
+  logical, intent(out) :: in_map
+
+  real(kind=dp), dimension(3) :: xyz
+  real(kind=dp) :: x_map, y_map
+
+  xyz(1) = x ; xyz(2) = y ; xyz(3) = z
+
+  x_map = dot_product(xyz, dx_map)
+  y_map = dot_product(xyz, dy_map)
+
+  i = int(x_map) + npix_x/2 + 1
+  j = int(y_map) + npix_y/2 + 1
+
+  if ((i<1).or.(i>igridx).or.(j<1).or.(j>igridy)) then
+     in_map = .false.
+  else
+     in_map = .true.
+  endif
+
+  return
+
+end subroutine find_pixel
 
 !***********************************************************
 
