@@ -562,10 +562,8 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   ! Definition des vecteurs de base du plan image dans le repere universel
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
-
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._dp/)
+  x = (/cos(tab_RT_az(iaz) * deg_to_rad),sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -576,7 +574,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   endif
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
-  y_plan_image = cross_product(x_plan_image, uvw)
+  y_plan_image = -cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
@@ -588,7 +586,6 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
-
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
      ! Pas de sous-pixel car les pixels ne sont pas carres
      n_iter_min = 1
@@ -599,7 +596,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      i = 1
      j = 1
 
-     rmin_RT = max(w*0.9_dp,0.05_dp) * rmin
+     rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
      rmax_RT = 2.0_dp * Rmax
 
      tab_r(1) = rmin_RT
@@ -647,7 +644,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = map_size / real(max(igridx,igridy),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(igridx,igridy),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
@@ -688,7 +685,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
-     call compute_stars_map(lambda, iaz, u, v, w)
+     call compute_stars_map(lambda, u, v, w, dx, dy)
 
      do iv =  -n_speed_rt, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
