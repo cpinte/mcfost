@@ -627,7 +627,6 @@ subroutine opacite_mol_loc(icell,imol)
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
 
-
      ! Opacite et emissivite raie
      kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))
      eps =  nu*fAul(iTrans)

@@ -251,7 +251,7 @@ subroutine init_directions_ray_tracing()
   do ibin=1, RT_n_incl
      ! 0 est remplace par un epsilon car il faut donner un axe de reference
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
-     tab_uv_rt(ibin) = sin(max(tab_RT_incl(ibin),1e-20)*deg_to_rad) ! uv_rt mais v_rt = 0 ici
+     tab_uv_rt(ibin) = sin( sign(max(abs(tab_RT_incl(ibin)),1e-20), tab_RT_incl(ibin)) *deg_to_rad ) ! uv_rt mais v_rt = 0 ici
      tab_w_rt(ibin) = sqrt(1.0_dp - tab_uv_rt(ibin)*tab_uv_rt(ibin))
      do iaz =1, RT_n_az
         tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz)*deg_to_rad)
