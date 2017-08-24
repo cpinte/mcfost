@@ -512,7 +512,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcorner
   real(kind=dp) :: taille_pix
-  integer :: i,j, id, igridx_max, n_iter_min, n_iter_max
+  integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
   integer, parameter :: n_ray_star = 1000
@@ -644,21 +644,21 @@ subroutine emission_line_map(imol,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/zoom) / real(max(igridx,igridy),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
      if (l_sym_ima) then
-        igridx_max = igridx/2 + modulo(igridx,2)
+        npix_x_max = npix_x/2 + modulo(npix_x,2)
      else
-        igridx_max = igridx
+        npix_x_max = npix_x
      endif
 
      ! Boucle sur les pixels de l'image
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
-     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy) &
+     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
      !$omp shared(n_iter_min,n_iter_max,imol,ibin,iaz)
 
      id =1 ! pour code sequentiel
@@ -666,9 +666,9 @@ subroutine emission_line_map(imol,ibin,iaz)
      n_iter_max = 1 ! 6
 
      !$omp do schedule(dynamic,1)
-     do i = 1,igridx_max
+     do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
-        do j = 1,igridy
+        do j = 1,npix_y
            !write(*,*) i,j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)

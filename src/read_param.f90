@@ -182,13 +182,12 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size
+    read(1,*) npix_x, npix_y, map_size
     zoom = 1.0
 
     ! default values for MC inclinations and azimuth bins
     N_thet = 10 ; N_phi = 1
 
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -300,18 +299,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ----------------
     ! Grain properties
@@ -633,10 +620,9 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size
+    read(1,*) npix_x, npix_y, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -748,18 +734,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -1074,10 +1048,9 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size
+    read(1,*) npix_x, npix_y, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -1189,18 +1162,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -1492,10 +1453,9 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size
+    read(1,*) npix_x, npix_y, map_size
     zoom = 1.0
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -1602,18 +1562,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -1900,9 +1848,8 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size, zoom
+    read(1,*) npix_x, npix_y, map_size, zoom
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2007,18 +1954,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -2306,9 +2241,8 @@ contains
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, map_size, zoom
+    read(1,*) npix_x, npix_y, map_size, zoom
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2414,18 +2348,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -2716,9 +2638,8 @@ contains
     ! ----
     read(1,*)
     read(1,*)
-    read(1,*) igridx, igridy, map_size, zoom
+    read(1,*) npix_x, npix_y, map_size, zoom
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -2819,18 +2740,6 @@ contains
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -3107,9 +3016,8 @@ end subroutine read_para215
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*) igridx, igridy, zoom
+    read(1,*) npix_x, npix_y, zoom
     read(1,*,iostat=ios) N_thet, N_phi
-    maxigrid = max(igridx, igridy)
     capt_interet= 1     ; delta_capt=1 ; angle_interet=75. ; lonly_capt_interet=.false.
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -3218,18 +3126,6 @@ end subroutine read_para215
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -3507,8 +3403,7 @@ end subroutine read_para215
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom
-    maxigrid = max(igridx, igridy)
+    read(1,*,iostat=ios) N_thet, N_phi, npix_x, npix_y, zoom
     read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -3611,18 +3506,6 @@ end subroutine read_para215
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
@@ -3899,8 +3782,7 @@ end subroutine read_para215
     ! Maps
     ! ----
     read(1,*) line_buffer
-    read(1,*,iostat=ios) N_thet, N_phi, igridx, igridy, zoom
-    maxigrid = max(igridx, igridy)
+    read(1,*,iostat=ios) N_thet, N_phi, npix_x, npix_y, zoom
     read(1,*) capt_interet, delta_capt, angle_interet, lonly_capt_interet
     capt_inf=max(1,capt_interet-delta_capt)
     capt_sup=min(N_thet,capt_interet+delta_capt)
@@ -4003,18 +3885,6 @@ end subroutine read_para215
        write(*,*) "Error : r_min < 0.0"
        stop
     endif
-
-    if (igridx == igridy) then
-       deltapix_x = 1
-       deltapix_y = 1
-    else if (igridx > igridy) then
-       deltapix_x = 1
-       deltapix_y = 1 - (igridx/2) + (igridy/2)
-    else
-       deltapix_x = 1 - (igridy/2) + (igridx/2)
-       deltapix_y = 1
-    endif
-    size_pix=maxigrid/(map_size)
 
     ! ------
     ! Cavity
