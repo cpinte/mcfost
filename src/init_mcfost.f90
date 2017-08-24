@@ -1093,8 +1093,27 @@ subroutine initialisation_mcfost()
   if (nz_opt > 0) nz = nz_opt
   if (n_T_opt > 0) n_T = n_T_opt
 
+  ! Defining pixel values
+  if (lresol) then
+     npix_x = nx
+     npix_y = ny
+  endif
+
+  maxigrid = max(npix_x, npix_y)
+  if (npix_x == npix_y) then
+     deltapix_x = 1
+     deltapix_y = 1
+  else if (npix_x > npix_y) then
+     deltapix_x = 1
+     deltapix_y = 1 - (npix_x/2) + (npix_y/2)
+  else
+     deltapix_x = 1 - (npix_y/2) + (npix_x/2)
+     deltapix_y = 1
+  endif
+  size_pix=maxigrid/(map_size)
+
+
   if (limg) then
-     npix_x = igridx ; npix_y = igridy
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
      else
@@ -1116,6 +1135,7 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
      endif
   else ! SED : we do not need pixels
+     npix_x_save = npix_x ; npix_y_save = npix_y
      npix_x = 1 ; npix_y = 1
      lmono0 = .false.
   endif
@@ -1164,25 +1184,6 @@ subroutine initialisation_mcfost()
   endif
 
   if (.not.limg) loutput_mc = .true.
-
-  if (lresol) then
-     igridx = nx
-     igridy = ny
-
-      maxigrid = max(igridx, igridy)
-
-      if (igridx == igridy) then
-         deltapix_x = 1
-         deltapix_y = 1
-      else if (igridx > igridy) then
-         deltapix_x = 1
-         deltapix_y = 1 - (igridx/2) + (igridy/2)
-      else
-         deltapix_x = 1 - (igridy/2) + (igridx/2)
-         deltapix_y = 1
-      endif
-      size_pix=maxigrid/(map_size)
-  endif
 
   if (lPA) ang_disque = PA
 

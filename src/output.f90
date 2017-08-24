@@ -118,7 +118,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
 
      call ROTATION(X1,Y1,Z1,u1,v1,w1,XPRIM,YPRIM,ZPRIM)
 
-     !*     LA CARTE IGRIDX * IGRIDY EST PRODUITE DANS LE PLAN Y'Z'
+     !*     LA CARTE NPIX_X * NPIX_Y EST PRODUITE DANS LE PLAN Y'Z'
      !*
      !*     utilisation de la symetrie gauche-droite, selon l'axe Y'
      !*     changement de yprim -> -yprim si yprim<0
@@ -128,9 +128,9 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      !           STOK(3,1) = -STOK(3,1)
      !        endif
 
-     !        IMAP = int(((YPRIM / size_neb) * IGRIDY / 2.) + 0.5) + 1
+     !        IMAP = int(((YPRIM / size_neb) * NPIX_Y / 2.) + 0.5) + 1
      !        if (IMAP <= 0 ) IMAP = 1
-     !        if (IMAP >= (IGRIDX + 1)) IMAP = IGRIDX
+     !        if (IMAP >= (NPIX_X + 1)) IMAP = NPIX_X
 
      ! Rotation eventuelle du disque
      ytmp = yprim
@@ -140,11 +140,11 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
 
      IMAP1 = int((YPRIM*zoom + 0.5*map_size)*size_pix) + deltapix_x
      if (IMAP1 <= 0 ) return !cycle photon
-     if (IMAP1 > IGRIDX)  return !cycle photon
+     if (IMAP1 > NPIX_X)  return !cycle photon
 
      JMAP1 = int((ZPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_y
      if (JMAP1 <= 0) return !cycle photon
-     if (JMAP1 > IGRIDY) return !cycle photon
+     if (JMAP1 > NPIX_Y) return !cycle photon
 
      if (l_sym_ima) then
         ! 1/2 photon
@@ -183,12 +183,12 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
 
         IMAP2 = int((YPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_x
         if (IMAP2 <= 0 ) return !cycle photon
-        if (IMAP2 > IGRIDX)  return !cycle photon
+        if (IMAP2 > NPIX_X)  return !cycle photon
 
 
         JMAP2 = int((ZPRIM*zoom + 0.5*map_size)*size_pix)  + deltapix_y
         if (JMAP2 <= 0) return !cycle photon
-        if (JMAP2 > IGRIDY) return !cycle photon
+        if (JMAP2 > NPIX_Y) return !cycle photon
 
 
         if ((IMAP1==IMAP2).and.(JMAP1==JMAP2)) then ! Pas de sym on est dans le meme pixel
@@ -431,8 +431,8 @@ subroutine write_stokes_fits()
   ! le signe - signifie que l'on ecrit des reels dans le fits
   bitpix=-32
   naxis=5
-  naxes(1)=igridx
-  naxes(2)=igridy
+  naxes(1)=npix_x
+  naxes(2)=npix_y
   naxes(3)=N_incl
   naxes(4)=N_phi
   naxes(5)=N_type_flux
@@ -451,14 +451,14 @@ subroutine write_stokes_fits()
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-  call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-  call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
 
@@ -521,14 +521,14 @@ subroutine ecriture_map_ray_tracing()
   real, dimension(:,:,:,:), allocatable :: image_casa
 
   if (lcasa) then
-     allocate(image_casa(igridx, igridy, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+     allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
      if (alloc_status > 0) then
         write(*,*) 'Allocation error RT image_casa'
         stop
      endif
      image_casa = 0.0 ;
   else
-     allocate(image(igridx, igridy, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
+     allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error RT image'
         stop
@@ -556,15 +556,15 @@ subroutine ecriture_map_ray_tracing()
 
   if (lcasa) then
      naxis=4
-     naxes(1)=igridx
-     naxes(2)=igridy
+     naxes(1)=npix_x
+     naxes(2)=npix_y
      naxes(3)= 1 ! pola
      naxes(4)=1 ! freq
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
   else
      naxis=5
-     naxes(1)=igridx
-     naxes(2)=igridy
+     naxes(1)=npix_x
+     naxes(2)=npix_y
      naxes(3)= RT_n_incl
      naxes(4)= RT_n_az
      naxes(5)=N_type_flux
@@ -582,14 +582,14 @@ subroutine ecriture_map_ray_tracing()
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-  call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-  call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   if (lcasa) then
@@ -639,16 +639,16 @@ subroutine ecriture_map_ray_tracing()
 
      W2m2_to_Jy = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
 
-     do j=1,igridy
-        do i=1,igridx
+     do j=1,npix_y
+        do i=1,npix_x
            image_casa(i,j,1,1) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * W2m2_to_Jy
         enddo !i
      enddo !j
 
      if (l_sym_ima) then
-        xcenter = igridx/2 + modulo(igridx,2)
-        do i=xcenter+1,igridx
-           image_casa(i,:,1,1) = image_casa(igridx-i+1,:,1,1)
+        xcenter = npix_x/2 + modulo(npix_x,2)
+        do i=xcenter+1,npix_x
+           image_casa(i,:,1,1) = image_casa(npix_x-i+1,:,1,1)
         enddo
      endif
 
@@ -658,8 +658,8 @@ subroutine ecriture_map_ray_tracing()
      type_loop : do itype=1,N_type_flux
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
-              do j=1,igridy
-                 do i=1,igridx
+              do j=1,npix_y
+                 do i=1,npix_x
                     if (lsepar_pola) then
                        if ((itype == 2 ).or. (itype==3)) then
                           if (itype==2) then
@@ -683,21 +683,21 @@ subroutine ecriture_map_ray_tracing()
      enddo type_loop ! itype
 
      if (l_sym_ima) then
-        xcenter = igridx/2 + modulo(igridx,2)
-        do i=xcenter+1,igridx
-           image(i,:,:,:,1) = image(igridx-i+1,:,:,:,1)
+        xcenter = npix_x/2 + modulo(npix_x,2)
+        do i=xcenter+1,npix_x
+           image(i,:,:,:,1) = image(npix_x-i+1,:,:,:,1)
 
            if (lsepar_pola) then
-              image(i,:,:,:,2) = image(igridx-i+1,:,:,:,2)
-              image(i,:,:,:,3) = - image(igridx-i+1,:,:,:,3)
-              image(i,:,:,:,4) = image(igridx-i+1,:,:,:,4)
+              image(i,:,:,:,2) = image(npix_x-i+1,:,:,:,2)
+              image(i,:,:,:,3) = - image(npix_x-i+1,:,:,:,3)
+              image(i,:,:,:,4) = image(npix_x-i+1,:,:,:,4)
            endif
 
            if (lsepar_contrib) then
-              image(i,:,:,:,n_Stokes+1) = image(igridx-i+1,:,:,:,n_Stokes+1)
-              image(i,:,:,:,n_Stokes+2) = image(igridx-i+1,:,:,:,n_Stokes+2)
-              image(i,:,:,:,n_Stokes+3) = image(igridx-i+1,:,:,:,n_Stokes+3)
-              image(i,:,:,:,n_Stokes+4) = image(igridx-i+1,:,:,:,n_Stokes+4)
+              image(i,:,:,:,n_Stokes+1) = image(npix_x-i+1,:,:,:,n_Stokes+1)
+              image(i,:,:,:,n_Stokes+2) = image(npix_x-i+1,:,:,:,n_Stokes+2)
+              image(i,:,:,:,n_Stokes+3) = image(npix_x-i+1,:,:,:,n_Stokes+3)
+              image(i,:,:,:,n_Stokes+4) = image(npix_x-i+1,:,:,:,n_Stokes+4)
            endif
         enddo
      endif ! l_sym_image
@@ -771,8 +771,8 @@ subroutine ecriture_sed_ray_tracing()
   if (RT_sed_method == 1) then
      sed_rt(:,:,:,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:,:),dim=5)
   else
-     do i=1,igridx
-        do j=1,igridy
+     do i=1,npix_x
+        do j=1,npix_y
            sed_rt(:,:,:,:) = sed_rt(:,:,:,:) + sum(Stokes_ray_tracing(:,i,j,:,:,:,:),dim=5)
         enddo
      enddo
@@ -2789,8 +2789,8 @@ subroutine ecriture_spectre(imol)
 
   if (lcasa) then
      naxis=3
-     naxes(1)=igridx
-     naxes(2)=igridy
+     naxes(1)=npix_x
+     naxes(2)=npix_y
      naxes(3)= 2*mol(imol)%n_speed_rt+1 ! velocity
      nelements=naxes(1)*naxes(2)*naxes(3)
      allocate(spectre_casa(naxes(1),naxes(2),naxes(3)))
@@ -2800,8 +2800,8 @@ subroutine ecriture_spectre(imol)
         naxes(1)=1
         naxes(2)=1
      else
-        naxes(1)=igridx
-        naxes(2)=igridy
+        naxes(1)=npix_x
+        naxes(2)=npix_y
      endif
      naxes(3)=2*mol(imol)%n_speed_rt+1
      naxes(4)=mol(imol)%nTrans_rayTracing
@@ -2816,14 +2816,14 @@ subroutine ecriture_spectre(imol)
   ! RAC, DEC, reference pixel & pixel scale en degres
   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-  call ftpkyj(unit,'CRPIX1',igridx/2+1,'',status)
-  pixel_scale_x = -map_size / (igridx * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-  call ftpkyj(unit,'CRPIX2',igridy/2+1,'',status)
-  pixel_scale_y = map_size / (igridy * distance * zoom) * arcsec_to_deg
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
   call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
@@ -2854,16 +2854,16 @@ subroutine ecriture_spectre(imol)
         ! On divise par deux
         spectre = spectre * 0.5
      else
-        xcenter = igridx/2 + modulo(igridx,2)
+        xcenter = npix_x/2 + modulo(npix_x,2)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
-           do i=xcenter+1,igridx
+           do i=xcenter+1,npix_x
               do iv=-mol(imol)%n_speed_rt,mol(imol)%n_speed_rt
-                 spectre(i,:,iv,:,:,:) = spectre(igridx-i+1,:,-iv,:,:,:)
+                 spectre(i,:,iv,:,:,:) = spectre(npix_x-i+1,:,-iv,:,:,:)
               enddo
            enddo
         else ! infall : meme profil de raie des 2 cotes
-           do i=xcenter+1,igridx
-              spectre(i,:,:,:,:,:) = spectre(igridx-i+1,:,:,:,:,:)
+           do i=xcenter+1,npix_x
+              spectre(i,:,:,:,:,:) = spectre(npix_x-i+1,:,:,:,:,:)
            enddo
         endif
      endif ! lkeplerian
@@ -2892,8 +2892,8 @@ subroutine ecriture_spectre(imol)
         naxes(1)=1
         naxes(2)=1
      else
-        naxes(1)=igridx
-        naxes(2)=igridy
+        naxes(1)=npix_x
+        naxes(2)=npix_y
      endif
      naxes(3)=mol(imol)%nTrans_rayTracing
      naxes(4)=RT_n_incl
@@ -2907,9 +2907,9 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      if (l_sym_ima.and.(RT_line_method==2)) then
-        xcenter = igridx/2 + modulo(igridx,2)
-        do i=xcenter+1,igridx
-           continu(i,:,:,:,:) = continu(igridx-i+1,:,:,:,:)
+        xcenter = npix_x/2 + modulo(npix_x,2)
+        do i=xcenter+1,npix_x
+           continu(i,:,:,:,:) = continu(npix_x-i+1,:,:,:,:)
         enddo
      endif ! l_sym_image
 

@@ -677,14 +677,14 @@ subroutine alloc_dynamique(n_cells_max)
   ! Tableaux relatifs aux images
   ! **************************************************
   if (lmono0.and.loutput_mc) then
-     allocate(STOKE_io(igridx,igridy,capt_debut:capt_fin,N_phi,N_type_flux), stat=alloc_status)
+     allocate(STOKE_io(npix_x,npix_y,capt_debut:capt_fin,N_phi,N_type_flux), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error STOKE_io'
         stop
      endif
      STOKE_io = 0.0
 
-     allocate(STOKEI(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     allocate(STOKEI(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error STOKEI'
         stop
@@ -692,21 +692,21 @@ subroutine alloc_dynamique(n_cells_max)
      STOKEI = 0.0
 
      if (lsepar_pola) then
-        allocate(STOKEQ(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEQ(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEQ'
            stop
         endif
         STOKEQ = 0.0
 
-        allocate(STOKEU(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEU(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEU'
            stop
         endif
         STOKEU=0.0
 
-        allocate(STOKEV(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEV(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEV'
            stop
@@ -715,28 +715,28 @@ subroutine alloc_dynamique(n_cells_max)
      endif
 
      if (lsepar_contrib) then
-        allocate(STOKEI_star(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEI_star(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_star'
            stop
         endif
         STOKEI_star = 0.0
 
-        allocate(STOKEI_star_scat(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEI_star_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_star_scat'
            stop
         endif
         STOKEI_star_scat = 0.0
 
-        allocate(STOKEI_disk(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEI_disk(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_disk'
            stop
         endif
         STOKEI_disk = 0.0
 
-        allocate(STOKEI_disk_scat(n_lambda,igridx,igridy,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+        allocate(STOKEI_disk_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
         if (alloc_status > 0) then
            write(*,*) 'Allocation error STOKEI_disk_scat'
            stop
@@ -1541,13 +1541,13 @@ subroutine alloc_emission_mol(imol)
   endif
 
   ! Methode d'echantillonnage
-  if (igridx > 1) then
+  if (npix_x > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
-     npix_x = igridx ; npix_y = igridy ! we update the value after the SED calculation
+     npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
 
      write(*,*) "WARNING : memory size if lots of pixels"
-     allocate(spectre(igridx,igridy,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
-          continu(igridx,igridy,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
+     allocate(spectre(npix_x,npix_y,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+          continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
      allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &

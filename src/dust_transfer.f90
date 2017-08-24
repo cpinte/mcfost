@@ -1158,7 +1158,7 @@ subroutine dust_map(lambda,ibin,iaz)
   real(kind=dp), dimension(3,nb_proc) :: pixelcorner
 
   real(kind=dp) :: taille_pix, l, x0, y0, z0
-  integer :: i,j, id, igridx_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
+  integer :: i,j, id, npix_x_max, n_iter_max, n_iter_min, ri_RT, phi_RT, ech_method
 
 
   integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
@@ -1259,32 +1259,32 @@ subroutine dust_map(lambda,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/zoom) / real(max(igridx,igridy),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
      ! Coin en bas gauche de l'image
-     Icorner(:) = center(:) - ( 0.5 * igridx * dx(:) +  0.5 * igridy * dy(:))
+     Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
      if (l_sym_ima) then
-        igridx_max = igridx/2 + modulo(igridx,2)
+        npix_x_max = npix_x/2 + modulo(npix_x,2)
      else
-        igridx_max = igridx
+        npix_x_max = npix_x
      endif
 
      ! Boucle sur les pixels de l'image
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
-     !$omp shared(Icorner,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy,n_iter_min,n_iter_max,ibin,iaz)
+     !$omp shared(Icorner,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y,n_iter_min,n_iter_max,ibin,iaz)
      id =1 ! pour code sequentiel
      n_iter_min = 2
      n_iter_max = 6
 
      !$omp do schedule(dynamic,1)
-     do i = 1, igridx_max
+     do i = 1, npix_x_max
         !$ id = omp_get_thread_num() + 1
-        do j = 1,igridy
+        do j = 1,npix_y
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            call intensite_pixel_dust(id,ibin,iaz,n_iter_min,n_iter_max,lambda,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
@@ -1296,8 +1296,8 @@ subroutine dust_map(lambda,ibin,iaz)
      ! On recupere tout le flux par symetrie
      ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
      if (l_sym_ima) then
-        do i=igridx_max+1,igridx
-           Stokes_ray_tracing(lambda,i,:,ibin,iaz,:,:) = Stokes_ray_tracing(lambda,igridx-i+1,:,ibin,iaz,:,:)
+        do i=npix_x_max+1,npix_x
+           Stokes_ray_tracing(lambda,i,:,ibin,iaz,:,:) = Stokes_ray_tracing(lambda,npix_x-i+1,:,ibin,iaz,:,:)
         enddo
      endif ! l_sym_image
 
@@ -1378,7 +1378,7 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
   n_ray_star(:) = max(n_ray_star_SED / n_etoiles,1)
 
   if (lmono0) then
-     pix_size = map_size/zoom / max(igridx,igridy)
+     pix_size = map_size/zoom / max(npix_x,npix_y)
      do istar=1, n_etoiles
         if (2*etoile(istar)%r > pix_size) then
            n_ray_star(istar) = max(n_ray_star_SED / n_etoiles,1) * 8 * int(max(etoile(istar)%r/pix_size**2,1.))
@@ -1477,6 +1477,7 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
 
      ! Normalizing map and Adding all the stars
      facteur2 =  (facteur * prob_E_star(lambda,istar)) / norme
+
      stars_map(:,:,1) = stars_map(:,:,1) + sum(map_1star(:,:,:),dim=3) * facteur2
 
 
@@ -1513,7 +1514,7 @@ subroutine find_pixel(x,y,z,dx_map,dy_map, i, j, in_map)
   i = int(x_map) + npix_x/2 + 1
   j = int(y_map) + npix_y/2 + 1
 
-  if ((i<1).or.(i>igridx).or.(j<1).or.(j>igridy)) then
+  if ((i<1).or.(i>npix_x).or.(j<1).or.(j>npix_y)) then
      in_map = .false.
   else
      in_map = .true.
