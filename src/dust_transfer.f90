@@ -1478,8 +1478,9 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
      ! Normalizing map and Adding all the stars
      facteur2 =  (facteur * prob_E_star(lambda,istar)) / norme
 
-     stars_map(:,:,1) = stars_map(:,:,1) + sum(map_1star(:,:,:),dim=3) * facteur2
-
+     do id=1, nb_proc
+        stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:,id) * facteur2
+     enddo
 
      if (lpola) then
         ! Normalizing maps and adding all the stars
@@ -1490,6 +1491,7 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
 
   deallocate(map_1star)
   if (lpola) deallocate(Q_1star, U_1star)
+
   return
 
 end subroutine compute_stars_map
