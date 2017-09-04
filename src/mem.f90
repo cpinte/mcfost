@@ -1541,7 +1541,7 @@ subroutine alloc_emission_mol(imol)
   endif
 
   ! Methode d'echantillonnage
-  if (npix_x > 1) then
+  if (npix_x_save > 1) then
      RT_line_method = 2 ! creation d'une carte avec pixels carres
      npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
 
