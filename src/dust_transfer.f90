@@ -1282,7 +1282,7 @@ subroutine dust_map(lambda,ibin,iaz)
      n_iter_max = 6
 
      !$omp do schedule(dynamic,1)
-     do i = 1, npix_x_max
+     do i = 1, npix_x_max ! We only compute half the map if it is symmetric
         !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
            ! Coin en bas gauche du pixel
@@ -1292,21 +1292,12 @@ subroutine dust_map(lambda,ibin,iaz)
      enddo !i
      !$omp end do
      !$omp end parallel
-
-     ! On recupere tout le flux par symetrie
-     ! TODO : BUG : besoin de le faire ici ?? c'est fait dans output.f90 de toute facon ...
-     if (l_sym_ima) then
-        do i=npix_x_max+1,npix_x
-           Stokes_ray_tracing(lambda,i,:,ibin,iaz,:,:) = Stokes_ray_tracing(lambda,npix_x-i+1,:,ibin,iaz,:,:)
-        enddo
-     endif ! l_sym_image
-
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda, u,v,w, dx,dy)
+  call compute_stars_map(lambda, u,v,w, taille_pix,dx,dy)
 
-  id = 1
+  id = 1 ! We add the map on the first cpu id
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
   if (lsepar_contrib) then
      Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,n_Stokes+1,id) &
@@ -1325,14 +1316,14 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
+subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
   ! Make a ray-traced map of the stars
 
   use utils, only : interp
 
   integer, intent(in) :: lambda
-  real(kind=dp), intent(in) :: u,v,w
-   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map
+  real(kind=dp), intent(in) :: u,v,w, taille_pix
+   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
 
   integer, parameter :: n_ray_star_SED = 1024
 
@@ -1408,7 +1399,7 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
-     !$omp shared(x_center,y_center,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star) &
+     !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme)
@@ -1454,7 +1445,7 @@ subroutine compute_stars_map(lambda, u,v,w, dx_map, dy_map)
          if (lsed.and.(RT_sed_method == 1)) then
            i=1 ; j=1
         else
-           call find_pixel(x,y,z, dx_map, dy_map, i,j,in_map)
+           call find_pixel(x,y,z, taille_pix, dx_map, dy_map, i,j,in_map)
         endif
 
         if (in_map) then
@@ -1498,10 +1489,10 @@ end subroutine compute_stars_map
 
 !***********************************************************
 
-subroutine find_pixel(x,y,z,dx_map,dy_map, i, j, in_map)
+subroutine find_pixel(x,y,z,taille_pix, dx_map,dy_map, i, j, in_map)
 
-  real(kind=dp), intent(in) :: x,y,z
-  real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map
+  real(kind=dp), intent(in) :: x,y,z, taille_pix
+  real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
   integer, intent(out) :: i,j
   logical, intent(out) :: in_map
 
@@ -1510,11 +1501,20 @@ subroutine find_pixel(x,y,z,dx_map,dy_map, i, j, in_map)
 
   xyz(1) = x ; xyz(2) = y ; xyz(3) = z
 
-  x_map = dot_product(xyz, dx_map)
-  y_map = dot_product(xyz, dy_map)
+  ! Offset from map center in units of pixel size
+  x_map = dot_product(xyz, dx_map) / taille_pix**2
+  y_map = dot_product(xyz, dy_map) / taille_pix**2
 
-  i = int(x_map) + npix_x/2 + 1
-  j = int(y_map) + npix_y/2 + 1
+  if (modulo(npix_x,2) == 1) then
+     i = nint(x_map) + npix_x/2 + 1
+  else
+     i = nint(x_map + 0.5) + npix_x/2
+  endif
+  if (modulo(npix_y,2) == 1) then
+     j = nint(y_map) + npix_y/2 + 1
+  else
+     j = nint(y_map + 0.5) + npix_y/2 + 1
+  endif
 
   if ((i<1).or.(i>npix_x).or.(j<1).or.(j>npix_y)) then
      in_map = .false.

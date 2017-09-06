@@ -661,15 +661,13 @@ subroutine ecriture_map_ray_tracing()
               do j=1,npix_y
                  do i=1,npix_x
                     if (lsepar_pola) then
-                       if ((itype == 2 ).or. (itype==3)) then
-                          if (itype==2) then
-                             Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
-                             U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
-                             image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
-                             image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
-                          else
-                             cycle type_loop ! itype 3 already done together with itype 2
-                          endif
+                       if (itype==2) then
+                          Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
+                          U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
+                          image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
+                          image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
+                       else if (itype==3) then ! itype 3 already done together with itype 2
+                          cycle type_loop
                        else ! Other images do not need rotation
                           image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
                        endif
