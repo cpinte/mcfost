@@ -685,7 +685,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
-     call compute_stars_map(lambda, u, v, w, dx, dy)
+     call compute_stars_map(lambda, u, v, w, taille_pix, dx, dy)
 
      do iv =  -n_speed_rt, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
