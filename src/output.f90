@@ -28,8 +28,23 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
   integer, intent(out) :: capt
 
   real(kind=dp), dimension(4)  :: stok
-  real(kind=dp) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp
-  integer :: c_phi, imap1, jmap1, imap2, jmap2
+  real(kind=dp) ::  x1,y1,z1,u1,v1,w1, xprim, yprim, zprim, ytmp, ztmp, size_pix
+  integer :: c_phi, imap1, jmap1, imap2, jmap2, deltapix_x, deltapix_y, maxigrid
+
+
+  maxigrid = max(npix_x, npix_y)
+  if (npix_x == npix_y) then
+     deltapix_x = 1
+     deltapix_y = 1
+  else if (npix_x > npix_y) then
+     deltapix_x = 1
+     deltapix_y = 1 - (npix_x/2) + (npix_y/2)
+  else
+     deltapix_x = 1 - (npix_y/2) + (npix_x/2)
+     deltapix_y = 1
+  endif
+  size_pix=maxigrid/map_size
+
 
   x1=xin ; y1=yin ; z1=zin
   u1=uin ; v1=vin ; w1=win
