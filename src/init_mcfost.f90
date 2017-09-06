@@ -1099,20 +1099,6 @@ subroutine initialisation_mcfost()
      npix_y = ny
   endif
 
-  maxigrid = max(npix_x, npix_y)
-  if (npix_x == npix_y) then
-     deltapix_x = 1
-     deltapix_y = 1
-  else if (npix_x > npix_y) then
-     deltapix_x = 1
-     deltapix_y = 1 - (npix_x/2) + (npix_y/2)
-  else
-     deltapix_x = 1 - (npix_y/2) + (npix_x/2)
-     deltapix_y = 1
-  endif
-  size_pix=maxigrid/(map_size)
-
-
   if (limg) then
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
