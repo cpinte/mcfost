@@ -337,9 +337,9 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
            xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
            if (xnyp < 1e-10) then
               xnyp = 0.0
-              costhet = 1.0
+              costhet = 1.0_dp ! omega=0
            else
-              costhet = -1.0*v1pj / xnyp
+              costhet = v1pj / xnyp
            endif
 
            ! calcul de l'angle entre la normale et l'axe z (theta)
@@ -407,7 +407,7 @@ subroutine angles_scatt_rt1(id,u,v,w)
            xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
            if (xnyp < 1e-10) then
               xnyp = 0.0_dp
-              costhet = 1.0_dp
+              costhet = 1.0_dp ! omega = 0
            else
               costhet = -1.0_dp*v1pj / xnyp
            endif
@@ -966,9 +966,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
                  if (xnyp < 1e-10) then
                     xnyp = 0.0
-                    costhet = 1.0
+                    costhet = 1.0_dp ! omega = 0
                  else
-                    costhet = -1.0*v1pj / xnyp
+                    costhet = v1pj / xnyp
                  endif
 
                  ! calcul de l'angle entre la normale et l'axe z (theta)
