@@ -1270,6 +1270,17 @@ subroutine initialisation_mcfost()
      endif
   endif
 
+  ! Forcing azimuthal angle to 0 in rt2
+  ! as angles are defined with phi=0 in mind
+  if (lscatt_ray_tracing2) then
+     if (RT_n_az > 1) then
+        write(*,*) "There can be only 1 azimuthal angle in RT method 2"
+        RT_n_az = 1
+     endif
+     RT_az_min = 0
+     RT_az_max = 0
+  endif
+
   lonly_LTE = .false.
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
