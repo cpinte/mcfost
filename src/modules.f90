@@ -736,7 +736,7 @@ module molecular_emission
   real(kind=dp), dimension(:,:), allocatable :: Jmol, Jmol2 ! nTrans, n_cpu
   real(kind=dp), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
 
-  logical :: linfall, lkeplerian
+  logical :: linfall, lkeplerian, lcylindrical_rotation
   real :: chi_infall
 
   real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells

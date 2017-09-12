@@ -117,6 +117,7 @@ subroutine set_default_variables()
   lno_internal_energy = .false.
   ldudt_implicit = .false.
   linfall = .false.
+  lcylindrical_rotation = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -982,6 +983,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) chi_infall
         i_arg = i_arg + 1
+     case("-cylindrical_rotation","-cyl_rotation","-cyl_rot")
+        i_arg = i_arg + 1
+        lcylindrical_rotation = .true.
      case default
         call display_help()
      end select
@@ -1425,6 +1429,7 @@ subroutine display_help()
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
+  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
 
   stop
 
