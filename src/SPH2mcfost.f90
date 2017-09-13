@@ -13,6 +13,7 @@ contains
     use read_phantom, only : read_phantom_file, read_phantom_input_file
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
+    use utils, only : read_comments
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
@@ -63,7 +64,7 @@ contains
           write(*,*) "Exiting"
           stop
        endif
-       read(1,*) line_buffer
+       call read_comments(1)
        read(1,*) SPH_limits(1), SPH_limits(3), SPH_limits(5)
        read(1,*) SPH_limits(2), SPH_limits(4), SPH_limits(6)
        close(unit=1)
@@ -101,14 +102,14 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: limit_threshold = 0.01
+    real, parameter :: limit_threshold = 0.005
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
-    real :: graindens, f
-    integer :: ierr, icell, l, k, iSPH
+    real :: f
+    integer :: icell, l, k, iSPH
 
     real(dp), dimension(6) :: limits
 

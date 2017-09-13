@@ -1224,7 +1224,7 @@ subroutine write_disk_struct(lparticle_density)
 
   logical, intent(in) :: lparticle_density
 
-  integer :: i, j, k, icell
+  integer :: i, j, icell
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1795,7 +1795,7 @@ subroutine ecriture_J(step)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, phik, icell
+  integer :: group,fpixel,nelements, lambda, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -1921,7 +1921,7 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, ri, zj, l, phik, icell, alloc_status
+  integer :: group,fpixel,nelements, lambda, l, icell
 
   logical :: simple, extend
   character(len=512) :: filename
@@ -2576,9 +2576,9 @@ subroutine ecriture_sed(ised)
   ! Ca donne lambda Flambda sur le detecteur
   if (l_sym_centrale) then
      !E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
-     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
   else
-     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)) / (distance*pc_to_AU)**2
+     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
   endif
 
   if (ised == 1) then
@@ -2772,15 +2772,16 @@ subroutine ecriture_spectre(imol)
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
-  integer :: group,fpixel,nelements, iv, xcenter,i, iTrans
+  integer :: group,fpixel,nelements, iv, xcenter,i
   logical :: simple, extend
 
   real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
   real, dimension(mol(imol)%nTrans_rayTracing) :: freq
   integer, dimension(mol(imol)%nTrans_rayTracing) :: indice_Trans
 
+  real, dimension(:,:,:), allocatable :: spectre_casa
 
-  real :: pixel_scale_x, pixel_scale_y
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
 
@@ -2801,22 +2802,29 @@ subroutine ecriture_spectre(imol)
   ! Line map
   !------------------------------------------------------------------------------
   bitpix=-32
-  naxis=6
-  if (RT_line_method==1) then
-     naxes(1)=1
-     naxes(2)=1
-  else
+
+  if (lcasa) then
+     naxis=3
      naxes(1)=igridx
      naxes(2)=igridy
+     naxes(3)= 2*mol(imol)%n_speed_rt+1 ! velocity
+     nelements=naxes(1)*naxes(2)*naxes(3)
+     allocate(spectre_casa(naxes(1),naxes(2),naxes(3)))
+  else
+     naxis=6
+     if (RT_line_method==1) then
+        naxes(1)=1
+        naxes(2)=1
+     else
+        naxes(1)=igridx
+        naxes(2)=igridy
+     endif
+     naxes(3)=2*mol(imol)%n_speed_rt+1
+     naxes(4)=mol(imol)%nTrans_rayTracing
+     naxes(5)=RT_n_incl
+     naxes(6)=RT_n_az
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
   endif
-  naxes(3)=2*mol(imol)%n_speed_rt+1
-  naxes(4)=mol(imol)%nTrans_rayTracing
-  naxes(5)=RT_n_incl
-  naxes(6)=RT_n_az
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
-
-  ! create new hdu
-  !call ftcrhd(unit, status)
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2839,9 +2847,14 @@ subroutine ecriture_spectre(imol)
   call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
   call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
 
-  call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
-
-!  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
+  if (lcasa) then
+     call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
+     call ftpkyd(unit,'RESTFREQ',Transfreq(mol(imol)%indice_Trans_rayTracing(1)),-7,'',status)
+     call ftpkys(unit,'BTYPE',"Intensity",' ',status)
+  else
+     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+  endif
+  !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
   if (l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave
      if (RT_line_method==1) then
@@ -2872,111 +2885,121 @@ subroutine ecriture_spectre(imol)
      endif ! lkeplerian
   endif ! l_sym_image
 
-  !  Write the array to the FITS file.
-  call ftppre(unit,group,fpixel,nelements,spectre,status)
+  if (lcasa) then
+     W2m2_to_Jy = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
 
-  !------------------------------------------------------------------------------
-  ! HDU 2 : Continuum map
-  !------------------------------------------------------------------------------
-  bitpix=-32
-  naxis=5
-  if (RT_line_method==1) then
-     naxes(1)=1
-     naxes(2)=1
+     spectre_casa(:,:,:) = spectre(:,:,:,1,1,1) * W2m2_to_Jy
+
+     !  Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,spectre_casa,status)
+     deallocate(spectre_casa)
   else
-     naxes(1)=igridx
-     naxes(2)=igridy
+     !  Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,spectre,status)
   endif
-  naxes(3)=mol(imol)%nTrans_rayTracing
-  naxes(4)=RT_n_incl
-  naxes(5)=RT_n_az
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
-  ! create new hdu
-  call ftcrhd(unit, status)
+  if (.not.lcasa) then
+     !------------------------------------------------------------------------------
+     ! HDU 2 : Continuum map
+     !------------------------------------------------------------------------------
+     bitpix=-32
+     naxis=5
+     if (RT_line_method==1) then
+        naxes(1)=1
+        naxes(2)=1
+     else
+        naxes(1)=igridx
+        naxes(2)=igridy
+     endif
+     naxes(3)=mol(imol)%nTrans_rayTracing
+     naxes(4)=RT_n_incl
+     naxes(5)=RT_n_az
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
 
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+     ! create new hdu
+     call ftcrhd(unit, status)
 
-  if (l_sym_ima.and.(RT_line_method==2)) then
-     xcenter = igridx/2 + modulo(igridx,2)
-     do i=xcenter+1,igridx
-        continu(i,:,:,:,:) = continu(igridx-i+1,:,:,:,:)
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     if (l_sym_ima.and.(RT_line_method==2)) then
+        xcenter = igridx/2 + modulo(igridx,2)
+        do i=xcenter+1,igridx
+           continu(i,:,:,:,:) = continu(igridx-i+1,:,:,:,:)
+        enddo
+     endif ! l_sym_image
+
+     !  Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,continu,status)
+
+     !------------------------------------------------------------------------------
+     ! HDU 3 : Transition numbers
+     !------------------------------------------------------------------------------
+     bitpix=32
+     naxis = 1
+     naxes(1) = mol(imol)%nTrans_rayTracing
+     nelements = naxes(1)
+
+     ! create new hdu
+     call ftcrhd(unit, status)
+
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+     do i=1, mol(imol)%nTrans_rayTracing
+        indice_Trans(i) = mol(imol)%indice_Trans_rayTracing(i)
      enddo
-  endif ! l_sym_image
 
-  !  Write the array to the FITS file.
-  call ftppre(unit,group,fpixel,nelements,continu,status)
+     !  Write the array to the FITS file.
+     call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
 
-  !------------------------------------------------------------------------------
-  ! HDU 3 : Transition numbers
-  !------------------------------------------------------------------------------
-  bitpix=32
-  naxis = 1
-  naxes(1) = mol(imol)%nTrans_rayTracing
-  nelements = naxes(1)
+     !------------------------------------------------------------------------------
+     ! HDU 4 : Transition frequencies
+     !------------------------------------------------------------------------------
+     bitpix=-32
+     naxis = 1
+     naxes(1) = mol(imol)%nTrans_rayTracing
+     nelements = naxes(1)
 
-  ! create new hdu
-  call ftcrhd(unit, status)
+     ! create new hdu
+     call ftcrhd(unit, status)
 
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  do i=1, mol(imol)%nTrans_rayTracing
-     indice_Trans(i) = mol(imol)%indice_Trans_rayTracing(i)
-  enddo
+     do i=1,mol(imol)%nTrans_rayTracing
+        freq(i) = Transfreq(mol(imol)%indice_Trans_rayTracing(i))
+     enddo
 
-  !  Write the array to the FITS file.
-  call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
+     !  Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,freq,status)
 
-  !------------------------------------------------------------------------------
-  ! HDU 4 : Transition frequencies
-  !------------------------------------------------------------------------------
-  bitpix=-32
-  naxis = 1
-  naxes(1) = mol(imol)%nTrans_rayTracing
-  nelements = naxes(1)
+     !------------------------------------------------------------------------------
+     ! HDU 5 : Velocities
+     !------------------------------------------------------------------------------
+     bitpix=-32
+     naxis = 1
+     naxes(1) = 2*mol(imol)%n_speed_rt+1
+     nelements = naxes(1)
 
-  ! create new hdu
-  call ftcrhd(unit, status)
+     ! create new hdu
+     call ftcrhd(unit, status)
 
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+     !  Write the required header keywords.
+     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  do i=1,mol(imol)%nTrans_rayTracing
-     freq(i) = Transfreq(mol(imol)%indice_Trans_rayTracing(i))
-  enddo
-
-  !  Write the array to the FITS file.
-  call ftppre(unit,group,fpixel,nelements,freq,status)
-
-  !------------------------------------------------------------------------------
-  ! HDU 5 : Velocities
-  !------------------------------------------------------------------------------
-  bitpix=-32
-  naxis = 1
-  naxes(1) = 2*mol(imol)%n_speed_rt+1
-  nelements = naxes(1)
-
-  ! create new hdu
-  call ftcrhd(unit, status)
-
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-  !  Write the array to the FITS file.
-  call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
+     !  Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
+  endif ! lcasa
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
-
   !  Check for any error, and if so print out error messages
   if (status > 0) then
      call print_error(status)
   endif
-
 
   !------------------------------------------------------------------------------
   ! Origine

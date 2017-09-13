@@ -83,7 +83,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
  allocate(dudt(np))
 
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
- itype = 1
+ ! itype = 1
 
  ! extract info from real header
  call extract('massoftype',massoftype(1:ntypes),hdr,ierr)
@@ -172,7 +172,7 @@ subroutine read_phantom_file(iunit,filename,x,y,z,particle_id,massgas,massdust,&
                    end select
                 elseif (i==i_int1) then
                    select case(trim(tag))
-                   case('iphase')
+                   case('itype')
                       matched = .true.
                       read(iunit,iostat=ierr) itype(1:np)
                    case default
@@ -265,7 +265,7 @@ end subroutine read_phantom_file
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass,utime,&
      udist,graindens,ndudt,dudt,n_SPH,x,y,z,particle_id,massgas,massdust,&
-     rhogas,rhodust,extra_heating)
+     rhogas,rhodust,extra_heating,T_to_u)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -274,6 +274,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J
   use prop_star
+  use parametres, only : ldudt_implicit,ufac_implicit
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
@@ -292,7 +293,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real, dimension(:), allocatable, intent(out) :: extra_heating
   integer, intent(out) :: n_SPH
-
+  real(dp), intent(in), optional :: T_to_u
   integer  :: i,j,k,itypei,alloc_status,i_etoiles
   real(dp) :: xi,yi,zi,hi,rhoi,udens,uerg_per_s,uWatt,ulength_au,usolarmass
   real(dp) :: dustfraci,Mtot,totlum,qtermi
@@ -367,7 +368,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
        totlum = 0.
        do i=1,n_SPH
-          qtermi = dudt(particle_id(i)) * massoftype(1) * uWatt
+          qtermi = dudt(particle_id(i)) * uWatt
           totlum = totlum + qtermi
           extra_heating(i) = qtermi
        enddo
@@ -376,14 +377,22 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
        write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
     endif
  endif
+ if (present( T_to_u )) then
+   ufac_implicit = T_to_u * uWatt
+   ldudt_implicit = .true.
+ else
+   ufac_implicit = 0.
+   ldudt_implicit = .false.
+ endif
 
- write(*,*) "Updating the stellar properties"
+ write(*,*) "Updating the stellar properties:"
  n_etoiles = 0
  do i=1,nptmass
     if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
        n_etoiles = n_etoiles + 1
     endif
  enddo
+ write(*,*) "There are", n_etoiles, "stars in the model"
 
  if (allocated(etoile)) deallocate(etoile)
  allocate(etoile(n_etoiles))
