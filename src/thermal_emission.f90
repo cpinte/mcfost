@@ -21,7 +21,7 @@ module thermal_emission
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
        allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
        define_proba_weight_emission, emission_nre, im_reemission_lte, im_reemission_nlte, &
-       im_reemission_qre, init_emissivite_nre, init_reemission, internal_heating, select_wl_em, &
+       im_reemission_qre, init_emissivite_nre, init_reemission, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
        repartition_wl_em, repartition_energie, allocate_thermal_energy
 
@@ -33,7 +33,7 @@ module thermal_emission
 
   ! fraction d'energie reemise sur energie etoile
   ! (Opacite moyenne de Planck * coeff)
-  real, dimension(:,:), allocatable :: log_E_em ! 0:n_T, n_cells
+  real, dimension(:,:), allocatable :: log_Qcool_minus_extra_heating ! 0:n_T, n_cells
   real, dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
   real, dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
 
@@ -104,12 +104,13 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   endif
   tab_Temp = 0.0
 
-  allocate(log_E_em(n_T,Nc), stat=alloc_status)
+
+  allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error log_E_em'
      stop
   endif
-  log_E_em = 0.0
+  log_Qcool_minus_extra_heating = 0.0
 
   allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
   if (alloc_status > 0) then
@@ -269,7 +270,7 @@ subroutine deallocate_thermal_emission()
 
   deallocate(tab_Temp)
   if (lsed_complete) then
-     deallocate(log_E_em)
+     deallocate(log_Qcool_minus_extra_heating)
      deallocate(DensE, DensE_m1, Dcoeff)
      call deallocate_radiation_field()
      if (allocated(nbre_reemission)) deallocate(nbre_reemission)
@@ -278,10 +279,6 @@ subroutine deallocate_thermal_emission()
 
   deallocate(prob_E_cell)
 
-  if (lRE_nLTE) then
-     deallocate(kabs_nLTE_CDF,kdB_dT_1grain_nLTE_CDF,log_E_em_1grain)
-     deallocate(xT_ech_1grain)
-  endif
 
   if (lnRE) then
      deallocate(E_em_1grain_nRE,log_E_em_1grain_nRE)
@@ -301,7 +298,7 @@ subroutine deallocate_temperature_calculation()
 
   use radiation_field, only : deallocate_radiation_field
 
-  if (lRE_LTE)  deallocate(kdB_dT_CDF, log_E_em, xT_ech)
+  if (lRE_LTE)  deallocate(kdB_dT_CDF, log_Qcool_minus_extra_heating, xT_ech)
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
   if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
@@ -482,7 +479,7 @@ end subroutine select_wl_em
 
 !***************************************************
 
-subroutine init_reemission()
+subroutine init_reemission(lheating,dudt)
 ! Pretabule les opacites de Planck en fonction de T et de la position
 ! + les termes k dB/dT pour tirage de la longueur d'onde du photon emis
 ! avec correction de temperature
@@ -492,11 +489,18 @@ subroutine init_reemission()
 
   implicit none
 
-  integer :: k,lambda,t, pop, icell, p_icell
+  logical, intent(in) :: lheating
+  real, dimension(:), intent(in), optional :: dudt
+
+  integer :: k,lambda,t, pop, icell, p_icell, id
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
   real(kind=dp), dimension(n_lambda) :: B, dB_dT
+
+  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating
+  real(kind=dp), dimension(n_cells) :: Qcool0
+
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
@@ -538,13 +542,37 @@ subroutine init_reemission()
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
            integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
-        ! Le coeff qui va bien
-        integ = integ * cst_E
 
-        if (integ > tiny_dp) then
-           log_E_em(T,icell)=log(integ)
+        ! Proper normalization
+        ! At this stage, this is Q- in W / (AU/m)^2
+        Qcool = integ * cst_E
+        if (T==1) Qcool0(icell) = Qcool
+
+        ! Non radiative heating :
+        ! We solve Q+ = int kappa.Jnu.dnu = Q- - extra_heating = int kappa.Bnu.dnu - extra_heating
+        ! Here we conpute the extra_heating term
+        if (.not.lextra_heating) then
+           ! Energie venant de l'equilibre avec nuage à T_min
+           extra_heating = Qcool0(icell)
         else
-           log_E_em(T,icell)=-1000.
+           if (ldudt_implicit) then
+              u_o_dt = ufac_implicit * Temp ! u(T)/dt
+              ! dudt is meant to be u^n/dt here
+              extra_heating = max(Qcool0(icell), (u_o_dt - dudt(icell)) / AU_to_m**2 )
+           else
+              extra_heating = max(Qcool0(icell), dudt(icell) / AU_to_m**2 )
+           endif
+        endif
+
+        Qcool_minus_extra_heating = Qcool - extra_heating
+        if (Qcool_minus_extra_heating > tiny_dp) then
+           ! ToDO : I will need to correct the log interpolation as it should now broken to to the shift in energy
+           log_Qcool_minus_extra_heating(T,icell)=log(Qcool_minus_extra_heating)
+        else
+           ! This sets the initial disk temperature
+           id = 1 ! not openmp yet
+           xT_ech(icell,id)=T+1
+           log_Qcool_minus_extra_heating(T,icell)=-1000.
         endif
 
         if (lRE_nLTE.and.(T==1)) then
@@ -672,7 +700,22 @@ subroutine init_reemission()
         enddo !k
      endif !lnRE
 
-  enddo !t
+  enddo !T
+
+  if (lextra_heating .and. ldudt_implicit) then
+     ! as u(T) depends on T, we need to check that int kappa_nu.Bnu(T).dnu - (u(T) - u_n)/dt
+     ! is still an increasing function of T
+     do icell=1, n_cells
+        do T=1,n_T-1
+           if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T,icell)) then
+              write(*,*) "ERROR : Qrad_minus_dudt is an increasing function of T"
+              write(*,*) "Exiting"
+              stop
+           endif
+        enddo
+     enddo
+  endif
+
 
   do pop=1, n_pop
      if (dust_pop(pop)%methode_chauffage == 3) then
@@ -685,6 +728,48 @@ subroutine init_reemission()
   return
 
 end subroutine init_reemission
+
+
+!********************************************************************
+
+subroutine Temp_LTE(icell, Ti, Temp)
+
+  use radiation_field, only : xKJ_abs
+
+  integer, intent(in) :: icell
+  integer, intent(out) :: Ti
+  real, intent(out) :: Temp
+
+  real :: Qheat, log_Qheat, frac
+
+  Qheat=sum(xKJ_abs(icell,:))
+  if (Qheat < 0.) then
+     Temp = T_min ; Ti = 2
+  else
+     log_Qheat = log(Qheat*L_packet_th)
+
+     if (log_Qheat <  log_Qcool_minus_extra_heating(1,icell)) then
+        Temp = T_min ; Ti = 2
+     else
+        ! Temperature echantillonee juste sup. a la temperature de la cellule
+        Ti = maxval(xT_ech(icell,:))
+
+        ! On incremente eventuellement la zone de temperature
+        do while((log_Qcool_minus_extra_heating(Ti,icell) < log_Qheat).and.(Ti < n_T))
+           Ti=Ti+1
+        enddo  ! LIMITE MAX
+
+        ! Interpolation lineaire entre energies emises pour des
+        ! temperatures echantillonees voisines
+        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,icell)) / &
+             (log_Qcool_minus_extra_heating(Ti,icell)-log_Qcool_minus_extra_heating(Ti-1,icell))
+        Temp=exp(log(tab_Temp(Ti))*frac+log(tab_Temp(Ti-1))*(1.0-frac))
+     endif
+  endif
+
+  return
+
+end subroutine Temp_LTE
 
 !********************************************************************
 
@@ -700,48 +785,21 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   real, intent(in) ::  aleat1, aleat2
   integer, intent(inout) :: lambda
 
-  integer :: l, l1, l2, T_int, T1, T2, k, heating_method
-  real :: Temp, Temp1, Temp2, frac_T1, frac_T2, proba, frac, log_E_abs, J_abs
-
-  ! Absorption d'un photon : on ajoute son energie dans la cellule
-  !xE_abs(ri,zj,phik,id) = xE_abs(ri,zj,phik,id) + E
-  !E_abs=sum(xE_abs(ri,zj,phik,:))
-  !log_E_abs=log(E_abs*L_packet_th + E0(ri,zj,phik)) ! le E0 comprend le L_tot car il est calcule a partir de E_em
+  integer :: l, l1, l2, Ti, T1, T2, k, heating_method
+  real :: Temp, frac_T1, frac_T2, proba
 
   if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_dp
 
-  J_abs=sum(xKJ_abs(icell,:)) ! plante avec sunf95 sur donald + ifort sur icluster2 car negatif (-> augmentation taille minimale des cellules dans define_grid3)
-  if (J_abs > 0.) then
-     log_E_abs=log(J_abs*L_packet_th + E0(icell)) ! le E0 comprend le L_tot car il est calcule a partir de E_em
-  else
-     log_E_abs = -300
-  endif
-
-  ! Temperature echantillonee juste sup. a la temperature de la cellule
-  T_int=maxval(xT_ech(icell,:))
-
-  ! On incremente eventuellement la zone de temperature
-  do while((log_E_em(T_int,icell) < log_E_abs).and.(T_int < n_T))
-     T_int=T_int+1
-  enddo  ! limite max
+  call Temp_LTE(icell, Ti, Temp)
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech(icell,id)=T_int
-
-  ! Interpolation lineaire entre energies emises pour des
-  ! temperatures echantillonees voisines
-  T2=T_int
-  Temp2=tab_Temp(T2)
-  T1=T_int-1
-  Temp1=tab_Temp(T1)
-
-  frac=(log_E_abs-log_E_em(T1,icell))/(log_E_em(T2,icell)-log_E_em(T1,icell))
-  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
+  xT_ech(icell,id) = Ti
 
   !**********************************************************************
   ! Choix de la longeur d'onde de reemission
   ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
-  frac_T2=(Temp-Temp1)/(Temp2-Temp1)
+  T2 = Ti ; T1 = Ti-1
+  Frac_T2=(Temp-tab_Temp(T1))/(tab_temp(T2)-tab_Temp(T1))
   frac_T1=1.0-frac_T2
 
   l1=0
@@ -889,59 +947,17 @@ subroutine Temp_finale()
 
   implicit none
 
-  real, dimension(n_cells) :: KJ_abs
-  real :: Temp, Temp1, Temp2, frac, log_E_abs
-  integer :: T_int, T1, T2, icell, i
-
-  ! Calcul de la temperature de la cellule et stokage energie recue + T
-  ! Utilisation temperature precedente
-
-  ! Somme sur differents processeurs
-  ! boucle pour eviter des problemes d'allocation memoire en 3D
-  !KJ_abs(:) = sum(xKJ_abs(:,:),dim=2)
-  KJ_abs(:) = 0.0
-  do i=1,nb_proc
-     KJ_abs(:) = KJ_abs(:) + xKJ_abs(1:n_cells,i)
-  enddo
-
-  KJ_abs(:)= KJ_abs(:)*L_packet_th + E0(1:n_cells) ! le E0 comprend le L_tot car il est calcule a partir de E_em
+  real :: Temp
+  integer :: Ti, icell
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(KJ_abs,xT_ech,log_E_em,Temperature,tab_Temp,n_cells,T_min,n_T)
+  !$omp private(icell,Temp,Ti) &
+  !$omp shared(Temperature,n_cells)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
-     if (KJ_abs(icell) < tiny_real) then
-        Temperature(icell) = T_min
-     else
-        log_E_abs=log(KJ_abs(icell))
-        if (log_E_abs <  log_E_em(1,icell)) then
-           Temperature(icell) = T_min
-        else
-           ! Temperature echantillonee juste sup. a la temperature de la cellule
-           !          xT_int(:)=xT_ech(:,i,j)
-           !          T_int=maxval(xT_int)
-           T_int=maxval(xT_ech(icell,:))
-
-           ! On incremente eventuellement la zone de temperature
-           do while((log_E_em(T_int,icell) < log_E_abs).and.(T_int < n_T))
-              T_int=T_int+1
-           enddo  ! LIMITE MAX
-
-           ! Interpolation lineaire entre energies emises pour des
-           ! temperatures echantillonees voisines
-           T2=T_int
-           Temp2=tab_Temp(T2)
-           T1=T_int-1
-           Temp1=tab_Temp(T1)
-           frac=(log_E_abs-log_E_em(T1,icell))/(log_E_em(T2,icell)-log_E_em(T1,icell))
-           Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
-
-           ! Save
-           Temperature(icell)=Temp
-        endif
-     endif
+     call Temp_LTE(icell, Ti, Temp)
+     Temperature(icell) = Temp
   enddo !icell
   !$omp enddo
   !$omp end parallel
@@ -1005,7 +1021,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,L_packet_th,xT_ech,log_E_em,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
+  !$omp shared(J_absorbe,L_packet_th,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
@@ -1996,56 +2012,6 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-subroutine internal_heating(lheating,dudt)
-  ! Calcule le temperature initiale du disque avant le step 1
-  ! C. Pinte
-  ! 27/02/06
-
-  use radiation_field, only : E0
-
-  implicit none
-
-  logical, intent(in) :: lheating
-  real, dimension(:), intent(in), optional :: dudt
-
-  integer :: icell
-
-  ! E0 = Q+ en W (AU/m)^2
-
-  if (lRE_LTE) then
-     ! Energie venant de l'equilibre avec nuage à T_min
-     E0(1:n_cells) = exp(log_E_em(1,1:n_cells))
-
-     if (lheating) then
-        write(*,*) "Computing heating from internal energy"
-        if (.not.present(dudt)) then
-           write(*,*) "ERROR: internal energy must be provided"
-           write(*,*) "Exiting"
-           stop
-        endif
-
-        do icell=1, n_cells
-           E0(icell) = max(E0(icell), dudt(icell) / AU_to_m**2 )
-        enddo
-     endif
-
-!!$  ! Energie venant du chauffage visqueux
-!!$  do i=1,n_rad
-!!$     do j=1,nz
-!!$        E0(i,j) = E0(i,j) !+ masse(i) * alpha *
-!!$     enddo
-!!$  enddo
-
-     ! Energie emise aux differente longueurs d'onde : repartition_energie
-     call Temp_finale()
-  endif
-
-  return
-
-end subroutine internal_heating
-
-!**********************************************************************
-
 integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(k)
   ! This routine will select randomly the scattering grain
   ! from the CDF of kabs
@@ -2239,6 +2205,12 @@ end subroutine allocate_weight_proba_emission
 
 subroutine reset_temperature()
 
+  use radiation_field, only : xKJ_abs, xJ_abs
+
+  if (lRE_LTE) then
+     xKJ_abs(:,:) = 0.0_dp
+  endif
+  if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
   xT_ech = 2
   Temperature = 1.0
 

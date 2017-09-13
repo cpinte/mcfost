@@ -340,9 +340,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs au *calcul* de la temperature
   ! **************************************************
-  if (lTemp) then
-     call allocate_thermal_emission(Nc, p_Nc)
-  endif ! lTemp
+  if (lTemp) call allocate_thermal_emission(Nc, p_Nc)
 
   ! **************************************************
   ! Tableaux relatifs aux SEDs
@@ -581,9 +579,7 @@ subroutine dealloc_em_th()
   deallocate(l_emission_pah) ! OUTDATED
   if (lorigine) deallocate(disk_origin,star_origin)
 
-  if (lTemp) then
-     call deallocate_thermal_emission()
-  endif ! lTemp
+  if (lTemp) call deallocate_thermal_emission()
 
   if (lTemp.or.lsed) then
      deallocate(sed,sed_q,sed_u,sed_v)

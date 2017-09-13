@@ -6,6 +6,7 @@ module cylindrical_grid
   use opacity, only :  cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
        delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
+  use prop_star, only : R_ISM, centre_ISM
 
   implicit none
 
