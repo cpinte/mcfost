@@ -40,6 +40,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
   real(kind=dp) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
+
   if (letape_th) then
      if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
      if (lxJ_abs_step1) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
@@ -59,7 +60,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            phi_k = 1
            psup = 1
         else
-           phi_pos = atan2(ym,xm)
+           phi_pos = atan2(xm,ym)
            phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
            if (phi_k > n_az_rt) phi_k=n_az_rt
 
@@ -85,10 +86,9 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            xm = 0.5_dp * (x0 + x1)
            ym = 0.5_dp * (y0 + y1)
            zm = 0.5_dp * (z0 + z1)
-           phi_pos = atan2(ym,xm)
+           phi_pos = atan2(xm,ym)
 
-           phi_vol = atan2(v,u) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
-
+           phi_vol = atan2(-u,-v) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
 
            !  if (l_sym_ima) then
            !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
@@ -96,7 +96,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
            !     if (phi_I > n_phi_I) phi_I = n_phi_I
            !  else
-           phi_I =  floor(  modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
+           phi_I =  floor( modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
            if (phi_I > n_phi_I) phi_I = 1
            !  endif
 

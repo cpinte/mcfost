@@ -407,11 +407,16 @@ subroutine init_molecular_disk(imol)
 
   ! En m.s-1
   ! Warning : assume all stars are at the center of the disk
-  do icell=1, n_cells
-     !vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) ) ! Midplane Keplerian velocity
-     vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-          ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-  enddo
+  if (lcylindrical_rotation) then
+     do icell=1, n_cells
+        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) ) ! Midplane Keplerian velocity
+     enddo
+  else ! dependence en z
+     do icell=1, n_cells
+        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+             ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
+     enddo
+  endif
 
   v_turb = vitesse_turb
 
@@ -624,7 +629,6 @@ subroutine opacite_mol_loc(icell,imol)
   do iTrans=1,nTrans_tot
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
-
 
      ! Opacite et emissivite raie
      kap = (nl*fBlu(iTrans) - nu*fBul(iTrans))

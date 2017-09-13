@@ -1,5 +1,6 @@
 #!/bin/sh
 
+SYSTEM=$1
 if [ "$SYSTEM" = "ifort" ] ; then
     echo "Building MCFOST's libraries with ifort"
     export CC=icc
@@ -13,10 +14,11 @@ elif [ "$SYSTEM" = "xeon-phi" ] ; then
     export CC=icc
 
 else
-    echo "Unknown system to build mcfost:"
+    echo "Unknown system to build mcfost."
     echo $SYSTEM
     echo ""
     echo "Please choose ifort or gfortran"
+    echo "install.sh <system>"
     echo "Exiting"
     exit
 fi
@@ -45,7 +47,7 @@ rm -rf sprng2.0
 # wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
 tar xzvf cfitsio3030.tar.gz
 cd cfitsio
-if [ "$SYSTEM" = "gfortran" ] ; then
+if [ "$SYSTEM" = "ifort" ] ; then
     export CC="icc"
     export FC="ifort"
 elif [ "$SYSTEM" = "gfortran" ] ; then
@@ -54,7 +56,7 @@ elif [ "$SYSTEM" = "gfortran" ] ; then
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
     export CFLAGS=-mmic
 fi
-./configure
+./configure --enable-ssse3
 if [ "$SYSTEM" = "xeon-phi" ] ; then
     \cp -f ../Makefile_cfitsio.xeon_phi Makefile
 fi
@@ -102,4 +104,4 @@ cd ..
 mkdir -p $MCFOST_INSTALL/include
 \cp -r include/* $MCFOST_INSTALL/include
 mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
-\cp -r lib/* $MCFOST_INSTALL/lib/$SYSTEM
+\cp -r lib/* $MCFOST_INSTALL/lib/$SYSTEM/

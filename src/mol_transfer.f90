@@ -105,10 +105,11 @@ subroutine mol_line_transfer()
      call integ_tau_mol(imol)
 
      ! Resolution population des niveaux nLTE
-     if (.not.lmol_LTE) call NLTE_mol_line_transfer(imol)
-
-     call ecriture_pops(imol)
-     call ecriture_Tex(imol)
+     if (.not.lmol_LTE) then
+        call NLTE_mol_line_transfer(imol)
+        call ecriture_pops(imol)
+        call ecriture_Tex(imol)
+     endif
 
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
@@ -513,7 +514,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcorner
   real(kind=dp) :: taille_pix
-  integer :: i,j, id, igridx_max, n_iter_min, n_iter_max
+  integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36  ! OK, ca marche avec n_rad_RT = 1000
   integer, parameter :: n_ray_star = 1000
@@ -563,10 +564,8 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   ! Definition des vecteurs de base du plan image dans le repere universel
 
-  ! Definition des vecteurs de base du plan image dans le repere universel
-
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
-  x = (/sin(tab_RT_az(iaz) * deg_to_rad),-cos(tab_RT_az(iaz) * deg_to_rad),0._dp/)
+  x = (/cos(tab_RT_az(iaz) * deg_to_rad),sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
 
   ! Vecteur x image avec PA
   if (abs(ang_disque) > tiny_real) then
@@ -577,7 +576,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   endif
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
-  y_plan_image = cross_product(x_plan_image, uvw)
+  y_plan_image = -cross_product(x_plan_image, uvw)
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
@@ -589,7 +588,6 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
-
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
      ! Pas de sous-pixel car les pixels ne sont pas carres
      n_iter_min = 1
@@ -600,7 +598,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      i = 1
      j = 1
 
-     rmin_RT = max(w*0.9_dp,0.05_dp) * rmin
+     rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
      rmax_RT = 2.0_dp * Rmax
 
      tab_r(1) = rmin_RT
@@ -648,21 +646,21 @@ subroutine emission_line_map(imol,ibin,iaz)
   else ! method 2 : echantillonnage lineaire avec sous-pixels
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = map_size / real(max(igridx,igridy),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
      if (l_sym_ima) then
-        igridx_max = igridx/2 + modulo(igridx,2)
+        npix_x_max = npix_x/2 + modulo(npix_x,2)
      else
-        igridx_max = igridx
+        npix_x_max = npix_x
      endif
 
      ! Boucle sur les pixels de l'image
      !$omp parallel &
      !$omp default(none) &
      !$omp private(i,j,id) &
-     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,igridx_max,igridy) &
+     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
      !$omp shared(n_iter_min,n_iter_max,imol,ibin,iaz)
 
      id =1 ! pour code sequentiel
@@ -670,9 +668,9 @@ subroutine emission_line_map(imol,ibin,iaz)
      n_iter_max = 1 ! 6
 
      !$omp do schedule(dynamic,1)
-     do i = 1,igridx_max
+     do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
-        do j = 1,igridy
+        do j = 1,npix_y
            !write(*,*) i,j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
@@ -689,7 +687,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
-     call compute_stars_map(lambda, iaz, u, v, w)
+     call compute_stars_map(lambda, u, v, w, taille_pix, dx, dy)
 
      do iv =  -n_speed_rt, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)

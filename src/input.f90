@@ -851,20 +851,60 @@ subroutine read_abundance(imol)
 
   !  determine the size of temperature file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 2) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
-     stop
-  endif
 
-  if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-     write(*,*) "Error : "//trim(abundance_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
-     stop
+  if (lVoronoi) then
+     if (nfound /= 1) then
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
+        write(*,*) "# fits file,   required"
+        write(*,*) nfound, 1
+        stop
+     endif
+     if ((naxes(1) /= n_cells)) then
+        write(*,*) "Error : "//trim(abundance_file)//" does not have the"
+        write(*,*) "right dimensions. Exiting."
+        write(*,*) "# fits file,   required"
+        write(*,*) naxes(1), n_cells
+        stop
+     endif
+     npixels=naxes(1)
+  else
+     if (l3D) then
+        if (nfound /= 3) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
+           write(*,*) "# fits file,   required"
+           write(*,*) nfound, 3
+           stop
+        endif
+        if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
+           write(*,*) "Error : "//trim(abundance_file)//" does not have the"
+           write(*,*) "right dimensions. Exiting."
+           write(*,*) "# fits file,   required"
+           write(*,*) naxes(1), n_rad
+           write(*,*) naxes(2), 2*nz
+           write(*,*) naxes(3), n_az
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)*naxes(3)
+     else
+        if (nfound /= 2) then
+           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+           write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
+           write(*,*) "# fits file,   required"
+           write(*,*) nfound, 2
+           stop
+        endif
+        if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
+           write(*,*) "Error : "//trim(abundance_file)//" does not have the"
+           write(*,*) "right dimensions. Exiting."
+           stop
+        endif
+        npixels=naxes(1)*naxes(2)
+     endif
   endif
-
-  npixels=naxes(1)*naxes(2)
   nbuffer=npixels
+
   ! read_image
   call ftgpve(unit,group,firstpix,nbuffer,nullval,tab_abundance,anynull,status)
 
