@@ -507,8 +507,6 @@ module em_th
   ! et temperature echantillonee
   integer  :: n_T
   real, dimension(:), allocatable :: tab_Temp
-  ! real, dimension(n_rad,nz,n_T) :: spline_Temp
-
   real(kind=dp) :: E_abs_nRE
 
   real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
