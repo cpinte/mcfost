@@ -409,8 +409,6 @@ subroutine repartition_wl_em()
   integer :: lambda
   real :: E_star_tot, E_disk_tot, E_ISM_tot, delta_wl, L_tot
 
-  real :: surface, C
-
   spectre_emission_cumul(0) = 0.0
   ! Fonction de répartition émssion
   do lambda=1,n_lambda
@@ -435,8 +433,7 @@ subroutine repartition_wl_em()
      E_ISM_tot  = E_ISM_tot  + E_ISM(lambda)   * delta_wl
   enddo
 
-  C = 2.0*pi*hp*c_light**2 / quatre_pi
-  L_tot = C * (E_star_tot + E_disk_tot + E_ISM_tot)
+  L_tot = 2.0*pi*hp*c_light**2 * (E_star_tot + E_disk_tot + E_ISM_tot)
   L_packet_th = L_tot/nbre_photons_tot
 
   return
@@ -503,11 +500,7 @@ subroutine init_reemission()
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
-  ! cst_E=2.0*hp*c_light**2/L_etoile
-  ! Depuis chauffage interne, L_etoile est sorti car il aurait du etre remplace par L_tot
-  ! qui depend des temp et donc de log_E_em
-  ! La rourine reste indépendante des autres !
-  cst_E=2.0*hp*c_light**2
+  cst_E = 2.0*hp*c_light**2 * quatre_pi
 
   call init_tab_temp()
 
@@ -546,7 +539,7 @@ subroutine init_reemission()
            integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
         enddo !lambda
         ! Le coeff qui va bien
-        integ = integ*cst_E  ! Manque facteur 4pi  dans terme Q-
+        integ = integ * cst_E
 
         if (integ > tiny_dp) then
            log_E_em(T,icell)=log(integ)
@@ -2017,7 +2010,7 @@ subroutine internal_heating(lheating,dudt)
 
   integer :: icell
 
-  ! E0 = Q+/4pi en W (AU/m)^2
+  ! E0 = Q+ en W (AU/m)^2
 
   if (lRE_LTE) then
      ! Energie venant de l'equilibre avec nuage à T_min
@@ -2032,7 +2025,7 @@ subroutine internal_heating(lheating,dudt)
         endif
 
         do icell=1, n_cells
-           E0(icell) = max(E0(icell), dudt(icell)/quatre_pi / AU_to_m**2 )
+           E0(icell) = max(E0(icell), dudt(icell) / AU_to_m**2 )
         enddo
      endif
 

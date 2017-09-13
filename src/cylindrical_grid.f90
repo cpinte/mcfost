@@ -264,6 +264,13 @@ subroutine define_cylindrical_grid()
   zmax = 0.0 ; volume=0.0
   ! end allocation
 
+  ! Defining the ISM sphere
+  if (lcylindrical) then
+     R_ISM = 1.000001_dp * (sqrt(Rmax**2 + zmax(n_rad)**2))
+  else ! lspherical
+     R_ISM = 1.000001_dp * Rmax
+  endif
+  centre_ISM(:) = 0._dp ;
 
   Rmax2 = Rmax*Rmax
 

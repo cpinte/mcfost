@@ -34,7 +34,7 @@ subroutine mol_line_transfer()
   implicit none
 
   real(kind=dp) :: u0, v0, w0
-  integer :: iTrans, imol, ibin, iaz
+  integer :: imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
 

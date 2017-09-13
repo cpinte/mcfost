@@ -396,7 +396,6 @@ subroutine init_molecular_disk(imol)
 
   ldust_mol  = .true.
   lkeplerian = .true.
-  linfall = .false.
 
   ! Temperature gaz = poussiere
   if (lcorrect_Tgas) then
@@ -1110,7 +1109,25 @@ function v_proj(icell,x,y,z,u,v,w) !
 
   vitesse = vfield(icell)
 
-  if (linfall) then
+
+  if (lkeplerian) then
+     r = sqrt(x*x+y*y)
+     if (r > tiny_dp) then
+        norme = 1.0_dp/r
+        vx = -y * norme * vitesse
+        vy = x * norme * vitesse
+        vz = 0.
+        if (linfall) then
+           r = sqrt(x*x+y*y+z*z) ; norme = 1.0_dp/r
+           vx = vx - chi_infall * x * norme * vitesse
+           vy = vy - chi_infall * y * norme * vitesse
+           vz = vz - chi_infall * z * norme * vitesse
+        endif
+        v_proj = vx * u + vy * v
+     else
+        v_proj = 0.0_dp
+     endif
+  else if (linfall) then
      r = sqrt(x*x+y*y+z*z)
      !  if (lbenchmark_water2)  vitesse = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
      if (r > tiny_dp) then
@@ -1120,16 +1137,6 @@ function v_proj(icell,x,y,z,u,v,w) !
         vz = z * norme * vitesse
         v_proj = vx * u + vy * v + vz * w
      else
-        v_proj = 0.0_dp
-     endif
-  else if (lkeplerian) then
-     r = sqrt(x*x+y*y)
-     if (r > tiny_dp) then
-        norme = 1.0_dp/r
-        vx = -y * norme * vitesse
-        vy = x * norme * vitesse
-        v_proj = vx * u + vy * v
-   else
         v_proj = 0.0_dp
      endif
   else
@@ -1200,7 +1207,7 @@ subroutine freeze_out()
 
   implicit none
 
-  real :: threshold_CD = 0.8 * 1.59e21 * 1e4 !cm^-2
+  real, parameter :: threshold_CD = 0.8 * 1.59e21  / (cm_to_m**2) ! m^-2
   ! 1e4x photodissociation from Qi et al 2011, ajsuted by hand for IM Lupi
 
   integer :: icell
@@ -1210,6 +1217,7 @@ subroutine freeze_out()
   write (*,*) "Freezing-out of molecules"
 
   do icell=1,n_cells
+     ldeplete = .false.
      if (Temperature(icell) < T_freeze_out)  then
         if (lphoto_desorption) then
            CD = compute_vertical_CD(icell)
@@ -1241,22 +1249,17 @@ subroutine photo_dissociation()
   integer :: icell
   real(kind=dp) :: CD
 
-  real :: threshold_CD = 0.8 * 1.59e21 * 0.65 !cm^-2 ! Value from Qi et al 2011
+  real, parameter :: threshold_CD = 0.8 * 1.59e21 * 0.65  / (cm_to_m**2) ! m^-2 ! Value from Qi et al 2011
   ! It makes sense only for constant dust --> needs to be updated
-  real :: photo_dissocation_depletion = 1.e-6
-
+  real, parameter :: photo_dissocation_depletion = 1.e-6
 
   write (*,*) "Photo-dissociating molecules", threshold_CD
 
-  threshold_CD = threshold_CD / (cm_to_m**2) ! m^-2
-
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
-
      if (CD < threshold_CD) then
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
-
   enddo ! icell
 
   return

@@ -7,7 +7,7 @@ module parametres
   save
 
   real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.14"
+  character(8), parameter :: mcfost_release = "3.0.15"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128), parameter :: webpage=      "http://ipag.osug.fr/public/pintec/mcfost/"
@@ -137,6 +137,10 @@ module parametres
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM, lread_grain_size_distrib
 
+  ! Phantom
+  logical :: ldudt_implicit
+  real(kind=dp) :: ufac_implicit
+
 end module parametres
 
 !********************************************************************
@@ -251,7 +255,8 @@ module prop_star
   real :: L_etoile
 
   real, dimension(:), allocatable :: E_ISM
-  real, parameter :: R_ISM = 1.5 ! rayon de la sphere d'ou est emis le champ ISM
+  real(kind=dp) :: R_ISM = 0._dp ! radius of the sphere from which the ISM radiation is emitted
+  real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
   real :: chi_ISM = 1.0
 
   ! Spot
@@ -685,6 +690,7 @@ module molecular_emission
   real(kind=dp), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
 
   logical :: linfall, lkeplerian
+  real :: chi_infall
 
   real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: tab_deltaV ! n_speed, n_cells
