@@ -103,6 +103,7 @@ contains
     logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: limit_threshold = 0.005
+    real, parameter :: SPH_2_total_dust = 20. ! SPH dust mass is 5% of total
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -292,9 +293,9 @@ contains
        enddo
        Mtot_dust = Mtot_dust / g_to_Msun
 
-       ! Remark : you may want to had a factor here if there are only a few grainsize
-       ! in the SPH dump
-       dust_to_gas = Mtot_dust/Mtot
+       ! Remark : SPH_2_total_dust is a factor to convert SPH dust mass to total
+       ! dust mass if there are only a few grainsizes in the SPH dump
+       dust_to_gas = SPH_2_total_dust*Mtot_dust/Mtot
 
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id

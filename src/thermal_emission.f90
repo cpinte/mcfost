@@ -490,17 +490,15 @@ subroutine init_reemission(lheating,dudt)
   implicit none
 
   logical, intent(in) :: lheating
-  real, dimension(:), intent(in), optional :: dudt
+  real, dimension(:), allocatable, intent(in), optional :: dudt
 
   integer :: k,lambda,t, pop, icell, p_icell, id
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
   real ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
-  real(kind=dp), dimension(n_lambda) :: B, dB_dT
+  real(kind=dp), dimension(n_lambda,n_T) :: B, dB_dT
 
-  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating
-  real(kind=dp), dimension(n_cells) :: Qcool0
-
+  real(kind=dp) :: Qcool, extra_heating, u_o_dt, Qcool_minus_extra_heating, Qcool0
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
@@ -522,45 +520,57 @@ subroutine init_reemission(lheating,dudt)
         if (cst_wl < 500.0) then
            coeff_exp=exp(cst_wl)
            ! Les formules prennent en compte le delta_wl de l'integration
-           B(lambda) = 1.0/((wl**5)*(coeff_exp-1.0))*delta_wl
-           dB_dT(lambda) = B(lambda) * cst_wl*coeff_exp/(coeff_exp-1.0) !/Temp * temp a cause de dT mais ca change rien en pratique
+           B(lambda,T) = 1.0/((wl**5)*(coeff_exp-1.0))*delta_wl
+           dB_dT(lambda,T) = B(lambda,T) * cst_wl*coeff_exp/(coeff_exp-1.0) !/Temp * temp a cause de dT mais ca change rien en pratique
         else
-           B(lambda)=0.0
-           dB_dT(lambda)=0.0
+           B(lambda,T)=0.0
+           dB_dT(lambda,T)=0.0
         endif
      enddo !lambda
+  enddo ! T
 
-     ! produit par opacite (abs seule) massique
-     ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
-     do icell=1,n_cells
+
+  ! produit par opacite (abs seule) massique
+  ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
+  !$omp parallel default(none) &
+  !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
+  !$omp shared(cst_E,kappa_abs_LTE,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
+  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE)
+
+  !$ id = omp_get_thread_num() + 1
+
+  !$omp do
+  do icell=1,n_cells
+     ! this multiple loop is not needed when the dust grains are the same everywhere
+
+     do T=1, n_T
+        Temp = tab_Temp(T)
         integ=0.0
-
-        ! this double loop is not needed when the dust grains are the same everywhere
         do lambda=1, n_lambda
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
-           integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda)
+           integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda,T)
         enddo !lambda
 
         ! Proper normalization
         ! At this stage, this is Q- in W / (AU/m)^2
         Qcool = integ * cst_E
-        if (T==1) Qcool0(icell) = Qcool
+        if (T==1) Qcool0 = Qcool
 
         ! Non radiative heating :
         ! We solve Q+ = int kappa.Jnu.dnu = Q- - extra_heating = int kappa.Bnu.dnu - extra_heating
         ! Here we conpute the extra_heating term
         if (.not.lextra_heating) then
            ! Energie venant de l'equilibre avec nuage à T_min
-           extra_heating = Qcool0(icell)
+           extra_heating = Qcool0
         else
            if (ldudt_implicit) then
               u_o_dt = ufac_implicit * Temp ! u(T)/dt
               ! dudt is meant to be u^n/dt here
-              extra_heating = max(Qcool0(icell), (u_o_dt - dudt(icell)) / AU_to_m**2 )
+              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / AU_to_m**2 )
            else
-              extra_heating = max(Qcool0(icell), dudt(icell) / AU_to_m**2 )
+              extra_heating = max(Qcool0, dudt(icell) / AU_to_m**2 )
            endif
         endif
 
@@ -570,25 +580,29 @@ subroutine init_reemission(lheating,dudt)
            log_Qcool_minus_extra_heating(T,icell)=log(Qcool_minus_extra_heating)
         else
            ! This sets the initial disk temperature
-           id = 1 ! not openmp yet
            xT_ech(icell,id)=T+1
            log_Qcool_minus_extra_heating(T,icell)=-1000.
         endif
 
         if (lRE_nLTE.and.(T==1)) then
            do lambda=1, n_lambda
-              J0(icell,lambda) =  volume(icell) * B(lambda) * cst_E
+              J0(icell,lambda) =  volume(icell) * B(lambda,T) * cst_E
            enddo
         endif
-     enddo !icell
+     enddo ! T
+
+  enddo !icell
+  !$omp enddo
+  !$omp end parallel
 
 
-     if (low_mem_th_emission) then
+  if (low_mem_th_emission) then
+     do T=1, n_T
         do k=grain_RE_LTE_start,grain_RE_LTE_end
            integ3(1) = 0.0
            do lambda=2, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
-              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
+              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_dp)) then
@@ -597,13 +611,15 @@ subroutine init_reemission(lheating,dudt)
               enddo !l
            endif
         enddo !k
-     else  ! .not. low_mem_th_emission
-        if (lvariable_dust) then ! Calcul dans toutes les cellules
-           do icell=1,p_n_cells
+     enddo ! T
+  else  ! .not. low_mem_th_emission
+     if (lvariable_dust) then ! Calcul dans toutes les cellules
+        do icell=1,p_n_cells
+           do T=1, n_T
               integ3(0) = 0.0
               do lambda=1, n_lambda
                  ! Pas besoin de cst , ni du volume (normalisation a 1)
-                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
+                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
               enddo !l
 
               ! Normalisation a 1
@@ -612,14 +628,16 @@ subroutine init_reemission(lheating,dudt)
                     kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
                  enddo !l
               endif
-           enddo !icell
-        else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
-           ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
-           icell = icell_not_empty
+           enddo ! T
+        enddo !icell
+     else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
+        ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
+        icell = icell_not_empty
+        do T=1, n_T
            integ3(0) = 0.0
            do lambda=1, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
            enddo !l
 
            ! Normalisation a 1
@@ -630,16 +648,18 @@ subroutine init_reemission(lheating,dudt)
                  kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
               enddo !l
            endif
-        endif !lvariable_dust
-     endif ! low_mem_th_emission
+        enddo ! T
+     endif !lvariable_dust
+  endif ! low_mem_th_emission
 
-     if (lRE_nLTE) then
-        ! produit par opacite (abs seule) massique d'une seule taille de grain
+  if (lRE_nLTE) then
+     ! produit par opacite (abs seule) massique d'une seule taille de grain
+     do T=1, n_T
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            integ=0.0
            do lambda=1, n_lambda
               ! WARNING : il manque la densite et le volume par rapport au cas LTE !!!
-              integ = integ + C_abs_norm(k,lambda) * B(lambda)
+              integ = integ + C_abs_norm(k,lambda) * B(lambda,T)
            enddo !lambda
            ! Le coeff qui va bien
            if (integ > tiny_real) then
@@ -647,14 +667,13 @@ subroutine init_reemission(lheating,dudt)
            else
               log_E_em_1grain(k,T)=-1000.
            endif
-        enddo
-
+        enddo ! k
 
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            integ3(1) = 0.0
            do lambda=2, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
-              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
+              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_dp)) then
@@ -663,13 +682,15 @@ subroutine init_reemission(lheating,dudt)
               enddo !l
            endif
         enddo !k
-     endif ! lnLTE
+     enddo ! T
+  endif ! lnLTE
 
-     if (lnRE) then
+  if (lnRE) then
+     do T=1, n_T
         do k=grain_nRE_start,grain_nRE_end
            integ=0.0
            do lambda=1, n_lambda
-              integ = integ + C_abs_norm(k,lambda) * B(lambda)
+              integ = integ + C_abs_norm(k,lambda) * B(lambda,T)
            enddo !lambda
            integ = integ * cst_E
            E_em_1grain_nRE(k,T) = integ
@@ -689,7 +710,7 @@ subroutine init_reemission(lheating,dudt)
            integ3(1) = 0.0
            do lambda=2, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1), ni densite
-              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda)
+              integ3(lambda) = integ3(lambda-1) + C_abs_norm(k,lambda) * dB_dT(lambda,T)
            enddo !l
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_dp)) then
@@ -698,9 +719,8 @@ subroutine init_reemission(lheating,dudt)
               enddo !l
            endif
         enddo !k
-     endif !lnRE
-
-  enddo !T
+     enddo ! T
+  endif !lnRE
 
   if (lextra_heating .and. ldudt_implicit) then
      ! as u(T) depends on T, we need to check that int kappa_nu.Bnu(T).dnu - (u(T) - u_n)/dt
@@ -715,7 +735,6 @@ subroutine init_reemission(lheating,dudt)
         enddo
      enddo
   endif
-
 
   do pop=1, n_pop
      if (dust_pop(pop)%methode_chauffage == 3) then

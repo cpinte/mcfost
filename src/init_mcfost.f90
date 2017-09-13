@@ -116,6 +116,7 @@ subroutine set_default_variables()
   lno_internal_energy = .false.
   ldudt_implicit = .false.
   linfall = .false.
+  lcylindrical_rotation = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -981,6 +982,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) chi_infall
         i_arg = i_arg + 1
+     case("-cylindrical_rotation","-cyl_rotation","-cyl_rot")
+        i_arg = i_arg + 1
+        lcylindrical_rotation = .true.
      case default
         call display_help()
      end select
@@ -1084,7 +1088,6 @@ subroutine initialisation_mcfost()
 
   if (lread_Seb_Charnoz) lvariable_dust = .true.
 
-
   if (lonly_scatt) l_em_disk_image=.false.
   if (lHG.or.lisotropic) aniso_method=2
 
@@ -1093,8 +1096,13 @@ subroutine initialisation_mcfost()
   if (nz_opt > 0) nz = nz_opt
   if (n_T_opt > 0) n_T = n_T_opt
 
+  ! Defining pixel values
+  if (lresol) then
+     npix_x = nx
+     npix_y = ny
+  endif
+
   if (limg) then
-     npix_x = igridx ; npix_y = igridy
      if (l_em_disk_image) then
         write(*,*) "Scattered light + thermal emission map calculation"
      else
@@ -1116,6 +1124,7 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
      endif
   else ! SED : we do not need pixels
+     npix_x_save = npix_x ; npix_y_save = npix_y
      npix_x = 1 ; npix_y = 1
      lmono0 = .false.
   endif
@@ -1164,25 +1173,6 @@ subroutine initialisation_mcfost()
   endif
 
   if (.not.limg) loutput_mc = .true.
-
-  if (lresol) then
-     igridx = nx
-     igridy = ny
-
-      maxigrid = max(igridx, igridy)
-
-      if (igridx == igridy) then
-         deltapix_x = 1
-         deltapix_y = 1
-      else if (igridx > igridy) then
-         deltapix_x = 1
-         deltapix_y = 1 - (igridx/2) + (igridy/2)
-      else
-         deltapix_x = 1 - (igridy/2) + (igridx/2)
-         deltapix_y = 1
-      endif
-      size_pix=maxigrid/(map_size)
-  endif
 
   if (lPA) ang_disque = PA
 
@@ -1266,7 +1256,12 @@ subroutine initialisation_mcfost()
   if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
   endif
-  if (n_az > 1) l3D = .true.
+  if (n_az > 1) then
+     write(*,*) "Forcing 3D mode"
+     l3D = .true.
+  endif
+
+  if (linfall) l_sym_ima = .false.
 
   if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
      if (lmono0.and.(.not.l3D)) then
@@ -1276,6 +1271,17 @@ subroutine initialisation_mcfost()
         lscatt_ray_tracing1 = .true.
         write(*,*) "Using ray-tracing method 1"
      endif
+  endif
+
+  ! Forcing azimuthal angle to 0 in rt2
+  ! as angles are defined with phi=0 in mind
+  if (lscatt_ray_tracing2) then
+     if (RT_n_az > 1) then
+        write(*,*) "There can be only 1 azimuthal angle in RT method 2"
+        RT_n_az = 1
+     endif
+     RT_az_min = 0
+     RT_az_max = 0
   endif
 
   lonly_LTE = .false.
@@ -1422,6 +1428,7 @@ subroutine display_help()
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
+  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
 
   stop
 

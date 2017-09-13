@@ -57,7 +57,7 @@ subroutine alloc_ray_tracing()
      n_theta_rt = 2
   endif
 
-  ! n_phi_I and n_theta_I are the angular diemensions of the store radiation field
+  ! n_phi_I and n_theta_I are the angular dimensions of the stored radiation field
   ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
   n_theta_I = 15 ;
@@ -77,11 +77,11 @@ subroutine alloc_ray_tracing()
   if (lsed.and.(RT_sed_method == 1)) then
       allocate(Stokes_ray_tracing(n_lambda,1,1,RT_n_incl,RT_n_az,N_type_flux,nb_proc), stars_map(1,1,1), stat=alloc_status)
   else
-     allocate(Stokes_ray_tracing(n_lambda,igridx,igridy,RT_n_incl,RT_n_az,N_type_flux,nb_proc), stat=alloc_status)
+     allocate(Stokes_ray_tracing(n_lambda,npix_x,npix_y,RT_n_incl,RT_n_az,N_type_flux,nb_proc), stat=alloc_status)
      if (lsepar_pola.and.llimb_darkening)then
-        allocate(stars_map(igridx,igridy,3), stat=alloc_status)
+        allocate(stars_map(npix_x,npix_y,3), stat=alloc_status)
      else
-        allocate(stars_map(igridx,igridy,1), stat=alloc_status)
+        allocate(stars_map(npix_x,npix_y,1), stat=alloc_status)
      endif
   endif
   if (alloc_status > 0) then
@@ -251,11 +251,13 @@ subroutine init_directions_ray_tracing()
   do ibin=1, RT_n_incl
      ! 0 est remplace par un epsilon car il faut donner un axe de reference
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
-     tab_uv_rt(ibin) = sin(max(tab_RT_incl(ibin),1e-20)*deg_to_rad) ! uv_rt mais v_rt = 0 ici
+     tab_uv_rt(ibin) = sin( sign(max(abs(tab_RT_incl(ibin)),1e-20), tab_RT_incl(ibin)) *deg_to_rad ) ! uv_rt mais v_rt = 0 ici
      tab_w_rt(ibin) = sqrt(1.0_dp - tab_uv_rt(ibin)*tab_uv_rt(ibin))
+
+     ! phi = 0 correspond a -v
      do iaz =1, RT_n_az
-        tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
-        tab_v_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz)*deg_to_rad)
+        tab_u_rt(ibin,iaz) =   tab_uv_rt(ibin) * sin(tab_RT_az(iaz)*deg_to_rad)
+        tab_v_rt(ibin,iaz) =   - tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
      enddo
   enddo
 
@@ -287,9 +289,9 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
 
   ! Calcul angle phi a la position
-  phi_pos = modulo(atan2(y,x) + deux_pi,deux_pi)
+  phi_pos = modulo(atan2(x,y) + deux_pi,deux_pi)
 
-  ! les directions de ray-tracing sont definis pr rapport a la ref u0
+  ! Nouvelle orientation: les directions de ray-tracing sont definies par rapport a l'axe de ref y
   ! il faut se replacer dans ce cas en fct de la position
   ! ie il faut soustraire le phi de la position du paquet
 
@@ -307,10 +309,10 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
         phi = deux_pi * real(iscatt) / real(N)
     ! endif
 
-     phi = phi + phi_pos
+     phi = phi - phi_pos
 
-     u_ray_tracing = uv0 * cos(phi)
-     v_ray_tracing = uv0 * sin(phi)
+     u_ray_tracing = uv0 * sin(phi)
+     v_ray_tracing = - uv0 * cos(phi)
      w_ray_tracing = w0
 
      prod1 = u_ray_tracing * u  + v_ray_tracing * v
@@ -335,9 +337,9 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
            xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
            if (xnyp < 1e-10) then
               xnyp = 0.0
-              costhet = 1.0
+              costhet = 1.0_dp ! omega=0
            else
-              costhet = -1.0*v1pj / xnyp
+              costhet = v1pj / xnyp
            endif
 
            ! calcul de l'angle entre la normale et l'axe z (theta)
@@ -405,7 +407,7 @@ subroutine angles_scatt_rt1(id,u,v,w)
            xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
            if (xnyp < 1e-10) then
               xnyp = 0.0_dp
-              costhet = 1.0_dp
+              costhet = 1.0_dp ! omega = 0
            else
               costhet = -1.0_dp*v1pj / xnyp
            endif
@@ -880,8 +882,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   endif
 
   ! Position : virtuelle !!
-  x = 1.0_dp ! doit juste etre non nul
-  y = 0.0_dp
+  x = 0.0_dp
+  y = 1.0_dp ! doit juste etre non nul
   z = 1.0_dp ! sert a rien
 
   ! Champ de radiation
@@ -901,8 +903,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   do dir=0,1
      do iscatt = 1, nang_ray_tracing
         phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
-        u_ray_tracing = uv0 * cos(phi_scatt)
-        v_ray_tracing = uv0 * sin(phi_scatt)
+        u_ray_tracing = uv0 * sin(phi_scatt)
+        v_ray_tracing = - uv0 * cos(phi_scatt)
         w_ray_tracing = w0 * (2 * dir - 1)
 
         do theta_I=1,n_theta_I
@@ -919,8 +921,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     phi = deux_pi * (real(phi_I,kind=dp) - f2) / real(n_phi_I,kind=dp)
 
                     w02 = sqrt(1.0_dp-w*w)
-                    u = w02 * cos(phi)
-                    v = w02 * sin(phi)
+                    u = w02 * sin(phi)
+                    v = - w02 * cos(phi)
                     ! BUG : u_ray_tracing
 
                     ! Angle de diffusion --> n'utilise plus cos_thet_ray_tracing depuis super-echantillonage
@@ -949,8 +951,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  phi = deux_pi * (real(phi_I,kind=dp) - 0.5) / real(n_phi_I,kind=dp)
 
                  w02 = sqrt(1.0_dp-w*w)
-                 u = w02 * cos(phi)
-                 v = w02 * sin(phi)
+                 u = w02 * sin(phi)
+                 v = - w02 * cos(phi)
 
                  ! Angle de diffusion
                  cos_scatt = u_ray_tracing * u + v_ray_tracing * v + w_ray_tracing * w
@@ -964,9 +966,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
                  if (xnyp < 1e-10) then
                     xnyp = 0.0
-                    costhet = 1.0
+                    costhet = 1.0_dp ! omega = 0
                  else
-                    costhet = -1.0*v1pj / xnyp
+                    costhet = v1pj / xnyp
                  endif
 
                  ! calcul de l'angle entre la normale et l'axe z (theta)
@@ -1022,7 +1024,6 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   RPO(4,4) = 1.0_dp
   ROP(4,4) = 1.0_dp
 
-
   if (.not.lvariable_dust) then   ! we precalculate the s11 as they are all the same
      icell = icell_ref
 
@@ -1061,8 +1062,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
         do iscatt = 1, nang_ray_tracing
 
            phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
-           u_ray_tracing = uv0 * cos(phi_scatt)
-           v_ray_tracing = uv0 * sin(phi_scatt)
+           u_ray_tracing = uv0 * sin(phi_scatt)
+           v_ray_tracing = - uv0 * cos(phi_scatt)
            w_ray_tracing = w0
 
            do theta_I=1,n_theta_I
@@ -1238,13 +1239,13 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
      if (stokes(1) < 1.e-30_dp) cycle
 
      ! Direction de vol
-     x = r_grid(icell) ! doit juste etre non nul
-     y = 0.0_dp
+     x = 0.0_dp
+     y = r_grid(icell) ! doit juste etre non nul
      z = z_grid(icell) ! sert a rien
 
-     norme = sqrt(x**2 + z**2)
-     u = x / norme
-     v = 0.0_dp
+     norme = sqrt(y**2 + z**2)
+     u = 0.0_dp
+     v = y / norme
      w = z / norme
 
      ! cos_scatt_ray_tracing correspondants
@@ -1401,7 +1402,7 @@ function dust_source_fct(icell, x,y,z)
            psup=2
         endif
         ! Cette methode est OK mais on voit les cellules
-        phi_pos = atan2(y,x)
+        phi_pos = atan2(x,y)
         k = floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
         if (k > n_az_rt) k = n_az_rt
      endif
@@ -1477,7 +1478,7 @@ function dust_source_fct(icell, x,y,z)
 
 
      ! Calcul angle phi a la position
-     phi_pos = modulo(atan2(y,x) + deux_pi,deux_pi)
+     phi_pos = modulo(atan2(x,y) + deux_pi,deux_pi)
 
      if (z > 0.0_dp) then
         dir=1
@@ -1488,7 +1489,7 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ diffuse plusieurs fois
      !----------------------------------------------------
-     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing, 0.0_dp)
+     xiscatt = max(phi_pos/deux_pi  * nang_ray_tracing, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
@@ -1517,7 +1518,7 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ stellaire diffuse 1 fois
      !----------------------------------------------------
-     xiscatt =   max(phi_pos/deux_pi  * nang_ray_tracing_star, 0.0_dp)
+     xiscatt =  max(phi_pos/deux_pi  * nang_ray_tracing_star, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
