@@ -218,7 +218,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   call allocate_stellar_spectra()
 
-  call allocate_thermal_energy()
+  call allocate_thermal_energy(Nc)
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(Nc,n_lambda), kappa_sca(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)

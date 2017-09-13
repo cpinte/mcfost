@@ -57,7 +57,9 @@ module thermal_emission
 
   contains
 
-subroutine allocate_thermal_energy()
+subroutine allocate_thermal_energy(Nc)
+
+  integer, intent(in) :: Nc
 
   integer :: alloc_status
 
@@ -67,6 +69,13 @@ subroutine allocate_thermal_energy()
      stop
   endif
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+
+  allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error prob_E_cell'
+     stop
+  endif
+  prob_E_cell = 0.0
 
   return
 
@@ -90,20 +99,12 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   endif
   spectre_emission_cumul = 0.0
 
-  allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
-     stop
-  endif
-  prob_E_cell = 0.0
-
   allocate(tab_Temp(n_T), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error tab_Temp'
      stop
   endif
   tab_Temp = 0.0
-
 
   allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
   if (alloc_status > 0) then
@@ -536,7 +537,7 @@ subroutine init_reemission(lheating,dudt)
   !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
   !$omp shared(cst_E,kappa_abs_LTE,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
   !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE)
-
+  id = 1 ! Pour code sequentiel
   !$ id = omp_get_thread_num() + 1
 
   !$omp do
