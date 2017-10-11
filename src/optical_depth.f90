@@ -347,7 +347,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   tau(:,:) = 0.0_dp
   I0(:,:,iray,id) = 0.0_dp
-  v_avg0 = 0.0_dp
+  v_avg0 = 0.0_dp ! case when labs = .false.
 
   tau_c(:) = 0.0_dp
   I0c(:,iray,id) = 0.0_dp
@@ -528,6 +528,7 @@ subroutine integ_tau_mol(imol)
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:), allocatable :: tab_speed, P
 
+  if (lVoronoi) return  ! TODO : the subrtoutine needs to be implemented in Voronoi mode
 
   n_speed = mol(imol)%n_speed_rt
   vmax = mol(imol)%vmax_center_rt

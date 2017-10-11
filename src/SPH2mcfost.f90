@@ -20,7 +20,7 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(dp), allocatable, dimension(:) :: x,y,z,rho,massgas,grainsize
+    real(dp), allocatable, dimension(:) :: x,y,z,vx,vy,vz,rho,massgas,grainsize
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
@@ -32,7 +32,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file,x,y,z, &
+       call read_phantom_file(iunit,SPH_file,x,y,z,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
@@ -72,7 +72,7 @@ contains
        SPH_limits(:) = 0
     endif
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
@@ -85,7 +85,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,massgas,massdust,rho,rhodust,grainsize, &
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, &
        SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
@@ -96,7 +96,7 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,rho,massgas
+    real(dp), dimension(n_SPH), intent(in) :: x,y,z,vx,vy,vz,rho,massgas
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: grainsize
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -388,6 +388,21 @@ contains
     enddo search_not_empty
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
+
+
+    !*************************
+    ! Velocities
+    !*************************
+    if (lemission_mol) then
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+             Voronoi(icell)%vxyz(1) = vx(iSPH)
+             Voronoi(icell)%vxyz(2) = vy(iSPH)
+             Voronoi(icell)%vxyz(3) = vz(iSPH)
+          endif
+       enddo
+    endif
 
     return
 
