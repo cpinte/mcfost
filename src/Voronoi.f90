@@ -15,7 +15,7 @@ module Voronoi_grid
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
-     real(kind=dp), dimension(3) :: xyz
+     real(kind=dp), dimension(3) :: xyz, vxyz
      integer :: id, first_neighbour, last_neighbour
      logical :: exist
   end type Voronoi_cell
@@ -238,7 +238,7 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,  limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, x,y,z, limits, check_previous_tesselation)
 
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z

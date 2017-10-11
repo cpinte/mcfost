@@ -407,11 +407,11 @@ subroutine init_molecular_disk(imol)
 
   ! En m.s-1
   ! Warning : assume all stars are at the center of the disk
-  if (lcylindrical_rotation) then
+  if (lcylindrical_rotation) then ! Midplane Keplerian velocity
      do icell=1, n_cells
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) ) ! Midplane Keplerian velocity
+        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
      enddo
-  else ! dependence en z
+  else ! dependance en z
      do icell=1, n_cells
         vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
              ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
@@ -436,6 +436,46 @@ subroutine init_molecular_disk(imol)
   return
 
 end subroutine init_molecular_disk
+
+!***********************************************************
+
+subroutine init_molecular_Voronoi(imol)
+  ! Velocities are defined from SPH files
+
+  integer, intent(in) :: imol
+  integer :: icell
+
+  ldust_mol  = .true.
+  lkeplerian = .true.
+
+  ! Temperature gaz = poussiere
+  if (lcorrect_Tgas) then
+     write(*,*) "Correcting Tgas by", correct_Tgas
+     Tcin(:) = Temperature(:)  * correct_Tgas
+  else
+     Tcin(:) = Temperature(:)
+  endif
+
+  ! Vitesse de turbulence
+  v_turb = vitesse_turb
+
+  ! Abondance
+  if (mol(imol)%lcst_abundance) then
+     write(*,*) "Setting constant abundance"
+     tab_abundance = mol(imol)%abundance
+  else
+     call read_abundance(imol)
+  endif
+
+  do icell=1, n_cells
+     !  550398
+     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
+          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
+  enddo
+
+  return
+
+end subroutine init_molecular_Voronoi
 
 !***********************************************************
 
@@ -1111,41 +1151,48 @@ function v_proj(icell,x,y,z,u,v,w) !
 
   real(kind=dp) :: vitesse, vx, vy, vz, norme, r
 
-  vitesse = vfield(icell)
+  if (lVoronoi) then
+     vx = Voronoi(icell)%vxyz(1)
+     vy = Voronoi(icell)%vxyz(2)
+     vz = Voronoi(icell)%vxyz(3)
 
-
-  if (lkeplerian) then
-     r = sqrt(x*x+y*y)
-     if (r > tiny_dp) then
-        norme = 1.0_dp/r
-        vx = -y * norme * vitesse
-        vy = x * norme * vitesse
-        vz = 0.
-        if (linfall) then
-           r = sqrt(x*x+y*y+z*z) ; norme = 1.0_dp/r
-           vx = vx - chi_infall * x * norme * vitesse
-           vy = vy - chi_infall * y * norme * vitesse
-           vz = vz - chi_infall * z * norme * vitesse
-        endif
-        v_proj = vx * u + vy * v
-     else
-        v_proj = 0.0_dp
-     endif
-  else if (linfall) then
-     r = sqrt(x*x+y*y+z*z)
-     !  if (lbenchmark_water2)  vitesse = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
-     if (r > tiny_dp) then
-        norme = 1.0_dp/r
-        vx = x * norme * vitesse
-        vy = y * norme * vitesse
-        vz = z * norme * vitesse
-        v_proj = vx * u + vy * v + vz * w
-     else
-        v_proj = 0.0_dp
-     endif
+     v_proj = vx * u + vy * v + vz * w
   else
-     write(*,*) "Error : velocity field not defined"
-     stop
+     vitesse = vfield(icell)
+
+     if (lkeplerian) then
+        r = sqrt(x*x+y*y)
+        if (r > tiny_dp) then
+           norme = 1.0_dp/r
+           vx = -y * norme * vitesse
+           vy = x * norme * vitesse
+           vz = 0.
+           if (linfall) then
+              r = sqrt(x*x+y*y+z*z) ; norme = 1.0_dp/r
+              vx = vx - chi_infall * x * norme * vitesse
+              vy = vy - chi_infall * y * norme * vitesse
+              vz = vz - chi_infall * z * norme * vitesse
+           endif
+           v_proj = vx * u + vy * v
+        else
+           v_proj = 0.0_dp
+        endif
+     else if (linfall) then
+        r = sqrt(x*x+y*y+z*z)
+        !  if (lbenchmark_water2)  vitesse = -r  * 1e5 * AU_to_pc    ! TMP pour bench water2 : ca change rien !!!????
+        if (r > tiny_dp) then
+           norme = 1.0_dp/r
+           vx = x * norme * vitesse
+           vy = y * norme * vitesse
+           vz = z * norme * vitesse
+           v_proj = vx * u + vy * v + vz * w
+        else
+           v_proj = 0.0_dp
+        endif
+     else
+        write(*,*) "Error : velocity field not defined"
+        stop
+     endif
   endif
 
   return

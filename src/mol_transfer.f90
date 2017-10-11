@@ -57,7 +57,9 @@ subroutine mol_line_transfer()
      ! Champ externe
      call init_tab_Cmb_mol()
 
-     if (lDutrey94) then
+     if (lVoronoi) then
+        call init_molecular_Voronoi(imol)
+     else if (lDutrey94) then
         call init_GG_Tau_mol()
         call init_molecular_disk(imol)
      else if (lHH30mol) then
