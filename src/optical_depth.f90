@@ -323,22 +323,16 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   integer, intent(in) :: nTrans
   integer, dimension(nTrans), intent(in) :: tab_Trans
 
-  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: tspeed
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, xphi, yphi, zphi
-  real(kind=dp) :: delta_vol, l, delta_vol_phi, v0, v1, v_avg0
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=dp), dimension(nTrans) :: tau_c
   real(kind=dp) :: dtau_c, Snu_c
-  integer :: i, ivpoint, iTrans, n_vpoints, nbr_cell, icell, next_cell, previous_cell
+  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
 
   real :: facteur_tau
 
-  logical :: lcellule_non_vide
-
-  integer, parameter :: n_vpoints_max = 200 ! pas super critique, presque OK avec 2 pour la simu Herbig de Peter (2x plus vite)
-  real(kind=dp), dimension(n_vpoints_max) :: vitesse
-
+  logical :: lcellule_non_vide, lsubtract_avg
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -347,7 +341,6 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   tau(:,:) = 0.0_dp
   I0(:,:,iray,id) = 0.0_dp
-  v_avg0 = 0.0_dp ! case when labs = .false.
 
   tau_c(:) = 0.0_dp
   I0c(:,iray,id) = 0.0_dp
@@ -376,54 +369,15 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
-     delta_vol = l
 
      if (lcellule_non_vide) then
-        ! Differentiel de vitesse au travers de la cellule
-        !dv = dv_proj(ri0,zj0,x0,y0,z0,x1,y1,z1,u,v,w)
-        v0 = v_proj(icell,x0,y0,z0,u,v,w)
+        lsubtract_avg = ((nbr_cell == 1).and.labs)
 
-        if (lVoronoi) then ! Velocity is constant in cell
-           n_vpoints = 1
-           vitesse(1) = v0
-        else ! Velocity is varying accross cell
-           v1 = v_proj(icell,x1,y1,z1,u,v,w)
-           dv = abs(v1 - v0)
-
-           ! Nbre de points d'integration en fct du differentiel de vitesse
-           ! compare a la largeur de raie de la cellule de depart
-           n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
-
-           ! Vitesse projete le long du trajet dans la cellule
-           do ivpoint=2, n_vpoints-1
-              delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * delta_vol
-              xphi=x0+delta_vol_phi*u
-              yphi=y0+delta_vol_phi*v
-              zphi=z0+delta_vol_phi*w
-              vitesse(ivpoint) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-           enddo
-           vitesse(1) = v0
-           vitesse(n_vpoints) = v1
-        endif
+        ! local line profile mutiplied by frequency
+        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
 
         if ((nbr_cell == 1).and.labs) then
-           v_avg0 = 0.0_dp
-           do ivpoint=1,n_vpoints
-              v_avg0 = v_avg0 + vitesse(ivpoint)
-           enddo
-           v_avg0 = v_avg0 / real(n_vpoints,kind=dp)
-        endif
-
-        ! Profil de raie local integre a multiplie par la frequence de la transition
-        P(:) = 0.0_dp
-        do ivpoint=1,n_vpoints
-           tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
-           P(:) = P(:) + phiProf(icell,ispeed,tspeed)
-        enddo
-        P(:) = P(:)/n_vpoints
-
-        if ((nbr_cell == 1).and.labs) then
-           ds(iray,id) = delta_vol
+           ds(iray,id) = l
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
@@ -440,6 +394,9 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
            Snu_c = emissivite_dust(icell,iTrans) / (kappa(icell,iTrans) + 1.0e-300_dp)
+
+           !if (icell == 593530)
+           !write(*,*) iTrans, emissivite_mol_o_freq(icell,iTrans) * maxval(P) / emissivite_dust(icell,iTrans)
 
            ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
            ! la profondeur optique jusqu'a la cellule
@@ -522,19 +479,86 @@ end subroutine integ_ray_mol
 
 !***********************************************************
 
+function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
+
+  integer, intent(in) :: icell
+  logical, intent(in) :: lsubtract_avg
+  real(kind=dp), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w,l
+  integer, dimension(2), intent(in) :: ispeed
+  real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: local_line_profile
+
+  integer, parameter :: n_vpoints_max = 200 ! pas super critique
+  ! presque OK avec 2 pour la simu Herbig de Peter (2x plus vite)
+  real(kind=dp), dimension(n_vpoints_max) :: vitesse
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: tspeed
+  real(kind=dp) ::  v0, v1, v_avg0, delta_vol_phi, xphi, yphi, zphi
+  integer :: ivpoint, n_vpoints
+
+  ! Differentiel de vitesse au travers de la cellule
+  !dv = dv_proj(ri0,zj0,x0,y0,z0,x1,y1,z1,u,v,w)
+  v0 = v_proj(icell,x0,y0,z0,u,v,w)
+
+  if (lVoronoi) then ! Velocity is constant in cell
+     n_vpoints = 1
+     vitesse(1) = v0
+  else ! Velocity is varying accross cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = abs(v1 - v0)
+
+     ! Nbre de points d'integration en fct du differentiel de vitesse
+     ! compare a la largeur de raie de la cellule de depart
+     n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
+
+     ! Vitesse projete le long du trajet dans la cellule
+     do ivpoint=2, n_vpoints-1
+        delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * l
+        xphi=x0+delta_vol_phi*u
+        yphi=y0+delta_vol_phi*v
+        zphi=z0+delta_vol_phi*w
+        vitesse(ivpoint) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+     enddo
+     vitesse(1) = v0
+     vitesse(n_vpoints) = v1
+  endif
+
+  if (lsubtract_avg) then
+     v_avg0 = 0.0_dp
+     do ivpoint=1,n_vpoints
+        v_avg0 = v_avg0 + vitesse(ivpoint)
+     enddo
+     v_avg0 = v_avg0 / real(n_vpoints,kind=dp)
+  else
+     v_avg0 = 0.0_dp
+  endif
+
+  ! Profil de raie local integre a multiplier par la frequence de la transition
+  local_line_profile(:) = 0.0_dp
+  do ivpoint=1,n_vpoints
+     tspeed(:) = tab_speed(:) - (vitesse(ivpoint) - v_avg0)
+     local_line_profile(:) = local_line_profile(:) + phiProf(icell,ispeed,tspeed)
+  enddo
+  local_line_profile(:) = local_line_profile(:)/n_vpoints
+
+  return
+
+end function local_line_profile
+
+!***********************************************************
+
+
 subroutine integ_tau_mol(imol)
 
   implicit none
 
   integer, intent(in) :: imol
 
-  real ::  norme, norme1, vmax, angle
+  real ::  norme, norme1, vmax
   integer :: i, j, iTrans, n_speed, icell, it
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:), allocatable :: tab_speed, P
-
-  if (lVoronoi) return  ! TODO : the subrtoutine needs to be implemented in Voronoi mode
 
   n_speed = mol(imol)%n_speed_rt
   vmax = mol(imol)%vmax_center_rt
@@ -544,9 +568,9 @@ subroutine integ_tau_mol(imol)
   ispeed(1) = -n_speed ; ispeed(2) = n_speed
   tab_speed(:) = span(-vmax,vmax,2*n_speed+1)
 
-  angle=angle_interet
-
   iTrans = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+
+
 
   do it=1, mol(imol)%nTrans_rayTracing
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
@@ -554,41 +578,70 @@ subroutine integ_tau_mol(imol)
      write(*,*) "-------------------------------"
      write(*,*) "Transition #", iTrans
 
-     norme=0.0
-     norme1=0.0
-     do i=1, n_rad
-        icell = cell_map(i,1,1)
-        P(:) = phiProf(icell,ispeed,tab_speed)
-        norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
-        norme1=norme1 + kappa(icell,iTrans) * (r_lim(i)-r_lim(i-1))
-     enddo
-     write(*,*) "tau_mol = ", norme
-     write(*,*) "tau_dust=", norme1
+     if (lVoronoi) then
+       ! x0=0.0 ; y0=0.0 ; z0=0.0
+       ! w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
+       !
+       ! call indice_cellule(x0,y0,z0, icell)
+       ! call optical_length_tot_mol(imol,iTrans,icell,x0,y0,y0,u0,v0,w0,tau_mol,tau_dust)
+       !
+       ! write(*,*) "tau_mol = ", tau_mol
+       ! write(*,*) "tau_dust=", tau_dust
+     else
 
-     loop_r : do i=1,n_rad
-        icell = cell_map(i,1,1)
-        if (r_grid(icell) > 100.0) then
-           norme=0.0
-           loop_z : do j=nz, 1, -1
-              icell = cell_map(i,j,1)
-              P(:) = phiProf(icell,ispeed,tab_speed)
-              norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
-              if (norme > 1.0) then
-                 write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
-                 exit loop_z
-              endif
-           enddo loop_z
-           if (norme < 1.0) write(*,*) "Vertical Tau_mol=1 (for r=100 au) not reached, tau_max=", norme
-           exit loop_r
-        endif
-     enddo loop_r
 
+        norme=0.0
+        norme1=0.0
+        do i=1, n_rad
+           icell = cell_map(i,1,1)
+           P(:) = phiProf(icell,ispeed,tab_speed)
+           norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
+           norme1=norme1 + kappa(icell,iTrans) * (r_lim(i)-r_lim(i-1))
+        enddo
+        write(*,*) "tau_mol = ", norme
+        write(*,*) "tau_dust=", norme1
+
+        loop_r : do i=1,n_rad
+           icell = cell_map(i,1,1)
+           if (r_grid(icell) > 100.0) then
+              norme=0.0
+              loop_z : do j=nz, 1, -1
+                 icell = cell_map(i,j,1)
+                 P(:) = phiProf(icell,ispeed,tab_speed)
+                 norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+                 if (norme > 1.0) then
+                    write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
+                    exit loop_z
+                 endif
+              enddo loop_z
+              if (norme < 1.0) write(*,*) "Vertical Tau_mol=1 (for r=100 au) not reached, tau_max=", norme
+              exit loop_r
+           endif
+        enddo loop_r
+
+     endif
   enddo
-  !read(*,*)
 
   return
 
 end subroutine integ_tau_mol
+
+!********************************************************************
+
+subroutine optical_length_tot_mol(imol,iTrans,icell,x,y,z,u,v,w, tau_mol,tau_dust)
+  ! Optical depth at the center of the line (ie at the systemoc velocity)
+
+  integer, intent(in) :: imol, iTrans, icell
+  real(kind=dp), intent(in) :: x,y,z,u,v,w
+  real(kind=dp), intent(out) :: tau_mol, tau_dust
+
+  tau_mol = 0.0_dp
+  tau_dust = 0.0_dp
+
+
+  return
+
+end subroutine optical_length_tot_mol
 
 !********************************************************************
 
