@@ -382,23 +382,29 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
         ! Differentiel de vitesse au travers de la cellule
         !dv = dv_proj(ri0,zj0,x0,y0,z0,x1,y1,z1,u,v,w)
         v0 = v_proj(icell,x0,y0,z0,u,v,w)
-        v1 = v_proj(icell,x1,y1,z1,u,v,w)
-        dv = abs(v1 - v0)
 
-        ! Nbre de points d'integration en fct du differentiel de vitesse
-        ! compare a la largeur de raie de la cellule de depart
-        n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
+        if (lVoronoi) then ! Velocity is constant in cell
+           n_vpoints = 1
+           vitesse(1) = v0
+        else ! Velocity is varying accross cell
+           v1 = v_proj(icell,x1,y1,z1,u,v,w)
+           dv = abs(v1 - v0)
 
-        ! Vitesse projete le long du trajet dans la cellule
-        do ivpoint=2, n_vpoints-1
-           delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * delta_vol
-           xphi=x0+delta_vol_phi*u
-           yphi=y0+delta_vol_phi*v
-           zphi=z0+delta_vol_phi*w
-           vitesse(ivpoint) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-        enddo
-        vitesse(1) = v0
-        vitesse(n_vpoints) = v1
+           ! Nbre de points d'integration en fct du differentiel de vitesse
+           ! compare a la largeur de raie de la cellule de depart
+           n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
+
+           ! Vitesse projete le long du trajet dans la cellule
+           do ivpoint=2, n_vpoints-1
+              delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * delta_vol
+              xphi=x0+delta_vol_phi*u
+              yphi=y0+delta_vol_phi*v
+              zphi=z0+delta_vol_phi*w
+              vitesse(ivpoint) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+           enddo
+           vitesse(1) = v0
+           vitesse(n_vpoints) = v1
+        endif
 
         if ((nbr_cell == 1).and.labs) then
            v_avg0 = 0.0_dp
