@@ -546,10 +546,11 @@ subroutine integ_tau_mol(imol)
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:), allocatable :: tab_speed, P
 
-  n_speed = mol(imol)%n_speed_rt
-  vmax = mol(imol)%vmax_center_rt
-
+  n_speed = 0
   allocate(tab_speed(-n_speed:n_speed), P(-n_speed:n_speed))
+
+  ! Here, we are only looking at the line center (for the observer)
+  ispeed(1) = 0 ; ispeed(2)  = 0 ; tab_speed(0) = 0.0_dp
 
   ispeed(1) = -n_speed ; ispeed(2) = n_speed
   tab_speed(:) = span(-vmax,vmax,2*n_speed+1)
@@ -612,16 +613,83 @@ end subroutine integ_tau_mol
 
 !********************************************************************
 
-subroutine optical_length_tot_mol(imol,iTrans,icell,x,y,z,u,v,w, tau_mol,tau_dust)
-  ! Optical depth at the center of the line (ie at the systemoc velocity)
+subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, nTrans, tab_Trans,tau_mol,tau_c)
+  ! Optical depth only : simplified version of integ_ray_mol
 
-  integer, intent(in) :: imol, iTrans, icell
+  integer, intent(in) :: imol, nTrans, icell_in
   real(kind=dp), intent(in) :: x,y,z,u,v,w
-  real(kind=dp), intent(out) :: tau_mol, tau_dust
+  real(kind=dp), dimension(:,:), intent(out) :: tau_mol
+  real(kind=dp), dimension(nTrans), intent(out) :: tau_c
 
-  tau_mol = 0.0_dp
-  tau_dust = 0.0_dp
+  integer, dimension(2), intent(in) :: ispeed
+  real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+  integer, dimension(nTrans), intent(in) :: tab_Trans
 
+  !integer, dimension(nTrans), intent(in) :: tab_Trans
+
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau_mol, opacite
+
+  real(kind=dp) :: dtau_c
+  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
+
+  logical :: lcellule_non_vide
+
+  logical, parameter :: lsubtract_avg = .false.
+
+  x1=x;y1=y;z1=z
+  next_cell = icell_in
+  nbr_cell = 0
+
+  tau_mol(:,:) = 0.0_dp
+  tau_c(:) = 0.0_dp
+
+  !*** propagation dans la grille
+
+  ! Boucle infinie sur les cellules
+  infinie : do ! Boucle infinie
+     ! Indice de la cellule
+     icell = next_cell
+     x0=x1 ; y0=y1 ; z0=z1
+
+     if (icell <= n_cells) then
+        lcellule_non_vide=.true.
+     else
+        lcellule_non_vide=.false.
+     endif
+
+     ! Test sortie
+     if (test_exit_grid(icell, x0, y0, z0)) then
+        return
+     endif
+
+     nbr_cell = nbr_cell + 1
+
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     previous_cell = 0 ! unused, just for Voronoi
+     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
+
+     if (lcellule_non_vide) then
+        ! local line profile mutiplied by frequency
+        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
+
+        do i=1,nTrans
+           iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
+
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
+
+           ! Epaisseur optique
+           dtau_mol(:) =  l * opacite(:)
+           dtau_c = l * kappa(icell,iTrans)
+
+           ! Mise a jour profondeur optique pour cellule suivante
+           ! Warning tau and  tau_c are smaller array (dimension nTrans)
+           tau_mol(:,i) = tau_mol(:,i) + dtau_mol(:)
+           tau_c(i) = tau_c(i) + dtau_c
+        enddo ! i
+     endif  ! lcellule_non_vide
+
+  enddo infinie
 
   return
 
