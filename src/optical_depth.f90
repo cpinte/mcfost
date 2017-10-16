@@ -395,20 +395,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
            Snu_c = emissivite_dust(icell,iTrans) / (kappa(icell,iTrans) + 1.0e-300_dp)
 
-           !if (icell == 593530)
-           !write(*,*) iTrans, emissivite_mol_o_freq(icell,iTrans) * maxval(P) / emissivite_dust(icell,iTrans)
-
-           ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
-           ! la profondeur optique jusqu'a la cellule
-           !---write(*,*) ri0, zj0
-           !---write(*,*) "kappa", kappa_mol_o_freq(ri0,zj0,iTrans), kappa(iTrans,ri0,zj0,1)
-           !---write(*,*) "eps", emissivite_mol_o_freq(ri0,zj0,iTrans)
-           !---
-           !---write(*,*) minval(tau(:,iTrans)), maxval(tau(:,iTrans))
-           !---write(*,*) minval(dtau(:)), maxval(dtau(:))
-           !---write(*,*) minval(Snu(:)), maxval(Snu(:))
-
-           ! Warning I0, I0c (and origine_mol) are smaller array (dimension nTrans)
+           ! Warning I0, I0c (and origine_mol) are smaller arrays (dimension nTrans)
            I0(:,i,iray,id) = I0(:,i,iray,id) + &
                 exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            I0c(i,iray,id) = I0c(i,iray,id) + &
@@ -547,7 +534,6 @@ end function local_line_profile
 
 !***********************************************************
 
-
 subroutine integ_tau_mol(imol)
 
   implicit none
@@ -569,8 +555,6 @@ subroutine integ_tau_mol(imol)
   tab_speed(:) = span(-vmax,vmax,2*n_speed+1)
 
   iTrans = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
-
-
 
   do it=1, mol(imol)%nTrans_rayTracing
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
