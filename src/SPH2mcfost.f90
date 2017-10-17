@@ -103,7 +103,7 @@ contains
     logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: limit_threshold = 0.005
-    real, parameter :: SPH_2_total_dust = 20. ! SPH dust mass is 5% of total
+    real, parameter :: SPH_dust_2_total_dust = 20. ! SPH dust mass is 5% of total
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -129,7 +129,7 @@ contains
     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
 
     if (lwrite_ASCII) then
-       ! Write the file for the grid version of mcfost
+       !  Write the file for the grid version of mcfost
        !- N_part: total number of particles
        !  - r_in: disk inner edge in AU
        !  - r_out: disk outer edge in AU
@@ -219,11 +219,12 @@ contains
     !enddo
     !masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
 
+    ! I need to work with masses, as Voronoi and SPH volume could be different
     do icell=1,n_cells
        iSPH = Voronoi(icell)%id
        if (iSPH > 0) then
-          masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun
-          densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
+          masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun ! en g
+          densite_gaz(icell)  = masse_gaz(icell) /  (masse_mol_gaz * volume(icell) * AU3_to_m3)
        else ! star
           masse_gaz(icell)    = 0.
           densite_gaz(icell)  = 0.
@@ -274,28 +275,21 @@ contains
           endif
        enddo
 
-       ! I need to work with masses
-       Mtot = 0. ;
-       Mtot_dust = 0. ;
+       Mtot = 0. ; Mtot_dust = 0.
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
-             masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun
-             densite_gaz(icell)  = masse_gaz(icell) /  (AU3_to_cm3 * masse_mol_gaz * volume(icell))
-
-             Mtot = Mtot +  masse_gaz(icell)
+             Mtot = Mtot +  massgas(icell)
              !Mtot_dust = Mtot_dust + masse_gaz(icell)* (sum(dustfrac(:,iSPH)))
              Mtot_dust = Mtot_dust + sum(massdust(:,icell))
-          else ! star
-             masse_gaz(icell)    = 0.
-             densite_gaz(icell)  = 0.
           endif
        enddo
        Mtot_dust = Mtot_dust / g_to_Msun
 
-       ! Remark : SPH_2_total_dust is a factor to convert SPH dust mass to total
+       ! Remark : SPH_dust_2_total_dust is a hard-coded factor to convert SPH dust mass to total
        ! dust mass if there are only a few grainsizes in the SPH dump
-       dust_to_gas = SPH_2_total_dust*Mtot_dust/Mtot
+       write(*,*) "WARNING: HARD-CODED: applying a corrective factor to the SPH dust mass, factor =", SPH_dust_2_total_dust
+       dust_to_gas = SPH_dust_2_total_dust * Mtot_dust/Mtot
 
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
@@ -360,7 +354,7 @@ contains
     else ! ndusttypes = 0 : using the gas density
 
        lvariable_dust = .false.
-       write(*,*) "Using gas to dust ratio in mcfost parameter file"
+       write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
 
        do icell=1,n_cells
           masse(icell) = 0.
