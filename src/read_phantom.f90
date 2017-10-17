@@ -294,7 +294,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
-  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,vx,vy,vz,rhogas,massgas
+  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,vx,vy,vz,rhogas,massgas ! massgas [Msun]
   integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real, dimension(:), allocatable, intent(out) :: extra_heating
@@ -424,8 +424,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
  endif
 
  write(*,*) ''
- write(*,*) 'Gas mass is      ', sum(massgas)
- write(*,*) 'SPH dust mass is ', sum(massdust)
+ write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
+ write(*,*) 'SPH dust mass is ', real(sum(massdust)), 'Msun'
  write(*,*) ''
 
  if (.not.lno_internal_energy) then
