@@ -544,48 +544,34 @@ subroutine integ_tau_mol(imol)
   integer :: i, j, iTrans, n_speed, icell, it
 
   integer, dimension(2) :: ispeed
-  real(kind=dp), dimension(:), allocatable :: tab_speed, P
+  real(kind=dp), dimension(0:0) :: tab_speed, P
+  real(kind=dp) :: x0, y0, z0, u0,v0,w0
 
-  n_speed = 0
-  allocate(tab_speed(-n_speed:n_speed), P(-n_speed:n_speed))
+  real(kind=dp), dimension(0:0,mol(imol)%nTrans_raytracing) :: tau_mol
+  real(kind=dp), dimension(mol(imol)%nTrans_raytracing) :: tau_dust
 
   ! Here, we are only looking at the line center (for the observer)
   ispeed(1) = 0 ; ispeed(2)  = 0 ; tab_speed(0) = 0.0_dp
 
-  ispeed(1) = -n_speed ; ispeed(2) = n_speed
-  tab_speed(:) = span(-vmax,vmax,2*n_speed+1)
 
-  iTrans = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+  x0=0.0 ; y0=0.0 ; z0=0.0
+  u0=1.0 ; v0=0.0 ; w0=0.0
+
+  call indice_cellule(x0,y0,z0, icell)
+
+  call optical_length_tot_mol(imol,icell,x0,y0,z0,u0,v0,w0, ispeed, tab_speed, &
+       mol(imol)%nTrans_raytracing ,mol(imol)%indice_Trans_raytracing,tau_mol,tau_dust)
 
   do it=1, mol(imol)%nTrans_rayTracing
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
 
      write(*,*) "-------------------------------"
-     write(*,*) "Transition #", iTrans
+     write(*,*) "Transition J=", itransUpper(iTrans), "-", itransLower(iTrans)
+     write(*,*) "tau_mol = ", real(tau_mol(0,iTrans))
+     write(*,*) "tau_dust=", real(tau_dust(iTrans))
 
-     if (lVoronoi) then
-       ! x0=0.0 ; y0=0.0 ; z0=0.0
-       ! w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
-       !
-       ! call indice_cellule(x0,y0,z0, icell)
-       ! call optical_length_tot_mol(imol,iTrans,icell,x0,y0,y0,u0,v0,w0,tau_mol,tau_dust)
-       !
-       ! write(*,*) "tau_mol = ", tau_mol
-       ! write(*,*) "tau_dust=", tau_dust
-     else
-
-
-        norme=0.0
-        norme1=0.0
-        do i=1, n_rad
-           icell = cell_map(i,1,1)
-           P(:) = phiProf(icell,ispeed,tab_speed)
-           norme=norme+kappa_mol_o_freq(icell,iTrans)*(r_lim(i)-r_lim(i-1))*P(0)
-           norme1=norme1 + kappa(icell,iTrans) * (r_lim(i)-r_lim(i-1))
-        enddo
-        write(*,*) "tau_mol = ", norme
-        write(*,*) "tau_dust=", norme1
-
+     ! Compute altitude at which tau=1 is reached
+     if (.not.lVoronoi) then
         loop_r : do i=1,n_rad
            icell = cell_map(i,1,1)
            if (r_grid(icell) > 100.0) then
@@ -593,7 +579,7 @@ subroutine integ_tau_mol(imol)
               loop_z : do j=nz, 1, -1
                  icell = cell_map(i,j,1)
                  P(:) = phiProf(icell,ispeed,tab_speed)
-                 norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*p(0)
+                 norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*P(0)
                  if (norme > 1.0) then
                     write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
                     exit loop_z
@@ -603,8 +589,8 @@ subroutine integ_tau_mol(imol)
               exit loop_r
            endif
         enddo loop_r
-
      endif
+
   enddo
 
   return
