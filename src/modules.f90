@@ -341,6 +341,9 @@ module grains
   real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs, C_abs_norm !n_grains, n_lambda
   !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
+  logical :: lforce_HG
+  real :: forced_g
+
   ! aggregats
   real, dimension(:,:,:,:,:), allocatable :: tab_mueller !4,4, 180, n_grains,n_lambda
 
