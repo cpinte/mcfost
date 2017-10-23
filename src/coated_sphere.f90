@@ -70,6 +70,9 @@ contains
     call dMiLay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext,qsca,qbs,gqsc,s1,s2)
     gsca = gqsc / qsca ! dmilay return gsca * qsca
 
+    if (lforce_HG) gsca = forced_g
+
+
     ! Passage des valeurs dans les tableaux de mcfost
     if (aniso_method==1) then
 
@@ -206,6 +209,8 @@ contains
        s2 = s2 + s2_HS * wf(i)
     enddo
     if (csca > 0.) gsca = gsca/csca
+
+    if (lforce_HG) gsca = forced_g
 
     factor = pi*a**2 ! va etre remultiplie par pi*a**2 a la sortie dans dust.f90
     qext = cext/factor

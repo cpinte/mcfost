@@ -117,6 +117,7 @@ subroutine set_default_variables()
   ldudt_implicit = .false.
   linfall = .false.
   lcylindrical_rotation = .false.
+  lforce_HG = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -819,6 +820,13 @@ subroutine initialisation_mcfost()
      case("-HG","-hg")
         i_arg = i_arg+1
         lHG=.true.
+     case("-force_HG","-force_hg")
+        i_arg = i_arg+1
+        lHG=.true.
+        lforce_HG=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) forced_g
      case("-p2m")
         i_arg = i_arg+1
         lProDiMo2mcfost=.true.
@@ -1413,6 +1421,8 @@ subroutine display_help()
   write(*,*) "        : -average_grain_size : computes average grain size in each cell,"
   write(*,*) "                             weighted by their geometrical cross-section;"
   write(*,*) "                             results stored in average_grain_size.fits.gz"
+  write(*,*) "        : -HG : uses an Heynyey-Greenstein function"
+  write(*,*) "        : -force_HG <g> : uses an Heynyey-Greenstein function and forces the g value"
   write(*,*) "        : -isotropic : forces isotropic scattering"
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
