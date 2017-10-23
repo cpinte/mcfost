@@ -216,7 +216,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux prop en fct de lambda
   ! **************************************************
-  call allocate_stellar_spectra()
+  call allocate_stellar_spectra(n_lambda)
 
   call allocate_thermal_energy(Nc)
 
@@ -708,7 +708,7 @@ subroutine realloc_dust_mol()
   tab_albedo_pos = 0
   tab_g_pos = 0.0
 
-  call allocate_stellar_spectra()
+  call allocate_stellar_spectra(n_lambda)
 
   return
 
@@ -747,6 +747,7 @@ subroutine realloc_step2()
 
   integer :: alloc_status, mem_size, p_n_lambda2_pos
 
+  n_lambda = n_lambda2
   if (ldust_prop) then
      p_n_lambda2_pos = n_lambda2
   else
@@ -766,7 +767,8 @@ subroutine realloc_step2()
   lscattering_method1 = (scattering_method==1)
 
   ! Liberation memoire
-  if (ltemp) then
+  if (lTemp) then
+
      call deallocate_temperature_calculation()
   endif
 
@@ -875,7 +877,7 @@ subroutine realloc_step2()
   n_phot_envoyes = 0.0
 
   call deallocate_stellar_spectra()
-  call allocate_stellar_spectra()
+  call allocate_stellar_spectra(n_lambda2)
 
   call realloc_emitting_fractions()
 
