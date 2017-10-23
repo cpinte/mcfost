@@ -19,12 +19,13 @@ module stars
 
   contains
 
-subroutine allocate_stellar_spectra()
+subroutine allocate_stellar_spectra(n_wl)
 
+  integer, intent(in) :: n_wl
   integer :: alloc_status
 
-  allocate(CDF_E_star(n_lambda,0:n_etoiles), prob_E_star(n_lambda,n_etoiles), E_stars(n_lambda),  &
-       E_disk(n_lambda), E_ISM(n_lambda), stat=alloc_status)
+  allocate(CDF_E_star(n_wl,0:n_etoiles), prob_E_star(n_wl,n_etoiles), E_stars(n_wl),  &
+       E_disk(n_wl), E_ISM(n_wl), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error CDF_E_star'
      stop
@@ -35,7 +36,7 @@ subroutine allocate_stellar_spectra()
   E_disk = 0.0
   E_ISM = 0.0
 
-  allocate(spectre_etoiles_cumul(0:n_lambda),spectre_etoiles(n_lambda), stat=alloc_status)
+  allocate(spectre_etoiles_cumul(0:n_wl),spectre_etoiles(n_wl), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error spectre_etoile'
      stop

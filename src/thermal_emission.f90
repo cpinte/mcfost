@@ -72,7 +72,7 @@ subroutine allocate_thermal_energy(Nc)
 
   allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
+     write(*,*) 'Allocation error prob_E_cell 1'
      stop
   endif
   prob_E_cell = 0.0
@@ -278,9 +278,6 @@ subroutine deallocate_thermal_emission()
      if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
   endif
 
-  deallocate(prob_E_cell)
-
-
   if (lnRE) then
      deallocate(E_em_1grain_nRE,log_E_em_1grain_nRE)
      deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
@@ -315,6 +312,7 @@ subroutine realloc_emitting_fractions()
 
   integer :: alloc_status
 
+  alloc_status = 0
   deallocate(frac_E_stars, frac_E_disk, E_totale)
   allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
@@ -323,9 +321,10 @@ subroutine realloc_emitting_fractions()
   endif
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
+  deallocate(prob_E_cell)
   allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
+     write(*,*) 'Allocation error prob_E_cell 2'
      stop
   endif
   prob_E_cell = 0.0
@@ -2211,7 +2210,7 @@ subroutine allocate_weight_proba_emission(Nc)
 
   allocate(weight_proba_emission(Nc), correct_E_emission(Nc), stat=alloc_status)
   if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell'
+     write(*,*) 'Allocation error prob_E_cell 3'
      stop
   endif
   weight_proba_emission = 1.0 ;
