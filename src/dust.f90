@@ -1065,6 +1065,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
   real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
   real(kind=dp) :: density, theta, norme, fact, k_sca_tot
+  real :: mu, g, g2
 
   integer :: icell, k, l
 
@@ -1078,7 +1079,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop) &
-  !$omp private(icell,k,density,norme,theta,k_sca_tot)
+  !$omp private(icell,k,density,norme,theta,k_sca_tot,mu,g,g2)
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
      if (aniso_method==1) then
@@ -1152,7 +1153,15 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! --
            ! -- if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
         else !aniso_method == 2 : HG
-           tab_s11_pos(:,icell,p_lambda) = 1.0
+
+           ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
+           ! (for ray-tracing)
+           do l=0,nang_scatt
+              g = tab_g_pos(icell,p_lambda) ; g2 = g**2
+              mu = cos((real(l))/real(nang_scatt)*pi) ! cos(theta)
+              tab_s11_pos(l,icell,p_lambda) = 1.0/quatre_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
+           enddo
+
            if (lsepar_pola) then
               tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
               tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
