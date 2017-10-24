@@ -1408,7 +1408,7 @@ subroutine hg(g, aleat, itheta, cospsi)
   if (abs(g) > tiny_real) then
      g1 = g ! dp
      g2 = g1*g1
-     cospsi = (1.0_dp + g2 - ((1.0_dp - g2) / (1.0_dp - g1 + 2.0_dp*g*rand))**2) / (2.0_dp * g1)
+     cospsi = (1.0_dp + g2 - ((1.0_dp - g2) / (1.0_dp - g1 + 2.0_dp*g1*rand))**2) / (2.0_dp * g1)
   else ! g=0 --> diffusion isotrope
      cospsi=2.0_dp*rand-1.0_dp
   endif
