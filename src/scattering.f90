@@ -1401,23 +1401,18 @@ subroutine hg(g, aleat, itheta, cospsi)
   real, intent(in) :: aleat
   real(kind=dp), intent(out) :: cospsi
   integer, intent(out) :: itheta
-  real (kind=dp) :: g1, g2, a, b, c, d, rand
+  real (kind=dp) :: rand, g1, g2
 
   rand = min(real(aleat,kind=dp), 1.0_dp-1e-6_dp)
 
   if (abs(g) > tiny_real) then
-     g1 = g
+     g1 = g ! dp
      g2 = g1*g1
-     a = 1.0_dp + g2
-     b = 1.0_dp - g2
-     c = 1.0_dp - g1 + 2.0_dp*g1*rand
-     d = b / c
-     cospsi = ( (a - d*d) / (2.0_dp * g1) )
+     cospsi = (1.0_dp + g2 - ((1.0_dp - g2) / (1.0_dp - g1 + 2.0_dp*g*rand))**2) / (2.0_dp * g1)
   else ! g=0 --> diffusion isotrope
      cospsi=2.0_dp*rand-1.0_dp
   endif
 
-  if (cospsi > 1.0_dp) write(*,*) g1, rand
   itheta = floor(acos(cospsi)*180.0_dp/pi)+1
   if (itheta > nang_scatt) itheta = nang_scatt
 
@@ -1429,7 +1424,7 @@ end subroutine hg
 subroutine angle_diff_theta(lambda, taille_grain, aleat, aleat2, itheta, cospsi)
 ! Calcul du cosinus de l'angle de diffusion
 ! a partir de l'integrale des s11 pretabulées
-! itheta est l'indice i de l'angle de 1 a 180 correspondant Ã  i-0.5°
+! itheta est l'indice i de l'angle de 1 a 180 correspondant a i-0.5°
 ! cospsi est tire uniformément dans le bin de 1° autour de l'angle i-0.5°
 ! itheta est utilisé pour les valeurs prétabulées
 ! cospsi est utilisé pour la direction de vol
