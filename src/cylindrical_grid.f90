@@ -287,7 +287,7 @@ subroutine define_cylindrical_grid()
   istart = 1
   tab_r(:) = 0.0_dp
   do ir=1, n_regions
-     regions(ir)%iRmin = istart ; regions(ir)%iRmax = istart+n_rad_region-1 ;
+     regions(ir)%iRmin = istart ; regions(ir)%iRmax = min(istart+n_rad_region-1, n_rad) ;
 
      if (ir == n_regions) then
         n_rad_region = n_rad - n_cells_tmp ! On prend toutes les celles restantes
