@@ -112,8 +112,9 @@ contains
     use read_phantom
     use prop_star, only : n_etoiles, E_ISM
     use em_th, only : temperature, E_abs_nRE
-    use thermal_emission, only : reset_radiation_field, select_wl_em, repartition_energie, init_reemission, &
-         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature
+    use radiation_field, only : reset_radiation_field
+    use thermal_emission, only : select_wl_em, repartition_energie, init_reemission, &
+         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, reset_temperature
     use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
@@ -156,7 +157,7 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas
+    real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas, vx,vy,vz
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
@@ -189,15 +190,15 @@ contains
     mu_gas = mu ! Molecular weight
     Frad = 0.
 
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,vxyzu,&
-      iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
-      umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,particle_id,&
-      massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+         vxyzu,iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
+         umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,vx,vy,vz,particle_id,&
+         massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
 
     call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
-    call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,massgas,massdust,rhogas,rhodust,grainsize, SPH_limits, .false.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,vx,vy,vz, massgas,massdust,rhogas,rhodust,grainsize, SPH_limits, .false.)
 
     call setup_grid()
     ! Allocation dynamique

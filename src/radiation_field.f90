@@ -9,7 +9,7 @@ module radiation_field
 
   public :: J0, xJ_abs, xN_abs, xKJ_abs, E0
   public :: save_radiation_field, allocate_radiation_field_step1, allocate_radiation_field_step2, &
-       deallocate_radiation_field
+       deallocate_radiation_field, reset_radiation_field
 
   private
 
