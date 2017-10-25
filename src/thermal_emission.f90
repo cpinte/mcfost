@@ -23,7 +23,8 @@ module thermal_emission
        define_proba_weight_emission, emission_nre, im_reemission_lte, im_reemission_nlte, &
        im_reemission_qre, init_emissivite_nre, init_reemission, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
-       repartition_wl_em, repartition_energie, allocate_thermal_energy
+       repartition_wl_em, repartition_energie, allocate_thermal_energy, set_min_temperature, &
+       reset_temperature
 
   private
 
