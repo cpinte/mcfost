@@ -16,6 +16,7 @@ module Voronoi_grid
 
   type Voronoi_cell
      real(kind=dp), dimension(3) :: xyz, vxyz
+     real(kind=dp) :: h ! SPH smoothing lengths
      integer :: id, first_neighbour, last_neighbour
      logical :: exist
   end type Voronoi_cell

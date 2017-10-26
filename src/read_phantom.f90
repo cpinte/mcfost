@@ -7,12 +7,12 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_file(iunit,filename,x,y,z,vx,vy,vz,particle_id,massgas,massdust,&
-      rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+    subroutine read_phantom_file(iunit,filename, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+         rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
 
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- real(dp), intent(out), dimension(:),   allocatable :: x,y,z, vx,vy,vz, rhogas,massgas,grainsize
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,grainsize
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  real, intent(out), dimension(:), allocatable :: extra_heating
@@ -252,8 +252,8 @@ subroutine read_phantom_file(iunit,filename,x,y,z,vx,vy,vz,particle_id,massgas,m
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
          vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,&
-         hfact,umass,utime,udist,graindens,ndudt,dudt,n_SPH,x,y,z,vx,vy,vz,particle_id,&
-         massgas,massdust,rhogas,rhodust,extra_heating)
+         hfact,umass,utime,udist,graindens,ndudt,dudt,n_SPH,x,y,z,h,vx,vy,vz,&
+         particle_id, massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -268,17 +268,17 @@ end subroutine read_phantom_file
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
-     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass,utime,&
-     udist,graindens,ndudt,dudt,n_SPH,x,y,z,vx,vy,vz,particle_id,massgas,massdust,&
-     rhogas,rhodust,extra_heating,T_to_u)
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
+     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
+     utime, udist,graindens,ndudt,dudt,n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
+     massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun
   use prop_star
   use parametres, only : ldudt_implicit,ufac_implicit
 
@@ -294,7 +294,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
-  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,vx,vy,vz,rhogas,massgas ! massgas [Msun]
+  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,rhogas,massgas ! massgas [Msun]
   integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real, dimension(:), allocatable, intent(out) :: extra_heating
@@ -302,12 +302,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
   real(dp), intent(in), optional :: T_to_u
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles
-  real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
-  real(dp) :: gasfraci,dustfraci,totlum,qtermi
+  real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
+  real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
-  logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust particles for Voronoi mesh
-
-  real, parameter :: Lsun = 3.839e26 ! W
+  logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
   udens = umass/udist**3
   uerg_per_s = umass*udist**2/utime**3
@@ -342,7 +340,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
  allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),particle_id(n_SPH),&
-      x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
+      x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
@@ -369,13 +367,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
 
     itypei = abs(iphase(i))
     if (hi > 0.) then
-       if (use_dust_particles .and. &
-           dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
+       if (use_dust_particles .and. dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
           j = j + 1
           particle_id(j) = i
           x(j) = xi * ulength_au
           y(j) = yi * ulength_au
           z(j) = zi * ulength_au
+          h(j) = hi * ulength_au
           if (lemission_mol) then
              vx(j) = vxi * uvelocity
              vy(j) = vyi * uvelocity

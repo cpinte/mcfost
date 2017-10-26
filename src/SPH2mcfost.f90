@@ -20,7 +20,7 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(dp), allocatable, dimension(:) :: x,y,z,vx,vy,vz,rho,massgas,grainsize
+    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,grainsize
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
@@ -32,7 +32,7 @@ contains
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file,x,y,z,vx,vy,vz, &
+       call read_phantom_file(iunit,SPH_file,x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
@@ -42,11 +42,11 @@ contains
     else if (lgadget2_file) then
        write(*,*) "Performing gadget2mcfost setup"
        write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
-       call read_gadget2_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       call read_gadget2_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     endif
     write(*,*) "Done"
 
@@ -72,7 +72,7 @@ contains
        SPH_limits(:) = 0
     endif
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
@@ -85,7 +85,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, &
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, &
        SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
@@ -96,7 +96,7 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,vx,vy,vz,rho,massgas
+    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,vx,vy,vz,rho,massgas
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: grainsize
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -398,6 +398,16 @@ contains
        enddo
     endif
 
+    !*************************
+    ! Smoothing lengths
+    !*************************
+    do icell=1,n_cells
+       iSPH = Voronoi(icell)%id
+       if (iSPH > 0) then
+          Voronoi(icell)%h = h(iSPH)
+       endif
+    enddo
+
     return
 
   end subroutine SPH_to_Voronoi
@@ -465,11 +475,11 @@ contains
 
   !*********************************************************
 
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust
     integer, intent(out) :: ndusttypes, n_SPH,ierr
 
@@ -488,7 +498,7 @@ contains
     write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
 
     alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Allocation error in phanton_2_mcfost"
        write(*,*) "Exiting"
@@ -497,7 +507,7 @@ contains
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), massgas(i)
+       read(1,*) x(i), y(i), z(i), h(i), massgas(i)
        rhogas(i) = massgas(i)
     enddo
 

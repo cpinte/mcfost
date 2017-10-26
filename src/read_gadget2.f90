@@ -8,13 +8,13 @@ module read_gadget2
 
 contains
 
-  subroutine read_gadget2_file(iunit,filename,x,y,z,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+  subroutine read_gadget2_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
     use prop_star
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,rhogas,massgas
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust
     integer, intent(out) :: ndusttypes,n_SPH
 
@@ -53,6 +53,10 @@ contains
 
     ierr = 0
     ndusttypes = 1 ! only gas for gadget
+
+    write(*,*) "ERROR: Gadget interface needs to be updated to read h"
+    write(*,*) "Exiting"
+    stop
 
     ! check dump file exists and open
     inquire(file = filename(1:len_trim(filename)), exist = exists)
