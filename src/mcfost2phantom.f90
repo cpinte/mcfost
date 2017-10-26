@@ -157,7 +157,7 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(:), allocatable :: XX,YY,ZZ,rhogas, massgas, vx,vy,vz
+    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
@@ -192,13 +192,14 @@ contains
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
          vxyzu,iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
-         umass,utime,udist,graindens,ndudt,dudt,n_SPH,XX,YY,ZZ,vx,vy,vz,particle_id,&
+         umass,utime,udist,graindens,ndudt,dudt,n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
 
     call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
-    call SPH_to_Voronoi(n_SPH, ndusttypes, XX,YY,ZZ,vx,vy,vz, massgas,massdust,rhogas,rhodust,grainsize, SPH_limits, .false.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH, &
+         massgas,massdust,rhogas,rhodust,grainsize, SPH_limits, .false.)
 
     call setup_grid()
     ! Allocation dynamique

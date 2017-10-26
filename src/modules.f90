@@ -603,6 +603,7 @@ module constantes
   real(kind=dp), parameter :: eV_to_J = 1.60217653e-19_dp
   real(kind=dp), parameter :: erg_to_J = 1.0e-7_dp
   real, parameter :: jansky = 1.0e-26 ! W.m^-2.Hz-1 (F_nu en jansky)
+  real, parameter :: Lsun = 3.839e26 ! W
 
   ! Masses
   real(kind=dp), parameter :: Msun_to_g = 1.9891e33_dp
