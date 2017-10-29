@@ -21,10 +21,17 @@ contains
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
 
+    write(*,*)
+    write(*,*) "------------------------------"
     write(*,*) "Initializing MCFOST library"
+    write(*,*) "------------------------------"
+    write(*,*)
 
     ! Global logical variables
     call set_default_variables()
+
+    write(*,*) "WARNING : internal heating is turned off in mcfost"
+    lno_internal_energy = .true.
 
     ! Looking for the mcfost utils directory
     call get_mcfost_utils_dir()

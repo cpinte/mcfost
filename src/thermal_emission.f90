@@ -729,7 +729,7 @@ subroutine init_reemission(lheating,dudt)
      do icell=1, n_cells
         do T=1,n_T-1
            if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T,icell)) then
-              write(*,*) "ERROR : Qrad_minus_dudt is an increasing function of T"
+              write(*,*) "ERROR : Qrad_minus_dudt is not an increasing function of T"
               write(*,*) "Exiting"
               stop
            endif
