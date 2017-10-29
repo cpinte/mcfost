@@ -426,6 +426,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  write(*,*) 'SPH dust mass is ', real(sum(massdust)), 'Msun'
  write(*,*) ''
 
+ lextra_heating = .false. ; ldudt_implicit = .false.
  if (.not.lno_internal_energy) then
     if (ndudt == np) then
        write(*,*) "Computing energy input"
@@ -446,13 +447,15 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
        write(*,*) "Total energy input = ",real(totlum),' W'
        write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
     endif
- endif
- if (present( T_to_u )) then
-   ufac_implicit = T_to_u * uWatt
-   ldudt_implicit = .true.
- else
-   ufac_implicit = 0.
-   ldudt_implicit = .false.
+
+    if (present( T_to_u )) then
+       ufac_implicit = T_to_u * uWatt
+       ldudt_implicit = .true.
+       write(*,*) "Implicit heating scheme"
+    else
+       ufac_implicit = 0.
+       ldudt_implicit = .false.
+    endif
  endif
 
  write(*,*) "Updating the stellar properties:"
