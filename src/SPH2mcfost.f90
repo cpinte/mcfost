@@ -96,7 +96,8 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,vx,vy,vz,rho,massgas
+    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas
+    real(dp), dimension(:), allocatable, intent(in) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: grainsize
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -113,7 +114,6 @@ contains
     integer :: icell, l, k, iSPH
 
     real(dp), dimension(6) :: limits
-
 
     icell_ref = 1
 
@@ -223,7 +223,7 @@ contains
     do icell=1,n_cells
        iSPH = Voronoi(icell)%id
        if (iSPH > 0) then
-          masse_gaz(icell)    = massgas(iSPH) /  g_to_Msun ! en g
+          masse_gaz(icell)    = massgas(iSPH) * Msun_to_g ! en g
           densite_gaz(icell)  = masse_gaz(icell) /  (masse_mol_gaz * volume(icell) * AU3_to_m3)
        else ! star
           masse_gaz(icell)    = 0.
@@ -284,7 +284,8 @@ contains
              Mtot_dust = Mtot_dust + sum(massdust(:,icell))
           endif
        enddo
-       Mtot_dust = Mtot_dust / g_to_Msun
+
+       !Mtot_dust = Mtot_dust * Msun_to_g
 
        ! Remark : SPH_dust_2_total_dust is a hard-coded factor to convert SPH dust mass to total
        ! dust mass if there are only a few grainsizes in the SPH dump
@@ -298,7 +299,7 @@ contains
              do l=1, ndusttypes+1
                 if (l==1) then
                    ! small grains follow the gas, we do not care about normalization here
-                   rho_dust(l) = massgas(iSPH) / (100. * volume(icell))
+                   rho_dust(l) = massgas(iSPH) * dust_to_gas / volume(icell)
                 else
                    rho_dust(l) = massdust(l-1,iSPH) / volume(icell)
                 endif
@@ -337,10 +338,10 @@ contains
        mass = 0.0
        do icell=1,n_cells
           do l=1,n_grains_tot
-             mass=mass + densite_pouss(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+             mass = mass + densite_pouss(l,icell) * M_grain(l) * volume(icell)
           enddo !l
        enddo !icell
-       mass =  mass !/Msun_to_g
+       mass = mass * AU3_to_cm3
        densite_pouss(:,:) = densite_pouss(:,:) * sum(masse_gaz)/mass * dust_to_gas
 
        do icell=1,n_cells
@@ -370,7 +371,7 @@ contains
     endif
 
     write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
-    write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
