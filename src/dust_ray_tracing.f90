@@ -57,7 +57,7 @@ subroutine alloc_ray_tracing()
      n_theta_rt = 2
   endif
 
-  ! n_phi_I and n_theta_I are the angular dimensions of the stored radiation field
+  ! n_phi_I and n_theta_I are the angular dimensions of the stored radiation field for rt2
   ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
   n_theta_I = 15 ;
@@ -303,11 +303,11 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
 
   ! creation des tableaux de u,v,w
   do iscatt=1, N
-    ! if (l_sym_ima) then
-    !    phi = pi * real(iscatt-1) / real(nang_ray_tracing-1) + pi
-    ! else
-        phi = deux_pi * real(iscatt) / real(N)
-    ! endif
+     ! if (l_sym_ima) then
+     !    phi = pi * real(iscatt-1) / real(nang_ray_tracing-1) + pi
+     ! else
+     phi = deux_pi * real(iscatt) / real(N)
+     ! endif
 
      phi = phi - phi_pos
 
@@ -1507,13 +1507,33 @@ function dust_source_fct(icell, x,y,z)
 
      ! Fct source des cellules
      icell_tmp = cell_map(ri1,zj1,phik)
-     SF1(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     SF1(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF1(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri2,zj1,phik)
-     SF2(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     SF2(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF2(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri1,zj2,phik)
-     SF3(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     SF3(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF3(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri2,zj2,phik)
-     SF4(:) = eps_dust2(:,iscatt2,dir,icell_tmp) * frac + eps_dust2(:,iscatt1,dir,icell_tmp) * un_m_frac
+     SF4(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF4(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
 
      !----------------------------------------------------
      ! Emissivite du champ stellaire diffuse 1 fois
@@ -1588,5 +1608,41 @@ function dust_source_fct(icell, x,y,z)
 end function dust_source_fct
 
 !***********************************************************
+
+function interpolate_Stokes_QU(QU1,QU2,frac1)
+  ! This fonction interpolates Stokes Q and U
+  ! by a linear interpolation in polarisation intensity and angle
+  ! as interpolating Q and U directly creates artefacts
+  ! (reduced pola when interpolating 2 Stokes vectors that are not aligned)
+  ! C. Pinte 1/11/2017
+
+  real, dimension(2), intent(in) :: QU1,QU2
+  real(dp), intent(in) :: frac1
+  real, dimension(2) :: interpolate_Stokes_QU
+
+  real :: PxI1, PxI2, PxI, deux_theta1, deux_theta2, deux_theta
+
+
+  PxI1 = sqrt(QU1(1)**2 + QU1(2)**2) ; deux_theta1 = atan2(QU1(2),QU1(1))
+  PxI2 = sqrt(QU2(1)**2 + QU2(2)**2) ; deux_theta2 = atan2(QU2(2),QU2(1))
+
+  ! Linear interpolation of polarized intensity
+  PxI = PxI2 * (1.0_dp-frac1) + PxI1 * frac1
+
+  ! Making sure there is no wrapping before the linear interpolation in angle
+  if (abs(deux_theta2 - deux_theta1) >= pi) then
+     if (deux_theta2 > deux_theta1) then
+        deux_theta1 = deux_theta1 + deux_pi
+     else
+        deux_theta2 = deux_theta2 + deux_pi
+     endif
+  endif
+  deux_theta = deux_theta2 * (1.0_dp-frac1) + deux_theta1 * frac1
+
+  interpolate_Stokes_QU = PxI * [cos(deux_theta),sin(deux_theta)]
+
+  return
+
+end function interpolate_Stokes_QU
 
 end module dust_ray_tracing
