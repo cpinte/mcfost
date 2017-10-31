@@ -536,7 +536,7 @@ module constantes
   save
 
   ! Quelques reels utiles
-  real(kind=dp), parameter :: pi =3.141592653589793238462643383279502884197_dp ! ca devrait etre bon la
+  real(kind=dp), parameter :: pi = 3.141592653589793238462643383279502884197_dp ! ca devrait etre bon la
   real(kind=dp), parameter :: deux_pi = 2.0_dp * pi
   real(kind=dp), parameter :: un_sur_deux_pi = 1.0_dp/deux_pi
   real(kind=dp), parameter :: quatre_pi = 4.0_dp * pi
