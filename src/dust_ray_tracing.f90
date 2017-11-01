@@ -681,6 +681,8 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   integer, intent(in) :: lambda, p_lambda,ibin
   integer :: iscatt, dir, icell
 
+  real :: Q, U
+
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
   if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
 
@@ -702,7 +704,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp default(none) &
   !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,eps_dust2_star,lsepar_pola) &
   !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc) &
-  !$omp private(icell,dir,iscatt)
+  !$omp private(icell,dir,iscatt,Q,U)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      if (kappa(icell,lambda) > tiny_dp) then
@@ -713,6 +715,11 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
               if (lsepar_pola) then
                  eps_dust2(2:4,iscatt,dir,icell) =  I_sca2(2:4,iscatt,dir,icell)  / kappa(icell,lambda)
+
+                 ! Transforming to P*I and 2*theta for new interpolation scheme in dust_source_fct()
+                 Q = eps_dust2(2,iscatt,dir,icell) ; U = eps_dust2(3,iscatt,dir,icell)
+                 eps_dust2(2,iscatt,dir,icell) = sqrt(Q**2 + U**2)
+                 eps_dust2(3,iscatt,dir,icell) = atan2(U,Q)
               endif
 
               if (lsepar_contrib) then
@@ -1609,22 +1616,25 @@ end function dust_source_fct
 
 !***********************************************************
 
-function interpolate_Stokes_QU(QU1,QU2,frac1)
+function interpolate_Stokes_QU(PI_deuxtheta1,PI_deuxtheta2,frac1)
   ! This fonction interpolates Stokes Q and U
   ! by a linear interpolation in polarisation intensity and angle
   ! as interpolating Q and U directly creates artefacts
   ! (reduced pola when interpolating 2 Stokes vectors that are not aligned)
   ! C. Pinte 1/11/2017
 
-  real, dimension(2), intent(in) :: QU1,QU2
+  real, dimension(2), intent(in) :: PI_deuxtheta1,PI_deuxtheta2
   real(dp), intent(in) :: frac1
   real, dimension(2) :: interpolate_Stokes_QU
 
   real :: PxI1, PxI2, PxI, deux_theta1, deux_theta2, deux_theta
 
+  !PxI1 = sqrt(QU1(1)**2 + QU1(2)**2) ; deux_theta1 = atan2(QU1(2),QU1(1))
+  !PxI2 = sqrt(QU2(1)**2 + QU2(2)**2) ; deux_theta2 = atan2(QU2(2),QU2(1))
 
-  PxI1 = sqrt(QU1(1)**2 + QU1(2)**2) ; deux_theta1 = atan2(QU1(2),QU1(1))
-  PxI2 = sqrt(QU2(1)**2 + QU2(2)**2) ; deux_theta2 = atan2(QU2(2),QU2(1))
+  ! Using PxI and deux_theta
+  PxI1 = PI_deuxtheta1(1) ; deux_theta1 = PI_deuxtheta1(2)
+  PxI2 = PI_deuxtheta2(1) ; deux_theta2 = PI_deuxtheta2(2)
 
   ! Linear interpolation of polarized intensity
   PxI = PxI2 * (1.0_dp-frac1) + PxI1 * frac1
