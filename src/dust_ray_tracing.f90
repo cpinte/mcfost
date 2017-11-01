@@ -731,6 +731,11 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
            do iscatt = 1, nang_ray_tracing_star
               eps_dust2_star(:,iscatt,dir,icell) = eps_dust2_star(:,iscatt,dir,icell) / kappa(icell,lambda)
+
+              ! Transforming to P*I and 2*theta for new interpolation scheme in dust_source_fct()
+              Q = eps_dust2_star(2,iscatt,dir,icell) ; U = eps_dust2_star(3,iscatt,dir,icell)
+              eps_dust2_star(2,iscatt,dir,icell) = sqrt(Q**2 + U**2)
+              eps_dust2_star(3,iscatt,dir,icell) = atan2(U,Q)
            enddo ! iscatt
         enddo ! dir
      else
@@ -1564,25 +1569,38 @@ function dust_source_fct(icell, x,y,z)
 !     SF1(:) = SF1(:) + exp(log(eps_dust2_star(:,iscatt2,dir,ri1,zj1)) * frac + log(eps_dust2_star(:,iscatt1,dir,ri1,zj1)) * un_m_frac)
      ! TODO : passer en log ameliore un peu la forme a longue distance mais cree des bug si 0. !!
 
-     if (lsepar_pola) then
-        n_pola = 4
-     else
-        n_pola = 1
-     endif
-
      ! TODO : petit bug ici --> on peut ajuster la taille de eps_dust2_star au lieu de la fixer a 4
      icell_tmp = cell_map(ri1,zj1,phik)
-     SF1(1:n_pola) = SF1(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     SF1(1) = SF1(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF1(2:3) = SF1(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri2,zj1,phik)
-     SF2(1:n_pola) = SF2(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     SF2(1) = SF2(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF2(2:3) = SF2(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri1,zj2,phik)
-     SF3(1:n_pola) = SF3(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     SF3(1) = SF3(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF3(2:3) = SF3(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+
      icell_tmp = cell_map(ri2,zj2,phik)
-     SF4(1:n_pola) = SF4(1:n_pola) + eps_dust2_star(1:n_pola,iscatt2,dir,icell_tmp) * frac &
-          + eps_dust2_star(1:n_pola,iscatt1,dir,icell_tmp) * un_m_frac
+     SF4(1) = SF4(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+          + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+     if (lsepar_pola) then
+        SF4(2:3) = SF4(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
+             eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
 
      if (lsepar_contrib) then
         icell_tmp = cell_map(ri1,zj1,phik)
