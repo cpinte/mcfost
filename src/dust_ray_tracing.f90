@@ -149,7 +149,8 @@ subroutine alloc_ray_tracing()
      endif
      eps_dust2 =0.0_dp ; I_sca2 = 0.0_dp ;
 
-     allocate(eps_dust2_star(4,nang_ray_tracing_star,0:1,n_cells), stat=alloc_status)
+
+     allocate(eps_dust2_star(n_Stokes,nang_ray_tracing_star,0:1,n_cells), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error eps_dust2_star'
         stop
@@ -732,10 +733,12 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
            do iscatt = 1, nang_ray_tracing_star
               eps_dust2_star(:,iscatt,dir,icell) = eps_dust2_star(:,iscatt,dir,icell) / kappa(icell,lambda)
 
-              ! Transforming to P*I and 2*theta for new interpolation scheme in dust_source_fct()
-              Q = eps_dust2_star(2,iscatt,dir,icell) ; U = eps_dust2_star(3,iscatt,dir,icell)
-              eps_dust2_star(2,iscatt,dir,icell) = sqrt(Q**2 + U**2)
-              eps_dust2_star(3,iscatt,dir,icell) = atan2(U,Q)
+              if (lsepar_pola) then
+                 ! Transforming to P*I and 2*theta for new interpolation scheme in dust_source_fct()
+                 Q = eps_dust2_star(2,iscatt,dir,icell) ; U = eps_dust2_star(3,iscatt,dir,icell)
+                 eps_dust2_star(2,iscatt,dir,icell) = sqrt(Q**2 + U**2)
+                 eps_dust2_star(3,iscatt,dir,icell) = atan2(U,Q)
+              endif
            enddo ! iscatt
         enddo ! dir
      else
@@ -1569,7 +1572,6 @@ function dust_source_fct(icell, x,y,z)
 !     SF1(:) = SF1(:) + exp(log(eps_dust2_star(:,iscatt2,dir,ri1,zj1)) * frac + log(eps_dust2_star(:,iscatt1,dir,ri1,zj1)) * un_m_frac)
      ! TODO : passer en log ameliore un peu la forme a longue distance mais cree des bug si 0. !!
 
-     ! TODO : petit bug ici --> on peut ajuster la taille de eps_dust2_star au lieu de la fixer a 4
      icell_tmp = cell_map(ri1,zj1,phik)
      SF1(1) = SF1(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
           + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
