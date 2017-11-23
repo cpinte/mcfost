@@ -1385,6 +1385,8 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
   endif
 
   do istar=1, n_etoiles
+     if (etoile(istar)%icell == 0) cycle ! star is not in the grid
+
      map_1star(:,:,:) = 0.0
      if (lpola) then
         Q_1star(:,:,:) = 0.0
