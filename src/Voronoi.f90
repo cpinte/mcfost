@@ -949,8 +949,8 @@ module Voronoi_grid
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: r, k
-    real, dimension(:,:), allocatable :: n, p_r
-    real, dimension(:), allocatable :: den, num, s_tmp
+    real, dimension(3,100) :: n, p_r
+    real, dimension(100) :: den, num, s_tmp
     real :: s_tmp_wall
 
     integer :: n_neighbours, n_wall
@@ -979,22 +979,19 @@ module Voronoi_grid
     enddo
 
     ! Allocate arrays
-    allocate(n(3,n_neighbours), p_r(3,n_neighbours), den(n_neighbours), num(n_neighbours), s_tmp(n_neighbours))
+    !allocate(n(3,n_neighbours), p_r(3,n_neighbours), den(n_neighbours), num(n_neighbours), s_tmp(n_neighbours))
 
     ! Array of vectors
     do i=1,n_neighbours
        id_n = tab_id(i)
-!       write(*,*) i, "A", shape(n), id_n
-
-
        n(:,i) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
        p_r(:,i) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:)) - r(:)
     enddo
 
-    den(:) = n(1,:) * k(1) + n(2,:) * k(2) + n(3,:) * k(3)
-    num(:) = n(1,:) * p_r(1,:) + n(2,:) * p_r(2,:) + n(3,:) * p_r(3,:)
+    den(1:n_neighbours) = n(1,1:n_neighbours) * k(1) + n(2,1:n_neighbours) * k(2) + n(3,1:n_neighbours) * k(3)
+    num(1:n_neighbours) = n(1,1:n_neighbours) * p_r(1,1:n_neighbours) + n(2,1:n_neighbours) * p_r(2,1:n_neighbours) + n(3,1:n_neighbours) * p_r(3,1:n_neighbours)
 
-    s_tmp(:) = num(:)/den(:)
+    s_tmp(1:n_neighbours) = num(1:n_neighbours)/den(1:n_neighbours)
 
     s = huge(1.0)
     do i=1,n_neighbours
