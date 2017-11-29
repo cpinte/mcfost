@@ -933,6 +933,151 @@ module Voronoi_grid
   end subroutine cross_Voronoi_cell
 
   !----------------------------------------
+  subroutine cross_Voronoi_cell_vect(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s)
+
+    integer, intent(in) :: icell, previous_cell
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
+
+    real(kind=dp), intent(out) ::  s
+    integer, intent(out) :: next_cell
+
+    integer :: i, id_n, l
+
+    real(kind=dp), intent(out) :: x1, y1, z1
+
+    integer, dimension(100) :: tab_id, tab_id_wall
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real, dimension(3) :: r, k
+    real, dimension(:,:), allocatable :: n, p_r
+    real, dimension(:), allocatable :: den, num, s_tmp
+    real :: s_tmp_wall
+
+    integer :: n_neighbours, n_wall
+
+    r(1) = x ; r(2) = y ; r(3) = z
+    k(1) = u ; k(2) = v ; k(3) = w
+
+    s = 1e30 !huge_real
+    next_cell = 0
+
+
+    ! Counting number of neighbouring cells and walls
+    n_neighbours = 0
+    n_walls=0
+    do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+       id_n = neighbours_list(i) ! id du voisin
+       if (id_n==previous_cell) cycle
+       if (id_n > 0) then ! cellule
+          n_neighbours = n_neighbours + 1
+          tab_id(n_neighbours) = id_n
+       else
+          lwall = .true.
+          n_walls = n_walls + 1
+          tab_id_wall(n_walls) = id_n
+       endif
+    enddo
+
+    ! Allocate arrays
+    allocate(n(3,n_neighbours), p_r(3,n_neighbours), den(n_neighbours), num(n_neighbours), s_tmp(n_neighbours))
+
+    ! Array of vectors
+    do i=1,n_neighbours
+       id_n = tab_id(i)
+!       write(*,*) i, "A", shape(n), id_n
+
+
+       n(:,i) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
+       p_r(:,i) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:)) - r(:)
+    enddo
+
+    den(:) = n(1,:) * k(1) + n(2,:) * k(2) + n(3,:) * k(3)
+    num(:) = n(1,:) * p_r(1,:) + n(2,:) * p_r(2,:) + n(3,:) * p_r(3,:)
+
+    s_tmp(:) = num(:)/den(:)
+
+    s = huge(1.0)
+    do i=1,n_neighbours
+       if (s_tmp(i) > 0) then
+          if (s_tmp(i) < s) then
+             s = s_tmp(i)
+             next_cell = tab_id(i)
+          endif
+       endif
+    enddo
+
+    ! We test for walls now
+    if (lwall) then
+       do i=1, n_walls
+          id_n = tab_id_wall(i)
+
+          s_tmp_wall = distance_to_wall(x,y,z, u,v,w, -id_n) ;
+
+          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
+          if (s_tmp_wall < 0.) s_tmp_wall = huge(1.0)
+
+          if (s_tmp_wall < s) then
+             s = s_tmp_wall
+             next_cell = id_n
+          endif
+       enddo
+    endif
+
+!    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+!       id_n = neighbours_list(i) ! id du voisin
+!
+!       if (id_n==previous_cell) cycle nb_loop
+!
+!       if (id_n > 0) then ! cellule
+!          ! unnormalized vector to plane
+!          n(:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
+!
+!          ! test direction
+!          den = dot_product(n, k)
+!          if (den <= 0.) cycle nb_loop ! car s_tmp sera < 0
+!
+!          ! point on the plane
+!          p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
+!
+!          s_tmp = dot_product(n, p-r) / den
+!
+!          if (s_tmp < 0.) s_tmp = huge(1.0)
+!       else ! i < 0 ; le voisin est un wall
+!          s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
+!
+!          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
+!          if (s_tmp < 0.) s_tmp = huge(1.0)
+!       endif
+!
+!       if (s_tmp < s) then
+!          s = s_tmp
+!          next_cell = id_n
+!       endif
+!
+!    enddo nb_loop ! i
+
+    x1 = x + u*s
+    y1 = y + v*s
+    z1 = z + w*s
+
+    if (next_cell == 0) then ! there is a rounding-off error somewehere
+       ! We correct the cell index and do not move the packet
+       x1 = x ; y1 = y ; z1 = z ; s = 0.0
+       if (is_in_volume(x,y,z)) then
+          call indice_cellule_voronoi(x,y,z, next_cell)
+          if (icell == next_cell) then ! that means we are out of the grid already
+             next_cell = -1 ! the exact index does not matter
+          endif
+       else
+          next_cell = -1 ! the exact index does not matter
+       endif
+    endif
+
+    return
+
+  end subroutine cross_Voronoi_cell_vect
+
+  !----------------------------------------
 
   subroutine init_Voronoi_walls(n_walls, limits)
 
