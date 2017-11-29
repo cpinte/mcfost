@@ -208,7 +208,8 @@ subroutine setup_grid()
      write(*,*) "Using a Voronoi mesh"
      lcylindrical = .false.
      lspherical = .false.
-     cross_cell => cross_Voronoi_cell
+     !cross_cell => cross_Voronoi_cell
+     cross_cell => cross_Voronoi_cell_vect
      pos_em_cellule => pos_em_cellule_Voronoi
      move_to_grid => move_to_grid_Voronoi
      indice_cellule => indice_cellule_Voronoi
