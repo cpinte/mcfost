@@ -16,6 +16,8 @@ module input
   character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_DA.fits.gz"
   character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
 
+  real, dimension(:), allocatable :: s11_file
+
   contains
 
 subroutine read_opacity_file(pop)
@@ -1175,5 +1177,81 @@ subroutine read_limb_darkening_file(lambda)
   return
 
 end subroutine read_limb_darkening_file
+
+!*************************************************************
+
+subroutine read_phase_function(phase_function_file)
+
+  character(len=512), intent(in) :: phase_function_file
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype, i
+  real :: nullval
+  integer, dimension(2) :: naxes
+  logical :: anynull
+
+  real, dimension(0:nang_scatt,2) :: PF
+
+  allocate(s11_file(0:nang_scatt))
+
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  write(*,*) "Reading phase function file : "//trim(phase_function_file)
+
+  readwrite=0
+  call ftopen(unit,phase_function_file,readwrite,blocksize,status)
+  if (status /= 0) then ! le fichier n'existe pas
+     write(*,*) "ERROR : phase function file needed"
+     stop
+  endif
+
+  group=1
+  firstpix=1
+  nullval=-999
+
+  !  determine the size of temperature file
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if ((naxes(1) /= nang_scatt+1)) then
+     write(*,*) "Error : phase function file does not have the"
+     write(*,*) "right dimensions. Exiting."
+     write(*,*) "AXIS #1"
+     write(*,*) "# fits file,   required"
+     write(*,*) naxes(1), nang_scatt+1
+     stop
+  endif
+  if ((naxes(2) /= 2)) then
+     write(*,*) "Error : phase function file does not have the"
+     write(*,*) "right dimensions. Exiting."
+     write(*,*) "AXIS #2"
+     write(*,*) "# fits file,   required"
+     write(*,*) naxes(1), nang_scatt+1
+     stop
+  endif
+  npixels=naxes(1)*naxes(2)
+
+  ! read_image
+  nbuffer=npixels
+  call ftgpve(unit,group,firstpix,nbuffer,nullval,PF,anynull,status)
+
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  ! Checking angles, will replace by interpolation later
+  do i=0,nang_scatt
+     if (abs(PF(i,1) - i) > 1e-5) then
+        write(*,*) PF(i,1)
+        write(*,*) "ERROR: phase function file"
+        write(*,*) "Angle #", i, "should be equal to", i
+        write(*,*) "Exiting"
+        stop
+     endif
+  enddo
+  s11_file(:) = PF(:,2)
+
+  return
+
+end subroutine read_phase_function
+
 
 end module input

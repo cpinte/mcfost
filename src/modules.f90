@@ -135,11 +135,14 @@ module parametres
   logical, parameter :: ltest_rt3 = .false. ! marche pas
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
-  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM, lread_grain_size_distrib
+  logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
+  logical :: lread_grain_size_distrib, lphase_function_file
 
   ! Phantom
   logical :: ldudt_implicit
   real(kind=dp) :: ufac_implicit
+
+
 
 end module parametres
 
