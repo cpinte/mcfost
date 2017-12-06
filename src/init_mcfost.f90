@@ -118,6 +118,7 @@ subroutine set_default_variables()
   linfall = .false.
   lcylindrical_rotation = .false.
   lforce_HG = .false.
+  lphase_function_file = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -993,6 +994,11 @@ subroutine initialisation_mcfost()
      case("-cylindrical_rotation","-cyl_rotation","-cyl_rot")
         i_arg = i_arg + 1
         lcylindrical_rotation = .true.
+     case("-phase_function","-phase-function","-phase_function_file","-phase-function-file")
+        i_arg = i_arg + 1
+        lphase_function_file = .true.
+        call get_command_argument(i_arg,s) ; call read_phase_function(s)
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1426,6 +1432,7 @@ subroutine display_help()
   write(*,*) "        : -isotropic : forces isotropic scattering"
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
+  write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"
