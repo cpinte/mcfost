@@ -576,19 +576,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
-     if (lmanual) then
-        write(*,*) "Exiting."
-        stop
-     else ! if it is an auto-update, we don't exit
-        mcfost_update = .false.
-        ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
-        write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
-        write(s,*) (n_days-1) * 3600 * 24
-        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
-             //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
-        call appel_syst(cmd, syst_status)
-        return
-     endif
+     call exit_update(lmanual, n_days, lupdate)
+     return
   endif
 
   open(unit=1, file="version.txt", status='old',iostat=ios)
@@ -597,8 +586,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
-     write(*,*) "Exiting."
-     stop
+     call exit_update(lmanual, n_days, lupdate)
+     return
   endif
 
   ! Do we need to update ?
@@ -626,8 +615,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else
         write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
-        write(*,*) "Exiting."
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
 
      write(*,*) "Your system is ", operating_system
@@ -642,8 +631,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         cmd = "rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "ERROR during download. MCFOST has not been updated."
-        write(*,*) "Exiting"
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
 
      ! check sha
@@ -671,8 +660,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,*) mcfost_update_sha1
         write(*,*) "It should be:"
         write(*,*) mcfost_sha1
-        write(*,*) "Exiting"
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      else
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
@@ -709,10 +698,10 @@ function mcfost_update(lforce_update, lmanual, n_days)
      cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
      if (syst_status /= 0) then
-        write(*,*) "ERROR : the update failed for some reason"
-        write(*,*) "You may want to have a look at the file mcfost_update"
-        write(*,*) "Exiting"
-        stop
+        write(*,*) "ERROR : the update failed for some unknown reason"
+        write(*,*) "You may want to have a look at the file named mcfost_update"
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
@@ -727,6 +716,37 @@ function mcfost_update(lforce_update, lmanual, n_days)
   return
 
 end function mcfost_update
+
+!***********************************************************
+
+subroutine exit_update(lmanual, n_days, lupdate)
+  ! Exit update properly :
+  !  - exit mcfost if it is a manual update
+  !  - simply return if it is an auto-update
+
+  logical, intent(in) :: lmanual
+  integer, intent(in) :: n_days
+  logical, intent(out) :: lupdate
+
+  character(len=512) :: cmd, s
+  integer :: syst_status
+
+  if (lmanual) then
+     write(*,*) "Exiting."
+     stop
+  else ! if it is an auto-update, we don't exit
+     lupdate = .false.
+     ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
+     write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
+     write(s,*) (n_days-1) * 3600 * 24
+     cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
+          //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+     call appel_syst(cmd, syst_status)
+  endif
+
+  return
+
+end subroutine exit_update
 
 !***********************************************************
 
