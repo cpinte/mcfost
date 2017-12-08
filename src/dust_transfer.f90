@@ -1642,4 +1642,108 @@ end subroutine intensite_pixel_dust
 
 !***********************************************************
 
+subroutine optical_depth_map(lambda,tau, ibin,iaz)
+
+  real(dp), intent(in) :: tau
+  integer, intent(in) :: lambda, ibin, iaz
+  real(kind=dp) :: u,v,w
+
+  real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
+  real(kind=dp), dimension(3,nb_proc) :: pixelcenter
+
+  integer :: i,j, id, p_lambda, icell
+
+  real :: extrin, ltot
+  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
+  logical :: lintersect, flag_star, flag_direct_star, flag_sortie
+
+  real(kind=dp), dimension(4) :: Stokes
+
+  real, dimension(npix_x,npix_y,3) :: tau_surface
+
+  p_lambda=lambda
+  Stokes(1) = 1 ; Stokes(2:4) = 0.
+
+  ! Direction de visee pour le ray-tracing
+  u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
+  uvw = (/u,v,w/)
+
+  ! Definition des vecteurs de base du plan image dans le repere universel
+
+  ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
+  x = (/cos(tab_RT_az(iaz) * deg_to_rad), sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
+
+  ! Vecteur x image avec PA
+  if (abs(ang_disque) > tiny_real) then
+     ! Todo : on peut faire plus simple car axe rotation perpendiculaire a x
+     x_plan_image = rotation_3d(uvw, ang_disque, x)
+  else
+     x_plan_image = x
+  endif
+
+  ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+  y_plan_image = -cross_product(x_plan_image, uvw)
+
+  ! position initiale hors modele (du cote de l'observateur)
+  ! = centre de l'image
+  l = 10.*Rmax  ! on se met loin
+
+  x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
+  center(1) = x0 ; center(2) = y0 ; center(3) = z0
+
+
+  ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+  taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
+  dx(:) = x_plan_image * taille_pix
+  dy(:) = y_plan_image * taille_pix
+
+  ! Coin en bas gauche de l'image
+  Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
+
+  ! Boucle sur les pixels de l'image
+!---  !$omp parallel &
+!---  !$omp default(none) &
+!---  !$omp private(i,j,id) &
+!---  !$omp shared(Icenter,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y,n_iter_min,n_iter_max,ibin,iaz)
+  id =1 ! pour code sequentiel
+
+  !$omp do schedule(dynamic,1)
+  do i = 1, npix_x
+     !$ id = omp_get_thread_num() + 1
+     do j = 1,npix_y
+        ! Coin en bas gauche du pixel
+        pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
+
+        x0 = pixelcenter(1,id)
+        y0 = pixelcenter(2,id)
+        z0 = pixelcenter(3,id)
+
+        ! Ray tracing : on se propage dans l'autre sens
+        u0 = -u ; v0 = -v ; w0 = -w
+
+        ! On se met au bord de la grille : propagation a l'envers
+        call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
+
+        if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+           call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+           if (flag_sortie) then ! Weo do not reach the surface tau=1
+              tau_surface(i,j,:) = 0.0
+           else
+              tau_surface(i,j,1) = x0
+              tau_surface(i,j,2) = y0
+              tau_surface(i,j,3) = z0
+           endif
+        else ! We do not reach the disk
+           tau_surface(i,j,:) = 0.0
+        endif
+
+     enddo !j
+  enddo !i
+!---  !$omp end do
+  !--- !$omp end parallel
+
+  return
+
+end subroutine optical_depth_map
+
 end module dust_transfer
