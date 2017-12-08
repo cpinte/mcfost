@@ -1109,10 +1109,20 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         endif !aniso_method
      enddo !k
 
-     ! Over-riding phase function
-     if (lphase_function_file)  tab_s11_pos(:,icell,p_lambda) = s11_file(:)
-
      k_sca_tot = kappa_sca(icell,lambda) / fact ! We renormalize to remove the factor from opacity
+
+     ! Over-riding phase function
+     if (lphase_function_file)  then
+        tab_s11_pos(:,icell,p_lambda) = s11_file(:)
+
+        ! Normalisation of phase-function to k_sca_tot, ie like the internal routines
+        norme = 0.0
+        do l=1,nang_scatt-1 ! on saute j=0 & nang_scatt car sin(theta) = 0
+           theta = real(l)*dtheta
+           norme = norme + tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
+        enddo
+        tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * k_sca_tot / norme
+     endif
 
      if (k_sca_tot > tiny_real) then
 
