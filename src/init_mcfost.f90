@@ -119,6 +119,7 @@ subroutine set_default_variables()
   lcylindrical_rotation = .false.
   lforce_HG = .false.
   lphase_function_file = .false.
+  ltau1_surface=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -999,6 +1000,9 @@ subroutine initialisation_mcfost()
         lphase_function_file = .true.
         call get_command_argument(i_arg,s) ; call read_phase_function(s)
         i_arg = i_arg + 1
+     case("-tau=1_surface")
+        i_arg = i_arg + 1
+        ltau1_surface=.true.
      case default
         call display_help()
      end select
@@ -1433,6 +1437,7 @@ subroutine display_help()
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
+  write(*,*) "        : -tau=1_surface"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"

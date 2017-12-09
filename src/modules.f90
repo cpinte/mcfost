@@ -136,7 +136,7 @@ module parametres
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
-  logical :: lread_grain_size_distrib, lphase_function_file
+  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
 
   ! Phantom
   logical :: ldudt_implicit
@@ -788,6 +788,7 @@ module ray_tracing
   real, dimension(:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
+  real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
 
   real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt

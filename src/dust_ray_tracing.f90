@@ -90,6 +90,15 @@ subroutine alloc_ray_tracing()
   endif
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
+  if (ltau1_surface) then
+     allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tau_surface'
+        stop
+     endif
+  endif
+  tau_surface = 0.0
+
   allocate(J_th(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
