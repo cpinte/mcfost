@@ -639,6 +639,7 @@ subroutine transfert_poussiere()
 
                     time_1 = time_2
                     call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
+                    if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
                     call system_clock(time_2)
                     time_RT = time_RT + (time_2 - time_1)
                  enddo
@@ -651,8 +652,9 @@ subroutine transfert_poussiere()
 
                  time_1 = time_2
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                  call system_clock(time_2)
-                  time_RT = time_RT + (time_2 - time_1)
+                 if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
+                 call system_clock(time_2)
+                 time_RT = time_RT + (time_2 - time_1)
               endif
 
               call system_clock(time_end)
@@ -666,6 +668,7 @@ subroutine transfert_poussiere()
            enddo
 
            call ecriture_map_ray_tracing()
+           if (ltau1_surface) call write_tau_surface()
         endif
 
      elseif (letape_th) then ! Calcul de la structure en temperature
@@ -1642,7 +1645,7 @@ end subroutine intensite_pixel_dust
 
 !***********************************************************
 
-subroutine optical_depth_map(lambda,tau, ibin,iaz)
+subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
   real(dp), intent(in) :: tau
   integer, intent(in) :: lambda, ibin, iaz
@@ -1658,8 +1661,6 @@ subroutine optical_depth_map(lambda,tau, ibin,iaz)
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie
 
   real(kind=dp), dimension(4) :: Stokes
-
-  real, dimension(npix_x,npix_y,3) :: tau_surface
 
   p_lambda=lambda
   Stokes(1) = 1 ; Stokes(2:4) = 0.
@@ -1701,11 +1702,13 @@ subroutine optical_depth_map(lambda,tau, ibin,iaz)
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
   ! Boucle sur les pixels de l'image
-!---  !$omp parallel &
-!---  !$omp default(none) &
-!---  !$omp private(i,j,id) &
-!---  !$omp shared(Icenter,lambda,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y,n_iter_min,n_iter_max,ibin,iaz)
-  id =1 ! pour code sequentiel
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
+  !$omp private(flag_star,flag_direct_star,extrin,ltot,flag_sortie) &
+  !$omp shared(Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface)
+  id = 1 ! pour code sequentiel
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
@@ -1725,25 +1728,26 @@ subroutine optical_depth_map(lambda,tau, ibin,iaz)
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-           call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-           if (flag_sortie) then ! Weo do not reach the surface tau=1
-              tau_surface(i,j,:) = 0.0
+           call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
+                flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+           if (flag_sortie) then ! We do not reach the surface tau=1
+              tau_surface(i,j,ibin,iaz,:,id) = 0.0
            else
-              tau_surface(i,j,1) = x0
-              tau_surface(i,j,2) = y0
-              tau_surface(i,j,3) = z0
+              tau_surface(i,j,ibin,iaz,1,id) = x0
+              tau_surface(i,j,ibin,iaz,2,id) = y0
+              tau_surface(i,j,ibin,iaz,3,id) = z0
            endif
         else ! We do not reach the disk
-           tau_surface(i,j,:) = 0.0
+           tau_surface(i,j,ibin,iaz,:,id) = 0.0
         endif
 
      enddo !j
   enddo !i
-!---  !$omp end do
-  !--- !$omp end parallel
+  !$omp end do
+  !$omp end parallel
 
   return
 
-end subroutine optical_depth_map
+end subroutine tau_surface_map
 
 end module dust_transfer
