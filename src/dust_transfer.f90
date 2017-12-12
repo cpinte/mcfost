@@ -12,7 +12,6 @@ module dust_transfer
   use ray_tracing
   use scattering
   use grid
-  use grid
   use optical_depth
   use density
   use PAH
@@ -1707,7 +1706,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,extrin,ltot,flag_sortie) &
   !$omp shared(Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface)
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid)
   id = 1 ! pour code sequentiel
 
   !$omp do schedule(dynamic,1)
