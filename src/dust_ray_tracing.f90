@@ -96,8 +96,8 @@ subroutine alloc_ray_tracing()
         write(*,*) 'Allocation error tau_surface'
         stop
      endif
+     tau_surface = 0.0
   endif
-  tau_surface = 0.0
 
   allocate(J_th(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
