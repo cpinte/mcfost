@@ -563,7 +563,7 @@ contains
     ! -------------------------
     ! Number of photon packages
     ! -------------------------
-   read(1,*) line_buffer
+    read(1,*) line_buffer
     read(1,*) fnbre_photons_eq_th ;
     read(1,*) fnbre_photons_lambda ;
     read(1,*) fnbre_photons_image
