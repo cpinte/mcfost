@@ -221,7 +221,7 @@ subroutine alloc_dynamique(n_cells_max)
   call allocate_thermal_energy(Nc)
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(Nc,n_lambda), kappa_sca(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
+  allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
 
   if (.not.lonly_LTE .or. .not.lonly_nLTE) then
      allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
@@ -557,7 +557,6 @@ subroutine dealloc_em_th()
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
   deallocate(kappa,kappa_abs_LTE)
-  if (allocated(kappa_sca)) deallocate(kappa_sca)
   if (allocated(proba_abs_RE_LTE)) then
      deallocate(proba_abs_RE_LTE)
      if (lRE_nLTE) deallocate(kappa_abs_nLTE)
@@ -673,13 +672,13 @@ subroutine realloc_dust_mol()
   ksca_CDF = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), kappa_sca(n_cells,n_lambda), &
+  allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), &
        emissivite_dust(n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error emissivite_dust (realloc)'
      stop
   endif
-  kappa = 0.0 ; kappa_abs_LTE = 0.0 ; kappa_sca = 0.0 ; emissivite_dust = 0.0
+  kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
   if (.not.lonly_LTE .or. .not.lonly_nLTE) then
      allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
@@ -718,7 +717,7 @@ end subroutine realloc_dust_mol
 
 subroutine clean_mem_dust_mol()
 
-  ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, kappa_sca, emissivite_dust
+  ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, emissivite_dust
   ! et spectre_etoiles, spectre_etoiles_cumul
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
@@ -1026,17 +1025,16 @@ subroutine realloc_step2()
   endif ! method
 
   deallocate(kappa,kappa_abs_LTE)
-  if (allocated(kappa_sca)) deallocate(kappa_sca)
   deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  allocate(kappa(n_cells,n_lambda2), kappa_sca(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
+  allocate(kappa(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa'
      stop
   endif
-  kappa=0.0 ; kappa_sca = 0.0 ; kappa_abs_LTE=0.0
+  kappa=0.0 ; kappa_abs_LTE=0.0
   if (lRE_nLTE) then
      allocate(kappa_abs_nLTE(n_cells,n_lambda2))
      if (alloc_status > 0) then
@@ -1232,7 +1230,6 @@ subroutine dealloc_emission_mol()
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
   deallocate(kappa,emissivite_dust)
-  if (allocated(kappa_sca)) deallocate(kappa_sca)
 
   call deallocate_stellar_spectra()
 

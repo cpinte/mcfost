@@ -813,7 +813,7 @@ subroutine opacite(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
 
   integer :: icell, k, thetaj
-  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, angle
+  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, k_sca_tot, angle
   logical :: lcompute_obs,  ldens0
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
@@ -841,22 +841,23 @@ subroutine opacite(lambda, p_lambda)
   ! Calcul opacite et probabilite de diffusion
   do icell=1, n_cells  ! this can be long when there are many cells
      kappa(icell,lambda) = 0.0
-     kappa_sca(icell,lambda) = 0.0
      tab_g_pos(icell,lambda) = 0.0
+     k_sca_tot = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
 
      do  k=1,n_grains_tot ! Expensive when n_cells is large
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
-        kappa_sca(icell,lambda) = kappa_sca(icell,lambda) + C_sca(k,lambda) * density
         tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
 
+
+        k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
         k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
 
-     if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = kappa_sca(icell,lambda)/kappa(icell,lambda)
-     if (kappa_sca(icell,lambda) > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/kappa_sca(icell,lambda)
+     if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
+     if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
 
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
@@ -917,7 +918,6 @@ subroutine opacite(lambda, p_lambda)
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
   kappa(:,lambda) = kappa(:,lambda) * fact
-  kappa_sca(:,lambda) = kappa_sca(:,lambda) * fact
 
   if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
   if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
@@ -974,9 +974,6 @@ subroutine opacite(lambda, p_lambda)
      kappa(icell,lambda) = 0.0_dp
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0_dp
-     endif
-     if (lcompute_obs.and.lscatt_ray_tracing.or.lProDiMo2mcfost) then
-        kappa_sca(icell,lambda) = 0.0_dp
      endif
      if (lRE_nLTE) then
         kabs_nLTE_CDF(:,icell,lambda) = 0.0
@@ -1076,7 +1073,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos) &
   !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
-  !$omp shared(zmax,kappa,kappa_sca,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
+  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file) &
   !$omp private(icell,k,density,norme,theta,k_sca_tot,mu,g,g2)
@@ -1109,7 +1106,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         endif !aniso_method
      enddo !k
 
-     k_sca_tot = kappa_sca(icell,lambda) / fact ! We renormalize to remove the factor from opacity
+     k_sca_tot = kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / fact ! We renormalize to remove the factor from opacity
 
      ! Over-riding phase function
      if (lphase_function_file)  then
