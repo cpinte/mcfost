@@ -328,7 +328,7 @@ contains
        do l=1,n_grains_tot
           somme=0.0
           do icell=1,n_cells
-             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_dp
+             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
              somme=somme+densite_pouss(l,icell)*volume(icell)
           enddo !icell
           densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
@@ -375,7 +375,7 @@ contains
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
-          if (densite_pouss(k,icell) > 0.0_dp) then
+          if (densite_pouss(k,icell) > 0.0_sp) then
              icell_not_empty = icell
              exit search_not_empty
           endif
