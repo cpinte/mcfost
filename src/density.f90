@@ -554,7 +554,7 @@ subroutine define_dust_density()
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1.0e-200_dp) then
                           icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_dp
+                          densite_pouss(l,icell)  = 1.0_sp
                           norme = 1.0_dp
 
                           write(*,*) "WARNING: Vertical settling unresolved for"
@@ -625,7 +625,7 @@ subroutine define_dust_density()
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1e-200_dp) then
                           icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_dp
+                          densite_pouss(l,icell)  = 1.0_sp
                           norme = 1.0_dp
 
                           if (lwarning) then
@@ -791,7 +791,7 @@ subroutine define_dust_density()
      do icell=1,n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
-           densite_pouss(:,icell) = 0.0_dp
+           densite_pouss(:,icell) = 0.0_sp
         endif
      enddo
   endif
@@ -805,7 +805,7 @@ subroutine define_dust_density()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1,n_cells
-        if (densite_pouss(l,icell) > 0.0_dp) then
+        if (densite_pouss(l,icell) > 0.0_sp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -1562,7 +1562,7 @@ subroutine densite_file()
      somme=0.0
 
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_dp
+        if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      densite_pouss(l,:) = (densite_pouss(l,:)/somme)
@@ -1575,7 +1575,7 @@ subroutine densite_file()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_dp) then
+        if (densite_pouss(l,icell) > 0.0_sp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -1788,7 +1788,7 @@ subroutine densite_Seb_Charnoz()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_dp) then
+        if (densite_pouss(l,icell) > 0.0_sp) then
            icell_not_empty = icell
            exit search_not_empty
         endif
@@ -1918,7 +1918,7 @@ subroutine densite_Seb_Charnoz2()
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_dp) then
+        if (densite_pouss(l,icell) > 0.0_sp) then
            icell_not_empty = icell
            exit search_not_empty
         endif

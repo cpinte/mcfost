@@ -970,7 +970,7 @@ subroutine opacite(lambda, p_lambda)
   ! On remet la densite à zéro si besoin
   if (ldens0) then
      icell = icell_ref
-     densite_pouss(:,icell) = 0.0_dp
+     densite_pouss(:,icell) = 0.0_sp
      kappa(icell,lambda) = 0.0_dp
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0_dp
