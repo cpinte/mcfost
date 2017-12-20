@@ -841,7 +841,6 @@ subroutine opacite(lambda, p_lambda)
   ! Calcul opacite et probabilite de diffusion
   do icell=1, n_cells  ! this can be long when there are many cells
      kappa(icell,lambda) = 0.0
-     tab_g_pos(icell,lambda) = 0.0
      k_sca_tot = 0.0
      k_abs_tot = 0.0
      k_abs_RE = 0.0
@@ -849,15 +848,21 @@ subroutine opacite(lambda, p_lambda)
      do  k=1,n_grains_tot ! Expensive when n_cells is large
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
-        tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
-
 
         k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
         k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
 
      if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
-     if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
+
+     if (aniso_method==2) then
+        tab_g_pos(icell,lambda) = 0.0
+        do  k=1,n_grains_tot ! Expensive when n_cells is large
+           density=densite_pouss(k,icell)
+           tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + C_sca(k,lambda) * density * tab_g(k,lambda)
+        enddo ! k
+        if (k_sca_tot > tiny_real) tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda)/k_sca_tot
+     endif
 
      if (lRE_LTE) then
         kappa_abs_LTE(icell,lambda) = 0.0
@@ -1024,12 +1029,16 @@ subroutine write_dust_prop()
   icell = icell_ref
   kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
-  g_lambda=tab_g_pos(icell,:)
+
 
   call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
   call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
   call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
-  call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+
+  if (aniso_method==2) then
+     g_lambda=tab_g_pos(icell,:)
+     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+  endif
 
   do l=1, n_lambda
      kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
