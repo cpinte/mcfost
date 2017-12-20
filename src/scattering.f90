@@ -802,7 +802,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
   real :: prob, CDF, norm
 
   ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
-  norm =  kappa_sca(icell,lambda) / (AU_to_cm * mum_to_cm**2)
+  norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
 
   if (aleat < 0.5) then ! We start from first grain
      prob = aleat * norm
