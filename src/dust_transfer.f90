@@ -176,7 +176,7 @@ subroutine transfert_poussiere()
      write(*,*) ""
      write(*,*) "Dust properties in cell #", icell_ref
      p_icell = icell_ref
-     write(*,*) "g             ", tab_g_pos(p_icell,1)
+     if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
      if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
 
