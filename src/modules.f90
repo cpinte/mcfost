@@ -433,7 +433,7 @@ module opacity
   real, dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
-  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, Proba_abs_RE_LTE_p_nLTE
+  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
   real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
