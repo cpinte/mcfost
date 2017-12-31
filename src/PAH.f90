@@ -5,8 +5,6 @@ module PAH
   use opacity
   use constantes
   use em_th
-  use nr, only : indexx, indexx_sp
-
   use dust_prop
   use utils, only : interp
 
@@ -182,7 +180,7 @@ function PAH_specific_heat(T,taille_grain)
   !hbarw = [hbarw_CCop, hbarw_CCip, hbarw_CH]
   !g = [g_CCop, g_CCip, g_CH]
 
-  call indexx_sp(real(hbarw),s) ! renvoie les indices tries (=sort en Yorick)
+  s = bubble_sort(hbarw) ! renvoie les indices tries (=sort en Yorick), slow
   hbarw = hbarw(s)
   g = g(s)
 
