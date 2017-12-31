@@ -83,23 +83,6 @@ mkdir -p ../include/voro++
 cd ..
 rm -rf voro
 
-# Numerical recipes
-mkdir lib/nr lib/nr/eq_diff lib/nr/spline lib/nr/sort
-cd nr
-if [ "$SYSTEM" = "ifort" ] ; then
-    ./compile_ifort.sh
-elif [ "$SYSTEM" = "gfortran" ] ; then
-    ./compile_gfortran.sh
-elif [ "$SYSTEM" = "xeon-phi" ] ; then
-    ./compile_xeon_phi.sh
-fi
-\cp libnr.a *.mod ../lib/nr
-\cp eq_diff/libnr_eq_diff.a eq_diff/*.mod ../lib/nr/eq_diff
-\cp spline/libnr_splin.a ../lib/nr/spline
-\cp sort/libnr_sort.a ../lib/nr/sort
-./clean.sh
-cd ..
-
 # Put in final directory
 mkdir -p $MCFOST_INSTALL/include
 \cp -r include/* $MCFOST_INSTALL/include
