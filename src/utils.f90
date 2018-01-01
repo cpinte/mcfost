@@ -395,8 +395,8 @@ function calc_mu0(mu,a)
      denom = sqrt(q3)
      theta = acos(r/denom)
      mu01 = -2.0_dp*qh*cos(theta/3.0_dp) - a1/3.0_dp
-     mu02 = -2.d0*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
-     mu03 = -2.d0*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
+     mu02 = -2._dp*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
+     mu03 = -2._dp*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
      if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu02",mu01,mu02
         stop
@@ -1277,7 +1277,6 @@ subroutine appel_syst(cmd, status)
 
 end subroutine appel_syst
 
-
 !************************************************************
 
 subroutine GauLeg(x1,x2,x,w,n)
@@ -1306,35 +1305,35 @@ subroutine GauLeg(x1,x2,x,w,n)
 
   ! The roots are symmetric in the interval, so we only have to find half of them.
   m = (n+1)/2
-  xm = 0.5d0 * (x2+x1)
-  xl = 0.5d0 * (x2-x1)
+  xm = 0.5_dp * (x2+x1)
+  xl = 0.5_dp * (x2-x1)
 
   do i=1,m ! Loop over the desired roots
-     z = cos(pi*(real(i,kind=dp)-0.25d0)/(real(n,kind=dp)+0.5d0))
+     z = cos(pi*(real(i,kind=dp)-0.25_dp)/(real(n,kind=dp)+0.5_dp))
      ! Starting with the above approximation to the ith root, we
      ! enter the main loop of refinement by Newton's method
      conv = .false.
      do while (.not.conv)
-        p1 = 1.0d0
-        p2 = 0.0d0
+        p1 = 1.0_dp
+        p2 = 0.0_dp
 
         !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
            dj=real(j,kind=dp)
            p3 = p2
            p2 = p1
-           p1 = ((2.0d0*dj-1.0d0)*z*p2 - (dj-1.0d0)*p3)/dj
+           p1 = ((2.0_dp*dj-1.0_dp)*z*p2 - (dj-1.0_dp)*p3)/dj
         enddo ! j
 
         ! p1 is now the desired Legendre polynomial. We next compute pp, its
         ! derivative, by a standard relation involving also p2, the
         ! polynomial of one lower order.
-        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0d0)
+        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0_dp)
 
         ! Newton's method.
         z1 = z
         z = z1 - p1 / pp
-        conv = abs(z-z1).le.eps
+        conv = abs(z-z1) <= eps
      enddo ! conv
 
      ! Scale the root to the desired interval, and put in its symmetric counterpart.
@@ -1342,13 +1341,13 @@ subroutine GauLeg(x1,x2,x,w,n)
      x(n+1-i) = xm + xl * z
 
      ! Compute the weight and its symmetric counterpart.
-     w(i) = 2.0d0 * xl / ((1.0d0 - z * z) * pp * pp)
+     w(i) = 2.0_dp * xl / ((1.0_dp - z * z) * pp * pp)
      w(n+1-i) = w(i)
   enddo ! i
 
   return
 
-end subroutine gauleg
+end subroutine GauLeg
 
 !************************************************************
 
@@ -1478,23 +1477,25 @@ function select(k,arr)
   l=1
   r=n
   do
-     if (r-l <= 1) then !Active partition contains 1 or 2 elements.
-        if (r-l == 1) call masked_swap_rs(arr(l),arr(r),arr(l)>arr(r))  ! Active partition contains 2 elements.
+     if (r-l <= 1) then ! Active partition contains 1 or 2 elements.
+        if (r-l == 1) then
+           if (arr(l)>arr(r)) call swap(arr(l),arr(r))  ! Active partition contains 2 elements.
+        endif
         select=arr(k)
         return
      else
-        !Choose median of left, center, and right elements
-        !as partitioning element a. Also rearrange so
-        !that arr(l) <= arr(l+1) <= arr(r).
+        ! Choose median of left, center, and right elements
+        ! as partitioning element a. Also rearrange so
+        ! that arr(l) <= arr(l+1) <= arr(r).
         i=(l+r)/2
-        call swap_r(arr(i),arr(l+1))
-        call masked_swap_rs(arr(l),arr(r),arr(l)>arr(r))
-        call masked_swap_rs(arr(l+1),arr(r),arr(l+1)>arr(r))
-        call masked_swap_rs(arr(l),arr(l+1),arr(l)>arr(l+1))
+        call swap(arr(i),arr(l+1))
+        if (arr(l)>arr(r))   call swap(arr(l),arr(r))
+        if (arr(l+1)>arr(r)) call swap(arr(l+1),arr(r))
+        if (arr(l)>arr(l+1)) call swap(arr(l),arr(l+1))
         i=l+1 ! Initialize pointers for partitioning.
         j=r
         a=arr(l+1) ! Partitioning element.
-        do !Here is the meat.
+        do ! Here is the meat.
            do ! Scan up to find element > a.
               i=i+1
               if (arr(i) >= a) exit
@@ -1504,7 +1505,7 @@ function select(k,arr)
               if (arr(j) <= a) exit
            end do
            if (j < i) exit ! Pointers crossed. Exit with partitioning complete.
-           call swap_r(arr(i),arr(j)) ! Exchange elements.
+           call swap(arr(i),arr(j)) ! Exchange elements.
         end do
         arr(l+1)=arr(j) ! Insert partitioning element.
         arr(j)=a
@@ -1533,35 +1534,15 @@ end function select_inplace
 
 !************************************************************
 
-subroutine swap_r(a,b)
+subroutine swap(a,b)
   real(sp), intent(inout) :: a,b
   real(sp) :: dum
 
-  dum=a
-  a=b
-  b=dum
+  dum=a ; a=b ; b=dum
 
   return
 
-end subroutine swap_r
-
-!************************************************************
-
-subroutine masked_swap_rs(a,b,mask)
-
-  real(sp), intent(inout) :: a,b
-  logical, intent(in) :: mask
-  real(sp) :: swp
-
-  if (mask) then
-     swp=a
-     a=b
-     b=swp
-  end if
-
-  return
-
-end subroutine masked_swap_rs
+end subroutine swap
 
 !************************************************************
 
