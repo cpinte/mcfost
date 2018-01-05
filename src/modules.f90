@@ -229,6 +229,8 @@ module disk
   real :: struct_file_amin, struct_file_amax,  struct_file_rref
   integer :: struct_file_n_grains, struct_file_nspecies
 
+  real :: SPH_keep_particles
+
 end module disk
 
 !********************************************************************

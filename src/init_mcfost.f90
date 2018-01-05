@@ -130,6 +130,8 @@ subroutine set_default_variables()
 
   system_age = "3Myr"
 
+  SPH_keep_particles = 0.99
+
   return
 
 end subroutine set_default_variables
@@ -744,6 +746,16 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         limits_file = s
         i_arg = i_arg + 1
+     case("-keep_particles")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) SPH_keep_particles
+        if ((SPH_keep_particles < 0) .or. (SPH_keep_particles > 1)) then
+           write(*,*) "keep particles value must between 0 and 1"
+           write(*,*) "Exiting"
+           stop
+        endif
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1
         lsigma_file=.true.
@@ -1351,6 +1363,9 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phamtom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
+  write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
+  write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
+  write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
