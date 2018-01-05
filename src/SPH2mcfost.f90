@@ -103,17 +103,18 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: limit_threshold = 0.005
     real, parameter :: SPH_dust_2_total_dust = 20. ! SPH dust mass is 5% of total
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
-    real :: f
+    real :: f, limit_threshold
     integer :: icell, l, k, iSPH
 
     real(dp), dimension(6) :: limits
+
+    limit_threshold = (1.0 - SPH_keep_particles) * 0.5 ;
 
     icell_ref = 1
 
@@ -178,9 +179,9 @@ contains
 
     if (abs(maxval(SPH_limits)) < tiny_real) then
        write(*,*) "Selecting spatial range which contains"
-       write(*,*) 1.0-2*limit_threshold, "particles in each dimension"
+       write(*,*) SPH_keep_particles*100, "% of particles in each dimension"
 
-       k = int(limit_threshold * n_SPH)
+       k = max(int(limit_threshold * n_SPH),1)
        limits(1) = select_inplace(k,real(x))
        limits(3) = select_inplace(k,real(y))
        limits(5) = select_inplace(k,real(z))
