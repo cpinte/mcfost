@@ -103,17 +103,18 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: limit_threshold = 0.005
     real, parameter :: SPH_dust_2_total_dust = 20. ! SPH dust mass is 5% of total
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
-    real :: f
+    real :: f, limit_threshold
     integer :: icell, l, k, iSPH
 
     real(dp), dimension(6) :: limits
+
+    limit_threshold = (1.0 - SPH_keep_particles) * 0.5 ;
 
     icell_ref = 1
 
@@ -178,9 +179,9 @@ contains
 
     if (abs(maxval(SPH_limits)) < tiny_real) then
        write(*,*) "Selecting spatial range which contains"
-       write(*,*) 1.0-2*limit_threshold, "particles in each dimension"
+       write(*,*) SPH_keep_particles*100, "% of particles in each dimension"
 
-       k = int(limit_threshold * n_SPH)
+       k = max(int(limit_threshold * n_SPH),1)
        limits(1) = select_inplace(k,real(x))
        limits(3) = select_inplace(k,real(y))
        limits(5) = select_inplace(k,real(z))
@@ -328,7 +329,7 @@ contains
        do l=1,n_grains_tot
           somme=0.0
           do icell=1,n_cells
-             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_dp
+             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
              somme=somme+densite_pouss(l,icell)*volume(icell)
           enddo !icell
           densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
@@ -375,7 +376,7 @@ contains
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
-          if (densite_pouss(k,icell) > 0.0_dp) then
+          if (densite_pouss(k,icell) > 0.0_sp) then
              icell_not_empty = icell
              exit search_not_empty
           endif

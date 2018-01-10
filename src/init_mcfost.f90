@@ -118,6 +118,8 @@ subroutine set_default_variables()
   linfall = .false.
   lcylindrical_rotation = .false.
   lforce_HG = .false.
+  lphase_function_file = .false.
+  ltau1_surface=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -127,6 +129,8 @@ subroutine set_default_variables()
   RT_sed_method = 1
 
   system_age = "3Myr"
+
+  SPH_keep_particles = 0.999
 
   return
 
@@ -742,6 +746,16 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         limits_file = s
         i_arg = i_arg + 1
+     case("-keep_particles")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) SPH_keep_particles
+        if ((SPH_keep_particles < 0) .or. (SPH_keep_particles > 1)) then
+           write(*,*) "keep particles value must between 0 and 1"
+           write(*,*) "Exiting"
+           stop
+        endif
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1
         lsigma_file=.true.
@@ -993,6 +1007,14 @@ subroutine initialisation_mcfost()
      case("-cylindrical_rotation","-cyl_rotation","-cyl_rot")
         i_arg = i_arg + 1
         lcylindrical_rotation = .true.
+     case("-phase_function","-phase-function","-phase_function_file","-phase-function-file")
+        i_arg = i_arg + 1
+        lphase_function_file = .true.
+        call get_command_argument(i_arg,s) ; call read_phase_function(s)
+        i_arg = i_arg + 1
+     case("-tau=1_surface")
+        i_arg = i_arg + 1
+        ltau1_surface=.true.
      case default
         call display_help()
      end select
@@ -1341,6 +1363,9 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phamtom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
+  write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
+  write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
+  write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1426,6 +1451,8 @@ subroutine display_help()
   write(*,*) "        : -isotropic : forces isotropic scattering"
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
+  write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
+  write(*,*) "        : -tau=1_surface"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"

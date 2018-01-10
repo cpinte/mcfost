@@ -742,6 +742,111 @@ end subroutine ecriture_map_ray_tracing
 
 !**********************************************************************
 
+subroutine write_tau_surface()
+
+  implicit none
+
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(5) :: naxes
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+
+  character(len = 512) :: filename
+  logical :: simple, extend
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+
+  ! Allocation dynamique pour passer en stack
+  real, dimension(:,:,:,:,:), allocatable :: image
+
+  allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az, 3), stat=alloc_status)
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error tau_surface image'
+     stop
+  endif
+  image = 0.0 ;
+
+  lambda=1
+  filename = trim(data_dir)//"/tau=1_surface.fits.gz"
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit, status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  group=1
+  fpixel=1
+  extend=.true.
+  bitpix=-32
+
+  naxis=5
+  naxes(1)=npix_x
+  naxes(2)=npix_y
+  naxes(3)= RT_n_incl
+  naxes(4)= RT_n_az
+  naxes(5)= 3 !xyz
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  !  wavelength
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
+
+  ! RAC, DEC, reference pixel & pixel scale en degres
+  call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+
+  call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+  call ftpkys(unit,'BUNIT',"AU",'',status)
+
+  call ftpkys(unit,'COORD_1',"x",' ',status)
+  call ftpkys(unit,'COORD_2',"y",' ',status)
+  call ftpkys(unit,'COORD_3',"z",' ',status)
+
+  !----- Images
+  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  do ibin=1,RT_n_incl
+     do iaz=1,RT_n_az
+        do j=1,npix_y
+           do i=1,npix_x
+              image(i,j,ibin,iaz,:) = sum(tau_surface(i,j,ibin,iaz,:,:), dim=2)
+           enddo !i
+        enddo !j
+     enddo ! iaz
+  enddo !ibin
+
+  call ftppre(unit,group,fpixel,nelements,image,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+  deallocate(image)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     call print_error(status)
+  end if
+
+  return
+
+end subroutine write_tau_surface
+
+!**********************************************************************
+
 subroutine ecriture_sed_ray_tracing()
 
   implicit none

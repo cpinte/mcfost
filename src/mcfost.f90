@@ -9,15 +9,6 @@ program BIGCRUNCH
   ! F. Menard, G. Duchene et C. Pinte
   ! Grenoble, Exeter, Grenoble, Santiago
   !
-  !
-  ! Quelques remarques :
-  ! - Vive le 64bits !!
-  ! - il faut augmenter la stack size sur les architectures x86
-  ! et AIX pour les lib numerical recipes. Passage en
-  ! allocation dynamique dans MCFOST en cas de pb
-  ! - pas de pointeur en OpenMP sur Sun x86_64
-  ! - ifort n'aime pas le retypage a la volee des tableaux
-  !
   !***********************************************************
   use parametres
   use init_mcfost

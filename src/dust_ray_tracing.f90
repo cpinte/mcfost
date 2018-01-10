@@ -90,6 +90,15 @@ subroutine alloc_ray_tracing()
   endif
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
+  if (ltau1_surface) then
+     allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tau_surface'
+        stop
+     endif
+     tau_surface = 0.0
+  endif
+
   allocate(J_th(n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error J_th'
@@ -196,7 +205,6 @@ subroutine dealloc_ray_tracing()
   ! C. Pinte
   ! 13/10/08
 
-  if (allocated(kappa_sca)) deallocate(kappa_sca)
   deallocate(Stokes_ray_tracing,stars_map,J_th)
 
   if (lscatt_ray_tracing1) then
@@ -609,7 +617,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   integer, intent(in) :: lambda, ibin, iaz
 
   integer :: itype, iRT, icell
-  real(kind=dp) :: facteur, energie_photon, n_photons_envoyes
+  real(kind=dp) :: facteur, energie_photon, n_photons_envoyes, kappa_sca
 
   if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
   iRT = RT2d_to_RT1d(ibin, iaz)
@@ -634,16 +642,18 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   ! Intensite specifique diffusion
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(icell,facteur,itype,I_scatt) &
-  !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_sca,N_type_flux,lambda,iRT) &
-  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc)
+  !$omp private(icell,facteur,kappa_sca,itype,I_scatt) &
+  !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,N_type_flux,lambda,iRT) &
+  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc,tab_albedo_pos)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
+     kappa_sca = kappa(icell,lambda) * tab_albedo_pos(icell,lambda)
+
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa(icell,lambda) > tiny_dp) then
         do itype=1,N_type_flux
-           I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca(icell,lambda)
+           I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca
         enddo ! itype
 
         eps_dust1(:,:,1,icell) =  (  I_scatt(:,:,1) +  J_th(icell) ) / kappa(icell,lambda)
@@ -704,7 +714,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,eps_dust2_star,lsepar_pola) &
-  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc) &
+  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc,tab_albedo_pos) &
   !$omp private(icell,dir,iscatt,Q,U)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
@@ -849,7 +859,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer, intent(in) :: lambda, p_lambda, ibin
 
   real(kind=dp), dimension(4) :: Stokes, S, C, D
-  real(kind=dp) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon
+  real(kind=dp) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon, kappa_sca
   real(kind=dp) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
 
   real(kind=dp), dimension(:,:,:,:), allocatable :: Inu ! sum of I_spec over cpus
@@ -1018,13 +1028,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,kappa_sca) &
+  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes) &
   !$omp shared(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,icell_ref,energie_photon,volume) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
-  !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc) &
+  !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc,kappa,tab_albedo_pos) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
-  !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur)
+  !$omp private(s12,s33,s34,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur,kappa_sca)
   id = 1 ! pour code sequentiel
 
   ! Matrice de Mueller
@@ -1071,6 +1081,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
      else
         p_icell = icell_ref
      endif
+
+
 
      ! Boucle sur les directions de ray-tracing
      do dir=0,1
@@ -1172,7 +1184,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
      ! Normalisation
      facteur = energie_photon / volume(icell)
-     I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  facteur * kappa_sca(icell,lambda)
+     kappa_sca = kappa(lambda, icell) * tab_albedo_pos(lambda,icell)
+     I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  facteur * kappa_sca
   enddo ! icell
   !$omp enddo
   !$omp end parallel
@@ -1192,7 +1205,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   integer :: p_ri, p_zj, dir, iscatt, id
   real(kind=dp), dimension(4) :: Stokes, S, C, D
-  real(kind=dp) :: x, y, z, u, v, w, facteur
+  real(kind=dp) :: x, y, z, u, v, w, facteur, kappa_sca
 
   real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
@@ -1235,9 +1248,9 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
   !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,eps_dust2_star) &
-  !$omp shared(energie_photon,volume,kappa_sca) &
+  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa) &
   !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
-  !$omp private(s11,s12,s33,s34,C,D,M,facteur)
+  !$omp private(s11,s12,s33,s34,C,D,M,facteur,kappa_sca)
   !$omp do
   do icell=1, n_cells
      !$ id = omp_get_thread_num() + 1
@@ -1378,7 +1391,8 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
      ! Normalisation
      facteur = energie_photon / volume(icell)
-     eps_dust2_star(:,:,:,icell) =  eps_dust2_star(:,:,:,icell) *  facteur * kappa_sca(icell,lambda)
+     kappa_sca = kappa(icell,lambda) * tab_albedo_pos(icell,lambda)
+     eps_dust2_star(:,:,:,icell) =  eps_dust2_star(:,:,:,icell) *  facteur * kappa_sca
 
   enddo ! icell
   !$omp end do

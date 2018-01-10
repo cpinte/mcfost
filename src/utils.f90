@@ -395,8 +395,8 @@ function calc_mu0(mu,a)
      denom = sqrt(q3)
      theta = acos(r/denom)
      mu01 = -2.0_dp*qh*cos(theta/3.0_dp) - a1/3.0_dp
-     mu02 = -2.d0*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
-     mu03 = -2.d0*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
+     mu02 = -2._dp*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
+     mu03 = -2._dp*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
      if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
         write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu02",mu01,mu02
         stop
@@ -576,19 +576,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
-     if (lmanual) then
-        write(*,*) "Exiting."
-        stop
-     else ! if it is an auto-update, we don't exit
-        mcfost_update = .false.
-        ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
-        write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
-        write(s,*) (n_days-1) * 3600 * 24
-        cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
-             //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
-        call appel_syst(cmd, syst_status)
-        return
-     endif
+     call exit_update(lmanual, n_days, lupdate)
+     return
   endif
 
   open(unit=1, file="version.txt", status='old',iostat=ios)
@@ -597,8 +586,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
-     write(*,*) "Exiting."
-     stop
+     call exit_update(lmanual, n_days, lupdate)
+     return
   endif
 
   ! Do we need to update ?
@@ -626,8 +615,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else
         write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
-        write(*,*) "Exiting."
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
 
      write(*,*) "Your system is ", operating_system
@@ -642,8 +631,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         cmd = "rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "ERROR during download. MCFOST has not been updated."
-        write(*,*) "Exiting"
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
 
      ! check sha
@@ -671,8 +660,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
         write(*,*) mcfost_update_sha1
         write(*,*) "It should be:"
         write(*,*) mcfost_sha1
-        write(*,*) "Exiting"
-        stop
+        call exit_update(lmanual, n_days, lupdate)
+        return
      else
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
@@ -709,10 +698,10 @@ function mcfost_update(lforce_update, lmanual, n_days)
      cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
      call appel_syst(cmd, syst_status)
      if (syst_status /= 0) then
-        write(*,*) "ERROR : the update failed for some reason"
-        write(*,*) "You may want to have a look at the file mcfost_update"
-        write(*,*) "Exiting"
-        stop
+        write(*,*) "ERROR : the update failed for some unknown reason"
+        write(*,*) "You may want to have a look at the file named mcfost_update"
+        call exit_update(lmanual, n_days, lupdate)
+        return
      endif
      write(*,*) "Done"
      write(*,*) "MCFOST has been updated"
@@ -727,6 +716,37 @@ function mcfost_update(lforce_update, lmanual, n_days)
   return
 
 end function mcfost_update
+
+!***********************************************************
+
+subroutine exit_update(lmanual, n_days, lupdate)
+  ! Exit update properly :
+  !  - exit mcfost if it is a manual update
+  !  - simply return if it is an auto-update
+
+  logical, intent(in) :: lmanual
+  integer, intent(in) :: n_days
+  logical, intent(out) :: lupdate
+
+  character(len=512) :: cmd, s
+  integer :: syst_status
+
+  if (lmanual) then
+     write(*,*) "Exiting."
+     stop
+  else ! if it is an auto-update, we don't exit
+     lupdate = .false.
+     ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
+     write(*,*) "WARNING: Skiping auto-update. MCFOST will try again tomorrow."
+     write(s,*) (n_days-1) * 3600 * 24
+     cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; expr `date +%s` - "&
+          //trim(s)//" > "//trim(mcfost_utils)//"/.last_update"
+     call appel_syst(cmd, syst_status)
+  endif
+
+  return
+
+end subroutine exit_update
 
 !***********************************************************
 
@@ -1257,7 +1277,6 @@ subroutine appel_syst(cmd, status)
 
 end subroutine appel_syst
 
-
 !************************************************************
 
 subroutine GauLeg(x1,x2,x,w,n)
@@ -1286,35 +1305,35 @@ subroutine GauLeg(x1,x2,x,w,n)
 
   ! The roots are symmetric in the interval, so we only have to find half of them.
   m = (n+1)/2
-  xm = 0.5d0 * (x2+x1)
-  xl = 0.5d0 * (x2-x1)
+  xm = 0.5_dp * (x2+x1)
+  xl = 0.5_dp * (x2-x1)
 
   do i=1,m ! Loop over the desired roots
-     z = cos(pi*(real(i,kind=dp)-0.25d0)/(real(n,kind=dp)+0.5d0))
+     z = cos(pi*(real(i,kind=dp)-0.25_dp)/(real(n,kind=dp)+0.5_dp))
      ! Starting with the above approximation to the ith root, we
      ! enter the main loop of refinement by Newton's method
      conv = .false.
      do while (.not.conv)
-        p1 = 1.0d0
-        p2 = 0.0d0
+        p1 = 1.0_dp
+        p2 = 0.0_dp
 
         !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
            dj=real(j,kind=dp)
            p3 = p2
            p2 = p1
-           p1 = ((2.0d0*dj-1.0d0)*z*p2 - (dj-1.0d0)*p3)/dj
+           p1 = ((2.0_dp*dj-1.0_dp)*z*p2 - (dj-1.0_dp)*p3)/dj
         enddo ! j
 
         ! p1 is now the desired Legendre polynomial. We next compute pp, its
         ! derivative, by a standard relation involving also p2, the
         ! polynomial of one lower order.
-        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0d0)
+        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0_dp)
 
         ! Newton's method.
         z1 = z
         z = z1 - p1 / pp
-        conv = abs(z-z1).le.eps
+        conv = abs(z-z1) <= eps
      enddo ! conv
 
      ! Scale the root to the desired interval, and put in its symmetric counterpart.
@@ -1322,13 +1341,13 @@ subroutine GauLeg(x1,x2,x,w,n)
      x(n+1-i) = xm + xl * z
 
      ! Compute the weight and its symmetric counterpart.
-     w(i) = 2.0d0 * xl / ((1.0d0 - z * z) * pp * pp)
+     w(i) = 2.0_dp * xl / ((1.0_dp - z * z) * pp * pp)
      w(n+1-i) = w(i)
   enddo ! i
 
   return
 
-end subroutine gauleg
+end subroutine GauLeg
 
 !************************************************************
 
@@ -1443,38 +1462,40 @@ end subroutine progress_bar
 !************************************************************
 
 function select(k,arr)
-  use nrtype; use nrutil, only : assert,swap
-  implicit none
-  integer(i4b), intent(in) :: k
-  real(sp), dimension(:), intent(inout) :: arr
-  real(sp) :: select
   ! Returns the kth smallest value in the array arr. The input array will be rearranged to have
   ! this value in location arr(k), with all smaller elements moved to arr(1:k-1) (in arbitrary
-  !order) and all larger elements in arr(k+1:) (also in arbitrary order).
-  integer(i4b) :: i,r,j,l,n
+  ! order) and all larger elements in arr(k+1:) (also in arbitrary order).
+
+  integer, intent(in) :: k
+  real(sp), dimension(:), intent(inout) :: arr
+  real(sp) :: select
+
+  integer :: i,r,j,l,n
   real(sp) :: a
   n=size(arr)
-  call assert(k >= 1, k <= n, 'select args')
+
   l=1
   r=n
   do
-     if (r-l <= 1) then !Active partition contains 1 or 2 elements.
-        if (r-l == 1) call swap(arr(l),arr(r),arr(l)>arr(r))  ! Active partition contains 2 elements.
+     if (r-l <= 1) then ! Active partition contains 1 or 2 elements.
+        if (r-l == 1) then
+           if (arr(l)>arr(r)) call swap(arr(l),arr(r))  ! Active partition contains 2 elements.
+        endif
         select=arr(k)
-        RETURN
+        return
      else
-        !Choose median of left, center, and right elements
-        !as partitioning element a. Also rearrange so
-        !that arr(l) <= arr(l+1) <= arr(r).
+        ! Choose median of left, center, and right elements
+        ! as partitioning element a. Also rearrange so
+        ! that arr(l) <= arr(l+1) <= arr(r).
         i=(l+r)/2
         call swap(arr(i),arr(l+1))
-        call swap(arr(l),arr(r),arr(l)>arr(r))
-        call swap(arr(l+1),arr(r),arr(l+1)>arr(r))
-        call swap(arr(l),arr(l+1),arr(l)>arr(l+1))
+        if (arr(l)>arr(r))   call swap(arr(l),arr(r))
+        if (arr(l+1)>arr(r)) call swap(arr(l+1),arr(r))
+        if (arr(l)>arr(l+1)) call swap(arr(l),arr(l+1))
         i=l+1 ! Initialize pointers for partitioning.
         j=r
         a=arr(l+1) ! Partitioning element.
-        do !Here is the meat.
+        do ! Here is the meat.
            do ! Scan up to find element > a.
               i=i+1
               if (arr(i) >= a) exit
@@ -1492,23 +1513,36 @@ function select(k,arr)
         if (j <= k) l=i
      end if
   end do
+
 end function select
 
 !************************************************************
 
 function select_inplace(k,arr)
-  use nrtype
-  !use nr, only : select
-  implicit none
-  integer(i4b), intent(in) :: k
-  real(sp), dimension(:), intent(in) :: arr
-  real(sp) :: select_inplace
   ! Returns the kth smallest value in the array arr, without altering the input array.
   ! In Fortran 90's assumed memory-rich environment, we just call select in scratch space.
+
+  integer, intent(in) :: k
+  real(sp), dimension(:), intent(in) :: arr
+  real(sp) :: select_inplace
+
   real(sp), dimension(size(arr)) :: tarr
   tarr=arr
   select_inplace=select(k,tarr)
+
 end function select_inplace
+
+!************************************************************
+
+subroutine swap(a,b)
+  real(sp), intent(inout) :: a,b
+  real(sp) :: dum
+
+  dum=a ; a=b ; b=dum
+
+  return
+
+end subroutine swap
 
 !************************************************************
 

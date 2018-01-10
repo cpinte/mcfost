@@ -1047,7 +1047,7 @@ subroutine Temp_finale_nLTE()
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-        if (densite_pouss(k,icell) > tiny_dp) then
+        if (densite_pouss(k,icell) > tiny_real) then
            J_absorbe=0.0
            do lambda=1, n_lambda
               J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
@@ -1226,7 +1226,7 @@ subroutine Temp_nRE(lconverged)
         if (l_dark_zone(icell)) then
            l_RE(:,icell) = .true.
         else
-           if (densite_pouss(l,icell) > tiny_dp) then
+           if (densite_pouss(l,icell) > tiny_real) then
               ! Champ de radiation
               Int_k_lambda_Jlambda=0.0
               do lambda=1, n_lambda

@@ -59,7 +59,7 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2 -mmacosx-version-min=10.9
+        ARCH= -axSSSE3,SSE4.1,SSE4.2 -mmacosx-version-min=10.9 -heap-arrays
     else
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
     endif
@@ -156,14 +156,9 @@ endif
 #------------------------------------------------------------------------------#
 # Library flags
 
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ \
-          -I$(LIBS)/nr
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
 
 LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
-LDFLAGS+= -L$(LIBS)/nr -lnr
-LDFLAGS+= -L$(LIBS)/nr/eq_diff -lnr_eq_diff
-LDFLAGS+= -L$(LIBS)/nr/spline -lnr_splin
-LDFLAGS+= -L$(LIBS)/nr/sort -lnr_sort
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -198,14 +193,8 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	cp $(LIBS)/libcfitsio.a libtmp
 	cp $(LIBS)/libsprng.a libtmp
 	cp $(LIBS)/libvoro++.a libtmp
-	cp $(LIBS)/nr/libnr.a libtmp
-	cp $(LIBS)/nr/eq_diff/libnr_eq_diff.a libtmp
-	cp $(LIBS)/nr/sort/libnr_sort.a libtmp
 	cd libtmp; \
 	ar x libcfitsio.a; \
-	ar x libnr.a; \
-	ar x libnr_eq_diff.a; \
-	ar x libnr_sort.a; \
 	ar x libsprng.a; \
 	ar x libvoro++.a
 	rm -f mcfost.o io_phantom_utils.o io_phantom_infiles.o libtmp/pmlcg.o \
