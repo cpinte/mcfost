@@ -130,7 +130,7 @@ subroutine set_default_variables()
 
   system_age = "3Myr"
 
-  SPH_keep_particles = 0.99
+  SPH_keep_particles = 0.999
 
   return
 
