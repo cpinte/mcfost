@@ -222,6 +222,7 @@ subroutine alloc_dynamique(n_cells_max)
 
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
+  kappa=0.0 ; kappa_abs_LTE=0.0
 
   if (.not.lonly_LTE .or. .not.lonly_nLTE) then
      allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
@@ -232,7 +233,6 @@ subroutine alloc_dynamique(n_cells_max)
         write(*,*) 'Allocation error kappa'
         stop
      endif
-     kappa=0.0 ; kappa_abs_LTE=0.0
      proba_abs_RE_LTE=0.0
      if (lRE_nLTE) kappa_abs_nLTE=0.0
      if (lRE_nLTE.or.lnRE) proba_abs_RE_LTE_p_nLTE=0.0

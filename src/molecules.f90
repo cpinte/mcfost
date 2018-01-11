@@ -748,6 +748,17 @@ subroutine init_dust_mol(imol)
   ! Reallocation des tableaux de proprietes de poussiere
   ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
   n_lambda =   nTrans_tot ! opacites dust considerees cst sur le profil de raie
+
+
+  ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
+  ! -> pas de polarisation, on utilise une HG
+  scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+  aniso_method = 2 ; lmethod_aniso1 = .false.
+
+  lsepar_pola = .false.
+  ltemp = .false.
+  lmono = .true. ! equivalent au mode sed2
+
   call realloc_dust_mol()
 
   if (ldust_mol) then
@@ -786,15 +797,6 @@ subroutine init_dust_mol(imol)
 
      else ! cas par defaut
         call init_indices_optiques()
-
-        ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
-        ! -> pas de polarisation, on utilise une HG
-        scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
-        aniso_method = 2 ; lmethod_aniso1 = .false.
-
-        lsepar_pola = .false.
-        ltemp = .false.
-        lmono = .true. ! equivalent au mode sed2
 
         ! On recalcule les proprietes optiques
         write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
