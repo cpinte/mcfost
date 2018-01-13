@@ -1184,7 +1184,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
      ! Normalisation
      facteur = energie_photon / volume(icell)
-     kappa_sca = kappa(lambda, icell) * tab_albedo_pos(lambda,icell)
+     kappa_sca = kappa(icell,lambda) * tab_albedo_pos(icell,lambda)
      I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  facteur * kappa_sca
   enddo ! icell
   !$omp enddo
