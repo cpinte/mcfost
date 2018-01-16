@@ -224,13 +224,19 @@ subroutine alloc_dynamique(n_cells_max)
   allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
   kappa=0.0 ; kappa_abs_LTE=0.0
 
-  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
-     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
-     if (lRE_nLTE)  allocate(kappa_abs_nLTE(Nc,n_lambda), stat=alloc_status)
-     if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status)
-     if (lnRE) allocate(proba_abs_RE(Nc,n_lambda), kappa_abs_RE(Nc,n_lambda), stat=alloc_status)
+  if (.not.(lonly_LTE.or.lonly_nLTE)) then
+     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
+     if (lRE_nLTE)  then
+        allocate(kappa_abs_nLTE(Nc,n_lambda), stat=alloc_status) ; kappa_abs_nLTE=0.0
+     endif
+     if (lRE_nLTE.or.lnRE) then
+        allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
+     endif
+     if (lnRE) then
+        allocate(proba_abs_RE(Nc,n_lambda), kappa_abs_RE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE=0.0 ;kappa_abs_RE=0.0
+     endif
      if (alloc_status > 0) then
-        write(*,*) 'Allocation error kappa'
+        write(*,*) 'Allocation error kappa_abs'
         stop
      endif
      proba_abs_RE_LTE=0.0
@@ -690,7 +696,7 @@ subroutine realloc_dust_mol()
   endif
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
-  if (.not.lonly_LTE .or. .not.lonly_nLTE) then
+  if (.not.(lonly_LTE .or.lonly_nLTE)) then
      allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status)
      if (lRE_nLTE) allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
      if (lRE_nLTE.or.lnRE) allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status)
