@@ -886,10 +886,12 @@ subroutine opacite(lambda, p_lambda)
            proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
         endif
 
-        if (k_abs_RE > tiny_dp) then
-           Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
-        else ! the cell is probably empty
-           Proba_abs_RE_LTE(icell,lambda) = 1.0
+        if (.not. (lonly_LTE.or.lonly_nLTE)) then
+           if (k_abs_RE > tiny_dp) then
+              Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
+           else ! the cell is probably empty
+              Proba_abs_RE_LTE(icell,lambda) = 1.0
+           endif
         endif
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
      endif ! letape_th
