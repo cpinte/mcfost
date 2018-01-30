@@ -586,7 +586,7 @@ subroutine dealloc_em_th()
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
   else ! prop par grains
-     deallocate(ksca_CDF)
+     if (allocated(ksca_CDF)) deallocate(ksca_CDF)
   endif ! method
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
