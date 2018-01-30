@@ -1541,12 +1541,20 @@ function dust_source_fct(icell, x,y,z)
         SF1(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
+     if (lsepar_contrib) then
+        SF1(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+     endif
 
      icell_tmp = cell_map(ri2,zj1,phik)
      SF2(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
      if (lsepar_pola) then
         SF2(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+     if (lsepar_contrib) then
+        SF2(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
      icell_tmp = cell_map(ri1,zj2,phik)
@@ -1555,12 +1563,20 @@ function dust_source_fct(icell, x,y,z)
         SF3(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
+     if (lsepar_contrib) then
+        SF3(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+     endif
 
      icell_tmp = cell_map(ri2,zj2,phik)
      SF4(1) = eps_dust2(1,iscatt2,dir,icell_tmp) * frac + eps_dust2(1,iscatt1,dir,icell_tmp) * un_m_frac
      if (lsepar_pola) then
         SF4(2:3) = interpolate_Stokes_QU(eps_dust2(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     endif
+     if (lsepar_contrib) then
+        SF4(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
 
@@ -1589,9 +1605,13 @@ function dust_source_fct(icell, x,y,z)
      icell_tmp = cell_map(ri1,zj1,phik)
      SF1(1) = SF1(1) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
           + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
+
      if (lsepar_pola) then
+        n_pola = 4
         SF1(2:3) = SF1(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
+     else
+        n_pola = 1
      endif
 
      icell_tmp = cell_map(ri2,zj1,phik)
