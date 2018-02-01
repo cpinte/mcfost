@@ -68,7 +68,7 @@
   Mie   2 2    0.0  0.999   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
   Draine_Si_sUV.dat  0.8  Optical indices file, volume fraction
   ice_opct.dat  0.2  Optical indices file, volume fraction
-  1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  2	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
   0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
 
   Mie   1 2    0.0  1.e-3   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
