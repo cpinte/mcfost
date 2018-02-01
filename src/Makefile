@@ -59,7 +59,7 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2 -mmacosx-version-min=10.9 -heap-arrays
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX -mmacosx-version-min=10.9
     else
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
     endif
