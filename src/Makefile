@@ -59,12 +59,12 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX -mmacosx-version-min=10.9
+        ARCH = -axCORE-AVX2 -mmacosx-version-min=10.9
     else
-        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
+        ARCH = -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
     endif
     FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -traceback -static-intel $(ARCH)
+    FFLAGS= -fast -fpp -traceback -static-intel $(ARCH) #-fpp -O3 -no-prec-div -traceback -static-intel $(ARCH)
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
@@ -72,7 +72,7 @@ ifeq ($(SYSTEM), ifort)
     FOMPFLAGS= -fopenmp
     IPOFLAGS= -ipo
     CC= icc
-    CCFLAGS= -O3 -no-prec-div -traceback $(ARCH)
+    CCFLAGS= -fast -traceback $(ARCH) #-O3 -no-prec-div -traceback $(ARCH)
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
