@@ -34,7 +34,7 @@ def test_Temperature():
     filename = "test_data/ref3.0/ref3.0.para"
     if (os.path.isdir("data_th")):
         shutil.rmtree("data_th")
-    mcfost(filename)
+    mcfost(filename,opt="-mol")
 
     # Read the results
     T = fits.getdata("data_th/Temperature.fits.gz")
@@ -57,6 +57,18 @@ def test_SED():
 
     assert MC_similar(SED_ref,SED,threshold=0.05)
 
+
+def test_mol_map():
+    # Re-use the previous mcfost model
+
+    # Read the results
+    image = fits.getdata("data_CO/lines.fits.gz")
+    image_ref = fits.getdata("test_data/ref3.0/data_CO/lines.fits.gz")
+
+    print("Maximum mol map difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
+    print("Mean mol map difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
+
+    assert MC_similar(image_ref,image,threshold=0.05)
 
 def test_image():
     # Run the mcfost model
