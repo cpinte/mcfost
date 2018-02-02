@@ -2,16 +2,22 @@ import astropy.io.fits as fits
 import numpy as np
 import subprocess
 import shutil
+import glob
 import os
 
+# Reference tests are computed with v3.0.28
+
 _mcfost_bin = "../src/mcfost"
+#_mcfost_bin = "../src/bin/mcfost_3.0.25"
+#_mcfost_bin = "../src/bin/mcfost_3.0.10"
 
 def mcfost(filename,opt=""):
     cmd = _mcfost_bin+" "+filename+" "+opt
     result = subprocess.call(cmd.split())
 
 def clean_results():
-    result = subprocess.call("rm","-rf data_*")
+    cmd = ["rm","-rf"]+glob.glob("data_*")
+    result = subprocess.call(cmd)
 
 def all_almost_equal(x,y,threshold=0.01):
     # test if all the values of two arrays are almost equal
@@ -28,12 +34,15 @@ def MC_similar(x,y,threshold=0.01):
     #return (abs((x_ma-y_ma)/x_ma).mean() < threshold)
     return ( np.percentile(abs((x_ma-y_ma)/x_ma), 75)  < threshold )
 
+def test_mcfost_bin():
+    # We first test if the mcfost binary actually exists
+    return os.path.isfile(_mcfost_bin)
 
 def test_Temperature():
     # Run the mcfost model
     filename = "test_data/ref3.0/ref3.0.para"
-    if (os.path.isdir("data_th")):
-        shutil.rmtree("data_th")
+
+    clean_results() # removing all previous calculations
     mcfost(filename,opt="-mol")
 
     # Read the results
@@ -73,8 +82,6 @@ def test_mol_map():
 def test_image():
     # Run the mcfost model
     filename = "test_data/ref3.0/ref3.0.para"
-    if (os.path.isdir("data_1.0")):
-        shutil.rmtree("data_1.0")
     mcfost(filename,opt="-img 1.0")
 
     # Read the results
