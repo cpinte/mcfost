@@ -562,6 +562,7 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
+     Tfile = trim(root_dir)//"/"//trim(Tfile)
      write(*,*) "Reading temperature file : "//trim(Tfile)
 
      readwrite=0
@@ -643,6 +644,7 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
+     Tfile_nLTE = trim(root_dir)//"/"//trim(Tfile_nLTE)
      write(*,*) "Reading temperature file : "//trim(Tfile_nLTE)
 
      readwrite=0
@@ -701,7 +703,7 @@ subroutine lect_Temperature()
      !  Get an unused Logical Unit Number to use to open the FITS file.
      call ftgiou(unit,status)
 
-
+     Tfile_nRE=trim(root_dir)//"/"//trim(Tfile_nRE)
      write(*,*) "Reading temperature file : "//trim(Tfile_nRE)
      !call init_tab_Temp()
 
