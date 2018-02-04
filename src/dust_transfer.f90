@@ -790,8 +790,8 @@ subroutine transfert_poussiere()
      ind_etape = ind_etape + 1
   enddo ! nbre_etapes
 
-  if (lscatt_ray_tracing.and.(lsed_complete.or.(lmono0))) call dealloc_ray_tracing()
   if (lscatt_ray_tracing) then
+     call dealloc_ray_tracing()
      write(*,*) "Source fct time", time_source_fct/real(time_tick), "s"
      write(*,*) "RT time        ", time_RT/real(time_tick), "s"
   endif

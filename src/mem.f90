@@ -551,7 +551,7 @@ end subroutine alloc_dynamique
 
 !**********************************************************************
 
-subroutine dealloc_em_th()
+subroutine deallocate_em_th_mol()
 
   use thermal_emission, only : deallocate_thermal_emission
   use stars, only : deallocate_stellar_spectra
@@ -570,8 +570,9 @@ subroutine dealloc_em_th()
      deallocate(proba_abs_RE_LTE)
   endif
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
-  if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
-  if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
+  if (allocated(proba_abs_RE_LTE_p_nLTE)) deallocate(proba_abs_RE_LTE_p_nLTE)
+  if (allocated(proba_abs_RE)) deallocate(proba_abs_RE)
+  if (allocated(kappa_abs_RE)) deallocate(kappa_abs_RE)
 
   deallocate(tab_albedo_pos)
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
@@ -596,10 +597,9 @@ subroutine dealloc_em_th()
      deallocate(sed1_io,sed2_io,wave2_io)
   endif ! ltemp.or.lSED
 
-
   return
 
-end subroutine dealloc_em_th
+end subroutine deallocate_em_th_mol
 
 !******************************************************************************
 
@@ -786,10 +786,7 @@ subroutine realloc_step2()
   lscattering_method1 = (scattering_method==1)
 
   ! Liberation memoire
-  if (lTemp) then
-
-     call deallocate_temperature_calculation()
-  endif
+  if (lTemp) call deallocate_temperature_calculation()
 
   call allocate_radiation_field_step2()
 
@@ -1055,7 +1052,7 @@ subroutine realloc_step2()
   endif ! method
 
   deallocate(kappa,kappa_abs_LTE)
-  deallocate(proba_abs_RE_LTE)
+  if (allocated(proba_abs_RE_LTE)) deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
