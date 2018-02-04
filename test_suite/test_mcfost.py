@@ -20,8 +20,9 @@ def mcfost(filename,opt=""):
     cmd = _mcfost_bin+" "+filename+" "+opt
     result = subprocess.call(cmd.split())
 
-def clean_results():
-    cmd = ["rm","-rf"]+glob.glob("data_*")
+def clean_results(model_name):
+    #cmd = ["rm","-rf"]+glob.glob("data_*")
+    cmd = ["rm","-rf",model_name]
     result = subprocess.call(cmd)
 
 def all_almost_equal(x,y,threshold=0.01):
@@ -40,20 +41,27 @@ def MC_similar(x,y,threshold=0.01,mask_threshold=1e-20):
     return ( np.percentile(abs((x_ma-y_ma)/x_ma), 75)  < threshold )
 
 def test_mcfost_bin():
-    # We first test if the mcfost binary actually exists
-    return os.path.isfile(_mcfost_bin)
+    # We first test if the mcfost binary actually exists and runs
+    #assert os.path.isfile(_mcfost_bin)
+    try:
+        subprocess.call(_mcfost_bin)
+    except OSError as e:
+        if e.errno == os.errno.ENOENT:
+            assert False
+    assert True
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_Temperature(model_name):
+    clean_results(model_name) # removing all previous calculations
+
     # Run the mcfost model
     filename = "test_data/"+model_name+"/"+model_name+".para"
-
-    clean_results() # removing all previous calculations
-    mcfost(filename,opt="-mol")
+    mcfost(filename,opt="-mol -root_dir "+model_name)
 
     # Read the results
-    T = fits.getdata("data_th/Temperature.fits.gz")
-    T_ref = fits.getdata("test_data/ref3.0/data_th/Temperature.fits.gz")
+    T_name = model_name+"/data_th/Temperature.fits.gz"
+    T = fits.getdata(T_name)
+    T_ref = fits.getdata("test_data/"+T_name)
 
     print("Maximum T difference", (abs(T-T_ref)/(T_ref+1e-30)).max())
     print("Mean T difference   ", (abs(T-T_ref)/(T_ref+1e-30)).mean())
@@ -65,8 +73,9 @@ def test_SED(model_name):
     # Re-use the previous mcfost model
 
     # Read the results
-    SED = fits.getdata("data_th/sed_rt.fits.gz")
-    SED_ref = fits.getdata("test_data/"+model_name+"/data_th/sed_rt.fits.gz")
+    SED_name = model_name+"/data_th/sed_rt.fits.gz"
+    SED = fits.getdata(SED_name)
+    SED_ref = fits.getdata("test_data/"+SED_name)
 
     print("Maximum SED difference", (abs(SED-SED_ref)/(SED_ref+1e-30)).max())
     print("Mean SED difference   ", (abs(SED-SED_ref)/(SED_ref+1e-30)).mean())
@@ -79,8 +88,9 @@ def test_mol_map(model_name):
     # Re-use the previous mcfost model
 
     # Read the results
-    image = fits.getdata("data_CO/lines.fits.gz")
-    image_ref = fits.getdata("test_data/"+model_name+"/data_CO/lines.fits.gz")
+    image_name = model_name+"/data_CO/lines.fits.gz"
+    image = fits.getdata(image_name)
+    image_ref = fits.getdata("test_data/"+image_name)
 
     print("Maximum mol map difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean mol map difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
@@ -93,11 +103,12 @@ def test_mol_map(model_name):
 def test_image(model_name, wl):
     # Run the mcfost model
     filename = "test_data/"+model_name+"/"+model_name+".para"
-    mcfost(filename,opt="-img "+wl)
+    mcfost(filename,opt="-img "+wl+" -root_dir "+model_name)
 
     # Read the results
-    image = fits.getdata("data_"+wl+"/RT.fits.gz")
-    image_ref = fits.getdata("test_data/"+model_name+"/data_"+wl+"/RT.fits.gz")
+    image_name = model_name+"/data_"+wl+"/RT.fits.gz"
+    image = fits.getdata(image_name)
+    image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep intensity
     image = image[0,:,:,:,:]
@@ -115,8 +126,9 @@ def test_pola(model_name, wl):
     # Re-use previous calculation
 
     # Read the results
-    image = fits.getdata("data_"+wl+"/RT.fits.gz")
-    image_ref = fits.getdata("test_data/"+model_name+"/data_"+wl+"/RT.fits.gz")
+    image_name = model_name+"/data_"+wl+"/RT.fits.gz"
+    image = fits.getdata(image_name)
+    image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep Stokes Q, U
     image = image[[1,2],:,:,:,:]
@@ -133,8 +145,9 @@ def test_contrib(model_name, wl):
     # Re-use previous calculation
 
     # Read the results
-    image = fits.getdata("data_"+wl+"/RT.fits.gz")
-    image_ref = fits.getdata("test_data/"+model_name+"/data_"+wl+"/RT.fits.gz")
+    image_name = model_name+"/data_"+wl+"/RT.fits.gz"
+    image = fits.getdata(image_name)
+    image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep separate contributions
     image = image[[4,5,6,7],:,:,:,:]
