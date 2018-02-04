@@ -279,14 +279,6 @@ subroutine deallocate_thermal_emission()
      if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
   endif
 
-  if (lnRE) then
-     deallocate(E_em_1grain_nRE,log_E_em_1grain_nRE)
-     deallocate(Temperature_1grain_nRE_old,kdB_dT_1grain_nRE_CDF,xT_ech_1grain_nRE)
-     deallocate(Emissivite_nRE_old)
-     deallocate(Tpeak_old)
-     if (lRE_nlTE) deallocate(Temperature_1grain_old)
-  endif
-
   return
 
 end subroutine deallocate_thermal_emission
@@ -300,7 +292,11 @@ subroutine deallocate_temperature_calculation()
   if (lRE_LTE)  deallocate(kdB_dT_CDF, log_Qcool_minus_extra_heating, xT_ech)
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
-  if (lnRE) deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
+  if (lnRE) then
+     deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
+     deallocate(Temperature_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old)
+     if (lRE_nlTE) deallocate(Temperature_1grain_old)
+  endif
   call deallocate_radiation_field()
 
   return

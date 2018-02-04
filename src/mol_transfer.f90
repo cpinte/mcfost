@@ -39,7 +39,7 @@ subroutine mol_line_transfer()
   if (lProDiMo2mcfost) ldust_mol = .true.
 
   ! Liberation memoire
-  call dealloc_em_th()
+  call deallocate_em_th_mol()
   lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for mol emssion
   call init_directions_ray_tracing() ! TODO : on peut le faire apres
 

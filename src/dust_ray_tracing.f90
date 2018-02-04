@@ -228,8 +228,10 @@ subroutine init_directions_ray_tracing()
   real(kind=dp) :: cos_min, cos_max
   integer :: ibin, iaz
 
-  allocate(tab_RT_incl(RT_n_incl),tab_RT_az(RT_n_az), tab_uv_rt(RT_n_incl), &
-       tab_u_rt(RT_n_incl,RT_n_az),tab_v_rt(RT_n_incl,RT_n_az),tab_w_rt(RT_n_incl))
+  if (.not.allocated(tab_RT_incl)) then
+     allocate(tab_RT_incl(RT_n_incl),tab_RT_az(RT_n_az), tab_uv_rt(RT_n_incl), &
+          tab_u_rt(RT_n_incl,RT_n_az),tab_v_rt(RT_n_incl,RT_n_az),tab_w_rt(RT_n_incl))
+  endif
 
   if (RT_n_incl==1) then
      tab_RT_incl(1) = RT_imin
