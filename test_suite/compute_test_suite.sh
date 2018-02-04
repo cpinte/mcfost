@@ -1,9 +1,14 @@
-pushd test_data/ref3.0
-rm -rf data_*
-~/mcfost/src/mcfost ref3.0.para -mol
-rm -f _dust_prop_th.tmp
-~/mcfost/src/mcfost ref3.0.para -img 1.0
-~/mcfost/src/mcfost ref3.0.para -img 10
-~/mcfost/src/mcfost ref3.0.para -img 100
-~/mcfost/src/mcfost ref3.0.para -img 1000
-popd
+export mcfost=$HOME"/mcfost/src/mcfost"
+
+for dir in test_data/*; do
+    export param=`basename "$dir".para`
+    pushd "$dir"
+    rm -rf data_*
+    $mcfost $param -mol
+    rm -f _dust_prop_th.tmp
+    $mcfost $param -img 1.0
+    $mcfost $param -img 10
+    $mcfost $param -img 100
+    $mcfost $param -img 1000
+    popd
+done
