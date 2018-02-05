@@ -75,4 +75,4 @@ Mie  1 2  0.0  0.25  0.9 Grain type (Mie or DHS), N_components, mixing rule (1 =
   1 Number of stars
   4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), is a blackbody?
   lte4000-3.5.NextGen.fits.gz
-  0.1	2.2  fUV, slope_fUV
+  0.0	2.2  fUV, slope_fUV
