@@ -540,7 +540,7 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
-  if (ibin == 1) then
+  if ((ibin == 1).and.(iaz==1)) then
      allocate(I0(-n_speed_rt:n_speed_rt,nTrans_raytracing,1,nb_proc), &
           I0c(nTrans_raytracing,1,nb_proc))
 
