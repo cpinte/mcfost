@@ -205,14 +205,16 @@ subroutine dealloc_ray_tracing()
   ! C. Pinte
   ! 13/10/08
 
-  deallocate(Stokes_ray_tracing,stars_map,J_th)
+  if (allocated(Stokes_ray_tracing)) then
+     deallocate(Stokes_ray_tracing,stars_map,J_th)
 
-  if (lscatt_ray_tracing1) then
-     deallocate(xI_scatt,I_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
-  else
-     deallocate(I_spec_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,I_spec)
+     if (lscatt_ray_tracing1) then
+        deallocate(xI_scatt,I_scatt,eps_dust1,sin_scatt_rt1,sin_omega_rt1,cos_omega_rt1)
+     else
+        deallocate(I_spec_star,eps_dust2, eps_dust2_star, I_sca2,cos_thet_ray_tracing,omega_ray_tracing,I_spec)
+     endif
+     deallocate(tab_RT_incl,tab_RT_az,tab_uv_rt,tab_u_rt,tab_v_rt,tab_w_rt)
   endif
-  deallocate(tab_RT_incl,tab_RT_az,tab_uv_rt,tab_u_rt,tab_v_rt,tab_w_rt)
 
   return
 
