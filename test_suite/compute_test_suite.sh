@@ -1,14 +1,20 @@
+#!/bin/bash
 export mcfost=$HOME"/mcfost/src/mcfost"
 
 for dir in test_data/*; do
-    export param=`basename "$dir".para`
+    param=`basename "$dir".para`
     pushd "$dir"
     rm -rf data_*
-    $mcfost $param -mol
-    rm -f _dust_prop_th.tmp
-    $mcfost $param -img 1.0
-    $mcfost $param -img 10
-    $mcfost $param -img 100
-    $mcfost $param -img 1000
+    if [ "$param" == "discF_00500.para" ]; then
+        opt="-phantom discF_00500"
+    else
+        opt=""
+    fi
+    $mcfost $param $opt -mol
+    $mcfost $param $opt -img 1.0
+    $mcfost $param $opt -img 10
+    $mcfost $param $opt -img 100
+    $mcfost $param $opt -img 1000
+    rm -f *.tmp
     popd
 done

@@ -56,7 +56,11 @@ def test_Temperature(model_name):
 
     # Run the mcfost model
     filename = "test_data/"+model_name+"/"+model_name+".para"
-    mcfost(filename,opt="-mol -root_dir "+model_name)
+    if (model_name == "discF_00500"):
+        opt=" -phantom test_data/"+model_name+"/"+model_name
+    else:
+        opt=""
+    mcfost(filename,opt="-mol -root_dir "+model_name+opt)
 
     # Read the results
     T_name = model_name+"/data_th/Temperature.fits.gz"
@@ -74,6 +78,8 @@ def test_SED(model_name):
 
     # Read the results
     SED_name = model_name+"/data_th/sed_rt.fits.gz"
+    if (not os.path.isfile(SED_name)):
+        pytest.skip("No SED")
     SED = fits.getdata(SED_name)
     SED_ref = fits.getdata("test_data/"+SED_name)
 
@@ -103,7 +109,11 @@ def test_mol_map(model_name):
 def test_image(model_name, wl):
     # Run the mcfost model
     filename = "test_data/"+model_name+"/"+model_name+".para"
-    mcfost(filename,opt="-img "+wl+" -root_dir "+model_name)
+    if (model_name == "discF_00500"):
+        opt=" -phantom test_data/"+model_name+"/"+model_name
+    else:
+        opt=""
+    mcfost(filename,opt="-img "+wl+" -root_dir "+model_name+opt)
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -128,6 +138,8 @@ def test_pola(model_name, wl):
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(image_name)
+    if ((image.shape[0] != 4) & (image.shape[0] != 8)):
+        pytest.skip("No pola")
     image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep Stokes Q, U
@@ -147,6 +159,8 @@ def test_contrib(model_name, wl):
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(image_name)
+    if ((image.shape[0] != 5) & (image.shape[0] != 8)):
+        pytest.skip("No contrib")
     image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep separate contributions
