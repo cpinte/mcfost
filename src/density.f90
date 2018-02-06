@@ -351,6 +351,8 @@ subroutine define_dust_density()
 
   logical :: lwarning
 
+  lwarning = .true.
+
   densite_pouss = 0.0; masse = 0.0
 
   ! Coefficient de diffusion constant
@@ -556,8 +558,11 @@ subroutine define_dust_density()
                           densite_pouss(l,icell)  = 1.0_sp
                           norme = 1.0_dp
 
-                          write(*,*) "WARNING: Vertical settling unresolved for"
-                          write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                          if (lwarning) then
+                             write(*,*) "WARNING: Vertical settling unresolved for"
+                             write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                             lwarning = .false.
+                          endif
                        endif
 
                        do j=j_start,nz
@@ -583,7 +588,6 @@ subroutine define_dust_density()
               stop
            endif
 
-           lwarning = .true.
            do i=1, n_rad
               rho0 = densite_gaz_midplane(i) ! pour dependance en R : pb en coord sperique
               icell = cell_map(i,1,1)
@@ -631,7 +635,7 @@ subroutine define_dust_density()
                              write(*,*)
                              write(*,*) "WARNING : Vertical settling unresolved for"
                              write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
-                             lwarning = .false. ! on ne fait un warning qu'1 fois par rayon
+                             lwarning = .false. ! on ne fait un warning qu'1 fois par rayon --> 1 seule fois au total
                           endif
                        endif
 
