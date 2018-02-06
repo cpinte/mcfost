@@ -120,6 +120,7 @@ subroutine set_default_variables()
   lforce_HG = .false.
   lphase_function_file = .false.
   ltau1_surface=.false.
+  lcasa=.false.
 
   ! Geometrie Grille
   lcylindrical=.true.
