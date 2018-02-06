@@ -333,10 +333,10 @@ cleanall : clean cleandata
 .PHONY : save
 
 save :
-	git push phare
+	#git push phare
 	git push bitbucket
 	git push github
-	git push dmz
+	#git push dmz
 
 #------------------------------------------------------------------------------#
 # Testing
