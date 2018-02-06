@@ -18,7 +18,7 @@ module density
   real, public :: T_rm
 
   public :: define_density, define_density_wall3d, define_dust_density, densite_file, &
-       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file
+       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density
 
   private
 
@@ -1381,7 +1381,38 @@ subroutine densite_file()
      enddo ! k
   endif  !lvariable_dust
 
+  call normalize_dust_density()
+  deallocate(sph_dens,a_sph)
+
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+
+  !write(*,*) "MODIFYING 3D DENSITY !!!"
+  !k = 36
+  !densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
+  !densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
+
+  return
+
+end subroutine densite_file
+
+!**********************************************************
+
+subroutine normalize_dust_density(disk_dust_mass)
+
+  real(kind=dp), intent(in), optional :: disk_dust_mass
+  integer :: icell, l
+
+  real(kind=dp) :: somme, mass, facteur, total_dust_mass
+
+  if (present(disk_dust_mass)) then
+     total_dust_mass = disk_dust_mass
+  else
+     total_dust_mass = diskmass ! using the parameter file value
+  endif
+
   ! Normalisation : on a 1 grain de chaque taille dans le disque
+  ! puis on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
      somme=0.0
 
@@ -1389,13 +1420,8 @@ subroutine densite_file()
         if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = (densite_pouss(l,:)/somme)
+     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum dennsite_pouss = 1  dans le disque
   enddo !l
-
-  ! Normalisation : on a 1 grain en tout dans le disque
-  do l=1,n_grains_tot
-     densite_pouss(l,:) = (densite_pouss(l,:)/somme)*nbre_grains(l)
-  enddo
 
   search_not_empty : do l=1,n_grains_tot
      do icell=1, n_cells
@@ -1406,7 +1432,6 @@ subroutine densite_file()
      enddo !icell
   enddo search_not_empty
 
-
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do icell=1,n_cells
@@ -1415,7 +1440,7 @@ subroutine densite_file()
      enddo !l
   enddo !icell
   mass =  mass/Msun_to_g
-  densite_pouss(:,:) = densite_pouss(:,:) * diskmass/mass
+  densite_pouss(:,:) = densite_pouss(:,:) * total_dust_mass/mass
 
   do icell=1,n_cells
      do l=1,n_grains_tot
@@ -1424,18 +1449,9 @@ subroutine densite_file()
   enddo ! icell
   masse(:) = masse(:) * AU3_to_cm3
 
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-  deallocate(sph_dens,a_sph)
-
-  !write(*,*) "MODIFYING 3D DENSITY !!!"
-  !k = 36
-  !densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
-  !densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
-
   return
 
-end subroutine densite_file
+end subroutine normalize_dust_density
 
 !**********************************************************
 

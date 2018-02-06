@@ -8,13 +8,14 @@ module read_phantom
   contains
 
     subroutine read_phantom_file(iunit,filename, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
-         rhogas,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+         rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
  integer,               intent(in) :: iunit
  character(len=*),      intent(in) :: filename
- real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,grainsize
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
+
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -30,6 +31,7 @@ module read_phantom
  real(dp) :: massoftype(maxtypes),hfact,umass,utime,udist
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
+ real(dp), allocatable, dimension(:) :: grainsize
  real(dp) :: graindens
  real(dp), allocatable, dimension(:) :: dudt
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
@@ -89,7 +91,7 @@ module read_phantom
  call extract('massoftype',massoftype(1:ntypes),hdr,ierr)
  call extract('hfact',hfact,hdr,ierr)
  if (ndusttypes > 0) then
-    call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr)
+    call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
     call extract('graindens',graindens,hdr,ierr)
  endif
  !write(*,*) ' hfact = ',hfact
@@ -252,8 +254,9 @@ module read_phantom
  if (got_h) then
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
          vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,&
-         hfact,umass,utime,udist,graindens,ndudt,dudt,n_SPH,x,y,z,h,vx,vy,vz,&
-         particle_id, massgas,massdust,rhogas,rhodust,extra_heating)
+         hfact,umass,utime,udist,graindens,ndudt,dudt,&
+         n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -270,15 +273,16 @@ end subroutine read_phantom_file
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
-     utime, udist,graindens,ndudt,dudt,n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-     massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
+     utime, udist,graindens,ndudt,dudt,&
+     n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
+     SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum
   use prop_star
   use parametres, only : ldudt_implicit,ufac_implicit
 
@@ -286,7 +290,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
-  real(dp), dimension(ndusttypes),    intent(in) :: grainsize
+  real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), intent(in) :: graindens
   real(dp), dimension(ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
@@ -294,12 +298,15 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
+  ! MC
+  integer, intent(out) :: n_SPH
   real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,rhogas,massgas ! massgas [Msun]
   integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
+  real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
   real, dimension(:), allocatable, intent(out) :: extra_heating
-  integer, intent(out) :: n_SPH
   real(dp), intent(in), optional :: T_to_u
+
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
@@ -312,7 +319,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   uWatt = uerg_per_s * erg_to_J
   ulength_au = udist/ (au_to_cm)
   uvelocity =  udist / (m_to_cm) / utime ! m/s
-  usolarmass = umass/Msun_to_g
+  usolarmass = umass / Msun_to_g
+
 
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
@@ -339,12 +347,17 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  ! TODO : use mcfost quantities directly rather that these intermediate variables
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
- allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),particle_id(n_SPH),&
+ allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),SPH_grainsizes(ndusttypes),particle_id(n_SPH),&
       x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
  endif
+
+ ! Dust grain sizes in microns
+ SPH_grainsizes(:) = grainsize(:) * udist * cm_to_mum
+ ! graindens * udens is in g/cm3
+
 
  if (lemission_mol) then
     allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)

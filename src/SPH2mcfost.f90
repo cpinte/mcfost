@@ -3,6 +3,7 @@ module SPH2mcfost
   use parametres
   use constantes
   use utils
+  use density, only : normalize_dust_density
 
   implicit none
 
@@ -20,7 +21,7 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,grainsize
+    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
@@ -33,7 +34,7 @@ contains
        write(*,*) "Performing phantom2mcfost setup"
        write(*,*) "Reading phantom density file: "//trim(SPH_file)
        call read_phantom_file(iunit,SPH_file,x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,grainsize,n_SPH,ierr)
+            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
@@ -72,7 +73,7 @@ contains
        SPH_limits(:) = 0
     endif
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, SPH_limits, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
     deallocate(massgas,rho)
     if (ndusttypes > 0) then
@@ -85,7 +86,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,grainsize, &
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, &
        SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
@@ -99,16 +100,14 @@ contains
     real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas
     real(dp), dimension(:), allocatable, intent(in) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-    real(dp), dimension(ndusttypes), intent(in) :: grainsize
+    real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
-
-    real, parameter :: SPH_dust_2_total_dust = 20. ! SPH dust mass is 5% of total
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
-    real(dp) :: mass, somme, Mtot, Mtot_dust, dust_to_gas
+    real(dp) :: mass, somme, Mtot, Mtot_dust
     real :: f, limit_threshold
     integer :: icell, l, k, iSPH
 
@@ -240,16 +239,19 @@ contains
        ! mcfost adds an extra grain size follwing the gas
        ! this is required if ndusttypes == 1, but I do it in any case
        allocate(a_SPH(ndusttypes+1),log_a_SPH(ndusttypes+1),rho_dust(ndusttypes+1))
-       do l=1, ndusttypes
-          a_SPH(l+1) = grainsize(l)
-       enddo
-       ! temorary for old phantom dumps were grain sizes were not defined
-       if (grainsize(1) < 1) then
-          a_SPH(2) = 1000. ;
-          write(*,*) "WARNING: forcing big grains to be 1mm"
-       endif
-       write(*,*) "WARNING: HARD-CODED: assuming dust grains smaller than 1mum are following the gas"
+       write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
        a_SPH(1) = 1. ;
+
+       do l=1, ndusttypes
+          a_SPH(l+1) = SPH_grainsizes(l)
+       enddo
+
+       ! temporary for old phantom dumps were grain sizes were not defined
+       if (SPH_grainsizes(1) < tiny_real) then
+          a_SPH(2) = 1000. ;
+          write(*,*) "WARNING: SPH dust grain size  not found"
+          write(*,*) "         forcing big grains to be 1mm"
+       endif
 
        log_a_SPH(:) = 0.
        rho_dust(:) = 0.
@@ -288,11 +290,6 @@ contains
 
        !Mtot_dust = Mtot_dust * Msun_to_g
 
-       ! Remark : SPH_dust_2_total_dust is a hard-coded factor to convert SPH dust mass to total
-       ! dust mass if there are only a few grainsizes in the SPH dump
-       write(*,*) "WARNING: HARD-CODED: applying a corrective factor to the SPH dust mass, factor =", SPH_dust_2_total_dust
-       dust_to_gas = SPH_dust_2_total_dust * Mtot_dust/Mtot
-
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
@@ -300,7 +297,7 @@ contains
              do l=1, ndusttypes+1
                 if (l==1) then
                    ! small grains follow the gas, we do not care about normalization here
-                   rho_dust(l) = massgas(iSPH) * dust_to_gas / volume(icell)
+                   rho_dust(l) = massgas(iSPH) / volume(icell)
                 else
                    rho_dust(l) = massdust(l-1,iSPH) / volume(icell)
                 endif
@@ -324,35 +321,9 @@ contains
           endif
        enddo ! icell
 
-       ! Normalisation en taille de grain: on a 1 grain de chaque taille dans le disque,
-       ! puis 1 grain en tout dans le disque
-       do l=1,n_grains_tot
-          somme=0.0
-          do icell=1,n_cells
-             if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
-             somme=somme+densite_pouss(l,icell)*volume(icell)
-          enddo !icell
-          densite_pouss(l,:) = densite_pouss(l,:) * (nbre_grains(l)/somme)
-       enddo !l
-
-       ! Normalisation : Calcul masse totale
-       mass = 0.0
-       do icell=1,n_cells
-          do l=1,n_grains_tot
-             mass = mass + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-          enddo !l
-       enddo !icell
-       mass = mass * AU3_to_cm3
-       densite_pouss(:,:) = densite_pouss(:,:) * sum(masse_gaz)/mass * dust_to_gas
-
-       do icell=1,n_cells
-          masse(icell) = 0.
-          do l=1,n_grains_tot
-             masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-          enddo !l
-       enddo ! icell
-       masse(:) = masse(:) * AU3_to_cm3
-
+       ! Using the parameter file gas-to-dust ratio for now
+       ! until phantom provides a proper grain size distribution
+       call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
     else ! ndusttypes = 0 : using the gas density
 
        lvariable_dust = .false.
@@ -369,7 +340,7 @@ contains
        f = 1./disk_zone(1)%gas_to_dust * sum(masse_gaz)/sum(masse)
        densite_pouss(:,:) = densite_pouss(:,:) * f
        masse(:) = masse(:) * f
-    endif
+    endif ! ndusttypes == 0
 
     write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
