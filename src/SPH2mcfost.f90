@@ -239,18 +239,29 @@ contains
        ! mcfost adds an extra grain size follwing the gas
        ! this is required if ndusttypes == 1, but I do it in any case
        allocate(a_SPH(ndusttypes+1),log_a_SPH(ndusttypes+1),rho_dust(ndusttypes+1))
-       write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
-       a_SPH(1) = 1. ;
 
+       write(*,*) "Found the following grain sizes in SPH calculation:"
        do l=1, ndusttypes
           a_SPH(l+1) = SPH_grainsizes(l)
+          write(*,*) real(SPH_grainsizes(l)), "microns"
        enddo
+
+       ! Adding smallest grain size following the gas
+       if (a_SPH(2) <= 1.0+1e-6) then
+          write(*,*) "WARNING: assuming dust grains smaller than 0.1mum are following the gas"
+          a_SPH(1) = 0.1 ;
+       else
+          write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
+          a_SPH(1) = 1. ;
+       endif
+
 
        ! temporary for old phantom dumps were grain sizes were not defined
        if (SPH_grainsizes(1) < tiny_real) then
+          a_SPH(2) = 1. ;
           a_SPH(2) = 1000. ;
           write(*,*) "WARNING: SPH dust grain size  not found"
-          write(*,*) "         forcing big grains to be 1mm"
+          write(*,*) "forcing small & big grains to be 1mum & 1mm"
        endif
 
        log_a_SPH(:) = 0.
