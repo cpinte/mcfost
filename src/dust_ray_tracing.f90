@@ -623,7 +623,10 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   integer :: itype, iRT, icell
   real(kind=dp) :: facteur, energie_photon, n_photons_envoyes, kappa_sca
 
-  if (lmono0) write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
+  if (lmono0) then
+     write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
+     write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
+  endif
   iRT = RT2d_to_RT1d(ibin, iaz)
 
   eps_dust1(:,:,:,:) = 0.0_dp
