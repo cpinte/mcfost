@@ -607,7 +607,8 @@ subroutine realloc_dust_mol()
 
   use stars, only : allocate_stellar_spectra
 
-  integer :: alloc_status, mem_size
+  integer :: alloc_status
+  real :: mem_size
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
        tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
@@ -672,9 +673,10 @@ subroutine realloc_dust_mol()
 
   ! TODO : cette partie prend bcp de memoire
   low_mem_scattering = .false.
-  allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
-  mem_size = n_grains_tot * p_n_cells * n_lambda * 4. / 1024.**3
+
+  mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**3
   if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+  allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error ksca_CDF (realloc)'
      stop
@@ -1041,9 +1043,9 @@ subroutine realloc_step2()
   else
      deallocate(ksca_CDF)
      low_mem_scattering = .false.
-     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
      mem_size = n_grains_tot * p_n_cells * p_n_lambda2_pos * 4. / 1024.**3
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+     allocate(ksca_CDF(0:n_grains_tot,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
      if (alloc_status > 0) then
         write(*,*) 'Allocation error ksca_CDF'
         stop
