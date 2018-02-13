@@ -44,8 +44,8 @@ rm -rf sprng2.0
 
 # cfitsio
 # g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
-# wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3030.tar.gz
-tar xzvf cfitsio3030.tar.gz
+# wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
+tar xzvf cfitsio3420.tar.gz
 cd cfitsio
 if [ "$SYSTEM" = "ifort" ] ; then
     export CC="icc"
