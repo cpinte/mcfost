@@ -1234,6 +1234,11 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
           (n_photons_envoyes *  AU_to_cm * pi)
   endif
 
+  if (n_etoiles > 1) then
+     write(*,*) "WARNING : RT2 needs to be updated for multiple stars"
+     write(*,*) " if extra stars/planets emit significantly"
+  endif
+
   ! Matrice de Mueller
   M = 0.0_dp
 
@@ -1276,7 +1281,8 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
      if (stokes(1) < 1.e-30_dp) cycle
 
-     ! Direction de vol
+     ! Direction de vol : lumiere stellaire directe : direction == position
+     ! WARNING : only works for single star at x,y,z = 0 !!!
      x = 0.0_dp
      y = r_grid(icell) ! doit juste etre non nul
      z = z_grid(icell) ! sert a rien
