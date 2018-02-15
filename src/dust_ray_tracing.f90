@@ -887,11 +887,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real :: s11, s12, s33, s34
 
   ! Many dimensions but small numbers (<1MB for default values)
-  real, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sin_scatt_norm
-  integer, dimension(N_super,N_super,0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_k
+  real, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sin_scatt_norm
+  integer, dimension(N_super,N_super,n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_k
 
-  real, dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: s11_save
-  real(kind=dp), dimension(0:1,nang_ray_tracing,n_theta_I,n_phi_I) :: tab_sinw, tab_cosw
+  real, dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: s11_save
+  real(kind=dp), dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sinw, tab_cosw
 
 
   ! Direction observateur dans repere refence
@@ -966,10 +966,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     k = nint(acos(cos_scatt) * real(nang_scatt)/pi)
                     if (k > nang_scatt) k = nang_scatt
                     if (k < 0) k = 0
-                    tab_k(i1,i2,dir,iscatt,theta_I,phi_I) = k
+                    tab_k(i1,i2,theta_I,phi_I,iscatt,dir) = k
 
                     sin_scatt = sqrt(1.0_dp - cos_scatt*cos_scatt)
-                    tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I) = sin_scatt
+                    tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir) = sin_scatt
 
                     sum_sin = sum_sin + sin_scatt
                  enddo !i1
@@ -977,7 +977,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
               ! Normalization du facteur sin ici
               ! tab_sin_scatt depends on ibin !!!
-              tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) = tab_sin_scatt_norm(:,:,dir,iscatt,theta_I,phi_I) / sum_sin
+              tab_sin_scatt_norm(:,:,theta_I,phi_I,iscatt,dir) = tab_sin_scatt_norm(:,:,theta_I,phi_I,iscatt,dir) / sum_sin
 
               if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
 
@@ -1026,8 +1026,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  if (abs(cosw) < 1e-06) cosw = 0.0_dp
                  if (abs(sinw) < 1e-06) sinw = 0.0_dp
 
-                 tab_cosw(dir,iscatt,theta_I,phi_I) = cosw
-                 tab_sinw(dir,iscatt,theta_I,phi_I) = sinw
+                 tab_cosw(theta_I,phi_I,iscatt,dir) = cosw
+                 tab_sinw(theta_I,phi_I,iscatt,dir) = sinw
               endif ! lsepar_pola
            enddo !theta_I
         enddo !phi_I
@@ -1070,11 +1070,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  s11 = 0. ;
                  do i2=1, N_super
                     do i1 = 1, N_super
-                       k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
-                       s11 = s11 + tab_s11_pos(k,icell,p_lambda) * tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I)
+                       k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
+                       s11 = s11 + tab_s11_pos(k,icell,p_lambda) * tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir)
                     enddo ! i1
                  enddo !i2
-                 s11_save(dir,iscatt,theta_I,phi_I) = s11
+                 s11_save(theta_I,phi_I,iscatt,dir) = s11
 
               enddo ! theta_I
            enddo ! phi_I
@@ -1111,21 +1111,21 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     s11 = 0.
                     do i2=1, N_super
                        do i1 = 1, N_super
-                          k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
-                          s11 = s11 + tab_s11_pos(k,p_icell,p_lambda) * tab_sin_scatt_norm(i1,i2,dir,iscatt,theta_I,phi_I)
+                          k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
+                          s11 = s11 + tab_s11_pos(k,p_icell,p_lambda) * tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir)
                        enddo ! i1
                     enddo !i2
                  else ! does not depend on icell, we use the stored value
-                    s11 = s11_save(dir,iscatt,theta_I,phi_I)
+                    s11 = s11_save(theta_I,phi_I,iscatt,dir)
                  endif
 
 
                  if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
                     i1 = N_super/2+1 ; i2 = i1
-                    k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
+                    k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
 
-                    cosw = tab_cosw(dir,iscatt,theta_I,phi_I)
-                    sinw = tab_sinw(dir,iscatt,theta_I,phi_I)
+                    cosw = tab_cosw(theta_I,phi_I,iscatt,dir)
+                    sinw = tab_sinw(theta_I,phi_I,iscatt,dir)
 
                     RPO(2,2) = cosw
                     ROP(2,2) = cosw
