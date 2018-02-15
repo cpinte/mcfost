@@ -49,6 +49,8 @@ subroutine alloc_ray_tracing()
   ! Ok, this is the trick which makes mcfost rt2 in 2D very fast
   ! in 2D, we save the scattered radiation field for various azimuth (as the cell is a ring) + 2 elevation directions (up & down)
   ! in 3D, each cell is already divided in azimuth, so there is no need to divide the radiation field in azymuth (it is too memory expensive anyway)
+
+  ! Variables for rt1
   if (l3D) then
      n_az_rt = 1
      n_theta_rt = 1
@@ -57,6 +59,7 @@ subroutine alloc_ray_tracing()
      n_theta_rt = 2
   endif
 
+  ! Variables for rt2
   ! n_phi_I and n_theta_I are the angular dimensions of the stored radiation field for rt2
   ! 15 15 90 90 OK pour benchmark
   n_phi_I = 15 ; ! 17/11/10 semble mieux si egal a nang_ray_tracing
@@ -939,8 +942,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
         v_ray_tracing = - uv0 * cos(phi_scatt)
         w_ray_tracing = w0 * (2 * dir - 1)
 
-        do theta_I=1,n_theta_I
-           do phi_I=1,n_phi_I
+        do phi_I=1,n_phi_I
+           do theta_I=1,n_theta_I
               ! Moyennage de la fct de phase sur le  bin
               sum_sin = 0.
               do i2=1, N_super
@@ -1023,11 +1026,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  if (abs(cosw) < 1e-06) cosw = 0.0_dp
                  if (abs(sinw) < 1e-06) sinw = 0.0_dp
 
-                 tab_cosw(dir,iscatt,phi_I,theta_I) = cosw
-                 tab_sinw(dir,iscatt,phi_I,theta_I) = sinw
+                 tab_cosw(dir,iscatt,theta_I,phi_I) = cosw
+                 tab_sinw(dir,iscatt,theta_I,phi_I) = sinw
               endif ! lsepar_pola
-           enddo !phi_I
-        enddo !theta_I
+           enddo !theta_I
+        enddo !phi_I
 
      enddo ! iscatt
   enddo ! dir
@@ -1100,8 +1103,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
            v_ray_tracing = - uv0 * cos(phi_scatt)
            w_ray_tracing = w0
 
-           do theta_I=1,n_theta_I
-              do phi_I=1,n_phi_I
+           do phi_I=1,n_phi_I
+              do theta_I=1,n_theta_I
 
                  if (lvariable_dust) then
                     ! Average of the phase over the bin
@@ -1121,8 +1124,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     i1 = N_super/2+1 ; i2 = i1
                     k = tab_k(i1,i2,dir,iscatt,theta_I,phi_I)
 
-                    cosw = tab_cosw(dir,iscatt,phi_I,theta_I)
-                    sinw = tab_sinw(dir,iscatt,phi_I,theta_I)
+                    cosw = tab_cosw(dir,iscatt,theta_I,phi_I)
+                    sinw = tab_sinw(dir,iscatt,theta_I,phi_I)
 
                     RPO(2,2) = cosw
                     ROP(2,2) = cosw
@@ -1183,8 +1186,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                          s11 * Inu(n_Stokes+4,theta_I,phi_I,icell)
                  endif ! lsepar_contrib
 
-              enddo ! phi_I
-           enddo ! theta_I
+              enddo ! theta_I
+           enddo ! phi_I
 
         enddo ! iscatt
      enddo ! dir
