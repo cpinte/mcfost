@@ -934,13 +934,15 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ! Precalcul des directions ou on va calculer Inu * s11
   ! Permet d'etre aussi rapide que la version initiale calc_Isca2
 
-  ! TODO : save cos_scatt --> k et sin sca + sum : see below loop i2,i1
+  ! TODO : tab_k, tab_sin_scatt_norm, tab_cosw and tab_cosw can be saved
+  ! They only to be compured once per ibin
+
   do dir=0,1
      do iscatt = 1, nang_ray_tracing
         phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
         u_ray_tracing = uv0 * sin(phi_scatt)
         v_ray_tracing = - uv0 * cos(phi_scatt)
-        w_ray_tracing = w0 * (2 * dir - 1)
+        w_ray_tracing = w0 !* (2. * dir - 1)
 
         do phi_I=1,n_phi_I
            do theta_I=1,n_theta_I
