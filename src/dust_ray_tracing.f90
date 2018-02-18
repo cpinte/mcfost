@@ -292,7 +292,8 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
   ! C. Pinte
   ! 19/01/08
 
-  ! TODO: cos_thet_ray_tracing n'est plus utilise depuis le super-echantillonage
+  ! NB: cos_thet_ray_tracing n'est plus utilise  pour la composante diffusee
+  ! plusieurs fois depuis le super-echantillonage
 
   integer, intent(in) :: id, ibin ! RT2 : la direction d'azimuth n'a pas d'importance ici
   real(kind=dp), intent(in) :: x,y,z, u, v, w  ! z est inutilise
@@ -898,6 +899,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
 
   ! Allocation dynamique pour passer en stack
+  ! Todo : we do not need to compute this for each ibin !!!
   allocate(Inu(N_type_flux,n_theta_I,n_phi_I,n_cells), stat=alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error I_nu'
@@ -1066,9 +1068,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
      do dir=0,1
         do iscatt = 1, nang_ray_tracing
+           ! Loop over the specific intensity bins
            do phi_I=1,n_phi_I
               do theta_I=1,n_theta_I
-                 ! Average of the phase over the bin
+                 ! Average of the phase function over the bin
                  s11 = 0. ;
                  do i2=1, N_super
                     do i1 = 1, N_super
@@ -1123,6 +1126,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
 
                  if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
+                    ! The polarisability phase function is not as steep as the phase function,
+                    ! so we only use the center of the bin for the polarization to make it faster
                     i1 = N_super/2+1 ; i2 = i1
                     k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
 
@@ -1145,15 +1150,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     ! Champ de radiation
                     stokes(:) = Inu(1:4,theta_I,phi_I,icell)
 
-                    M(1,1) = s11
-                    M(2,2) = s11
-                    M(1,2) = s12
-                    M(2,1) = s12
-
-                    M(3,3) = s33
-                    M(4,4) = s33
-                    M(3,4) = -s34
-                    M(4,3) = s34
+                    M(1,1) = s11 ; M(2,2) = s11 ; M(1,2) = s12 ; M(2,1) = s12
+                    M(3,3) = s33 ; M(4,4) = s33 ; M(3,4) = -s34 ; M(4,3) = s34
 
                     !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
 
