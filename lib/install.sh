@@ -85,6 +85,6 @@ rm -rf voro
 
 # Put in final directory
 mkdir -p $MCFOST_INSTALL/include
-\cp -r include/* $MCFOST_INSTALL/include
+\cp -r include/*.h include/voro++ $MCFOST_INSTALL/include/
 mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
-\cp -r lib/* $MCFOST_INSTALL/lib/$SYSTEM/
+\cp -r lib/*.a $MCFOST_INSTALL/lib/$SYSTEM/
