@@ -69,7 +69,7 @@ rm -rf cfitsio
 # Original voro++ can be obtained from
 # svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro
 # Downloading last version tested with mcfost :
-git clone https://cpinte@bitbucket.org/cpinte/voro.git
+git clone git@bitbucket.org:cpinte/voro.git
 if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
