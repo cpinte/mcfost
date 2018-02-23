@@ -942,10 +942,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   do dir=0,1
      do iscatt = 1, nang_ray_tracing
         phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
+
+        ! Direction of the various rays that will sampled a "cylindrical" cell
         u_ray_tracing = uv0 * sin(phi_scatt)
         v_ray_tracing = - uv0 * cos(phi_scatt)
-        w_ray_tracing = w0 !* (2. * dir - 1)
+        w_ray_tracing = w0
 
+        ! Direction of the stored specific intensity
         do phi_I=1,n_phi_I
            do theta_I=1,n_theta_I
               ! Moyennage de la fct de phase sur le  bin
@@ -956,7 +959,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     f1 = real(i1) / (N_super + 1)
                     f2 = real(i2) / (N_super + 1)
 
-                    w = 2.0_dp * ((real(theta_I,kind=dp) - f1) / real(n_theta_I,kind=dp) ) - 1.0_dp
+                    w = (2.0_dp * ((real(theta_I,kind=dp) - f1) / real(n_theta_I,kind=dp) ) - 1.0_dp) * (2*dir-1)
                     phi = deux_pi * (real(phi_I,kind=dp) - f2) / real(n_phi_I,kind=dp)
 
                     w02 = sqrt(1.0_dp-w*w)
@@ -986,7 +989,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
               if (lsepar_pola) then ! On calcule les s12, s33, s34 et la matrice de rotation
 
                  ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
-                 w = 2.0_dp * ((real(theta_I,kind=dp) - 0.5) / real(n_theta_I,kind=dp) ) - 1.0_dp
+                 w = (2.0_dp * ((real(theta_I,kind=dp) - 0.5) / real(n_theta_I,kind=dp) ) - 1.0_dp) * (2*dir-1)
                  phi = deux_pi * (real(phi_I,kind=dp) - 0.5) / real(n_phi_I,kind=dp)
 
                  w02 = sqrt(1.0_dp-w*w)
@@ -1097,16 +1100,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
         p_icell = icell_ref
      endif
 
-
-
      ! Boucle sur les directions de ray-tracing
      do dir=0,1
         do iscatt = 1, nang_ray_tracing
-
-           phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
-           u_ray_tracing = uv0 * sin(phi_scatt)
-           v_ray_tracing = - uv0 * cos(phi_scatt)
-           w_ray_tracing = w0
 
            do phi_I=1,n_phi_I
               do theta_I=1,n_theta_I
