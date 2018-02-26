@@ -158,7 +158,7 @@ endif
 
 INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
 
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lcurl -lvoro++ -lsprng
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
 
 #------------------------------------------------------------------------------#
 # Sources and objects

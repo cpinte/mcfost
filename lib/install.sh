@@ -60,6 +60,8 @@ fi
 if [ "$SYSTEM" = "xeon-phi" ] ; then
     \cp -f ../Makefile_cfitsio.xeon_phi Makefile
 fi
+# We do not want to have to link with libcurl
+cat Makefile | sed s/-DCFITSIO_HAVE_CURL=1// |  sed s/-lcurl// >> Makefile.tmp && \mv -f Makefile.tmp Makefile
 make
 \cp libcfitsio.a ../lib
 cd ..
