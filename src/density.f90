@@ -1138,7 +1138,6 @@ subroutine densite_file()
         write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
         write(*,*) 'HDU 2 has', nfound, 'dimensions.'
         write(*,*) 'Exiting.'
-        write(*,*)
         stop
      endif
      if ((naxes(1) /= n_a)) then
@@ -1242,7 +1241,6 @@ subroutine densite_file()
 
         ! Multiplication par a car da = a.dln(a)
         do k=1, n_grains_tot
-           write(*,*) k
            a = r_grain(k)
            ! todo : peut etre optimise sans interp
            nbre_grains(k) = exp( interp(log_n_a_sph, log_a_sph, log(a)) )  * a
