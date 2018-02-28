@@ -1427,7 +1427,7 @@ function dust_source_fct(icell, x,y,z)
 
   real(kind=dp) :: phi_pos, frac, un_m_frac, xiscatt, frac_r, frac_z, r
   integer :: iscatt1, iscatt2, dir, psup, ri1, zj1, ri2, zj2
-  integer :: k, n_pola, icell_tmp, ri, zj, phik
+  integer :: k, icell_tmp, ri, zj, phik
 
   SF1 = 0 ; SF2 = 0 ; SF3 = 0 ; SF4 = 0
 
@@ -1554,8 +1554,8 @@ function dust_source_fct(icell, x,y,z)
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
      if (lsepar_contrib) then
-        SF1(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
-             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+        SF1(n_Stokes+1:N_type_flux) = eps_dust2(n_Stokes+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_Stokes+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
      icell_tmp = cell_map(ri2,zj1,phik)
@@ -1565,8 +1565,8 @@ function dust_source_fct(icell, x,y,z)
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
      if (lsepar_contrib) then
-        SF2(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
-             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+        SF2(n_Stokes+1:N_type_flux) = eps_dust2(n_Stokes+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_Stokes+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
      icell_tmp = cell_map(ri1,zj2,phik)
@@ -1576,8 +1576,8 @@ function dust_source_fct(icell, x,y,z)
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
      if (lsepar_contrib) then
-        SF3(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
-             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+        SF3(n_Stokes+1:N_type_flux) = eps_dust2(n_Stokes+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_Stokes+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
      icell_tmp = cell_map(ri2,zj2,phik)
@@ -1587,8 +1587,8 @@ function dust_source_fct(icell, x,y,z)
              eps_dust2(2:3,iscatt2,dir,icell_tmp),un_m_frac)
      endif
      if (lsepar_contrib) then
-        SF4(n_pola+1:N_type_flux) = eps_dust2(n_pola+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
-             eps_dust2(n_pola+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
+        SF4(n_Stokes+1:N_type_flux) = eps_dust2(n_Stokes+1:N_type_flux,iscatt2,dir,icell_tmp) * frac + &
+             eps_dust2(n_Stokes+1:N_type_flux,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
 
@@ -1619,11 +1619,8 @@ function dust_source_fct(icell, x,y,z)
           + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
 
      if (lsepar_pola) then
-        n_pola = 4
         SF1(2:3) = SF1(2:3) + interpolate_Stokes_QU(eps_dust2_star(2:3,iscatt1,dir,icell_tmp), &
              eps_dust2_star(2:3,iscatt2,dir,icell_tmp),un_m_frac)
-     else
-        n_pola = 1
      endif
 
      icell_tmp = cell_map(ri2,zj1,phik)
@@ -1652,16 +1649,16 @@ function dust_source_fct(icell, x,y,z)
 
      if (lsepar_contrib) then
         icell_tmp = cell_map(ri1,zj1,phik)
-        SF1(n_pola+2) = SF1(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+        SF1(n_Stokes+2) = SF1(n_Stokes+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
              + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
         icell_tmp = cell_map(ri2,zj1,phik)
-        SF2(n_pola+2) = SF2(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+        SF2(n_Stokes+2) = SF2(n_Stokes+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
              + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
         icell_tmp = cell_map(ri1,zj2,phik)
-        SF3(n_pola+2) = SF3(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+        SF3(n_Stokes+2) = SF3(n_Stokes+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
              + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
         icell_tmp = cell_map(ri2,zj2,phik)
-        SF4(n_pola+2) = SF4(n_pola+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
+        SF4(n_Stokes+2) = SF4(n_Stokes+2) + eps_dust2_star(1,iscatt2,dir,icell_tmp) * frac &
              + eps_dust2_star(1,iscatt1,dir,icell_tmp) * un_m_frac
      endif
 
