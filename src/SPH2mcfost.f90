@@ -27,7 +27,7 @@ contains
     real, allocatable, dimension(:) :: extra_heating
 
     real(dp), dimension(6) :: SPH_limits
-    integer :: ndusttypes, ierr, ios
+    integer :: ndusttypes, ierr
     character(len=100) :: line_buffer
 
     if (lphantom_file) then
@@ -53,9 +53,30 @@ contains
 
     if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
 
-    !*******************************
     ! Model limits
-    !*******************************
+    call read_SPH_limits_file(SPH_limits_file, SPH_limits)
+
+    ! Voronoi tesselation
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
+
+    deallocate(massgas,rho)
+    if (ndusttypes > 0) then
+       deallocate(rhodust,massdust)
+    endif
+
+    return
+
+  end subroutine setup_SPH2mcfost
+
+  !*********************************************************
+
+  subroutine read_SPH_limits_file(SPH_limits_file, SPH_limits)
+
+    character(len=512), intent(in) :: SPH_limits_file
+    real(dp), dimension(6), intent(out) :: SPH_limits
+
+    integer :: ios
+
     write(*,*) " "
     if (llimits_file) then
        write(*,*) "Reading limits file: "//trim(SPH_limits_file)
@@ -73,16 +94,9 @@ contains
        SPH_limits(:) = 0
     endif
 
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
-
-    deallocate(massgas,rho)
-    if (ndusttypes > 0) then
-       deallocate(rhodust,massdust)
-    endif
-
     return
 
-  end subroutine setup_SPH2mcfost
+  end subroutine read_SPH_limits_file
 
   !*********************************************************
 

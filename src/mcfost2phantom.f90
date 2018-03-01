@@ -4,7 +4,8 @@ module mcfost2phantom
 
 contains
 
-  subroutine init_mcfost_phantom(mcfost_para_filename, ierr, keep_particles) !,  np, nptmass, ntypes, ndusttypes, npoftype)
+  subroutine init_mcfost_phantom(mcfost_para_filename, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
+       keep_particles)
 
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -14,8 +15,11 @@ contains
     use grid, only : define_physical_zones, order_zones, init_lambda
     use optical_depth, only : no_dark_zone
     use mem, only : alloc_dust_prop
+    use SPH2mcfost, only : read_SPH_limits_file
 
-    character(len=*), intent(in) :: mcfost_para_filename
+    character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
+    logical, intent(in) :: use_SPH_limits_file
+    real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
 
@@ -34,6 +38,13 @@ contains
     if (present(keep_particles)) then
        SPH_keep_particles = keep_particles
        write(*,*) "WARNING: updating SPH_keep_particles to" , SPH_keep_particles
+    endif
+
+    ! Model limits
+    if (use_SPH_limits_file) then
+       call read_SPH_limits_file(SPH_limits_file, SPH_limits)
+    else
+       SPH_limits = 0.
     endif
 
     write(*,*) "WARNING: internal heating is turned off in mcfost"
