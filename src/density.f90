@@ -1122,7 +1122,6 @@ subroutine densite_file()
 
      read_n_a = 0
      call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
-
      write(*,*) "read_n_a", read_n_a
 
      !---------------------------------------------------------
@@ -1226,7 +1225,18 @@ subroutine densite_file()
         tmp = sum(n_a_sph)
         write(*,*) "The following grain sizes were found in the fits file:"
         do i=1,n_a
-           write(*,*) i, a_sph(i), "microns", n_a_sph(i) / tmp
+           write(*,*) i, a_sph(i), "microns, relative number density =", n_a_sph(i) / tmp
+           ! Checking values as we will take the log a bit later
+           if (a_sph(i) < tiny_real) then
+              write(*,*) "Error: grain sizes must be > 0"
+              write(*,*) "Exiting"
+              stop
+           endif
+           if (n_a_sph(i) / tmp < tiny_real) then
+              write(*,*) "Error: grain number density must be > 0"
+              write(*,*) "Exiting"
+              stop
+           endif
         enddo
         write(*,*) "They will be used to set the integrated grain size distribution"
 
