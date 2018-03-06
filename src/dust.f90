@@ -800,7 +800,7 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-subroutine opacite(lambda, p_lambda)
+subroutine opacite(lambda, p_lambda, no_scatt)
 ! Calcule la table d'opacite et ksca_CDF
 ! Inclus stratification empirique
 ! Utilise les resultats des routine densite et prop_grains
@@ -811,10 +811,18 @@ subroutine opacite(lambda, p_lambda)
   implicit none
 
   integer, intent(in) :: lambda, p_lambda
+  logical, intent(in), optional :: no_scatt
 
   integer :: icell, k, thetaj
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, k_sca_tot, angle
-  logical :: lcompute_obs,  ldens0
+  logical :: lcompute_obs,  ldens0, compute_scatt
+
+
+  if (present(no_scatt)) then
+     compute_scatt = .not.no_scatt
+  else
+     compute_scatt = .true.
+  endif
 
   ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
   ! on la met à nbre_grains et on effacera apres
@@ -938,28 +946,30 @@ subroutine opacite(lambda, p_lambda)
   endif
 
 
-  if (scattering_method==2) then
-     call calc_local_scattering_matrices(lambda, p_lambda)
-  else ! scattering_method ==1
-     if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
-        do icell=1, p_n_cells
-           ksca_CDF(0,icell,lambda)=0.0
+  if (compute_scatt) then
+     if (scattering_method==2) then
+        call calc_local_scattering_matrices(lambda, p_lambda)
+     else ! scattering_method ==1
+        if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
+           do icell=1, p_n_cells
+              ksca_CDF(0,icell,lambda)=0.0
 
-           do  k=1,n_grains_tot
-              ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda) * densite_pouss(k,icell)
-           enddo !k
+              do  k=1,n_grains_tot
+                 ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda) * densite_pouss(k,icell)
+              enddo !k
 
-           if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
-              ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
-           else
-              ! a la surface, on peut avoir une proba de 0.0 partout
-              ! dans ce cas, on decide qu'il n'y a que les plus petits grains
-              ! rq : en pratique, la densite est trop faible pour qu'il y ait
-              ! une diffusion a cet endroit.
-              ksca_CDF(:,icell,lambda) = 1.0
-           endif
-        enddo ! icell
-     endif ! .not.low_mem_scattering
+              if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
+                 ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
+              else
+                 ! a la surface, on peut avoir une proba de 0.0 partout
+                 ! dans ce cas, on decide qu'il n'y a que les plus petits grains
+                 ! rq : en pratique, la densite est trop faible pour qu'il y ait
+                 ! une diffusion a cet endroit.
+                 ksca_CDF(:,icell,lambda) = 1.0
+              endif
+           enddo ! icell
+        endif ! .not.low_mem_scattering
+     endif
   endif
 
   ! Supression scattering

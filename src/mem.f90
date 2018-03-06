@@ -635,54 +635,6 @@ subroutine realloc_dust_mol()
   endif
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
 
-
-  allocate(prob_s11(n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_s11 (realloc)'
-     stop
-  endif
-  prob_s11 = 0
-
-  allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s11 (realloc)'
-     stop
-  endif
-  tab_s11 = 0
-
-  allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s12 (realloc)'
-     stop
-  endif
-  tab_s12 = 0
-
-  allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s33 (realloc)'
-     stop
-  endif
-  tab_s33 = 0
-
-  allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_s34 (realloc)'
-     stop
-  endif
-  tab_s34 = 0
-
-  ! TODO : cette partie prend bcp de memoire
-  low_mem_scattering = .false.
-
-  mem_size = (1.0 * n_grains_tot) * p_n_cells * n_lambda * 4. / 1024.**3
-  if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
-  allocate(ksca_CDF(0:n_grains_tot,p_n_cells,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error ksca_CDF (realloc)'
-     stop
-  endif
-  ksca_CDF = 0
-
   ! Tableaux relatifs aux prop optiques des cellules
   allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), &
        emissivite_dust(n_cells,n_lambda), stat=alloc_status)
@@ -691,25 +643,6 @@ subroutine realloc_dust_mol()
      stop
   endif
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
-
-  if (.not.(lonly_LTE .or.lonly_nLTE)) then
-     allocate(proba_abs_RE_LTE(n_cells,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE=0.0
-  endif
-
-  if (lRE_nLTE) then
-     allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status) ; kappa_abs_nLTE = 0.0
-  endif
-  if (lRE_nLTE.or.lnRE) then
-     allocate(proba_abs_RE_LTE_p_nLTE(n_cells,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
-  endif
-  if (lnRE) then
-     allocate(proba_abs_RE(n_cells,n_lambda), kappa_abs_RE(n_cells,n_lambda), stat=alloc_status)
-     proba_abs_RE=0.0 ; kappa_abs_RE=0.0
-  endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa (realloc)'
-     stop
-  endif
 
   ! todo : could be p_n_cells
   allocate(tab_albedo_pos(n_cells,n_lambda),stat=alloc_status)
@@ -743,14 +676,7 @@ subroutine clean_mem_dust_mol()
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
-  deallocate(prob_s11,tab_s11,tab_s12,tab_s33,tab_s34,ksca_CDF)
   deallocate(kappa_abs_LTE)
-  if (allocated(proba_abs_RE_LTE)) then
-     deallocate(proba_abs_RE_LTE)
-     if (lRE_nLTE) deallocate(kappa_abs_nLTE)
-     if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
-     if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  endif
   deallocate(tab_albedo_pos)
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
 
