@@ -44,11 +44,11 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, &
           n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
@@ -241,6 +241,8 @@ module Voronoi_grid
 
   subroutine Voronoi_tesselation(n_points, x,y,z, limits, check_previous_tesselation)
 
+    !$ use omp_lib
+
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z
     real(kind=dp), dimension(6), intent(in) :: limits
@@ -258,6 +260,8 @@ module Voronoi_grid
 
     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
+
+    integer :: icell_start, icell_end, id
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
@@ -377,13 +381,34 @@ module Voronoi_grid
        lcompute = .true.
     endif
     if (lcompute) then
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
+
+       !$omp parallel default(none) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc) &
+       !$omp private(id,icell_start,icell_end,ierr) &
+       !$omp private(n_in, volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)  ! TODO !!!!
+
+       id = 1
+       !$ id = omp_get_thread_num() + 1
+
+       icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
+       icell_end = (1.0 * (id)) / nb_proc * n_cells
+
+       write(*,*) "cpu=", id, "cells=", icell_start, "to", icell_end, "n_cells=", icell_end - icell_start+1
+
+       volume = 0.
+
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start,icell_end, &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr
           write(*,*) "Exiting"
           stop
        endif
+       write(*,*) id, volume(150000), volume(300000), volume(450000), volume(600000)
+       !$omp end parallel
+
+       stop
+
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
        endif

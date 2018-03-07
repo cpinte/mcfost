@@ -24,7 +24,7 @@ void progress_bar(float progress) {
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[],
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end,
               int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
 
     ierr = 0 ;
@@ -89,48 +89,43 @@ extern "C" {
     // std::cout << "test0 " << *(vlo.cp) << " " << *(vlo.o) << " " << *(vlo.op) << std::endl;
 
     do {
+      pid = vlo.pid() ; // id of the current cell in the c_loop
 
-      //if () // return false if the cell was removed
-      // id of the current cell in the c_loop
-      pid = vlo.pid() ;
+      if ((pid > icell_start) && (pid < icell_end)) { // We only compute a fraction of the cells in a given thread
+        if (con.compute_cell(c,vlo)) { // return false if the cell was removed
+          n_in++ ;
 
-      if (pid < n) { // test to made parallel with pid specific to each cpu
-        con.compute_cell(c,vlo) ;
-        n_in++ ;
-
-        if (n_in > threshold) {
-          progress  += progress_bar_step ;
-          threshold += progress_bar_step * n ;
-          progress_bar(progress) ;
-        }
-
-        //std::cout << pid << std::endl;
-
-        // Volume
-        volume[pid] = c.volume() ;
-
-        // Store the neighbours list
-        n_neighbours = c.number_of_faces() ;
-        n_neighbours_tot = n_neighbours_tot + n_neighbours ;
-
-        first_neighbour = last_neighbour+1 ; first_neighbours[pid] = first_neighbour ;
-        last_neighbour  = last_neighbour + n_neighbours ; last_neighbours[pid]  = last_neighbour ;
-
-        if (n_neighbours_tot > max_size_list) {
-          ierr = 1 ;
-          exit(1) ;
-        }
-
-        c.neighbors(vi) ;
-        for (i=0 ; i<n_neighbours ; i++) {
-          if (vi[i] >=0) {
-            neighbours_list[first_neighbour+i] = vi[i] + 1 ;
-          } else {
-            // Wall
-            neighbours_list[first_neighbour+i] = vi[i] ;
+          if (n_in > threshold) {
+            progress  += progress_bar_step ;
+            threshold += progress_bar_step * n ;
+            progress_bar(progress) ;
           }
-        }
 
+          // Volume
+          volume[pid] = c.volume() ;
+
+          // Store the neighbours list
+          n_neighbours = c.number_of_faces() ;
+          n_neighbours_tot = n_neighbours_tot + n_neighbours ;
+
+          first_neighbour = last_neighbour+1 ; first_neighbours[pid] = first_neighbour ;
+          last_neighbour  = last_neighbour + n_neighbours ; last_neighbours[pid]  = last_neighbour ;
+
+          if (n_neighbours_tot > max_size_list) {
+            ierr = 1 ;
+            exit(1) ;
+          }
+
+          c.neighbors(vi) ;
+          for (i=0 ; i<n_neighbours ; i++) {
+            if (vi[i] >=0) {
+              neighbours_list[first_neighbour+i] = vi[i] + 1 ;
+            } else {
+              // Wall
+              neighbours_list[first_neighbour+i] = vi[i] ;
+            }
+          }
+        }  // con.compute_cell
       } // pid test
 
     } while(vlo.inc()); //Finds the next particle to test
