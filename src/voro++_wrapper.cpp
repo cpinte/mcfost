@@ -86,7 +86,16 @@ extern "C" {
       exit(1) ;
     }
 
-    do if (con.compute_cell(c,vlo)) { // return false if the cell was removed
+    // std::cout << "test0 " << *(vlo.cp) << " " << *(vlo.o) << " " << *(vlo.op) << std::endl;
+
+    do {
+
+      //if () // return false if the cell was removed
+      // id of the current cell in the c_loop
+      pid = vlo.pid() ;
+
+      if (pid < n) { // test to made parallel with pid specific to each cpu
+        con.compute_cell(c,vlo) ;
         n_in++ ;
 
         if (n_in > threshold) {
@@ -94,9 +103,6 @@ extern "C" {
           threshold += progress_bar_step * n ;
           progress_bar(progress) ;
         }
-
-        // id of the current cell in the c_loop
-        pid = vlo.pid() ;
 
         //std::cout << pid << std::endl;
 
@@ -125,8 +131,10 @@ extern "C" {
           }
         }
 
+      } // pid test
 
-      } while(vlo.inc()); //Finds the next particle to test
+    } while(vlo.inc()); //Finds the next particle to test
+
     progress_bar(1.0) ;
   }
 }
