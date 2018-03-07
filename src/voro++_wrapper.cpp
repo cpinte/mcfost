@@ -24,7 +24,7 @@ void progress_bar(float progress) {
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end,
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end, int cpu_id, int n_cpu,
               int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
 
     ierr = 0 ;
@@ -77,7 +77,7 @@ extern "C" {
 
     float progress = 0.0 ;
     float progress_bar_step = 0.01 ;
-    float threshold = progress_bar_step*n ;
+    float threshold = progress_bar_step*(1.*n)/n_cpu ;
 
     if (!vlo.start()) {
       std::cout << "Error : voro++ did not manage to initialize" << std::endl;
@@ -95,10 +95,12 @@ extern "C" {
         if (con.compute_cell(c,vlo)) { // return false if the cell was removed
           n_in++ ;
 
-          if (n_in > threshold) {
-            progress  += progress_bar_step ;
-            threshold += progress_bar_step * n ;
-            progress_bar(progress) ;
+          if (cpu_id == n_cpu) {
+            if (n_in > threshold) {
+              progress  += progress_bar_step ;
+              threshold += progress_bar_step*(1.*n)/n_cpu ;
+              progress_bar(progress) ;
+            }
           }
 
           // Volume
@@ -130,6 +132,6 @@ extern "C" {
 
     } while(vlo.inc()); //Finds the next particle to test
 
-    progress_bar(1.0) ;
+    if (cpu_id == n_cpu) progress_bar(1.0) ;
   }
 }

@@ -44,11 +44,11 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, &
           n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
@@ -397,7 +397,7 @@ module Voronoi_grid
 
        volume = 0.
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start,icell_end, &
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start,icell_end, id, nb_proc, &
             n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr
