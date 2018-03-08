@@ -76,6 +76,8 @@ if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
     \cp -f  ifort/config.mk voro # To be tested
+elif [ "$SYSTEM" = "gfortran" ] ; then
+    \cp -f  gfortran/config.mk voro
 fi
 cd voro
 make

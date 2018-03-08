@@ -8,16 +8,10 @@
 # the Makefiles.
 
 # C++ compiler
-CXX=icc
-
-ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-     ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.9 -mdynamic-no-pic
-else
-     ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
-endif
+CXX=g++
 
 # Flags for the C++ compiler
-CFLAGS=-Wall -ansi -pedantic -O3 -no-prec-div -fp-model fast=2 -DVOROPP_VERBOSE=1 $(ARCH)
+CFLAGS=-Wall -ansi -pedantic -O3 -DVOROPP_VERBOSE=1
 
 # Relative include and library paths for compilation of the examples
 E_INC=-I../../src
