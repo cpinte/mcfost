@@ -44,18 +44,19 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, &
-          n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
+     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
-       integer(c_int), intent(out) :: n_in, n_neighbours_tot,  ierr
+       integer(c_int), intent(out) :: n_in,  ierr
+       integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
        real(c_double), dimension(n_points), intent(out) :: volume
        integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
-       integer(c_int), dimension(n_points * 20), intent(out) :: neighbours_list
+       integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
 
 
      end subroutine voro
@@ -253,15 +254,17 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
     integer, dimension(:), allocatable :: SPH_id
     real :: time
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
+    integer, dimension(:), allocatable :: neighbours_list_loc
+    integer, dimension(nb_proc) :: n_neighbours
 
     logical :: is_outside_stars, lcompute
 
     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
-    integer :: icell_start, icell_end, id
+    integer :: icell_start, icell_end, id, row
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
@@ -357,13 +360,15 @@ module Voronoi_grid
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
 
-    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2, "MB for neighbours list"
-    allocate(neighbours_list(n_cells * max_neighbours), stat=alloc_status)
+    n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
+
+    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2 * 2, "MB for neighbours list"
+    allocate(neighbours_list(n_cells * max_neighbours), neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Error when allocating neighbours list"
        write(*,*) "Exiting"
     endif
-    neighbours_list = 0
+    neighbours_list = 0 ; neighbours_list_loc = 0
 
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
@@ -381,33 +386,88 @@ module Voronoi_grid
        lcompute = .true.
     endif
     if (lcompute) then
-
+       ! We initialize arrays at 0 as we have a reduction + clause
+       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0
        !$omp parallel default(none) &
-       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc,n_cells_per_cpu) &
+       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours) &
        !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp private(n_in, volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list)  ! TODO !!!!
-
+       !$omp reduction(+:volume,n_in,n_neighbours_tot)
        id = 1
        !$ id = omp_get_thread_num() + 1
-
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
-       write(*,*) "cpu=", id, "cells=", icell_start, "to", icell_end, "n_cells=", icell_end - icell_start+1
-
-       volume = 0.
-
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start,icell_end, id, nb_proc, &
-            n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+            n_in,volume,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
-          write(*,*) "Voro++ excited with an error", ierr
+          write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
           stop
        endif
-       write(*,*) id, volume(150000), volume(300000), volume(450000), volume(600000)
        !$omp end parallel
 
-       stop
+       !-----------------------------------------------------------
+       ! Merging the neighbour arrays from the different threads
+       !-----------------------------------------------------------
+       ! We need to shift the indices of the neighbours
+       do id=2, nb_proc
+          icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
+          icell_end = (1.0 * (id)) / nb_proc * n_cells
+
+          ! Pointers to the first and last neighbours of the cell
+          first_neighbours(icell_start:icell_end) = first_neighbours(icell_start:icell_end) + last_neighbours(icell_start-1) + 1
+          last_neighbours(icell_start:icell_end)  = last_neighbours(icell_start:icell_end)  + last_neighbours(icell_start-1) + 1
+       enddo
+
+       row = n_cells_per_cpu * max_neighbours ;
+       k = 0 ;
+
+       do id=1, nb_proc
+          do i=1, n_neighbours(id)
+             k = k+1
+             neighbours_list(k) = neighbours_list_loc(row * (id-1) + i)
+          enddo
+       enddo
+       n_neighbours_tot = sum(n_neighbours)
+
+       !write(*,*) volume(150000), volume(300000), volume(450000), volume(600000), n_in, n_neighbours_tot, sum(volume)
+       !write(*,*) first_neighbours(300000),last_neighbours(300000), first_neighbours(600000),last_neighbours(600000)
+       !write(*,*) neighbours_list(k), neighbours_list(k-k/2), neighbours_list(k-k/4), neighbours_list(k-k/8), neighbours_list(k/8), neighbours_list(k-k/4)
+       !stop
+
+       ! ifort
+       ! 1cpu : cpu 1:16.90 total
+       !  17.3529605198330        67.8846435404420        8.97491799751581        30.8484693161312           657353    10146637   696401787.340970
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
+       !
+       ! 4cpu :  cpu 19.815 total
+       !  17.3529605198330        67.8846435404420        8.97491799751581        30.8484693161312           657353    10146637   696401787.340970
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
+       !
+       ! 8cpu : cpu 15.725 total
+       !  17.3529605198330        67.8846435404420        8.97491799751581        30.8484693161312           657353    10146637   696401787.340970
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
+
+       ! gfortran
+       ! 1 cpu :  cpu 1:02.41 total
+       !  17.352960519833026        67.884643540442013        8.9749179975158064        30.848469316131165           657353    10146637   696401787.34100127
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
+       !
+       ! 4 cpu : cpu 16.619 total
+       !  17.352960519833026        67.884643540442013        8.9749179975158064        30.848469316131165           657353    10146637   696401787.34100127
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
+
+       !
+       ! 8 cpu : cpu 13.394 total
+       !  17.352960519833026        67.884643540442013        8.9749179975158064        30.848469316131165           657353    10146637   696401787.34100127
+       !  4631112     4631126     9261412     9261428
+       !  251438      496476      283076      614976      469261      283076
 
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
