@@ -24,8 +24,8 @@ void progress_bar(float progress) {
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[],
-              int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int &n_neighbours_tot, int neighbours_list[], int &ierr) {
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+              int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
 
     ierr = 0 ;
 
@@ -36,6 +36,8 @@ extern "C" {
     az = limits[4] ; bz = limits[5] ;
 
     int i, nx,ny,nz,init_mem(8);
+
+    int row = n_points_per_cpu * max_neighbours ;
 
     //wall_list wl; // I am not adding extra walls yet
     bool xperiodic,yperiodic,zperiodic ;
@@ -68,57 +70,69 @@ extern "C" {
     int pid ;
     std::vector<int> vi;
 
-    int n_neighbours, first_neighbour, last_neighbour ;
+    int n_neighbours_cell, first_neighbour, last_neighbour ;
     int max_size_list = max_neighbours * n ;
 
-    n_neighbours_tot = 0 ;
+    n_neighbours[cpu_id] = 0 ;
     last_neighbour = -1 ;
     n_in = 0 ;
 
-
     float progress = 0.0 ;
     float progress_bar_step = 0.01 ;
-    float threshold = progress_bar_step*n ;
+    float threshold = progress_bar_step*(1.*n)/n_cpu ;
 
-    if(vlo.start()) do if(con.compute_cell(c,vlo)) { // return false if the cell was removed
+    if (!vlo.start()) {
+      std::cout << "Error : voro++ did not manage to initialize" << std::endl;
+      std::cout << "Exiting" << std::endl;
+      ierr = 1 ;
+      exit(1) ;
+    }
+
+    do {
+      pid = vlo.pid() ; // id of the current cell in the c_loop
+
+      if ((pid >= icell_start) && (pid <= icell_end)) { // We only compute a fraction of the cells in a given thread
+        if (con.compute_cell(c,vlo)) { // return false if the cell was removed
           n_in++ ;
 
-          if (n_in > threshold) {
-            progress  += progress_bar_step ;
-            threshold += progress_bar_step * n ;
-            progress_bar(progress) ;
+          if (cpu_id == n_cpu-1) {
+            if (n_in > threshold) {
+              progress  += progress_bar_step ;
+              threshold += progress_bar_step*(1.*n)/n_cpu ;
+              progress_bar(progress) ;
+            }
           }
-
-          // id of the current cell in the c_loop
-          pid = vlo.pid() ;
 
           // Volume
           volume[pid] = c.volume() ;
 
           // Store the neighbours list
-          n_neighbours = c.number_of_faces() ;
-          n_neighbours_tot = n_neighbours_tot + n_neighbours ;
+          n_neighbours_cell = c.number_of_faces() ;
+          n_neighbours[cpu_id] = n_neighbours[cpu_id] + n_neighbours_cell ;
 
           first_neighbour = last_neighbour+1 ; first_neighbours[pid] = first_neighbour ;
-          last_neighbour  = last_neighbour + n_neighbours ; last_neighbours[pid]  = last_neighbour ;
+          last_neighbour  = last_neighbour + n_neighbours_cell ; last_neighbours[pid]  = last_neighbour ;
 
-          if (n_neighbours_tot > max_size_list) {
+          if (n_neighbours[cpu_id] > max_size_list) {
             ierr = 1 ;
             exit(1) ;
           }
 
           c.neighbors(vi) ;
-          for (i=0 ; i<n_neighbours ; i++) {
+          for (i=0 ; i<n_neighbours_cell ; i++) {
+            //std::cout << "test0 " << row  << " " << n_points_per_cpu << " " << max_neighbours << std::endl;
             if (vi[i] >=0) {
-              neighbours_list[first_neighbour+i] = vi[i] + 1 ;
+              neighbours_list[row * cpu_id + first_neighbour+i] = vi[i] + 1 ;
             } else {
               // Wall
-              neighbours_list[first_neighbour+i] = vi[i] ;
+              neighbours_list[row * cpu_id + first_neighbour+i] = vi[i] ;
             }
           }
+        }  // con.compute_cell
+      } // pid test
 
+    } while(vlo.inc()); //Finds the next particle to test
 
-        } while(vlo.inc()); //Finds the next particle to test
-    progress_bar(1.0) ;
+    if (cpu_id == n_cpu-1) progress_bar(1.0) ;
   }
 }

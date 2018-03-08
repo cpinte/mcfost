@@ -44,18 +44,19 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z, &
-          n_in, volume, first_neighbours,last_neighbours, n_neighbours_tot,neighbours_list, ierr) bind(C, name='voro_C')
+     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z
 
-       integer(c_int), intent(out) :: n_in, n_neighbours_tot,  ierr
+       integer(c_int), intent(out) :: n_in,  ierr
+       integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
        real(c_double), dimension(n_points), intent(out) :: volume
        integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
-       integer(c_int), dimension(n_points * 20), intent(out) :: neighbours_list
+       integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
 
 
      end subroutine voro
@@ -241,6 +242,8 @@ module Voronoi_grid
 
   subroutine Voronoi_tesselation(n_points, x,y,z, limits, check_previous_tesselation)
 
+    !$ use omp_lib
+
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z
     real(kind=dp), dimension(6), intent(in) :: limits
@@ -251,13 +254,17 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
     integer, dimension(:), allocatable :: SPH_id
     real :: time
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
+    integer, dimension(:), allocatable :: neighbours_list_loc
+    integer, dimension(nb_proc) :: n_neighbours
 
     logical :: is_outside_stars, lcompute
 
     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
+
+    integer :: icell_start, icell_end, id, row
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
@@ -353,13 +360,15 @@ module Voronoi_grid
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
 
-    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2, "MB for neighbours list"
-    allocate(neighbours_list(n_cells * max_neighbours), stat=alloc_status)
+    n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
+
+    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2 * 2, "MB for neighbours list"
+    allocate(neighbours_list(n_cells * max_neighbours), neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Error when allocating neighbours list"
        write(*,*) "Exiting"
     endif
-    neighbours_list = 0
+    neighbours_list = 0 ; neighbours_list_loc = 0
 
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
@@ -377,13 +386,51 @@ module Voronoi_grid
        lcompute = .true.
     endif
     if (lcompute) then
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,  &
-            n_in,volume,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,ierr)
+       ! We initialize arrays at 0 as we have a reduction + clause
+       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0
+       !$omp parallel default(none) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc,n_cells_per_cpu) &
+       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours) &
+       !$omp private(id,icell_start,icell_end,ierr) &
+       !$omp reduction(+:volume,n_in,n_neighbours_tot)
+       id = 1
+       !$ id = omp_get_thread_num() + 1
+       icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
+       icell_end = (1.0 * (id)) / nb_proc * n_cells
+
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+            n_in,volume,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
-          write(*,*) "Voro++ excited with an error", ierr
+          write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
           stop
        endif
+       !$omp end parallel
+
+       !-----------------------------------------------------------
+       ! Merging the neighbour arrays from the different threads
+       !-----------------------------------------------------------
+       ! We need to shift the indices of the neighbours
+       do id=2, nb_proc
+          icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
+          icell_end = (1.0 * (id)) / nb_proc * n_cells
+
+          ! Pointers to the first and last neighbours of the cell
+          first_neighbours(icell_start:icell_end) = first_neighbours(icell_start:icell_end) + last_neighbours(icell_start-1) + 1
+          last_neighbours(icell_start:icell_end)  = last_neighbours(icell_start:icell_end)  + last_neighbours(icell_start-1) + 1
+       enddo
+
+       row = n_cells_per_cpu * max_neighbours ;
+       k = 0 ;
+
+       do id=1, nb_proc
+          do i=1, n_neighbours(id)
+             k = k+1
+             neighbours_list(k) = neighbours_list_loc(row * (id-1) + i)
+          enddo
+       enddo
+       n_neighbours_tot = sum(n_neighbours)
+
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list)
        endif
