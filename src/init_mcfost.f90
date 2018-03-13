@@ -184,11 +184,11 @@ subroutine initialisation_mcfost()
   implicit none
 
   integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer
-  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth
+  integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
 
-  character(len=512) :: cmd, s, str_seed, para
+  character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
@@ -304,6 +304,8 @@ subroutine initialisation_mcfost()
      stop
   endif
 
+  ilen = index(para,'/',back=.true.) ! last position of the '_' character
+  base_para = para(ilen+1:)
 
   ! Les benchmarks
   if (para(1:8)=="Pascucci") then
@@ -1101,14 +1103,14 @@ subroutine initialisation_mcfost()
 
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(para)
+     call save_data(base_para)
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(para)
+     call save_data(base_para)
   endif
 
   if (ln_zone) then
@@ -1292,7 +1294,7 @@ subroutine initialisation_mcfost()
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
 
-  call save_data(para)
+  call save_data(base_para)
 
   if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
