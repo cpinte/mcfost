@@ -125,6 +125,7 @@ subroutine set_default_variables()
   ! Geometrie Grille
   lcylindrical=.true.
   lspherical=.not.lcylindrical
+  z_scaling_env = 1.0
 
   ! Methodes par defaut
   RT_sed_method = 1
@@ -1016,6 +1017,11 @@ subroutine initialisation_mcfost()
      case("-tau=1_surface")
         i_arg = i_arg + 1
         ltau1_surface=.true.
+     case("-z_scaling_env")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) z_scaling_env
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1257,6 +1263,10 @@ subroutine initialisation_mcfost()
      write(*,*) "Spot will be applied on star #1"
   endif
 
+  ! Adjusting grid for prolate or oblate envelope
+  if (z_scaling_env > 1.) Rmax = Rmax * z_scaling_env
+  if (z_scaling_env < 1.) Rmin = Rmin * z_scaling_env
+
   if (lpara) then
      if (nb_proc==1) then
         write (*,'(" Parallelized code on ", I3, " processor")')  nb_proc
@@ -1429,6 +1439,7 @@ subroutine display_help()
   write(*,*) "        : -cutoff <number>, upper limit of the grid [scale height] default = 7"
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
+  write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"

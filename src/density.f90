@@ -190,7 +190,7 @@ subroutine define_gas_density()
                     rcyl = r_grid(icell)
                     z = z_grid(icell)
                  endif
-                 rsph = sqrt(rcyl**2+z**2)
+                 rsph = sqrt(rcyl**2 + (z/z_scaling_env)**2)
 
                  ! Setup densite du gaz
                  if (rsph > dz%rmax) then

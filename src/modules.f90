@@ -218,8 +218,8 @@ module disk
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
   character(len=512), dimension(:), allocatable :: sh_file
 
-  ! Correction locale de la desnite (dans un anneau)
-  real :: correct_density_factor, correct_density_Rin, correct_density_Rout
+  ! Correction locale de la densite (dans un anneau)
+  real :: correct_density_factor, correct_density_Rin, correct_density_Rout, z_scaling_env
 
   logical :: lgap_Gaussian
   real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
@@ -229,6 +229,7 @@ module disk
   real :: struct_file_amin, struct_file_amax,  struct_file_rref
   integer :: struct_file_n_grains, struct_file_nspecies
 
+  ! SPH
   real :: SPH_keep_particles
 
 end module disk
