@@ -1175,7 +1175,7 @@ subroutine write_column_density()
   end do ! direction
   CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
 
-  filename = "data_disk/column_density.fits.gz"
+  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1326,7 +1326,7 @@ subroutine write_disk_struct(lparticle_density)
      stop
   endif
 
-  filename = "data_disk/gas_density.fits.gz"
+  filename = trim(root_dir)//"/data_disk/gas_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1390,7 +1390,7 @@ subroutine write_disk_struct(lparticle_density)
 
   ! ********************************************************************************
   if (lparticle_density) then
-     filename = "data_disk/dust_particule_density.fits.gz"
+     filename = trim(root_dir)//"/data_disk/dust_particule_density.fits.gz"
 
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0
@@ -1455,7 +1455,7 @@ subroutine write_disk_struct(lparticle_density)
   endif ! lparticle_density
 
   ! ********************************************************************************
-  filename = "data_disk/dust_mass_density.fits.gz"
+  filename = trim(root_dir)//"/data_disk/dust_mass_density.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1518,7 +1518,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/grain_sizes.fits.gz"
+  filename = trim(root_dir)//"/data_disk/grain_sizes.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1562,7 +1562,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/grain_sizes_min.fits.gz"
+  filename = trim(root_dir)//"/data_disk/grain_sizes_min.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1606,7 +1606,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/grain_sizes_max.fits.gz"
+  filename = trim(root_dir)//"/data_disk/grain_sizes_max.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1650,7 +1650,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/grain_masses.fits.gz"
+  filename = trim(root_dir)//"/data_disk/grain_masses.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1694,7 +1694,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/volume.fits.gz"
+  filename = trim(root_dir)//"/data_disk/volume.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1752,7 +1752,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! ********************************************************************************
-  filename = "data_disk/grid.fits.gz"
+  filename = trim(root_dir)//"/data_disk/grid.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
