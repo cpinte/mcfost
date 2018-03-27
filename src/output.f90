@@ -1319,7 +1319,7 @@ subroutine write_disk_struct(lparticle_density)
   real(kind=dp), dimension(:,:), allocatable :: dust_dens
   real(kind=dp), dimension(:,:,:,:), allocatable :: grid
 
-  write(*,*) "Writing disk structucture files in data_disk ..."
+  write(*,*) "Writing disk structure files in data_disk ..."
   allocate(dens(n_cells), vol(n_cells), dust_dens(n_cells,n_grains_tot), stat = alloc_status)
   if (alloc_status > 0) then
      write(*,*) 'Allocation error density tables for fits file'
