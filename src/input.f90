@@ -469,8 +469,8 @@ subroutine readmolecule(imol)
 
   read(1,*) junk
   do i = 1, nLevels
-  !   read(1,*) j, Level_energy(i), poids_stat_g(i) , j_qnb(i)
-     read(1,*) j, Level_energy(i), poids_stat_g(i) !, buffer
+     read(1,*) j, Level_energy(i), poids_stat_g(i) , j_qnb(i)
+ !    read(1,*) j, Level_energy(i), poids_stat_g(i) !, buffer
      Level_energy(i) = Level_energy(i) / 8065.541  ! per cm to ev
   enddo
 

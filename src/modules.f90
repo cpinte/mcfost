@@ -651,7 +651,8 @@ module molecular_emission
   real :: abundance
   integer :: nLevels
   real(kind=dp) :: largeur_profile
-  real, dimension(:), allocatable :: Level_energy, j_qnb
+  real, dimension(:), allocatable :: Level_energy
+  integer, dimension(:), allocatable ::  j_qnb
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
   integer :: nTrans_tot

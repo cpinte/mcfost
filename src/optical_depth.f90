@@ -566,9 +566,9 @@ subroutine integ_tau_mol(imol)
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
 
      write(*,*) "-------------------------------"
-     write(*,*) "Transition J=", itransUpper(iTrans), "-", itransLower(iTrans)
-     write(*,*) "tau_mol = ", real(tau_mol(0,iTrans))
-     write(*,*) "tau_dust=", real(tau_dust(iTrans))
+     write(*,*) "Transition J=", j_qnb(itransUpper(iTrans)), "-", j_qnb(itransLower(iTrans))
+     write(*,*) "tau_mol = ", real(tau_mol(0,it))
+     write(*,*) "tau_dust=", real(tau_dust(it))
 
      ! Compute altitude at which tau=1 is reached
      if (.not.lVoronoi) then
