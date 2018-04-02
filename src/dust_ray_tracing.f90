@@ -241,16 +241,16 @@ subroutine init_directions_ray_tracing()
   if (RT_n_incl==1) then
      tab_RT_incl(1) = RT_imin
   else
-     cos_min = cos(RT_imin / 180.0_dp * pi)
-     cos_max = cos(RT_imax / 180.0_dp * pi)
+     cos_min = cos(RT_imin * deg_to_rad)
+     cos_max = cos(RT_imax * deg_to_rad)
 
      if (lRT_i_centered) then
         do ibin=1, RT_n_incl
-           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) -0.5)/real(RT_n_incl) * (cos_max - cos_min) ) /pi * 180.0_dp
+           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) -0.5)/real(RT_n_incl) * (cos_max - cos_min) ) / deg_to_rad
         enddo
      else
         do ibin=1, RT_n_incl
-           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) - 1)/(real(RT_n_incl) -1) * (cos_max - cos_min) ) /pi * 180.0_dp
+           tab_RT_incl(ibin) = acos(  cos_min + (real(ibin) - 1)/(real(RT_n_incl) -1) * (cos_max - cos_min) ) / deg_to_rad
         enddo
      endif
   endif
@@ -269,6 +269,7 @@ subroutine init_directions_ray_tracing()
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
      tab_uv_rt(ibin) = sin( sign(max(abs(tab_RT_incl(ibin)),1e-20), tab_RT_incl(ibin)) *deg_to_rad ) ! uv_rt mais v_rt = 0 ici
      tab_w_rt(ibin) = sqrt(1.0_dp - tab_uv_rt(ibin)*tab_uv_rt(ibin))
+     if (abs(tab_RT_incl(ibin)) > 90.) tab_w_rt(ibin) = - tab_w_rt(ibin)
 
      ! phi = 0 correspond a -v
      do iaz =1, RT_n_az
