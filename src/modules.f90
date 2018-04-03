@@ -230,7 +230,9 @@ module disk
   integer :: struct_file_n_grains, struct_file_nspecies
 
   ! SPH
-  real :: SPH_keep_particles
+  real :: SPH_keep_particles, planet_az
+  logical :: lplanet_az
+
 
 end module disk
 

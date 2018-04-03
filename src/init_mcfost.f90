@@ -121,6 +121,7 @@ subroutine set_default_variables()
   lphase_function_file = .false.
   ltau1_surface=.false.
   lcasa=.false.
+  lplanet_az = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -1024,6 +1025,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) z_scaling_env
         i_arg = i_arg + 1
+     case("-planet_az")
+        lplanet_az = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) planet_az
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1400,6 +1407,8 @@ subroutine display_help()
   write(*,*) "        : -no-rt : do not output the ray-tracing results"
   write(*,*) "        : -mc :  keep Monte-Carlo output in ray-tracing mode"
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
+  write(*,*) "        : -planet_az <angle> [deg] : adjust the model azimuth so that the planet is at"
+  write(*,*) "                                     desired azimuth in the map"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"

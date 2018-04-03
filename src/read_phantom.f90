@@ -282,9 +282,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
   use prop_star
   use parametres, only : ldudt_implicit,ufac_implicit
+  use ray_tracing, only: RT_az_min, RT_az_max, RT_n_az
+  use disk, only : lplanet_az, planet_az
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
@@ -480,9 +482,22 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
        n_etoiles = n_etoiles + 1
     endif
  enddo
+
+ if (lplanet_az) then
+    if (nptmass /= 2) then
+       write(*,*) "ERROR: option -planet_az only works with 2 sink particles"
+       write(*,*) "Exiting"
+       stop
+    endif
+    RT_n_az = 1
+    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,2) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,2) - xyzmh_ptmass(1,1)) / deg_to_rad
+    RT_az_max = RT_az_min
+    write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+ endif
+
+ write(*,*) ""
  write(*,*) "Updating the stellar properties:"
  write(*,*) "There are", n_etoiles, "stars in the model"
-
  if (allocated(etoile)) deallocate(etoile)
  allocate(etoile(n_etoiles))
 
