@@ -15,6 +15,9 @@ contains
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
+    use prop_star, only : etoile
+    use disk, only : lscale_SPH, scale_SPH
+
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
@@ -52,6 +55,14 @@ contains
     write(*,*) "Done"
 
     if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
+
+    if (lscale_SPH) then
+       write(*,*) "**************************************************"
+       write(*,*) "WARNING : rescaling SPH simulation by:", scale_SPH
+       write(*,*) "**************************************************"
+       x = x * scale_SPH ; y = y * scale_SPH ; z = z * scale_SPH
+       etoile(:)%x = etoile(:)%x * scale_SPH ; etoile(:)%y = etoile(:)%y * scale_SPH ; etoile(:)%z = etoile(:)%z * scale_SPH
+    endif
 
     ! Model limits
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
@@ -118,7 +129,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
+    logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust

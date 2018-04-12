@@ -122,6 +122,7 @@ subroutine set_default_variables()
   ltau1_surface=.false.
   lcasa=.false.
   lplanet_az = .false.
+  lscale_SPH = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -1030,6 +1031,12 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) planet_az
+        i_arg = i_arg + 1
+     case("-scale_SPH")
+        lscale_SPH = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) scale_SPH
         i_arg = i_arg + 1
      case default
         call display_help()
