@@ -1390,7 +1390,7 @@ subroutine write_disk_struct(lparticle_density)
 
   ! ********************************************************************************
   if (lparticle_density) then
-     filename = trim(root_dir)//"/data_disk/dust_particule_density.fits.gz"
+     filename = trim(root_dir)//"/data_disk/dust_particle_density.fits.gz"
 
      !  Get an unused Logical Unit Number to use to open the FITS file.
      status=0

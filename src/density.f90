@@ -823,11 +823,11 @@ subroutine define_dust_density()
 
      if (dz%geometry /= 5) then ! pas de wall ici
         d_p => dust_pop(pop)
-        mass = 0.0
+        mass = 0.0_dp
 
         do icell=1,n_cells
            do l=d_p%ind_debut,d_p%ind_fin
-              mass=mass + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+              mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l) * volume(icell)
            enddo !l
         enddo !icell
         mass =  mass * AU3_to_cm3 * g_to_Msun
