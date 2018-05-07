@@ -121,7 +121,7 @@ subroutine transfert_poussiere()
   if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
-        call densite_file()
+        call read_density_file()
      else if (lread_Seb_Charnoz) then
         call densite_Seb_Charnoz()
      else if (lread_Seb_Charnoz2) then

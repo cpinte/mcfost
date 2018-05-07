@@ -17,7 +17,7 @@ module density
   integer, public :: specie_removed
   real, public :: T_rm
 
-  public :: define_density, define_density_wall3d, define_dust_density, densite_file, &
+  public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density
 
   private
@@ -1003,7 +1003,7 @@ end subroutine define_density_wall3D
 
 !********************************************************************
 
-subroutine densite_file()
+subroutine read_density_file()
   ! Nouvelle routine pour lire les grilles de densite
   ! calculees par Yorick directement a partir des donnees SPH (ou autre)
   ! Les donnees sont directement lissees sur la grille de MCFOST
@@ -1022,18 +1022,22 @@ subroutine densite_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, jj, icell, phik
+  integer :: k, l, i, n_a, read_n_a, read_gas_density, jj, icell, phik
   real(kind=dp) :: somme, mass, facteur
-  real :: a, tmp
+  real :: a, tmp, gas2dust
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
+  real, dimension(:,:,:), allocatable :: sph_gas_dens ! (n_rad,nz,n_az)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
 
   real(kind=dp), dimension(:,:,:,:), allocatable :: sph_dens_dp
+  real(kind=dp), dimension(:,:,:), allocatable :: sph_gas_dens_dp
   real(kind=dp), dimension(:), allocatable :: a_sph_dp
   real(kind=dp) :: f
 
   type(disk_zone_type) :: dz
+
+  logical :: lread_gas_density
 
   ! Lecture donnees
   status=0
@@ -1083,7 +1087,6 @@ subroutine densite_file()
      l3D_file = .false.
   endif
 
-
   if (l3D_file) then
      allocate(sph_dens(n_rad,-nz:nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
   else
@@ -1112,7 +1115,7 @@ subroutine densite_file()
      stop
   endif
 
-  write(*,*) "Density range:", minval(sph_dens), maxval(sph_dens)
+  write(*,*) "Dust density range:", minval(sph_dens), maxval(sph_dens)
 
   ! Au cas ou : on elimine les valeurs a 0
   sph_dens = sph_dens/maxval(sph_dens) ! normalization avant d'ajouter une constante
@@ -1271,6 +1274,81 @@ subroutine densite_file()
      a_sph(1) = 1.0
   endif
 
+  ! Do we read the gas density ?
+  read_gas_density = 0
+  call ftgkyj(unit,"read_gas_density",read_gas_density,comment,status)
+  write(*,*) "read_gas_density", read_gas_density
+  lread_gas_density = (read_gas_density == 1)
+
+  if (lread_gas_density) then
+     call ftgkye(unit,"gas_dust_ratio",gas2dust,comment,status)
+
+     write(*,*) "Updating gas-to-dust ratio to", gas2dust
+     dz%gas_to_dust = gas2dust
+
+     if (l3D_file) then
+        allocate(sph_gas_dens(n_rad,-nz:nz,n_az))
+     else
+        allocate(sph_gas_dens(n_rad,nz,n_az))
+     endif
+     sph_gas_dens = 0.0
+
+     !  move to next hdu
+     call ftmrhd(unit,1,hdutype,status)
+
+     nfound = 0 ; naxes = 0 ;
+
+     !  determine the size of density file
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+     if (nfound /= 3) then
+        write(*,*) 'Gas density:'
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+        write(*,*) "I found", nfound, "axis instead of 3"
+        stop
+     endif
+
+     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
+        write(*,*) "Error : "//trim(density_file)//" does not have the"
+        write(*,*) "right dimensions. Exiting."
+        write(*,*) "# fits_file vs mcfost_grid"
+        write(*,*) naxes(1), n_rad
+        write(*,*) naxes(2), nz
+        write(*,*) naxes(3), n_az
+        !write(*,*) naxes(4), n_a
+        stop
+     endif
+     npixels=naxes(1)*naxes(2)*naxes(3)
+
+     bitpix = 0
+     call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+     ! read_image
+     if (bitpix==-32) then
+        call ftgpve(unit,group,firstpix,npixels,nullval,sph_gas_dens,anynull,status)
+     else if (bitpix==-64) then
+        if (l3D_file) then
+           allocate(sph_gas_dens_dp(n_rad,-nz:nz,n_az))
+        else
+           allocate(sph_gas_dens_dp(n_rad,nz,n_az))
+        endif
+        sph_gas_dens_dp = 0.0_dp
+        call ftgpvd(unit,group,firstpix,npixels,nullval,sph_gas_dens_dp,anynull,status)
+        sph_gas_dens = real(sph_gas_dens_dp,kind=sp)
+        deallocate(sph_gas_dens_dp)
+     else
+        write(*,*) "ERROR: cannot read bitpix in fits file"
+        stop
+     endif
+
+     write(*,*) "Gas density range:", minval(sph_gas_dens), maxval(sph_gas_dens)
+
+     ! Au cas ou : on elimine les valeurs a 0
+     sph_gas_dens = sph_gas_dens/maxval(sph_gas_dens) ! normalization avant d'ajouter une constante
+     sph_gas_dens = max(sph_gas_dens,1e10*tiny_real)
+
+  endif ! lread_gas_density
+
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
@@ -1288,7 +1366,11 @@ subroutine densite_file()
            !densite_gaz(cell_map(i,j,k)) =0.0
         else
            do i=1, n_rad
-              densite_gaz(cell_map(i,j,k)) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
+              if (lread_gas_density) then
+                 densite_gaz(cell_map(i,j,k)) = sph_gas_dens(i,jj,k)
+              else
+                 densite_gaz(cell_map(i,j,k)) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
+              endif
            enddo
         endif
      enddo
@@ -1402,7 +1484,7 @@ subroutine densite_file()
 
   return
 
-end subroutine densite_file
+end subroutine read_density_file
 
 !**********************************************************
 
