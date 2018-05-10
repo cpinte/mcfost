@@ -1474,7 +1474,7 @@ subroutine read_density_file()
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
 
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+  write(*,*) 'Total  gas mass in model :', real(sum(masse_gaz) * g_to_Msun),' Msun'
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
 
   !write(*,*) "MODIFYING 3D DENSITY !!!"

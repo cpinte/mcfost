@@ -477,7 +477,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  write(*,*) "# Sink particles:"
  n_etoiles = 0
  do i=1,nptmass
-    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", xyzmh_ptmass(4,i), "Msun"
+    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
     if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
        n_etoiles = n_etoiles + 1
     endif
