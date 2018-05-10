@@ -1022,22 +1022,23 @@ subroutine read_density_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, read_gas_density, jj, icell, phik
+  integer :: k, l, i, n_a, read_n_a, read_gas_density, read_gas_velocity, jj, icell, phik
   real(kind=dp) :: somme, mass, facteur
   real :: a, tmp, gas2dust
 
-  real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
+  real, dimension(:,:,:,:), allocatable :: sph_dens, sph_gas_velocity ! (n_rad,nz,n_az,n_a)
   real, dimension(:,:,:), allocatable :: sph_gas_dens ! (n_rad,nz,n_az)
+  real, dimension(:,:,:,:), allocatable :: sph_V ! (n_rad,nz,n_az,3)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
 
-  real(kind=dp), dimension(:,:,:,:), allocatable :: sph_dens_dp
+  real(kind=dp), dimension(:,:,:,:), allocatable :: sph_dens_dp, sph_V_dp
   real(kind=dp), dimension(:,:,:), allocatable :: sph_gas_dens_dp
   real(kind=dp), dimension(:), allocatable :: a_sph_dp
   real(kind=dp) :: f
 
   type(disk_zone_type) :: dz
 
-  logical :: lread_gas_density
+  logical :: lread_gas_density, lread_gas_velocity
 
   ! Lecture donnees
   status=0
@@ -1052,6 +1053,19 @@ subroutine read_density_file()
      write(*,*) "ERROR : density file needed"
      stop
   endif
+
+  ! Do we read the gas density ?
+  read_gas_density = 0
+  call ftgkyj(unit,"read_gas_density",read_gas_density,comment,status)
+  write(*,*) "read_gas_density =", read_gas_density
+  lread_gas_density = (read_gas_density == 1)
+
+  ! Do we read the gas density ?
+  read_gas_velocity = 0
+  call ftgkyj(unit,"read_gas_velocity",read_gas_density,comment,status)
+  write(*,*) "read_gas_velocity =", read_gas_velocity
+  lread_gas_velocity = (read_gas_velocity == 1)
+
 
   group=1
   firstpix=1
@@ -1274,12 +1288,9 @@ subroutine read_density_file()
      a_sph(1) = 1.0
   endif
 
-  ! Do we read the gas density ?
-  read_gas_density = 0
-  call ftgkyj(unit,"read_gas_density",read_gas_density,comment,status)
-  write(*,*) "read_gas_density", read_gas_density
-  lread_gas_density = (read_gas_density == 1)
-
+  !-----------------------------
+  ! Gas density
+  !-----------------------------
   if (lread_gas_density) then
      call ftgkye(unit,"gas_dust_ratio",gas2dust,comment,status)
 
@@ -1349,12 +1360,77 @@ subroutine read_density_file()
 
   endif ! lread_gas_density
 
+
+  !------------------------
+  ! Velocity field
+  !------------------------
+  if (lread_gas_velocity) then
+     lvelocity_file = .true.
+
+     if (l3D_file) then
+        allocate(sph_gas_velocity(n_rad,-nz:nz,n_az,3))
+     else
+        allocate(sph_gas_velocity(n_rad,nz,n_az,3))
+     endif
+     sph_gas_velocity = 0.0
+
+     ! move to next hdu
+     call ftmrhd(unit,1,hdutype,status)
+
+     nfound = 0 ; naxes = 0 ;
+
+     !  determine the size of density file
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+     if (nfound /= 4) then
+        write(*,*) 'Gas velocity:'
+        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+        write(*,*) 'of '//trim(density_file)//' file. Exiting.'
+        write(*,*) "I found", nfound, "axis instead of 4"
+        stop
+     endif
+
+     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
+        write(*,*) "Error : "//trim(density_file)//" does not have the"
+        write(*,*) "right dimensions. Exiting."
+        write(*,*) "# fits_file vs mcfost_grid"
+        write(*,*) naxes(1), n_rad
+        write(*,*) naxes(2), nz
+        write(*,*) naxes(3), n_az
+        write(*,*) naxes(4), 3
+        stop
+     endif
+     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+     bitpix = 0
+     call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+     ! read_image
+     if (bitpix==-32) then
+        call ftgpve(unit,group,firstpix,npixels,nullval,sph_gas_velocity,anynull,status)
+     else if (bitpix==-64) then
+        if (l3D_file) then
+           allocate(sph_V_dp(n_rad,-nz:nz,n_az,3))
+        else
+           allocate(sph_V_dp(n_rad,nz,n_az,3))
+        endif
+        sph_V_dp = 0.0_dp
+        call ftgpvd(unit,group,firstpix,npixels,nullval,sph_V_dp,anynull,status)
+        sph_gas_velocity = real(sph_V_dp,kind=sp)
+        deallocate(sph_V_dp)
+     else
+        write(*,*) "ERROR: cannot read bitpix in fits file"
+        stop
+     endif
+
+     allocate(vfield_x(n_cells),vfield_y(n_cells),vfield_z(n_cells))
+  endif ! lread_gas_velocity
+
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
-  ! Densite du gaz : gaz = plus petites particules
+
+  ! Passing the densities and velocities to mcfost arrays
   dz = disk_zone(1)
-  !densite_gaz(:,1:nz,:) = sph_dens(:,:,:,1) ! marche pas, bizarre ???
   do k=1, n_az
      do j=j_start,nz
         if (l3D_file) then
@@ -1366,15 +1442,23 @@ subroutine read_density_file()
            !densite_gaz(cell_map(i,j,k)) =0.0
         else
            do i=1, n_rad
+              icell = cell_map(i,j,k)
               if (lread_gas_density) then
-                 densite_gaz(cell_map(i,j,k)) = sph_gas_dens(i,jj,k)
+                 densite_gaz(icell) = sph_gas_dens(i,jj,k)
               else
-                 densite_gaz(cell_map(i,j,k)) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
+                 densite_gaz(icell) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
               endif
-           enddo
-        endif
-     enddo
-  enddo
+
+              if (lread_gas_velocity) then
+                 vfield_x(icell) = sph_gas_velocity(i,jj,k,1)
+                 vfield_y(icell) = sph_gas_velocity(i,jj,k,2)
+                 vfield_z(icell) = sph_gas_velocity(i,jj,k,3)
+                 if ((.not.l3D_file).and.(j<0)) vfield_z(icell) = - vfield_z(icell)
+              endif
+           enddo ! i
+        endif ! j==0
+     enddo !j
+  enddo ! k
 
   ! Calcul de la masse de gaz de la zone
   mass = 0.
@@ -1476,11 +1560,6 @@ subroutine read_density_file()
 
   write(*,*) 'Total  gas mass in model :', real(sum(masse_gaz) * g_to_Msun),' Msun'
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
-
-  !write(*,*) "MODIFYING 3D DENSITY !!!"
-  !k = 36
-  !densite_pouss(:,:,k,:) = densite_pouss(:,:,k,:)* 1e20
-  !densite_gaz(:,:,k) = densite_gaz(:,:,k)* 1e20
 
   return
 

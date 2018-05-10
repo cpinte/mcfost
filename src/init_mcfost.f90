@@ -78,6 +78,7 @@ subroutine set_default_variables()
   lscatt_ray_tracing2=.false.
   loutput_mc=.false.
   ldensity_file=.false.
+  lvelocity_file=.false.
   lphantom_file=.false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
