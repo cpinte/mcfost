@@ -1335,11 +1335,6 @@ function compute_vertical_CD(icell) result(CD)
   real(kind=dp) :: CD, x0, y0, z0, x1, y1, z1, u,v,w, l
 
   if (lVoronoi) then
-     write(*,*) "photo-dissociate/Column density option not implemented in Voronoi"
-     write(*,*) "Exiting"
-     ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
-     ! needs to be updated
-     stop
      x1 = Voronoi(icell)%xyz(1)
      y1 = Voronoi(icell)%xyz(2)
      z1 = Voronoi(icell)%xyz(3)
@@ -1359,7 +1354,10 @@ function compute_vertical_CD(icell) result(CD)
   next_cell = icell
   icell0 = 0
   CD = 0.0
-  do while(next_cell <= n_cells)
+  ! The test to check if we exit the model volume depends on the grid:
+  !  - next_cell > n_cells for cylindrical and spherical grids
+  !  - next_cell < 0 for Voronoi mesh (ie next_cell is a wall)
+  do while((next_cell > 0).and.(next_cell <= n_cells))
      previous_cell = icell0
      icell0 = next_cell
      x0 = x1 ; y0 = y1 ; z0 = z1
