@@ -1851,13 +1851,14 @@ subroutine write_disk_struct(lparticle_density)
      call print_error(status)
   end if
 
+  ! Wrting the column density
+  call write_column_density()
+
   if (lstop_after_init) then
      write(*,*) "Exiting"
      stop
   endif
 
-  ! Wrting the column density
-  call write_column_density()
   write(*,*) "Done"
 
   return
