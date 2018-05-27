@@ -1514,6 +1514,8 @@ function select(k,arr)
      end if
   end do
 
+  return
+
 end function select
 
 !************************************************************
@@ -1521,14 +1523,21 @@ end function select
 function select_inplace(k,arr)
   ! Returns the kth smallest value in the array arr, without altering the input array.
   ! In Fortran 90's assumed memory-rich environment, we just call select in scratch space.
+  ! C.P. : this is an issue for very large arrays: using allocatable array instead
 
   integer, intent(in) :: k
   real(sp), dimension(:), intent(in) :: arr
   real(sp) :: select_inplace
 
-  real(sp), dimension(size(arr)) :: tarr
+  real(sp), dimension(:), allocatable :: tarr
+
+  allocate(tarr(size(arr)))
+
   tarr=arr
   select_inplace=select(k,tarr)
+  deallocate(tarr)
+
+  return
 
 end function select_inplace
 
