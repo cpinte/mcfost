@@ -33,7 +33,7 @@ module read_phantom
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize
  real(dp) :: graindens
- real(dp), allocatable, dimension(:) :: dudt
+ real(dp), allocatable, dimension(:) :: dudt, tmp_dp
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
@@ -80,7 +80,7 @@ module read_phantom
     dustfluidtype = 1
  endif
 
- allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np))
+ allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np),tmp_dp(np))
  allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
  allocate(dudt(np))
 
@@ -127,20 +127,20 @@ module read_phantom
                 if (i==i_real .or. i==i_real8) then
                    select case(trim(tag))
                    case('x')
-                      read(iunit,iostat=ierr) xyzh(1,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; xyzh(1,1:np) = tmp_dp
                    case('y')
-                      read(iunit,iostat=ierr) xyzh(2,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; xyzh(2,1:np) = tmp_dp
                    case('z')
-                      read(iunit,iostat=ierr) xyzh(3,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; xyzh(3,1:np) = tmp_dp
                    case('h')
-                      read(iunit,iostat=ierr) xyzh(4,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; xyzh(4,1:np) = tmp_dp
                       got_h = .true.
                    case('vx')
-                      read(iunit,iostat=ierr) vxyzu(1,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(1,1:np) = tmp_dp
                    case('vy')
-                      read(iunit,iostat=ierr) vxyzu(2,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(2,1:np) = tmp_dp
                    case('vz')
-                      read(iunit,iostat=ierr) vxyzu(3,1:np)
+                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(3,1:np) = tmp_dp
                    case('dustfrac')
                       ngrains = ngrains + 1
                       if (ngrains > ndusttypes) then
@@ -233,7 +233,7 @@ module read_phantom
           enddo
        enddo
     enddo
- enddo
+ enddo ! block
 
  close(iunit)
 
@@ -264,7 +264,7 @@ module read_phantom
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp,vxyzu)
+ deallocate(xyzh,itype,tmp,vxyzu,tmp_dp)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_file
