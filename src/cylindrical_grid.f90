@@ -218,51 +218,53 @@ subroutine define_cylindrical_grid()
   ! **************************************************
   ! Tableaux relatifs a la grille
   ! **************************************************
-  allocate(r_lim(0:n_rad), r_lim_2(0:n_rad), r_lim_3(0:n_rad), &
-  delta_z(n_rad), dr2_grid(n_rad), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_lim'
-     stop
-  endif
-  r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
+  if (.not.allocated(r_grid)) then
+     allocate(r_lim(0:n_rad), r_lim_2(0:n_rad), r_lim_3(0:n_rad), &
+          delta_z(n_rad), dr2_grid(n_rad), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error r_lim'
+        stop
+     endif
+     r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
 
-  allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_lim'
-     stop
-  endif
-  r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
+     allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error r_lim'
+        stop
+     endif
+     r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
 
-  allocate(tab_region(n_rad), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_region'
-     stop
-  endif
-  tab_region = 0
+     allocate(tab_region(n_rad), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tab_region'
+        stop
+     endif
+     tab_region = 0
 
-  allocate(z_lim(n_rad,nz+2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error z_lim'
-     stop
-  endif
-  z_lim = 0.0
+     allocate(z_lim(n_rad,nz+2), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error z_lim'
+        stop
+     endif
+     z_lim = 0.0
 
-  allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tan_phi_lim'
-     stop
-  endif
-  w_lim = 0.0
-  theta_lim=0.0
-  tan_theta_lim = 0.0
-  tan_phi_lim = 0.0
+     allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error tan_phi_lim'
+        stop
+     endif
+     w_lim = 0.0
+     theta_lim=0.0
+     tan_theta_lim = 0.0
+     tan_phi_lim = 0.0
 
-  allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error zmax, volume'
-     stop
+     allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
+     if (alloc_status > 0) then
+        write(*,*) 'Allocation error zmax, volume'
+        stop
+     endif
+     zmax = 0.0 ; volume=0.0
   endif
-  zmax = 0.0 ; volume=0.0
   ! end allocation
 
   ! Defining the ISM sphere

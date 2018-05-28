@@ -8,6 +8,8 @@ module disk_physics
   use constantes
   use stars, only : spectre_etoiles
 
+  implicit none
+
   character(len=32) :: sublimationFile = "sublimation_radius.txt"
 
 contains
@@ -83,10 +85,10 @@ subroutine set_sublimation_radius(sublimation_radius)
 
   do i=1,n_zones
      !write(*,*) "zone", i,sublimation_radius, disk_zone(i)%rmin, sublimation_radius > disk_zone(i)%rmin
-     if (sublimation_radius > disk_zone(i)%rmin) then
+     if (sublimation_radius < disk_zone(i)%rmin) then
         !write(*,*) "SUBLIMATING DUST IN ZONE", i
         disk_zone(i)%rmin = sublimation_radius
-        disk_zone(i)%rin = disk_zone(i)%rmin !+ 5* disk_zone(1)%edge
+        disk_zone(i)%rin = disk_zone(i)%rmin + 5* disk_zone(1)%edge
         disk_zone(i)%edge = 0.0
      endif
   enddo !i
@@ -124,7 +126,7 @@ subroutine sublimate_dust()
   ! C. Pinte
   ! 07/08/12
 
-  integer :: i, j, pk, icell, k, ipop
+  integer :: i, j, pk, icell, k, ipop, l
   real :: mass
 
   write(*,*) "Sublimating dust"

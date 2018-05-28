@@ -707,7 +707,7 @@ module Voronoi_grid
           s_tmp = dot_product(n, p-r) / den
 
           if (s_tmp < 0.) s_tmp = huge(1.0)
-       else ! i < 0 ; le voisin est un wall
+       else ! id_n < 0 ; le voisin est un wall
           s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
 
           ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
