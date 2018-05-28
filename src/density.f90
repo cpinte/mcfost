@@ -1055,18 +1055,20 @@ subroutine read_density_file()
   endif
 
   ! Do we read the gas density ?
-  read_gas_density = 0
+  status = 0
   call ftgkyj(unit,"read_gas_density",read_gas_density,comment,status)
+  if (status /=0) read_gas_density = 0
   write(*,*) "read_gas_density =", read_gas_density
   lread_gas_density = (read_gas_density == 1)
 
   ! Do we read the gas density ?
-  read_gas_velocity = 0
+  status = 0
   call ftgkyj(unit,"read_gas_velocity",read_gas_density,comment,status)
+  if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
   lread_gas_velocity = (read_gas_velocity == 1)
 
-
+  status = 0
   group=1
   firstpix=1
   nullval=-999
@@ -1074,7 +1076,7 @@ subroutine read_density_file()
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 4) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
+     write(*,*) 'READ_IMAGE failed to read the NAXIS keyword in HDU 1'
      write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      write(*,*) "I found", nfound, "axis instead of 4"
      stop
@@ -1082,7 +1084,7 @@ subroutine read_density_file()
 
   if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
      write(*,*) "Error : "//trim(density_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
+     write(*,*) "right dimensions in HDU 1. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
