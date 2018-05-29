@@ -1,15 +1,34 @@
 #!/bin/sh
 
-SYSTEM=$1
-if [ "$SYSTEM" = "ifort" ] ; then
+#preliminary checks
+
+if [ -z $MCFOST_INSTALL ]; then
+    echo "error: MCFOST_INSTALL needs to be set."
+    exit 1
+fi
+if [ ! -d $MCFOST_INSTALL ]; then
+    echo "error: MCFOST_INSTALL needs to point to an existing directory."
+    exit 1
+fi
+
+if [ ! $# = 0 ]; then
+    SYSTEM=$1
+fi
+
+if [ -z $SYSTEM ]; then
+    echo "error: SYSTEM need to be set (choose: ifort, gfortran or xeon-phi)"
+    exit 1
+fi
+
+if [ $SYSTEM = "ifort" ] ; then
     echo "Building MCFOST's libraries with ifort"
     export CC=icc
 
-elif [ "$SYSTEM" = "gfortran" ] ; then
+elif [ $SYSTEM = "gfortran" ] ; then
     echo "Building MCFOST's libraries with gfortran"
     export CC=gcc
 
-elif [ "$SYSTEM" = "xeon-phi" ] ; then
+elif [ $SYSTEM = "xeon-phi" ] ; then
     echo "Building MCFOST's libraries with ifort for Xeon-Phi"
     export CC=icc
 
