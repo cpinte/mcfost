@@ -98,11 +98,14 @@ rm -rf cfitsio
 
 
 # voro++
-# Original voro++ can be obtained from
-# svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro
 
 # Downloading last version tested with mcfost :
-git clone git@bitbucket.org:cpinte/voro.git \
+# git clone git@bitbucket.org:cpinte/voro.git
+# Original voro++ can be obtained from
+echo
+echo "password is 'anonsvn'"
+echo
+svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro \
 && if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
