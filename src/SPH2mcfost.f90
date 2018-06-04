@@ -130,7 +130,7 @@ contains
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust
     real :: f, limit_threshold
-    integer :: icell, l, k, iSPH
+    integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
 
@@ -370,6 +370,25 @@ contains
        densite_pouss(:,:) = densite_pouss(:,:) * f
        masse(:) = masse(:) * f
     endif ! ndusttypes == 0
+
+    ! Todo : cells that are touching a wall receive an empty density
+!--   n_force_empty = 0.0
+!--   cell_loop : do icell=1,n_cells
+!--      do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+!--         id_n = neighbours_list(i) ! id du voisin
+!--
+!--         if (id_n < 0) then
+!--            n_force_empty = n_force_empty + 1
+!--            densite_gaz(icell)  = 0.0
+!--            masse_gaz(icell)    = 0.0
+!--            densite_pouss(:,icell) = 0.0
+!--            masse(icell) = 0.0
+!--            cycle cell_loop
+!--         endif
+!--      enddo
+!--   enddo cell_loop
+!--
+!--   write(*,*) "Density was forced to 0 in", n_force_empty, "cells surrounding the model"
 
     write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
