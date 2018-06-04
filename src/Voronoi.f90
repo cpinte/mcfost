@@ -18,7 +18,7 @@ module Voronoi_grid
      real(kind=dp), dimension(3) :: xyz, vxyz
      real(kind=dp) :: h ! SPH smoothing lengths
      integer :: id, first_neighbour, last_neighbour
-     logical :: exist
+     logical :: exist, is_star
   end type Voronoi_cell
 
   type Voronoi_wall
@@ -335,6 +335,7 @@ module Voronoi_grid
     etoile(:)%out_model = .true.
     etoile(:)%icell = 0
     do i=1, n_etoiles
+       ! We test is the star is in the model
        if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
           if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
              if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
@@ -359,6 +360,7 @@ module Voronoi_grid
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
+    Voronoi(:)%is_star = .false.
 
     n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
 
@@ -376,6 +378,10 @@ module Voronoi_grid
        Voronoi(icell)%xyz(3) = z_tmp(icell)
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
+
+    do i=1, n_etoiles
+       Voronoi(etoile(i)%icell)%is_star = .true.
+    end do
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"

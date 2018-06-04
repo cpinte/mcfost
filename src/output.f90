@@ -1120,7 +1120,9 @@ end subroutine calc_optical_depth_map
 subroutine write_column_density()
   ! Only works if the star in in 0, 0, 0 at the moment
 
-  real, dimension(n_cells,2) :: CD
+  integer, parameter :: n_directions = 4
+
+  real, dimension(n_cells,n_directions) :: CD
   integer :: icell, icell0, next_cell, previous_cell
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1132,15 +1134,10 @@ subroutine write_column_density()
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
 
   CD(:,:) = 0.0
-  do direction = 1, 2
+  do direction = 1, n_directions
      do icell=1,n_cells
 
         if (lVoronoi) then
-           write(*,*) "Column density option not implemented in Voronoi"
-           write(*,*) "No CD file will be written"
-           ! won't work in Voronoi grid either as the test next_cell <= n_cells is not correct
-           ! needs to be updated
-           return
            x1 = Voronoi(icell)%xyz(1)
            y1 = Voronoi(icell)%xyz(2)
            z1 = Voronoi(icell)%xyz(3)
@@ -1150,21 +1147,25 @@ subroutine write_column_density()
            z1 = z_grid(icell)
         endif
 
-        if (direction == 1) then
+        if (direction == 1) then ! to star : test needs to be updated for Voronoi
            norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
            u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
-        else
-           u = 0.0 ; v = 0.0 ;
-           if (z1 >= 0) then
-              w = 1.0
-           else
-              w = -1.0
-           endif
+        else if (direction == 2) then ! vertical +z
+           u = 0.0 ; v = 0.0 ; w = 1.0
+        else if (direction == 3) then ! vertical -z
+           u = 0.0 ; v = 0.0 ; w = -1.0
+        else ! radial
+           u = x1 ; v = y1 ; w = 0
+           norme = 1./sqrt(u**2 + v**2)
+           u = u * norme ; v = v* norme
         endif
 
         next_cell = icell
         icell0 = 0
-        do while(next_cell <= n_cells)
+
+        ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false, (not a star)
+        ! Cylindrical : next_cell <= n_cells
+        do while((next_cell > 0).and.(.not.Voronoi(next_cell)%is_star).and.(next_cell <= n_cells))
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
@@ -1194,7 +1195,7 @@ subroutine write_column_density()
   if (lVoronoi) then
      naxis=2
      naxes(1)=n_cells
-     naxes(2)=2
+     naxes(2)=n_directions
      nelements=naxes(1)*naxes(2)
   else
      if (l3D) then
@@ -1202,13 +1203,13 @@ subroutine write_column_density()
         naxes(1)=n_rad
         naxes(2)=2*nz
         naxes(3)=n_az
-        naxes(4)=2
+        naxes(4)=n_directions
         nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
      else
         naxis=3
         naxes(1)=n_rad
         naxes(2)=nz
-        naxes(3)=2
+        naxes(3)=n_directions
         nelements=naxes(1)*naxes(2)*naxes(3)
      endif
   endif
