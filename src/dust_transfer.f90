@@ -133,7 +133,7 @@ subroutine transfert_poussiere()
      if (lwall) call define_density_wall3D()
   endif
 
-  if (ldisk_struct) call write_disk_struct(.false.)
+  if ((ldisk_struct).and.(.not. ldust_sublimation)) call write_disk_struct(.false.) ! We write it later if there is sublimation
 
   if (lmono) then ! code monochromatique
      lambda=1
@@ -268,6 +268,8 @@ subroutine transfert_poussiere()
               call compute_othin_sublimation_radius()
               call define_grid()
               call define_dust_density()
+
+              if (ldisk_struct) call write_disk_struct(.false.) ! We do now in cases where we computed the dust submination radius
 
               do lambda=1,n_lambda
                  ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem

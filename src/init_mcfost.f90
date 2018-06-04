@@ -307,7 +307,7 @@ subroutine initialisation_mcfost()
      stop
   endif
 
-  ilen = index(para,'/',back=.true.) ! last position of the '_' character
+  ilen = index(para,'/',back=.true.) ! last position of the '/' character
   base_para = para(ilen+1:)
 
   ! Les benchmarks
