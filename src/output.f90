@@ -1128,7 +1128,7 @@ subroutine write_column_density()
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements, direction
 
-  logical :: simple, extend
+  logical :: simple, extend, ltest
   character(len=512) :: filename
 
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
@@ -1165,12 +1165,19 @@ subroutine write_column_density()
 
         ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false, (not a star)
         ! Cylindrical : next_cell <= n_cells
-        do while((next_cell > 0).and.(.not.Voronoi(next_cell)%is_star).and.(next_cell <= n_cells))
+        ltest = .true.
+        do while(ltest)
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
            call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
            CD(icell,direction) = CD(icell,direction) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
+
+           if (lVoronoi) then
+              ltest = (next_cell > 0).and.(.not.Voronoi(next_cell)%is_star)
+           else
+              ltest = (next_cell <= n_cells)
+           endif
         enddo
      enddo ! icell
   end do ! direction
