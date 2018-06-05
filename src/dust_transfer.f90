@@ -133,7 +133,14 @@ subroutine transfert_poussiere()
      if (lwall) call define_density_wall3D()
   endif
 
-  if ((ldisk_struct).and.(.not. ldust_sublimation)) call write_disk_struct(.false.) ! We write it later if there is sublimation
+  if ((ldisk_struct).and.(.not. ldust_sublimation)) then
+     ! We write it later if there is sublimation
+     if (lastrochem) then
+        call write_disk_struct(.true.)
+     else
+        call write_disk_struct(.false.)
+     endif
+  endif
 
   if (lmono) then ! code monochromatique
      lambda=1
