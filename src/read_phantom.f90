@@ -2,6 +2,7 @@ module read_phantom
 
   use parametres
   use dump_utils
+  use messages
 
   implicit none
 
@@ -429,13 +430,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  enddo
  n_SPH = j
 
- if (sum(massgas) == 0.) then
-    write(*,*) ''
-    write(*,*) 'Using old phantom dumpfile without gas-to-dust ratio on dust particles.'
-    write(*,*) 'Set use_dust_particles = .false. (read_phantom.f90) and compile and run again.'
-    write(*,*) 'Exiting...'
-    stop
- endif
+ if (sum(massgas) == 0.) call error('Using old phantom dumpfile without gas-to-dust ratio on dust particles.', &
+      msg2='Set use_dust_particles = .false. (read_phantom.f90) and compile and run again.')
 
  write(*,*) ''
  write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
@@ -448,10 +444,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
        write(*,*) "Computing energy input"
        lextra_heating = .true.
        allocate(extra_heating(n_SPH), stat=alloc_status)
-       if (alloc_status /=0) then
-          write(*,*) "Allocation error in phanton_2_mcfost"
-          write(*,*) "Exiting"
-       endif
+       if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
 
        totlum = 0.
        do i=1,n_SPH
@@ -485,11 +478,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  enddo
 
  if (lplanet_az) then
-    if (nptmass /= 2) then
-       write(*,*) "ERROR: option -planet_az only works with 2 sink particles"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (nptmass /= 2) call error("option -planet_az only works with 2 sink particles")
     RT_n_az = 1
     RT_az_min = planet_az + atan2(xyzmh_ptmass(2,2) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,2) - xyzmh_ptmass(1,1)) / deg_to_rad
     RT_az_max = RT_az_min

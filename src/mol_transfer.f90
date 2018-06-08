@@ -193,11 +193,7 @@ subroutine NLTE_mol_line_transfer(imol)
      tab_Trans(i) = 1 ! we use all the transitions here
   enddo
 
-  if (n_level_comp < 2) then
-     write(*,*) "ERROR : n_level_comp must be > 2"
-     write(*,*) "Exiting."
-     stop
-  endif
+  if (n_level_comp < 2) call error("n_level_comp must be > 2")
   write(*,*) "NLTE line transfer on", n_level_comp, "levels"
 
   etape_start=1
@@ -208,42 +204,27 @@ subroutine NLTE_mol_line_transfer(imol)
   endif
 
   allocate(tab_speed(-n_speed:n_speed,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_speed'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_speed')
   tab_speed = 0.0_dp
 
   allocate(I0(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), &
        I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error I0'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error I0')
   I0 = 0.0_dp
   I0c = 0.0_dp
 
   if (ldouble_RT) then
      allocate(I02(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error I0'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error I0')
      I02 = 0.0_dp
   endif
 
   allocate(ds(n_rayons_start,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error ds'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error ds')
   ds = 0.0_dp
 
   allocate(Doppler_P_x_freq(-n_speed:n_speed,n_rayons_start,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error Doppler_P_x_freq'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error Doppler_P_x_freq')
   Doppler_P_x_freq = 0.0_dp
 
   ! 2 etapes : 1) direction des rayons fixee pour eliminer les fluctuations aletoires
@@ -272,33 +253,21 @@ subroutine NLTE_mol_line_transfer(imol)
         deallocate(tab_speed,I0,I0c,ds,Doppler_P_x_freq)
 
         allocate(tab_speed(ispeed(1):ispeed(2),nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_speed'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error tab_speed')
         tab_speed = 0.0_dp
 
         allocate(I0(ispeed(1):ispeed(2),nTrans_tot,n_rayons_max,nb_proc), &
              I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error I0'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error I0')
         I0 = 0.0_dp
         I0c = 0.0_dp
 
         allocate(ds(n_rayons_max,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error ds'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error ds')
         ds = 0.0_dp
 
         allocate(Doppler_P_x_freq(ispeed(1):ispeed(2),n_rayons_max,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Doppler_P_x_freq'
-           stop
-        endif
+        if (alloc_status > 0) call error( 'Allocation error Doppler_P_x_freq')
         Doppler_P_x_freq = 0.0_dp
      endif
 

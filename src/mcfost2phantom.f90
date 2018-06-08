@@ -57,9 +57,8 @@ contains
     call read_para(mcfost_para_filename)
 
     if (lnRE) then
-       write(*,*) "Non-equilibrium grains are not yet implemented in libmcfost"
-       write(*,*) "Exiting"
-       stop
+       call error("Non-equilibrium grains are not yet implemented in libmcfost",ierr=ierr)
+       if (ierr) return
     endif
 
     ! Setting option for the mcfost2phantom interface
@@ -70,10 +69,8 @@ contains
     llimits_file = .false.
 
     if (n_zones > 1) then
-       write(*,*) "ERROR: mcfost2phantom only works with a 1zone parameter file"
-       write(*,*) "Exiting"
-       ierr = 1
-       return
+       call error("mcfost2phantom only works with a 1zone parameter file",ierr=ierr)
+       if (ierr) return
     endif
 
     ! Building the wavelength & basic dust properties grid
@@ -432,10 +429,7 @@ contains
     integer :: syst_status
 
     n_call = n_call + 1
-    if (n_call > 9) then
-       write(*,*) "STOPPING to write T files at dump #9"
-       stop
-    endif
+    if (n_call > 9) call error("STOPPING to write T files at dump #9")
 
     syst_status = 0
 

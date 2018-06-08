@@ -1,6 +1,7 @@
 module read_DustEM
 
   use grains
+  use messages
 
 
   implicit none
@@ -17,11 +18,7 @@ contains
     real :: material_density
 
     call get_environment_variable('DUSTEM_DIR',DustEM_dir)
-    if (DustEM_dir == "") then
-       write(*,*) "ERROR: environnement variable DUSTEM_DIR is not defined."
-       write(*,*) "Exiting."
-       stop
-    endif
+    if (DustEM_dir == "") call error("environnement variable DUSTEM_DIR is not defined.")
 
     ! 1) open lambda file
     filename = trim(DustEM_dir)//"/oprop/LAMBDA.DAT"
@@ -81,9 +78,7 @@ contains
     case('aOlM5')
        material_density = 2.19
     case default
-       write(*,*) "Material density is unknown for the DustEM material: "//trim(dust_pop(pop)%indices(1))
-       write(*,*) "Exiting"
-       stop
+       call error("Material density is unknown for the DustEM material: "//trim(dust_pop(pop)%indices(1)))
     end select
     dust_pop(pop)%component_rho1g(1) = material_density
     dust_pop(pop)%rho1g_avg = material_density
@@ -151,11 +146,7 @@ contains
     open(unit=1, file=filename,status='old')
     the_char = read_com(1)
     read(the_char, fmt=*) na
-    if (na /= op_file_na(pop)) then
-       write(*,*) "DustEM: G file must have same dimension as opacity file"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (na /= op_file_na(pop)) call error("DustEM: G file must have same dimension as opacity file")
 
     ! get grain sizes
     read(1,*) (op_file_log_r_grain(i,pop), i=1, op_file_na(pop))
@@ -180,7 +171,7 @@ contains
 
    subroutine get_DustEM_specific_heat_dim(pop)
 
-    use utils, only : is_file
+     use utils, only : is_file
 
     integer, intent(in) :: pop
 
@@ -197,10 +188,8 @@ contains
        read(1,*) file_sh_nT(pop)
        close(unit=1)
     else
-       write(*,*) "ERROR: "//trim(filename)//" does not exist"
-       write(*,*) "Are you sure you wish to perform stochastic heating ?"
-       write(*,*) "Exiting"
-       stop
+       call error(trim(filename)//" does not exist", &
+            msg2="Are you sure you wish to perform stochastic heating ?")
     endif
 
     return
@@ -224,11 +213,7 @@ contains
     open(unit=1, file=filename,status='old')
     the_char = read_com(1)
     read(the_char, fmt=*) na
-    if (na /= op_file_na(pop)) then
-       write(*,*) "DustEM: heat capacity file must have same dimension as opacity file"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (na /= op_file_na(pop)) call error("DustEM: heat capacity file must have same dimension as opacity file")
     read(1,*) ! skip 1 line : I already have the size
     read(1,*) file_sh_nT(pop) ! already done but ok
 

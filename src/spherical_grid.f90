@@ -6,6 +6,7 @@ module spherical_grid
        delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
   use cylindrical_grid, only: cell2cylindrical
+  use messages
 
   implicit none
 
@@ -455,10 +456,8 @@ end subroutine indice_cellule_sph_theta
        call indice_cellule_sph(x,y,z, icell)
        ri = cell_map_i(icell)
        if (ri==0) then
-          write(*,*) "BUG in verif_cell_position_sph"
-          write(*,*) x,y,z, sqrt(x*x+y*y+z*z)
-          write(*,*) "Exiting"
-          stop
+          call error("BUG in verif_cell_position_sph")
+          !write(*,*) x,y,z, sqrt(x*x+y*y+z*z)
        endif
     endif
 
@@ -525,15 +524,6 @@ end subroutine indice_cellule_sph_theta
     ! s1 < s2
     s1=-b-rac
     !  s2=-b+rac
-
-    ! TMP
-    if (s1 < 0.0) then
-       write(*,*) "Bug dans ray tracing in spherical coordinates !!!  s1 =", s1
-       write(*,*) x,y,z, u,v,w
-       write(*,*) r_lim_2(n_rad)
-       stop
-    endif
-    ! END TMP
 
     delta_vol = s1
 

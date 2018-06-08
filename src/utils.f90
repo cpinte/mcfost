@@ -4,6 +4,7 @@ module utils
   use naleat, only : stream, gauss_random_saved, lgauss_random_saved
   use constantes
   use sha
+  use messages
 
   implicit none
 
@@ -128,10 +129,7 @@ subroutine polint(xa,ya,n,x,y,dy)
         hp=xa(i+m)-x
         w=c(i+1)-d(i)
         den=ho-hp
-        if(den.eq.0.) then
-           write(*,*) 'failure in polint'
-           stop
-        endif
+        if(den == 0.) call error('failure in polint')
         den=w/den
         d(i)=hp*den
         c(i)=ho*den
@@ -398,14 +396,11 @@ function calc_mu0(mu,a)
      mu02 = -2._dp*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
      mu03 = -2._dp*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
      if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
-        write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu02",mu01,mu02
-        stop
+        call error("calc_mu0: 2 positives roots, mu01, mu02")
      else if ((mu01 > 0.0_dp).and.(mu03 > 0.0_dp)) then
-        write(*,*) "ERREUR: calc_mu0: 2 racines: mu01,mu03",mu01,mu03
-        stop
+        call error("calc_mu0: 2 positives roots, mu01, mu03")
      elseif ((mu02 > 0.0_dp).and.(mu03 > 0.0_dp)) then
-        write(*,*) "ERREUR: calc_mu0: 2 racines: mu02,mu03",mu02,mu03
-        stop
+        call error("calc_mu0: 2 positives roots, mu02, mu03")
      endif
 
      if (mu01 > 0.0_dp) calc_mu0 = mu01
@@ -733,7 +728,7 @@ subroutine exit_update(lmanual, n_days, lupdate)
 
   if (lmanual) then
      write(*,*) "Exiting."
-     stop
+     call exit(1)
   else ! if it is an auto-update, we don't exit
      lupdate = .false.
      ! We try again tomorrow : Write date of the last time an update was search for - (mcfost_auto_update -1) days
@@ -759,11 +754,7 @@ subroutine mcfost_history()
   write(*,*) "Getting MCFOST history ..."
   cmd = "curl "//trim(webpage)//"history.txt"
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "Cannot get MCFOST history"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST history")
   write(*,*) " "
 
   return
@@ -801,11 +792,7 @@ subroutine mcfost_get_ref_para()
   call appel_syst(cmd, syst_status)
   cmd = "curl "//trim(webpage)//ref_file_3D//" -O -s"
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "Cannot get MCFOST reference file"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST reference file")
   write(*,*) "Done"
 
   return
@@ -827,11 +814,7 @@ subroutine mcfost_get_manual()
   cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
 
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "Cannot get MCFOST manual"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST manual")
   write(*,*) "Done"
 
   return
@@ -855,11 +838,7 @@ subroutine mcfost_get_yorick()
        "curl "//trim(webpage)//trim(yo_dir)//trim(yo_file2)//" -O -s"
 
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "Cannot get MCFOST yorick package"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST yorick package")
   write(*,*) "Done"
 
   return
@@ -896,19 +875,13 @@ subroutine mcfost_v()
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
 
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "ERROR: Cannot get MCFOST last version number (Error 1)"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST last version number (Error 1)")
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
-     write(*,*) "ERROR: Cannot get MCFOST last version number (Error 2)"
-     write(*,*) "Exiting"
-     stop
+     call error("Cannot get MCFOST last version number (Error 2)")
   endif
 
   ! Do we have the last version ?
@@ -922,11 +895,7 @@ subroutine mcfost_v()
      write(*,*) "Getting MCFOST history ..."
      cmd = "curl "//trim(webpage)//"history.txt -O -s"
      call appel_syst(cmd, syst_status)
-     if (syst_status/=0) then
-        write(*,*) "Cannot get MCFOST history"
-        write(*,*) "Exiting"
-        stop
-     endif
+     if (syst_status/=0) call error("Cannot get MCFOST history")
 
      ! Getting line number of current version in history
      cmd = "grep -n "//trim(mcfost_release)//" history.txt | awk -F : '{print $1}' > line_number.txt"
@@ -978,19 +947,13 @@ subroutine update_utils(lforce_update)
 
   cmd = "curl "//trim(utils_webpage)//"Version -O -s"
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) then
-     write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 1)"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (syst_status/=0) call error("Cannot get MCFOST UTILS last version number (Error 1)")
   open(unit=1, file="Version", status='old',iostat=ios)
   read(1,*,iostat=ios) s_last_version
   close(unit=1,status="delete",iostat=ios)
 
   if ( (ios/=0) .or. (.not.is_digit(s_last_version(1:1)))) then
-     write(*,*) "ERROR: Cannot get MCFOST UTILS last version number (Error 2)"
-     write(*,*) "Exiting"
-     stop
+     call error("Cannot get MCFOST UTILS last version number (Error 2)")
   endif
   read(s_last_version,*) last_version
 
@@ -1056,11 +1019,7 @@ real function get_mcfost_utils_version()
   close(unit=1,iostat=ios)
   if (ios /= 0) get_mcfost_utils_version = 0.0
 
-  if (abs(get_mcfost_utils_version) < 1e-6) then
-     write(*,*) "ERROR : could not find current MCFOST utils version"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (abs(get_mcfost_utils_version) < 1e-6) call error("could not find current MCFOST utils version")
 
   return
 

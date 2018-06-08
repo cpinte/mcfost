@@ -65,17 +65,11 @@ subroutine allocate_thermal_energy(Nc)
   integer :: alloc_status
 
   allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error frac_E_stars'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error frac_E_stars')
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell 1'
-     stop
-  endif
+  if (alloc_status > 0) call error( 'Allocation error prob_E_cell 1')
   prob_E_cell = 0.0
 
   return
@@ -94,48 +88,30 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   real :: mem_size
 
   allocate(spectre_emission_cumul(0:n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error spectre_etoile'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error spectre_etoile')
   spectre_emission_cumul = 0.0
 
   allocate(tab_Temp(n_T), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_Temp'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_Temp')
   tab_Temp = 0.0
 
   allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error log_E_em'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error log_E_em')
   log_Qcool_minus_extra_heating = 0.0
 
   allocate(DensE(n_rad,0:nz,n_az), DensE_m1(n_rad,0:nz,n_az), Dcoeff(n_rad,0:nz,n_az), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error kappa_abs_1grain'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error kappa_abs_1grain')
   DensE = 0.0 ; DensE_m1 = 0.0
 
   call allocate_radiation_field_step1(Nc)
 
   allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error xT_ech'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error xT_ech')
   xT_ech = 2
 
   if (lreemission_stats) then
      allocate(nbre_reemission(Nc,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error nbre_reemission'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error nbre_reemission')
      nbre_reemission = 0.0
   endif
 
@@ -144,19 +120,13 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
         low_mem_th_emission = .false.
         if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
         allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_CDF'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error kdB_dT_CDF')
         kdB_dT_CDF = 0
      else
         low_mem_th_emission = .true.
         write(*,*) "Using low memory mode for thermal emission"
         allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_LTE_CDF'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_LTE_CDF')
         kdB_dT_1grain_LTE_CDF = 0
      endif
 
@@ -167,10 +137,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
            low_mem_th_emission_nLTE = .false.
            if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
            allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
-           if (alloc_status > 0) then
-              write(*,*) 'Allocation error kabs_nLTE_CDF'
-              stop
-           endif
+           if (alloc_status > 0) call error('Allocation error kabs_nLTE_CDF')
            kabs_nLTE_CDF = 0.0
         else
            low_mem_th_emission_nLTE = .true.
@@ -178,24 +145,15 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
         endif
 
         allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_nLTE_CDF'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nLTE_CDF')
         kdB_dT_1grain_nLTE_CDF=0.0
 
         allocate(log_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error log_E_em_1grain'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error log_E_em_1grain')
         log_E_em_1grain=0.0
 
         allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xT_ech_1grain'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error xT_ech_1grain')
         xT_ech_1grain = 2
      endif
 
@@ -203,60 +161,39 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      if (lnRE) then
         allocate(E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T),&
              log_E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error E_em_1grain'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error E_em_1grain')
         E_em_1grain_nRE=0.0
         log_E_em_1grain_nRE=0.0
 
         allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Temperature_1grain_nRE_old'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error Temperature_1grain_nRE_old')
         Temperature_1grain_nRE_old =0.0
 
         allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
              maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
              stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Tpeak'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error Tpeak')
         Tpeak_old=0
         maxP_old=0.
 
         allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error xT_ech_1grain_nRE'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error xT_ech_1grain_nRE')
         xT_ech_1grain_nRE = 2
 
         allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error kdB_dT_1grain_nRE_CDF'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nRE_CDF')
         kdB_dT_1grain_nRE_CDF=0.0
 
         if (lRE_nlTE) then
            allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-           if (alloc_status > 0) then
-              write(*,*) 'Allocation error Temperature_1grain_old'
-              stop
-           endif
+           if (alloc_status > 0) call error('Allocation error Temperature_1grain_old')
            Temperature_old=0.
         endif
      endif
 
      if (lnRE) then
         allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error Emissivite_nRE_old'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error Emissivite_nRE_old')
         Emissivite_nRE_old = 0.0
      endif
 
@@ -312,18 +249,12 @@ subroutine realloc_emitting_fractions()
   alloc_status = 0
   deallocate(frac_E_stars, frac_E_disk, E_totale)
   allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error frac_E_stars'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error frac_E_stars')
   frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(prob_E_cell)
   allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell 2'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error prob_E_cell 2')
   prob_E_cell = 0.0
 
   return
@@ -340,46 +271,30 @@ subroutine allocate_temperature(Nc)
   integer :: alloc_status
 
   allocate(Temperature(Nc), Temperature_old(Nc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error Temperature'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error Temperature')
   Temperature = 0.0 ; Temperature_old=0.0
-
 
   if (lRE_nLTE) then
      allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error Temperature_1grain'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error Temperature_1grain')
      Temperature_1grain = 0.0
   endif
 
   if (lnRE) then
      if ( (.not.ltemp).and.(lsed.or.lmono0.or.lProDiMo.or.lProDiMo2mcfost) ) then ! si ltemp --> tableau alloue ci-dessous
         allocate(tab_Temp(n_T), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_Temp'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error tab_Temp')
         tab_Temp = 0.0
      endif
 
      allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,Nc), &
           Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error Proba_Temperature'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error Proba_Temperature')
      Proba_Temperature=0.0
      Temperature_1grain_nRE=0.0
 
      allocate(l_RE(grain_nRE_start:grain_nRE_end,Nc), lchange_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error l_RE'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error l_RE')
      l_RE=.false. ; lchange_nRE = .false.
   endif
 
@@ -699,7 +614,7 @@ subroutine init_reemission(lheating,dudt)
               write(*,*) "grain", k, "C_abs_norm seems to be incorrect"
               write(*,*) C_abs_norm(k,:)
               write(*,*) "Exiting"
-              stop
+              call exit(1)
            endif
         enddo
 
@@ -725,9 +640,7 @@ subroutine init_reemission(lheating,dudt)
      do icell=1, n_cells
         do T=1,n_T-1
            if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T,icell)) then
-              write(*,*) "ERROR : Qrad_minus_dudt is not an increasing function of T"
-              write(*,*) "Exiting"
-              stop
+              call error("Qrad_minus_dudt is not an increasing function of T")
            endif
         enddo
      enddo
@@ -1143,17 +1056,11 @@ subroutine Temp_nRE(lconverged)
   if (lforce_PAH_equilibrium) write(*,*) "Forcing equilibrium " ;
 
   allocate(A(n_T,n_T,nb_proc), B(n_T,n_T,nb_proc), X(n_T,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error A'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error A')
   A=0.0 ; B=0.0 ;
 
   allocate(kJnu(n_lambda,nb_proc), lambda_Jlambda(n_lambda,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error A'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error kJnu')
   kJnu = 0.0 ;  lambda_Jlambda=0.0
 
   delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
@@ -1346,7 +1253,7 @@ subroutine Temp_nRE(lconverged)
                  write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(densite_pouss(l,icell)), &
                       real(Temperature_1grain_nRE(l,icell))
                  write(*,*) "Exiting"
-                 stop
+                 call exit(1)
               endif
 
               ! Forcing equilibrium or no equilibrium
@@ -1397,7 +1304,7 @@ subroutine Temp_nRE(lconverged)
                     X(T,id) =  sum(B(T,1:T-1,id)*X(1:T-1,id)) / max(A(T-1, T,id),tiny_dp)
                     if (A(T-1, T,id) < tiny_dp) then
                        write(*,*) l, T, id, "normalization error"
-                       stop
+                       call exit(1)
                     endif
 
                  enddo
@@ -1658,7 +1565,7 @@ subroutine update_proba_abs_nRE()
               write(*,*) "Having only grains out of equilibrium is not implemented yet."
               write(*,*) "Cell #", icell, " lambda #", lambda
               write(*,*) "Exiting"
-              stop
+              call exit(1)
            else
               correct = kappa_abs_RE_new / kappa_abs_RE_old ! > 1
               correct_m1 = 1.0_dp/correct ! < 1
@@ -1880,11 +1787,7 @@ subroutine repartition_energie(lambda)
   E_star = E_stars(lambda)
 
   allocate(E_cell(n_cells), E_cell_corrected(n_cells), stat = alloc_status)
-  if (alloc_status /= 0) then
-     write(*,*) "Allocation error in repartition_energie"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (alloc_status /= 0) call error("Allocation error in repartition_energie")
   E_cell(:) = 0.0_dp
   E_cell_corrected(:) = 0.0_dp
 
@@ -1984,7 +1887,7 @@ subroutine repartition_energie(lambda)
   if (E_star+E_disk(lambda)+E_ISM(lambda) < tiny_real) then
      write(*,*) "Error: wl #", lambda, " No energy"
      write(*,*) "Exiting"
-     stop
+     call exit(1)
   endif
 
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda)+E_ISM(lambda))
@@ -2206,10 +2109,7 @@ subroutine allocate_weight_proba_emission(Nc)
   integer ::  alloc_status
 
   allocate(weight_proba_emission(Nc), correct_E_emission(Nc), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error prob_E_cell 3'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error prob_E_cell 3')
   weight_proba_emission = 1.0 ;
   correct_E_emission = 1.0 ;
 

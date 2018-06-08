@@ -9,6 +9,7 @@ module read_params
   use ray_tracing
   use input
   use sha
+  use messages
 
   implicit none
 
@@ -31,11 +32,7 @@ contains
 
     ! Lecture du fichier de parametres
     open(unit=1, file=para, status='old', iostat=ios)
-    if (ios/=0) then
-       write(*,*) "ERROR : cannot open "//trim(para)
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (ios/=0) call error("cannot open "//trim(para))
 
     read(1,*) para_version
 
@@ -44,17 +41,13 @@ contains
 
     ! Petit test pour le ray-tracing
     if (lscatt_ray_tracing .and. (abs(para_version) < 2.0901)) then
-       write(*,*) "Parameter version >= 2.10 required for ray-tracing."
-       write(*,*) "Exiting."
-       stop
+       call error("Parameter version >= 2.10 required for ray-tracing.")
     endif
 
     ! Petit test pour cavite
     if (lcavity .and. (abs(para_version) < 3.0)) then
-       write(*,*) "Parameter version >= 3.0 required for option -lcavity."
-       write(*,*) "Use cavity section is parameter file for earlier version."
-       write(*,*) "Exiting."
-       stop
+       call error("Parameter version >= 3.0 required for option -lcavity.", &
+            msg2="Use cavity section is parameter file for earlier version.")
     endif
 
     correct_Rsub = 1.0_dp
@@ -127,9 +120,7 @@ contains
           return
        else
           close(unit=1)
-          write(*,*) "Unsupported version of the parameter file :", para_version
-          write(*,*) "Exiting."
-          stop
+          call error("Unsupported version of the parameter file")
        endif
     endif
 
@@ -261,10 +252,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -301,10 +289,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ----------------
     ! Grain properties
@@ -327,9 +312,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -339,7 +322,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -389,10 +372,7 @@ contains
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
@@ -495,17 +475,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -525,11 +499,7 @@ contains
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
        if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-          if (etoile(i)%r > Rmin) then
-             write(*,*) "ERROR : inner disk radius is smaller than stellar radius"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
        endif
 
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
@@ -696,10 +666,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -736,10 +703,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -770,9 +734,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -782,7 +744,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -823,10 +785,7 @@ contains
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     !dust_pop%is_PAH = .false.
     !dust_pop%is_opacity_file = .false.
     !dust_pop%is_Misselt_opacity_file = .false.
@@ -929,17 +888,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -959,11 +912,7 @@ contains
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
        if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-          if (etoile(i)%r > Rmin) then
-             write(*,*) "ERROR : inner disk radius is smaller than stellar radius"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
        endif
 
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
@@ -1124,10 +1073,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -1164,10 +1110,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -1198,9 +1141,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -1210,7 +1151,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -1235,10 +1176,7 @@ contains
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
     dust_pop%is_Misselt_opacity_file = .false.
@@ -1341,18 +1279,10 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
-    if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
-    endif
+    if (ios/=0) call error("you are using a 2-zone disk parameter file", &
+         msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -1529,10 +1459,7 @@ contains
 
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -1564,10 +1491,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -1598,9 +1522,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -1610,7 +1532,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -1633,19 +1555,11 @@ contains
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -1737,17 +1651,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -1920,10 +1828,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -1956,10 +1861,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -1990,9 +1892,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -2002,7 +1902,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -2025,19 +1925,11 @@ contains
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -2129,17 +2021,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2313,10 +2199,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -2350,10 +2233,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -2384,9 +2264,7 @@ contains
           endif
           if ((dust_pop_tmp(n_pop)%lcoating) .and. ((dust_pop_tmp(n_pop)%type=="DHS").or. &
                (dust_pop_tmp(n_pop)%type=="dhs")) ) then
-             write(*,*) "ERROR: cannot use DHS and coating for the same dust garins"
-             write(*,*) "Exiting"
-             stop
+             call error("cannot use DHS and coating for the same dust grains")
           endif
           V_somme = 0.0
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -2396,7 +2274,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -2419,19 +2297,11 @@ contains
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -2524,17 +2394,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -2705,10 +2569,7 @@ contains
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -2742,10 +2603,7 @@ contains
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (Rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -2782,7 +2640,7 @@ contains
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -2804,19 +2662,11 @@ contains
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -2908,17 +2758,11 @@ contains
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3080,10 +2924,7 @@ end subroutine read_para215
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -3114,11 +2955,7 @@ end subroutine read_para215
        if (j==1) then
           map_size=2*size_neb_tmp
        else
-          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-             write(*,*) "Error : different values for size_neb"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) call error("different values for size_neb")
        endif
     enddo ! n_zones
 
@@ -3128,10 +2965,7 @@ end subroutine read_para215
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -3168,7 +3002,7 @@ end subroutine read_para215
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -3190,19 +3024,11 @@ end subroutine read_para215
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -3294,17 +3120,11 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3465,10 +3285,7 @@ end subroutine read_para215
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -3493,11 +3310,7 @@ end subroutine read_para215
        if (j==1) then
           map_size=2*size_neb_tmp
        else
-          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-             write(*,*) "Error : different values for size_neb"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) call error("different values for size_neb")
        endif
     enddo ! n_zones
 
@@ -3508,10 +3321,7 @@ end subroutine read_para215
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -3548,7 +3358,7 @@ end subroutine read_para215
           if (V_somme < tiny_real) then
              write(*,*) "ERROR: population #", n_pop,  ": sum of volume fraction is 0"
              write(*,*) "Exiting"
-             stop
+             call exit(1)
           endif
           ! renormalisation des fraction en volume
           do k=1, dust_pop_tmp(n_pop)%n_components
@@ -3570,19 +3380,11 @@ end subroutine read_para215
        enddo
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -3674,17 +3476,11 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -3843,10 +3639,7 @@ end subroutine read_para215
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -3871,11 +3664,7 @@ end subroutine read_para215
        if (j==1) then
           map_size=2*size_neb_tmp
        else
-          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-             write(*,*) "Error : different values for size_neb"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) call error("different values for size_neb")
        endif
     enddo ! n_zones
 
@@ -3886,10 +3675,7 @@ end subroutine read_para215
     Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -3929,19 +3715,11 @@ end subroutine read_para215
 
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
     dust_pop%is_opacity_file = .false.
 
@@ -4033,17 +3811,11 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error('you are using a 2-zone disk parameter file', &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"
@@ -4210,10 +3982,7 @@ end subroutine read_para215
     endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error disk parameters'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error disk parameters')
     disk_zone%exp_beta=0.0; disk_zone%surf=0.0; disk_zone%sclht=0.0; disk_zone%diskmass=0.0; disk_zone%rref=0.0
     disk_zone%rin=0.0 ; disk_zone%rout=0.0 ; disk_zone%edge=0.0
 
@@ -4238,11 +4007,7 @@ end subroutine read_para215
        if (j==1) then
           map_size=2*size_neb_tmp
        else
-          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) then
-             write(*,*) "Error : different values for size_neb"
-             write(*,*) "Exiting"
-             stop
-          endif
+          if (abs(map_size-2*size_neb_tmp) > 1.e-6*map_size) call error("different values for size_neb")
        endif
     enddo ! n_zones
 
@@ -4252,10 +4017,7 @@ end subroutine read_para215
     rmax = maxval(disk_zone(:)%rout)
     diskmass = sum(disk_zone(:)%diskmass)
 
-    if (rmin < 0.0) then
-       write(*,*) "Error : r_min < 0.0"
-       stop
-    endif
+    if (rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -4301,19 +4063,11 @@ end subroutine read_para215
 
     enddo !n_zones
 
-    if (lRE_LTE.and.lRE_nLTE) then
-       write(*,*) "Error : cannot mix grains in LTE and nLTE"
-       write(*,*) " Is it usefull anyway ???"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (lRE_LTE.and.lRE_nLTE) call error("cannot mix grains in LTE and nLTE")
 
     ! variables triees
     allocate(dust_pop(n_pop), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_pop tmp'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_pop tmp')
     dust_pop%is_PAH = .false.
 
     ! Classement des populations de grains : LTE puis nLTE puis nRE
@@ -4404,17 +4158,11 @@ end subroutine read_para215
     read(1,*) line_buffer
     read(1,*,iostat=ios) n_etoiles
     if (ios/=0) then
-       write(*,*) 'Error reading file: you are using a 2-zone disk parameter file'
-       write(*,*) 'You must use the [-2zone] option to calculate a 2-zone disk'
-       !   write(*,*) ' '
-       write(*,*) 'Exiting'
-       stop
+       call error("you are using a 2-zone disk parameter file", &
+            msg2='You must use the [-2zone] option to calculate a 2-zone disk')
     endif
     allocate(etoile(n_etoiles), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error etoile'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error etoile')
 
     if (n_etoiles > 1) then
        write(*,*) "Multiple illuminating stars! Cancelling all image symmetries"

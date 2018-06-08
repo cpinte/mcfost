@@ -50,12 +50,6 @@ module grid
       enddo
    enddo
 
-   ! Verif
- !  do ipop=1,n_pop
- !     write(*,*) ipop,  dust_pop(ipop)%zone
- !  enddo
- !  stop
-
    return
 
  end subroutine order_zones
@@ -258,9 +252,7 @@ subroutine setup_grid()
         test_exit_grid => test_exit_grid_sph
         define_grid => define_cylindrical_grid ! same routine at the moment
      else
-        write(*,*) "Unknown grid type"
-        write(*,*) "Exiting"
-        stop
+        call error("Unknown grid type")
      endif
 
      if (lfirst) then
@@ -317,24 +309,15 @@ subroutine init_lambda()
   integer :: i, alloc_status
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_lambda'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_lambda')
   tab_lambda=0.0 ;  tab_lambda_inf=0.0 ; tab_lambda_sup=0.0 ; tab_delta_lambda=0.0
 
   allocate(tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_amu'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_amu')
   tab_amu1=0.0; tab_amu2=0.0;
 
   allocate(tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_amu_coating'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_amu_coating')
   tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
   if (lmono0) then

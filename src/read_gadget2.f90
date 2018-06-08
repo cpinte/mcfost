@@ -54,9 +54,7 @@ contains
     ierr = 0
     ndusttypes = 1 ! only gas for gadget
 
-    write(*,*) "ERROR: Gadget interface needs to be updated to read h"
-    write(*,*) "Exiting"
-    stop
+    call error("Gadget interface needs to be updated to read h")
 
     ! check dump file exists and open
     inquire(file = filename(1:len_trim(filename)), exist = exists)
@@ -73,7 +71,7 @@ contains
           write(*,*) '       Should be: ', testlen
           write(*,*) '        On block: ', blockid
           write(*,*) "Exiting"
-          stop
+          call exit(1)
        end if
        read(1) npart, massarr, time, redshift, flag_sfr, flag_feedback, nall, unused
        ! print selected header data
@@ -86,9 +84,7 @@ contains
        write(*,*) '             Time in orbits: ', time / (2. * pi)
        write(*,*) ''
     else
-       write(*,*) "File "//trim(filename)//" does not exist"
-       write(*,*) "Exiting"
-       stop
+       call error("File "//trim(filename)//" does not exist")
     end if
 
     n_SPH = npart(0)
@@ -202,15 +198,12 @@ contains
        write(*,*) '       Should be: ', testlen
        write(*,*) '        On block: ', blockid
        write(*,*) "Exiting"
-       stop
+       call exit(1)
     endif
 
     alloc_status = 0
     allocate(x(n_SPH),y(n_SPH),z(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error in phanton_2_mcfost"
-       write(*,*) "Exiting"
-    endif
+    if (alloc_status /=0) call error("Allocation error in gadget_2_mcfost")
 
     x(:) = pos(1,1:n_SPH) * ulength_au
     y(:) = pos(2,1:n_SPH) * ulength_au

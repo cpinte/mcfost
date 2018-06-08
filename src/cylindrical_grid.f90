@@ -7,6 +7,7 @@ module cylindrical_grid
        delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
   use prop_star, only : R_ISM, centre_ISM
+  use messages
 
   implicit none
 
@@ -48,7 +49,7 @@ contains
        write(*,*) "The number of cells is not matching :"
        write(*,*) "ntot=", ntot, "should be", n_cells
        write(*,*) "Exiting."
-       stop
+       call exit(1)
     endif
 
     istart2 = 0
@@ -76,11 +77,7 @@ contains
           do i=istart, iend
 
              icell = icell+1
-             if (icell > ntot) then
-                write(*,*) "ERROR : there is an issue in the cell mapping"
-                write(*,*) "Exiting"
-                stop
-             endif
+             if (icell > ntot) call error("There is an issue in the cell mapping")
 
              cell_map_i(icell) = i
              cell_map_j(icell) = j
@@ -92,11 +89,9 @@ contains
     enddo
 
     if (icell /= ntot) then
-       write(*,*) "Something went wrong in the call mapping"
-       write(*,*) "I am missing some real cells"
-       write(*,*) icell, ntot
-       write(*,*)
-       stop
+       call error("Something went wrong in the call mapping", &
+            msg2="I am missing some real cells")
+       ! write(*,*) icell, ntot
     endif
 
 
@@ -105,10 +100,7 @@ contains
     ! Can the packet exit from this cell : 0 -> no, 1 -> radially, 2 -> vertically
     ! Warning lexit_cells == 2 works only in cylindrical
     allocate(lexit_cell(1:ntot2), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error lexit_cell'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error lexit_cell')
     lexit_cell(:) = 0
 
     ! Cases j=0 and j=nz+1
@@ -117,11 +109,7 @@ contains
           do i=istart2, iend2
 
              icell = icell+1
-             if (icell > ntot2) then
-                write(*,*) "ERROR : there is an issue in the cell mapping"
-                write(*,*) "Exiting"
-                stop
-             endif
+             if (icell > ntot2) call error("there is an issue in the cell mapping")
 
              if (abs(j)==jend2) lexit_cell(icell) = 2
              if (i==iend2) lexit_cell(icell) = 1
@@ -147,7 +135,7 @@ contains
                 write(*,*) "Extra cells:", icell, ntot2
                 write(*,*) i,j,k
                 write(*,*) "Exiting"
-                stop
+                call exit(1)
              endif
 
              if (i==iend2) lexit_cell(icell) = 1
@@ -166,16 +154,8 @@ contains
        write(*,*) "I am missing some virtual cells"
        write(*,*) icell, ntot2
        write(*,*)
-       stop
+       call exit(1)
     endif
-
-    !if (cell_map(1,1,1) /= 1) then
-    !   write(*,*) "WARNING : mapping of cell (1,1,1) is not 1"
-    !   write(*,*) "(1,1,1) --->", cell_map(1,1,1)
-    !   write(*,*) "MCFOST might crash"
-    !   !write(*,*) "Exiting"
-    !   !stop
-    !endif
 
     return
 
@@ -221,48 +201,30 @@ subroutine define_cylindrical_grid()
   if (.not.allocated(r_grid)) then
      allocate(r_lim(0:n_rad), r_lim_2(0:n_rad), r_lim_3(0:n_rad), &
           delta_z(n_rad), dr2_grid(n_rad), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error r_lim'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error r_lim')
      r_lim = 0.0 ; r_lim_2=0.0; r_lim_3=0.0 ; delta_z=0.0 ; dr2_grid=0.0
 
      allocate(r_grid(n_cells), z_grid(n_cells), phi_grid(n_cells), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error r_lim'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error r_lim')
      r_grid=0.0; z_grid=0.0 ; phi_grid = 0.0
 
      allocate(tab_region(n_rad), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tab_region'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error tab_region')
      tab_region = 0
 
      allocate(z_lim(n_rad,nz+2), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error z_lim'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error z_lim')
      z_lim = 0.0
 
      allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tan_phi_lim'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error tan_phi_lim')
      w_lim = 0.0
      theta_lim=0.0
      tan_theta_lim = 0.0
      tan_phi_lim = 0.0
 
      allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error zmax, volume'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error zmax, volume')
      zmax = 0.0 ; volume=0.0
   endif
   ! end allocation
@@ -345,9 +307,8 @@ subroutine define_cylindrical_grid()
            !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
            !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
            if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
-              write(*,*) "Error : spatial grid resolution too high"
-              write(*,*) "Differences between two cells are below double precision"
-              stop
+              call error("spatial grid resolution too high", &
+                   msg2="Differences between two cells are below double precision")
            endif
            tab_r2(i) = tab_r(i) * tab_r(i)
            tab_r3(i) = tab_r2(i) * tab_r(i)
@@ -387,12 +348,7 @@ subroutine define_cylindrical_grid()
      r_lim(i)=tab_r(i+1)
      r_lim_2(i)= tab_r2(i+1)
      r_lim_3(i)= tab_r3(i+1)
-     if (r_lim(i) < r_lim(i-1)) then
-        write(*,*) "ERROR in gridding: this is likely to be a bug"
-        write(*,*) "i", i, r_lim(i), r_lim(i-1)
-        write(*,*) "Exiting"
-        stop
-     endif
+     if (r_lim(i) < r_lim(i-1)) call error("gridding: this is likely to be a bug")
   enddo !i
 
   if (lcylindrical) then
@@ -566,7 +522,7 @@ subroutine define_cylindrical_grid()
                 i, j, r_lim(i-1), r_lim(i) - r_lim(i-1), z_lim(i,j),  z_lim(i,j+1) -  z_lim(i,j)
         enddo
      enddo
-     stop
+     call exit(1)
   endif ! lSeb_Charnoz
 
   deallocate(r_grid_tmp,z_grid_tmp,phi_grid_tmp)
@@ -628,14 +584,14 @@ end subroutine define_cylindrical_grid
                    write(*,*) "PB test convert"
                    write(*,*) i,j,k, "-->", icell
                    write(*,*) icell, "-->", i2,j2,k2
-                   stop
+                   call exit(1)
                 endif
              else
                 if ((i/=i2)) then ! seul i est defini ds la cas 0
                    write(*,*) "PB test convert"
                    write(*,*) i,j,k, "-->", icell
                    write(*,*) icell, "-->", i2,j2,k2
-                   stop
+                   call exit(1)
                 endif
              endif
           enddo
@@ -643,7 +599,7 @@ end subroutine define_cylindrical_grid
     enddo
 
     write(*,*) "DONE"
-    stop
+    call exit(0)
     return
 
 
@@ -1101,11 +1057,7 @@ end subroutine define_cylindrical_grid
        ! On verifie que c'est OK maintenant
        call indice_cellule_cyl(x,y,z, icell)
        ri = cell_map_i(icell)
-       if (ri==0) then
-          write(*,*) "BUG in verif_cell_position_cyl"
-          write(*,*) "Exiting"
-          stop
-       endif
+       if (ri==0) call error("BUG in verif_cell_position_cyl")
     endif
 
     if (l_dark_zone(icell)) then ! Petit test de securite

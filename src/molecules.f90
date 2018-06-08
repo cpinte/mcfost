@@ -883,7 +883,6 @@ subroutine equilibre_LTE_mol()
 
   ! write(*,*) real( (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) / (4.*pi/3. * (rout * AU_to_cm)**3 ) )
   ! write(*,*) (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) * abundance * fAul(1) * hp * transfreq(1)
-  ! stop
 
   return
 
@@ -1198,8 +1197,7 @@ function v_proj(icell,x,y,z,u,v,w) !
               v_proj = 0.0_dp
            endif
         else
-           write(*,*) "Error : velocity field not defined"
-           stop
+           call error("velocity field not defined")
         endif
      endif ! ldensity_file
   endif

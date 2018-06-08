@@ -4,6 +4,7 @@ module radiation_field
   use constantes
   use ray_tracing, only : lscatt_ray_tracing1, lscatt_ray_tracing2, n_theta_I, n_phi_I, n_az_rt, I_spec, I_spec_star
   use opacity, only : kappa_abs_LTE
+  use messages
 
   implicit none
 
@@ -134,10 +135,7 @@ subroutine allocate_radiation_field_step1(Nc)
 
   if (lRE_LTE) then
      allocate(xKJ_abs(Nc,nb_proc), E0(Nc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xKJ_abs'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error xKJ_abs')
      xKJ_abs = 0.0 ; E0 = 0.0
   endif
 
@@ -145,10 +143,7 @@ subroutine allocate_radiation_field_step1(Nc)
   lxJ_abs_step1 = lRE_nLTE .or. lnRE .or. loutput_J_step1
   if (lxJ_abs_step1 .or. (lxJ_abs.and.lsed.and.lsed_complete)) then
      allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xJ_abs'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error xJ_abs')
      xJ_abs=0.0 ; J0 = 0.0
   endif
 
@@ -165,10 +160,7 @@ subroutine allocate_radiation_field_step2()
   lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
   if (lxJ_abs) then
      allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xJ_abs in realloc_step2'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error xJ_abs in realloc_step2')
      xJ_abs = 0.0 ; J0 = 0.0
   endif
 

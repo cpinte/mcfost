@@ -540,17 +540,11 @@ subroutine ecriture_map_ray_tracing()
 
   if (lcasa) then
      allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error RT image_casa'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error RT image_casa')
      image_casa = 0.0 ;
   else
      allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az, N_type_flux), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error RT image'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error RT image')
      image = 0.0 ;
   endif
 
@@ -758,10 +752,7 @@ subroutine write_tau_surface()
   real, dimension(:,:,:,:,:), allocatable :: image
 
   allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az, 3), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tau_surface image'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tau_surface image')
   image = 0.0 ;
 
   lambda=1
@@ -1110,8 +1101,7 @@ subroutine calc_optical_depth_map(lambda)
   end if
 
   write(*,*) "Done"
-  stop
-  return
+  call exit(0)
 
 end subroutine calc_optical_depth_map
 
@@ -1329,10 +1319,7 @@ subroutine write_disk_struct(lparticle_density)
 
   write(*,*) "Writing disk structure files in data_disk ..."
   allocate(dens(n_cells), vol(n_cells), dust_dens(n_cells,n_grains_tot), stat = alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error density tables for fits file'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error density tables for fits file')
 
   filename = trim(root_dir)//"/data_disk/gas_density.fits.gz"
 
@@ -1864,7 +1851,7 @@ subroutine write_disk_struct(lparticle_density)
 
   if (lstop_after_init) then
      write(*,*) "Exiting"
-     stop
+     call exit(0)
   endif
 
   write(*,*) "Done"
@@ -2355,11 +2342,7 @@ subroutine ecriture_temperature(iTemperature)
      endif
      allocate(tmp(grain_nRE_start:grain_nRE_end,n_cells), stat=alloc_status)
 
-     if (alloc_status /= 0) then
-        write(*,*) "Allocation error in ecriture_temperature"
-        write(*,*) "Exiting"
-        stop
-     endif
+     if (alloc_status /= 0) call error("Allocation error in ecriture_temperature")
 
       ! create new hdu
      call ftcrhd(unit, status)
@@ -2469,10 +2452,7 @@ subroutine ecriture_Tex(imol)
   real, dimension(:,:), allocatable :: Tex
 
   allocate(Tex(n_cells,nTrans_tot), stat = alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error Tex in ecriture_Tex'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error Tex in ecriture_Tex')
   Tex = 0.0
 
   k=1 ! Cette version n'est pas en 3D

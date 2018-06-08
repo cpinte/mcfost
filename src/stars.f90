@@ -6,6 +6,7 @@ module stars
   use constantes
   use ProDiMo
   use grid
+  use messages
 
   implicit none
 
@@ -26,10 +27,7 @@ subroutine allocate_stellar_spectra(n_wl)
 
   allocate(CDF_E_star(n_wl,0:n_etoiles), prob_E_star(n_wl,n_etoiles), E_stars(n_wl),  &
        E_disk(n_wl), E_ISM(n_wl), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error CDF_E_star'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error CDF_E_star')
   CDF_E_star = 0.0
   prob_E_star = 0.0
   E_stars = 0.0
@@ -37,10 +35,7 @@ subroutine allocate_stellar_spectra(n_wl)
   E_ISM = 0.0
 
   allocate(spectre_etoiles_cumul(0:n_wl),spectre_etoiles(n_wl), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error spectre_etoile'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error spectre_etoile')
   spectre_etoiles_cumul = 0.0
   spectre_etoiles = 0.0
 
@@ -288,9 +283,8 @@ subroutine repartition_energie_etoiles()
 
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
-        write(*,*) "Error : all stars must be black bodies or"
-        write(*,*) "all stars must not be black bodies : you cannot mix"
-        stop
+        call error("all stars must be black bodies or", &
+             msg2="all stars must not be black bodies : you cannot mix")
      endif
   enddo
 
@@ -333,9 +327,7 @@ subroutine repartition_energie_etoiles()
         filename=trim(etoile(i)%spectre)
         dir = in_dir(filename, star_dir,  status=ios)
         if (ios /=0) then
-           write(*,*) "ERROR: star file cannot be found:",trim(filename)
-           write(*,*) "Exiting"
-           stop
+           call error("star file cannot be found:",trim(filename))
         else
            filename = trim(dir)//trim(filename) ;
            write(*,*) "Reading "//trim(filename) ;
@@ -347,33 +339,20 @@ subroutine repartition_energie_etoiles()
 
         readwrite=0
         call ftopen(unit,filename,readwrite,blocksize,status)
-        if (status /= 0)then
-           write(*,*) 'ERROR opening fits file '//trim(filename)
-           write(*,*) "Exiting"
-           stop
-        end if
+        if (status /= 0) call error("cannot open fits file "//trim(filename))
 
         !  determine the size of the image
         call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         !  check that it found both NAXIS1 and NAXIS2 keywords
-        if (nfound /= 2)then
-           write(*,*) 'ERROR failed to read the NAXISn keywords in '//trim(filename)
-           stop
-        end if
+        if (nfound /= 2) call error("failed to read the NAXISn keywords in "//trim(filename))
 
-        if (naxes(2) /= 3) then
-           print *, "ERROR : "//trim(filename)//" does not have the right shape"
-           stop
-        endif
+        if (naxes(2) /= 3) call error(trim(filename)//" does not have the right shape")
 
         ! check all spectra have same dimensions
         if (i==1) then
            naxes1_ref = naxes(1)
         else
-           if (naxes1_ref /= naxes(1)) then
-              print *, "Error : all stellar spactra must have the same shape"
-              stop
-           endif
+           if (naxes1_ref /= naxes(1)) call error("all stellar spactra must have the same shape")
         endif
 
         !  initialize variables.
@@ -627,11 +606,7 @@ subroutine repartition_energie_ISM(ISM_model)
   eV_to_Hz = electron_charge/hp
   nu_p_MIR = c_light/100.e-6
 
-  if (R_ISM < tiny_dp) then
-     write(*,*) "Error : the ISM emitting sphere is nor defined"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (R_ISM < tiny_dp) call error("the ISM emitting sphere is nor defined")
 
   if (ISM_model==0) then
      E_ISM(:) = 0.
@@ -675,9 +650,7 @@ subroutine repartition_energie_ISM(ISM_model)
         E_ISM(lambda) = E
      enddo
   else
-     write(*,*) "Unknown ISM model"
-     write(*,*) "Exiting"
-     stop
+     call error("Unknown ISM model")
   endif
 
   ! Normalization for MCFOST

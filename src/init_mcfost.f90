@@ -81,6 +81,7 @@ subroutine set_default_variables()
   lvelocity_file=.false.
   lphantom_file=.false.
   lascii_SPH_file = .false.
+  ldiskevol_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -149,11 +150,7 @@ subroutine get_mcfost_utils_dir()
 
  ! Test if MCFOST_UTILS is defined
   call get_environment_variable('MCFOST_UTILS',mcfost_utils)
-  if (mcfost_utils == "") then
-     write(*,*) "ERROR: environnement variable MCFOST_UTILS is not defined."
-     write(*,*) "Exiting."
-     stop
-  endif
+  if (mcfost_utils == "") call error("environnement variable MCFOST_UTILS is not defined.")
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
 
   ! Directories to search (ordered)
@@ -248,11 +245,7 @@ subroutine initialisation_mcfost()
            write(*,*) "Restarting MCFOST ..."
            write(*,*) ""
            call appel_syst(cmd_opt,syst_status)
-           if (syst_status /=0) then
-              write(*,*) "ERROR : MCFOST did not manage to restart itself"
-              write(*,*) "Exiting"
-           endif
-           stop
+           if (syst_status /=0) call error("MCFOST did not manage to restart")
         endif ! lupdate
      endif
   endif
@@ -283,7 +276,7 @@ subroutine initialisation_mcfost()
      else if (para(2:4)=="url") then
         write(*,*) trim(webpage)//"linux/mcfost.tgz"
         write(*,*) trim(webpage)//"mac/mcfost.tgz"
-        stop
+        call exit(0)
      else  if (para(2:13)=="update_utils") then ! update utils
         call update_utils(.false.)
      else if (para(2:14)=="fupdate_utils") then ! force update utils
@@ -295,7 +288,7 @@ subroutine initialisation_mcfost()
      else
         call display_help()
      endif
-     stop
+     call exit(0)
   endif
 
   utils_version =  get_mcfost_utils_version()
@@ -304,7 +297,7 @@ subroutine initialisation_mcfost()
      write(*,*) "Utils:", utils_version, "required:",required_utils_version
      write(*,*) "Please update with mcfost -update_utils"
      write(*,*) "Exiting."
-     stop
+     call exit(1)
   endif
 
   ilen = index(para,'/',back=.true.) ! last position of the '/' character
@@ -345,66 +338,42 @@ subroutine initialisation_mcfost()
      select case(trim(s))
      case("-v")
         call mcfost_v()
-        stop
+        call exit(0)
      case("-seed")
         lseed=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : seed needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("seed needed")
         call get_command_argument(i_arg,str_seed)
         read(str_seed,*,iostat=ios) seed
-        if (ios/=0) then
-           write(*,*) "Error : seed needed"
-           stop
-        endif
+        if (ios/=0) call error("seed needed")
         write(*,*) "Updating seed =", seed
         seed_dir = "seed="//trim(str_seed)
         i_arg = i_arg+1
      case("-img")
         limg=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed for -img. Error #1"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("wavelength needed for -img. Error #1")
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
-        if (ios/=0) then
-           write(*,*) "Error : wavelength needed for -img. Error #2"
-           stop
-        endif
+        if (ios/=0) call error("wavelength needed for -img. Error #2")
         i_arg = i_arg+1
      case("-op")
         limg=.true.
         lopacite_only=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : wavelength needed for -op. Error #1"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("wavelength needed for -op. Error #1")
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
-        if (ios/=0) then
-           write(*,*) "Error : wavelength needed for -op. Error #2"
-           stop
-        endif
+        if (ios/=0) call error("wavelength needed for -op. Error #2")
         i_arg = i_arg+1
      case("-n-zone")
         ln_zone=.true.
         write(*,*) "n-zone disk calculation"
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : Number of zones needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("Number of zones needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) n_zones
-        if (ios/=0) then
-           write(*,*) "Error : Number of zones needed"
-           stop
-        endif
+        if (ios/=0) call error("Number of zones needed")
         i_arg = i_arg+1
      case("-origin")
         lorigine=.true.
@@ -412,45 +381,27 @@ subroutine initialisation_mcfost()
      case("-zoom")
         i_arg = i_arg+1
         lzoom = .true.
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : zoom needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("zoom needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) opt_zoom
-        if (ios/=0) then
-           write(*,*) "Error : zoom needed"
-           stop
-        endif
+        if (ios/=0) call error("zoom needed")
         i_arg = i_arg+1
      case("-pah")
         lpah=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : emmisivity needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("emmisivity needed")
         call get_command_argument(i_arg,model_pah)
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : grain type needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("grain type needed")
         call get_command_argument(i_arg,pah_grain)
         i_arg = i_arg+1
      case("-aggregate")
         laggregate=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : GMM input file needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,aggregate_file)
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : GMM output file needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,mueller_aggregate_file)
      case("-3D")
         l3D=.true.
@@ -462,86 +413,59 @@ subroutine initialisation_mcfost()
         endif
         lwarp=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : h_warp needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("h_warp needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) z_warp
         i_arg= i_arg+1
      case("-tilt")
         if (.not.l3D) then
-           write(*,*) "WARNING : forcing 3D mode"
+           call warning("forcing 3D mode")
            l3D=.true.
         endif
-        write(*,*) "WARNING : tilt will only be applied to 1st zone"
+        call warning("tilt will only be applied to 1st zone")
         ltilt=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : tilt angle needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("tilt angle needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) tilt_angle
         i_arg= i_arg+1
      case("-rs")
         lremove=.true.
         i_arg= i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : specie number needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("specie number needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) specie_removed
         i_arg= i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : Temperature needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("Temperature needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) T_rm
         i_arg= i_arg+1
      case("-resol")
         lresol=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : resolution needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("resolution needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) nx
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : resolution needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("resolution needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ny
         i_arg= i_arg+1
      case("-n_MC_bins")
         lMC_bins=.true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : MC bins needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("MC bins needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ntheta
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : MC bins needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("MC bins needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) nazimuth
         i_arg= i_arg+1
      case("-PA")
         lPA = .true.
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : PA needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("PA needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) PA
         i_arg= i_arg+1
@@ -567,37 +491,25 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
      case("-killing_level")
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : killing_level needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("killing_level needed")
         call get_command_argument(i_arg,s)
         read(s,*) n_dif_max_eq_th
         i_arg = i_arg+1
      case("-tau_dark_zone_eq_th")
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : tau_dark_zone needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("tau_dark_zone needed")
         call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_eq_th
         i_arg = i_arg+1
      case("-tau_dark_zone_obs")
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : tau_dark_zone needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("tau_dark_zone needed")
         call get_command_argument(i_arg,s)
         read(s,*) tau_dark_zone_obs
         i_arg = i_arg+1
      case("-root_dir")
         i_arg = i_arg+1
-        if (i_arg > nbr_arg) then
-           write(*,*) "Error : root_dir needed"
-           stop
-        endif
+        if (i_arg > nbr_arg) call error("root_dir needed")
         call get_command_argument(i_arg,s)
         root_dir=trim(root_dir)//"/"//s
         i_arg = i_arg+1
@@ -629,10 +541,7 @@ subroutine initialisation_mcfost()
         lemission_mol=.true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
-        if (i_arg + 3 > nbr_arg) then
-           write(*,*) "Error : rim parameters needed"
-           stop
-        endif
+        if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
         i_arg = i_arg+1
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_h
@@ -738,6 +647,15 @@ subroutine initialisation_mcfost()
         density_file = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-diskevol")
+        i_arg = i_arg + 1
+        ldiskevol_file = .true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-gadget","-gadget2")
         i_arg = i_arg + 1
         lgadget2_file=.true.
@@ -759,9 +677,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(s,*) SPH_keep_particles
         if ((SPH_keep_particles < 0) .or. (SPH_keep_particles > 1)) then
-           write(*,*) "keep particles value must between 0 and 1"
-           write(*,*) "Exiting"
-           stop
+           call error("keep_particles value must between 0 and 1")
         endif
      case("-sigma_file","-sigma")
         i_arg = i_arg + 1
@@ -920,9 +836,7 @@ subroutine initialisation_mcfost()
         lbenchmark_SHG=.true.
      case("-Mathis_field")
         if (.not.lbenchmark_SHG) then
-           write(*,*) "ERROR: Mathis field can only be used with the SHG benchmark"
-           write(*,*) "Exiting"
-           stop
+           call error("Mathis field can only be used with the SHG benchmark")
         endif
         i_arg = i_arg + 1
         lMathis_field=.true.
@@ -1057,22 +971,12 @@ subroutine initialisation_mcfost()
      call read_para(para)
   endif
 
-  if (lemission_mol.and.para_version < 2.11) then
-     write(*,*) "ERROR: parameter version must be larger than 2.10"
-     write(*,*) "line transfer"
-     write(*,*) "Exiting."
-     stop
-  endif
-
-  if (map_size < tiny_real) then
-     write(*,*) "ERROR: map size is set to 0"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
+  if (map_size < tiny_real) call error("map size is set to 0")
 
   if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
-     write(*,*) "WARNING: polarization is turned off in ray-traced SEDs"
-     write(*,*) "         it can be turned back on with -rt2"
+     call warning("polarization is turned off in ray-traced SEDs", &
+          msg2="it can be turned back on with -rt2")
      lsepar_pola = .false.
   endif
 
@@ -1106,14 +1010,7 @@ subroutine initialisation_mcfost()
         lvariable_dust=.false.
         scattering_method=2
      else
-        if (lvariable_dust) then
-           write(*,*) "Cannot use +dust_prop when settling is on"
-           write(*,*) "Please use -dust_prop instead"
-           write(*,*) "This will compute the dust properties of the complete"
-           write(*,*) "grain size distribution (1st zone)"
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (lvariable_dust) call error("Cannot use +dust_prop when settling is on, use -dust_prop instead")
      endif
 
      basename_data_dir = "data_dust"
@@ -1190,19 +1087,13 @@ subroutine initialisation_mcfost()
   n_lambda2 = n_lambda
   if ((.not.lmono0).and.(lsed).and.(.not.lsed_complete)) call lect_lambda()
 
-  if ((.not.lmono0).and.llimb_darkening) then
-     write(*,*) "Limb darkening only implementing in imaging mode"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if ((.not.lmono0).and.llimb_darkening) call error("Limb darkening only implementing in imaging mode")
 
   if ((ltemp.or.lsed.or.lsed_complete).and.(.not.lstop_after_init)) then
      write(*,*) "Thermal equilibrium calculation"
      if (lmono) then
-        write(*,*) "Error : thermal equilibrium cannot be calculated with only 1 wavelength!"
-        write(*,*) "      Set n_lambda to a value higher than 1 in parameter file"
-        write(*,*) 'Exiting'
-        stop
+        call error("thermal equilibrium cannot be calculated with only 1 wavelength!", &
+             msg2="Set n_lambda to a value higher than 1 in parameter file")
      endif
      if ((.not.lstop_after_init)) basename_data_dir = "data_th"
   endif
@@ -1216,14 +1107,14 @@ subroutine initialisation_mcfost()
   endif
 
   if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lstop_after_init)) then
-     write(*,*) "Error : Nothing to calculate!"
+     write(*,*) "ERROR: Nothing to calculate!"
      write(*,*) "You can: "
      write(*,*) "- use the [-img wavelength] option to calculate an image"
      write(*,*) "- set ltemp, lsed and/or lsed_complete to T"
      write(*,*) "  for thermal equilibrium calculations"
      write(*,*) "- use the [-dust_prop] option to compute global dust properties"
      write(*,*) 'Exiting'
-     stop
+     call exit(1)
   endif
 
   if (.not.limg) loutput_mc = .true.
@@ -1267,16 +1158,8 @@ subroutine initialisation_mcfost()
   endif
 
   if (lspot) then
-     if (lscatt_ray_tracing) then
-        write(*,*) "ERROR : stellar spots are not implemented in ray-tracing mode yet"
-        write(*,*) "Exiting"
-        stop
-     endif
-     if (etoile(1)%fUV > 0.) then
-        write(*,*) "ERROR : stellar spots are not implemented if the star has a fUV"
-        write(*,*) "Exiting"
-        stop
-     endif
+     if (lscatt_ray_tracing) call error("stellar spots are not implemented in ray-tracing mode yet")
+     if (etoile(1)%fUV > 0.) call error("stellar spots are not implemented if the star has a fUV")
      write(*,*) "Spot will be applied on star #1"
   endif
 
@@ -1296,7 +1179,7 @@ subroutine initialisation_mcfost()
   endif
 
   if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
-     write(*,*) "WARNING: PA different from zero: removing image symetry"
+     call warning("PA different from zero: removing image symetry")
      l_sym_ima=.false.
   endif
 
@@ -1498,7 +1381,7 @@ subroutine display_help()
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
 
-  stop
+  call exit(0)
 
 end subroutine display_help
 
@@ -1546,7 +1429,7 @@ subroutine display_disclaimer()
      else
         write(*,*) "* Exiting MCFOST                          *"
         write(*,*) "*******************************************"
-        stop
+        call exit(0)
      endif
   endif ! accept disclaimer
 
@@ -1647,13 +1530,12 @@ subroutine save_data(para)
 
         if (lmove_data) then
            if (lno_backup) then
-              write (*,*) 'Directory '//trim(local_data_dir)//' already exists : exiting!'
-              stop
+              call error('Directory '//trim(local_data_dir)//' already exists : exiting!')
+
            else
               write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
               if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
-                 write (*,*) 'Directory '//trim(local_data_dir)//'_old already exists : exiting!'
-                 stop
+                 call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
               endif
               cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
               call appel_syst(cmd,syst_status)

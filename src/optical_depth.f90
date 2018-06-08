@@ -961,11 +961,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   enddo
 
   if ((ldiff_approx).and.(n_rad > 1)) then
-     if (minval(ri_in_dark_zone(:))==1) then
-        write(*,*) "ERROR : first cell is in diffusion approximation zone"
-        write(*,*) "Increase spatial grid resolution"
-        stop
-     endif
+     if (minval(ri_in_dark_zone(:))==1) call error("first cell is in diffusion approximation zone", &
+          msg2="Increase spatial grid resolution")
   endif
 
 

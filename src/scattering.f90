@@ -51,16 +51,6 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
   complex (kind=dp), dimension(:), allocatable :: D
   integer :: alloc_status
 
-  ! Allocation dynamique sinon ca plante quand nmxx devient trop grand,
-  ! permet de passer le tableau de la zone stack a la zone data
-!  allocate(D(nmxx), stat=alloc_status)
-!  if (alloc_status > 0) then
-!     write(*,*) 'Allocation error BHMIE'
-!     stop
-!  endif
-!  D = 0
-
-
 
 !***********************************************************************
 ! Subroutine BHMIE is the Bohren-Huffman Mie scattering subroutine
@@ -137,13 +127,10 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 
   XSTOP=X+4.*X**0.3333+2.
   NMX=max(XSTOP,YMOD)+15
-! Allocation ici : on connait la taille du tableau
 
+  ! Allocation dynamique
   allocate(D(nmx), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error BHMIE'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error BHMIE')
   D = 0
 
 
@@ -154,12 +141,6 @@ subroutine bhmie(x,refrel,nang,s1,s2,qext,qsca,qback,gsca)
 ! computed number changed (out of 4*7001) and it only changed by 1/8387
 ! conclusion: we are indeed retaining enough terms in series!
   NSTOP=XSTOP
-
-! Inutile depuis que l'on est passé en allocation dynamique
-!  if(NMX > NMXX)then
-!     write(0,*)'Error: NMX =', NMX,' > NMXX=',NMXX,' for |m|x=',YMOD
-!     stop
-!  endif
 
 !*** Require NANG.GE.1 in order to calculate scattering intensities
   DANG=0.
@@ -311,11 +292,7 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
 
   refrel = cmplx(amu1,amu2)
 
-  if (modulo(nang_scatt,2)==1) then
-     write(*,*) "ERROR : nang_scatt must be an EVEN number"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (modulo(nang_scatt,2) == 1) call error("nang_scatt must be an EVEN number")
 
   ! Si fonction de HG, on ne calcule pas la fonction de phase
   if (aniso_method==2) then
@@ -422,23 +399,13 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
   character(len=128) :: string
 
 
-  write(*,*) "mueller_gmm ne marche pas plus !!!"
-  write(*,*) "Il faut coriger pour la nouvelle definition de nang_scatt"
-  write(*,*) "Il faut aussi corriger la normalisation de s11 (faire comme mueller_Mie)"
-  write(*,*) "int S11 sin(theta) dtheta = Qsca, utilise la normalisation excate, pas numerique"
-  stop
+  ! Il faut coriger pour la nouvelle definition de nang_scatt
+  ! Il faut aussi corriger la normalisation de s11 (faire comme mueller_Mie)
+  ! int S11 sin(theta) dtheta = Qsca, utilise la normalisation excate, pas numerique
+  call error("mueller_gmm needs to be updated")
 
-
-  if(n_grains_tot > 1) then
-     write(*,*) "You must choose n_grains_tot=1"
-     stop
-  endif
-
-  if (scattering_method/=1) then
-     write(*,*) "You must choose scattering_method 1"
-     stop
-  endif
-
+  if(n_grains_tot > 1) call error("You must choose n_grains_tot=1")
+  if (scattering_method /= 1) call error("You must choose scattering_method 1")
 
   ! Lecture du fichier de résultats de gmm01TrA : 'gmm01TrA.out'
   open(unit=12,file=mueller_aggregate_file,status='old')
@@ -510,22 +477,6 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
      prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j)/somme_prob
   enddo
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!$  open(unit=1,file='diffusion.dat')
-!!$
-!!$  write(*,*) 'g=',gsca
-!!$  somme1=0.0
-!!$  somme2=0.0
-!!$  do J=1,2*NANG
-!!$     hg=((1-gsca**2)/(2.0))*(1+gsca**2-2*gsca*cos((real(j)-0.5)/180.*pi))**(-1.5)
-!!$     somme1=somme1+s11(j)/somme_prob*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     somme2=somme2+hg*sin((real(j)-0.5)/180.*pi)*pi/(2*nang)
-!!$     write(1,*) (real(j)-0.5), s11(j)/somme_prob,hg , 0.5E0*CABS(S2(J))*CABS(S2(J)), 0.5E0*CABS(S1(J))*CABS(S1(J))
-!!$  enddo
-!!$  write(*,*) somme1, somme2
-!!$  close(unit=1)
-!!$!  stop
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   do J=1,2*NANG_scatt
 !     ! Normalisation pour diffusion isotrope et E_sca(theta)
@@ -656,14 +607,6 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
         fact4 = frac_a * (1.-frac_lambda)
         fact3 = frac_a * frac_lambda
      endif
-
-     ! PB : ca produit un soucis quand on extrapole
-   !  if ((frac_a > 1).or.(frac_a < 0).or.(frac_lambda > 1).or.(frac_lambda < 0)) then
-   !     write(*,*) "ERROR : mueller_opacity_file"
-   !     write(*,*) frac_a, frac_lambda
-   !     write(*,*) log(op_file_lambda(i-1,pop)), log_wavel, log(op_file_lambda(i,pop))
-   !     stop
-   !  endif
 
      qext = exp(log(op_file_Qext(i-1,j-1,pop)) * fact1 &
           + log(op_file_Qext(i,j-1,pop)) * fact2 &
@@ -1614,16 +1557,14 @@ real function rtsafe(funcd,x1,x2,xacc,ppp,A)
 
   call funcd(x1,fl,df,ppp,A)
   call funcd(x2,fh,df,ppp,A)
-  if ((fl > 0.0 .and. fh > 0.0) .or. (fl < 0.0 .and. fh < 0.0)) then
-     write(*,*) 'root must be bracketed in rtsafe'
-     stop
-  endif
+  if ((fl > 0.0 .and. fh > 0.0) .or. (fl < 0.0 .and. fh < 0.0)) call error('root must be bracketed in rtsafe')
+
   if (fl == 0.0) then
      rtsafe=x1
-     RETURN
+     return
   else if (fh == 0.0) then
      rtsafe=x2
-     RETURN
+     return
   else if (fl < 0.0) then
      xl=x1
      xh=x2
@@ -1641,15 +1582,15 @@ real function rtsafe(funcd,x1,x2,xacc,ppp,A)
         dxold=dx
         dx=0.5*(xh-xl)
         rtsafe=xl+dx
-        if (xl == rtsafe) RETURN
+        if (xl == rtsafe) return
      else
         dxold=dx
         dx=f/df
         temp=rtsafe
         rtsafe=rtsafe-dx
-        if (temp == rtsafe) RETURN
+        if (temp == rtsafe) return
      end if
-     if (abs(dx) < xacc) RETURN
+     if (abs(dx) < xacc) return
      call funcd(rtsafe,f,df,ppp,A)
      if (f < 0.0) then
         xl=rtsafe
@@ -1658,8 +1599,8 @@ real function rtsafe(funcd,x1,x2,xacc,ppp,A)
      end if
   end do
 
-  write(*,*) 'rtsafe: exceeded maximum iterations'
-  stop
+  call error('rtsafe: exceeded maximum iterations')
+
 end function rtsafe
 
 !**********************************************************************
@@ -1675,18 +1616,12 @@ subroutine radius_aggregate()
 
   open(unit=1,file=trim(aggregate_file), status='old')
   read(1,*) wavelength
-  if (abs(wavelength - tab_lambda(1)) < 1.0e-5) then
-     write(*,*) "Error : walength does correspond to wavelength of the Mueller matrix"
-     stop
-  endif
+  if (abs(wavelength - tab_lambda(1)) < 1.0e-5) call error("walength does correspond to wavelength of the Mueller matrix")
 
   read(1,*) n_grains_tot
-  allocate(x(n_grains_tot), y(n_grains_tot), z(n_grains_tot), r(n_grains_tot), eps1(n_grains_tot)&
-       , eps2(n_grains_tot),stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error in radius_aggregate'
-     stop
-  endif
+  allocate(x(n_grains_tot), y(n_grains_tot), z(n_grains_tot), r(n_grains_tot), eps1(n_grains_tot), &
+       eps2(n_grains_tot),stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error in radius_aggregate')
 
   do i=1, n_grains_tot
      read(1,*) x(i), y(i), z(i), r(i), eps1(i), eps2(i)
