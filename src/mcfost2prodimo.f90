@@ -1,6 +1,7 @@
 module mcfost2ProDiMo
 
   use constantes, only : pi
+  use messages
 
   implicit none
 
@@ -79,10 +80,7 @@ contains
     ! Open file
     readwrite=0
     call ftopen(unit,filename,readwrite,blocksize,status)
-    if (status /= 0) then ! le fichier temperature n'existe pas
-       write(*,*) "ERROR : ProDiMo.fits.gz file needed"
-       stop
-    endif
+    if (status /= 0) call error("ProDiMo.fits.gz file needed")
 
     group=1
     firstpix=1
@@ -95,15 +93,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 1 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 1.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2)) then
-       write(*,*) "Error : HDU 1 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 1 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -139,16 +131,10 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 2) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 2 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 2) call error('failed to read the NAXISn keywords of HDU 2.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-       write(*,*) "Error : HDU 2 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda
-       stop
+       write(*,*) naxes(1), "/=", n_lambda
+       call error("HDU 2 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)
 
@@ -162,19 +148,12 @@ contains
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
-
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 1) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 3 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 1) call error('failed to read the NAXISn keywords of HDU 3.')
     if (naxes(1) /= n_lambda) then
-       write(*,*) "Error : HDU 3 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda
-       stop
+       write(*,*) naxes(1), '/=', n_lambda
+       call error("HDU 3 does not have the right dimensions.")
     endif
     npixels=naxes(1)
 
@@ -187,19 +166,12 @@ contains
     !  move to next hdu
     call ftmrhd(unit,1,hdutype,status)
 
-
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 1) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 3 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 1) call error('failed to read the NAXISn keywords of HDU 4.')
     if (naxes(1) /= n_lambda) then
-       write(*,*) "Error : HDU 3 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda
-       stop
+       write(*,*) naxes(1), "/=", n_lambda
+       call error("HDU 4 does not have the right dimensions.")
     endif
     npixels=naxes(1)
 
@@ -215,16 +187,10 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 1) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 3 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 1) call error('failed to read the NAXISn keywords of HDU 5.')
     if (naxes(1) /= n_lambda) then
-       write(*,*) "Error : HDU 3 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda
-       stop
+       write(*,*) naxes(1), "/=", n_lambda
+       call error("HDU 5 does not have the right dimensions.")
     endif
     npixels=naxes(1)
 
@@ -239,15 +205,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 4 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 6.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_lambda)) then
-       write(*,*) "Error : HDU 4 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 6 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -262,15 +222,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 4 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 7.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_lambda)) then
-       write(*,*) "Error : HDU 4 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 7 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -285,15 +239,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 4 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 8.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_lambda)) then
-       write(*,*) "Error : HDU 4 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 8 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -308,15 +256,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 4 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 9.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= n_lambda)) then
-       write(*,*) "Error : HDU 4 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 9 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -331,15 +273,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 2) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 5 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 2) call error('failed to read the NAXISn keywords of HDU 10.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-       write(*,*) "Error : HDU 5 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
+       call error("HDU 10 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)
 
@@ -354,16 +290,9 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 4) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 6 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 4) call error('failed to read the NAXISn keywords of HDU 11.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2).or.(naxes(4) /= n_lambda)) then
-       write(*,*) "Error : HDU 6 does not have the"
-       write(*,*) "right dimensions. Exiting."
-  !     write(*,*) naxes(1:4)
-       stop
+       call error("HDU 11 does not have the right dimensions.")
     endif
     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
@@ -380,16 +309,10 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 7 file. Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keywords of HDU 12.')
     if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 4)) then
-       write(*,*) "Error : HDU 7 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
-    endif
+        call error("HDU 12 does not have the right dimensions.")
+     endif
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -403,12 +326,12 @@ contains
     !  Get the text string which describes the error
     if (status > 0) then
        call ftgerr(status,errtext)
-       print *,'FITSIO Error Status =',status,': ',errtext
+       write(*,*) 'FITSIO Error Status =',status,': ',errtext
 
        !  Read and print out all the error messages on the FITSIO stack
        call ftgmsg(errmessage)
        do while (errmessage .ne. ' ')
-          print *,errmessage
+          write(*,*) errmessage
           call ftgmsg(errmessage)
        end do
     endif
