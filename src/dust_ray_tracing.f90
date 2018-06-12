@@ -87,26 +87,17 @@ subroutine alloc_ray_tracing()
         allocate(stars_map(npix_x,npix_y,1), stat=alloc_status)
      endif
   endif
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error Stokes_ray_tracing'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error Stokes_ray_tracing')
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
   if (ltau1_surface) then
      allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error tau_surface'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error tau_surface')
      tau_surface = 0.0
   endif
 
   allocate(J_th(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error J_th'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error J_th')
   J_th = 0.0_dp
 
   if (lscatt_ray_tracing1) then
@@ -114,32 +105,20 @@ subroutine alloc_ray_tracing()
      if (mem_size > 0.5) write(*,*) "Trying to allocate", mem_size, "GB for ray-tracing"
 
      allocate(xI_scatt(n_az_rt,n_theta_rt,N_type_flux,RT_n_incl*RT_n_az,n_cells,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xI_scatt'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error xI_scatt')
      xI_scatt = 0.0_dp
 
      allocate(I_scatt(n_az_rt,n_theta_rt,N_type_flux), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error I_scatt'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error I_scatt')
      I_scatt = 0.0_dp
 
      allocate(eps_dust1(n_az_rt,n_theta_rt,N_type_flux,n_cells), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error eps_dust1'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error eps_dust1')
      eps_dust1 =0._dp
 
      allocate(itheta_rt1(RT_n_incl,RT_n_az,nb_proc), sin_scatt_rt1(RT_n_incl,RT_n_az,nb_proc), &
           sin_omega_rt1(RT_n_incl,RT_n_az,nb_proc), cos_omega_rt1(RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error itheta_rt1'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error itheta_rt1')
      itheta_rt1 = 1
      sin_scatt_rt1 = 0.0
      sin_omega_rt1 = 0.5
@@ -147,53 +126,35 @@ subroutine alloc_ray_tracing()
 
   else !rt 2
      allocate(I_spec_star(n_cells,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error I_spec_star'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error I_spec_star')
      I_spec_star = 0.0_dp
 
      allocate(eps_dust2(N_type_flux,nang_ray_tracing,0:1,n_cells), &
           I_sca2(N_type_flux,nang_ray_tracing,0:1,n_cells), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error eps_dust2'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error eps_dust2')
      eps_dust2 =0.0_dp ; I_sca2 = 0.0_dp ;
 
 
      allocate(eps_dust2_star(n_Stokes,nang_ray_tracing_star,0:1,n_cells), stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error eps_dust2_star'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error eps_dust2_star')
      eps_dust2_star =0.0_dp
 
 
      allocate(cos_thet_ray_tracing(nang_ray_tracing,0:1,nb_proc), omega_ray_tracing(nang_ray_tracing,0:1,nb_proc),&
           stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error cos_thet_ray_tracing'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error cos_thet_ray_tracing')
      cos_thet_ray_tracing = 0._dp
      omega_ray_tracing = 0._dp
 
      allocate(cos_thet_ray_tracing_star(nang_ray_tracing_star,0:1,nb_proc), &
           omega_ray_tracing_star(nang_ray_tracing_star,0:1,nb_proc),&
           stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error cos_thet_ray_tracing_star'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error cos_thet_ray_tracing_star')
      cos_thet_ray_tracing_star = 0._dp
      omega_ray_tracing_star = 0._dp
 
      allocate(I_spec(N_type_flux,n_theta_I,n_phi_I,n_cells,nb_proc),stat=alloc_status)
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error xI'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error xI')
      I_spec = 0.0_dp
   endif !lscatt_ray_tracing1
 
@@ -902,10 +863,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ! Allocation dynamique pour passer en stack
   ! Todo : we do not need to compute this for each ibin !!!
   allocate(Inu(N_type_flux,n_theta_I,n_phi_I,n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error I_nu'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error I_nu')
   Inu = 0.0_dp
 
   id = 1

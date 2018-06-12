@@ -81,7 +81,6 @@ subroutine set_default_variables()
   lvelocity_file=.false.
   lphantom_file=.false.
   lascii_SPH_file = .false.
-  ldiskevol_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -641,15 +640,6 @@ subroutine initialisation_mcfost()
      case("-ascii_SPH")
         i_arg = i_arg + 1
         lascii_SPH_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        density_file = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-diskevol")
-        i_arg = i_arg + 1
-        ldiskevol_file = .true.
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)

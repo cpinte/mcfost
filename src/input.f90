@@ -8,6 +8,7 @@ module input
   use disk
   use read_DustEM
   use utils, only : in_dir
+  use messages
 
   implicit none
 
@@ -78,11 +79,7 @@ subroutine get_opacity_file_dim(pop)
 
   if (.not.dp%is_DustEM_opacity_file) then
      dir = in_dir(filename, dust_dir,  status=ios)
-     if (ios /=0) then
-        write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-        write(*,*) "Exiting"
-        stop
-     endif
+     if (ios /=0) call error("dust file cannot be found:"//trim(filename))
      filename = trim(dir)//trim(filename) ;
 
      ! Updating indice filename with directory
@@ -116,10 +113,7 @@ subroutine alloc_mem_opacity_file()
   allocate(op_file_Qext(n_lambda,na,n_pop), op_file_Qsca(n_lambda,na,n_pop), &
        op_file_g(n_lambda,na,n_pop), op_file_log_r_grain(na,n_pop), &
        op_file_lambda(n_lambda,n_pop), op_file_delta_lambda(n_lambda,n_pop), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error opacity file'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error opacity file')
 
   if (lnRE) then
      do pop = 1, n_pop
@@ -131,10 +125,7 @@ subroutine alloc_mem_opacity_file()
 
      nT = maxval(file_sh_nT(:))
      allocate(file_sh_T(nT,n_pop), file_sh(nT,n_pop))
-     if (alloc_status > 0) then
-        write(*,*) 'Allocation error specific heat capacity file'
-        stop
-     endif
+     if (alloc_status > 0) call error('Allocation error specific heat capacity file')
   endif
 
   return
@@ -321,11 +312,7 @@ subroutine read_Misselt_specific_heat(pop)
   real :: fbuffer
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
-  if (ios/=0) then
-     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (ios/=0) call error("cannot open SH file "//trim(sh_file(pop)))
   write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
 
   ! On elimine les lignes avec des commentaires
@@ -363,11 +350,7 @@ subroutine get_Misselt_specific_heat_dim(pop)
   real :: fbuffer
 
   open(unit=1, file=sh_file(pop), status='old', iostat=ios)
-  if (ios/=0) then
-     write(*,*) "ERROR : cannot open SH file "//trim(sh_file(pop))
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (ios/=0) call error("cannot open SH file "//trim(sh_file(pop)))
   write(*,*) "Reading specific heat capacity: "//trim(sh_file(pop))
 
   ! On elimine les lignes avec des commentaires
@@ -407,9 +390,7 @@ subroutine read_molecules_names(imol)
   filename = trim(mol(imol)%filename)
   dir = in_dir(filename, mol_dir,  status=ios)
   if (ios /=0) then
-     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
-     write(*,*) "Exiting"
-     stop
+     call error("molecule file cannot be found: "//trim(filename))
   else
      filename = trim(dir)//trim(filename) ;
      write(*,*) "Reading "//trim(filename) ;
@@ -445,9 +426,7 @@ subroutine readmolecule(imol)
   filename = trim(mol(imol)%filename)
   dir = in_dir(filename, mol_dir,  status=ios)
   if (ios /=0) then
-     write(*,*) "ERROR: molecule file cannot be found:",trim(filename)
-     write(*,*) "Exiting"
-     stop
+     call error("molecule file cannot be found: "//trim(filename))
   else
      filename = trim(dir)//trim(filename) ;
      write(*,*) "Reading "//trim(filename) ;
@@ -567,10 +546,7 @@ subroutine lect_Temperature()
 
      readwrite=0
      call ftopen(unit,Tfile,readwrite,blocksize,status)
-     if (status /= 0) then ! le fichier temperature n'existe pas
-        write(*,*) "ERROR : temperature file needed"
-        stop
-     endif
+     if (status /= 0) call error("temperature file needed")
 
      group=1
      firstpix=1
@@ -579,57 +555,45 @@ subroutine lect_Temperature()
      !  determine the size of temperature file
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (lVoronoi) then
-         if (nfound /= 1) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
+        if (nfound /= 1) then
            write(*,*) "# fits file,   required"
            write(*,*) nfound, 1
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(Tfile))
         endif
         if ((naxes(1) /= n_cells)) then
-           write(*,*) "Error : Temperature.fits.gz does not have the"
-           write(*,*) "right dimensions. Exiting."
            write(*,*) "# fits file,   required"
            write(*,*) naxes(1), n_cells
-           stop
+           call error("Temperature.fits.gz does not have the right dimensions.")
         endif
         npixels=naxes(1)
      else
         if (l3D) then
            if (nfound /= 3) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
               write(*,*) "# fits file,   required"
               write(*,*) nfound, 3
-              stop
+              call error('failed to read the NAXISn keywords of '//trim(Tfile))
            endif
            if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
-              write(*,*) "Error : Temperature.fits.gz does not have the"
-              write(*,*) "right dimensions. Exiting."
               write(*,*) "# fits file,   required"
               write(*,*) naxes(1), n_rad
               write(*,*) naxes(2), 2*nz
               write(*,*) naxes(3), n_az
-              stop
+              call error("Temperature.fits.gz does not have the right dimensions.")
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)
         else
            if (nfound /= 2) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of '//trim(Tfile)//' file. Exiting.'
               write(*,*) "# fits file,   required"
               write(*,*) nfound, 2
-              stop
+              call error('failed to read the NAXISn keywords of '//trim(Tfile))
            endif
 
            if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-              write(*,*) "Error : Temperature.fits.gz does not have the"
-              write(*,*) "right dimensions. Exiting."
-              stop
+              call error("Temperature.fits.gz does not have the right dimensions.")
            endif
            npixels=naxes(1)*naxes(2)
-        endif
-     endif
+        endif ! l3D
+     endif ! lVoronoi
 
      nbuffer=npixels
      ! read_image
@@ -649,10 +613,7 @@ subroutine lect_Temperature()
 
      readwrite=0
      call ftopen(unit,Tfile_nLTE,readwrite,blocksize,status)
-     if (status /= 0) then ! le fichier temperature n'existe pas
-        write(*,*) "ERROR : temperature file needed"
-        stop
-     endif
+     if (status /= 0) call error("temperature file needed")
 
      group=1
      firstpix=1
@@ -662,27 +623,21 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (lVoronoi) then
         if (nfound /= 2) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
            write(*,*) "Found", nfound, "axes", naxes
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE))
         endif
         npixels=naxes(1)*naxes(2)
      else
         if (l3D) then
            if (nfound /= 4) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
               write(*,*) "Found", nfound, "axes", naxes
-              stop
+              call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
            if (nfound /= 3) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
               write(*,*) "Found", nfound, "axes", naxes
-              stop
+              call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
@@ -709,10 +664,7 @@ subroutine lect_Temperature()
 
      readwrite=0
      call ftopen(unit,Tfile_nRE,readwrite,blocksize,status)
-     if (status /= 0) then ! le fichier temperature n'existe pas
-        write(*,*) "ERROR : temperature file needed"
-        stop
-     endif
+     if (status /= 0) call error("ERROR : temperature file needed")
 
      group=1
      firstpix=1
@@ -722,23 +674,19 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (lVoronoi) then
         if (nfound /= 2) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
            write(*,*) "Found", nfound, "axes", naxes
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
         endif
         npixels=naxes(1)*naxes(2)
      else
         if (l3D) then
            if (nfound /= 4) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 1.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
            if (nfound /= 3) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 1. Exiting.'
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 1.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
@@ -752,25 +700,19 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (lVoronoi) then
         if (nfound /= 2) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
            write(*,*) "Found", nfound, "axes", naxes
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
         endif
         npixels=naxes(1)*naxes(2)
      else
         if (l3D) then
            if (nfound /= 4) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
-              stop
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 2.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
            if (nfound /= 3) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 2. Exiting.'
-              stop
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 2.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)
         endif
@@ -785,25 +727,19 @@ subroutine lect_Temperature()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (lVoronoi) then
         if (nfound /= 3) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(Tfile_nLTE)//' file. Exiting.'
            write(*,*) "Found", nfound, "axes", naxes
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(Tfile_nLTE)//' file.')
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
      else
         if (l3D) then
            if (nfound /= 5) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
-              stop
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 4.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
         else
            if (nfound /= 4) then
-              write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-              write(*,*) 'of Temperature_nRE.fits.gz file HDU 4. Exiting.'
-              stop
+              call error('failed to read the NAXISn keywords of Temperature_nRE.fits.gz file HDU 4.')
            endif
            npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         endif
@@ -844,10 +780,7 @@ subroutine read_abundance(imol)
 
   readwrite=0
   call ftopen(unit,abundance_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier temperature n'existe pas
-     write(*,*) "ERROR : abundance file needed"
-     stop
-  endif
+  if (status /= 0)call error("abundance file needed")
 
   group=1
   firstpix=1
@@ -858,51 +791,39 @@ subroutine read_abundance(imol)
 
   if (lVoronoi) then
      if (nfound /= 1) then
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
         write(*,*) "# fits file,   required"
         write(*,*) nfound, 1
-        stop
+        call error('failed to read the NAXISn keywords of '//trim(abundance_file)//' file.')
      endif
      if ((naxes(1) /= n_cells)) then
-        write(*,*) "Error : "//trim(abundance_file)//" does not have the"
-        write(*,*) "right dimensions. Exiting."
         write(*,*) "# fits file,   required"
         write(*,*) naxes(1), n_cells
-        stop
+        call error(trim(abundance_file)//" does not have the right dimensions.")
      endif
      npixels=naxes(1)
   else
      if (l3D) then
         if (nfound /= 3) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
            write(*,*) "# fits file,   required"
            write(*,*) nfound, 3
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(abundance_file)//' file.')
         endif
         if ((naxes(1) /= n_rad).or.(naxes(2) /= 2*nz).or.(naxes(3) /= n_az)) then
-           write(*,*) "Error : "//trim(abundance_file)//" does not have the"
-           write(*,*) "right dimensions. Exiting."
            write(*,*) "# fits file,   required"
            write(*,*) naxes(1), n_rad
            write(*,*) naxes(2), 2*nz
            write(*,*) naxes(3), n_az
-           stop
+           call error(trim(abundance_file)//" does not have the right dimensions.")
         endif
         npixels=naxes(1)*naxes(2)*naxes(3)
      else
         if (nfound /= 2) then
-           write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-           write(*,*) 'of '//trim(abundance_file)//' file. Exiting.'
            write(*,*) "# fits file,   required"
            write(*,*) nfound, 2
-           stop
+           call error('failed to read the NAXISn keywords of '//trim(abundance_file)//' file.')
         endif
         if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-           write(*,*) "Error : "//trim(abundance_file)//" does not have the"
-           write(*,*) "right dimensions. Exiting."
-           stop
+           call error(trim(abundance_file)//" does not have the right dimensions.")
         endif
         npixels=naxes(1)*naxes(2)
      endif
@@ -936,9 +857,7 @@ subroutine lect_lambda()
 
   dir = in_dir(lambda_filename, lambda_dir,  status=ios)
   if (ios /=0) then
-     write(*,*) "ERROR: lambda file cannot be found:",trim(lambda_filename)
-     write(*,*) "Exiting"
-     stop
+     call error("lambda file cannot be found: "//trim(lambda_filename))
   else
      lambda_filename = trim(dir)//trim(lambda_filename) ;
      write(*,*) "Reading "//trim(lambda_filename) ;
@@ -946,15 +865,13 @@ subroutine lect_lambda()
 
   open(unit=1,file=lambda_filename,status="old",iostat=status)
   if (status /= 0) then
-     write(*,*) "WARNING: '"//trim(lambda_filename)//"' does not exit."
-     write(*,*) "Looking into working directory ..."
+     call warning(trim(lambda_filename)//"' does not exit.", &
+          msg2="Looking into working directory ...")
 
      lambda_filename = trim(tab_wavelength)
      open(unit=1,file=lambda_filename,status="old",iostat=status)
      if (status /= 0) then
-        write(*,*) "ERROR: '"//trim(lambda_filename)//"' does not exit."
-        write(*,*) "Exiting"
-        stop
+        call error(trim(lambda_filename)//" does not exit.")
      else
         write(*,*) "Using local file: "//trim(lambda_filename)
      endif
@@ -988,10 +905,7 @@ subroutine lect_lambda()
   ! Allocations des tab
   allocate(tab_lambda2(n_lambda2), tab_lambda2_inf(n_lambda2),tab_lambda2_sup(n_lambda2), &
        tab_delta_lambda2(n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_lambda2'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error tab_lambda2')
 
   ! Lecture proprement dite
   do lambda=1, n_lambda2
@@ -1004,7 +918,7 @@ subroutine lect_lambda()
 
   if (lProDiMo) then
      if (abs(tab_lambda2(1) - 0.0912) > 1e-6) then
-        write(*,*) "WARNING: matching step2 wavelength bins to ProDiMo set-up"
+        call warning("matching step2 wavelength bins to ProDiMo set-up")
         tab_lambda2_inf(1) = 0.0912
         tab_lambda2_sup(1) = tab_lambda2(1) * tab_lambda2(1)/tab_lambda2_inf(1)
         tab_delta_lambda2(1) = tab_lambda2_sup(1) - tab_lambda2_inf(1)
@@ -1020,7 +934,7 @@ subroutine lect_lambda()
               write(*,*) "Exiting"
               write(*,*) lambda, "wl=", tab_lambda2(lambda), "delta=", tab_delta_lambda2(lambda)
               write(*,*) "            min, max =", tab_lambda2_inf(lambda), tab_lambda2_sup(lambda)
-              stop
+              call exit(1)
            endif
         enddo
      endif ! test tab_lambda2 == 0.0912
@@ -1084,24 +998,14 @@ subroutine read_limb_darkening_file(lambda)
   else if (buffer4 == "Rmax") then
      lb_n_wl = 10 ; lb_n_mu = 99
   else
-     write(*,*) "Unknown limb darkening file format"
-     write(*,*) "Exiting"
-     stop
+     call error("Unknown limb darkening file format")
   endif
 
   allocate(limb_darkening(lb_n_mu), pola_limb_darkening(lb_n_mu), mu_limb_darkening(lb_n_mu), stat=alloc_status)
-  if (alloc_status /= 0) then
-     write(*,*) "Allocation error in limb_darkening"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (alloc_status /= 0) call error("Allocation error in limb_darkening")
 
   allocate(Imu(lb_n_mu, lb_n_wl), Q_o_Imu(lb_n_mu, lb_n_wl), lb_wavelength(lb_n_wl), tmp(lb_n_mu), stat=alloc_status)
-  if (alloc_status /= 0) then
-     write(*,*) "Allocation error in limb_darkening (local variables)"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (alloc_status /= 0) call error("Allocation error in limb_darkening (local variables)")
 
   if (buffer4 == "Teff") then
      ! line 2 : reading 20 wavelengths & converting to mum
@@ -1112,7 +1016,7 @@ subroutine read_limb_darkening_file(lambda)
         write(*,*) "ERROR : wavelength is outside limb darkening wavelength range"
         write(*,*) "valod values are between", lb_wavelength(lb_n_wl), "and", lb_wavelength(1), "mum"
         write(*,*) "Exiting"
-        stop
+        call exit(1)
      endif
 
      ! line 3 : sKipping Flux line
@@ -1203,10 +1107,7 @@ subroutine read_phase_function(phase_function_file)
 
   readwrite=0
   call ftopen(unit,phase_function_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier n'existe pas
-     write(*,*) "ERROR : phase function file needed"
-     stop
-  endif
+  if (status /= 0) call error("phase function file needed")
 
   group=1
   firstpix=1
@@ -1215,20 +1116,16 @@ subroutine read_phase_function(phase_function_file)
   !  determine the size of temperature file
   call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
   if ((naxes(1) /= nang_scatt+1)) then
-     write(*,*) "Error : phase function file does not have the"
-     write(*,*) "right dimensions. Exiting."
      write(*,*) "AXIS #1"
      write(*,*) "# fits file,   required"
      write(*,*) naxes(1), nang_scatt+1
-     stop
+     call error("phase function file does not have the right dimensions.")
   endif
   if ((naxes(2) /= 2)) then
-     write(*,*) "Error : phase function file does not have the"
-     write(*,*) "right dimensions. Exiting."
      write(*,*) "AXIS #2"
      write(*,*) "# fits file,   required"
      write(*,*) naxes(1), nang_scatt+1
-     stop
+     call error("phase function file does not have the right dimensions.")
   endif
   npixels=naxes(1)*naxes(2)
 
@@ -1246,7 +1143,7 @@ subroutine read_phase_function(phase_function_file)
         write(*,*) "ERROR: phase function file"
         write(*,*) "Angle #", i, "should be equal to", i
         write(*,*) "Exiting"
-        stop
+        call exit(1)
      endif
   enddo
   s11_file(:) = PF(:,2)
