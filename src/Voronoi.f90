@@ -8,6 +8,7 @@ module Voronoi_grid
   use disk, only : density_file, Rmax
   use prop_star
   use kdtree2_module
+  use messages
 
   implicit none
 
@@ -105,11 +106,7 @@ module Voronoi_grid
     n_cells = iVoronoi
 
     allocate(Voronoi(n_cells), volume(n_cells), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error Voronoi structure"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (alloc_status /=0) call error("Allocation error Voronoi structure")
     Voronoi(:)%exist = .false. ! cells are not defined yet
     volume(:) = 0.0
 
@@ -191,7 +188,7 @@ module Voronoi_grid
           write(*,*) "icell=", icell,Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
           write(*,*) "icell-1=", icell-1,Voronoi(icell-1)%first_neighbour, Voronoi(icell-1)%last_neighbour
           write(*,*) "Exiting"
-          stop
+          call exit(1)
        endif
        n_neighbours_tot = n_neighbours_tot + n_neighbours
     enddo
@@ -221,7 +218,7 @@ module Voronoi_grid
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
                 write(*,*) wall(j)%n_neighbours, max_wall_neighbours
                 write(*,*) "Exiting"
-                stop
+                call exit(1)
              endif
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
@@ -279,11 +276,7 @@ module Voronoi_grid
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles),stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error Voronoi temp arrays"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
     do istar=1, n_etoiles
        deuxr2_star(istar) = (2*etoile(istar)%r)**2
@@ -351,11 +344,7 @@ module Voronoi_grid
     n_cells = icell
 
     allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error Voronoi structure"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (alloc_status /=0) call error("Allocation error Voronoi structure")
     volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ;
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
@@ -409,7 +398,7 @@ module Voronoi_grid
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
-          stop
+          call exit(1)
        endif
        !$omp end parallel
 
@@ -466,7 +455,7 @@ module Voronoi_grid
                 write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
                 write(*,*) wall(j)%n_neighbours, max_wall_neighbours
                 write(*,*) "Exiting"
-                stop
+                call exit(1)
              endif
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
@@ -493,12 +482,7 @@ module Voronoi_grid
     endif
     write(*,*) "Found", n_in, "cells"
 
-    if (n_in /= n_cells) then
-       write(*,*) "*******************************************"
-       write(*,*) "ERROR : some particles are not in the mesh"
-       write(*,*) "*******************************************"
-       stop
-    endif
+    if (n_in /= n_cells) call error("some particles are not in the mesh")
 
     write(*,*) "Neighbours list size =", n_neighbours_tot
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
@@ -625,7 +609,7 @@ module Voronoi_grid
        write(*,*) "wall#", iwall, wall(iwall)%n_neighbours
     enddo
 
-    stop
+    call exit(0)
     return
 
   end subroutine test_walls
@@ -756,18 +740,10 @@ module Voronoi_grid
     real(kind=dp), dimension(n_walls), intent(in) :: limits
     integer :: iwall, alloc_status
 
-    if (n_walls /= 6) then
-       write(*,*) "ERROR: n_walls must be 6 in Voronoi grid"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (n_walls /= 6) call error("n_walls must be 6 in Voronoi grid")
 
     allocate(wall(n_walls),stat=alloc_status)
-    if (alloc_status /= 0) then
-       write(*,*) "Allocation error Voronoi wall"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (alloc_status /= 0) call error("Allocation error Voronoi wall")
 
     ! initialise plane walls
     do iwall=1, n_walls
@@ -1134,11 +1110,7 @@ subroutine build_wall_kdtrees()
   call allocate_kdtree2_search(nb_proc)
 
   allocate(wall_cells(3,maxval(wall(:)%n_neighbours),n_walls), stat=alloc_status)
-  if (alloc_status /=0) then
-     write(*,*) "Allocation error wall kdtrees"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (alloc_status /=0) call error("Allocation error wall kdtrees")
   wall_cells = 0.
 
   do iwall=1, n_walls

@@ -155,10 +155,7 @@ subroutine transfert_poussiere()
         lmethod_aniso1=.true.
      else
         lmethod_aniso1=.false.
-        if (laggregate) then
-           write(*,*) "Error : you must use scattering method 1 when grains are aggregates"
-           stop
-        endif
+        if (laggregate) call error("you must use scattering method 1 when grains are aggregates")
      endif
      call repartition_energie_etoiles()
 
@@ -187,7 +184,7 @@ subroutine transfert_poussiere()
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
      if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
 
-     if (lopacite_only) stop
+     if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque émet
         if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
@@ -1368,11 +1365,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
      Q_1star = 0.0 ; U_1star = 0.0
   endif
 
-  if (alloc_status/=0) then
-     write(*,*) "Alloctaion error in compute_stars_map"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if (alloc_status/=0) call error("Allocation error in compute_stars_map")
 
   x_center = npix_x/2 + 1
   y_center = npix_y/2 + 1

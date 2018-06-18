@@ -333,11 +333,7 @@ subroutine Temp_approx_diffusion_vertical()
         ! Calcul coeff de diffusion : condition limite
         call setDiffusion_coeff0(i)
 
-        if (stabilite < 0.01) then
-           write(*,*) "Error : diffusion approximation does not seem to converge"
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (stabilite < 0.01) call error("diffusion approximation does not seem to converge")
 
         ! Iterations
         n_iter = 0

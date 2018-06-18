@@ -4,6 +4,7 @@ module coated_sphere
   use constantes
   use grains
   use utils, only : gauleg
+  use messages
 
   implicit none
 
@@ -48,11 +49,7 @@ contains
     refrel = conjg(refrel)  ! to match convetion in dmilay (negative img part)
     refrel_coat = conjg(refrel_coat)  ! to match convention in dmilay (negative img part)
 
-    if (modulo(nang_scatt,2)==1) then
-       write(*,*) "ERROR : nang_scatt must be an EVEN number"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
     ! Si fonction de HG, on ne calcule pas la fonction de phase
     if (aniso_method==2) then
@@ -165,11 +162,7 @@ contains
     refrel_coat = cmplx(amu1,amu2)
     refrel_coat = conjg(refrel_coat)  ! to match convention in dmilay (negative img part)
 
-    if (modulo(nang_scatt,2)==1) then
-       write(*,*) "ERROR : nang_scatt must be an EVEN number"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (modulo(nang_scatt,2)==1) call error("nang_scatt must be an EVEN number")
 
     ! Si fonction de HG, on ne calcule pas la fonction de phase
     if (aniso_method==2) then
@@ -624,10 +617,7 @@ contains
     ! Dynamical allocation
     ll = nmx1 + 1
     allocate(acap(ll), W(3,ll), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error in Dmilay'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error in Dmilay')
     acap = czero ; W = czero ;
 
     ! Nothing changed below this line (except skipping computation of M1, M2, S21 and D21)
@@ -928,7 +918,7 @@ contains
 
     if (fatal) then
        write(*, '(//,2A,//)') ' ****** ERROR *****  ', MESSAG
-       stop
+       call exit(1)
     endif
 
     NUMMSG = NUMMSG + 1

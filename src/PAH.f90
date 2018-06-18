@@ -97,11 +97,8 @@ function PAH_specific_heat(T,taille_grain)
   endif
 
   if (NC > limite_stack) then
-     write(*,*) "Error : PAH grain size is too large"
-     write(*,*) "Reaching stack limit"
-     write(*,*) "Cannot compute the mode spectra"
-     write(*,*) "Exiting"
-     stop
+     call error("PAH grain size is too large, reaching stack limit", &
+          msg2="Cannot compute the mode spectra")
   endif
 
   !compute mode spectra
@@ -156,11 +153,8 @@ function PAH_specific_heat(T,taille_grain)
   N_tot = N_CCop +  N_CCip + N_H
 
   if (N_tot > limite_stack) then
-     write(*,*) "Error : PAH grain size is too large"
-     write(*,*) "Reaching stack limit"
-     write(*,*) "Cannot combine the mode spectra"
-     write(*,*) "Exiting"
-     stop
+     call error("PAH grain size is too large, reaching stack limit", &
+          msg2="Cannot compute the mode spectra")
   endif
 
   allocate(hbarw(N_tot),g(N_tot),s(N_tot), x(N_tot))
@@ -219,7 +213,7 @@ subroutine test_PAH_specific_heat()
 
   C = PAH_specific_heat(T,1)
 
-  stop
+  call exit(0)
 
 end subroutine test_PAH_specific_heat
 

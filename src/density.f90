@@ -10,6 +10,7 @@ module density
   use disk
   use grid
   use utils
+  use messages
 
   implicit none
 
@@ -117,11 +118,7 @@ subroutine define_gas_density()
                  if (dz%geometry == 1) then ! power-law
                     fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta)
                  else  if (dz%geometry == 2) then ! tappered-edge : dz%surf correspond a -gamma
-                    if (dz%rc < tiny_dp) then
-                       write(*,*) "ERROR : tappered-edge structure with Rc = 0."
-                       write(*,*) "Exiting"
-                       stop
-                    endif
+                    if (dz%rc < tiny_dp) call error("tappered-edge structure with Rc = 0.")
                     fact_exp = (rcyl/dz%rref)**(dz%surf-dz%exp_beta) * exp( -(rcyl/dz%rc)**(2+dz%moins_gamma_exp) )
                  endif
                  coeff_exp = (2*(rcyl/dz%rref)**(2*dz%exp_beta))
@@ -365,9 +362,8 @@ subroutine define_dust_density()
      dz=disk_zone(izone)
 
      if ((1.0_dp+1e-10_dp) * dz%rin >=  dz%rmax) then
-        write(*,*) "ERROR: Rout must be larger than than Rin in zone", izone
-        write(*,*) "Exiting"
-        stop
+        write(*,*) "Zone #", izone
+        call error("Rout must be larger than than Rin in zone")
      endif
 
      if (dz%geometry == 5) lwall = .true.
@@ -534,10 +530,8 @@ subroutine define_dust_density()
 
            if (lvariable_dust.and.(settling_type == 2)) then
               if (lspherical) then
-                 write(*,*) "ERROR: settling following Dubrulle's prescription is only"
-                 write(*,*) "implemented on a cylindrical grid so far"
-                 write(*,*) "Exiting"
-                 stop
+                 call error("settling following Dubrulle's prescription is only", &
+                      msg2="implemented on a cylindrical grid so far")
               endif
 
               if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
@@ -582,10 +576,8 @@ subroutine define_dust_density()
            ! je ne code que la dependence en z dans un premier temps puis normalise et ajoute la dependence en R et taille de grain
 
            if (lspherical) then
-              write(*,*) "ERROR: settling following Fromang's prescription is only"
-              write(*,*) "implemented on a cylindrical grid so far"
-              write(*,*) "Exiting"
-              stop
+              call error("settling following Fromang's prescription is only", &
+                   msg2="implemented on a cylindrical grid so far")
            endif
 
            do i=1, n_rad
@@ -832,14 +824,9 @@ subroutine define_dust_density()
         enddo !icell
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
-        if (mass < tiny_dp) then
-           write(*,*)
-           write(*,*) "ERROR : something went wrong, there is no dust in the disk"
-           write(*,*) "Exiting." ; stop
-        endif
+        if (mass < tiny_dp) call error("something went wrong, there is no dust in the disk")
 
         facteur = d_p%masse / mass
-
         do icell=1,n_cells
            do l=d_p%ind_debut,d_p%ind_fin
               densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
@@ -901,10 +888,7 @@ subroutine define_density_wall3D()
 
   allocate(density_wall(n_cells,n_grains_tot), stat=alloc_status)
   allocate(masse_wall(n_cells), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error wall'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error wall')
   density_wall = 0.
   masse_wall = 0.
 
@@ -914,16 +898,11 @@ subroutine define_density_wall3D()
 
 
      if (dz%geometry == 3) then ! wall
-        if (abs(dz%exp_beta) > 1e-6) then
-           write(*,*) "ERROR: the wall must have Beta = 0"
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (abs(dz%exp_beta) > 1e-6) call error("the wall must have Beta = 0")
 
         write(*,*) "Wall between", real(dz%rin), "and", real(dz%rmax), "AU"
         h_wall = dz%sclht
         write(*,*) "h_wall =", real(h_wall)
-
 
         do icell=1, n_cells
            ! On calcule la densite au milieu de la cellule
@@ -1049,10 +1028,7 @@ subroutine read_density_file()
 
   readwrite=0
   call ftopen(unit,density_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier temperature n'existe pas
-     write(*,*) "ERROR : density file needed"
-     stop
-  endif
+  if (status /= 0) call error("density file needed")
 
   ! Do we read the gas density ?
   status = 0
@@ -1076,21 +1052,17 @@ subroutine read_density_file()
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound /= 4) then
-     write(*,*) 'READ_IMAGE failed to read the NAXIS keyword in HDU 1'
-     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      write(*,*) "I found", nfound, "axis instead of 4"
-     stop
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
   endif
 
   if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
-     write(*,*) "Error : "//trim(density_file)//" does not have the"
-     write(*,*) "right dimensions in HDU 1. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
      write(*,*) naxes(3), n_az
      !write(*,*) naxes(4), n_a
-     stop
+     call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
   endif
   n_a = naxes(4)
   write(*,*) n_a, "grain sizes found"
@@ -1127,8 +1099,7 @@ subroutine read_density_file()
      sph_dens = real(sph_dens_dp,kind=sp)
      deallocate(sph_dens_dp)
   else
-     write(*,*) "ERROR: cannot read bitpix in fits file"
-     stop
+     call error("cannot read bitpix in fits file")
   endif
 
   write(*,*) "Dust density range:", minval(sph_dens), maxval(sph_dens)
@@ -1153,16 +1124,12 @@ subroutine read_density_file()
      naxes(:) = 0
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 1) then
-        write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
         write(*,*) 'HDU 2 has', nfound, 'dimensions.'
-        write(*,*) 'Exiting.'
-        stop
+        call error('did not find 1 dimension in HDU 2')
      endif
      if ((naxes(1) /= n_a)) then
-        write(*,*) "Error : HDU 2 does not have the right dimension"
-        write(*,*) "It has ", naxes(1), "instead of ", n_a
-        write(*,*) "Exiting."
-        stop
+        write(*,*) "HDU2 dim is ", naxes(1), "instead of ", n_a
+        call error("HDU 2 does not have the right dimension")
      endif
      npixels=naxes(1)
 
@@ -1178,22 +1145,18 @@ subroutine read_density_file()
         a_sph = real(a_sph_dp,kind=sp)
         deallocate(a_sph_dp)
      else
-        write(*,*) "ERROR: cannot read bitpix in fits file"
-        stop
+        call error("cannot read bitpix in fits file")
      endif
 
      ! read_image
-
      ! On verifie que les grains sont tries
      do i=1, n_a-1
         if (a_sph(i) >= a_sph(i+1)) then
-           write(*,*) "ERROR : grains must be ordered from small to large"
            write(*,*) "I found the follwing grain sizes in the fits :"
            do j=1, n_a
               write(*,*) a_sph(j)
            enddo
-           write(*,*) "Exiting"
-           stop
+           call error("grains must be ordered from small to large")
         endif
      enddo
 
@@ -1212,16 +1175,12 @@ subroutine read_density_file()
         ! Check dimensions
         call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
         if (nfound /= 1) then
-           write(*,*) 'READ_IMAGE did not find 1 dimension in HDU 2'
            write(*,*) 'HDU 3 has', nfound, 'dimensions.'
-           write(*,*) 'Exiting.'
-           stop
+           call error('did not find 1 dimension in HDU 3')
         endif
         if ((naxes(1) /= n_a)) then
-           write(*,*) "Error : HDU 3 does not have the right dimension"
-           write(*,*) "It has ", naxes(1), "instead of ", n_a
-           write(*,*) "Exiting."
-           stop
+           write(*,*) "HDU 3 dim is ", naxes(1), "instead of ", n_a
+           call error("HDU 3 does not have the right dimension")
         endif
         npixels=naxes(1)
 
@@ -1237,8 +1196,7 @@ subroutine read_density_file()
            n_a_sph = real(a_sph_dp,kind=sp)
            deallocate(a_sph_dp)
         else
-           write(*,*) "ERROR: cannot read bitpix in fits file"
-           stop
+           call error("cannot read bitpix in fits file")
         endif
 
         tmp = sum(n_a_sph)
@@ -1246,24 +1204,12 @@ subroutine read_density_file()
         do i=1,n_a
            write(*,*) i, a_sph(i), "microns, relative number density =", n_a_sph(i) / tmp
            ! Checking values as we will take the log a bit later
-           if (a_sph(i) < tiny_real) then
-              write(*,*) "Error: grain sizes must be > 0"
-              write(*,*) "Exiting"
-              stop
-           endif
-           if (n_a_sph(i) / tmp < tiny_real) then
-              write(*,*) "Error: grain number density must be > 0"
-              write(*,*) "Exiting"
-              stop
-           endif
+           if (a_sph(i) < tiny_real) call error("grain sizes must be > 0")
+           if (n_a_sph(i) / tmp < tiny_real) call error("grain number density must be > 0")
         enddo
         write(*,*) "They will be used to set the integrated grain size distribution"
 
-
-        if (n_pop > 1) then
-           write(*,*) "ERROR : density fits interface only works for 1 dust pop"
-           stop
-        endif
+        if (n_pop > 1) call error("density fits interface only works for 1 dust pop")
 
         allocate(log_a_sph(n_a), log_n_a_sph(n_a))
         log_a_sph = log(a_sph) ; log_n_a_sph = log(n_a_sph)
@@ -1315,21 +1261,16 @@ subroutine read_density_file()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'Gas density:'
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of '//trim(density_file)//' file. Exiting.'
         write(*,*) "I found", nfound, "axis instead of 3"
-        stop
+        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
-        write(*,*) "Error : "//trim(density_file)//" does not have the"
-        write(*,*) "right dimensions. Exiting."
         write(*,*) "# fits_file vs mcfost_grid"
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
-        !write(*,*) naxes(4), n_a
-        stop
+        call error(trim(density_file)//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -1350,8 +1291,7 @@ subroutine read_density_file()
         sph_gas_dens = real(sph_gas_dens_dp,kind=sp)
         deallocate(sph_gas_dens_dp)
      else
-        write(*,*) "ERROR: cannot read bitpix in fits file"
-        stop
+        call error("cannot read bitpix in fits file")
      endif
 
      write(*,*) "Gas density range:", minval(sph_gas_dens), maxval(sph_gas_dens)
@@ -1359,7 +1299,6 @@ subroutine read_density_file()
      ! Au cas ou : on elimine les valeurs a 0
      sph_gas_dens = sph_gas_dens/maxval(sph_gas_dens) ! normalization avant d'ajouter une constante
      sph_gas_dens = max(sph_gas_dens,1e10*tiny_real)
-
   endif ! lread_gas_density
 
 
@@ -1385,21 +1324,17 @@ subroutine read_density_file()
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 4) then
         write(*,*) 'Gas velocity:'
-        write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-        write(*,*) 'of '//trim(density_file)//' file. Exiting.'
         write(*,*) "I found", nfound, "axis instead of 4"
-        stop
+        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
-        write(*,*) "Error : "//trim(density_file)//" does not have the"
-        write(*,*) "right dimensions. Exiting."
         write(*,*) "# fits_file vs mcfost_grid"
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
         write(*,*) naxes(4), 3
-        stop
+        call error(trim(density_file)//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
@@ -1420,8 +1355,7 @@ subroutine read_density_file()
         sph_gas_velocity = real(sph_V_dp,kind=sp)
         deallocate(sph_V_dp)
      else
-        write(*,*) "ERROR: cannot read bitpix in fits file"
-        stop
+        call error("cannot read bitpix in fits file")
      endif
 
      allocate(vfield_x(n_cells),vfield_y(n_cells),vfield_z(n_cells))
@@ -1651,10 +1585,7 @@ subroutine read_Sigma_file()
 
   readwrite=0
   call ftopen(unit,sigma_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier temperature n'existe pas
-     write(*,*) "ERROR : surface density file needed"
-     stop
-  endif
+  if (status /= 0) call error("surface density file needed")
 
   group=1
   firstpix=1
@@ -1663,27 +1594,21 @@ subroutine read_Sigma_file()
   ! determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound > 2) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
      write(*,*) "nfound = ", nfound, "instead of 1 or 2"
-     stop
+     call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
   endif
 
   if ((naxes(1) /= n_rad)) then
-     write(*,*) "Error : "//trim(sigma_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
      write(*,*) "Axis #1 (radius) :  fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
-     stop
+     call error(trim(sigma_file)//" does not have the right dimensions.")
   endif
 
   if (nfound==2) then
      if ((naxes(2) /= n_az)) then
-        write(*,*) "Error : "//trim(sigma_file)//" does not have the"
-        write(*,*) "right dimensions. Exiting."
         write(*,*) "Axis #2 (azimuth):  fits_file vs mcfost_grid"
         write(*,*) naxes(1), n_az
-        stop
+        call error(trim(sigma_file)//" does not have the right dimensions.")
      endif
      npixels = naxes(1) * naxes(2)
   else
@@ -1703,8 +1628,7 @@ subroutine read_Sigma_file()
   else if (bitpix==-64) then
      call ftgpvd(unit,group,firstpix,npixels,nullval,surface_density,anynull,status)
   else
-     write(*,*) "ERROR: cannot read bitpix in fits file"
-     stop
+     call error("cannot read bitpix in fits file")
   endif
 
   ! Au cas ou
@@ -1758,17 +1682,8 @@ subroutine densite_Seb_Charnoz()
   read(1,*)
   read(1,*) Nr_Seb, Nz_Seb, Na_Seb
 
-  if ((Nr_Seb /= n_rad).or.(Nz_Seb /= nz)) then
-     write(*,*) "ERROR: Spatial grid does not match!"
-     write(*,*) "Exiting"
-     stop
-  endif
-
-  if (Na_Seb /= n_grains_tot) then
-     write(*,*) "ERROR: Grain size grid does not match!"
-     write(*,*) "Exiting"
-     stop
-  endif
+  if ((Nr_Seb /= n_rad).or.(Nz_Seb /= nz)) call error("Spatial grid does not match!")
+  if (Na_Seb /= n_grains_tot) call error("Grain size grid does not match!")
 
   read(1,*)
   read(1,*) taille_grains_Seb
@@ -1858,10 +1773,7 @@ subroutine densite_Seb_Charnoz2()
 
   readwrite=0
   call ftopen(unit,density_file,readwrite,blocksize,status)
-  if (status /= 0) then ! le fichier de densite n'existe pas
-     write(*,*) "ERROR : density file needed"
-     stop
-  endif
+  if (status /= 0) call error("density file needed")
 
   group=1
   firstpix=1
@@ -1869,19 +1781,13 @@ subroutine densite_Seb_Charnoz2()
 
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 2) then
-     write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-     write(*,*) 'of '//trim(density_file)//' file. Exiting.'
-     stop
-  endif
+  if (nfound /= 2) call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
 
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then
-     write(*,*) "Error : "//trim(density_file)//" does not have the"
-     write(*,*) "right dimensions. Exiting."
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
-     stop
+     call error(trim(density_file)//" does not have the right dimensions.")
   endif
 
   npixels=naxes(1)*naxes(2)

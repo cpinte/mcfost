@@ -40,10 +40,7 @@ subroutine build_grain_size_distribution()
   ! **************************************************
   allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
        S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error r_grain'
-     stop
-  endif
+  if (alloc_status > 0) call error('Allocation error r_grain')
   nbre_grains = 0.0   ; r_core=0.0
   r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
@@ -52,18 +49,10 @@ subroutine build_grain_size_distribution()
      d_p => dust_pop(pop)
 
       if (lread_grain_size_distrib) then
-        if (n_pop > 1) then
-           write(*,*) "ERROR: you cannot provide a grain size distribution with more than 1 population"
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (n_pop > 1) call error("you cannot provide a grain size distribution with more than 1 population")
 
         open(unit=1, file=grain_size_file, status='old', iostat=ios)
-        if (ios/=0) then
-           write(*,*) "ERROR: cannot open grain size file"//trim(grain_size_file)
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (ios/=0) call error("cannot open grain size file"//trim(grain_size_file))
         write(*,*) "Reading "//trim(grain_size_file)
 
         ! On elimine les lignes avec des commentaires
@@ -84,13 +73,7 @@ subroutine build_grain_size_distribution()
         enddo
         n_grains = n_grains - 1
 
-        if (n_grains /= n_grains_tot) then
-           write(*,*) "ERROR: the number of grains must be the same as in the parameter file"
-           write(*,*) "I will correct that later", n_grains, n_grains_tot
-           write(*,*) "Exiting"
-           stop
-        endif
-
+        if (n_grains /= n_grains_tot) call error("the number of grains must be the same as in the parameter file.")
 
         ! Lecture proprement dite
         rewind(1)
@@ -256,18 +239,13 @@ subroutine init_indices_optiques()
            if (dust_pop(pop)%mixing_rule /= 1) then
               dust_pop(pop)%mixing_rule = 1 ! forcing EMT when there is only 1 component
               if (n_components > 2) then ! mcfost does not know what to do when there is more than 1 component
-                 write(*,*) "ERROR: cannot use porosity with coating"
                  write(*,*) "dust population #", pop
-                 write(*,*) "Exiting"
-                 stop
+                 call error("cannot use porosity with coating")
               endif
            endif
         endif
         allocate(tab_tmp_amu1(n_lambda,n_components), tab_tmp_amu2(n_lambda,n_components), stat=alloc_status)
-        if (alloc_status > 0) then
-           write(*,*) 'Allocation error tab_tmp_amu1'
-           stop
-        endif
+        if (alloc_status > 0) call error('Allocation error tab_tmp_amu1')
         tab_tmp_amu1 = 0. ; tab_tmp_amu2 = 0.
 
         ! Lecture fichier indices
@@ -275,21 +253,13 @@ subroutine init_indices_optiques()
            filename = trim(dust_pop(pop)%indices(k))
 
            dir = in_dir(filename, dust_dir,  status=ios)
-           if (ios /=0) then
-              write(*,*) "ERROR: dust file cannot be found:",trim(filename)
-              write(*,*) "Exiting"
-              stop
-           else
-              filename = trim(dir)//trim(filename) ;
-              write(*,*) "Reading "//trim(filename) ;
-           endif
+           if (ios /=0) call error("dust file cannot be found: "//trim(filename))
+
+           filename = trim(dir)//trim(filename) ;
+           write(*,*) "Reading "//trim(filename) ;
 
            open(unit=1,file=filename, status='old', iostat=ios)
-           if (ios /=0) then
-              write(*,*) "ERROR: dust file cannot be opened:",trim(filename)
-              write(*,*) "Exiting"
-              stop
-           endif
+           if (ios /=0) call error("dust file cannot be opened: "//trim(filename))
 
            ! On elimine les lignes avec des commentaires
            status = 1
@@ -314,10 +284,7 @@ subroutine init_indices_optiques()
 
            ! Allocation de tab
            allocate(tab_l(n_ind), tab_n(n_ind), tab_k(n_ind), stat=alloc_status)
-           if (alloc_status > 0) then
-              write(*,*) 'Allocation error zsup'
-              stop
-           endif
+           if (alloc_status > 0) call error('Allocation error zsup')
            tab_l=0.0 ; tab_n=0.0 ; tab_k=0.0
 
            ! Lecture proprement dite
@@ -329,11 +296,7 @@ subroutine init_indices_optiques()
 
            ! lecture densite
            read(1,*) dust_pop(pop)%component_rho1g(k), dust_pop(pop)%component_T_sub(k)
-           if (dust_pop(pop)%component_rho1g(k) > 10.) then
-              write(*,*) "ERROR: optical indices file has the wrong format"
-              write(*,*) "Exiting"
-              stop
-           endif
+           if (dust_pop(pop)%component_rho1g(k) > 10.) call error("optical indices file has the wrong format")
            ! ligne vide
            read(1,*)
 
@@ -417,10 +380,8 @@ subroutine init_indices_optiques()
            else ! coating : 2 composants max pour coating
               !write(*,*) "Applying coating for pop.", pop
               if (n_components /= 2) then
-                 write(*,*) "ERROR: coating can only be computed with 2 components"
                  write(*,*) "there is", n_components, "components in pop #", pop
-                 write(*,*) "Exiting"
-                 stop
+                 call error("coating can only be computed with 2 components")
               endif
               tab_amu1(:,pop) = tab_tmp_amu1(:,1)
               tab_amu2(:,pop) = tab_tmp_amu2(:,1)
@@ -457,11 +418,7 @@ subroutine init_indices_optiques()
            call get_opacity_file_dim(pop)
         endif
 
-        if (dust_pop(pop)%n_components > 1) then
-           write(*,*) "ERROR : cannot mix dust with opacity file with other component"
-           write(*,*) "Exiting"
-           stop
-        endif
+        if (dust_pop(pop)%n_components > 1) call error("cannot mix dust with opacity file with other component")
      endif ! fichier d'opacite
   enddo ! pop
 
@@ -523,18 +480,12 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
      ! Selection (et verif) de l'unique racine positive (a priori c'est eps_eff1)
      if (aimag(eps_eff1) > 0) then
         if (aimag(eps_eff2) > 0) then
-           write(*,*) "Error in Bruggeman EMT rule !!!"
-           write(*,*) "All imaginary parts are > 0"
-           write(*,*) "Exiting."
-           stop
+           call error("Bruggeman EMT rule: all imaginary parts are > 0")
         endif
         eps_eff = eps_eff1
      else
         if (aimag(eps_eff2) < 0) then
-           write(*,*) "Error in Bruggeman EMT rule !!!"
-           write(*,*) "All imaginary parts are < 0"
-           write(*,*) "Exiting."
-           stop
+           call error("Bruggeman EMT rule: all imaginary parts are < 0")
         endif
         eps_eff = eps_eff2
      endif
@@ -635,8 +586,7 @@ subroutine prop_grains(lambda)
               endif
            else
               write(*,*) "Unknow dust type : ", dust_pop(pop)%type
-              write(*,*) "Exiting"
-              stop
+              call error("")
            endif
         endif ! laggregate
         tab_albedo(k,lambda)=qsca/qext
@@ -689,7 +639,6 @@ subroutine prop_grains(lambda)
   !--    qsca= C_sca(lambda,k)/S_grain(k)
   !--    write(*,*) "Verif phase function (a<<lambda) : ", tab_lambda(lambda), r_grain(k), norme/qsca, qsca
   !-- enddo
-  !-- stop
 
   return
 
@@ -1002,7 +951,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
      if (lstop_after_init) then
         write(*,*) "Exiting"
-        stop
+        call exit(1)
      else
         ! Re-Normalisation S11
         ! la normalisation n'a pas eu lieu dans le cas ldust_prop pour sauver S11 dans le fichier fits

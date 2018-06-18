@@ -41,7 +41,7 @@ contains
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
-          stop
+          call exit(1)
        endif
     else if (lgadget2_file) then
        write(*,*) "Performing gadget2mcfost setup"
@@ -92,11 +92,7 @@ contains
     if (llimits_file) then
        write(*,*) "Reading limits file: "//trim(SPH_limits_file)
        open(unit=1, file=SPH_limits_file, status='old', iostat=ios)
-       if (ios/=0) then
-          write(*,*) "ERROR : cannot open "//trim(SPH_limits_file)
-          write(*,*) "Exiting"
-          stop
-       endif
+       if (ios/=0) call error("cannot open "//trim(SPH_limits_file))
        call read_comments(1)
        read(1,*) SPH_limits(1), SPH_limits(3), SPH_limits(5)
        read(1,*) SPH_limits(2), SPH_limits(4), SPH_limits(6)
@@ -301,16 +297,14 @@ contains
                    write(*,*) k, a_sph(k)
                 enddo
                 write(*,*) "Exiting"
-                stop
+                call exit(1)
              endif
           endif
 
           if (a_SPH(l) > 0.) then
              log_a_SPH(l) = log(a_SPH(l))
           else
-             write(*,*) "ERROR : grains size must be > 0 in SPH file"
-             write(*,*) "Exiting"
-             stop
+             call error("grains size must be > 0 in SPH file")
           endif
        enddo
 
@@ -351,7 +345,6 @@ contains
                    densite_pouss(k,icell) = rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))
                 endif
              enddo !k
-             !stop
           else ! iSPH == 0, star
              densite_pouss(:,icell) = 0.
           endif
@@ -508,11 +501,7 @@ contains
 
     alloc_status = 0
     allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Allocation error in phanton_2_mcfost"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH

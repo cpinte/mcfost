@@ -7,6 +7,7 @@ module disk_physics
   use molecular_emission, only : densite_gaz
   use constantes
   use stars, only : spectre_etoiles
+  use messages
 
   implicit none
 
@@ -50,11 +51,8 @@ subroutine compute_othin_sublimation_radius()
      enddo
 
      if (E_dust < tiny_real) then
-        write(*,*) "Sublimation radius : something is wrong"
-        write(*,*) "Opacity is not defined yet"
-        write(*,*) "Maybe the parameter file is old ?"
-        write(*,*) "Exiting"
-        stop
+        call error("Sublimation radius : opacity is not defined yet", &
+             msg2="Maybe the parameter file is old ?")
      endif
      etoile(i)%othin_sublimation_radius = sqrt(E_etoile/E_dust)
   enddo

@@ -6,6 +6,7 @@ module benchmarks
   use opacity
   use em_th
   use molecular_emission
+  use messages
 
   implicit none
 
@@ -24,17 +25,9 @@ subroutine lect_section_eff()
 
   open(unit=1,file="optSi.dat",status="old")
 
-  if (n_lambda /= 61) then
-     write(*,*) "Benchmark error"
-     write(*,*) "n_lambda must be 61"
-     stop
-  endif
+  if (n_lambda /= 61) call error("Benchmark, n_lambda must be 61")
 
-  if (n_grains_tot /= 1) then
-     write(*,*) "Benchmark error"
-     write(*,*) "n_grains_tot must be 1"
-     stop
-  endif
+  if (n_grains_tot /= 1) call error("Benchmark : n_grains_tot must be 1")
 
   do lambda=1,n_lambda
      read(1,*) tab_lambda(lambda), qsca(lambda), qext(lambda)
