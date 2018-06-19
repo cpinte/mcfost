@@ -191,7 +191,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lpola
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -208,6 +208,7 @@ subroutine initialisation_mcfost()
   lHG = .false.
   lonly_scatt = .false.
   lno_T = .false.
+  lpola = .false.
 
   ! Global logical variables
   call set_default_variables()
@@ -943,6 +944,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) scale_SPH
         i_arg = i_arg + 1
+     case("-pola")
+        i_arg = i_arg + 1
+        lpola=.true.
      case default
         call display_help()
      end select
@@ -971,6 +975,23 @@ subroutine initialisation_mcfost()
   endif
 
   if (lno_T) ltemp = .false.
+  if (lpola) lsepar_pola = .true.
+
+  if (lsepar_pola) then
+     n_Stokes = 4
+     if (lsepar_contrib) then
+        N_type_flux = 8
+     else
+        N_type_flux = 4
+     endif
+  else
+     n_Stokes = 1
+     if (lsepar_contrib) then
+        N_type_flux = 5
+     else
+        N_type_flux = 1
+     endif
+  endif
 
   write(*,*) 'Input file read successfully'
 

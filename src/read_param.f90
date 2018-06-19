@@ -151,23 +151,6 @@ contains
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -562,23 +545,6 @@ contains
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
-
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
 
     ! -------------------------------
     ! Grid geometry
@@ -975,23 +941,6 @@ contains
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -1361,23 +1310,6 @@ contains
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -1734,23 +1666,6 @@ contains
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -2105,22 +2020,6 @@ contains
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
-
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
 
     ! -------------------------------
     ! Grid geometry
@@ -2479,23 +2378,6 @@ contains
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -2837,23 +2719,6 @@ end subroutine read_para215
     if (.not.lsed) lsed_complete = .false.
     read(1,*) tab_wavelength
     read(1,*) lsepar_contrib, lsepar_pola
-
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
 
     ! -------------------------------
     ! Grid geometry
@@ -3201,23 +3066,6 @@ end subroutine read_para215
     read(1,*) l_em_disk_image
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -3555,23 +3403,6 @@ end subroutine read_para215
     read(1,*) l_em_disk_image
     read(1,*) lsepar_contrib, lsepar_pola
 
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
-
-
     ! -------------------------------
     ! Grid geometry
     ! -------------------------------
@@ -3893,22 +3724,6 @@ end subroutine read_para215
     read(1,*) tab_wavelength
     read(1,*) l_em_disk_image
     read(1,*) lsepar_contrib, lsepar_pola
-
-    if (lsepar_pola) then
-       n_Stokes = 4
-       if (lsepar_contrib) then
-          N_type_flux = 8
-       else
-          N_type_flux = 4
-       endif
-    else
-       n_Stokes = 1
-       if (lsepar_contrib) then
-          N_type_flux = 5
-       else
-          N_type_flux = 1
-       endif
-    endif
 
     ! -------------------------------
     ! Grid geometry / input FITS file
