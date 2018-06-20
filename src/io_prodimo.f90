@@ -14,6 +14,7 @@ module ProDiMo
   use read_params
   use sha
   use utils, only : appel_syst
+  use messages
 
   implicit none
 
@@ -152,11 +153,7 @@ contains
     real, dimension(:), allocatable :: fPAH
 
     ! Maximum 4 zones dans ProDiMo
-    if (n_regions > 4) then
-       write(*,*) "ERROR: ProDiMo cannot deal with more than 4 zones."
-       write(*,*) "Exiting."
-       stop
-    endif
+    if (n_regions > 4) call error("ProDiMo cannot deal with more than 4 zones.")
 
     ! Directories
     if (.not.lprodimo_input_dir) then
@@ -174,31 +171,18 @@ contains
     slope_UV_ProDiMo = etoile(1)%slope_UV
 
     allocate(xN_abs(n_cells,n_lambda2,nb_proc),  stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error xN_abs'
-       stop
-    endif
-    xN_abs = 0.0
+    if (alloc_status > 0) call error('Allocation error xN_abs')
 
     allocate(J_ProDiMo(n_lambda2,n_rad,nz),  stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error J_ProDiMo'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error J_ProDiMo')
     J_ProDiMo = 0.0
 
     allocate(N_ProDiMo(n_lambda2,n_rad,nz),  stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error J_ProDiMo'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error J_ProDiMo')
     N_ProDiMo = 0.0
 
     allocate(n_phot_envoyes_ISM(n_lambda2,nb_proc),  stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error n_phot_envoyes_ISM'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error n_phot_envoyes_ISM')
     n_phot_envoyes_ISM = 0.0
 
 
@@ -227,11 +211,7 @@ contains
                    mPAH = 12 * NC + NH    ! masse du PAH
 
                    if (NC_0 > 0) then
-                      if (NC /= NC_0) then
-                         write(*,*) "ERROR: there can be only 1 type of PAH for ProDiMo"
-                         write(*,*) "Exiting"
-                         stop
-                      endif
+                      if (NC /= NC_0) call error("there can be only 1 type of PAH for ProDiMo")
                    else
                       NC_0 = NC
                    endif
@@ -272,21 +252,17 @@ contains
        do i=2,regions(ir)%n_zones
           iz = regions(ir)%zones(i)
           if ( abs(ProDiMo_fPAH(ir)-fPAH(iz)) > 1e-3*ProDiMo_fPAH(ir)) then
-             write(*,*) "ERROR: fPAH must be contant within a region for ProDiMo"
              do k=1, n_zones
                 write(*,*) "zone ", k,  "region", disk_zone(k)%region, "fPAH =", fPAH(k)
              enddo ! k
-             write(*,*) "Exiting"
-             stop
+             call error("fPAH must be contant within a region for ProDiMo")
           endif
 
           if ( abs(ProDiMo_dust_gas(ir)-1.0/disk_zone(iz)%gas_to_dust) > 1e-3*ProDiMo_dust_gas(ir)) then
-             write(*,*) "ERROR: gas_to_dust must be contant within a region for ProDiMo"
-              do k=1, n_zones
+             do k=1, n_zones
                 write(*,*) "zone ", k, "region", disk_zone(k)%region, "gas_dust =", disk_zone(k)%gas_to_dust
              enddo ! k
-             write(*,*) "Exiting"
-             stop
+             call error("gas_to_dust must be contant within a region for ProDiMo")
           endif
 
           ProDiMo_Mdisk(ir) = ProDiMo_Mdisk(ir) + disk_zone(iz)%diskmass * disk_zone(iz)%gas_to_dust
@@ -366,9 +342,8 @@ contains
     !allocate(m2p%grain_size(n_rad,nz,0:3),stat=istat(8))
     do i=1,8
        if(istat(i) /= 0) then
-          write(*,*) "ERROR: memory allocation problem in allocate_m2p"
           write(*,*) istat(i)," at ",i
-          stop
+          call error("memory allocation problem in allocate_m2p")
        endif
     enddo
 
@@ -447,31 +422,19 @@ contains
 
     !allocate(is_eq(n_rad,nz,iPAH_start:iPAH_end), stat=alloc_status)
     allocate(is_eq(n_rad,nz,1), TPAH_eq(n_rad,nz,1), P_TPAH(n_T,n_rad,nz,1), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error is_eq forProDiMo.fits.gz'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error is_eq forProDiMo.fits.gz')
     is_eq = 0 ; TPAH_eq = 0.0 ; P_TPAH = 0.0
 
     allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error opacite forProDiMo.fits.gz'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error opacite forProDiMo.fits.gz')
     opacite = 0
 
     allocate(J_io(n_rad,nz,n_lambda), stat=alloc_status)
-    if (alloc_status > 0) then
-       write(*,*) 'Allocation error J_io forProDiMo.fits.gz'
-       stop
-    endif
+    if (alloc_status > 0) call error('Allocation error J_io forProDiMo.fits.gz')
     J_io = 0
 
     allocate(J_ProDiMo_ISM(n_lambda,n_rad,nz), stat=alloc_status)
-     if (alloc_status > 0) then
-       write(*,*) 'Allocation error J_ProDiMo_ISM forProDiMo.fits.gz'
-       stop
-    endif
+     if (alloc_status > 0) call error('Allocation error J_ProDiMo_ISM forProDiMo.fits.gz')
     J_ProDiMo_ISM = 0
 
     filename = trim(data_ProDiMo)//"/"//trim(mcfost2ProDiMo_file)
@@ -1164,7 +1127,7 @@ contains
     !  Check for any error, and if so print out error messages
     if (status > 0) then
        call print_error(status)
-       stop
+       call exit(1)
     endif
 
     return
@@ -1343,15 +1306,8 @@ contains
     read(1,*) n_files
     close(unit=1,status="delete")
 
-    if (n_files > 1) then
-       write(*,*) "There are more than 1 parameter file in data_th"
-       write(*,*) "Exiting"
-       stop
-    else if (n_files < 1) then
-       write(*,*) "There are less than 1 parameter file in data_th"
-       write(*,*) "Exiting"
-       stop
-    endif
+    if (n_files > 1) call error("There are more than 1 parameter file in data_th")
+    if (n_files < 1) call error("There are less than 1 parameter file in data_th")
 
     cmd = "cp data_th/*.par* data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
     call read_para("data_th/forMCFOST.par")
@@ -1432,31 +1388,21 @@ contains
     ! Open file
     readwrite=0 ; blocksize = 1
     call ftopen(unit,filename,readwrite,blocksize,status)
-    if (status /= 0) then ! le fichier forProDiMo n'existe pas
-       write(*,*) "ERROR : "//trim(mcfost2ProDiMo_file)//" file needed"
-       stop
-    endif
-
+    if (status /= 0) call error(trim(mcfost2ProDiMo_file)//" file needed")
 
     !------------------------------------------------------------------------
     ! HDU 6 : Read dimensions : radiation field(n_rad,nz,n_lambda)
     !------------------------------------------------------------------------
     call ftmahd(unit,6,hdutype,status)
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 6 file.',nfound,' Exiting.'
-       stop
-    endif
+    if (nfound /= 3) call error('failed to read the NAXISn keyworrds of HDU 6')
     n_rad_m2p    = naxes(1)
     nz_m2p       = naxes(2)
     n_lambda_m2p = naxes(3)
 
     if ( (n_rad_m2p /= n_rad) .or. (nz_m2p /= nz) ) then
-       write(*,*) "Spatial grid if forProDiMo.fits.gz must be the same as the mcfost's one"
        write(*,*) "forProDiMo.fits.gz: n_rad=", n_rad_m2p, "nz=", nz_m2p
-       write(*,*) "Exiting"
-       stop
+       call error("Spatial grid if forProDiMo.fits.gz must be the same as the mcfost's one")
     endif
 
     call allocate_m2p(n_rad_m2p,nz_m2p,n_lambda_m2p)
@@ -1477,17 +1423,8 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 2) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 2 file. Exiting.'
-       stop
-    endif
-    if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-       write(*,*) "Error : HDU 2 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda
-       stop
-    endif
+    if (nfound /= 2) call error("failed to read the NAXISn keywords of HDU 2")
+    if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) call error("HDU 2 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)
 
     ! read_image
@@ -1502,17 +1439,8 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 1) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 3 file.',nfound,' Exiting.'
-       stop
-    endif
-    if (naxes(1) /= n_lambda_m2p) then
-       write(*,*) "Error : HDU 3 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       write(*,*) naxes(1), n_lambda_m2p
-       stop
-    endif
+    if (nfound /= 1) call error("failed to read the NAXISn keywords of HDU 3")
+    if (naxes(1) /= n_lambda_m2p) call error("HDU 3 does not have the right dimensions.")
     npixels=naxes(1)
 
     ! read_image
@@ -1528,16 +1456,8 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 7 file. Exiting.'
-       stop
-    endif
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
-       write(*,*) "Error : HDU 7 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
-    endif
+    if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 7")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p))  call error("HDU 7 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1551,16 +1471,8 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 8 file. Exiting.'
-       stop
-    endif
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
-       write(*,*) "Error : HDU 8 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
-    endif
+    if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 8")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) call error("HDU 8 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1574,16 +1486,8 @@ contains
 
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-    if (nfound /= 3) then
-       write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-       write(*,*) 'of HDU 9 file. Exiting.'
-       stop
-    endif
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) then
-       write(*,*) "Error : HDU 9 does not have the"
-       write(*,*) "right dimensions. Exiting."
-       stop
-    endif
+    if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 9")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) call error("HDU 9 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1598,12 +1502,12 @@ contains
     if (status > 0) then
        call ftgerr(status,errtext)
        write(*,*) "ERROR : "//trim(filename)
-       print *,'FITSIO Error Status =',status,': ',errtext
+       write(*,*) 'FITSIO Error Status =',status,': ',errtext
 
        !  Read and print out all the error messages on the FITSIO stack
        call ftgmsg(errmessage)
        do while (errmessage .ne. ' ')
-          print *,errmessage
+          write(*,*) errmessage
           call ftgmsg(errmessage)
        end do
     endif
@@ -1712,11 +1616,7 @@ contains
        ! Open file
        readwrite=0
        call ftopen(unit,filename,readwrite,blocksize,fits_status)
-       if (fits_status > 0) then ! le fichier temperature n'existe pas
-          write(*,*) "Status0=", fits_status
-          write(*,*) "ERROR : "//trim(filename)//" file needed"
-          stop
-       endif
+       if (fits_status > 0) call error(trim(filename)//" file needed")
 
        group=1
        firstpix=1
@@ -1728,16 +1628,8 @@ contains
        !---------------------------------------------------------
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
-       if (nfound /= 3) then
-          write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-          write(*,*) 'of HDU 1 file. Exiting.'
-          stop
-       endif
-       if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2)) then
-          write(*,*) "Error : HDU 1 does not have the right dimensions. Exiting."
-          write(*,*) naxes(1:3)
-          stop
-       endif
+       if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 1")
+       if ((naxes(1) /= n_rad).or.(naxes(2) /= nz).or.(naxes(3) /= 2)) call error("HDU 1 does not have the right dimensions.")
        npixels=naxes(1)*naxes(2)*naxes(3)
 
        ! reading keywords
@@ -1812,10 +1704,7 @@ contains
        allocate(nCII(n_rad,nz), dvCII(n_rad,nz), nOI(n_rad,nz), dvOI(n_rad,nz),  &
             noH2O(n_rad,nz), dvoH2O(n_rad,nz), npH2O(n_rad,nz), dvpH2O(n_rad,nz), &
             nCO(n_rad,nz), dvCO(n_rad,nz), stat=alloc_status )
-       if (alloc_status > 0) then
-          write(*,*) 'Allocation error nCII'
-          stop
-       endif
+       if (alloc_status > 0) call error('Allocation error nCII')
        nCII = 0.0 ; dvCII = 0.0 ; nOI = 0.0 ; dvOI = 0.0 ; nCO=0.0 ;  dvCO = 0.0
        noH2O = 0.0 ;  dvoH2O = 0.0 ;  npH2O = 0.0 ;  dvpH2O = 0.0
 
@@ -1824,10 +1713,7 @@ contains
        allocate(pop_CO(nLevel_CO, n_rad, nz), stat=alloc_status )
        allocate(pop_oH2O(nLevel_oH2O, n_rad, nz), stat=alloc_status )
        allocate(pop_pH2O(nLevel_pH2O,n_rad, nz) , stat=alloc_status )
-       if (alloc_status > 0) then
-          write(*,*) 'Allocation error pop_CII'
-          stop
-       endif
+       if (alloc_status > 0) call error('Allocation error pop_CII')
        pop_CII = 0.0 ; pop_OI = 0.0 ; pop_oH2O = 0.0 ; pop_pH2O = 0.0 ; pop_CO=0.0 ;
 
        ! read_image : HDU 1 : MCgrid, to make a test inside mcfost
@@ -1839,15 +1725,12 @@ contains
           do zj=1,nz
              icell = cell_map(ri,zj,1)
              if (abs(r_grid(icell) - grid(ri,zj,1)) > 1e-5 * r_grid(icell)) then
-                write(*,*) "ERROR R. Exiting."
                 write(*,*) ri, "MCFOST=", r_grid(icell), "ProDiMo=", grid(ri,zj,1)
-                !stop
+                call error("Non matching radius")
              endif
-
              if (abs(z_grid(icell) - grid(ri,zj,2)) > 1e-5 * z_grid(icell)) then
-                write(*,*) "ERROR Z. Exiting."
-                write(*,*) ri, zj, z_grid(icell), grid(ri,zj,2)
-                !stop
+                write(*,*) ri, zj, "MCFOST=", z_grid(icell), "ProDiMo=", grid(ri,zj,2)
+                call error("Non matching altitude")
              endif
           enddo
        enddo
@@ -1860,16 +1743,8 @@ contains
 
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
-       if (nfound /= 2) then
-          write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-          write(*,*) 'of HDU 2 file. Exiting.'
-          stop
-       endif
-       if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) then
-          write(*,*) "Error : HDU 2 does not have the"
-          write(*,*) "right dimensions. Exiting."
-          stop
-       endif
+       if (nfound /= 2) call error("failed to read the NAXISn keywords of HDU 2")
+       if ((naxes(1) /= n_rad).or.(naxes(2) /= nz)) call error("HDU 2 does not have the right dimensions.")
        npixels=naxes(1)*naxes(2)
 
        ! read_image
@@ -1883,17 +1758,8 @@ contains
 
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
-       if (nfound /= 3) then
-          write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-          write(*,*) 'of HDU 3 file. Exiting.'
-          stop
-       endif
-       if ((naxes(1) /= MC_NSP).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) then
-          write(*,*) "Error : HDU 3 does not have the"
-          write(*,*) "right dimensions. Exiting."
-          write(*,*) naxes(1), n_lambda
-          stop
-       endif
+       if (nfound /= 3)  call error("failed to read the NAXISn keywords of HDU 3")
+       if ((naxes(1) /= MC_NSP).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) call error("HDU 3 does not have the right dimensions.")
        npixels=naxes(1)*naxes(2)*naxes(3)
 
        ! read_image
@@ -1914,16 +1780,8 @@ contains
 
        ! Check dimensions
        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
-       if (nfound /= 3) then
-          write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-          write(*,*) 'of HDU 4 file. Exiting.'
-          stop
-       endif
-       if ((naxes(1) /= MC_NSP).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) then
-          write(*,*) "Error : HDU 4 does not have the"
-          write(*,*) "right dimensions. Exiting."
-          stop
-       endif
+       if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 4")
+       if ((naxes(1) /= MC_NSP).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) call error("HDU 4 does not have the right dimensions.")
        npixels=naxes(1)*naxes(2)*naxes(3)
 
        ! read_image
@@ -1945,25 +1803,12 @@ contains
 
           ! Check dimensions
           call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
-          if (nfound /= 3) then
-             write(*,*) 'READ_IMAGE failed to read the NAXISn keywords'
-             write(*,*) 'of HDU ',i+4,' file. Exiting.'
-             stop
-          endif
-          if ((naxes(1) /= lpops%lmax(i)).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) then
-             write(*,*) "Error : HDU ",i+4," does not have the"
-             write(*,*) "right dimensions (Level pop). Exiting."
-             write(*,*) naxes(1:3)
-             write(*,*) lpops%lmax(i)
-             stop
-          endif
+          if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 5+")
+          if ((naxes(1) /= lpops%lmax(i)).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) call error("HDU 5+ does not have the right dimensions.")
           npixels=naxes(1)*naxes(2)*naxes(3)
 
           allocate(MCpops(lpops%lmax(i),n_rad,nz), stat=alloc_status)
-          if (alloc_status > 0) then
-             write(*,*) 'Allocation error MCpops'
-             stop
-          endif
+          if (alloc_status > 0) call error('Allocation error MCpops')
           MCpops = 0.0
 
           ! read_image
@@ -2005,12 +1850,12 @@ contains
        !  Get the text string which describes the error
        if (fits_status > 0) then
           call ftgerr(fits_status,errtext)
-          print *,'FITSIO Error Status =',fits_status,': ',errtext
+          write(*,*) 'FITSIO Error Status =',fits_status,': ',errtext
 
           !  Read and print out all the error messages on the FITSIO stack
           call ftgmsg(errmessage)
           do while (errmessage .ne. ' ')
-             print *,errmessage
+             write(*,*) errmessage
              call ftgmsg(errmessage)
           end do
        endif
@@ -2127,10 +1972,7 @@ contains
           v_line(icell) = sqrt(sigma2)
 
           !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
-          if (sigma2 <=0.) then
-             write(*,*) "ERROR in ProDiMo data, dv = 0"
-             stop
-          endif
+          if (sigma2 <=0.) call error("ProDiMo data, dv = 0")
 
           sigma2_m1 = 1.0_dp / sigma2
           sigma2_phiProf_m1(icell) = sigma2_m1
