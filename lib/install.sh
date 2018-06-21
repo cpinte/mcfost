@@ -19,11 +19,12 @@ else
     echo "Unknown system to build mcfost: "$SYSTEM"\nPlease choose ifort or gfortran\ninstall.sh <system>\nExiting" ; exit 1
 fi
 
-# Clean eventual previous files
-rm -rf lib include sprng2.0 cfitsio voro ; mkdir lib include
-pushd .
+rm -rf lib include sprng2.0 cfitsio voro # Clean previous files if any
+
 
 echo "Installing MCFOST libraries in "$MCFOST_INSTALL/lib/$SYSTEM
+mkdir lib include
+pushd .
 
 #-------------------------------------------
 # SPRNG
