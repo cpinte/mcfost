@@ -18,6 +18,7 @@ module Voronoi_grid
   type Voronoi_cell
      real(kind=dp), dimension(3) :: xyz, vxyz
      real(kind=dp) :: h ! SPH smoothing lengths
+     real(kind=dp) :: delta_edge, delta_centroid
      integer :: id, first_neighbour, last_neighbour
      logical :: exist, is_star
   end type Voronoi_cell
@@ -46,7 +47,7 @@ module Voronoi_grid
 
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
+          n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu
@@ -55,7 +56,7 @@ module Voronoi_grid
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
-       real(c_double), dimension(n_points), intent(out) :: volume
+       real(c_double), dimension(n_points), intent(out) :: volume, delta_edge, delta_centroid
        integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
        integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
 
@@ -252,6 +253,7 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: SPH_id
     real :: time
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
+    real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
     integer, dimension(nb_proc) :: n_neighbours
@@ -343,9 +345,9 @@ module Voronoi_grid
     enddo
     n_cells = icell
 
-    allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), stat=alloc_status)
+    allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), delta_edge(n_cells), delta_centroid(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
-    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ;
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
@@ -382,19 +384,19 @@ module Voronoi_grid
     endif
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
-       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0
+       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0.
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours) &
        !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp reduction(+:volume,n_in,n_neighbours_tot)
+       !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid)
        id = 1
        !$ id = omp_get_thread_num() + 1
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
-            n_in,volume,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
+            n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
@@ -437,6 +439,10 @@ module Voronoi_grid
     Voronoi(:)%first_neighbour = first_neighbours(:) + 1
     Voronoi(:)%last_neighbour = last_neighbours(:) + 1
     deallocate(first_neighbours,last_neighbours)
+
+    Voronoi(:)%delta_edge = delta_edge(:)
+    Voronoi(:)%delta_centroid = delta_centroid(:)
+    deallocate(delta_edge, delta_centroid)
 
     ! Setting-up the walls
     n_missing_cells = 0
