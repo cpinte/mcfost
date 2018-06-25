@@ -263,13 +263,12 @@ release : main
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
-	cp -r Doc web/
-	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update"
 	rm -rf yorick web
+	pushd . ; cd ../docs ; make html ; scp -r _build/* horus:/user/publicdir/pintec/mcfost/docs ; popd
 	git tag release
 
 release_mac : main
@@ -283,8 +282,6 @@ release_mac : main
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
-	cp -r Doc web/
-	openssl sha1 web/Doc/MCFOSTManual.pdf | awk '{print $$2}' > web/Doc/MCFOSTManual.sha1
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost

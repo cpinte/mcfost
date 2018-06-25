@@ -537,13 +537,16 @@ subroutine mcfost_setup()
 
   call get_utils()
   call mcfost_get_ref_para()
-  call mcfost_get_manual()
   ! Write date of the last time an update was search for
   cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
        //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
   write(*,*) "MCFOST set-up was sucessful"
+
+  write(*,*) "You can find the full documentation at:"
+  write(*,*) trim(doc_webpage)
+
   return
 
 end subroutine mcfost_setup
@@ -798,28 +801,6 @@ subroutine mcfost_get_ref_para()
   return
 
 end subroutine mcfost_get_ref_para
-
-!***********************************************************
-
-subroutine mcfost_get_manual()
-
-  character(len=512) :: cmd
-  character(len=128) :: doc_dir, doc_file
-  integer ::  syst_status
-
-  doc_dir = "Doc/"
-  doc_file = "MCFOSTManual.pdf"
-
-  write(*,*) "Getting MCFOST manual: ", trim(doc_file)
-  cmd = "curl "//trim(webpage)//trim(doc_dir)//trim(doc_file)//" -O -s"
-
-  call appel_syst(cmd, syst_status)
-  if (syst_status/=0) call error("Cannot get MCFOST manual")
-  write(*,*) "Done"
-
-  return
-
-end subroutine mcfost_get_manual
 
 !***********************************************************
 
