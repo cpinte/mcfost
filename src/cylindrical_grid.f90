@@ -938,7 +938,11 @@ end subroutine define_cylindrical_grid
              endif
              ! Longueur av interserction
              if (tan_angle_lim > 1.0d299) then
-                t_phi = -x0/u
+                if (abs(u) > 1e-6) then
+                   t_phi = -x0/u
+                else
+                   t_phi = 1.0e30
+                endif
              else
                 den= v-u*tan_angle_lim
                 if (abs(den) > 1.0e-6) then

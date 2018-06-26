@@ -4,6 +4,7 @@ module diffusion
   use constantes
   use opacity
   use em_th
+  use messages
 
   implicit none
 
