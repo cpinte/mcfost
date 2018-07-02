@@ -60,7 +60,6 @@ module Voronoi_grid
        integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
        integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
 
-
      end subroutine voro
   end interface
 

@@ -371,39 +371,6 @@ contains
        masse(:) = masse(:) * f
     endif ! ndusttypes == 0
 
-    ! Todo : cells that are touching a wall receive an empty density
-!--   n_force_empty = 0.0
-!--   cell_loop : do icell=1,n_cells
-!--      do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-!--         id_n = neighbours_list(i) ! id du voisin
-!--
-!--         if (id_n < 0) then
-!--            n_force_empty = n_force_empty + 1
-!--            densite_gaz(icell)  = 0.0
-!--            masse_gaz(icell)    = 0.0
-!--            densite_pouss(:,icell) = 0.0
-!--            masse(icell) = 0.0
-!--            cycle cell_loop
-!--         endif
-!--      enddo
-!--   enddo cell_loop
-!--
-!--   write(*,*) "Density was forced to 0 in", n_force_empty, "cells surrounding the model"
-
-    write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
-    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
-
-    search_not_empty : do k=1,n_grains_tot
-       do icell=1, n_cells
-          if (densite_pouss(k,icell) > 0.0_sp) then
-             icell_not_empty = icell
-             exit search_not_empty
-          endif
-       enddo !icell
-    enddo search_not_empty
-
-    if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
-
 
     !*************************
     ! Velocities
@@ -428,6 +395,61 @@ contains
           Voronoi(icell)%h = h(iSPH)
        endif
     enddo
+
+
+    ! Removing strange cells
+    n_force_empty = 0.0
+    ! Todo : cells that are touching a wall receive an empty density
+    cell_loop : do icell=1,n_cells
+       do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+          id_n = neighbours_list(i) ! id du voisin
+
+          if (id_n < 0) then
+             n_force_empty = n_force_empty + 1
+             densite_gaz(icell)  = 0.0
+             masse_gaz(icell)    = 0.0
+             densite_pouss(:,icell) = 0.0
+             masse(icell) = 0.0
+             cycle cell_loop
+          endif
+       enddo
+    enddo cell_loop
+
+    do icell=1, n_cells
+       if ( (Voronoi(icell)%delta_edge > 5 * Voronoi(icell)%h) .and.(Voronoi(icell)%id > 0) ) then ! exclude stars
+          ! 3 is extreme
+          n_force_empty = n_force_empty + 1
+          densite_gaz(icell)  = 0.0
+          masse_gaz(icell)    = 0.0
+          densite_pouss(:,icell) = 0.0
+          masse(icell) = 0.0
+       endif
+    enddo
+    write(*,*) "Density was forced to 0 in", n_force_empty, "cells surrounding the model", (1.0*n_force_empty)/n_cells * 100, "%"
+
+    open(unit=1, file="Voronoi_stats.txt",status="replace")
+    write(1,*) "# icell, id, x, y, z, h, Volume, delta_edge, delta_centroid"
+    do icell=1, n_cells
+       write(1, *) icell, Voronoi(icell)%id, Voronoi(icell)%xyz(1), Voronoi(icell)%xyz(2), Voronoi(icell)%xyz(3), Voronoi(icell)%h, volume(icell), Voronoi(icell)%delta_edge, Voronoi(icell)%delta_centroid
+    enddo
+    close(unit=1)
+
+
+    write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
+
+    write(*,*) "STOP", maxval(Voronoi(:)%delta_edge) ; stop
+
+    search_not_empty : do k=1,n_grains_tot
+       do icell=1, n_cells
+          if (densite_pouss(k,icell) > 0.0_sp) then
+             icell_not_empty = icell
+             exit search_not_empty
+          endif
+       enddo !icell
+    enddo search_not_empty
+
+    if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
 
     return
 
