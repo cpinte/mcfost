@@ -263,10 +263,10 @@ subroutine initialisation_mcfost()
   if (para(1:1)=="-") then
      if (para(2:2)=="v") then ! mcfost version
         call mcfost_v()
+     else if (para(2:8)=="history") then ! mcfost history
+        call mcfost_history()
      else if (para(2:2)=="h") then
         call display_help()
-     else if (para(2:2)=="history") then ! mcfost history
-        call mcfost_history()
      else if (para(2:6)=="setup") then ! download the utils and para file the 1st time the code is used
         call mcfost_setup()
      else if (para(2:9)=="get_para") then ! download current reference file
@@ -1264,13 +1264,13 @@ subroutine display_help()
 
   write(*,*) "usage : mcfost parameter_file [options]"
   write(*,*)
-  write(*,*) "mcfost -help : displays this help message"
+  write(*,*) "mcfost -h, -help : displays this help message"
   write(*,*) "       -v : displays version number, and available updates"
-  write(*,*) "       -get_para or get_doc : downloads the current version of the parameter file"
+  write(*,*) "       -get_para : downloads the current version of the parameter file"
   write(*,*) "       -get_yorick : downloads the current version of yorick scripts"
   write(*,*) "       -u : updates MCFOST to most recent version"
   write(*,*) "       -update_utils : updates MCFOST_UTILS to most recent version"
-  write(*,*) "       -h : displays full MCFOST history since v2.12.9"
+  write(*,*) "       -history : displays full MCFOST history since v2.12.9"
   write(*,*) "       -max_mem [GB] : maximum memory that MCFOST can use (approx), default 8"
   write(*,*) " "
   write(*,*) " Main mcfost options"
