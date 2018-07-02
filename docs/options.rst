@@ -26,6 +26,15 @@ no new release available
 
 ``-max_mem <value>`` [GB]: maximum memory that MCFOST can use (approx), default 8
 
+Main options
+------------
+
+``-img <wavelength>`` [microns]: computes image at specified wavelength
+
+``-mol``: calculates molecular maps
+
+
+
 
 Stellar Properties
 -------------------
@@ -46,3 +55,22 @@ darkening) on the stellar photosphere. Exemples of limb darkening files can be f
 simulations (e.g., SPH), mcfost  will assume an age to determine the stellar
 luminosity and temperature from the mass. The age can be selected using::
 Isochrones are found in ``$MCFOST_UTILS/Stellar_Polarization/Siess1``.
+
+
+Coupling with other codes
+-------------------------
+
+``-prodimo``: creates required files for ProDiMo.
+
+``-p2m``: reads the results from ProDiMo.
+
+``-astrochem``: creates required files for Astrochem.
+
+``-phamtom`` : reads a phantom dump file.
+
+``-gadget`` : reads a gadget-2 dump file.
+
+``-limits <limit-file>`` : x,y,z values used for the Voronoi tesselation.
+
+``-keep_particles <fraction>`` (default: 0.99): fraction of SPH particles to
+keep for the Voronoi tesselation.
