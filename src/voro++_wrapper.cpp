@@ -25,7 +25,7 @@ void progress_bar(float progress) {
 
 extern "C" {
   void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
-              int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
+              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
 
     ierr = 0 ;
 
@@ -72,6 +72,7 @@ extern "C" {
 
     int n_neighbours_cell, first_neighbour, last_neighbour ;
     int max_size_list = max_neighbours * n ;
+    double cx, cy, cz ;
 
     n_neighbours[cpu_id] = 0 ;
     last_neighbour = -1 ;
@@ -103,7 +104,7 @@ extern "C" {
             }
           }
 
-          // Volume
+          // Volume of the cell
           volume[pid] = c.volume() ;
 
           // Store the neighbours list
@@ -113,10 +114,7 @@ extern "C" {
           first_neighbour = last_neighbour+1 ; first_neighbours[pid] = first_neighbour ;
           last_neighbour  = last_neighbour + n_neighbours_cell ; last_neighbours[pid]  = last_neighbour ;
 
-          if (n_neighbours[cpu_id] > max_size_list) {
-            ierr = 1 ;
-            exit(1) ;
-          }
+          if (n_neighbours[cpu_id] > max_size_list) {ierr = 1 ; exit(1) ;}
 
           c.neighbors(vi) ;
           for (i=0 ; i<n_neighbours_cell ; i++) {
@@ -128,6 +126,12 @@ extern "C" {
               neighbours_list[row * cpu_id + first_neighbour+i] = vi[i] ;
             }
           }
+
+          // Compute the maximum distance to a vertex and the distance to the centroid from the particule position
+          delta_edge[pid] = sqrt(c.max_radius_squared()) ;
+
+          c.centroid(cx,cy,cz) ;
+          delta_centroid[pid] = sqrt(cx*cx + cy*cy + cz*cz) ;
         }  // con.compute_cell
       } // pid test
 

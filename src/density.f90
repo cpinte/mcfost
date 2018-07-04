@@ -19,7 +19,7 @@ module density
   real, public :: T_rm
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
-       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density
+       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, reduce_density
 
   private
 
@@ -1891,6 +1891,22 @@ subroutine remove_specie()
   return
 
 end subroutine remove_specie
+
+!************************************************************
+
+subroutine reduce_density(icell, factor)
+
+  integer, intent(in) :: icell
+  real, intent(in) :: factor
+
+  densite_gaz(icell)     = factor * densite_gaz(icell)
+  masse_gaz(icell)       = factor * masse_gaz(icell)
+  densite_pouss(:,icell) = factor * densite_pouss(:,icell)
+  masse(icell)           = factor * masse(icell)
+
+  return
+
+end subroutine reduce_density
 
 !************************************************************
 
