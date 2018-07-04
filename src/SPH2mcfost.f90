@@ -3,7 +3,7 @@ module SPH2mcfost
   use parametres
   use constantes
   use utils
-  use density, only : normalize_dust_density
+  use density, only : normalize_dust_density, reduce_density
 
   implicit none
 
@@ -125,6 +125,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
+    real, parameter :: density_factor = 1e-6
     logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
@@ -133,6 +134,10 @@ contains
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
+
+
+
+    !integer, allocatable, dimension(:) :: next_to_wall
 
     limit_threshold = (1.0 - SPH_keep_particles) * 0.5 ;
 
@@ -396,49 +401,50 @@ contains
        endif
     enddo
 
+    ! Removing cells at the "surface" of the SPH model:
+    ! density is reduced so that they do not appear in images or cast artificial shadows,
+    ! but we can still compute a temperature (forcing them to be optically thin)
 
-    ! Removing strange cells
     n_force_empty = 0.0
-    ! Todo : cells that are touching a wall receive an empty density
+    !allocate(next_to_wall(n_cells))
+
+    ! We reduce the density on cells that are touching a wall
     cell_loop : do icell=1,n_cells
+       !next_to_wall(icell) = 0
        do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
           id_n = neighbours_list(i) ! id du voisin
 
           if (id_n < 0) then
+             !next_to_wall(icell) = 1
              n_force_empty = n_force_empty + 1
-             densite_gaz(icell)  = 0.0
-             masse_gaz(icell)    = 0.0
-             densite_pouss(:,icell) = 0.0
-             masse(icell) = 0.0
+             call reduce_density(icell, density_factor)
              cycle cell_loop
           endif
        enddo
     enddo cell_loop
 
+    ! We reduce the density on cells that are very elongated
     do icell=1, n_cells
-       if ( (Voronoi(icell)%delta_edge > 5 * Voronoi(icell)%h) .and.(Voronoi(icell)%id > 0) ) then ! exclude stars
-          ! 3 is extreme
-          n_force_empty = n_force_empty + 1
-          densite_gaz(icell)  = 0.0
-          masse_gaz(icell)    = 0.0
-          densite_pouss(:,icell) = 0.0
-          masse(icell) = 0.0
+       if ( (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) .and.(Voronoi(icell)%id > 0) ) then ! exclude stars
+         n_force_empty = n_force_empty + 1
+         call reduce_density(icell, density_factor)
        endif
     enddo
-    write(*,*) "Density was forced to 0 in", n_force_empty, "cells surrounding the model", (1.0*n_force_empty)/n_cells * 100, "%"
+    write(*,*) "Density was reduced in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
 
-    open(unit=1, file="Voronoi_stats.txt",status="replace")
-    write(1,*) "# icell, id, x, y, z, h, Volume, delta_edge, delta_centroid"
-    do icell=1, n_cells
-       write(1, *) icell, Voronoi(icell)%id, Voronoi(icell)%xyz(1), Voronoi(icell)%xyz(2), Voronoi(icell)%xyz(3), Voronoi(icell)%h, volume(icell), Voronoi(icell)%delta_edge, Voronoi(icell)%delta_centroid
-    enddo
-    close(unit=1)
+    !! for testing
+    !open(unit=1, file="Voronoi_stats.txt",status="replace")
+    !write(1,*) "# icell, id, x, y, z, h, Volume, delta_edge, delta_centroid, next_to_wall"
+    !do icell=1, n_cells
+    !   write(1, *) icell, Voronoi(icell)%id, Voronoi(icell)%xyz(1), Voronoi(icell)%xyz(2), Voronoi(icell)%xyz(3), Voronoi(icell)%h, volume(icell), Voronoi(icell)%delta_edge, Voronoi(icell)%delta_centroid, next_to_wall(icell)
+    !enddo
+    !close(unit=1)
+    !deallocate(next_to_wall)
 
-
-    write(*,*) 'Total  gas mass in model:',  real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
 
-    write(*,*) "STOP", maxval(Voronoi(:)%delta_edge) ; stop
+!    write(*,*) "STOP", maxval(Voronoi(:)%delta_edge) ; stop
 
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
