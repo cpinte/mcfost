@@ -226,7 +226,7 @@ contains
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
-    call Voronoi_tesselation(n_SPH, x,y,z, limits, check_previous_tesselation)
+    call Voronoi_tesselation(n_SPH, x,y,z,h, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 

@@ -18,14 +18,17 @@ void progress_bar(float progress) {
   std::cout << "| \r";
   std::cout.flush();
 
-  //progress += 0.16; // for demonstration only
   if (progress >= 1.0) std::cout << std::endl;
 }
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[], double threshold, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
               int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
+
+    // Golden ratio constants for dodecahedron
+    const double Phi      = 0.5*(1+sqrt(5.0)) ;
+    const double inv_Norm = 1.0/sqrt(1.0+Phi*Phi) ; // Norm of vector with components (0,1,Phi) (in any order)
 
     ierr = 0 ;
 
@@ -80,7 +83,9 @@ extern "C" {
 
     float progress = 0.0 ;
     float progress_bar_step = 0.01 ;
-    float threshold = progress_bar_step*(1.*n)/n_cpu ;
+    float pb_threshold = progress_bar_step*(1.*n)/n_cpu ;
+
+    double f, fPhi ;
 
     if (!vlo.start()) {
       std::cout << "Error : voro++ did not manage to initialize" << std::endl;
@@ -97,15 +102,12 @@ extern "C" {
           n_in++ ;
 
           if (cpu_id == n_cpu-1) {
-            if (n_in > threshold) {
+            if (n_in > pb_threshold) {
               progress  += progress_bar_step ;
-              threshold += progress_bar_step*(1.*n)/n_cpu ;
+              pb_threshold += progress_bar_step*(1.*n)/n_cpu ;
               progress_bar(progress) ;
             }
           }
-
-          // Volume of the cell
-          volume[pid] = c.volume() ;
 
           // Store the neighbours list
           n_neighbours_cell = c.number_of_faces() ;
@@ -128,10 +130,27 @@ extern "C" {
           }
 
           // Compute the maximum distance to a vertex and the distance to the centroid from the particule position
-          delta_edge[pid] = sqrt(c.max_radius_squared()) ;
+          delta_edge[pid] = sqrt(c.max_radius_squared()) ; // does not cost anything
 
           c.centroid(cx,cy,cz) ;
           delta_centroid[pid] = sqrt(cx*cx + cy*cy + cz*cz) ;
+
+          // If the Voronoi cell is elongated, we intersect it with a dodecahedron
+          if (delta_edge[pid] > threshold * h[pid]) {
+            f = h[pid] * inv_Norm ; // todo : we need to add a factor to compare the volume of dodecahedron with sphere
+            fPhi = f * Phi ;
+
+            // Adding the 12 planes to cut the cell
+            c.plane(0,fPhi,f)  ; c.plane(0,-fPhi,f)  ;
+            c.plane(0,fPhi,-f) ; c.plane(0,-fPhi,-f) ;
+            c.plane(f,0,fPhi)  ; c.plane(-f,0,fPhi)  ;
+            c.plane(f,0,-fPhi) ; c.plane(-f,0,-fPhi) ;
+            c.plane(fPhi,f,0)  ; c.plane(-fPhi,f,0)  ;
+            c.plane(fPhi,-f,0) ; c.plane(-fPhi,-f,0) ;
+          }
+
+          // Volume of the cell (computed after eventual cut)
+          volume[pid] = c.volume() ;
         }  // con.compute_cell
       } // pid test
 

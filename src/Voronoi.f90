@@ -46,13 +46,14 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
           n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu
        real(c_double), dimension(6), intent(in) :: limits
-       real(c_double), dimension(n_points), intent(in) :: x,y,z
+       real(c_double), dimension(n_points), intent(in) :: x,y,z,h
+       real(c_double), intent(in), value :: threshold ! defines at how many h the cells will be cut
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
@@ -66,6 +67,7 @@ module Voronoi_grid
   contains
 
     subroutine define_Voronoi_grid()
+      ! This is an empty routine as a target for define_grid
 
       return
 
@@ -237,18 +239,18 @@ module Voronoi_grid
 
 !----------------------------------------
 
-  subroutine Voronoi_tesselation(n_points, x,y,z, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
 
     !$ use omp_lib
 
     integer, intent(in) :: n_points
-    real(kind=dp), dimension(n_points), intent(in) :: x, y, z
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
 
     integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
 
-    real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp
+    real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id
     real :: time
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
@@ -264,6 +266,8 @@ module Voronoi_grid
 
     integer :: icell_start, icell_end, id, row
 
+    real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
+
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
@@ -275,7 +279,7 @@ module Voronoi_grid
     R_ISM = 1.000001_dp * 0.5_dp * Rmax
     centre_ISM(:) = 0.5_dp * (/limits(2)+limits(1), limits(4)+limits(3), limits(6)+limits(5)/)
 
-    allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), &
+    allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles),stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
@@ -313,7 +317,7 @@ module Voronoi_grid
                 if (is_outside_stars) then
                    icell = icell + 1
                    SPH_id(icell) = i
-                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;
+                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(n_points+n_etoiles) = h(i)
                 endif
              endif
           endif
@@ -334,7 +338,7 @@ module Voronoi_grid
           if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
              if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
                 icell = icell + 1
-                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ;
+                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
                 etoile(i)%out_model = .false.
                 etoile(i)%icell = icell
                 SPH_id(icell) = 0
@@ -385,7 +389,7 @@ module Voronoi_grid
        ! We initialize arrays at 0 as we have a reduction + clause
        volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0.
        !$omp parallel default(none) &
-       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,nb_proc,n_cells_per_cpu) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours) &
        !$omp private(id,icell_start,icell_end,ierr) &
        !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid)
@@ -394,7 +398,7 @@ module Voronoi_grid
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
             n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
