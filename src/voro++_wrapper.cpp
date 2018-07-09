@@ -23,12 +23,8 @@ void progress_bar(float progress) {
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[], double threshold, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
               int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
-
-    // Golden ratio constants for dodecahedron
-    const double Phi      = 0.5*(1+sqrt(5.0)) ;
-    const double inv_Norm = 1.0/sqrt(1.0+Phi*Phi) ; // Norm of vector with components (0,1,Phi) (in any order)
 
     ierr = 0 ;
 
@@ -38,7 +34,7 @@ extern "C" {
     ay = limits[2] ; by = limits[3] ;
     az = limits[4] ; bz = limits[5] ;
 
-    int i, nx,ny,nz,init_mem(8);
+    int i, k, nx,ny,nz,init_mem(8);
 
     int row = n_points_per_cpu * max_neighbours ;
 
@@ -137,16 +133,20 @@ extern "C" {
 
           // If the Voronoi cell is elongated, we intersect it with a dodecahedron
           if (delta_edge[pid] > threshold * h[pid]) {
-            f = h[pid] * inv_Norm ; // todo : we need to add a factor to compare the volume of dodecahedron with sphere
-            fPhi = f * Phi ;
+            //f = h[pid] * inv_Norm ; // todo : we need to add a factor to compare the volume of dodecahedron with sphere
+            //fPhi = f * Phi ;
 
-            // Adding the 12 planes to cut the cell
-            c.plane(0,fPhi,f)  ; c.plane(0,-fPhi,f)  ;
-            c.plane(0,fPhi,-f) ; c.plane(0,-fPhi,-f) ;
-            c.plane(f,0,fPhi)  ; c.plane(-f,0,fPhi)  ;
-            c.plane(f,0,-fPhi) ; c.plane(-f,0,-fPhi) ;
-            c.plane(fPhi,f,0)  ; c.plane(-fPhi,f,0)  ;
-            c.plane(fPhi,-f,0) ; c.plane(-fPhi,-f,0) ;
+            // Adding the n-planes to cut the cell
+            for (k=0 ; k<n_vectors ; k++) {
+              //std::cout << "test0 " << k << " " << cutting_vectors[1][k] << "h= " << h[pid] <<  std::endl;
+              c.plane(h[pid] * cutting_vectors[0][k], h[pid] * cutting_vectors[1][k], h[pid] * cutting_vectors[2][k]) ;
+            }
+            //c.plane(0,fPhi,f)  ; c.plane(0,-fPhi,f)  ;
+            //c.plane(0,fPhi,-f) ; c.plane(0,-fPhi,-f) ;
+            //c.plane(f,0,fPhi)  ; c.plane(-f,0,fPhi)  ;
+            //c.plane(f,0,-fPhi) ; c.plane(-f,0,-fPhi) ;
+            //c.plane(fPhi,f,0)  ; c.plane(-fPhi,f,0)  ;
+            //c.plane(fPhi,-f,0) ; c.plane(-fPhi,-f,0) ;
           }
 
           // Volume of the cell (computed after eventual cut)

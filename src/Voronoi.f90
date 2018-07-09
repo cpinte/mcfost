@@ -46,14 +46,15 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
           n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
        real(c_double), intent(in), value :: threshold ! defines at how many h the cells will be cut
+       real(c_double), dimension(12,3), intent(in) :: cutting_vectors
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
@@ -268,6 +269,31 @@ module Voronoi_grid
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
 
+    ! Docehedrons to cut large Voronpoi cells
+    real(kind=dp) :: Phi = 0.5*(1+sqrt(5.0)) ! Golden ratio constants for dodecahedron
+    real(kind=dp), dimension(12,3) :: Dodecahedron_vectors
+    real(kind=dp) :: fPhi, f, inv_Norm
+
+    ! Defining dodecahedron
+    inv_Norm = 1.0/sqrt(1.0+Phi*Phi)  ! Norm of vector with components (0,1,Phi) (in any order)
+    f = inv_Norm ; fPhi = f * Phi
+
+    ! Vectors perpendicular to faces
+    Dodecahedron_vectors(1,:) = (/0.0_dp,fPhi,f/)
+    Dodecahedron_vectors(2,:) = (/0.0_dp,-fPhi,f/)
+    Dodecahedron_vectors(3,:) = (/0.0_dp,fPhi,-f/)
+    Dodecahedron_vectors(4,:) = (/0.0_dp,-fPhi,-f/)
+    Dodecahedron_vectors(5,:) = (/f,0.0_dp,fPhi/)
+    Dodecahedron_vectors(6,:) = (/-f,0.0_dp,fPhi/)
+    Dodecahedron_vectors(7,:) = (/f,0.0_dp,-fPhi/)
+    Dodecahedron_vectors(8,:) = (/-f,0.0_dp,-fPhi/)
+    Dodecahedron_vectors(9,:) = (/fPhi,f,0.0_dp/)
+    Dodecahedron_vectors(10,:)= (/-fPhi,f,0.0_dp/)
+    Dodecahedron_vectors(11,:)= (/fPhi,-f,0.0_dp/)
+    Dodecahedron_vectors(12,:)= (/-fPhi,-f,0.0_dp/)
+
+    write(*,*)  "F", Dodecahedron_vectors(12,:)
+
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
@@ -317,7 +343,7 @@ module Voronoi_grid
                 if (is_outside_stars) then
                    icell = icell + 1
                    SPH_id(icell) = i
-                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(n_points+n_etoiles) = h(i)
+                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
                 endif
              endif
           endif
@@ -390,7 +416,7 @@ module Voronoi_grid
        volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0.
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
-       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours) &
+       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,Dodecahedron_vectors) &
        !$omp private(id,icell_start,icell_end,ierr) &
        !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid)
        id = 1
@@ -398,7 +424,7 @@ module Voronoi_grid
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, 12, Dodecahedron_vectors, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
             n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
