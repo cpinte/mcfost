@@ -387,16 +387,6 @@ contains
        enddo
     endif
 
-    !*************************
-    ! Smoothing lengths
-    !*************************
-    do icell=1,n_cells
-       iSPH = Voronoi(icell)%id
-       if (iSPH > 0) then
-          Voronoi(icell)%h = h(iSPH)
-       endif
-    enddo
-
     ! Removing cells at the "surface" of the SPH model:
     ! density is reduced so that they do not appear in images or cast artificial shadows,
     ! but we can still compute a temperature (forcing them to be optically thin)

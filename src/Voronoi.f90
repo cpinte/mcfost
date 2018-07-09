@@ -304,7 +304,7 @@ module Voronoi_grid
 
   subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
 
-    use iso_fortran_env
+    use, intrinsic :: iso_c_binding
     !$ use omp_lib
 
     integer, intent(in) :: n_points
@@ -439,6 +439,7 @@ module Voronoi_grid
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
        Voronoi(icell)%xyz(3) = z_tmp(icell)
+       Voronoi(icell)%h      = h_tmp(icell)
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
 
@@ -456,12 +457,13 @@ module Voronoi_grid
     endif
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
-       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0.
+       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0. ; was_cell_cut = .false.
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid,was_cell_cut)
+       !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid) &
+       !$omp reduction(.or.:was_cell_cut)
        id = 1
        !$ id = omp_get_thread_num() + 1
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
@@ -514,8 +516,39 @@ module Voronoi_grid
 
     Voronoi(:)%delta_edge = delta_edge(:)
     Voronoi(:)%delta_centroid = delta_centroid(:)
-    Voronoi(:)%was_cut = was_cell_cut
+    Voronoi(:)%was_cut = was_cell_cut(:)
     deallocate(delta_edge, delta_centroid,was_cell_cut)
+
+
+    ! We check if we get the same test between Fortran and C++
+    write(*,*) "TESTING TESSELATION"
+    do icell=1,n_cells
+       ! We reduce the density on cells that are very elongated
+       if (Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h) then
+          if (.not.Voronoi(icell)%was_cut) call error("There was an issue cutting cells 1 !!!")
+       else
+          !write(*,*) '-------------------------------'
+          !write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
+          if (Voronoi(icell)%was_cut) then
+             write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
+             call error("There was an issue cutting cells 2 !!!")
+          endif
+       end if
+    end do
+
+    do icell = 1, n_cells
+       if (Voronoi(icell)%was_cut) then
+          if ( Voronoi(icell)%delta_edge < threshold * Voronoi(icell)%h ) then
+             write(*,*) "was_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
+          endif
+       else
+          if ( Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h ) then
+             write(*,*) "was_not_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
+          endif
+       endif
+    enddo
+    write(*,*) "TESTING OK"
+
 
     ! Setting-up the walls
     n_missing_cells = 0
