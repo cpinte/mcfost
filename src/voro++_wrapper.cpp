@@ -23,8 +23,8 @@ void progress_bar(float progress) {
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
-              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], double cutting_distance, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
 
     ierr = 0 ;
 
@@ -71,7 +71,7 @@ extern "C" {
 
     int n_neighbours_cell, first_neighbour, last_neighbour ;
     int max_size_list = max_neighbours * n ;
-    double cx, cy, cz ;
+    double cx, cy, cz, f ;
 
     n_neighbours[cpu_id] = 0 ;
     last_neighbour = -1 ;
@@ -81,8 +81,6 @@ extern "C" {
     float progress_bar_step = 0.01 ;
     float pb_threshold = progress_bar_step*(1.*n)/n_cpu ;
 
-    double f, fPhi ;
-
     if (!vlo.start()) {
       std::cout << "Error : voro++ did not manage to initialize" << std::endl;
       std::cout << "Exiting" << std::endl;
@@ -90,6 +88,7 @@ extern "C" {
       exit(1) ;
     }
 
+    //float V_old, V_new ;
     do {
       pid = vlo.pid() ; // id of the current cell in the c_loop
 
@@ -132,21 +131,20 @@ extern "C" {
           delta_centroid[pid] = sqrt(cx*cx + cy*cy + cz*cz) ;
 
           // If the Voronoi cell is elongated, we intersect it with a dodecahedron
+          was_cell_cut[pid] = false ;
           if (delta_edge[pid] > threshold * h[pid]) {
-            //f = h[pid] * inv_Norm ; // todo : we need to add a factor to compare the volume of dodecahedron with sphere
-            //fPhi = f * Phi ;
+            f = cutting_distance * h[pid] ;
+
+            //V_old = c.volume() ;
 
             // Adding the n-planes to cut the cell
             for (k=0 ; k<n_vectors ; k++) {
-              //std::cout << "test0 " << k << " " << cutting_vectors[1][k] << "h= " << h[pid] <<  std::endl;
-              c.plane(h[pid] * cutting_vectors[0][k], h[pid] * cutting_vectors[1][k], h[pid] * cutting_vectors[2][k]) ;
+              c.plane(f * cutting_vectors[0][k], f * cutting_vectors[1][k], f * cutting_vectors[2][k]) ;
             }
-            //c.plane(0,fPhi,f)  ; c.plane(0,-fPhi,f)  ;
-            //c.plane(0,fPhi,-f) ; c.plane(0,-fPhi,-f) ;
-            //c.plane(f,0,fPhi)  ; c.plane(-f,0,fPhi)  ;
-            //c.plane(f,0,-fPhi) ; c.plane(-f,0,-fPhi) ;
-            //c.plane(fPhi,f,0)  ; c.plane(-fPhi,f,0)  ;
-            //c.plane(fPhi,-f,0) ; c.plane(-fPhi,-f,0) ;
+            was_cell_cut[pid] = true ;
+
+            //V_new = c.volume() ;
+            // std::cout << "e/3h= " << delta_edge[pid] / ( threshold * h[pid])   << " V_ratio=" << V_new / V_old << std::endl ; // Ok, numbers make sense
           }
 
           // Volume of the cell (computed after eventual cut)
