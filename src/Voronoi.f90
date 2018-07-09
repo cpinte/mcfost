@@ -26,16 +26,36 @@ module Voronoi_grid
   type Voronoi_wall
      character(len=10) :: type
      real :: x1, x2, x3, x4, x5, x6, x7
-     integer :: n_neighbours
-     integer, dimension(max_wall_neighbours) :: neighbour_list ! Warning hard coded
-
-     ! Fortran trick to make an array of pointers
-     type(kdtree2), pointer :: tree
-
      ! Plane wall :
      ! x1, x2, x3 : normal
      ! x4 : displacement along the normal
+
+     integer :: n_neighbours
+     integer, dimension(max_wall_neighbours) :: neighbour_list ! Warning max_wall_neighbours is hard coded
+
+     ! Fortran trick to make an array of pointers
+     type(kdtree2), pointer :: tree
   end type Voronoi_wall
+
+  real(kind=dp), parameter :: Phi = (1+sqrt(5.0))/2. ! Golden ratio
+
+  type dodecahedron
+     integer :: n_faces = 12
+
+     ! Value defined as a factor on the edge length a
+     real(kind=dp) :: radius       ! distance from center to edge
+     real(kind=dp) :: dist_to_face ! distance from center to face
+
+     ! ratio distance face to distance edge
+     real(kind=dp) :: face_o_edge
+
+     ! Value defined as a factor on a**3
+     real(kind=dp) :: volume
+
+     ! Vectors to face
+     real(kind=dp), dimension(12,3) :: vectors
+
+  end type dodecahedron
 
   real(kind=dp), dimension(:,:,:), allocatable :: wall_cells ! 3, n_cells_wall, n_walls
 
@@ -74,7 +94,46 @@ module Voronoi_grid
 
     end subroutine define_Voronoi_grid
 
-  !************************************************************************
+    !************************************************************************
+
+    subroutine init_dodecahedron(D)
+
+      type(dodecahedron), intent(out) :: D
+
+      real(kind=dp) :: f, fPhi
+
+      D.n_faces = 12
+
+      ! a is the edge length
+      D.radius = sqrt(3.0)/2. * Phi ! a
+      D.dist_to_face = Phi**3 / (2*sqrt(Phi**2+1)) ! a
+
+      D.face_o_edge = D.dist_to_face/D.radius
+
+      D.volume = (15 + 7*sqrt(5.0))/4. ! a**3
+
+      f = 1.0/sqrt(1.0+Phi*Phi)  ! 1/Norm of vector with components (0,1,Phi) (in any order)
+      fPhi = f * Phi
+
+      ! Normalized vectors perpendicular to faces
+      D.vectors(1,:) = (/0.0_dp,fPhi,f/)
+      D.vectors(2,:) = (/0.0_dp,-fPhi,f/)
+      D.vectors(3,:) = (/0.0_dp,fPhi,-f/)
+      D.vectors(4,:) = (/0.0_dp,-fPhi,-f/)
+      D.vectors(5,:) = (/f,0.0_dp,fPhi/)
+      D.vectors(6,:) = (/-f,0.0_dp,fPhi/)
+      D.vectors(7,:) = (/f,0.0_dp,-fPhi/)
+      D.vectors(8,:) = (/-f,0.0_dp,-fPhi/)
+      D.vectors(9,:) = (/fPhi,f,0.0_dp/)
+      D.vectors(10,:)= (/-fPhi,f,0.0_dp/)
+      D.vectors(11,:)= (/fPhi,-f,0.0_dp/)
+      D.vectors(12,:)= (/-fPhi,-f,0.0_dp/)
+
+      return
+
+    end subroutine init_dodecahedron
+
+    !************************************************************************
 
   subroutine Voronoi_tesselation_cmd_line(n_points, x,y,z,  limits)
 
@@ -269,30 +328,11 @@ module Voronoi_grid
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
 
-    ! Docehedrons to cut large Voronpoi cells
-    real(kind=dp) :: Phi = 0.5*(1+sqrt(5.0)) ! Golden ratio constants for dodecahedron
-    real(kind=dp), dimension(12,3) :: Dodecahedron_vectors
-    real(kind=dp) :: fPhi, f, inv_Norm
+    ! Dodecahedron to cut large Voronpoi cells
+    type(dodecahedron) :: D
 
     ! Defining dodecahedron
-    inv_Norm = 1.0/sqrt(1.0+Phi*Phi)  ! Norm of vector with components (0,1,Phi) (in any order)
-    f = inv_Norm ; fPhi = f * Phi
-
-    ! Vectors perpendicular to faces
-    Dodecahedron_vectors(1,:) = (/0.0_dp,fPhi,f/)
-    Dodecahedron_vectors(2,:) = (/0.0_dp,-fPhi,f/)
-    Dodecahedron_vectors(3,:) = (/0.0_dp,fPhi,-f/)
-    Dodecahedron_vectors(4,:) = (/0.0_dp,-fPhi,-f/)
-    Dodecahedron_vectors(5,:) = (/f,0.0_dp,fPhi/)
-    Dodecahedron_vectors(6,:) = (/-f,0.0_dp,fPhi/)
-    Dodecahedron_vectors(7,:) = (/f,0.0_dp,-fPhi/)
-    Dodecahedron_vectors(8,:) = (/-f,0.0_dp,-fPhi/)
-    Dodecahedron_vectors(9,:) = (/fPhi,f,0.0_dp/)
-    Dodecahedron_vectors(10,:)= (/-fPhi,f,0.0_dp/)
-    Dodecahedron_vectors(11,:)= (/fPhi,-f,0.0_dp/)
-    Dodecahedron_vectors(12,:)= (/-fPhi,-f,0.0_dp/)
-
-    write(*,*)  "F", Dodecahedron_vectors(12,:)
+    call init_Dodecahedron(D)
 
     n_walls = 6
     write(*,*) "Finding ", n_walls, "walls"
@@ -416,7 +456,7 @@ module Voronoi_grid
        volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0.
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
-       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,Dodecahedron_vectors) &
+       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,D) &
        !$omp private(id,icell_start,icell_end,ierr) &
        !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid)
        id = 1
@@ -424,7 +464,7 @@ module Voronoi_grid
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, 12, Dodecahedron_vectors, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, D.n_faces, D.vectors, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
             n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
