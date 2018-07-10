@@ -304,7 +304,7 @@ module Voronoi_grid
 
   subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
 
-    use, intrinsic :: iso_c_binding
+    use, intrinsic :: iso_c_binding, only : c_bool
     !$ use omp_lib
 
     integer, intent(in) :: n_points
@@ -451,7 +451,7 @@ module Voronoi_grid
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
     if (check_previous_tesselation) then
        call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge,delta_centroid)
+            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
     else
        lcompute = .true.
     endif
@@ -503,7 +503,7 @@ module Voronoi_grid
        n_neighbours_tot = sum(n_neighbours)
 
        if (check_previous_tesselation) then
-          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid)
+          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
        endif
     else
        write(*,*) "Reading previous Voronoi tesselation"
@@ -610,12 +610,15 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
+
+    use, intrinsic :: iso_c_binding, only : c_bool
 
     real(kind=dp), intent(in), dimension(6) :: limits
     integer, intent(in) :: n_in, n_neighbours_tot
     integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
     real(kind=dp), dimension(:), intent(in) :: delta_edge, delta_centroid
+    logical(c_bool), dimension(:), intent(in) :: was_cell_cut
     character(len=512) :: filename
     character(len=40) :: voronoi_sha1
 
@@ -624,7 +627,7 @@ module Voronoi_grid
     filename = "_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
-    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid
+    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid, was_cell_cut
     close(1)
 
     return
@@ -635,7 +638,9 @@ module Voronoi_grid
   !**********************************************************
 
   subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge, delta_centroid)
+       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge, delta_centroid,was_cell_cut)
+
+    use, intrinsic :: iso_c_binding, only : c_bool
 
     integer, intent(in) :: n_cells,max_neighbours
     real(kind=dp), intent(in), dimension(6) :: limits
@@ -645,6 +650,7 @@ module Voronoi_grid
     integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
     integer, dimension(n_cells*max_neighbours), intent(out) :: neighbours_list
     real(kind=dp), dimension(n_cells), intent(out) :: delta_edge, delta_centroid
+    logical(c_bool), dimension(n_cells), intent(out) :: was_cell_cut
 
     character(len=512) :: filename
     integer :: ios
@@ -667,7 +673,7 @@ module Voronoi_grid
 
     ! read the saved Voronoi mesh
     read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, &
-         first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid
+         first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid, was_cell_cut
     close(unit=1)
     if (ios /= 0) then ! if some dimension changed
        return
