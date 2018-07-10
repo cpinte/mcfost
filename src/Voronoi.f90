@@ -20,7 +20,7 @@ module Voronoi_grid
      real(kind=dp) :: h ! SPH smoothing lengths
      real(kind=dp) :: delta_edge, delta_centroid
      integer :: id, first_neighbour, last_neighbour
-     logical :: exist, is_star, was_cut
+     logical(kind=lp) :: exist, is_star, was_cut
   end type Voronoi_cell
 
   type Voronoi_wall
