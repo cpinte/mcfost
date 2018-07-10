@@ -40,7 +40,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   logical, intent(out) :: flag_sortie
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
-  real(kind=dp) :: l, tau, opacite
+  real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
   integer :: icell_in, icell0, icell_old, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
@@ -98,7 +98,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
-     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      ! opacity wall
      !---if (ri0 == 1) then
@@ -113,13 +113,13 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      !---   endif
      !---endif
 
-     tau = l*opacite ! opacite constante dans la cellule
+     tau = l_contrib * opacite ! opacite constante dans la cellule
 
      ! Comparaison integrale avec tau
      ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
         lstop = .true.
-        l = l * (extr/tau) ! on rescale l pour que tau=extr
+        l = l_void_before + l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
         ltot=ltot+l
      else ! Il reste extr - tau a integrer dans la cellule suivante
         extr=extr-tau
@@ -127,7 +127,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      endif
 
      ! Stockage des champs de radiation
-     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l, &
+     if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
           x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
 
      ! On a fini d'integrer : sortie de la routine
@@ -244,7 +244,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   real(kind=dp), intent(out) :: lmin,lmax
 
 
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
   integer :: icell0, previous_cell, next_cell
 
   correct_plus = 1.0_dp + prec_grille
@@ -281,9 +281,9 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
-     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
+     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
-     tau=l*opacite ! opacite constante dans la cellule
+     tau=l_contrib*opacite ! opacite constante dans la cellule
 
      tau_tot = tau_tot + tau
      ltot= ltot + l
@@ -323,7 +323,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   integer, intent(in) :: nTrans
   integer, dimension(nTrans), intent(in) :: tab_Trans
 
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=dp), dimension(nTrans) :: tau_c
@@ -368,7 +368,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
+     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      if (lcellule_non_vide) then
         lsubtract_avg = ((nbr_cell == 1).and.labs)
@@ -387,8 +387,8 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
 
            ! Epaisseur optique
-           dtau(:) =  l * opacite(:)
-           dtau_c = l * kappa(icell,iTrans)
+           dtau(:) =  l_contrib * opacite(:)
+           dtau_c = l_contrib * kappa(icell,iTrans)
 
            ! Fonction source
            Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
@@ -422,7 +422,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
               iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
               opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
-              dtau(:) =  l * opacite(:)
+              dtau(:) =  l_contrib * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
               ! la profondeur optique jusqu'a la cellule
@@ -613,7 +613,7 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
   !integer, dimension(nTrans), intent(in) :: tab_Trans
 
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau_mol, opacite
 
   real(kind=dp) :: dtau_c
@@ -653,7 +653,7 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
+     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      if (lcellule_non_vide) then
         ! local line profile mutiplied by frequency
@@ -665,8 +665,8 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
            opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
 
            ! Epaisseur optique
-           dtau_mol(:) =  l * opacite(:)
-           dtau_c = l * kappa(icell,iTrans)
+           dtau_mol(:) =  l_contrib * opacite(:)
+           dtau_c = l_contrib * kappa(icell,iTrans)
 
            ! Mise a jour profondeur optique pour cellule suivante
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
@@ -703,7 +703,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
 
   real(kind=dp), dimension(N_type_flux) :: integ_ray_dust
 
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l, l_contrib, l_void_before
   integer :: icell, previous_cell, next_cell
 
   real(kind=dp) :: tau, dtau
@@ -739,11 +739,11 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
      previous_cell = 0 ! unused, just for Voronoi
-     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l)
+     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l * kappa(icell,lambda)
+        dtau =  l_contrib * kappa(icell,lambda)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)

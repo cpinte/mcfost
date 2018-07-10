@@ -770,18 +770,20 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s)
+  subroutine cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s, s_contrib, s_void_before)
 
     integer, intent(in) :: icell, previous_cell
     real(kind=dp), intent(in) :: x,y,z, u,v,w
 
-    real(kind=dp), intent(out) ::  s
+    real(kind=dp), intent(out) :: x1, y1, z1, s, s_contrib, s_void_before
     integer, intent(out) :: next_cell
 
-    real(kind=dp) :: s_tmp, den, s_virtual ! TODO : s_virtual needs to be intent(out)
+    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n
 
-    real(kind=dp), intent(out) :: x1, y1, z1
+    logical :: ltest_exit
+
+
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k
@@ -843,8 +845,11 @@ module Voronoi_grid
     endif
 
     ! Vitual walls of the cell if the cell was cut during the tesselation
+    ! we need to test if the packet will enter the Platonic Solid, not just if it will exit it
     if (Voronoi(icell)%was_cut) then
-       s_virtual = 1e30
+       s_entry = 1e30
+       s_exit = s
+
        vnb_loop : do i=1, PS.n_faces
           ! normalized vector to plane
           n(:) = PS.vectors(i,:)
@@ -856,14 +861,31 @@ module Voronoi_grid
           ! point on the plane
           p(:) = Voronoi(icell)%xyz(:) +  (Voronoi(id_n)%h * PS.cutting_distance_o_h) * n(:)
 
-          s_tmp = dot_product(n, p-r) / den
+          num = dot_product(n, p-r)
+
+          if (num > 0.0_dp) then ! the current point and center of the cell are on the same side of the plane
+             ltest_exit = .true. ! we are looking at an exit plane
+          else
+             ltest_exit = .false. ! we are looking at an entry plane
+          endif
+
+          s_tmp = num / den
 
           if (s_tmp > 0.) then
-             if (s_tmp < s_virtual)  s_virtual = s_tmp
+             if (ltest_exit) then
+                if (s_tmp < s_exit)  s_exit  = s_tmp
+             else
+                if (s_tmp < s_entry) s_entry = s_tmp
+             endif
           endif
        enddo vnb_loop ! i
+       if (s_entry > s_exit) s_entry = 0.0_dp ! We were already in the Platonic solid
+
+       s_void_before = s_entry
+       s_contrib = s_exit - s_entry
     else ! the cell was not cut
-       s_virtual = s
+       s_void_before = 0.0_dp
+       s_contrib = s
     endif
 
     return
@@ -1014,87 +1036,6 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine length_Voronoi(id,lambda,Stokes,cell_io,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
-    ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-    ! C. Pinte
-
-    integer, intent(in) :: id,lambda
-    integer, intent(inout) :: cell_io
-    real(kind=dp), dimension(4), intent(in) :: Stokes
-    logical, intent(in) :: flag_star, flag_direct_star
-    real(kind=dp), intent(inout) :: u,v,w
-    real(kind=dp), intent(in) :: extrin
-    real(kind=dp), intent(inout) :: xio,yio,zio
-    real(kind=dp), intent(out) :: ltot
-    logical, intent(out) :: flag_sortie
-
-
-    logical :: lstop
-
-    real(kind=dp) :: extr, tau, opacite !, correct_moins, correct_plus
-    integer :: previous_cell, cell, next_cell
-
-    real(kind=dp) :: x, y, z, l, x1,y1,z1
-
-    !correct_moins = 1.0_dp - prec_grille
-    !correct_plus = 1.0_dp + prec_grille
-
-    extr = extrin
-
-    previous_cell = 0
-    cell = cell_io
-
-    lstop = .false.
-
-    x = xio ; y = yio ; z=zio
-    ltot = 0.0
-
-    ! Boucle infinie sur les cellules
-    do
-       !write(*,*) "I am in cell ", cell, "position", real(x), real(y), real(z)
-       call cross_Voronoi_cell(x,y,z, u,v,w, cell, previous_cell, x1,y1,z1, next_cell, l)
-       opacite=1.0 !kappa(lambda,cell,1,1) ! TODO !!!
-
-       ! Calcul longeur de vol et profondeur optique dans la cellule
-       tau=l*opacite ! opacite constante dans la cellule
-
-       ! Comparaison integrale avec tau
-       ! et ajustement longueur de vol evntuellement
-       if(tau > extr) then ! On a fini d'integrer
-          lstop = .true.
-          l = l * (extr/tau) ! on rescale l pour que tau=extr
-          ltot=ltot+l
-       else ! Il reste extr - tau a integrer dans la cellule suivante
-          extr=extr-tau
-          ltot=ltot+l
-       endif
-
-       ! Update position
-       x=x1 ; y=y1 ; z=z1
-
-       ! Test si on on sort de la routine ou pas
-       if (lstop) then ! On a fini d'integrer
-          flag_sortie = .false.
-          cell_io = cell
-          xio=x ; yio=y ;zio=z
-          return
-       else ! On passe a la cellule suivante
-          previous_cell = cell
-          cell = next_cell
-
-          if (cell < 0) then ! on sort du volume
-             flag_sortie = .true.
-             return
-          endif
-       endif
-    enddo ! Boucle sur cellules
-
-    return
-
-  end subroutine length_Voronoi
-
-!----------------------------------------
-
 pure logical function test_exit_grid_Voronoi(icell, x,y,z)
 
   integer, intent(in) :: icell
@@ -1172,7 +1113,7 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
 
   real(kind=dp) :: u, v, w, srw2, argmt, x1,y1,z1
   integer :: previous_cell, next_cell
-  real(kind=dp) :: l
+  real(kind=dp) :: l, l_contrib, l_void_before
 
   ! Direction aleatoire
   w = 2.0_dp * aleat1 - 1.0_dp
@@ -1184,10 +1125,10 @@ subroutine pos_em_cellule_Voronoi(icell,aleat1,aleat2,aleat3, x,y,z)
   ! Distance jusqu'au bord de la cellule
   previous_cell = 0
   x = Voronoi(icell)%xyz(1) ; y = Voronoi(icell)%xyz(2) ; z = Voronoi(icell)%xyz(3)
-  call cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l)
+  call cross_Voronoi_cell(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
   ! Repartition uniforme selon cette direction
-  l = l * aleat3**(1./3)
+  l = l_contrib * aleat3**(1./3)
   !x=x+l ; y=y+l*v ; z=z+l*w ! emission au centre cellule si cette ligne est commentee
 
   return
