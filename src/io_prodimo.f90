@@ -740,8 +740,6 @@ contains
        enddo
     enddo ! lambda
 
-
-
     ! Inversion de l'ordre des dimensions + passage en simple precision
     do ri=1, n_rad
        do zj=1,nz

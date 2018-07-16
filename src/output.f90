@@ -1107,19 +1107,13 @@ end subroutine calc_optical_depth_map
 
 !***********************************************************
 
-subroutine write_column_density()
-  ! Only works if the star in in 0, 0, 0 at the moment
+subroutine compute_CD(CD)
 
   integer, parameter :: n_directions = 4
+  real, dimension(n_cells,n_directions), intent(out) :: CD
 
-  real, dimension(n_cells,n_directions) :: CD
-  integer :: icell, icell0, next_cell, previous_cell
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, direction
-
-  logical :: simple, extend, ltest
-  character(len=512) :: filename
+  integer :: icell, icell0, next_cell, previous_cell, direction
+  logical :: ltest
 
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
 
@@ -1172,6 +1166,29 @@ subroutine write_column_density()
      enddo ! icell
   end do ! direction
   CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
+
+  return
+
+end subroutine compute_CD
+
+!***********************************************************
+
+
+subroutine write_column_density()
+  ! Only works if the star in in 0, 0, 0 at the moment
+
+  integer, parameter :: n_directions = 4
+
+  real, dimension(n_cells,n_directions) :: CD
+
+
+  integer :: status,unit,blocksize,bitpix,naxis,group,fpixel,nelements
+  integer, dimension(4) :: naxes
+  logical :: simple, extend
+  character(len=512) :: filename
+
+  call compute_CD(CD)
+
 
   filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
 
