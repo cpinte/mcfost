@@ -19,7 +19,7 @@ else
     echo "Unknown system to build mcfost: "$SYSTEM"\nPlease choose ifort or gfortran\ninstall.sh <system>\nExiting" ; exit 1
 fi
 
-rm -rf lib include sprng2.0 cfitsio voro # Clean previous files if any
+rm -rf lib include sprng2.0 cfitsio voro xgboost # Clean previous files if any
 
 
 echo "Installing MCFOST libraries in "$MCFOST_INSTALL/lib/$SYSTEM
@@ -84,12 +84,28 @@ make
 mkdir -p ../include/voro++ ; \cp src/*.hh ../include/voro++/
 cd ~1
 
+#-------------------------------------------
+# xgboost
+#-------------------------------------------
+git clone --recursive https://github.com/dmlc/xgboost
+
+cd xgboost
+if [ "$SYSTEM" = "ifort" ] ; then
+    export CXX=g++ ; export CC=gcc # does not compile with icc
+elif [ "$SYSTEM" = "gfortran" ] ; then
+    export CXX=g++ ; export CC=gcc
+fi
+make -j
+\cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
+\cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
+cd ~1
+
 # Put in final directory
 mkdir -p $MCFOST_INSTALL/include
-\cp -r include/*.h include/voro++ $MCFOST_INSTALL/include/
+\cp -r include/* $MCFOST_INSTALL/include/
 mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
 \cp -r lib/*.a $MCFOST_INSTALL/lib/$SYSTEM/
 
 # Final cleaning
-rm -rf lib include sprng2.0 cfitsio voro
+rm -rf lib include sprng2.0 cfitsio voro xgboost
 popd

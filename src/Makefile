@@ -155,9 +155,9 @@ endif
 #------------------------------------------------------------------------------#
 # Library flags
 
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/dmlc -I$(MCFOST_INSTALL)/include/rabit -I$(MCFOST_INSTALL)/include/xgboost
 
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -ldmlc -lrabit -lxgboost
 
 #------------------------------------------------------------------------------#
 # Sources and objects
