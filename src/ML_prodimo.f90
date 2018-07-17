@@ -8,6 +8,8 @@ module ML_prodimo
   private
 
    real(kind=dp), dimension(:,:), allocatable :: J_ML
+   real(kind=dp), dimension(:,:), allocatable :: feature_Tgas
+   real(kind=dp), dimension(:,:), allocatable :: feature_abundance
 
 contains
 
@@ -21,6 +23,11 @@ contains
     allocate(J_ML(n_cells,n_lambda), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
+    allocate(feature_Tgas(n_cells,51), stat=alloc_status)
+    if (alloc_status /= 0) call error("Allocation feature_Tgas")
+    
+    allocate(feature_abundance(n_cells,52), stat=alloc_status)
+    if (alloc_status /= 0) call error("Allocation feature_abundance")
 
     ! Todo : we also need to allocate an array for the interface
     ! n_cells x 52 features
@@ -70,12 +77,11 @@ contains
     return
 
   end subroutine save_J_ML
-
-
-  subroutine xgboost_predict()
-
+  
+  subroutine xgb_compute_fea()
+  
     use output, only : compute_CD
-
+    
     real, dimension(n_cells,0:3) :: N_grains
     logical, dimension(n_grains_tot) :: mask_not_PAH
 
@@ -84,7 +90,7 @@ contains
 
     real(kind=dp) :: N
     integer :: icell
-
+    
     !--- Grille
     !r_grid(:)
     !z_grid(:)
@@ -122,18 +128,48 @@ contains
     !--- Column density
     call compute_CD(CD)
 
+    feature_Tgas(:,1) = r_grid
+    feature_Tgas(:,2) = z_grid
+    feature_Tgas(:,3) = temperature
+    feature_Tgas(:,4) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+    feature_Tgas(:,5:43) = J_ML
+    feature_Tgas(:,44:47) = N_grains
+    feature_Tgas(:,48:51) = CD
+    feature_Tgas = log10(feature_Tgas)
+    
+  end subroutine xgb_compute_fea 
 
+  subroutine xgb_predict_Tgas()
+    
+    integer :: out_len
+    
     ! Predict Tgas
     ! ---> Tcin()
+    
+    call predict("model_Tgas", feature_Tgas, size(feature_Tgas,1), 51, Tcin, out_len) ! à terme remplacer par un Path
 
+    feature_abundance(:,1:51) = feature_Tgas
+    feature_abundance(:,52) = Tcin
 
     ! Predict abundance
     ! ---> tab_abundance()
 
-
     return
 
-  end subroutine xgboost_predict
+  end subroutine xgb_predict_Tgas
+  
+  subroutine xgb_predict_abundance(molecule)
 
-
+     integer :: out_len
+     character(len = 10), intent(in) :: molecule
+     
+     ! Predict abundance
+     ! ---> tab_abundance()
+     
+     ! TODO : Some molecules are gave with in differents units do aptation
+     
+     call predict("model_" // molecule, feature_abundance, size(feature_abundance,1), 52, tab_abundance, out_len)
+     
+  end subroutine xgb_predict_abundance
+     
 end module ML_prodimo
