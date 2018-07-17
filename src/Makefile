@@ -157,7 +157,7 @@ endif
 
 INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/dmlc -I$(MCFOST_INSTALL)/include/rabit -I$(MCFOST_INSTALL)/include/xgboost
 
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -ldmlc -lrabit -lxgboost
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -213,7 +213,7 @@ io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
 voro++_wrapper.o :  voro++_wrapper.cpp
-	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
+	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
 
 cockchafer.o :  cockchafer.cpp
 	$(CC) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
