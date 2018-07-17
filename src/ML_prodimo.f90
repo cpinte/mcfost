@@ -21,6 +21,11 @@ contains
     allocate(J_ML(n_cells,n_lambda), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
+    allocate(feature_Tgas(n_cells,51), stat=alloc_status)
+    if (alloc_status /= 0) call error("Allocation feature_Tgas")
+    
+    allocate(feature_abundance(n_cells,52), stat=alloc_status)
+    if (alloc_status /= 0) call error("Allocation feature_abundance")
 
     ! Todo : we also need to allocate an array for the interface
     ! n_cells x 52 features
@@ -122,13 +127,33 @@ contains
     !--- Column density
     call compute_CD(CD)
 
-
+    feature_Tgas(:,1) = r_grid
+    feature_Tgas(:,2) = z_grid
+    feature_Tgas(:,3) = temperature
+    feature_Tgas(:,4) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+    feature_Tgas(:,5:43) = J_ML
+    feature_Tgas(:,44:47) = N_grains
+    feature_Tgas(:,48:51) = CD
+    
     ! Predict Tgas
     ! ---> Tcin()
+    
+    call predict("model_Tgas", feature_Tgas, size(feature_Tgas,1), 51, Tcin, out_len) ! à terme remplacer par un Path
 
+    feature_abundance(:,1:51) = feature_Tgas
+    feature_abundance(:,52) = Tcin
 
     ! Predict abundance
     ! ---> tab_abundance()
+    
+    call predict("model_xCO", feature_abundance, size(feature_abundance,1), 52, abundance(:,1), out_len)
+    if all_abundance then
+        call predict("model_xe-", feature_abundance, size(feature_abundance,1), 52, abundance(:,2), out_len)
+        call predict("model_xHCO+", feature_abundance, size(feature_abundance,1), 52, abundance(:,3), out_len)
+        call predict("model_xNH2", feature_abundance, size(feature_abundance,1), 52, abundance(:,4), out_len)
+        call predict("model_xH2O", feature_abundance, size(feature_abundance,1), 52, abundance(:,5), out_len)
+        call predict("model_HN2+", feature_abundance, size(feature_abundance,1), 52, abundance(:,6), out_len)
+    endif
 
 
     return
