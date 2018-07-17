@@ -8,6 +8,8 @@ module ML_prodimo
   private
 
    real(kind=dp), dimension(:,:), allocatable :: J_ML
+   real(kind=dp), dimension(:,:), allocatable :: feature_Tgas
+   real(kind=dp), dimension(:,:), allocatable :: feature_abundance
 
 contains
 
@@ -75,12 +77,11 @@ contains
     return
 
   end subroutine save_J_ML
-
-
-  subroutine xgboost_predict()
-
+  
+  subroutine xgb_compute_fea()
+  
     use output, only : compute_CD
-
+    
     real, dimension(n_cells,0:3) :: N_grains
     logical, dimension(n_grains_tot) :: mask_not_PAH
 
@@ -89,7 +90,7 @@ contains
 
     real(kind=dp) :: N
     integer :: icell
-
+    
     !--- Grille
     !r_grid(:)
     !z_grid(:)
@@ -134,6 +135,13 @@ contains
     feature_Tgas(:,5:43) = J_ML
     feature_Tgas(:,44:47) = N_grains
     feature_Tgas(:,48:51) = CD
+    feature_Tgas = log10(feature_Tgas)
+    
+  end subroutine xgb_compute_fea 
+
+  subroutine xgb_predict_Tgas()
+    
+    integer :: out_len
     
     ! Predict Tgas
     ! ---> Tcin()
@@ -145,20 +153,23 @@ contains
 
     ! Predict abundance
     ! ---> tab_abundance()
-    
-    call predict("model_xCO", feature_abundance, size(feature_abundance,1), 52, abundance(:,1), out_len)
-    if all_abundance then
-        call predict("model_xe-", feature_abundance, size(feature_abundance,1), 52, abundance(:,2), out_len)
-        call predict("model_xHCO+", feature_abundance, size(feature_abundance,1), 52, abundance(:,3), out_len)
-        call predict("model_xNH2", feature_abundance, size(feature_abundance,1), 52, abundance(:,4), out_len)
-        call predict("model_xH2O", feature_abundance, size(feature_abundance,1), 52, abundance(:,5), out_len)
-        call predict("model_HN2+", feature_abundance, size(feature_abundance,1), 52, abundance(:,6), out_len)
-    endif
-
 
     return
 
-  end subroutine xgboost_predict
+  end subroutine xgb_predict_Tgas
+  
+  subroutine xgb_predict_abundance(molecule)
 
-
+     integer :: out_len
+     character(len = 10), intent(in) :: molecule
+     
+     ! Predict abundance
+     ! ---> tab_abundance()
+     
+     ! TODO : Some molecules are gave with in differents units do aptation
+     
+     call predict("model_" // molecule, feature_abundance, size(feature_abundance,1), 52, tab_abundance, out_len)
+     
+  end subroutine xgb_predict_abundance
+     
 end module ML_prodimo
