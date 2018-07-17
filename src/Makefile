@@ -7,7 +7,7 @@
 # Initialization
 
 # Linux compiling server
-LINUX_SERVER= froggy
+LINUX_SERVER= ozstar
 
 KNOWN_SYSTEM= no
 
@@ -222,6 +222,8 @@ voro++_wrapper.o :  voro++_wrapper.cpp
 io_prodimo.o : sha.f90
 
 utils.o : sha.f90
+
+Voronoi.o : voro++_wrapper.o
 
 ifeq ($(MCFOST_GIT),1)
 sha.f90 : ../.git/objects modules.o
