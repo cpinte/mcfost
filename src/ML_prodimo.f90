@@ -12,7 +12,7 @@ module ML_prodimo
   integer, parameter :: n_features = 51
   integer, parameter :: n_lambda_ML = 39
 
-  real(kind=dp), dimension(:,:), allocatable, save :: J_ML
+  real(kind=sp), dimension(:,:), allocatable, save :: J_ML
   real(kind=sp), dimension(:,:), allocatable, save :: feature_Tgas
   real(kind=sp), dimension(:,:), allocatable, save :: feature_abundance
 
@@ -22,7 +22,7 @@ module ML_prodimo
        use, intrinsic :: iso_c_binding
 
        real(c_float), dimension(nrow, nfea), intent(in) :: feature
-       integer(c_int), intent(in) :: model, nrow, nfea
+       integer(c_int), intent(in), value :: model, nrow, nfea
 
        real(c_float), dimension(nrow), intent(out) :: output
 
