@@ -120,8 +120,8 @@ ifeq ($(SYSTEM), gfortran)
     KNOWN_SYSTEM= yes
     FOMPFLAGS= -fopenmp
     CC= g++
-    CCFLAGS= -Wall -ansi -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math
+    CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
+             -fno-trapping-math #
     COMPFLAGS= -fopenmp
     LIBCXX= -lstdc++
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
@@ -168,8 +168,8 @@ SOURCES = modules.f90 sha.f90 messages.f90 system.f90 utils.f90 fits_utils.f90 \
 	radiation_field.f90 diffusion.f90 io_prodimo.f90 \
 	cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 Voronoi.f90 grid.f90 \
 	dust.f90 stars.f90 disk_physics.f90 PAH.f90 thermal_emission.f90 mem.f90 \
-	molecules.f90 optical_depth.f90 \
-	density.f90 output.f90 ML_prodimo.f90 init_mcfost.f90 \
+	optical_depth.f90 \
+	density.f90 output.f90 ML_prodimo.f90 molecules.f90 init_mcfost.f90 \
 	io_phantom_infiles.f90 io_phantom_utils.f90 read_phantom.f90 \
 	read_gadget2.f90 SPH2mcfost.f90 \
 	dust_transfer.f90 mol_transfer.f90
@@ -183,8 +183,8 @@ main : mcfost
 
 all : mcfost libmcfost.a
 
-mcfost :  $(OBJECTS) voro++_wrapper.o mcfost.o
-	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o mcfost.o $(LDFLAGS)
+mcfost :  $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o
+	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
@@ -215,6 +215,9 @@ io_phantom_utils.o :  io_phantom_utils.f90
 
 voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
+
+cockchafer.o :  cockchafer.cpp
+	$(CC) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90  modules.o
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)

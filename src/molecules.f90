@@ -389,6 +389,9 @@ subroutine init_molecular_disk(imol)
   ! definie les tableaux vfield, v_turb et tab_abundance
   ! et lcompute_molRT
 
+
+  use ML_prodimo, only : xgb_predict_Tgas
+
   implicit none
 
   integer, intent(in) :: imol
@@ -404,6 +407,11 @@ subroutine init_molecular_disk(imol)
   else
      Tcin(:) = Temperature(:)
   endif
+
+
+  write(*,*) "XGBOOST"
+  call xgb_predict_Tgas()
+  write(*,*) "DONE"
 
   ! En m.s-1
   ! Warning : assume all stars are at the center of the disk

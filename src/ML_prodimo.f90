@@ -5,13 +5,29 @@ module ML_prodimo
 
   implicit none
 
+  public :: xgb_predict_Tgas
+
   private
 
   integer, parameter :: n_features = 51
+  integer, parameter :: n_lambda_ML = 39
 
   real(kind=dp), dimension(:,:), allocatable, save :: J_ML
-  real(kind=dp), dimension(:,:), allocatable, save :: feature_Tgas
-  real(kind=dp), dimension(:,:), allocatable, save :: feature_abundance
+  real(kind=sp), dimension(:,:), allocatable, save :: feature_Tgas
+  real(kind=sp), dimension(:,:), allocatable, save :: feature_abundance
+
+  interface
+     subroutine predictF(model, feature, nrow, nfea, output) bind(C, name='predict')
+
+       use, intrinsic :: iso_c_binding
+
+       real(c_float), dimension(nrow, nfea), intent(in) :: feature
+       integer(c_int), intent(in) :: model, nrow, nfea
+
+       real(c_float), dimension(nrow), intent(out) :: output
+
+     end subroutine predictF
+  end interface
 
 contains
 
@@ -20,6 +36,8 @@ contains
     integer :: alloc_status
 
     ! Todo : check or force wavelength bins
+    if (n_lambda /= n_lambda_ML) call error("Incorrect number of wavelength bins for xgboost")
+
 
     alloc_status = 0
     allocate(J_ML(n_cells,n_lambda), stat=alloc_status)
@@ -93,6 +111,8 @@ contains
     real(kind=dp) :: N
     integer :: icell
 
+    call init_ML() ! TO be moved !!!!
+
     !--- Grille
     !r_grid(:)
     !z_grid(:)
@@ -107,7 +127,6 @@ contains
 
     !--- Densite de gaz
     !densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
-
 
     !--- Moments de la distribution de grain
     mask_not_PAH(:) = .not.grain(:)%is_PAH
@@ -139,14 +158,16 @@ contains
     feature_Tgas(:,48:51) = CD
     feature_Tgas = log10(feature_Tgas)
 
+    return
+
   end subroutine xgb_compute_fea
 
   subroutine xgb_predict_Tgas()
 
-    integer :: out_len
+    call xgb_compute_fea()
 
     ! Predict Tgas
-    call predict("model_Tgas", feature_Tgas, n_cells, n_features, Tcin, out_len) ! A terme remplacer par un Path
+    call predictF(1, feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
     feature_abundance(:,1:n_features) = feature_Tgas
     feature_abundance(:,n_features+1) = Tcin
@@ -157,12 +178,11 @@ contains
 
   subroutine xgb_predict_abundance(molecule)
 
-     integer :: out_len
      character(len = 10), intent(in) :: molecule
 
      ! Predict abundance
      ! TODO : Some molecules are given with in different units, we need to adapt the code
-     call predict("model_" // molecule, feature_abundance, n_cells, n_features+1, tab_abundance, out_len)
+     call predictF(2 , feature_abundance, n_cells, n_features+1, tab_abundance)
 
   end subroutine xgb_predict_abundance
 
