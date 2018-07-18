@@ -213,7 +213,7 @@ io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
 voro++_wrapper.o :  voro++_wrapper.cpp
-	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
+	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
 cockchafer.o :  cockchafer.cpp
 	$(CC) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
