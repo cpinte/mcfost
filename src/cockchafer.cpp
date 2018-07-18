@@ -1,7 +1,7 @@
 #include "cockchafer.hpp"
 #include "iostream"
 
-int predict(char *model_name, float *feature, int nrow, int nfea, const float *output){
+int predict(char *model_name, float *feature, int nrow, int nfea, float *output){
   BoosterHandle booster;
   bst_ulong out_len;
 
@@ -17,12 +17,18 @@ int predict(char *model_name, float *feature, int nrow, int nfea, const float *o
     std::cerr << "XGDMatrixCreateFromMat error" << std::endl;
     return err;
   }
+  
+  const float *outXGB;
 
-  if(int err = XGBoosterPredict(booster, input, 0, 0, &out_len, &output)){
+  if(int err = XGBoosterPredict(booster, input, 0, 0, &out_len, &outXGB)){
     std::cerr << "xgb predict error" << std::endl;
     return err;
   }
+  
+  for(int i=0; i<out_len; i++)
+    output[i] = outXGB[i];
 
+  std::cout << std::endl;
   XGDMatrixFree(input);
   XGBoosterFree(booster);
   return 0;

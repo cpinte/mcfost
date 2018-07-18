@@ -189,6 +189,7 @@ contains
     !write(*,*) n_cells, n_features, feature_Tgas(:,1)
 
     call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
+    Tcin = 10**Tcin
 
     feature_abundance(1:n_features,:) = feature_Tgas
     feature_abundance(n_features+1,:) = Tcin ! Todo : do we need to take the log here ??
