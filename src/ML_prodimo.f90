@@ -183,6 +183,8 @@ contains
 
   subroutine xgb_predict_Tgas()
 
+    use fits_utils, only : cfitsWrite
+
     call xgb_compute_features()
 
     ! Predict Tgas
@@ -191,8 +193,15 @@ contains
     call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
     Tcin = 10**Tcin
 
+    ! Prepare the features for the abundance prediction
     feature_abundance(1:n_features,:) = feature_Tgas
     feature_abundance(n_features+1,:) = Tcin ! Todo : do we need to take the log here ??
+
+    if (.not.lVoronoi) then
+       call cfitsWrite("!Tgas_ML.fits",Tcin,[n_rad,nz])
+    else
+       call cfitsWrite("!Tgas_ML.fits",Tcin,[n_cells])
+    endif
 
     return
 
@@ -202,11 +211,21 @@ contains
 
   subroutine xgb_predict_abundance(imol)
 
+    use fits_utils, only : cfitsWrite
+
      integer, intent(in) :: imol
 
      ! Predict abundance
      ! TODO : Some molecules are given with in different units, we need to adapt the code
      call predictF(str_f2c("model_xCO.raw") , feature_abundance, n_cells, n_features+1, tab_abundance)
+
+     if (.not.lVoronoi) then
+        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
+     else
+        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_cells])
+     endif
+
+     return
 
   end subroutine xgb_predict_abundance
 
