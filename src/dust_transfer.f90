@@ -28,6 +28,7 @@ module dust_transfer
   use ProDiMo
   use init_mcfost
   use SPH2mcfost
+  use ML_ProDiMo
   !$ use omp_lib
 
   implicit none
@@ -117,6 +118,7 @@ subroutine transfert_poussiere()
   enddo
 
   if (lProDiMo) call setup_ProDiMo()
+  if (lML) call init_ML()
 
   if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
@@ -501,7 +503,7 @@ subroutine transfert_poussiere()
      !$omp private(x,y,z,u,v,w,Stokes,flag_star,flag_ISM,flag_scatt,n_phot_sed2,capt) &
      !$omp shared(nnfot1_start,nbre_photons_loop,capt_sup,n_phot_lim,lscatt_ray_tracing1) &
      !$omp shared(nbre_phot2,n_phot_envoyes,nb_proc) &
-     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,letape_th,tab_lambda,nbre_photons_lambda, nnfot1_cumul,ibar) &
+     !$omp shared(stream,laffichage,lmono,lmono0,lProDiMo,lML,letape_th,tab_lambda,nbre_photons_lambda, nnfot1_cumul,ibar) &
      !$omp reduction(+:E_abs_nRE)
      if (letape_th) then
         p_nnfot2 => nnfot2
@@ -512,7 +514,7 @@ subroutine transfert_poussiere()
         else
            p_nnfot2 => n_phot_sed2
 
-           if (lProDiMo)  then
+           if (lProDiMo.or.lML)  then
               p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
               nbre_phot2 = nbre_photons_lambda * 10
               ! Augmentation du nbre de paquets dans UV
@@ -570,9 +572,8 @@ subroutine transfert_poussiere()
      !$omp end parallel
      if (laffichage) call progress_bar(50)
 
-
      ! Champ de radiation interstellaire
-     if ((.not.letape_th).and.lProDiMo) then
+     if ((.not.letape_th).and.(lProDiMo.or.lML)) then
         ! Pas de ray-tracing avec les packets ISM
         lscatt_ray_tracing1_save = lscatt_ray_tracing1
         lscatt_ray_tracing2_save = lscatt_ray_tracing2
@@ -580,7 +581,8 @@ subroutine transfert_poussiere()
         lscatt_ray_tracing2 = .false.
 
         ! Sauvegarde champ stellaire et th separement
-        call save_J_ProDiMo(lambda)
+        if (lProDiMo) call save_J_ProDiMo(lambda)
+        if (lML)      call save_J_ML(lambda,.false.)
 
         !$omp parallel &
         !$omp default(none) &
@@ -616,6 +618,7 @@ subroutine transfert_poussiere()
         lscatt_ray_tracing1 = lscatt_ray_tracing1_save
         lscatt_ray_tracing2 = lscatt_ray_tracing2_save
 
+        if (lML) call save_J_ML(lambda,.true.)
      endif ! champ ISM
 
      !----------------------------------------------------
@@ -714,7 +717,7 @@ subroutine transfert_poussiere()
            call ecriture_temperature(1)
            call ecriture_sed(1)
 
-           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lforce_diff_approx)) then
+           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx)) then
               call Temp_approx_diffusion_vertical()
               ! call Temp_approx_diffusion()
               call diffusion_approx_nLTE_nRE()

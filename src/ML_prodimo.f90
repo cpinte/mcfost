@@ -1,11 +1,11 @@
-module ML_prodimo
+module ML_ProDiMo
 
   use prodimo
   use constantes
 
   implicit none
 
-  public :: xgb_predict_Tgas
+  public :: init_ML, save_J_ML, xgb_compute_features, xgb_predict_Tgas, xgb_predict_abundance
 
   private
 
@@ -61,7 +61,7 @@ contains
 
 
     alloc_status = 0
-    allocate(J_ML(n_cells,n_lambda), stat=alloc_status)
+    allocate(J_ML(n_lambda,n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
     allocate(feature_Tgas(51, n_cells), stat=alloc_status)
@@ -73,6 +73,11 @@ contains
     ! Todo : we also need to allocate an array for the interface
     ! n_cells x 52 features
 
+    ! Todo : this is ugly, I re-use a variable from io_prodimo.f90
+    allocate(n_phot_envoyes_ISM(n_lambda2,nb_proc),  stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error n_phot_envoyes_ISM')
+    n_phot_envoyes_ISM = 0.0
+
     return
 
   end subroutine init_ML
@@ -83,6 +88,10 @@ contains
     ! sauvegarde le champ de radiation pour ProDiMo
     ! avant et apres le calcul du champ ISM
 
+    !use resultats, only : n_phot_envoyes, n_phot_envoyes_ISM
+    !use radiation_field, only : xJ_abs, xN_abs
+    !use grains, only : grain
+
     integer, intent(in) :: lambda
     logical, intent(in) :: lISM
 
@@ -90,6 +99,7 @@ contains
     real(kind=dp) :: n_photons_envoyes, energie_photon, facteur
     real :: wl
 
+    ! Note: this is a slow loop as we are swapping dimensions
     if (.not.lISM) then
        ! Step2
        n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
@@ -98,12 +108,11 @@ contains
 
        do icell=1, n_cells
           facteur = energie_photon / volume(icell)
-          J_ML(icell,lambda) = facteur * sum(xJ_abs(icell,lambda,:))
+          J_ML(lambda,icell) = facteur * sum(xJ_abs(icell,lambda,:))
        enddo
 
        ! reset for ISM radiation
        xJ_abs(:,lambda,:) = 0.0
-       xN_abs(:,lambda,:) = 0.0
     else ! Champs ISM
        n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
 
@@ -113,7 +122,7 @@ contains
 
        do icell=1, n_cells
           facteur = energie_photon / volume(icell)
-          J_ML(icell,lambda) =  J_ML(icell,lambda) +  facteur * sum(xJ_abs(icell,lambda,:))
+          J_ML(lambda,icell) =  J_ML(icell,lambda) +  facteur * sum(xJ_abs(icell,lambda,:))
        enddo
     endif
 
@@ -121,7 +130,9 @@ contains
 
   end subroutine save_J_ML
 
-  subroutine xgb_compute_fea()
+!-----------------------------------------------------------------------------------------
+
+  subroutine xgb_compute_features()
 
     use output, only : compute_CD
 
@@ -133,23 +144,6 @@ contains
 
     real(kind=dp) :: N
     integer :: icell
-
-    call init_ML() ! TO be moved !!!!
-
-    !--- Grille
-    !r_grid(:)
-    !z_grid(:)
-
-
-    !--- Dust temperature
-    !Temperature(:)
-
-    !--- Champ de radiation
-    !J_ML(:,:)
-
-
-    !--- Densite de gaz
-    !densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
 
     !--- Moments de la distribution de grain
     mask_not_PAH(:) = .not.grain(:)%is_PAH
@@ -179,23 +173,25 @@ contains
     feature_Tgas(5:43,:) = J_ML
     feature_Tgas(44:47,:) = N_grains
     feature_Tgas(48:51,:) = CD
-    !feature_Tgas = log10(feature_Tgas)
+    feature_Tgas = log10(max(feature_Tgas,tiny_real))
 
     return
 
-  end subroutine xgb_compute_fea
+  end subroutine xgb_compute_features
+
+!-----------------------------------------------------------------------------------------
 
   subroutine xgb_predict_Tgas()
 
-    call xgb_compute_fea()
+    call xgb_compute_features()
 
     ! Predict Tgas
     !write(*,*) n_cells, n_features, feature_Tgas(:,1)
-    
+
     call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
     feature_abundance(1:n_features,:) = feature_Tgas
-    feature_abundance(n_features+1,:) = Tcin
+    feature_abundance(n_features+1,:) = Tcin ! Todo : do we need to take the log here ??
 
     return
 
@@ -203,9 +199,9 @@ contains
 
 !-----------------------------------------------------------------------------------------
 
-  subroutine xgb_predict_abundance(molecule)
+  subroutine xgb_predict_abundance(imol)
 
-     character(len = 10), intent(in) :: molecule
+     integer, intent(in) :: imol
 
      ! Predict abundance
      ! TODO : Some molecules are given with in different units, we need to adapt the code
@@ -213,4 +209,4 @@ contains
 
   end subroutine xgb_predict_abundance
 
-end module ML_prodimo
+end module ML_ProDiMo

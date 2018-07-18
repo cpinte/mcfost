@@ -124,6 +124,7 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   lscale_SPH = .false.
+  lML = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -947,6 +948,9 @@ subroutine initialisation_mcfost()
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
+     case("-ML")
+        i_arg = i_arg + 1
+        lML=.true.
      case default
         call display_help()
      end select
@@ -1156,7 +1160,7 @@ subroutine initialisation_mcfost()
 
   endif
 
-  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then
+  if ((lProDiMo .and. (mcfost2ProDiMo_version == 1)).or.lML) then ! DENT grid was used to train the ML
      ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
      write(*,*) "***************************"
      write(*,*) "* Modelling for ProDiMo   *"

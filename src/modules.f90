@@ -143,6 +143,8 @@ module parametres
   logical :: ldudt_implicit
   real(kind=dp) :: ufac_implicit
 
+  ! Machine Learning
+  logical :: lML
 
 
 end module parametres

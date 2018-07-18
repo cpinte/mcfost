@@ -6,7 +6,7 @@ int predict(char *model_name, float *feature, int nrow, int nfea, const float *o
   bst_ulong out_len;
 
   XGBoosterCreate(NULL, 0, &booster) ;
-  std::cout << "Trying to read " << model_name << std::endl ;
+  std::cout << " Trying to read " << model_name << std::endl ;
   if (int err = XGBoosterLoadModel(booster,model_name)) {
     std::cerr << "load model error : " << model_name << std::endl ;
     return err;

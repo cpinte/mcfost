@@ -139,7 +139,7 @@ subroutine allocate_radiation_field_step1(Nc)
      xKJ_abs = 0.0 ; E0 = 0.0
   endif
 
-  lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
+  lxJ_abs = lProDiMo.or.lML.or.loutput_UV_field.or.loutput_J
   lxJ_abs_step1 = lRE_nLTE .or. lnRE .or. loutput_J_step1
   if (lxJ_abs_step1 .or. (lxJ_abs.and.lsed.and.lsed_complete)) then
      allocate(xJ_abs(Nc,n_lambda,nb_proc), J0(Nc,n_lambda), stat=alloc_status) ! BIG array
