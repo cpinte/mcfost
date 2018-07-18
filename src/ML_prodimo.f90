@@ -12,17 +12,18 @@ module ML_prodimo
   integer, parameter :: n_features = 51
   integer, parameter :: n_lambda_ML = 39
 
-  real(kind=dp), dimension(:,:), allocatable, save :: J_ML
+  real(kind=sp), dimension(:,:), allocatable, save :: J_ML
   real(kind=sp), dimension(:,:), allocatable, save :: feature_Tgas
   real(kind=sp), dimension(:,:), allocatable, save :: feature_abundance
 
   interface
-     subroutine predictF(model, feature, nrow, nfea, output) bind(C, name='predict')
+     subroutine predictF(model_name, feature, nrow, nfea, output) bind(C, name='predict')
 
        use, intrinsic :: iso_c_binding
 
+       character(len=1,kind=c_char), dimension(*) :: model_name
        real(c_float), dimension(nrow, nfea), intent(in) :: feature
-       integer(c_int), intent(in) :: model, nrow, nfea
+       integer(c_int), intent(in), value :: nrow, nfea
 
        real(c_float), dimension(nrow), intent(out) :: output
 
@@ -30,6 +31,26 @@ module ML_prodimo
   end interface
 
 contains
+
+  pure function str_f2c (f_string) result (c_string)
+    ! Converts a fortran string to C string
+    ! From http://fortranwiki.org/fortran/show/Generating+C+Interfaces
+    use, intrinsic :: iso_c_binding, only: c_char, c_null_char
+    implicit none
+
+    character(len=*), intent(in) :: f_string
+    character(len=1,kind=c_char), dimension(len_trim(f_string)+1) :: c_string
+    integer :: n, i
+
+    n = len_trim(f_string)
+    do i = 1, n
+       c_string(i) = f_string(i:i)
+    enddo
+    c_string(n + 1) = c_null_char
+
+  end function str_f2c
+
+!-----------------------------------------------------------------------------------------
 
   subroutine init_ML()
 
@@ -55,6 +76,8 @@ contains
     return
 
   end subroutine init_ML
+
+!-----------------------------------------------------------------------------------------
 
   subroutine save_J_ML(lambda, lISM)
     ! sauvegarde le champ de radiation pour ProDiMo
@@ -169,7 +192,7 @@ contains
     ! Predict Tgas
     !write(*,*) n_cells, n_features, feature_Tgas(:,1)
     
-    call predictF(1, feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
+    call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
     feature_abundance(1:n_features,:) = feature_Tgas
     feature_abundance(n_features+1,:) = Tcin
@@ -178,13 +201,15 @@ contains
 
   end subroutine xgb_predict_Tgas
 
+!-----------------------------------------------------------------------------------------
+
   subroutine xgb_predict_abundance(molecule)
 
      character(len = 10), intent(in) :: molecule
 
      ! Predict abundance
      ! TODO : Some molecules are given with in different units, we need to adapt the code
-     call predictF(2 , feature_abundance, n_cells, n_features+1, tab_abundance)
+     call predictF(str_f2c("model_xCO.raw") , feature_abundance, n_cells, n_features+1, tab_abundance)
 
   end subroutine xgb_predict_abundance
 

@@ -1,23 +1,19 @@
 #include "cockchafer.hpp"
 #include "iostream"
 
-int predict(int *model, float *feature, int *nrow, int *nfea, const float *output){
+int predict(char *model_name, float *feature, int nrow, int nfea, const float *output){
   BoosterHandle booster;
   bst_ulong out_len;
 
-  std::string model_str ;
-
-  if (*model == 1)
-    model_str = "model_Tgas.raw" ;
-
-  XGBoosterCreate(NULL, 0, &booster);
-  if(int err = XGBoosterLoadModel(booster,model_str.c_str())){
-    std::cerr << "load model error : " << model_str << " !" << std::endl;
+  XGBoosterCreate(NULL, 0, &booster) ;
+  std::cout << "Trying to read " << model_name << std::endl ;
+  if (int err = XGBoosterLoadModel(booster,model_name)) {
+    std::cerr << "load model error : " << model_name << std::endl ;
     return err;
   }
 
   DMatrixHandle input;
-  if(int err = XGDMatrixCreateFromMat(feature, *nrow, *nfea, -1, &input)){
+  if(int err = XGDMatrixCreateFromMat(feature, nrow, nfea, -1, &input)){
     std::cerr << "XGDMatrixCreateFromMat error" << std::endl;
     return err;
   }
