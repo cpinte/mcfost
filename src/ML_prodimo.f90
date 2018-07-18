@@ -1,6 +1,6 @@
 module ML_ProDiMo
 
-  use prodimo
+  use prodimo, only : n_phot_envoyes_ISM ! todo : move out of prodimo module
   use constantes
 
   implicit none
@@ -54,6 +54,8 @@ contains
 
   subroutine init_ML()
 
+    use messages
+
     integer :: alloc_status
 
     ! Todo : check or force wavelength bins
@@ -70,12 +72,9 @@ contains
     allocate(feature_abundance(52, n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation feature_abundance")
 
-    ! Todo : we also need to allocate an array for the interface
-    ! n_cells x 52 features
-
     ! Todo : this is ugly, I re-use a variable from io_prodimo.f90
     allocate(n_phot_envoyes_ISM(n_lambda2,nb_proc),  stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error n_phot_envoyes_ISM')
+    if (alloc_status /= 0) call error('Allocation error n_phot_envoyes_ISM')
     n_phot_envoyes_ISM = 0.0
 
     return
@@ -88,9 +87,14 @@ contains
     ! sauvegarde le champ de radiation pour ProDiMo
     ! avant et apres le calcul du champ ISM
 
-    !use resultats, only : n_phot_envoyes, n_phot_envoyes_ISM
-    !use radiation_field, only : xJ_abs, xN_abs
-    !use grains, only : grain
+    use resultats, only : n_phot_envoyes
+    use radiation_field, only : xJ_abs, xN_abs
+    use prodimo, only : chi_ISM, R_ISM, T_ISM_stars, Wdil, Tcmb
+    use disk, only : Rmax, E_disk
+    use opacity, only : volume
+    use grains, only : tab_lambda
+    use prop_star, only : E_stars
+    use utils, only : Blambda
 
     integer, intent(in) :: lambda
     logical, intent(in) :: lISM
@@ -134,7 +138,11 @@ contains
 
   subroutine xgb_compute_features()
 
+    use grains, only : grain, r_grain, n_grains_tot
     use output, only : compute_CD
+    use opacity, only : densite_pouss, r_grid, z_grid
+    use molecular_emission, only : densite_gaz, Tcin
+    use em_th, only : Temperature
 
     real, dimension(0:3,n_cells) :: N_grains
     logical, dimension(n_grains_tot) :: mask_not_PAH
@@ -186,12 +194,11 @@ contains
   subroutine xgb_predict_Tgas()
 
     use fits_utils, only : cfitsWrite
+    use molecular_emission, only : Tcin
 
     call xgb_compute_features()
 
     ! Predict Tgas
-    !write(*,*) n_cells, n_features, feature_Tgas(:,1)
-
     call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
     ! Prepare the features for the abundance prediction
@@ -216,6 +223,7 @@ contains
   subroutine xgb_predict_abundance(imol)
 
     use fits_utils, only : cfitsWrite
+    use molecular_emission, only : tab_abundance
 
     integer, intent(in) :: imol
 
