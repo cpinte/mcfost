@@ -136,32 +136,32 @@ contains
 
     use output, only : compute_CD
 
-    real, dimension(n_cells,0:3) :: N_grains
+    real, dimension(0:3,n_cells) :: N_grains
     logical, dimension(n_grains_tot) :: mask_not_PAH
 
     integer, parameter :: n_directions = 4
     real, dimension(n_cells,n_directions) :: CD
 
     real(kind=dp) :: N
-    integer :: icell
+    integer :: icell, i
 
     !--- Moments de la distribution de grain
     mask_not_PAH(:) = .not.grain(:)%is_PAH
     do icell=1, n_cells
        N = sum(densite_pouss(:,icell),mask=mask_not_PAH)
-       N_grains(icell,0) = N
+       N_grains(0,icell) = N
        if (N > 0) then
-          N_grains(icell,1) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
-          N_grains(icell,2) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
-          N_grains(icell,3) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
+          N_grains(1,icell) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
+          N_grains(2,icell) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
+          N_grains(3,icell) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
        else
-          N_grains(icell,1) = 0.0
-          N_grains(icell,2) = 0.0
-          N_grains(icell,3) = 0.0
+          N_grains(1,icell) = 0.0
+          N_grains(2,icell) = 0.0
+          N_grains(3,icell) = 0.0
        endif
     enddo
     ! part.cm^-3 --> part.m^-3
-    N_grains(:,0) = N_grains(:,0) /  (cm_to_m**3)
+    N_grains(0,:) = N_grains(0,:) /  (cm_to_m**3)
 
     !--- Column density
     call compute_CD(CD)
@@ -171,8 +171,10 @@ contains
     feature_Tgas(3,:) = temperature
     feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
     feature_Tgas(5:43,:) = J_ML
-    feature_Tgas(44:47,:) = N_grains
-    feature_Tgas(48:51,:) = CD
+    feature_Tgas(44:47,:) = N_grains(:,:)
+    do i=1,n_directions
+       feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
+    enddo
     feature_Tgas = log10(max(feature_Tgas,tiny_real))
 
     return
@@ -191,11 +193,13 @@ contains
     !write(*,*) n_cells, n_features, feature_Tgas(:,1)
 
     call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
-    Tcin = 10**Tcin
 
     ! Prepare the features for the abundance prediction
     feature_abundance(1:n_features,:) = feature_Tgas
-    feature_abundance(n_features+1,:) = Tcin ! Todo : do we need to take the log here ??
+    feature_abundance(n_features+1,:) = Tcin ! this is still log10(Tcin) here
+
+    ! We predicted log10(Tcin)
+    Tcin = 10**Tcin
 
     if (.not.lVoronoi) then
        call cfitsWrite("!Tgas_ML.fits",Tcin,[n_rad,nz])
@@ -213,19 +217,19 @@ contains
 
     use fits_utils, only : cfitsWrite
 
-     integer, intent(in) :: imol
+    integer, intent(in) :: imol
 
-     ! Predict abundance
-     ! TODO : Some molecules are given with in different units, we need to adapt the code
-     call predictF(str_f2c("model_xCO.raw") , feature_abundance, n_cells, n_features+1, tab_abundance)
+    ! Predict abundance
+    ! TODO : Some molecules are given with in different units, we need to adapt the code
+    call predictF(str_f2c("model_xCO.raw") , feature_abundance, n_cells, n_features+1, tab_abundance)
 
-     if (.not.lVoronoi) then
-        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
-     else
-        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_cells])
-     endif
+    if (.not.lVoronoi) then
+       call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
+    else
+       call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_cells])
+    endif
 
-     return
+    return
 
   end subroutine xgb_predict_abundance
 
