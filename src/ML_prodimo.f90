@@ -43,10 +43,10 @@ contains
     allocate(J_ML(n_cells,n_lambda), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
-    allocate(feature_Tgas(n_cells,51), stat=alloc_status)
+    allocate(feature_Tgas(51, n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation feature_Tgas")
 
-    allocate(feature_abundance(n_cells,52), stat=alloc_status)
+    allocate(feature_abundance(52, n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation feature_abundance")
 
     ! Todo : we also need to allocate an array for the interface
@@ -149,14 +149,14 @@ contains
     !--- Column density
     call compute_CD(CD)
 
-    feature_Tgas(:,1) = r_grid
-    feature_Tgas(:,2) = z_grid
-    feature_Tgas(:,3) = temperature
-    feature_Tgas(:,4) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
-    feature_Tgas(:,5:43) = J_ML
-    feature_Tgas(:,44:47) = N_grains
-    feature_Tgas(:,48:51) = CD
-    feature_Tgas = log10(feature_Tgas)
+    feature_Tgas(1,:) = r_grid
+    feature_Tgas(2,:) = z_grid
+    feature_Tgas(3,:) = temperature
+    feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+    feature_Tgas(5:43,:) = J_ML
+    feature_Tgas(44:47,:) = N_grains
+    feature_Tgas(48:51,:) = CD
+    !feature_Tgas = log10(feature_Tgas)
 
     return
 
@@ -167,10 +167,12 @@ contains
     call xgb_compute_fea()
 
     ! Predict Tgas
+    !write(*,*) n_cells, n_features, feature_Tgas(:,1)
+    
     call predictF(1, feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
-    feature_abundance(:,1:n_features) = feature_Tgas
-    feature_abundance(:,n_features+1) = Tcin
+    feature_abundance(1:n_features,:) = feature_Tgas
+    feature_abundance(n_features+1,:) = Tcin
 
     return
 

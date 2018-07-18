@@ -10,5 +10,5 @@
 #include <xgboost/c_api.h>
 
 extern "C" {
-  int predict(int model, float *feature, int nrow, int nfea, const float **output);
+  int predict(int *model, float *feature, int *nrow, int *nfea, const float *output);
 }
