@@ -1096,6 +1096,24 @@ subroutine initialisation_mcfost()
   endif
   lmono = lmono0
 
+  if (lProDiMo .and. (mcfost2ProDiMo_version == 1)) then
+     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
+     write(*,*) "***************************"
+     write(*,*) "* Modelling for ProDiMo   *"
+     write(*,*) "* Forcing wavelength grid *"
+     write(*,*) "***************************"
+     n_lambda = 39 ; lambda_min = 0.0912 ; lambda_max = 3410.85
+     lsed=.true. ; lsed_complete = .true.
+  endif
+
+  if (lML) then ! We use the same wavelength in step2 as in the DENT grid
+     write(*,*) "***************************************************"
+     write(*,*) "* Forcing wavelength grid for xgboost predictions *"
+     write(*,*) "***************************************************"
+     lsed=.true. ; lsed_complete = .false.
+     tab_wavelength = DENT_tab_wavelength
+  endif
+
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
   ! verification coherence du fichier de parametres
@@ -1158,18 +1176,6 @@ subroutine initialisation_mcfost()
         write(*,*) "NLTE molecular line transfer"
      endif
 
-  endif
-
-  if ((lProDiMo .and. (mcfost2ProDiMo_version == 1)).or.lML) then ! DENT grid was used to train the ML
-     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
-     write(*,*) "***************************"
-     write(*,*) "* Modelling for ProDiMo   *"
-     write(*,*) "* Forcing wavelength grid *"
-     write(*,*) "***************************"
-     n_lambda = 39
-     lambda_min = 0.0912
-     lambda_max = 3410.85
-     lsed_complete = .true.
   endif
 
   if (lspot) then
