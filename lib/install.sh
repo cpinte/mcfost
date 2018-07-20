@@ -92,7 +92,8 @@ git clone --recursive https://github.com/dmlc/xgboost
 cd xgboost
 git checkout v0.72
 if [ "$SYSTEM" = "ifort" ] ; then
-    export CXX=g++ ; export CC=gcc # does not compile with icc
+    export CXX=icpc -std=c++11 ; export CC=icc
+    \cp ../ifort/xgboost/base.h include/xgboost/base.h
 elif [ "$SYSTEM" = "gfortran" ] ; then
     export CXX=g++ ; export CC=gcc
 fi

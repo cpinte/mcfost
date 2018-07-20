@@ -72,6 +72,7 @@ ifeq ($(SYSTEM), ifort)
     FOMPFLAGS= -fopenmp
     IPOFLAGS= -ipo
     CC= icc
+    CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
@@ -88,6 +89,7 @@ ifeq ($(SYSTEM), fostino)
     FOMPFLAGS= -qopenmp
     IPOFLAGS= -ipo
     CC= icc
+    CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prev-div -traceback -axP -xW
     COMPFLAGS= -qopenmp
     LIBCXX= -cxxlib
@@ -104,6 +106,7 @@ ifeq ($(SYSTEM), xeonphi)
     FOMPFLAGS= -qopenmp
     IPOFLAGS= -ipo
     CC= icc
+    CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prev-div -traceback -mmic
     COMPFLAGS= -qopenmp
     LIBCXX= -cxxlib
@@ -119,7 +122,8 @@ ifeq ($(SYSTEM), gfortran)
                -Wuninitialized -fbacktrace
     KNOWN_SYSTEM= yes
     FOMPFLAGS= -fopenmp
-    CC= g++
+    CC= gcc
+    CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
              -fno-trapping-math #
     COMPFLAGS= -fopenmp
@@ -213,10 +217,10 @@ io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
 voro++_wrapper.o :  voro++_wrapper.cpp
-	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
+	$(CXX) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
 cockchafer.o :  cockchafer.cpp
-	$(CC) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
+	$(CXX) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90  modules.o
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
