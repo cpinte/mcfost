@@ -516,7 +516,6 @@ subroutine transfert_poussiere()
 
            if (lProDiMo.or.lML)  then
               p_nnfot2 => nnfot2  ! Nbre de paquet cst par lambda
-              nbre_phot2 = nbre_photons_lambda * 10
               ! Augmentation du nbre de paquets dans UV
               if (tab_lambda(lambda) < 0.5) nbre_phot2 = nbre_photons_lambda * 10
            endif
