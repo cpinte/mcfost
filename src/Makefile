@@ -176,10 +176,12 @@ SOURCES = modules.f90 sha.f90 messages.f90 system.f90 utils.f90 fits_utils.f90 \
 
 OBJECTS= $(SOURCES:.f90=.o)
 
+
 #------------------------------------------------------------------------------#
 # Compile
-
 main : mcfost
+
+include .depend
 
 all : mcfost libmcfost.a
 
@@ -206,9 +208,6 @@ modules.o : .make_lastsystem modules.f90
 		'{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 modules.f90 $(INCLUDE)
-
-mem.o :  mem.f90 modules.o
-	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mem.f90 $(INCLUDE)
 
 io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
@@ -259,7 +258,7 @@ release : main
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
 	rsync -Pu *.f90 Makefile $(LINUX_SERVER):mcfost/src
-	ssh $(LINUX_SERVER) "cd mcfost/src ; MCFOST_GIT=0 ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src ; MCFOST_GIT=0 ; export MAKEFLAGS=-j ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
