@@ -164,13 +164,14 @@ subroutine get_mcfost_utils_dir()
      search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
   endif
 
-  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
-  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
+  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir),ML_dir(n_dir))
+  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ; ML_dir(1) = "./"
   do i=2,n_dir
      dust_dir(i)   = trim(search_dir(i))//"/Dust/"
      mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
      star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
      lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
+     ML_dir(i) = trim(search_dir(i))//"/ML/"
   enddo
 
   return

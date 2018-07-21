@@ -24,7 +24,7 @@ mem.o : mem.f90 radiation_field.o thermal_emission.o stars.o messages.o utils.o 
 messages.o : messages.f90
 modules.o : modules.f90
 mol_transfer.o : mol_transfer.f90 mem.o grid.o stars.o dust_transfer.o dust_ray_tracing.o io_prodimo.o optical_depth.o scattering.o dust.o output.o benchmarks.o input.o molecules.o modules.o utils.o
-molecules.o : molecules.f90 mem.o dust.o grid.o modules.o
+molecules.o : molecules.f90 mem.o dust.o grid.o modules.o ML_prodimo.o
 optical_depth.o : optical_depth.f90 radiation_field.o cylindrical_grid.o grid.o dust_ray_tracing.o molecules.o utils.o modules.o
 output.o : output.f90 fits_utils.o grid.o Voronoi.o utils.o modules.o thermal_emission.o radiation_field.o
 prodimo2mcfost.o : prodimo2mcfost.f90 grid.o
@@ -38,3 +38,4 @@ spherical_grid.o : spherical_grid.f90 messages.o cylindrical_grid.o modules.o
 stars.o : stars.f90 messages.o grid.o io_prodimo.o modules.o utils.o
 thermal_emission.o : thermal_emission.f90 radiation_field.o stars.o grid.o PAH.o utils.o modules.o
 utils.o : utils.f90 messages.o modules.o system.o
+ML_prodimo.o : ML_prodimo.f90 fits_utils.o output.o utils.o radiation_field.o messages.o modules.o io_prodimo.o

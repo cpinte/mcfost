@@ -17,7 +17,7 @@ module ML_ProDiMo
   real(kind=sp), dimension(:,:), allocatable, save :: feature_abundance
 
   interface
-     subroutine predictF(model_name, feature, nrow, nfea, output) bind(C, name='predict')
+     subroutine xgb_predict(model_name, feature, nrow, nfea, output) bind(C, name='predict')
 
        use, intrinsic :: iso_c_binding
 
@@ -27,7 +27,7 @@ module ML_ProDiMo
 
        real(c_float), dimension(nrow), intent(out) :: output
 
-     end subroutine predictF
+     end subroutine xgb_predict
   end interface
 
 contains
@@ -195,11 +195,26 @@ contains
 
     use fits_utils, only : cfitsWrite
     use molecular_emission, only : Tcin
+    use utils, only : in_dir
+    use messages
+
+    character(len=512) :: filename, dir
+    integer :: ios
 
     call xgb_compute_features()
 
+    ! Reading xgboosr file
+    filename = "Tgas.xgb"
+    dir = in_dir(filename, ML_dir,  status=ios)
+    if (ios /=0) then
+       call error("xgboost file cannot be found: "//trim(filename))
+    else
+       filename = trim(dir)//trim(filename) ;
+       write(*,*) "Reading "//trim(filename) ;
+    endif
+
     ! Predict Tgas
-    call predictF(str_f2c("model_Tgas.raw"), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
+    call xgb_predict(str_f2c(filename), feature_Tgas, n_cells, n_features, Tcin) ! A terme remplacer par un Path
 
     ! Prepare the features for the abundance prediction
     feature_abundance(1:n_features,:) = feature_Tgas
@@ -223,13 +238,44 @@ contains
   subroutine xgb_predict_abundance(imol)
 
     use fits_utils, only : cfitsWrite
-    use molecular_emission, only : tab_abundance
+    use molecular_emission, only : tab_abundance, mol
+    use utils, only : in_dir
+    use messages
 
     integer, intent(in) :: imol
 
-    ! Predict abundance
-    ! TODO : Some molecules are given with in different units, we need to adapt the code
-    call predictF(str_f2c("model_xCO.raw") , feature_abundance, n_cells, n_features+1, tab_abundance)
+    character(len=512) :: filename, dir
+    integer :: ios
+    real :: factor
+    logical :: lfactor
+
+    ! TODO : Some molecules are given with in different units, we need to adapt the code (?????)
+    factor = 1.0 ; lfactor = .false.
+    select case(trim(mol(imol)%name))
+    case("CO")
+       filename = "12co.xgb"
+    case("13C16O")
+       filename = "12co.xgb"
+       factor = 1.428571428e-2 ; lfactor = .true.
+    case("C18O")
+       filename = "12co.xgb"
+       factor = 2e-3 ; lfactor = .true.
+    case("HCO+")
+       filename = "hco+.xgb"
+    case default
+       call error("Selected molecule does not have xgboost training data")
+    end select
+
+    dir = in_dir(filename, ML_dir,  status=ios)
+    if (ios /=0) then
+       call error("xgboost file cannot be found: "//trim(filename))
+    else
+       filename = trim(dir)//trim(filename) ;
+       write(*,*) "Reading "//trim(filename) ;
+    endif
+
+    call xgb_predict(str_f2c(filename) , feature_abundance, n_cells, n_features+1, tab_abundance)
+    if (lfactor) tab_abundance = tab_abundance * factor
 
     if (.not.lVoronoi) then
        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
