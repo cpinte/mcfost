@@ -557,19 +557,20 @@ module constantes
   real(kind=dp), parameter :: un_tiers = 1.0_dp / 3.0_dp
 
   ! Constantes en SI !!!!!!!!
-  real, parameter :: hp = 6.6260693e-34  ! Planck (J.Hz-1)
-  real, parameter :: kb = 1.3806505e-23  ! Boltzmann (J.K^-1)
-  real, parameter :: c_light = 299792458. ! vitesse lumiere (m.s^-1)
-  real, parameter :: cst_th=c_light*hp/kb   ! pour calcul de (h c)/(lambda k T)
-  real, parameter :: sigma = 5.6697e-8 ! Stefan (en W/(m^2.K^4))
-  real, parameter :: Ggrav = 6.672e-11 ! (m^3.s^-2.kg^-1)    e-8 en cgs
+  real, parameter :: hp = 6.6260693e-34    ! Planck (J.Hz-1)
+  real, parameter :: kb = 1.3806505e-23    ! Boltzmann (J.K^-1)
+  real, parameter :: c_light = 299792458.  ! vitesse lumiere (m.s^-1)
+  real, parameter :: cst_th=c_light*hp/kb  ! pour calcul de (h c)/(lambda k T)
+  real, parameter :: sigma = 5.6697e-8     ! Stefan (en W/(m^2.K^4))
+  real, parameter :: Ggrav = 6.672e-11     ! (m^3.s^-2.kg^-1)    e-8 en cgs
   real, parameter :: electron_charge = 1.6021766208e-19  ! Coulombs
 
-  real, parameter :: mole = 6.022e23   ! Nombre d'Avogadro
-  real, parameter :: masseH = 1.0/mole ! masse d'un atome d'hydrogene en g
-  real, parameter :: mu = 2.3 ! en g,  2.3 selon Walker 2004
+  real, parameter :: Na     = 6.022140857e23    ! Nombre d'Avogadro
+  real, parameter :: amu    = 1.660531000E-24  ! atomar mass unit
+  real, parameter :: masseH = 1.00794 * amu    ! masse d'un atome d'hydrogene en g
+  real, parameter :: mu = 2.3                  ! en g,  2.3 selon Walker 2004
   real, parameter :: masse_mol_gaz = mu * masseH
-  real, parameter :: T_Cmb = 2.73
+  real, parameter :: T_Cmb = 2.73              ! K
 
   ! Changements d'unites
   ! Angles
