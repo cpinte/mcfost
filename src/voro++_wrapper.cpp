@@ -18,14 +18,13 @@ void progress_bar(float progress) {
   std::cout << "| \r";
   std::cout.flush();
 
-  //progress += 0.16; // for demonstration only
   if (progress >= 1.0) std::cout << std::endl;
 }
 
 
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
-              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], int &ierr) {
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], double cutting_distance, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
 
     ierr = 0 ;
 
@@ -35,7 +34,7 @@ extern "C" {
     ay = limits[2] ; by = limits[3] ;
     az = limits[4] ; bz = limits[5] ;
 
-    int i, nx,ny,nz,init_mem(8);
+    int i, k, nx,ny,nz,init_mem(8);
 
     int row = n_points_per_cpu * max_neighbours ;
 
@@ -72,7 +71,7 @@ extern "C" {
 
     int n_neighbours_cell, first_neighbour, last_neighbour ;
     int max_size_list = max_neighbours * n ;
-    double cx, cy, cz ;
+    double cx, cy, cz, f ;
 
     n_neighbours[cpu_id] = 0 ;
     last_neighbour = -1 ;
@@ -80,7 +79,7 @@ extern "C" {
 
     float progress = 0.0 ;
     float progress_bar_step = 0.01 ;
-    float threshold = progress_bar_step*(1.*n)/n_cpu ;
+    float pb_threshold = progress_bar_step*(1.*n)/n_cpu ;
 
     if (!vlo.start()) {
       std::cout << "Error : voro++ did not manage to initialize" << std::endl;
@@ -89,6 +88,7 @@ extern "C" {
       exit(1) ;
     }
 
+    //float V_old, V_new ;
     do {
       pid = vlo.pid() ; // id of the current cell in the c_loop
 
@@ -97,15 +97,12 @@ extern "C" {
           n_in++ ;
 
           if (cpu_id == n_cpu-1) {
-            if (n_in > threshold) {
+            if (n_in > pb_threshold) {
               progress  += progress_bar_step ;
-              threshold += progress_bar_step*(1.*n)/n_cpu ;
+              pb_threshold += progress_bar_step*(1.*n)/n_cpu ;
               progress_bar(progress) ;
             }
           }
-
-          // Volume of the cell
-          volume[pid] = c.volume() ;
 
           // Store the neighbours list
           n_neighbours_cell = c.number_of_faces() ;
@@ -128,10 +125,30 @@ extern "C" {
           }
 
           // Compute the maximum distance to a vertex and the distance to the centroid from the particule position
-          delta_edge[pid] = sqrt(c.max_radius_squared()) ;
+          delta_edge[pid] = sqrt(c.max_radius_squared()) ; // does not cost anything
 
           c.centroid(cx,cy,cz) ;
           delta_centroid[pid] = sqrt(cx*cx + cy*cy + cz*cz) ;
+
+          // If the Voronoi cell is elongated, we intersect it with a dodecahedron
+          was_cell_cut[pid] = false ;
+          if (delta_edge[pid] > threshold * h[pid]) {
+            f = cutting_distance * h[pid] ;
+
+            //V_old = c.volume() ;
+
+            // Adding the n-planes to cut the cell
+            for (k=0 ; k<n_vectors ; k++) {
+              c.plane(f * cutting_vectors[0][k], f * cutting_vectors[1][k], f * cutting_vectors[2][k]) ;
+            }
+            was_cell_cut[pid] = true ;
+
+            //V_new = c.volume() ;
+            // std::cout << "e/3h= " << delta_edge[pid] / ( threshold * h[pid])   << " V_ratio=" << V_new / V_old << std::endl ; // Ok, numbers make sense
+          }
+
+          // Volume of the cell (computed after eventual cut)
+          volume[pid] = c.volume() ;
         }  // con.compute_cell
       } // pid test
 

@@ -1347,7 +1347,7 @@ function compute_vertical_CD(icell) result(CD)
 
   integer, intent(in) :: icell
   integer :: icell0, next_cell, previous_cell
-  real(kind=dp) :: CD, x0, y0, z0, x1, y1, z1, u,v,w, l
+  real(kind=dp) :: CD, x0, y0, z0, x1, y1, z1, u,v,w, l, l_contrib, l_void_before
 
   if (lVoronoi) then
      x1 = Voronoi(icell)%xyz(1)
@@ -1376,8 +1376,8 @@ function compute_vertical_CD(icell) result(CD)
      previous_cell = icell0
      icell0 = next_cell
      x0 = x1 ; y0 = y1 ; z0 = z1
-     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-     CD = CD + (l * AU_to_m) * densite_gaz(icell) ! part.m^-2
+     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+     CD = CD + (l_contrib * AU_to_m) * densite_gaz(icell) ! part.m^-2
   enddo
 
   return

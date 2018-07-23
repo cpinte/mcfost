@@ -226,7 +226,7 @@ contains
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
-    call Voronoi_tesselation(n_SPH, x,y,z, limits, check_previous_tesselation)
+    call Voronoi_tesselation(n_SPH, x,y,z,h, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 
@@ -386,16 +386,6 @@ contains
           endif
        enddo
     endif
-
-    !*************************
-    ! Smoothing lengths
-    !*************************
-    do icell=1,n_cells
-       iSPH = Voronoi(icell)%id
-       if (iSPH > 0) then
-          Voronoi(icell)%h = h(iSPH)
-       endif
-    enddo
 
     ! Removing cells at the "surface" of the SPH model:
     ! density is reduced so that they do not appear in images or cast artificial shadows,

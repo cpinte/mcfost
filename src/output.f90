@@ -1115,7 +1115,7 @@ subroutine compute_CD(CD)
   integer :: icell, icell0, next_cell, previous_cell, direction
   logical :: ltest
 
-  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w
+  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before
 
   CD(:,:) = 0.0
   do direction = 1, n_directions
@@ -1154,8 +1154,8 @@ subroutine compute_CD(CD)
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
-           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l)
-           CD(icell,direction) = CD(icell,direction) + (l * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
+           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+           CD(icell,direction) = CD(icell,direction) + (l_contrib * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
 
            if (lVoronoi) then
               ltest = (next_cell > 0).and.(.not.Voronoi(next_cell)%is_star)

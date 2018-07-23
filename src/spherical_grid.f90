@@ -169,7 +169,7 @@ end subroutine indice_cellule_sph_theta
 !******************************************************************************
 
 
-  subroutine cross_spherical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l)
+  subroutine cross_spherical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
     integer, intent(in) :: cell, previous_cell
     real(kind=dp), intent(in) :: x0,y0,z0
@@ -177,7 +177,7 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=dp), intent(out) :: x1, y1, z1
     integer, intent(out) :: next_cell
-    real(kind=dp), intent(out) :: l
+    real(kind=dp), intent(out) :: l, l_contrib, l_void_before
 
 
     real(kind=dp) :: correct_moins, correct_plus, uv, precision
@@ -419,6 +419,9 @@ end subroutine indice_cellule_sph_theta
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell =  cell_map(ri1,thetaj1,phik1)
+
+    l_contrib = l
+    l_void_before = 0.0_dp
 
     return
 
