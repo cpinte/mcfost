@@ -434,7 +434,7 @@ subroutine init_molecular_disk(imol)
   if (lML) then
      write(*,*) "Predicting  molecular abundance"
      call xgb_predict_abundance(imol)
-     write(*,*) "Max abundance=", maxval(tab_abundance)
+     write(*,*) "Min-Max abundance=", maxval(tab_abundance)
   else
      if (mol(imol)%lcst_abundance) then
         write(*,*) "Setting constant abundance"
@@ -459,33 +459,48 @@ end subroutine init_molecular_disk
 subroutine init_molecular_Voronoi(imol)
   ! Velocities are defined from SPH files
 
+  use ML_prodimo, only : xgb_predict_Tgas, xgb_predict_abundance
+
   integer, intent(in) :: imol
   integer :: icell
 
   ldust_mol  = .true.
   lkeplerian = .true.
 
-  ! Temperature gaz = poussiere
-  if (lcorrect_Tgas) then
-     write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:) = Temperature(:)  * correct_Tgas
+  ! Todo : we only need to do the prediction for Tgas once
+  if (lML) then
+     write(*,*) "Predicting gas temperature"
+     call xgb_predict_Tgas()
+     write(*,*) "Min-Max gas temperature=", minval(Tcin), maxval(Tcin)
   else
-     Tcin(:) = Temperature(:)
+     ! Temperature gaz = poussiere
+     if (lcorrect_Tgas) then
+        write(*,*) "Correcting Tgas by", correct_Tgas
+        Tcin(:) = Temperature(:)  * correct_Tgas
+     else
+        Tcin(:) = Temperature(:)
+     endif
   endif
 
   ! Vitesse de turbulence
   v_turb = vitesse_turb
 
-  ! Abondance
-  if (mol(imol)%lcst_abundance) then
-     write(*,*) "Setting constant abundance"
-     tab_abundance = mol(imol)%abundance
+    ! Abondance
+  if (lML) then
+     write(*,*) "Predicting  molecular abundance"
+     call xgb_predict_abundance(imol)
+     write(*,*) "Max abundance=", minval(tab_abundance), maxval(tab_abundance)
   else
-     call read_abundance(imol)
+     if (mol(imol)%lcst_abundance) then
+        write(*,*) "Setting constant abundance"
+        tab_abundance = mol(imol)%abundance
+     else
+        write(*,*) "Reading abundance from file"
+        call read_abundance(imol)
+     endif
   endif
 
   do icell=1, n_cells
-     !  550398
      lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
           (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
   enddo
