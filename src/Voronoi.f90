@@ -37,8 +37,6 @@ module Voronoi_grid
      type(kdtree2), pointer :: tree
   end type Voronoi_wall
 
-  real(kind=dp), parameter :: Phi = (1+sqrt(5.0))/2. ! Golden ratio
-
   type Platonic_Solid
      integer :: n_faces
 
@@ -98,44 +96,82 @@ module Voronoi_grid
       integer, intent(in) :: n_faces
       real(kind=dp), intent(in) ::  radius_o_h
 
-      real(kind=dp) :: radius, dist_to_face,  face_o_edge, f, fPhi, volume, volume_relative_to_circumsphere
+      real(kind=dp), parameter :: Phi = (1+sqrt(5.0))/2. ! Golden ratio
+      real(kind=dp), parameter :: psi = (1-sqrt(5.0))/2. ! Golden ratio
 
-      if (n_faces /= 12) call error("Only dodecahedon is implemented so far")
+
+      real(kind=dp) :: radius, dist_to_face,  face_o_edge, f, fPhi, fpsi, volume, volume_relative_to_circumsphere
+
+      if ((n_faces /= 12).and.(n_faces /= 20)) call error("Only dodecahedon and icosahedron are implemented so far")
 
       PS.n_faces = n_faces
       PS.radius_o_h = radius_o_h ! We have the input value just in case
       allocate(PS.vectors(3,n_faces))
 
-      ! a is the edge length
-      radius = sqrt(3.0)/2. * Phi ! x a
-      dist_to_face = Phi**3 / (2*sqrt(Phi**2+1)) ! x a
+      if (n_faces == 12) then ! regular dodecahedron
+         ! a is the edge length
+         radius = sqrt(3.0)/2. * Phi ! x a
+         dist_to_face = Phi**3 / (2*sqrt(Phi**2+1)) ! x a
+
+         volume = (15 + 7*sqrt(5.0))/4. ! x a**3 ! filling factor ~ 0.665
+
+         f = 1.0/sqrt(1.0+Phi*Phi)  ! 1/Norm of vector with components (0,1,Phi) (in any order)
+         fPhi = f * Phi
+
+         ! Normalized vectors perpendicular to faces
+         PS.vectors(1,:)  = (/0.0_dp,fPhi,f/)
+         PS.vectors(2,:)  = (/0.0_dp,-fPhi,f/)
+         PS.vectors(3,:)  = (/0.0_dp,fPhi,-f/)
+         PS.vectors(4,:)  = (/0.0_dp,-fPhi,-f/)
+         PS.vectors(5,:)  = (/f,0.0_dp,fPhi/)
+         PS.vectors(6,:)  = (/-f,0.0_dp,fPhi/)
+         PS.vectors(7,:)  = (/f,0.0_dp,-fPhi/)
+         PS.vectors(8,:)  = (/-f,0.0_dp,-fPhi/)
+         PS.vectors(9,:)  = (/fPhi,f,0.0_dp/)
+         PS.vectors(10,:) = (/-fPhi,f,0.0_dp/)
+         PS.vectors(11,:) = (/fPhi,-f,0.0_dp/)
+         PS.vectors(12,:) = (/-fPhi,-f,0.0_dp/)
+
+      else if (n_faces == 20) then ! regular icosahedron
+         ! a is the edge length
+         radius = 0.5 * sqrt(Phi * sqrt(5.0))  ! x a
+         dist_to_face = Phi**2 / (2*sqrt(3.0)) ! x a
+
+         volume = 5. * (3+sqrt(5.0))/12. ! a**3   filling factor is 0.605
+
+         f = 1.0/sqrt(3.0)  ! 1/Norm of vector with components (1,1,1) or (0,Phi,psi) (in any order)
+         fPhi = f * Phi
+         fpsi = f * psi
+
+         ! Normalized vectors perpendicular to faces
+         PS.vectors(1,:)  = (/f,f,f/)
+         PS.vectors(2,:)  = (/-f,f,f/)
+         PS.vectors(3,:)  = (/f,-f,f/)
+         PS.vectors(4,:)  = (/-f,-f,f/)
+         PS.vectors(5,:)  = (/f,f,-f/)
+         PS.vectors(6,:)  = (/-f,f,-f/)
+         PS.vectors(7,:)  = (/f,-f,-f/)
+         PS.vectors(8,:)  = (/-f,-f,-f/)
+         PS.vectors(9,:)  = (/0.0_dp,fpsi,fPhi/)
+         PS.vectors(10,:) = (/0.0_dp,fpsi,-fPhi/)
+         PS.vectors(11,:) = (/0.0_dp,-fpsi,fPhi/)
+         PS.vectors(12,:) = (/0.0_dp,-fpsi,-fPhi/)
+         PS.vectors(13,:) = (/fPhi,0.0_dp,fpsi/)
+         PS.vectors(14,:) = (/fPhi,0.0_dp,-fpsi/)
+         PS.vectors(15,:) = (/-fPhi,0.0_dp,fpsi/)
+         PS.vectors(16,:) = (/-fPhi,0.0_dp,-fpsi/)
+         PS.vectors(17,:) = (/fpsi,fPhi,0.0_dp/)
+         PS.vectors(18,:) = (/fpsi,-fPhi,0.0_dp/)
+         PS.vectors(19,:) = (/-fpsi,fPhi,0.0_dp/)
+         PS.vectors(20,:) = (/-fpsi,-fPhi,0.0_dp/)
+      endif
 
       face_o_edge = dist_to_face/radius
-
-      volume = (15 + 7*sqrt(5.0))/4. ! x a**3
       volume_relative_to_circumsphere = volume / (4.*pi/3 * radius**3)
 
       ! distance of a face / smoothing length (if edges are at radius_o_h x h from the center)
       !PS.cutting_distance_o_h = radius_o_h * face_o_edge ! PS is exactly included in the sphere
-      PS.cutting_distance_o_h = radius_o_h * face_o_edge / (volume_relative_to_circumsphere)**(1./3) ! PS has the sphere volume as sphere of radius h*radius_o_h
-
-
-      f = 1.0/sqrt(1.0+Phi*Phi)  ! 1/Norm of vector with components (0,1,Phi) (in any order)
-      fPhi = f * Phi
-
-      ! Normalized vectors perpendicular to faces
-      PS.vectors(1,:) = (/0.0_dp,fPhi,f/)
-      PS.vectors(2,:) = (/0.0_dp,-fPhi,f/)
-      PS.vectors(3,:) = (/0.0_dp,fPhi,-f/)
-      PS.vectors(4,:) = (/0.0_dp,-fPhi,-f/)
-      PS.vectors(5,:) = (/f,0.0_dp,fPhi/)
-      PS.vectors(6,:) = (/-f,0.0_dp,fPhi/)
-      PS.vectors(7,:) = (/f,0.0_dp,-fPhi/)
-      PS.vectors(8,:) = (/-f,0.0_dp,-fPhi/)
-      PS.vectors(9,:) = (/fPhi,f,0.0_dp/)
-      PS.vectors(10,:)= (/-fPhi,f,0.0_dp/)
-      PS.vectors(11,:)= (/fPhi,-f,0.0_dp/)
-      PS.vectors(12,:)= (/-fPhi,-f,0.0_dp/)
+      PS.cutting_distance_o_h = radius_o_h * face_o_edge / (volume_relative_to_circumsphere)**(1./3) ! PS has the same volume as sphere of radius h*radius_o_h
 
       return
 
