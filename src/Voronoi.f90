@@ -42,8 +42,10 @@ module Voronoi_grid
   type Platonic_Solid
      integer :: n_faces
 
-     ! ratio distance face to distance edge
+     ! distance face as a function of h
      real(kind=dp) :: cutting_distance_o_h
+     ! distance to vertex as a function of h
+     real(kind=dp) :: radius_o_h
 
      ! Normalized vectors to faces
      real(kind=dp), dimension(:,:), allocatable :: vectors
@@ -96,12 +98,12 @@ module Voronoi_grid
       integer, intent(in) :: n_faces
       real(kind=dp), intent(in) ::  radius_o_h
 
-      real(kind=dp) :: radius, dist_to_face,  face_o_edge, f, fPhi
-
+      real(kind=dp) :: radius, dist_to_face,  face_o_edge, f, fPhi, volume, volume_relative_to_circumsphere
 
       if (n_faces /= 12) call error("Only dodecahedon is implemented so far")
 
       PS.n_faces = n_faces
+      PS.radius_o_h = radius_o_h ! We have the input value just in case
       allocate(PS.vectors(3,n_faces))
 
       ! a is the edge length
@@ -110,10 +112,13 @@ module Voronoi_grid
 
       face_o_edge = dist_to_face/radius
 
-      ! volume = (15 + 7*sqrt(5.0))/4. ! x a**3
+      volume = (15 + 7*sqrt(5.0))/4. ! x a**3
+      volume_relative_to_circumsphere = volume / (4.*pi/3 * radius**3)
 
       ! distance of a face / smoothing length (if edges are at radius_o_h x h from the center)
-      PS.cutting_distance_o_h = radius_o_h * face_o_edge
+      !PS.cutting_distance_o_h = radius_o_h * face_o_edge ! PS is exactly included in the sphere
+      PS.cutting_distance_o_h = radius_o_h * face_o_edge / (volume_relative_to_circumsphere)**(1./3) ! PS has the sphere volume as sphere of radius h*radius_o_h
+
 
       f = 1.0/sqrt(1.0+Phi*Phi)  ! 1/Norm of vector with components (0,1,Phi) (in any order)
       fPhi = f * Phi
@@ -334,7 +339,7 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     real(kind=dp) :: cutting_distance
 
-    ! Defining dodecahedron
+    ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
 
     n_walls = 6
@@ -521,33 +526,33 @@ module Voronoi_grid
 
 
     ! We check if we get the same test between Fortran and C++
-    write(*,*) "TESTING TESSELATION"
-    do icell=1,n_cells
-       ! We reduce the density on cells that are very elongated
-       if (Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h) then
-          if (.not.Voronoi(icell)%was_cut) call error("There was an issue cutting cells 1 !!!")
-       else
-          !write(*,*) '-------------------------------'
-          !write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
-          if (Voronoi(icell)%was_cut) then
-             write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
-             call error("There was an issue cutting cells 2 !!!")
-          endif
-       end if
-    end do
-
-    do icell = 1, n_cells
-       if (Voronoi(icell)%was_cut) then
-          if ( Voronoi(icell)%delta_edge < threshold * Voronoi(icell)%h ) then
-             write(*,*) "was_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
-          endif
-       else
-          if ( Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h ) then
-             write(*,*) "was_not_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
-          endif
-       endif
-    enddo
-    write(*,*) "TESTING OK"
+!--    write(*,*) "TESTING TESSELATION"
+!--    do icell=1,n_cells
+!--       ! We reduce the density on cells that are very elongated
+!--       if (Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h) then
+!--          if (.not.Voronoi(icell)%was_cut) call error("There was an issue cutting cells 1 !!!")
+!--       else
+!--          !write(*,*) '-------------------------------'
+!--          !write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
+!--          if (Voronoi(icell)%was_cut) then
+!--             write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
+!--             call error("There was an issue cutting cells 2 !!!")
+!--          endif
+!--       end if
+!--    end do
+!--
+!--    do icell = 1, n_cells
+!--       if (Voronoi(icell)%was_cut) then
+!--          if ( Voronoi(icell)%delta_edge < threshold * Voronoi(icell)%h ) then
+!--             write(*,*) "was_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
+!--          endif
+!--       else
+!--          if ( Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h ) then
+!--             write(*,*) "was_not_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
+!--          endif
+!--       endif
+!--    enddo
+!--    write(*,*) "TESTING OK"
 
 
     ! Setting-up the walls
@@ -787,9 +792,8 @@ module Voronoi_grid
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n
 
-    logical :: ltest_exit
-
-
+    real(kind=dp) :: b, c, delta, rac, s1, s2
+    real(kind=dp), dimension(3) :: delta_r
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k
@@ -850,45 +854,35 @@ module Voronoi_grid
        endif
     endif
 
-    ! Vitual walls of the cell if the cell was cut during the tesselation
-    ! we need to test if the packet will enter the Platonic Solid, not just if it will exit it
     if (Voronoi(icell)%was_cut) then
-       s_entry = 1e30
-       s_exit = s
+       ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS.cutting_distance_o_h
+       ! centered on the center of the cell
+       delta_r = (/x,y,z/) - Voronoi(icell)%xyz(:)
+       b = dot_product(delta_r,(/u,v,w/))
+       c = dot_product(delta_r,delta_r) - (Voronoi(icell)%h * PS.cutting_distance_o_h)**2
+       delta = b*b - c
 
-       vnb_loop : do i=1, PS.n_faces
-          ! normalized vector to plane
-          n(:) = PS.vectors(i,:)
-
-          ! test direction
-          den = dot_product(n, k)
-          if (den <= 0.) cycle vnb_loop ! car s_tmp sera < 0
-
-          ! point on the plane
-          p(:) = Voronoi(icell)%xyz(:) +  (Voronoi(id_n)%h * PS.cutting_distance_o_h) * n(:)
-
-          num = dot_product(n, p-r)
-
-          if (num > 0.0_dp) then ! the current point and center of the cell are on the same side of the plane
-             ltest_exit = .true. ! we are looking at an exit plane
-          else
-             ltest_exit = .false. ! we are looking at an entry plane
-          endif
-
-          s_tmp = num / den
-
-          if (s_tmp > 0.) then
-             if (ltest_exit) then
-                if (s_tmp < s_exit)  s_exit  = s_tmp
+       if (delta < 0.) then ! the packet never encounters the sphere
+          s_void_before = s
+          s_contrib = s
+       else ! the packet never encounters the sphere at least once
+          rac = sqrt(delta)
+          s1 = -b - rac
+          s2 = -b + rac
+          if (s1 < 0) then ! we are alredy in the sphere
+             s_void_before = 0
+             s_contrib = min(s2,s)
+          else ! We will enter in the sphere
+             if (s1 < s) then
+                s_void_before = s1
+                s_contrib = min(s2,s) - s1
              else
-                if (s_tmp < s_entry) s_entry = s_tmp
+                s_void_before = s
+                s_contrib = 0
              endif
           endif
-       enddo vnb_loop ! i
-       if (s_entry > s_exit) s_entry = 0.0_dp ! We were already in the Platonic solid
+       endif ! delta < 0
 
-       s_void_before = s_entry
-       s_contrib = s_exit - s_entry
     else ! the cell was not cut
        s_void_before = 0.0_dp
        s_contrib = s
