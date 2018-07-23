@@ -143,6 +143,7 @@ contains
     use opacity, only : densite_pouss, r_grid, z_grid
     use molecular_emission, only : densite_gaz, Tcin
     use em_th, only : Temperature
+    use Voronoi_grid, only : Voronoi
 
     real, dimension(0:3,n_cells) :: N_grains
     logical, dimension(n_grains_tot) :: mask_not_PAH
@@ -176,8 +177,13 @@ contains
     call compute_CD(CD)
     write(*,*) "Done"
 
-    feature_Tgas(1,:) = r_grid
-    feature_Tgas(2,:) = z_grid
+    if (lVoronoi) then
+       feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(3)**2)
+       feature_Tgas(2,:) = Voronoi(:)%xyz(3)
+    else
+       feature_Tgas(1,:) = r_grid
+       feature_Tgas(2,:) = z_grid
+    endif
     feature_Tgas(3,:) = temperature
     feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
     feature_Tgas(5:43,:) = J_ML
