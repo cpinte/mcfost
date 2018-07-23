@@ -139,7 +139,7 @@ contains
   subroutine xgb_compute_features()
 
     use grains, only : grain, r_grain, n_grains_tot
-    use output, only : compute_CD
+    use density, only : compute_CD
     use opacity, only : densite_pouss, r_grid, z_grid
     use molecular_emission, only : densite_gaz, Tcin
     use em_th, only : Temperature
@@ -172,7 +172,9 @@ contains
     N_grains(0,:) = N_grains(0,:) /  (cm_to_m**3)
 
     !--- Column density
+    write(*,*) "Computing column densities"
     call compute_CD(CD)
+    write(*,*) "Done"
 
     feature_Tgas(1,:) = r_grid
     feature_Tgas(2,:) = z_grid

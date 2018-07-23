@@ -38,4 +38,4 @@ spherical_grid.o : spherical_grid.f90 messages.o cylindrical_grid.o modules.o
 stars.o : stars.f90 messages.o grid.o io_prodimo.o modules.o utils.o
 thermal_emission.o : thermal_emission.f90 radiation_field.o stars.o grid.o PAH.o utils.o modules.o
 utils.o : utils.f90 messages.o modules.o system.o
-ML_prodimo.o : ML_prodimo.f90 fits_utils.o output.o utils.o radiation_field.o messages.o modules.o io_prodimo.o
+ML_prodimo.o : ML_prodimo.f90 fits_utils.o density.o utils.o radiation_field.o messages.o modules.o io_prodimo.o Voronoi.o
