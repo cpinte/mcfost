@@ -285,6 +285,8 @@ contains
     call xgb_predict(str_f2c(filename) , feature_abundance, n_cells, n_features+1, tab_abundance)
     if (lfactor) tab_abundance = tab_abundance * factor
 
+    tab_abundance = max(0.0, tab_abundance) ! preventing slightly negative abundances
+
     if (.not.lVoronoi) then
        call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
     else
