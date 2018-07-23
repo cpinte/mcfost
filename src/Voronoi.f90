@@ -900,13 +900,13 @@ module Voronoi_grid
 
        if (delta < 0.) then ! the packet never encounters the sphere
           s_void_before = s
-          s_contrib = s
+          s_contrib = 0.0_dp
        else ! the packet never encounters the sphere at least once
           rac = sqrt(delta)
           s1 = -b - rac
           s2 = -b + rac
           if (s1 < 0) then ! we are alredy in the sphere
-             s_void_before = 0
+             s_void_before = 0.0_dp
              s_contrib = min(s2,s)
           else ! We will enter in the sphere
              if (s1 < s) then
@@ -914,7 +914,7 @@ module Voronoi_grid
                 s_contrib = min(s2,s) - s1
              else
                 s_void_before = s
-                s_contrib = 0
+                s_contrib = 0.0_dp
              endif
           endif
        endif ! delta < 0
