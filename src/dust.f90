@@ -533,14 +533,26 @@ subroutine prop_grains(lambda)
   ! sortie des routines opacite
   ! C. Pinte 7/01/05
 
+  use benchmarks, only : read_Pascucci_cross_sections
+
   implicit none
 
   integer, intent(in) :: lambda
-  real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat
+  real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat, Cext, Csca
   integer :: k, pop
 
-  !-- real :: norme, dtheta, theta
-  !-- integer :: j
+  ! In the Pascucci benckmark, we read directly the cross sections
+  if (lbenchmark_Pascucci) then
+     k=1 ! 1 grain size
+     call read_Pascucci_cross_sections(lambda, Cext, Csca)
+     tab_albedo(k,lambda)=Csca/Cext
+     tab_g(k,lambda) = 0.0
+     C_ext(k,lambda) = Cext
+     C_sca(k,lambda) = Csca
+     C_abs(k,lambda) = Cext - Csca
+     C_abs_norm(k,lambda) = C_abs(k,lambda) * AU_to_cm * mum_to_cm**2
+     return
+  endif
 
   qext=0.0
   qsca=0.0
@@ -608,6 +620,7 @@ subroutine prop_grains(lambda)
   !$omp enddo
   !$omp end parallel
 
+  ! Opacity files
   ! On refait exactement la meme boucle en sequentielle (pour eviter pb d'allocation en parallel)
   ! pour les grains definis par un fichier d'opacite
   ! Boucle a l'endroit cette fois
