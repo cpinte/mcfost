@@ -119,7 +119,8 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      ! et ajustement longueur de vol eventuellement
      if(tau > extr) then ! On a fini d'integrer
         lstop = .true.
-        l = l_void_before + l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+        l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+        l = l_void_before + l_contrib
         ltot=ltot+l
      else ! Il reste extr - tau a integrer dans la cellule suivante
         extr=extr-tau

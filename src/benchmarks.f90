@@ -12,66 +12,78 @@ module benchmarks
 
   contains
 
-subroutine lect_section_eff()
+subroutine init_Pascucci_benchmark()
+
+  character(len=32) :: filename = "Pascucci_optSi.dat"
+
+  write(*,*) "------------------------------------------------"
+  write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
+  write(*,*) "------------------------------------------------"
+
+  if (n_lambda /= 61) call error("Benchmark, n_lambda must be 61")
+  if (n_grains_tot /= 1) call error("Benchmark : n_grains_tot must be 1")
+
+  write(*,*) "Forcing use of cross section file: "//trim(filename)
+  dust_pop(1)%is_opacity_file = .true.
+  dust_pop(1)%indices = trim(filename)
+
+  write(*,*) "Forcing dust grain density to 3.6 g.cm-3"
+  dust_pop(1)%component_rho1g(1) = 3.6
+  dust_pop(1)%rho1g_avg = 3.6
+
+  write(*,*) "Forcing isotropic scattering"
+  lisotropic=.true.
+
+  return
+
+end subroutine init_Pascucci_benchmark
+
+!*************************************************************
+
+subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
 ! Lecture table section efficace
 ! Benchmark Pascucci et al. 2004
 ! bande V : ligne 15
 
+  use utils, only : in_dir
+
   implicit none
 
-  integer :: lambda, l, icell
-  real, dimension(61) :: qext, qsca
-  real, dimension(0:61) :: tab_lambda_lim
+  integer, intent(in) :: lambda
+  real, intent(out) :: Cext, Csca
 
-  open(unit=1,file="optSi.dat",status="old")
+  integer :: l, ios
+  real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
 
-  if (n_lambda /= 61) call error("Benchmark, n_lambda must be 61")
+  character(len=512) :: filename, dir
 
-  if (n_grains_tot /= 1) call error("Benchmark : n_grains_tot must be 1")
+  if (lambda == 1) then
+     filename = dust_pop(1)%indices(1)
+     dir = in_dir(filename, dust_dir,  status=ios)
+     if (ios /=0) call error("dust file cannot be found:"//trim(filename))
+     filename = trim(dir)//trim(filename) ;
 
-  do lambda=1,n_lambda
-     read(1,*) tab_lambda(lambda), qsca(lambda), qext(lambda)
-  enddo
+     open(unit=1,file=filename,status="old")
+     ! Skipping header
+     do l=1,11
+        read(1,*)
+     enddo
 
-  close(unit=1)
+     do l=1,n_lambda
+        read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
+     enddo
+     close(unit=1)
+  endif
 
-  ! Propriétés optiques des cellules
-  do lambda=1,n_lambda
-     tab_albedo_pos(:,lambda)=qsca(lambda)/qext(lambda)
-     tab_s11_pos(:,:,lambda)=1.0
-     tab_s12_o_s11_pos(:,:,lambda)=0.0
-     tab_s33_o_s11_pos(:,:,lambda)=0.0
-     tab_s34_o_s11_pos(:,:,lambda)=0.0
-     do icell=1, n_cells
-        ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-        ! a² m² -> 1e4 cm²                    \    /\ Cas particulier benchmark !!
-        ! density en cm-3                      > reste facteur 1.49595e17
-        ! longueur de vol en AU = 1.5e13 cm   /
-        kappa(icell,lambda)=densite_pouss(1,icell) * qext(lambda) * 1.49595e17
-        kappa_abs_LTE(icell,lambda)=densite_pouss(1,icell)*(qext(lambda)-qsca(lambda))*1.49595e17
-     enddo !icell
-  enddo !lambda
-
-  tab_g_pos=0.0
-  proba_abs_RE = 1.0
-
-
-  ! Largeur des bins en longueur d'onde
-  ! tab_lambda_lim : limite sup du bin
-  do l=1,n_lambda-1
-     tab_lambda_lim(l)=sqrt(tab_lambda(l)*tab_lambda(l+1))
-  enddo
-
-  tab_lambda_lim(0)=tab_lambda(1)/(tab_lambda_lim(1)/tab_lambda(1))
-  tab_lambda_lim(n_lambda)=tab_lambda(n_lambda)*(tab_lambda(n_lambda)/tab_lambda_lim(n_lambda-1))
-
-  do l=1,n_lambda
-     tab_delta_lambda(l)=tab_lambda_lim(l)-tab_lambda_lim(l-1)
-  enddo
+  ! Convert to mum**2
+  Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
+  Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
 
   return
 
-end subroutine lect_section_eff
+end subroutine read_Pascucci_cross_sections
+
+!*************************************************************
 
 subroutine readMolecule_benchmark1()
 

@@ -88,7 +88,12 @@ subroutine transfert_poussiere()
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()
-  call init_indices_optiques()
+
+  if (lbenchmark_Pascucci) then ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
+     call init_Pascucci_benchmark()
+  else
+     call init_indices_optiques()
+  endif
 
   ! Building the dust grain population
   call build_grain_size_distribution()
@@ -236,97 +241,89 @@ subroutine transfert_poussiere()
            E_ISM = 0.0 ;
         endif
 
-        if (.not.lbenchmark_Pascucci) then
-           if (lscatt_ray_tracing.and.lsed_complete) then
-              call alloc_ray_tracing()
-              call init_directions_ray_tracing()
-           endif
+        if (lscatt_ray_tracing.and.lsed_complete) then
+           call alloc_ray_tracing()
+           call init_directions_ray_tracing()
+        endif
 
-           ! Try to restore dust calculation from previous run
-           call read_saved_dust_prop(letape_th, lcompute_dust_prop)
-           if (lcompute_dust_prop) then
-              write(*,'(a30, $)') "Computing dust properties ..."
-           else
-              write(*,'(a46, $)') "Reading dust properties from previous run ..."
-           endif
-
-           if (lscattering_method1) then
+        if (lscattering_method1) then
+           lambda = 1
+           p_lambda => lambda
+        else
+           if (p_n_lambda_pos == n_lambda) then
               lambda = 1
               p_lambda => lambda
            else
-              if (p_n_lambda_pos == n_lambda) then
-                 lambda = 1
-                 p_lambda => lambda
-              else
-                 lambda0 = 1
-                 p_lambda => lambda0
-              endif
+              lambda0 = 1
+              p_lambda => lambda0
            endif
+        endif
+
+        ! Try to restore dust calculation from previous run
+        call read_saved_dust_prop(letape_th, lcompute_dust_prop)
+        if (lcompute_dust_prop) then
+           write(*,'(a30, $)') "Computing dust properties ..."
+        else
+           write(*,'(a46, $)') "Reading dust properties from previous run ..."
+        endif
+
+        do lambda=1,n_lambda
+           if (lcompute_dust_prop) call prop_grains(lambda)
+           call opacite(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
+        enddo !n
+        if (lcompute_dust_prop) call save_dust_prop(letape_th)
+        write(*,*) "Done"
+
+        if (ldust_sublimation)  then
+           call compute_othin_sublimation_radius()
+           call define_grid()
+           call define_dust_density()
+
+           if (ldisk_struct) call write_disk_struct(.false.) ! We do now in cases where we computed the dust submination radius
 
            do lambda=1,n_lambda
-              if (lcompute_dust_prop) call prop_grains(lambda)
-              call opacite(lambda, p_lambda)!_eqdiff!_data  ! ~ takes 2 seconds  PB : takes a long time in RT as using method 2 for scattering
-           enddo !n
-           if (lcompute_dust_prop) call save_dust_prop(letape_th)
-           write(*,*) "Done"
+              ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
+              call prop_grains(lambda)
+              call opacite(lambda, p_lambda)
+           enddo
+        endif ! ldust_sublimation
 
-           if (ldust_sublimation)  then
-              call compute_othin_sublimation_radius()
-              call define_grid()
-              call define_dust_density()
+        test_tau : do lambda=1,n_lambda
+           if (tab_lambda(lambda) > wl_seuil) then
+              lambda_seuil=lambda
+              exit test_tau
+           endif
+        enddo test_tau
+        write(*,*) "lambda =", tab_lambda(lambda_seuil)
+        call integ_tau(lambda_seuil)
+        if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
 
-              if (ldisk_struct) call write_disk_struct(.false.) ! We do now in cases where we computed the dust submination radius
-
-              do lambda=1,n_lambda
-                 ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
-                 call prop_grains(lambda)
-                 call opacite(lambda, p_lambda)
-              enddo
-           endif ! ldust_sublimation
-
-           test_tau : do lambda=1,n_lambda
-              if (tab_lambda(lambda) > wl_seuil) then
-                 lambda_seuil=lambda
-                 exit test_tau
-              endif
-           enddo test_tau
-           write(*,*) "lambda =", tab_lambda(lambda_seuil)
-           call integ_tau(lambda_seuil)
-           if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
-
-           if (lspherical.or.l3D) then
-              write(*,*) "No dark zone"
-              call no_dark_zone()
-              lapprox_diffusion=.false.
-           else
-              if (lapprox_diffusion) then
-                 if (lcylindrical) then
-                    call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
-                 else
-                    write(*,*) "No dark zone"
-                    call no_dark_zone()
-                 endif
+        if (lspherical.or.l3D) then
+           write(*,*) "No dark zone"
+           call no_dark_zone()
+           lapprox_diffusion=.false.
+        else
+           if (lapprox_diffusion) then
+              if (lcylindrical) then
+                 call define_dark_zone(lambda_seuil,p_lambda,tau_dark_zone_eq_th,.true.) ! BUG avec 1 cellule
               else
                  write(*,*) "No dark zone"
                  call no_dark_zone()
               endif
+           else
+              write(*,*) "No dark zone"
+              call no_dark_zone()
            endif
+        endif
 
-           if (lonly_diff_approx) then
-              call lect_temperature()
-              call Temp_approx_diffusion_vertical()
-              ! call Temp_approx_diffusion()
-              call diffusion_approx_nLTE_nRE()
-              call ecriture_temperature(2)
-              return
-           endif
-
-        else ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
-           call lect_section_eff()
-           call repartition_energie_etoiles()
-           E_ISM = 0.0
-           if (lcylindrical) call integ_tau(15) !TODO
-        endif ! Fin bench
+        if (lonly_diff_approx) then
+           call lect_temperature()
+           call Temp_approx_diffusion_vertical()
+           ! call Temp_approx_diffusion()
+           call diffusion_approx_nLTE_nRE()
+           call ecriture_temperature(2)
+           return
+        endif
 
         if (lTemp) call init_reemission(lextra_heating,extra_heating)
 

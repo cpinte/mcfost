@@ -1,13 +1,13 @@
 PAH.o : PAH.f90 utils.o dust.o modules.o
 SPH2mcfost.o : SPH2mcfost.f90 mem.o disk_physics.o modules.o Voronoi.o io_phantom_utils.o read_gadget2.o read_phantom.o density.o utils.o
 Voronoi.o : Voronoi.f90 messages.o kdtree2.o modules.o utils.o
-benchmarks.o : benchmarks.f90 messages.o
+benchmarks.o : benchmarks.f90 messages.o utils.o
 coated_sphere.o : coated_sphere.f90 messages.o utils.o modules.o
 cylindrical_grid.o : cylindrical_grid.f90 messages.o modules.o
 density.o : density.f90 messages.o utils.o grid.o modules.o
 diffusion.o : diffusion.f90 messages.o modules.o
 disk_physics.o : disk_physics.f90 messages.o stars.o
-dust.o : dust.f90 fits_utils.o input.o coated_sphere.o scattering.o dust_ray_tracing.o modules.o
+dust.o : dust.f90 fits_utils.o input.o coated_sphere.o scattering.o dust_ray_tracing.o modules.o benchmarks.o
 dust_ray_tracing.o : dust_ray_tracing.f90 scattering.o modules.o
 dust_transfer.o : dust_transfer.f90 SPH2mcfost.o init_mcfost.o io_prodimo.o utils.o mem.o stars.o dust.o diffusion.o benchmarks.o input.o output.o disk_physics.o thermal_emission.o PAH.o density.o optical_depth.o grid.o scattering.o modules.o system.o
 fits_utils.o : fits_utils.f90
