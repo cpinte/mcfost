@@ -16,6 +16,7 @@ contains
     use optical_depth, only : no_dark_zone
     use mem, only : alloc_dust_prop
     use SPH2mcfost, only : read_SPH_limits_file
+    use messages, only : error
 
     character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
     logical, intent(in) :: use_SPH_limits_file
