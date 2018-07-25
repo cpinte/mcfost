@@ -22,9 +22,8 @@ void progress_bar(float progress) {
 }
 
 
-// works if hard-coded as double cutting_vectors[3][12]
 extern "C" {
-  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], double cutting_distance, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
+  void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[][3], double cutting_distance, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
               int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
 
     ierr = 0 ;
@@ -140,7 +139,7 @@ extern "C" {
 
             // Adding the n-planes to cut the cell
             for (k=0 ; k<n_vectors ; k++) {
-              c.plane(f * cutting_vectors[0][k], f * cutting_vectors[1][k], f * cutting_vectors[2][k]) ;
+              c.plane(f * cutting_vectors[k][0], f * cutting_vectors[k][1], f * cutting_vectors[k][2]) ;
             }
             was_cell_cut[pid] = true ;
 
