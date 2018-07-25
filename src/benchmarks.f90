@@ -20,18 +20,14 @@ subroutine init_Pascucci_benchmark()
   write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
   write(*,*) "------------------------------------------------"
 
-  if (n_lambda /= 61) call error("Benchmark, n_lambda must be 61")
   if (n_grains_tot /= 1) call error("Benchmark : n_grains_tot must be 1")
 
-  write(*,*) "Forcing use of cross section file: "//trim(filename)
-  dust_pop(1)%is_opacity_file = .true.
-  dust_pop(1)%indices = trim(filename)
-
-  write(*,*) "Forcing dust grain density to 3.6 g.cm-3"
+  write(*,*) "! Forcing dust grain density to 3.6 g.cm-3      |"
   dust_pop(1)%component_rho1g(1) = 3.6
   dust_pop(1)%rho1g_avg = 3.6
 
-  write(*,*) "Forcing isotropic scattering"
+  write(*,*) "! Forcing isotropic scattering                  |"
+  write(*,*) "-------------------------------------------------"
   lisotropic=.true.
 
   return

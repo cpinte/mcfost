@@ -541,19 +541,6 @@ subroutine prop_grains(lambda)
   real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat, Cext, Csca
   integer :: k, pop
 
-  ! In the Pascucci benckmark, we read directly the cross sections
-  if (lbenchmark_Pascucci) then
-     k=1 ! 1 grain size
-     call read_Pascucci_cross_sections(lambda, Cext, Csca)
-     tab_albedo(k,lambda)=Csca/Cext
-     tab_g(k,lambda) = 0.0
-     C_ext(k,lambda) = Cext
-     C_sca(k,lambda) = Csca
-     C_abs(k,lambda) = Cext - Csca
-     C_abs_norm(k,lambda) = C_abs(k,lambda) * AU_to_cm * mum_to_cm**2
-     return
-  endif
-
   qext=0.0
   qsca=0.0
 

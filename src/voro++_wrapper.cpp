@@ -22,6 +22,7 @@ void progress_bar(float progress) {
 }
 
 
+// works if hard-coded as double cutting_vectors[3][12]
 extern "C" {
   void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[3][n_vectors], double cutting_distance, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
               int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
