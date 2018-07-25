@@ -55,7 +55,6 @@ subroutine transfert_poussiere()
 
   logical :: lscatt_ray_tracing1_save, lscatt_ray_tracing2_save
 
-  ! NEW
   integer, target :: lambda, lambda0
   integer, pointer, save :: p_lambda
   integer :: capt
@@ -88,11 +87,9 @@ subroutine transfert_poussiere()
   ! Building the wavelength & basic dust properties grid
   call init_lambda()
 
-  if (lbenchmark_Pascucci) then ! Benchmark Pascucci: ne marche qu'avec le mode 2-2 pour le scattering
-     call init_Pascucci_benchmark()
-  else
-     call init_indices_optiques()
-  endif
+  if (lbenchmark_Pascucci) call init_Pascucci_benchmark()
+  call init_indices_optiques()
+
 
   ! Building the dust grain population
   call build_grain_size_distribution()
