@@ -24,7 +24,7 @@ module parametres
   logical :: lpara, lstop_after_init
   integer, parameter :: sp = selected_real_kind(p=6,r=37)
   integer, parameter :: dp = selected_real_kind(p=13,r=200)
-  integer, parameter :: lp = minval(logical_kinds) ! smallest logical available
+  integer, parameter :: lp = logical_kinds(1) ! smallest logical available
   integer, parameter :: limite_stack = 5000000
   integer :: indice_etape, etape_i, etape_f
   integer :: time_begin, time_end, time_tick, time_max
