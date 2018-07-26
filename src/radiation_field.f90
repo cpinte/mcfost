@@ -157,7 +157,7 @@ subroutine allocate_radiation_field_step2()
 
   integer :: alloc_status
 
-  lxJ_abs = lProDiMo.or.loutput_UV_field.or.loutput_J
+  lxJ_abs = lProDiMo.or.lML.or.loutput_UV_field.or.loutput_J
   if (lxJ_abs) then
      allocate(xJ_abs(n_cells,n_lambda,nb_proc), J0(n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error xJ_abs in realloc_step2')
