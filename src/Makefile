@@ -189,7 +189,7 @@ include .depend
 all : mcfost libmcfost.a
 
 mcfost :  $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o
-	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o $(LDFLAGS)
+	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
