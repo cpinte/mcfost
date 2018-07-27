@@ -697,12 +697,12 @@ subroutine realloc_step2()
   prob_s11 = 0
 
   if (scattering_method == 2) then
-     deallocate(tab_s11_pos)
+     if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
      allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_s11_pos')
 
      if (lsepar_pola) then
-        deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
+        if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
         allocate(tab_s12_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
              tab_s33_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
              tab_s34_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
@@ -713,12 +713,12 @@ subroutine realloc_step2()
         tab_s34_o_s11_pos = 0
      endif
 
-     deallocate(prob_s11_pos)
+     if (allocated(prob_s11_pos)) deallocate(prob_s11_pos)
      allocate(prob_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error prob_s11_pos')
      prob_s11_pos = 0
   else
-     deallocate(ksca_CDF)
+     if (allocated(ksca_CDF)) deallocate(ksca_CDF)
      low_mem_scattering = .false.
      mem_size = n_grains_tot * p_n_cells * p_n_lambda2_pos * 4. / 1024.**3
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
@@ -799,7 +799,7 @@ subroutine alloc_emission_mol(imol)
   integer, intent(in) :: imol
   integer :: alloc_status, n_speed, n_speed_rt, nTrans_raytracing
 
-
+  alloc_status = 0
   n_speed = mol(imol)%n_speed_rt ! I use the same now
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
@@ -810,11 +810,13 @@ subroutine alloc_emission_mol(imol)
   kappa_mol_o_freq=0.0
   emissivite_mol_o_freq = 0.0
 
+  ! Todo : we do not always need both arrays
   allocate(tab_nLevel(n_cells,nLevels), tab_nLevel_old(n_cells,nLevels), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_nLevel')
   tab_nLevel = 0.0
   tab_nLevel_old = 0.0
 
+  ! Todo : we don;t need this most of the time
   allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error maser_map')
   maser_map = 0.0
@@ -823,6 +825,7 @@ subroutine alloc_emission_mol(imol)
   if (alloc_status > 0) call error('Allocation error tab_v')
   tab_v=0.0
 
+  ! Warning this is potentially a big array
   allocate(tab_deltaV(-n_speed:n_speed,n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_deltaV')
   tab_deltaV = 0.0

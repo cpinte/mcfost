@@ -226,7 +226,10 @@ subroutine deallocate_temperature_calculation()
 
   use radiation_field, only : deallocate_radiation_field
 
-  if (lRE_LTE)  deallocate(kdB_dT_CDF, log_Qcool_minus_extra_heating, xT_ech)
+  if (lRE_LTE) then
+     if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
+     deallocate(log_Qcool_minus_extra_heating)
+  endif
   if (lRE_nLTE) deallocate(kabs_nLTE_CDF, kdB_dT_1grain_nLTE_CDF, log_E_em_1grain,xT_ech_1grain)
   if (lreemission_stats) deallocate(nbre_reemission)
   if (lnRE) then

@@ -113,14 +113,15 @@ endif
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
     FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math -ffree-line-length-none
+             -fno-trapping-math -ffree-line-length-none -fbacktrace
     DBLFLAG= -fdefault-real-8 -fdefault-double-8
     DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function \
                -Wuninitialized -fbacktrace
     KNOWN_SYSTEM= yes
     FOMPFLAGS= -fopenmp
-    CC= g++
-    CCFLAGS= -Wall -ansi -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
+    CC= gcc
+    CXX= g++
+    CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
              -fno-trapping-math
     COMPFLAGS= -fopenmp
     LIBCXX= -lstdc++
