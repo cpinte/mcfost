@@ -1113,6 +1113,7 @@ subroutine initialisation_mcfost()
      write(*,*) "***************************************************"
      lsed=.true. ; lsed_complete = .false.
      tab_wavelength = DENT_tab_wavelength
+     lscatt_ray_tracing = .false. ; call warning("turning ray-tracing off")
   endif
 
   ! Discrimination type de run (image vs SED/Temp)
