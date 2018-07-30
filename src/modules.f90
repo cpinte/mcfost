@@ -61,7 +61,7 @@ module parametres
   ! 0 -> automatique
   ! 1 -> choix taille du grain diffuseur + matrice Mueller par grain
   ! 2 -> matrice de Mueller moyenne par cellule (benchmark)
-  integer :: scattering_method
+  integer :: scattering_method, scattering_method0
   logical :: lscattering_method1
 
   ! Theorie de Mie ou HG

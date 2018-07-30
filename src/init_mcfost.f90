@@ -1019,7 +1019,7 @@ subroutine initialisation_mcfost()
         !lmono=.false.
         !lmono0=.false.
         lvariable_dust=.false.
-        scattering_method=2
+        scattering_method=2 ; scattering_method0=2
      else
         if (lvariable_dust) call error("Cannot use +dust_prop when settling is on, use -dust_prop instead")
      endif

@@ -683,7 +683,7 @@ end subroutine mueller_opacity_file
 
 !**********************************************************************
 
-integer function grainsize(lambda,aleat, icell)
+integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
 !-----------------------------------------------------
 !  Nouvelle version : janvier 04
 !  la dichotomie se fait en comparant les indices
@@ -699,7 +699,7 @@ integer function grainsize(lambda,aleat, icell)
   integer, intent(in) :: lambda, icell
   real, intent(in) :: aleat
   real :: prob
-  integer :: kmin, kmax, k
+  integer :: kmin, kmax
 
   prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
 
@@ -722,21 +722,17 @@ integer function grainsize(lambda,aleat, icell)
   enddo   ! while
   k=kmax
 
-  grainsize = k
   return
 
-end function grainsize
+end function select_grainsize_high_mem
 
 !***************************************************
 
 integer function select_scattering_grain(lambda,icell, aleat) result(k)
-  ! This routine will select randomly the scattering grain
-  ! from the CDF of ksca
-  ! Because we cannot store all the CDF for all cells
-  ! (n_grains x ncells x n_lambda)
-  ! The CDF is recomputed on the fly here
-  ! The normalization is saved via kappa_sca, so we do not need to compute
-  ! all the CDF
+  ! This routine will select randomly the scattering grain from the CDF of ksca
+  ! Because we cannot store all the CDF for all cells (n_grains x ncells x n_lambda),
+  ! the CDF is recomputed on the fly here.
+  ! The normalization is saved via kappa_sca, so we do not need to compute the whole CDF.
 
   implicit none
 
@@ -744,23 +740,27 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
   real, intent(in) :: aleat
   real :: prob, CDF, norm
 
-  ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
-  norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
+  if (low_mem_scattering) then
+     ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
+     norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
 
-  if (aleat < 0.5) then ! We start from first grain
-     prob = aleat * norm
-     CDF = 0.0
-     do k=1, n_grains_tot
-        CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
-        if (CDF > prob) exit
-     enddo
-  else ! We start from the end of the grain size distribution
-     prob = (1.0-aleat) * norm
-     CDF = 0.0
-     do k=n_grains_tot, 1, -1
-        CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
-        if (CDF > prob) exit
-     enddo
+     if (aleat < 0.5) then ! We start from first grain
+        prob = aleat * norm
+        CDF = 0.0
+        do k=1, n_grains_tot
+           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     else ! We start from the end of the grain size distribution
+        prob = (1.0-aleat) * norm
+        CDF = 0.0
+        do k=n_grains_tot, 1, -1
+           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     endif
+  else
+     k = select_grainsize_high_mem(lambda,aleat, icell) ! is this ever used ?
   endif
 
   return

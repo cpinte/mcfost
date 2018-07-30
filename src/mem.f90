@@ -524,6 +524,8 @@ end subroutine clean_mem_dust_mol
 
 subroutine realloc_step2()
 
+  use dust_ray_tracing, only : select_scattering_method
+
   use radiation_field, only : allocate_radiation_field_step2
   use stars, only : allocate_stellar_spectra, deallocate_stellar_spectra
   use thermal_emission, only : deallocate_temperature_calculation, realloc_emitting_fractions
@@ -539,15 +541,7 @@ subroutine realloc_step2()
   p_n_lambda_pos = p_n_lambda2_pos ! just in case
 
   ! parametrage methode de diffusion
-  if (scattering_method == 0) then
-     if ((lvariable_dust).and.(.not.lmono).and.(.not.lscatt_ray_tracing)) then
-        scattering_method = 1
-     else
-        scattering_method = 2
-     endif
-  endif
-  write(*,fmt='(" Using scattering method ",i1)') scattering_method
-  lscattering_method1 = (scattering_method==1)
+  call select_scattering_method(p_n_cells)
 
   ! Liberation memoire
   if (lTemp) call deallocate_temperature_calculation()
