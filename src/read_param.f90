@@ -190,7 +190,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -587,7 +587,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -977,7 +977,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -1346,7 +1346,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -1701,7 +1701,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -2056,7 +2056,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -2414,7 +2414,7 @@ contains
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -2755,7 +2755,7 @@ end subroutine read_para215
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -3099,7 +3099,7 @@ end subroutine read_para215
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -3436,7 +3436,7 @@ end subroutine read_para215
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------
@@ -3762,7 +3762,7 @@ end subroutine read_para215
     ! Scattering method
     ! -----------------
     read(1,*) line_buffer
-    read(1,*) scattering_method
+    read(1,*) scattering_method0 ; scattering_method = scattering_method0
     read(1,*) aniso_method
 
     ! ----------

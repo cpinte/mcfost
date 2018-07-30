@@ -388,7 +388,7 @@ subroutine transfert_poussiere()
         endif
 
         if ((ind_etape==first_etape_obs).and.lremove) then
-           call remove_specie
+           call remove_specie()
            if (lTemp.and.lsed_complete) then
               write(*,'(a30, $)') "Computing dust properties ..."
               do lambda=1, n_lambda

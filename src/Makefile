@@ -116,7 +116,7 @@ endif
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
     FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math -ffree-line-length-none
+             -fno-trapping-math -ffree-line-length-none -fbacktrace
     DBLFLAG= -fdefault-real-8 -fdefault-double-8
     DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function \
                -Wuninitialized -fbacktrace
@@ -125,7 +125,7 @@ ifeq ($(SYSTEM), gfortran)
     CC= gcc
     CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math #
+             -fno-trapping-math
     COMPFLAGS= -fopenmp
     LIBCXX= -lstdc++
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
