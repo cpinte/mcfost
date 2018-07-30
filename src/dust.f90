@@ -901,20 +901,20 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      else ! scattering_method ==1
         if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
            do icell=1, p_n_cells
-              ksca_CDF(0,icell,lambda)=0.0
+              ksca_CDF(0,icell,p_lambda)=0.0
 
               do  k=1,n_grains_tot
-                 ksca_CDF(k,icell,lambda) = ksca_CDF(k-1,icell,lambda) + C_sca(k,lambda) * densite_pouss(k,icell)
+                 ksca_CDF(k,icell,p_lambda) = ksca_CDF(k-1,icell,p_lambda) + C_sca(k,lambda) * densite_pouss(k,icell)
               enddo !k
 
-              if  (ksca_CDF(n_grains_tot,icell,lambda) > tiny_real) then
-                 ksca_CDF(:,icell,lambda)= ksca_CDF(:,icell,lambda)/ ksca_CDF(n_grains_tot,icell,lambda)
+              if  (ksca_CDF(n_grains_tot,icell,p_lambda) > tiny_real) then
+                 ksca_CDF(:,icell,p_lambda)= ksca_CDF(:,icell,p_lambda)/ ksca_CDF(n_grains_tot,icell,p_lambda)
               else
                  ! a la surface, on peut avoir une proba de 0.0 partout
                  ! dans ce cas, on decide qu'il n'y a que les plus petits grains
                  ! rq : en pratique, la densite est trop faible pour qu'il y ait
                  ! une diffusion a cet endroit.
-                 ksca_CDF(:,icell,lambda) = 1.0
+                 ksca_CDF(:,icell,p_lambda) = 1.0
               endif
            enddo ! icell
         endif ! .not.low_mem_scattering
@@ -942,7 +942,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         kappa_abs_LTE(icell,lambda) = 0.0_dp
      endif
      if (lRE_nLTE) then
-        kabs_nLTE_CDF(:,icell,lambda) = 0.0
+        kabs_nLTE_CDF(:,icell,p_lambda) = 0.0
      endif
   endif
 
