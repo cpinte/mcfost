@@ -1979,16 +1979,6 @@ contains
           ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
           norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
-
-!----          ! Echantillonage du profil de vitesse dans la cellule
-!----          ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
-!----          ! sa valeur au centre : exp(-2.15^2) = 0.01
-!----          vmax = sqrt(sigma2)
-!----          tab_dnu_o_freq(i,j) = largeur_profile * vmax / (real(n_speed) )
-!----          do iv=-n_speed, n_speed
-!----             tab_deltaV(iv,i,j) = largeur_profile * real(iv,kind=dp)/real(n_speed,kind=dp) * vmax
-!----          enddo ! iv
-!----          deltaVmax(i,j) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
        enddo !i
     enddo !j
 

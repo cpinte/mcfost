@@ -169,7 +169,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 
-  real :: rand, rand2, rand3, fac_etape
+  real :: rand, rand2, rand3, fac_etape, factor
 
   real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
 
@@ -302,9 +302,9 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell) &
+        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell,factor) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
-        !$omp shared(tab_deltaV,deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
+        !$omp shared(deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
         !$omp shared(nTrans_tot,tab_Trans)
         !$omp do schedule(static,1)
@@ -312,8 +312,11 @@ subroutine NLTE_mol_line_transfer(imol)
            !$ id = omp_get_thread_num() + 1
 
            ! Echantillonage uniforme du profil de raie
+           factor = deltaVmax(icell) / real(n_speed,kind=dp)
            if (lfixed_rays) then
-              tab_speed(:,id) = tab_deltaV(:,icell)
+              do iv=-n_speed, n_speed
+                 tab_speed(iv,id) =  factor * real(iv,kind=dp)
+              enddo ! iv
            endif
 
            if (lcompute_molRT(icell)) then

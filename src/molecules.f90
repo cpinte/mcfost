@@ -513,9 +513,6 @@ subroutine init_Doppler_profiles(imol)
      ! sa valeur au centre : exp(-2.15^2) = 0.01
      vmax = sqrt(sigma2)
      tab_dnu_o_freq(icell) = largeur_profile * vmax / (real(n_speed))
-     do iv=-n_speed, n_speed
-        tab_deltaV(iv,icell) = largeur_profile * real(iv,kind=dp)/real(n_speed,kind=dp) * vmax
-     enddo ! iv
      deltaVmax(icell) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
   enddo !icell
 
