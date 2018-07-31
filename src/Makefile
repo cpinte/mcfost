@@ -46,7 +46,7 @@ ifeq ($(DEBUG), yes)
 endif
 
 ifeq ($(debugp), yes)
-    DEBUGp=yes
+    DEBUGP=yes
 endif
 
 ifeq ($(DEBUGP), yes)
@@ -59,12 +59,12 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.9 -mdynamic-no-pic
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic -static-intel -qopenmp-link static
     else
-        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX
+        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512 -static
     endif
     FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback -static-intel -qopenmp-link static $(ARCH)
+    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
@@ -75,23 +75,6 @@ ifeq ($(SYSTEM), ifort)
     CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     COMPFLAGS= -fopenmp
-    LIBCXX= -cxxlib
-    LIBS= $(LIB)/ifort
-endif
-
-ifeq ($(SYSTEM), fostino)
-    FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -traceback -axP -xW -static-intel
-    DBLFLAG= -r8
-    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
-               -warn uninitialized -warn unused -warn truncated_source
-    KNOWN_SYSTEM= yes
-    FOMPFLAGS= -qopenmp
-    IPOFLAGS= -ipo
-    CC= icc
-    CXX=icpc -std=c++11
-    CCFLAGS= -O3 -no-prev-div -traceback -axP -xW
-    COMPFLAGS= -qopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
 endif

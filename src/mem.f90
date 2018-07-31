@@ -819,18 +819,13 @@ subroutine alloc_emission_mol(imol)
   if (alloc_status > 0) call error('Allocation error tab_v')
   tab_v=0.0
 
-  ! Warning this is potentially a big array
-  allocate(tab_deltaV(-n_speed:n_speed,n_cells), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_deltaV')
-  tab_deltaV = 0.0
+  allocate(tab_Cmb_mol(nTrans_tot), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tab_Cmb_mol')
+  tab_Cmb_mol = 0.0
 
-   allocate(tab_Cmb_mol(nTrans_tot), stat=alloc_status)
-   if (alloc_status > 0) call error('Allocation error tab_Cmb_mol')
-   tab_Cmb_mol = 0.0
-
-   allocate(Jmol(nTrans_tot,nb_proc), stat=alloc_status)
-   if (alloc_status > 0) call error('Allocation error Jmol')
-   Jmol = 0.0_dp
+  allocate(Jmol(nTrans_tot,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error Jmol')
+  Jmol = 0.0_dp
 
   if (ldouble_RT) then
      allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
@@ -887,7 +882,7 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, tab_deltaV, spectre,continu, stars_map, tab_Cmb_mol, Jmol, maser_map)
+       tab_v, spectre,continu, stars_map, tab_Cmb_mol, Jmol, maser_map)
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 

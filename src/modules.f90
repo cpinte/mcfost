@@ -710,7 +710,6 @@ module molecular_emission
   real :: chi_infall
 
   real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells
-  real(kind=dp), dimension(:,:), allocatable :: tab_deltaV ! n_speed, n_cells
   real(kind=dp), dimension(:), allocatable :: tab_dnu_o_freq ! n_cells
   real(kind=dp), dimension(:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_cells
 
