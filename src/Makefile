@@ -78,22 +78,6 @@ ifeq ($(SYSTEM), ifort)
     LIBS= $(LIB)/ifort
 endif
 
-ifeq ($(SYSTEM), fostino)
-    FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -traceback -axP -xW -static-intel
-    DBLFLAG= -r8
-    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
-               -warn uninitialized -warn unused -warn truncated_source
-    KNOWN_SYSTEM= yes
-    FOMPFLAGS= -qopenmp
-    IPOFLAGS= -ipo
-    CC= icc
-    CCFLAGS= -O3 -no-prev-div -traceback -axP -xW
-    COMPFLAGS= -qopenmp
-    LIBCXX= -cxxlib
-    LIBS= $(LIB)/ifort
-endif
-
 ifeq ($(SYSTEM), xeonphi)
     FC= ifort
     FFLAGS= -fpp -O3 -no-prec-div -traceback -mmic -static-intel
