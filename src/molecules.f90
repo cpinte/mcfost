@@ -385,22 +385,10 @@ end subroutine init_benchmark_water3
 
 !***********************************************************
 
-subroutine init_molecular_disk(imol)
-  ! definie les tableaux vfield, v_turb et tab_abundance
-  ! et lcompute_molRT
+subroutine init_Tgas()
 
+  use ML_prodimo, only : xgb_predict_Tgas
 
-  use ML_prodimo, only : xgb_predict_Tgas, xgb_predict_abundance
-
-  implicit none
-
-  integer, intent(in) :: imol
-  integer :: icell
-
-  ldust_mol  = .true.
-  lkeplerian = .true.
-
-  ! Todo : we only need to do the prediction for Tgas once
   if (lML) then
      write(*,*) "Predicting gas temperature"
      call xgb_predict_Tgas()
@@ -415,22 +403,20 @@ subroutine init_molecular_disk(imol)
      endif
   endif
 
-  ! En m.s-1
-  ! Warning : assume all stars are at the center of the disk
-  if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-     do icell=1, n_cells
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-     enddo
-  else ! dependance en z
-     do icell=1, n_cells
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-             ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-     enddo
-  endif
+  return
 
-  v_turb = vitesse_turb
+end subroutine init_Tgas
 
-  ! Abondance
+!***********************************************************
+
+subroutine init_abundance(imol)
+
+  use ML_prodimo, only : xgb_predict_abundance
+
+  integer, intent(in) :: imol
+
+  integer :: icell
+
   if (lML) then
      write(*,*) "Predicting  molecular abundance"
      call xgb_predict_abundance(imol)
@@ -452,6 +438,46 @@ subroutine init_molecular_disk(imol)
 
   return
 
+end subroutine init_abundance
+
+!***********************************************************
+
+subroutine init_molecular_disk(imol)
+  ! definie les tableaux vfield, v_turb et tab_abundance
+  ! et lcompute_molRT
+
+  integer, intent(in) :: imol
+
+  logical, save :: lfirst_time = .true.
+  integer :: icell
+
+  ldust_mol  = .true.
+  lkeplerian = .true.
+
+  if (lfirst_time) then
+     lfirst_time = .false.
+     call init_Tgas()
+
+     ! En m.s-1
+     ! Warning : assume all stars are at the center of the disk
+     if (lcylindrical_rotation) then ! Midplane Keplerian velocity
+        do icell=1, n_cells
+           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+        enddo
+     else ! dependance en z
+        do icell=1, n_cells
+           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
+        enddo
+     endif
+     v_turb = vitesse_turb
+  endif ! lfirst_time
+
+  ! Abondance
+  call init_abundance(imol)
+
+  return
+
 end subroutine init_molecular_disk
 
 !***********************************************************
@@ -459,51 +485,23 @@ end subroutine init_molecular_disk
 subroutine init_molecular_Voronoi(imol)
   ! Velocities are defined from SPH files
 
-  use ML_prodimo, only : xgb_predict_Tgas, xgb_predict_abundance
-
   integer, intent(in) :: imol
-  integer :: icell
+
+  logical, save :: lfirst_time = .true.
 
   ldust_mol  = .true.
-  lkeplerian = .true.
+  lkeplerian = .true. ! does not matter
 
-  ! Todo : we only need to do the prediction for Tgas once
-  if (lML) then
-     write(*,*) "Predicting gas temperature"
-     call xgb_predict_Tgas()
-     write(*,*) "Min-Max gas temperature=", minval(Tcin), maxval(Tcin)
-  else
-     ! Temperature gaz = poussiere
-     if (lcorrect_Tgas) then
-        write(*,*) "Correcting Tgas by", correct_Tgas
-        Tcin(:) = Temperature(:)  * correct_Tgas
-     else
-        Tcin(:) = Temperature(:)
-     endif
-  endif
+  if (lfirst_time) then
+     lfirst_time = .false.
+     call init_Tgas()
 
-  ! Vitesse de turbulence
-  v_turb = vitesse_turb
+     ! Vitesse de turbulence
+     v_turb = vitesse_turb
+  endif ! lfirst_time
 
-    ! Abondance
-  if (lML) then
-     write(*,*) "Predicting  molecular abundance"
-     call xgb_predict_abundance(imol)
-     write(*,*) "Max abundance=", minval(tab_abundance), maxval(tab_abundance)
-  else
-     if (mol(imol)%lcst_abundance) then
-        write(*,*) "Setting constant abundance"
-        tab_abundance = mol(imol)%abundance
-     else
-        write(*,*) "Reading abundance from file"
-        call read_abundance(imol)
-     endif
-  endif
-
-  do icell=1, n_cells
-     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
-          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
-  enddo
+  ! Abondance
+  call init_abundance(imol)
 
   return
 

@@ -521,6 +521,8 @@ subroutine readmolecule(imol)
 
   close(unit=1)
 
+  write(*,*) ""
+  write(*,*) "-------------------------------------------------------"
   write(*,*) trim(mol(imol)%name)//" molecular file read successfully"
 
   return

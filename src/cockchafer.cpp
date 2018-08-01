@@ -27,7 +27,6 @@ int predict(char *model_name, float *feature, int nrow, int nfea, float *output)
   for(int i=0; i<out_len; i++)
     output[i] = outXGB[i];
 
-  std::cout << std::endl;
   XGDMatrixFree(input);
   XGBoosterFree(booster);
   return 0;

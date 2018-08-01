@@ -949,7 +949,7 @@ subroutine initialisation_mcfost()
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
-     case("-ML")
+     case("-ML","-ml")
         i_arg = i_arg + 1
         lML=.true.
      case default

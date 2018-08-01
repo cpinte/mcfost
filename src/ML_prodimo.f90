@@ -58,12 +58,14 @@ contains
 
     integer :: alloc_status
 
-    ! Todo : check or force wavelength bins
-    if (n_lambda /= n_lambda_ML) call error("Incorrect number of wavelength bins for xgboost")
-
+    ! This should never happen because we fix the wavelenght grid, but we leave it just in case
+    if (n_lambda2 /= n_lambda_ML) then
+       write(*,*) n_lambda2, "wavelenght bins !!!"
+       call error("Incorrect number of wavelength bins for xgboost")
+    endif
 
     alloc_status = 0
-    allocate(J_ML(n_lambda,n_cells), stat=alloc_status)
+    allocate(J_ML(n_lambda2,n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
     allocate(feature_Tgas(51, n_cells), stat=alloc_status)
@@ -173,20 +175,20 @@ contains
     N_grains(0,:) = N_grains(0,:) /  (cm_to_m**3)
 
     !--- Column density
-    write(*,*) "Computing column densities"
+    write(*,'(a31, $)') "Computing column densities ..."
     call compute_CD(CD)
-    write(*,*) "Done"
+    write(*,*) " Done"
 
     if (lVoronoi) then
        feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(3)**2)
        feature_Tgas(2,:) = Voronoi(:)%xyz(3)
     else
-       feature_Tgas(1,:) = r_grid
-       feature_Tgas(2,:) = z_grid
+       feature_Tgas(1,:) = r_grid(:)
+       feature_Tgas(2,:) = z_grid(:)
     endif
-    feature_Tgas(3,:) = temperature
+    feature_Tgas(3,:) = temperature(:)
     feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
-    feature_Tgas(5:43,:) = J_ML
+    feature_Tgas(5:43,:) = J_ML(:,:)
     feature_Tgas(44:47,:) = N_grains(:,:)
     do i=1,n_directions
        feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
@@ -217,8 +219,8 @@ contains
     if (ios /=0) then
        call error("xgboost file cannot be found: "//trim(filename))
     else
-       filename = trim(dir)//trim(filename) ;
-       write(*,*) "Reading "//trim(filename) ;
+       filename = trim(dir)//trim(filename)
+       write(*,*) "Reading "//trim(filename)
     endif
 
     ! Predict Tgas
@@ -231,10 +233,11 @@ contains
     ! We predicted log10(Tcin)
     Tcin = 10**Tcin
 
+    filename = trim(data_dir)//"/Tgas_ML.fits"
     if (.not.lVoronoi) then
-       call cfitsWrite("!Tgas_ML.fits",Tcin,[n_rad,nz])
+       call cfitsWrite(trim(filename),Tcin,[n_rad,nz])
     else
-       call cfitsWrite("!Tgas_ML.fits",Tcin,[n_cells])
+       call cfitsWrite(trim(filename),Tcin,[n_cells])
     endif
 
     return
@@ -278,8 +281,9 @@ contains
     if (ios /=0) then
        call error("xgboost file cannot be found: "//trim(filename))
     else
-       filename = trim(dir)//trim(filename) ;
-       write(*,*) "Reading "//trim(filename) ;
+       filename = trim(dir)//trim(filename)
+       write(*,*) "Reading "//trim(filename)
+       if (lfactor) write(*,*) "Correcting abundance by factor ", factor
     endif
 
     call xgb_predict(str_f2c(filename) , feature_abundance, n_cells, n_features+1, tab_abundance)
@@ -287,10 +291,11 @@ contains
 
     tab_abundance = max(0.0, tab_abundance) ! preventing slightly negative abundances
 
+    filename = trim(data_dir2(imol))//"/abundance_ML.fits"
     if (.not.lVoronoi) then
-       call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_rad,nz])
+       call cfitsWrite(trim(filename),tab_abundance,[n_rad,nz])
     else
-       call cfitsWrite("!abundance_ML.fits",tab_abundance,[n_cells])
+       call cfitsWrite(trim(filename),tab_abundance,[n_cells])
     endif
 
     return
