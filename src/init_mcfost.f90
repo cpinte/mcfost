@@ -1227,14 +1227,19 @@ subroutine initialisation_mcfost()
 
   if (linfall) l_sym_ima = .false.
 
-  if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
-     if (lmono0.and.(.not.l3D)) then
-        lscatt_ray_tracing2 = .true.
-        write(*,*) "Using ray-tracing method 2"
-     else
-        lscatt_ray_tracing1 = .true.
-        write(*,*) "Using ray-tracing method 1"
+  if (lscatt_ray_tracing) then
+     if ((.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
+        if (lmono0.and.(.not.l3D)) then
+           lscatt_ray_tracing2 = .true.
+           write(*,*) "Using ray-tracing method 2"
+        else
+           lscatt_ray_tracing1 = .true.
+           write(*,*) "Using ray-tracing method 1"
+        endif
      endif
+  else
+     lscatt_ray_tracing1 = .false.
+     lscatt_ray_tracing2 = .false.
   endif
 
   ! Forcing azimuthal angle to 0 in rt2
