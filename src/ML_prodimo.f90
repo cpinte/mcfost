@@ -180,8 +180,8 @@ contains
     write(*,*) " Done"
 
     if (lVoronoi) then
-       feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(3)**2)
-       feature_Tgas(2,:) = Voronoi(:)%xyz(3)
+       feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(2)**2)
+       feature_Tgas(2,:) = abs(Voronoi(:)%xyz(3))
     else
        feature_Tgas(1,:) = r_grid(:)
        feature_Tgas(2,:) = z_grid(:)
