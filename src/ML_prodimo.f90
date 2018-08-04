@@ -9,8 +9,8 @@ module ML_ProDiMo
 
   private
 
-  integer, parameter :: n_features = 51
   integer, parameter :: n_lambda_ML = 39
+  integer :: n_features
 
   real(kind=sp), dimension(:,:), allocatable, save :: J_ML
   real(kind=sp), dimension(:,:), allocatable, save :: feature_Tgas
@@ -58,6 +58,9 @@ contains
 
     integer :: alloc_status
 
+    n_features = 45 ! When no spatial information is used
+    write(*,*) "Initializing ML with", n_features, "features"
+
     ! This should never happen because we fix the wavelenght grid, but we leave it just in case
     if (n_lambda2 /= n_lambda_ML) then
        write(*,*) n_lambda2, "wavelenght bins !!!"
@@ -68,10 +71,10 @@ contains
     allocate(J_ML(n_lambda2,n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation J_ML")
 
-    allocate(feature_Tgas(51, n_cells), stat=alloc_status)
+    allocate(feature_Tgas(n_features, n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation feature_Tgas")
 
-    allocate(feature_abundance(52, n_cells), stat=alloc_status)
+    allocate(feature_abundance(n_features+1, n_cells), stat=alloc_status)
     if (alloc_status /= 0) call error("Allocation feature_abundance")
 
     ! Todo : this is ugly, I re-use a variable from io_prodimo.f90
@@ -121,15 +124,16 @@ contains
        xJ_abs(:,lambda,:) = 0.0
     else ! Champs ISM
        n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
+       if (n_photons_envoyes > 0.) then ! We test if there were ISM packets
+          wl = tab_lambda(lambda) * 1e-6
+          energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+               * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
 
-       wl = tab_lambda(lambda) * 1e-6
-       energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-            * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
-
-       do icell=1, n_cells
-          facteur = energie_photon / volume(icell)
-          J_ML(lambda,icell) =  J_ML(icell,lambda) +  facteur * sum(xJ_abs(icell,lambda,:))
-       enddo
+          do icell=1, n_cells
+             facteur = energie_photon / volume(icell)
+             J_ML(lambda,icell) =  J_ML(lambda,icell) +  facteur * sum(xJ_abs(icell,lambda,:))
+          enddo
+       endif
     endif
 
     return
@@ -174,25 +178,33 @@ contains
     ! part.cm^-3 --> part.m^-3
     N_grains(0,:) = N_grains(0,:) /  (cm_to_m**3)
 
-    !--- Column density
-    write(*,'(a31, $)') "Computing column densities ..."
-    call compute_CD(CD)
-    write(*,*) " Done"
+    if (n_features == 51) then
+       !--- Column density
+       write(*,'(a31, $)') "Computing column densities ..."
+       call compute_CD(CD)
+       write(*,*) " Done"
 
-    if (lVoronoi) then
-       feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(2)**2)
-       feature_Tgas(2,:) = abs(Voronoi(:)%xyz(3))
-    else
-       feature_Tgas(1,:) = r_grid(:)
-       feature_Tgas(2,:) = z_grid(:)
+       if (lVoronoi) then
+          feature_Tgas(1,:) = sqrt(Voronoi(:)%xyz(1)**2 + Voronoi(:)%xyz(2)**2)
+          feature_Tgas(2,:) = abs(Voronoi(:)%xyz(3))
+       else
+          feature_Tgas(1,:) = r_grid(:)
+          feature_Tgas(2,:) = z_grid(:)
+       endif
+       feature_Tgas(3,:) = temperature(:)
+       feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+       feature_Tgas(5:43,:) = J_ML(:,:)
+       feature_Tgas(44:47,:) = N_grains(:,:)
+       do i=1,n_directions
+          feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
+       enddo
+    else if (n_features == 45) then
+       feature_Tgas(1,:) = temperature(:)
+       feature_Tgas(2,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+       feature_Tgas(3:41,:) = J_ML(:,:)
+       feature_Tgas(42:45,:) = N_grains(:,:)
     endif
-    feature_Tgas(3,:) = temperature(:)
-    feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
-    feature_Tgas(5:43,:) = J_ML(:,:)
-    feature_Tgas(44:47,:) = N_grains(:,:)
-    do i=1,n_directions
-       feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
-    enddo
+
     feature_Tgas = log10(max(feature_Tgas,tiny_real))
 
     return
