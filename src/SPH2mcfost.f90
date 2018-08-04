@@ -125,7 +125,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: density_factor = 1e-6
+    real, parameter :: density_factor = 1 !e-6
     logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
@@ -387,29 +387,32 @@ contains
        enddo
     endif
 
-    ! Removing cells at the "surface" of the SPH model:
-    ! density is reduced so that they do not appear in images or cast artificial shadows,
-    ! but we can still compute a temperature (forcing them to be optically thin)
-    n_force_empty = 0.0
-    cell_loop : do icell=1,n_cells
-       ! We reduce the density on cells that are very elongated
-       if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
-          n_force_empty = n_force_empty + 1
-          call reduce_density(icell, density_factor)
-          cycle cell_loop
-       endif
-
-       ! We reduce the density on cells that are touching a wall
-       do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-          id_n = neighbours_list(i) ! id du voisin
-          if (id_n < 0) then
+    ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
+    if (density_factor < 1.-1e-6) then
+       ! Removing cells at the "surface" of the SPH model:
+       ! density is reduced so that they do not appear in images or cast artificial shadows,
+       ! but we can still compute a temperature (forcing them to be optically thin)
+       n_force_empty = 0.0
+       cell_loop : do icell=1,n_cells
+          ! We reduce the density on cells that are very elongated
+          if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
              n_force_empty = n_force_empty + 1
              call reduce_density(icell, density_factor)
              cycle cell_loop
           endif
-       enddo
-    enddo cell_loop
-    write(*,*) "Density was reduced in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
+
+          ! We reduce the density on cells that are touching a wall
+          do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+             id_n = neighbours_list(i) ! id du voisin
+             if (id_n < 0) then
+                n_force_empty = n_force_empty + 1
+                call reduce_density(icell, density_factor)
+                cycle cell_loop
+             endif
+          enddo
+       enddo cell_loop
+       write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
+    endif
 
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
