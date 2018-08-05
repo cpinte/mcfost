@@ -156,9 +156,9 @@ contains
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
-    real(dp), dimension(ndusttypes), intent(in) :: grainsize
+    real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
     real(dp), dimension(ntypes), intent(in) :: massoftype
-    real(dp), intent(in) :: hfact, umass, utime, udist, graindens, T_to_u
+    real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
 
@@ -424,6 +424,7 @@ contains
     use parametres, only : data_dir
     use utils, only : appel_syst
     use output, only : ecriture_temperature, write_disk_struct
+    use messages, only : error
 
     integer, save :: n_call = -1 ! to match phantom's dump numbers
     character(len=1) :: s

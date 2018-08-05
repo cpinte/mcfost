@@ -32,8 +32,7 @@ module read_phantom
  real(dp) :: massoftype(maxtypes),hfact,umass,utime,udist
  integer(kind=1), allocatable, dimension(:) :: itype
  real(4),  allocatable, dimension(:) :: tmp
- real(dp), allocatable, dimension(:) :: grainsize
- real(dp) :: graindens
+ real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
@@ -82,7 +81,7 @@ module read_phantom
  endif
 
  allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np),tmp_dp(np))
- allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
+ allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np))
 
  !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
@@ -93,7 +92,7 @@ module read_phantom
  call extract('hfact',hfact,hdr,ierr)
  if (ndusttypes > 0) then
     call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
-    call extract('graindens',graindens,hdr,ierr)
+    call extract('graindens',graindens(1:ndusttypes),hdr,ierr)
  endif
  !write(*,*) ' hfact = ',hfact
  !write(*,*) ' massoftype = ',massoftype(1:ntypes)
@@ -294,7 +293,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   integer(kind=1), dimension(np), intent(in) :: iphase
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
-  real(dp), intent(in) :: graindens
+  real(dp), dimension(ndusttypes),    intent(in) :: graindens
   real(dp), dimension(ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
   real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
