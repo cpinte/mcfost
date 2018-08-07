@@ -297,8 +297,8 @@ The disk density structures are defined as :
 If ``Rout`` is set to 0, it is automatically set ``Rout`` to ``8 Rc`` in the case of
 a disk with tapered-edge.
 
-For types 1,2, 4 and 5, the local scale height is defined as h(r) =
-H\ :sub:`0` x (r/R\ :sub:`0`)^{\beta}
+For types 1,2, 4 and 5, the local scale height is defined as :math:`h(r) =
+h_0  (\frac{r}{r_0})^{\beta}`
 
 
 Grain properties
