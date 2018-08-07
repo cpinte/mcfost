@@ -7,7 +7,7 @@
 
 #Wavelength
   50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum] Do not change this line unless you know what you are doing
-  T T T 		  compute temperature?, compute sed?, use default wavelength grid for ouput ?
+  T T T 		  compute temperature?, compute sed?, use default wavelength grid for output ?
   IMLup.lambda		  wavelength file (if previous parameter is F)
   F T			  separation of different contributions?, stokes parameters?
 
