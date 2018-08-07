@@ -512,20 +512,4 @@ end subroutine phantom_2_mcfost
 
 !*************************************************************************
 
-subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
-
-  use infile_utils
-  integer, intent(in) :: iunit
-  character(len=*), intent(in) :: filename
-  real, intent(out) :: graintype,graindens
-  integer,  intent(out) :: ierr
-  type(inopts), allocatable :: dbin(:)
-
-  call open_db_from_file(dbin,filename,iunit,ierr)
-  call read_inopt(graindens,'graindens',dbin,ierr)
-  call read_inopt(graintype,'graintype',dbin,ierr)
-  call close_db(dbin)
-
-end subroutine read_phantom_input_file
-
 end module read_phantom

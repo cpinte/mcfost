@@ -11,7 +11,7 @@ contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
-    use read_phantom, only : read_phantom_file, read_phantom_input_file
+    use read_phantom, only : read_phantom_file
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
@@ -144,10 +144,6 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    !if (ndusttypes==1) then
-    !   call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-    !   write(*,*) grainsize,graindens
-    !endif
     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
 
     if (lwrite_ASCII) then
