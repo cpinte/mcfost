@@ -1030,14 +1030,14 @@ subroutine initialisation_mcfost()
 
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(base_para)
+     call save_data_prop(base_para)
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(base_para)
+     call save_data_prop(base_para)
   endif
 
   if (ln_zone) then
@@ -1460,6 +1460,41 @@ end subroutine display_disclaimer
 
 !********************************************************************
 
+subroutine save_data_prop(para)
+
+  character(len=*), intent(in) :: para
+
+  character(len=1024) :: cmd
+  integer ::  syst_status
+
+  if (is_dir(trim(data_dir))) then
+     write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
+     cmd = 'rm -Rf '//trim(data_dir)
+     call appel_syst(cmd,syst_status)
+  endif
+
+  ! Cree le dossier data
+  write (*,*) 'Creating directory '//trim(data_dir)
+  cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
+       ! copie le fichier de parametres
+       'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
+       ! options de la ligne de commande
+       'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! date du calcul
+       'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! machine de calcul
+       'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! id SHA
+       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
+  call appel_syst(cmd,syst_status)
+
+  return
+
+end subroutine save_data_prop
+
+!********************************************************************
+
 subroutine save_data(para)
   !*************************************************
   ! Si le dossier data existe on le sauve
@@ -1479,111 +1514,82 @@ subroutine save_data(para)
   lmove_data = .false.
 
   if (lonly_diff_approx) return
-  !if (lsed.and.(.not.ltemp)) return
 
-  if (ldust_prop .or. ldisk_struct) then
-     if (is_dir(trim(data_dir))) then
-        write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
-        cmd = 'rm -Rf '//trim(data_dir)
-        call appel_syst(cmd,syst_status)
-     endif
-
-     ! Cree le dossier data
-     write (*,*) 'Creating directory '//trim(data_dir)
-     cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
-          ! copie le fichier de parametres
-          'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
-          ! options de la ligne de commande
-          'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! date du calcul
-          'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! machine de calcul
-          'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! id SHA
-          'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-
+  if (lmono0) then
+     etape_start=1
+     etape_end=1
   else
-
-     if (lmono0) then
+     if (ltemp.or.lsed) then
         etape_start=1
-        etape_end=1
      else
-        if (ltemp.or.lsed) then
-           etape_start=1
-        else
-           etape_start=2
-        endif
-        if (lemission_mol) then
-           etape_end=1+n_molecules
-        else
-           etape_end=1
-        endif
+        etape_start=2
+     endif
+     if (lemission_mol) then
+        etape_end=1+n_molecules
+     else
+        etape_end=1
+     endif
+  endif
+
+  do etape=etape_start,etape_end
+
+     if (etape == 1) then
+        local_data_dir = data_dir
+        local_basename_data_dir = basename_data_dir
+     else
+        local_data_dir = data_dir2(etape-1)
+        local_basename_data_dir = basename_data_dir2(etape-1)
      endif
 
-     do etape=etape_start,etape_end
 
-        if (etape == 1) then
-           local_data_dir = data_dir
-           local_basename_data_dir = basename_data_dir
+     if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
+        if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
+           ! le dossier data existe
+           lnew_run = .true.
+           lmove_data=.true.
+        else ! le dossier data n'existe pas
+           lnew_run=.true.
+           lmove_data=.false.
+        endif ! if y a un dossier data
+     else
+        lnew_run = .true. ! le dossier data n'existe pas
+     endif
+
+     if (lmove_data) then
+        if (lno_backup) then
+           call error('Directory '//trim(local_data_dir)//' already exists : exiting!')
         else
-           local_data_dir = data_dir2(etape-1)
-           local_basename_data_dir = basename_data_dir2(etape-1)
-        endif
-
-
-        if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
-           if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
-              ! le dossier data existe
-              lnew_run = .true.
-              lmove_data=.true.
-           else ! le dossier data n'existe pas
-              lnew_run=.true.
-              lmove_data=.false.
-           endif ! if y a un dossier data
-        else
-           lnew_run = .true. ! le dossier data n'existe pas
-        endif
-
-        if (lmove_data) then
-           if (lno_backup) then
-              call error('Directory '//trim(local_data_dir)//' already exists : exiting!')
-
-           else
-              write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
-              if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
-                 call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
-              endif
-              cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
-              call appel_syst(cmd,syst_status)
+           write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
+           if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
+              call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
            endif
-        endif
-
-        if (lnew_run) then
-           ! Cree le dossier data
-           write (*,*) 'Creating directory '//trim(local_data_dir)
-           cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
-                ! copie le fichier de parametres
-                'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
-                ! options de la ligne de commande
-                'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! date du calcul
-                'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! machine de calcul
-                'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! id SHA
-                'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
-           ! Copie du fichier lambda si besoin
-           if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-              cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
-           endif
+           cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
            call appel_syst(cmd,syst_status)
         endif
-      enddo ! etape
+     endif
 
-  endif ! ldust_prop
+     if (lnew_run) then
+        ! Cree le dossier data
+        write (*,*) 'Creating directory '//trim(local_data_dir)
+        cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
+             ! copie le fichier de parametres
+             'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
+             ! options de la ligne de commande
+             'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! date du calcul
+             'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! machine de calcul
+             'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! id SHA
+             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
+        ! Copie du fichier lambda si besoin
+        if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
+           cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
+        endif
+        call appel_syst(cmd,syst_status)
+     endif
+  enddo ! etape
 
   return
 
