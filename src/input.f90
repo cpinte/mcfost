@@ -423,6 +423,9 @@ subroutine readmolecule(imol)
   real :: a, freq, eu
   real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
 
+  write(*,*) ""
+  write(*,*) "-------------------------------------------------------"
+
   filename = trim(mol(imol)%filename)
   dir = in_dir(filename, mol_dir,  status=ios)
   if (ios /=0) then
