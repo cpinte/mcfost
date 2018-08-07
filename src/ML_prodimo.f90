@@ -113,7 +113,7 @@ contains
        ! Step2
        n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
        energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
-            * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
+            * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
        do icell=1, n_cells
           facteur = energie_photon / volume(icell)
@@ -127,7 +127,7 @@ contains
        if (n_photons_envoyes > 0.) then ! We test if there were ISM packets
           wl = tab_lambda(lambda) * 1e-6
           energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-               * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
+               * (4.*pi*R_ISM**2) / n_photons_envoyes / pi
 
           do icell=1, n_cells
              facteur = energie_photon / volume(icell)
