@@ -16,7 +16,7 @@ contains
     use dump_utils, only : get_error_text
     use utils, only : read_comments
     use prop_star, only : etoile
-    use disk, only : lscale_SPH, scale_SPH
+    use disk, only : lscale_SPH, scale_SPH, lfix_star
 
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
@@ -54,7 +54,7 @@ contains
     endif
     write(*,*) "Done"
 
-    if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
+    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
     if (lscale_SPH) then
        write(*,*) "**************************************************"

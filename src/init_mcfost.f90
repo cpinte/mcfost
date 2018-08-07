@@ -124,6 +124,7 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   lscale_SPH = .false.
+  lfix_star = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -947,6 +948,9 @@ subroutine initialisation_mcfost()
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
+     case("-fix_star")
+        i_arg = i_arg + 1
+        lfix_star=.true.
      case default
         call display_help()
      end select
@@ -1356,6 +1360,7 @@ subroutine display_help()
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
   write(*,*) "        : -age <age>"
+  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"

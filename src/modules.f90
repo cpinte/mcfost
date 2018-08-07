@@ -235,7 +235,7 @@ module disk
 
   ! SPH
   real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH
+  logical :: lplanet_az, lscale_SPH, lfix_star
 
 
 end module disk
