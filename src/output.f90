@@ -1,7 +1,6 @@
 module output
 
   use parametres
-  use resultats
   use grains
   use em_th
   use radiation_field, only : J0, xJ_abs
@@ -19,10 +18,179 @@ module output
 
   implicit none
 
+  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
+  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
+  real, dimension(:,:,:,:,:), allocatable :: stoke_io ! x,y, theta, phi, type
+
+  real(kind=dp), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
+  real(kind=dp), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
+  real, dimension(:,:,:), allocatable :: sed1_io
+  real, dimension(:,:,:,:), allocatable :: sed2_io
+  real, dimension(:,:), allocatable :: wave2_io
+
   real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
   real(kind=dp), dimension(:,:), allocatable :: star_origin
 
+  ! Line transfer
+  real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
+  real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
+
   contains
+
+subroutine allocate_mc_images()
+
+  integer :: alloc_status
+
+  allocate(STOKE_io(npix_x,npix_y,capt_debut:capt_fin,N_phi,N_type_flux), stat=alloc_status)
+  if (alloc_status > 0) call error( 'Allocation error STOKE_io')
+  STOKE_io = 0.0
+
+  allocate(STOKEI(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error STOKEI')
+  STOKEI = 0.0
+
+  if (lsepar_pola) then
+     allocate(STOKEQ(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEQ')
+     STOKEQ = 0.0
+
+     allocate(STOKEU(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEU')
+     STOKEU=0.0
+
+     allocate(STOKEV(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEV')
+     STOKEV = 0.0
+  endif
+
+  if (lsepar_contrib) then
+     allocate(STOKEI_star(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEI_star')
+     STOKEI_star = 0.0
+
+     allocate(STOKEI_star_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEI_star_scat')
+     STOKEI_star_scat = 0.0
+
+     allocate(STOKEI_disk(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEI_disk')
+     STOKEI_disk = 0.0
+
+     allocate(STOKEI_disk_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error STOKEI_disk_scat')
+     STOKEI_disk_scat = 0.0
+  endif !lsepar
+
+  return
+
+end subroutine allocate_mc_images
+
+!**********************************************************************
+
+subroutine allocate_sed()
+
+  integer :: alloc_status
+
+  allocate(sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed')
+  sed = 0.0
+
+  allocate(sed_q(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_q')
+  sed_q = 0.0
+
+  allocate(sed_u(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_u')
+  sed_u = 0.0
+
+  allocate(sed_v(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_v')
+  sed_v = 0.0
+
+  allocate(sed_star(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_star')
+  sed_star = 0.0
+
+  allocate(sed_star_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_star_scat')
+  sed_star_scat = 0.0
+
+  allocate(sed_disk(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_disk')
+  sed_disk = 0.0
+
+  allocate(sed_disk_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_disk_scat')
+  sed_disk_scat = 0.0
+
+  allocate(n_phot_sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error n_phot_sed')
+  n_phot_sed = 0.0
+
+  allocate(sed1_io(n_lambda,N_thet,N_phi),sed2_io(n_lambda,N_thet,N_phi,9),wave2_io(n_lambda,2), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error sed_io')
+  sed1_io=0.0
+  sed2_io=0.0
+  wave2_io=0.0
+
+  return
+
+end subroutine allocate_sed
+
+!**********************************************************************
+
+subroutine deallocate_sed()
+
+  deallocate(sed,sed_q,sed_u,sed_v)
+  deallocate(sed_star,sed_star_scat,sed_disk,sed_disk_scat,n_phot_sed)
+  deallocate(sed1_io,sed2_io,wave2_io)
+
+  return
+
+end subroutine deallocate_sed
+
+!**********************************************************************
+
+subroutine allocate_mol_maps(imol)
+
+  integer, intent(in) :: imol
+
+  integer :: alloc_status, n_speed_rt, nTrans_raytracing
+
+  n_speed_rt = mol(imol)%n_speed_rt
+  nTrans_raytracing = mol(imol)%nTrans_raytracing
+
+ if (npix_x_save > 1) then
+     RT_line_method = 2 ! creation d'une carte avec pixels carres
+     npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
+
+     write(*,*) "WARNING : memory size if lots of pixels"
+     allocate(spectre(npix_x,npix_y,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+          continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
+  else
+     RT_line_method = 1 ! utilisation de pixels circulaires
+     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+          continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1,1), stat=alloc_status)
+  endif
+  if (alloc_status > 0) call error('Allocation error spectre')
+  spectre=0.0
+  continu=0.0
+  stars_map=0.0
+
+  return
+
+end subroutine allocate_mol_maps
+
+!**********************************************************************
+
+subroutine deallocate_mol_maps()
+
+  deallocate(spectre,continu)
+  return
+
+end subroutine deallocate_mol_maps
+
+!**********************************************************************
 
 subroutine allocate_origin()
 

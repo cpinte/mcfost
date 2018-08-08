@@ -3,7 +3,6 @@ module mol_transfer
   use parametres
   use molecular_emission
   use naleat
-  use resultats
   use utils
   use opacity
   use molecules
@@ -21,8 +20,8 @@ module mol_transfer
   use dust_transfer, only : compute_stars_map
   use stars
   use grid
-
   use mem
+  use output
 
   implicit none
 

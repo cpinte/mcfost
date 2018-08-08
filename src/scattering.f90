@@ -1,7 +1,6 @@
 module scattering
 
   use parametres
-  use resultats
   use constantes
   use opacity
   use em_th

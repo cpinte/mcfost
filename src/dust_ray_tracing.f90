@@ -11,7 +11,6 @@ module dust_ray_tracing
   use constantes
   use em_th
   use opacity
-  use resultats
   use ray_tracing
   use stars, only : E_stars
   !$ use omp_lib

@@ -27,7 +27,6 @@ module radiation_field
   real(kind=dp), dimension(:), allocatable :: E0 ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
 
-
 contains
 
 subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)

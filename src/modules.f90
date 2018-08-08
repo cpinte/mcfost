@@ -164,35 +164,6 @@ end module opacity
 
 !********************************************************************
 
-module resultats
-
-  use mcfost_env, only : dp
-
-  implicit none
-  save
-
-  integer :: ntot = 0, nkill = 0
-  real :: flux_etoile, flux_direct
-
-  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
-  real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
-  real, dimension(:,:,:,:,:), allocatable :: stoke_io ! x,y, theta, phi, type
-
-  real(kind=dp), dimension(:,:,:,:), allocatable :: sed, n_phot_sed, sed_u, sed_q, sed_v
-  real(kind=dp), dimension(:,:,:,:), allocatable, target :: sed_star, sed_star_scat, sed_disk, sed_disk_scat!id,lambda,n_thet,n_phi,x,y
-  real, dimension(:,:,:), allocatable :: sed1_io
-  real, dimension(:,:,:,:), allocatable :: sed2_io
-  real, dimension(:,:), allocatable :: wave2_io
-  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes
-
-  ! Line transfer
-  real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
-  real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
-
-end module resultats
-
-!********************************************************************
-
 module em_th
 
   use mcfost_env, only : dp
@@ -334,11 +305,14 @@ module ray_tracing
   save
 
 
+  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes
+
 
   ! inclinaisons
   real :: RT_imin, RT_imax, RT_az_min, RT_az_max
   integer ::  RT_n_incl, RT_n_az
   logical :: lRT_i_centered
+
   real, dimension(:), allocatable :: tab_RT_incl, tab_RT_az
   real(kind=dp), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
   real(kind=dp), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt

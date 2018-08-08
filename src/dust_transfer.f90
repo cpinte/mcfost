@@ -3,7 +3,6 @@ module dust_transfer
   use parametres
   use grains
   use naleat, only : seed, stream, gtype
-  use resultats
   use opacity
   use em_th
   use constantes
