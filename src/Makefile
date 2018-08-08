@@ -147,7 +147,8 @@ LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
 #------------------------------------------------------------------------------#
 # Sources and objects
 
-SOURCES = modules.f90 constants.f90 sha.f90 messages.f90 system.f90 utils.f90 fits_utils.f90 \
+SOURCES = mcfost_env.f90 parameters.f90 modules.f90 constants.f90 sha.f90 messages.f90 operating_system.f90 \
+	utils.f90 fits_utils.f90 \
 	read_DustEM.f90 input.f90 benchmarks.f90 read_param.f90 \
 	scattering.f90 coated_sphere.f90 dust_ray_tracing.f90 \
 	radiation_field.f90 diffusion.f90 io_prodimo.f90 \
@@ -188,11 +189,11 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	ar vr libmcfost.a *.o libtmp/*.o
 	ranlib libmcfost.a
 
-modules.o : .make_lastsystem modules.f90
-	rm -rf ../utils/Version ; grep required_utils_version modules.f90 | awk \
+mcfost_env.o : .make_lastsystem mcfost_env.f90
+	rm -rf ../utils/Version ; grep required_utils_version mcfost_env.f90 | awk \
 		'{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
-	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 modules.f90 $(INCLUDE)
+	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mcfost_env.f90 $(INCLUDE)
 
 io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
@@ -200,7 +201,7 @@ io_phantom_utils.o :  io_phantom_utils.f90
 voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
 
-%.o : %.f90  modules.o
+%.o : %.f90
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
 
 io_prodimo.o : sha.f90
@@ -210,7 +211,7 @@ utils.o : sha.f90
 Voronoi.o : voro++_wrapper.o
 
 ifeq ($(MCFOST_GIT),1)
-sha.f90 : ../.git/objects modules.o
+sha.f90 : ../.git/objects mcfost_env.o
 	printf "module sha\n  implicit none\n" > sha.f90
 	git log --pretty=format:"%H %d" | grep \(HEAD | awk \
 		'{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' \
@@ -218,12 +219,12 @@ sha.f90 : ../.git/objects modules.o
 	printf "end module sha\n" >> sha.f90
 endif
 
-system.f90 : sha.o
-	printf "module system\n  implicit none\n" > system.f90
+operating_system.f90 : sha.o
+	printf "module os\n  implicit none\n" > operating_system.f90
 	uname | awk \
 		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
-		>> system.f90
-	printf "end module system\n" >> system.f90
+		>> operating_system.f90
+	printf "end module os\n" >> operating_system.f90
 
 mcfost2prodimo :  mcfost mcfost2prodimo.o
 	$(FF) $(FFLAGS_EXE) -o mcfost2prodimo mcfost2prodimo.f90 $(LIBS_FITS)
@@ -246,8 +247,8 @@ release : main
 	ssh $(LINUX_SERVER) "cd mcfost/src ; MCFOST_GIT=0 ; export MAKEFLAGS=-j ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
-	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
+	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
+	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
@@ -265,8 +266,8 @@ release_mac : main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
-	cp `grep mcfost_version modules.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
-	grep mcfost_release modules.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
+	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
+	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
@@ -297,7 +298,7 @@ wardlaw :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 system.f90 system.o libmcfost.a
+	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :

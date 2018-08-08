@@ -1,6 +1,6 @@
 module utils
 
-  use parametres
+  use mcfost_env
   use naleat, only : stream
   use constantes
   use sha
@@ -516,7 +516,7 @@ end subroutine mcfost_setup
 
 function mcfost_update(lforce_update, lmanual, n_days)
 
-  use system
+  use os
 
   logical, intent(in) :: lforce_update, lmanual
   integer, intent(in), optional :: n_days

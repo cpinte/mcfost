@@ -1,6 +1,7 @@
 module radiation_field
 
   use parametres
+  use mcfost_env
   use constantes
   use ray_tracing, only : lscatt_ray_tracing1, lscatt_ray_tracing2, n_theta_I, n_phi_I, n_az_rt, I_spec, I_spec_star
   use opacity, only : kappa_abs_LTE

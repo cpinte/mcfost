@@ -1,6 +1,7 @@
 module input
 
   use parametres
+  use mcfost_env
   use constantes
   use molecular_emission
   use em_th

@@ -1,6 +1,7 @@
 module Voronoi_grid
 
   use constantes
+  use mcfost_env
   use parametres
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
@@ -736,7 +737,7 @@ module Voronoi_grid
 
   subroutine get_voronoi_sha1(filename, voronoi_sha1)
 
-    use system
+    use os
 
     character(len=512), intent(in) :: filename
     character(len=40), intent(out) :: voronoi_sha1

@@ -1,6 +1,7 @@
 module disk_physics
 
   use grains
+  use mcfost_env
   use opacity
   use disk
   use em_th

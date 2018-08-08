@@ -1,6 +1,7 @@
 module benchmarks
 
   use parametres
+  use mcfost_env
   use constantes
   use grains
   use opacity
