@@ -146,8 +146,6 @@ module parametres
   logical :: ldudt_implicit
   real(kind=dp) :: ufac_implicit
 
-
-
 end module parametres
 
 !********************************************************************
@@ -395,18 +393,6 @@ module naleat
   ! 4 -> Multiplicative Lagged Fibonacci Generator
 
   SPRNG_POINTER, dimension(:), allocatable :: stream
-
-  ! Generateur gaussien
-  real(kind=dp), dimension(:), allocatable:: gauss_random_saved
-  logical, dimension(:), allocatable :: lgauss_random_saved
-
-  interface
-     function gauss_random(id)
-       use parametres
-       integer, intent(in) :: id
-       real(kind=dp) :: gauss_random
-     end function gauss_random
-  end interface
 
 end module naleat
 

@@ -1,7 +1,7 @@
 module utils
 
   use parametres
-  use naleat, only : stream, gauss_random_saved, lgauss_random_saved
+  use naleat, only : stream
   use constantes
   use sha
   use messages
@@ -52,45 +52,6 @@ function spanl(xmin,xmax,n)
 end function spanl
 
 !************************************************************
-
-!-- function gauss_random(id)
-!--   ! Retourne un nombre aleatoire distribue suivant une gaussienne
-!--   ! avec moyenne nulle et variance 1
-!--   ! Adapte de numerical recipes pour fonctionner en parallel avec sprng
-!--   ! C. Pinte
-!--   ! 19/10/07
-!--
-!--   implicit none
-!--
-!-- #include "sprng_f.h"
-!--
-!--   integer, intent(in) :: id
-!--   real(kind=dp) :: gauss_random
-!--   real(kind=dp) :: rsq,rand1,rand2
-!--
-!--   if (lgauss_random_saved(id)) then
-!--      gauss_random=gauss_random_saved(id)
-!--      lgauss_random_saved(id)=.false.
-!--   else
-!--      loop : do
-!--         rand1 = sprng(stream(id))
-!--         rand2 = sprng(stream(id))
-!--         rand1 = 2.0_dp * rand1 - 1.0_dp
-!--         rand2 = 2.0_dp * rand2 - 1.0_dp
-!--         rsq=rand1**2+rand2**2
-!--         if (rsq > 0.0_dp .and. rsq < 1.0_dp) exit loop
-!--      enddo loop
-!--      rsq=sqrt(-2.0_dp*log(rsq)/rsq)
-!--      gauss_random = rand1 * rsq
-!--      gauss_random_saved(id)= rand2 * rsq
-!--      lgauss_random_saved(id)=.true.
-!--   endif
-!--
-!--   return
-!--
-!-- end function gauss_random
-
-!**********************************************************
 
 subroutine polint(xa,ya,n,x,y,dy)
 ! Interpolation polynomiale

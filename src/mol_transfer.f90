@@ -372,7 +372,6 @@ subroutine NLTE_mol_line_transfer(imol)
                  ! Echantillonnage aleatoire du champ de vitesse
                  if (lnotfixed_Rays) then
                     do iv=ispeed(1),ispeed(2)
-                       !tab_speed(1,id) = gauss_random(id) * deltaVmax(ri,zj)
                        rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_dp * (rand - 0.5_dp) * deltaVmax(icell)
                     enddo
                  endif

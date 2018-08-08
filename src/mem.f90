@@ -139,10 +139,8 @@ subroutine alloc_dynamique(n_cells_max)
      p_Nc = p_n_cells
   endif
 
-  allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
+  allocate(stream(nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error random number stream')
-  gauss_random_saved = 0.0_dp
-  lgauss_random_saved = .false.
 
   allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
