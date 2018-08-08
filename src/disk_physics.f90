@@ -2,6 +2,7 @@ module disk_physics
 
   use grains
   use opacity
+  use disk
   use em_th
   use prop_star
   use molecular_emission, only : densite_gaz

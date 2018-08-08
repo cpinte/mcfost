@@ -17,7 +17,7 @@ subroutine setDiffusion_coeff(i)
   ! C. Pinte
   ! 15/02/07
 
-  implicit none
+  use grains, only : tab_lambda, tab_delta_lambda
 
   integer, intent(in) :: i
 
@@ -76,8 +76,7 @@ subroutine setDiffusion_coeff0(i)
   ! l'approximation de diffusion
   ! C. Pinte
   ! 15/02/07
-
-  implicit none
+  use grains, only : tab_lambda, tab_delta_lambda
 
   integer, intent(in) :: i
 
@@ -129,8 +128,6 @@ subroutine Temperature_to_DensE(ri)
   ! C. Pinte
   ! 15/02/07
 
-  implicit none
-
   integer, intent(in) :: ri
 
   integer :: j, k, icell
@@ -160,9 +157,6 @@ subroutine DensE_to_temperature()
   ! C. Pinte
   ! 15/02/07
 
-  implicit none
-
-
   integer :: i, j, k
 
   do k=1,n_az
@@ -182,8 +176,6 @@ subroutine clean_temperature()
   ! Met la temperature a Tmin dans la zone sombre
   ! C. Pinte
   ! 15/02/07
-
-  implicit none
 
   integer :: i, j, k
 
@@ -208,8 +200,6 @@ subroutine Temp_approx_diffusion()
   ! est la limite a t --> inf de la solution non stationnaire
   ! C. Pinte
   ! 15/02/07
-
-  implicit none
 
   real, dimension(n_cells) :: Temp0
   real :: max_delta_E_r, stabilite, precision
@@ -300,8 +290,6 @@ subroutine Temp_approx_diffusion_vertical()
   ! C. Pinte
   ! 15/02/07
 
-  implicit none
-
   real :: max_delta_E_r, stabilite, precision
   integer :: n_iter, i, k
   logical :: lconverged
@@ -385,8 +373,6 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
   ! ie : un pas de temps de l'equation non stationnaire
   ! C. Pinte
   ! 15/02/07
-
-  implicit none
 
   real, intent(in) :: stabilite
   real, intent(out) :: max_delta_E_r
@@ -513,8 +499,6 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   ! ie : un pas de temps de l'equation non stationnaire
   ! C. Pinte
   ! 15/02/07
-
-  implicit none
 
   integer, intent(in) :: ri
   real, intent(in) :: stabilite

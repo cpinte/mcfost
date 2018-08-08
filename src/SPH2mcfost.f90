@@ -116,6 +116,7 @@ contains
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
+    use disk, only : SPH_keep_particles, disk_zone
 
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas

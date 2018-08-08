@@ -116,6 +116,7 @@ subroutine alloc_dynamique(n_cells_max)
   use stars, only : allocate_stellar_spectra
   use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
        allocate_weight_proba_emission, allocate_thermal_energy
+  use disk, only : disk_origin, star_origin
 
   integer, intent(in), optional :: n_cells_max
 
@@ -407,6 +408,7 @@ subroutine deallocate_em_th_mol()
 
   use thermal_emission, only : deallocate_thermal_emission
   use stars, only : deallocate_stellar_spectra
+  use disk, only : disk_origin, star_origin
 
   deallocate(n_phot_envoyes)
 
@@ -527,6 +529,7 @@ subroutine realloc_step2()
   use radiation_field, only : allocate_radiation_field_step2
   use stars, only : allocate_stellar_spectra, deallocate_stellar_spectra
   use thermal_emission, only : deallocate_temperature_calculation, realloc_emitting_fractions
+  use disk, only : disk_origin, star_origin
 
   integer :: alloc_status, mem_size, p_n_lambda2_pos
 
