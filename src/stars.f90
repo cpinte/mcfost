@@ -1,22 +1,30 @@
 module stars
 
   use parametres
-  use prop_star
   use utils
   use constantes
-  use ProDiMo
-  use grid
   use messages
+  use wavelengths
+  use grid
 
   implicit none
 
-  public :: spectre_etoiles
+  public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices
 
   private
 
+  real, dimension(:,:), allocatable :: CDF_E_star, prob_E_star
+  real, dimension(:), allocatable :: E_stars !n_lambda
+  real, dimension(:), allocatable :: spectre_etoiles_cumul, spectre_etoiles !(0:n_lambda)
+
+  real, dimension(:), allocatable :: E_ISM
+  real(kind=dp) :: R_ISM = 0._dp ! radius of the sphere from which the ISM radiation is emitted
+  real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
+
+  real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   contains
 
@@ -26,12 +34,11 @@ subroutine allocate_stellar_spectra(n_wl)
   integer :: alloc_status
 
   allocate(CDF_E_star(n_wl,0:n_etoiles), prob_E_star(n_wl,n_etoiles), E_stars(n_wl),  &
-       E_disk(n_wl), E_ISM(n_wl), stat=alloc_status)
+       E_ISM(n_wl), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error CDF_E_star')
   CDF_E_star = 0.0
   prob_E_star = 0.0
   E_stars = 0.0
-  E_disk = 0.0
   E_ISM = 0.0
 
   allocate(spectre_etoiles_cumul(0:n_wl),spectre_etoiles(n_wl), stat=alloc_status)
@@ -48,7 +55,7 @@ end subroutine allocate_stellar_spectra
 subroutine deallocate_stellar_spectra()
 
   if (allocated(spectre_etoiles)) deallocate(spectre_etoiles,spectre_etoiles_cumul)
-  if (allocated(CDF_E_star)) deallocate(CDF_E_star,prob_E_star,E_stars,E_disk,E_ISM)
+  if (allocated(CDF_E_star)) deallocate(CDF_E_star,prob_E_star,E_stars,E_ISM)
 
   return
 
@@ -228,7 +235,6 @@ subroutine repartition_energie_etoiles()
 ! - CDF_E_star, prob_E_star
 ! - E_stars
 ! - spectre_etoiles_cumul, spectre_etoiles
-! - L_etoile
 
   implicit none
 
@@ -242,7 +248,7 @@ subroutine repartition_energie_etoiles()
 
   integer :: lambda, i, n, n_lambda_spectre, l, ios
   real(kind=dp) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
-  real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV
+  real ::  L_etoile, wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
   real(kind=dp) :: fact_sup, fact_inf, cst_spectre_etoiles
 
   real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
@@ -415,13 +421,13 @@ subroutine repartition_energie_etoiles()
 
   ! wl doit etre en microns ici
   do i=1, n_etoiles
-     fUV_ProDiMo = etoile(i)%fUV
+     fUV = etoile(i)%fUV
      p = etoile(i)%slope_UV
 
      if (abs(p+1.0) > 1.0e-5) then
-        cst_UV_ProDiMo =  fUV_ProDiMo * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
+        cst_UV_ProDiMo =  fUV * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
      else
-        cst_UV_ProDiMo =  fUV_ProDiMo * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
+        cst_UV_ProDiMo =  fUV * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
      endif
 
      ! On ajoute l'UV que avant le pic de Wien
@@ -603,10 +609,24 @@ subroutine repartition_energie_ISM(ISM_model)
 
   real, dimension(5) :: wavelengths, power, W, T
 
+  ! Defining the ISM sphere
+  if (lcylindrical) then
+     R_ISM = 1.000001_dp * (sqrt(Rmax**2 + zmax(n_rad)**2))
+     centre_ISM(:) = 0._dp
+  else if (lspherical) then
+     R_ISM = 1.000001_dp * Rmax
+     centre_ISM(:) = 0._dp
+  else if (lVoronoi) then
+     ! Defining the ISM sphere
+     R_ISM = 1.000001_dp * 0.5_dp * Rmax
+     !centre_ISM(:) = 0.5_dp * (/limits(2)+limits(1), limits(4)+limits(3), limits(6)+limits(5)/)
+     centre_ISM(:) = 0._dp
+  endif
+
   eV_to_Hz = electron_charge/hp
   nu_p_MIR = c_light/100.e-6
 
-  if (R_ISM < tiny_dp) call error("the ISM emitting sphere is nor defined")
+  if (R_ISM < tiny_dp) call error("the ISM emitting sphere is not defined")
 
   if (ISM_model==0) then
      E_ISM(:) = 0.

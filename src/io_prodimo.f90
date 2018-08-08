@@ -9,7 +9,7 @@ module ProDiMo
   use utils, only: get_NH, Blambda, Bnu
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use radiation_field, only : xN_abs, xJ_abs
-  use prop_star, only : spectre_etoiles
+  use stars, only : spectre_etoiles, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
   use utils, only : appel_syst
@@ -38,15 +38,8 @@ module ProDiMo
   ! Grille de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
 
-  ! Pour champ ISM
-  real, parameter :: Wdil =  9.85357e-17
-  real, parameter :: TCmb = 2.73
-  real, parameter :: T_ISM_stars = 20000.
-
   real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes_ISM
-
-  real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   ! ProDiMo2mcfost
   integer,parameter :: MC_NSP=5      ! number of species

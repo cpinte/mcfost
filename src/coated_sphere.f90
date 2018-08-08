@@ -5,6 +5,7 @@ module coated_sphere
   use grains
   use utils, only : gauleg
   use messages
+  use wavelengths
 
   implicit none
 

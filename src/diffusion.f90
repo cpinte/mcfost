@@ -5,6 +5,7 @@ module diffusion
   use opacity
   use em_th
   use messages
+  use wavelengths
 
   implicit none
 
@@ -16,8 +17,6 @@ subroutine setDiffusion_coeff(i)
   ! l'approximation de diffusion
   ! C. Pinte
   ! 15/02/07
-
-  use grains, only : tab_lambda, tab_delta_lambda
 
   integer, intent(in) :: i
 
@@ -76,7 +75,7 @@ subroutine setDiffusion_coeff0(i)
   ! l'approximation de diffusion
   ! C. Pinte
   ! 15/02/07
-  use grains, only : tab_lambda, tab_delta_lambda
+
 
   integer, intent(in) :: i
 

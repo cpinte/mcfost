@@ -6,7 +6,6 @@ module Voronoi_grid
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
   use opacity, only : volume
-  use prop_star
   use kdtree2_module
   use messages
 
@@ -385,10 +384,6 @@ module Voronoi_grid
 
     ! For initial poistion of rays in ray-tracing mode
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
-
-    ! Defining the ISM sphere
-    R_ISM = 1.000001_dp * 0.5_dp * Rmax
-    centre_ISM(:) = 0.5_dp * (/limits(2)+limits(1), limits(4)+limits(3), limits(6)+limits(5)/)
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles),stat=alloc_status)

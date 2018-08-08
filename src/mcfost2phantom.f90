@@ -225,6 +225,7 @@ contains
          massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false.)
 
     call setup_grid()
+    call setup_scattering()
     ! Allocation dynamique
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then

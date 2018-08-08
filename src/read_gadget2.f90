@@ -10,8 +10,6 @@ contains
 
   subroutine read_gadget2_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
-    use prop_star
-
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
     real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas

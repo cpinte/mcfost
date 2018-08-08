@@ -27,10 +27,6 @@ module parametres
   ! Nbre d'angles pour echantillonner la fct de phase
   integer, parameter :: nang_scatt = 180  ! TODO : ca bug si c'est pas 180
 
-  ! Nbre de longueurs d'onde utilisees
-  integer :: n_lambda
-  logical :: lmono0, lmono
-
   ! lvariable_dust = true si les proprites de la poussiere sont variables dans chaque cellule
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
@@ -91,8 +87,6 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
-
-  integer :: n_lambda2
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
@@ -176,5 +170,40 @@ module parametres
 
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
   character(len=512), dimension(:), allocatable :: sh_file
+
+
+  ! Stars
+  type star_type
+     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
+     real(kind=dp) :: x,y,z
+     logical :: lb_body, out_model
+     character(len=512) :: spectre
+     integer :: icell
+  end type star_type
+
+  integer :: n_etoiles
+  type(star_type), dimension(:), allocatable :: etoile
+
+  ! Spot
+  real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
+
+  ! Limb darkening
+  logical :: llimb_darkening
+  character(len=512) :: limb_darkening_file
+  real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
+
+  ! ISM radiation following ProDiMo's definitions
+  real, parameter :: Wdil =  9.85357e-17
+  real, parameter :: TCmb = 2.73
+  real, parameter :: T_ISM_stars = 20000.
+  real :: chi_ISM = 1.0
+
+  character(len=8) :: system_age
+
+  logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
+  ! ray-tracing 1 : sauve le champ de radiation diffuse
+  ! ray-tracing 2 : sauve l'intensite specifique
+
+  integer :: n_pop
 
 end module parametres

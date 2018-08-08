@@ -14,6 +14,8 @@ module output
   use Voronoi_grid
   use grid
   use fits_utils, only : cfitsWrite, print_error
+  use wavelengths
+  use stars, only : E_stars
 
   implicit none
 

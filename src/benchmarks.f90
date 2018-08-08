@@ -8,6 +8,7 @@ module benchmarks
   use em_th
   use molecular_emission
   use messages
+  use wavelengths
 
   implicit none
 

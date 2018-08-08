@@ -1,48 +1,3 @@
-module prop_star
-
-  use mcfost_env, only : dp
-
-  implicit none
-  save
-
-  integer :: n_etoiles
-
-  type star_type
-     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
-     real(kind=dp) :: x,y,z
-     logical :: lb_body, out_model
-     character(len=512) :: spectre
-     integer :: icell
-  end type star_type
-
-  type(star_type), dimension(:), allocatable :: etoile
-  real, dimension(:,:), allocatable :: CDF_E_star, prob_E_star
-
-  real, dimension(:), allocatable :: E_stars !n_lambda
-
-  real :: L_etoile
-
-  real, dimension(:), allocatable :: E_ISM
-  real(kind=dp) :: R_ISM = 0._dp ! radius of the sphere from which the ISM radiation is emitted
-  real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
-  real :: chi_ISM = 1.0
-
-  ! Spot
-  real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
-
-  ! Limb darkening
-  logical :: llimb_darkening
-  character(len=512) :: limb_darkening_file
-  real, dimension(:), allocatable :: mu_limb_darkening, limb_darkening, pola_limb_darkening
-
-  character(len=8) :: system_age
-
-  real, dimension(:), allocatable :: spectre_etoiles_cumul, spectre_etoiles !(0:n_lambda)
-
-end module prop_star
-
-!********************************************************************
-
 module grains
 !****************************
 ! Parametres des grains
@@ -80,7 +35,6 @@ module grains
 
   ! Nombre de taille de grains
   ! le pas et (amax - amin)/n_grains
-  integer :: n_pop
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
@@ -99,10 +53,6 @@ module grains
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
   ! Tab de lambda
-  real(kind=dp), dimension(:), allocatable :: tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda !n_lambda
-  real, dimension (:,:), allocatable :: tab_amu1, tab_amu2 !n_lambda,n_pop
-  real, dimension (:,:), allocatable :: tab_amu1_coating, tab_amu2_coating !n_lambda,n_pop
-  real, dimension(:), allocatable :: tab_lambda2, tab_lambda2_inf, tab_lambda2_sup, tab_delta_lambda2
 
   ! Parametres de diffusion des grains
   real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
@@ -252,11 +202,6 @@ module em_th
 
   real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
 
-  ! Gamme de longueurs d'onde utilisees
-  real :: lambda_min, lambda_max
-  ! Echelle_log
-  ! Nbre d'intervalle de longueur d'onde
-  real(kind=dp) :: delta_lambda
 
   ! Nbre de temperatures utilisee pour pretabule kplanck et prob_delta_T
   ! et temperature echantillonee
@@ -388,9 +333,6 @@ module ray_tracing
   implicit none
   save
 
-  logical :: lscatt_ray_tracing, lscatt_ray_tracing1, lscatt_ray_tracing2, loutput_mc
-  ! ray-tracing 1 : sauve le champ de radiation diffuse
-  ! ray-tracing 2 : sauve l'intensite specifique
 
 
   ! inclinaisons

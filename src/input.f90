@@ -9,6 +9,7 @@ module input
   use read_DustEM
   use utils, only : in_dir
   use messages
+  use wavelengths
 
   implicit none
 
@@ -972,8 +973,6 @@ end subroutine init_tab_Temp
 !***************************************************
 
 subroutine read_limb_darkening_file(lambda)
-
-  use prop_star
 
   integer, intent(in) :: lambda
 

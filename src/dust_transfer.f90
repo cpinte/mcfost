@@ -6,7 +6,6 @@ module dust_transfer
   use resultats
   use opacity
   use em_th
-  use prop_star
   use constantes
   use ray_tracing
   use scattering
@@ -105,6 +104,7 @@ subroutine transfert_poussiere()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
+  call setup_scattering()
 
   ! Allocation dynamique de tous les autres tableaux
   call alloc_dust_prop()

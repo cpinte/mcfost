@@ -4,12 +4,12 @@ module mem
   use grains
   use opacity
   use resultats
-  use prop_star
   use naleat
   use molecular_emission
   use ray_tracing
   use utils
   use messages
+  use wavelengths
 
   implicit none
 

@@ -15,8 +15,6 @@ contains
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
-    use prop_star, only : etoile
-
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
@@ -430,8 +428,6 @@ contains
   !*********************************************************
 
   subroutine compute_stellar_parameters()
-
-    use prop_star
 
     integer :: i
 

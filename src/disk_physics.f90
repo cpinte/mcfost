@@ -4,11 +4,11 @@ module disk_physics
   use mcfost_env
   use opacity
   use em_th
-  use prop_star
   use molecular_emission, only : densite_gaz
   use constantes
   use stars, only : spectre_etoiles
   use messages
+  use wavelengths
 
   implicit none
 

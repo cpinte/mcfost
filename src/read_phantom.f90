@@ -283,7 +283,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   ! extra_heating is in W
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
-  use prop_star
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star
   use ray_tracing, only: RT_az_min, RT_az_max, RT_n_az
 

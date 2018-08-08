@@ -6,7 +6,6 @@ module optical_depth
   use em_th
   use molecular_emission
   use ray_tracing
-  use grains, only : tab_lambda
   use utils
   use molecules
 

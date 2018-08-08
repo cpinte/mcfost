@@ -3,10 +3,8 @@ module scattering
   use parametres
   use resultats
   use constantes
-  use prop_star
   use opacity
   use em_th
-  use prop_star
   use grains
   use input
 
@@ -15,6 +13,59 @@ module scattering
   implicit none
 
   contains
+
+
+subroutine setup_scattering()
+
+  ! parametrage methode de diffusion en fonction de la taille de la grille
+  ! 1 : per dust grain
+  ! 2 : per cell
+  call select_scattering_method(p_n_cells)
+
+  lMueller_pos_multi = .false.
+  if (lmono) then
+     p_n_lambda_pos = 1
+  else
+     if (scattering_method==1) then
+        p_n_lambda_pos = 1
+     else
+        p_n_lambda_pos = n_lambda
+        lMueller_pos_multi = .true.
+     endif
+  endif
+
+end subroutine setup_scattering
+
+!***************************************************
+
+subroutine select_scattering_method(p_n_cells)
+
+  integer, intent(in) :: p_n_cells
+
+  real :: mem_size
+
+  if (scattering_method0 == 0) then
+     if (.not.lmono) then
+        mem_size = (1.0*p_n_cells) * (nang_scatt+1) * n_lambda * 4 / 1024**3
+        if (mem_size > max_mem) then
+           scattering_method = 1
+        else
+           scattering_method = 2
+        endif
+     else
+        if (lscatt_ray_tracing) then
+           scattering_method = 2 ! it needs to be 2 for ray-tracing
+        else
+           ! ??? TODO + + TODO en realloc lscatt_ray_tracing = .false, en mode ML 3D ???
+           scattering_method = 2
+        endif
+     endif
+  endif
+
+  write(*,fmt='(" Using scattering method ",i1)') scattering_method
+  lscattering_method1 = (scattering_method==1)
+
+end subroutine select_scattering_method
 
 !***************************************************
 

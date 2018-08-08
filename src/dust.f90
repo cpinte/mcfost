@@ -6,7 +6,6 @@ module dust_prop
   use constantes
   use opacity
   use ray_tracing
-  use dust_ray_tracing
 
   use scattering
   use coated_sphere

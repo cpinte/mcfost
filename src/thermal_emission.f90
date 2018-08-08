@@ -5,13 +5,12 @@ module thermal_emission
   use em_th
   use grains
   use opacity
-  use prop_star
   !$ use omp_lib
 
   use utils
   use PAH
   use grid
-  use stars, only : spectre_etoiles
+  use stars, only : spectre_etoiles, E_ISM, E_stars
 
   implicit none
 
@@ -63,9 +62,9 @@ subroutine allocate_thermal_energy(Nc)
 
   integer :: alloc_status
 
-  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
+  allocate(E_disk(n_lambda), frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error frac_E_stars')
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+  E_disk = 0.0 ; frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error( 'Allocation error prob_E_cell 1')
@@ -249,10 +248,10 @@ subroutine realloc_emitting_fractions()
   integer :: alloc_status
 
   alloc_status = 0
-  deallocate(frac_E_stars, frac_E_disk, E_totale)
-  allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
+  deallocate(E_disk, frac_E_stars, frac_E_disk, E_totale)
+  allocate(E_disk(n_lambda2), frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error frac_E_stars')
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+  E_disk = 0.0 ; frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(prob_E_cell)
   allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)

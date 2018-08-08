@@ -5,8 +5,6 @@ module cylindrical_grid
   use opacity, only :  cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
        delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        zmax, volume, l_dark_zone
-
-  use prop_star, only : R_ISM, centre_ISM
   use messages
 
   implicit none
@@ -228,14 +226,6 @@ subroutine define_cylindrical_grid()
      zmax = 0.0 ; volume=0.0
   endif
   ! end allocation
-
-  ! Defining the ISM sphere
-  if (lcylindrical) then
-     R_ISM = 1.000001_dp * (sqrt(Rmax**2 + zmax(n_rad)**2))
-  else ! lspherical
-     R_ISM = 1.000001_dp * Rmax
-  endif
-  centre_ISM(:) = 0._dp ;
 
   Rmax2 = Rmax*Rmax
 

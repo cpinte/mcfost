@@ -5,7 +5,6 @@ module density
   use molecular_emission
   use opacity
   use em_th
-  use prop_star
   use grains
   use grid
   use utils
