@@ -1,7 +1,6 @@
 module scattering
 
   use parametres
-  use disk
   use resultats
   use constantes
   use prop_star

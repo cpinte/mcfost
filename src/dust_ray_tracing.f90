@@ -10,7 +10,6 @@ module dust_ray_tracing
   use parametres
   use constantes
   use em_th
-  use disk
   use opacity
   use prop_star
   use resultats

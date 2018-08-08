@@ -116,7 +116,7 @@ subroutine alloc_dynamique(n_cells_max)
   use stars, only : allocate_stellar_spectra
   use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
        allocate_weight_proba_emission, allocate_thermal_energy
-  use disk, only : disk_origin, star_origin
+  use output, only : allocate_origin
 
   integer, intent(in), optional :: n_cells_max
 
@@ -259,12 +259,7 @@ subroutine alloc_dynamique(n_cells_max)
      call allocate_weight_proba_emission(Nc)
   endif
 
-
-  if (lorigine) then
-     allocate(disk_origin(n_lambda, Nc, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error disk_origin')
-     disk_origin = 0.0 ; star_origin = 0.0
-  endif
+  if (lorigine) call allocate_origin()
 
   ! **************************************************
   ! Tableaux de temperature
@@ -408,7 +403,7 @@ subroutine deallocate_em_th_mol()
 
   use thermal_emission, only : deallocate_thermal_emission
   use stars, only : deallocate_stellar_spectra
-  use disk, only : disk_origin, star_origin
+   use output, only : deallocate_origin
 
   deallocate(n_phot_envoyes)
 
@@ -441,7 +436,7 @@ subroutine deallocate_em_th_mol()
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
 
   deallocate(l_emission_pah) ! OUTDATED
-  if (lorigine) deallocate(disk_origin,star_origin)
+  if (lorigine) call deallocate_origin()
 
   if (lTemp) call deallocate_thermal_emission()
 
@@ -525,11 +520,10 @@ end subroutine clean_mem_dust_mol
 subroutine realloc_step2()
 
   use dust_ray_tracing, only : select_scattering_method
-
   use radiation_field, only : allocate_radiation_field_step2
   use stars, only : allocate_stellar_spectra, deallocate_stellar_spectra
   use thermal_emission, only : deallocate_temperature_calculation, realloc_emitting_fractions
-  use disk, only : disk_origin, star_origin
+  use output, only : allocate_origin
 
   integer :: alloc_status, mem_size, p_n_lambda2_pos
 
@@ -736,13 +730,7 @@ subroutine realloc_step2()
      kappa_abs_nLTE=0.0
   endif
 
-  if (lorigine) then
-     deallocate(disk_origin, star_origin)
-     allocate(disk_origin(n_lambda2, n_cells, nb_proc), star_origin(n_lambda2, nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error disk_origin')
-     disk_origin = 0.0
-     star_origin = 0.0
-  endif
+  if (lorigine) call allocate_origin()
 
   return
 

@@ -2,7 +2,6 @@ module grid
 
   use parametres
   use constantes
-  use disk
   use opacity
   use grains
   use em_th

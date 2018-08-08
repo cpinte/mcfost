@@ -6,7 +6,6 @@ module Voronoi_grid
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
   use opacity, only : volume
-  use disk, only : density_file, Rmax
   use prop_star
   use kdtree2_module
   use messages

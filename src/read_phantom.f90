@@ -284,9 +284,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
   use prop_star
-  use parametres, only : ldudt_implicit,ufac_implicit
+  use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star
   use ray_tracing, only: RT_az_min, RT_az_max, RT_n_az
-  use disk, only : lplanet_az, planet_az, lfix_star
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu

@@ -5,7 +5,6 @@ module ProDiMo
   use em_th
   use constantes
   use molecular_emission
-  use disk
   use resultats
   use utils, only: get_NH, Blambda, Bnu
   use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered

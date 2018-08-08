@@ -6,7 +6,6 @@ module thermal_emission
   use grains
   use opacity
   use prop_star
-  use disk
   !$ use omp_lib
 
   use utils

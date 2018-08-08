@@ -1,7 +1,6 @@
 module dust_transfer
 
   use parametres
-  use disk
   use grains
   use naleat, only : seed, stream, gtype
   use resultats

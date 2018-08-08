@@ -2,7 +2,6 @@ module output
 
   use parametres
   use resultats
-  use disk
   use grains
   use em_th
   use radiation_field, only : J0, xJ_abs
@@ -18,7 +17,35 @@ module output
 
   implicit none
 
+  real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
+  real(kind=dp), dimension(:,:), allocatable :: star_origin
+
   contains
+
+subroutine allocate_origin()
+
+  integer :: alloc_status
+
+  if (allocated(disk_origin)) deallocate(disk_origin, star_origin)
+  allocate(disk_origin(n_lambda2, n_cells, nb_proc), star_origin(n_lambda2, nb_proc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error disk_origin')
+  disk_origin = 0.0
+  star_origin = 0.0
+
+  return
+
+end subroutine allocate_origin
+
+!**********************************************************************
+
+subroutine deallocate_origin()
+
+  deallocate(disk_origin, star_origin)
+  return
+
+end subroutine deallocate_origin
+
+!**********************************************************************
 
 subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag_scatt, capt)
 

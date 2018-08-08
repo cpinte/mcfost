@@ -2,7 +2,6 @@ module read_params
 
   use parametres
   use grains
-  use disk
   use prop_star
   use em_th
   use molecular_emission

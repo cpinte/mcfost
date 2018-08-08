@@ -1,7 +1,6 @@
 module optical_depth
 
   use parametres
-  use disk
   use opacity
   use constantes
   use em_th

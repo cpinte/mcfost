@@ -16,7 +16,6 @@ contains
     use dump_utils, only : get_error_text
     use utils, only : read_comments
     use prop_star, only : etoile
-    use disk, only : lscale_SPH, scale_SPH, lfix_star
 
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
@@ -116,7 +115,6 @@ contains
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
-    use disk, only : SPH_keep_particles, disk_zone
 
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas

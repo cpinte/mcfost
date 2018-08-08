@@ -7,7 +7,6 @@ module density
   use em_th
   use prop_star
   use grains
-  use disk
   use grid
   use utils
   use messages

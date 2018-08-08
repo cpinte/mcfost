@@ -20,7 +20,7 @@ io_prodimo.o : io_prodimo.f90 fits_utils.o messages.o read_param.o radiation_fie
 kdtree2.o : kdtree2.f90 messages.o
 mcfost.o : mcfost.f90 mol_transfer.o dust_transfer.o init_mcfost.o modules.o
 mcfost2phantom.o : mcfost2phantom.f90 output.o stars.o utils.o dust_transfer.o Voronoi.o thermal_emission.o radiation_field.o read_phantom.o SPH2mcfost.o mem.o optical_depth.o grid.o dust.o read_param.o init_mcfost.o modules.o mcfost_env.o
-mem.o : mem.f90 radiation_field.o thermal_emission.o stars.o messages.o utils.o modules.o dust_ray_tracing.f90
+mem.o : mem.f90 radiation_field.o thermal_emission.o stars.o messages.o utils.o modules.o dust_ray_tracing.o output.o
 messages.o : messages.f90
 modules.o : modules.f90
 mol_transfer.o : mol_transfer.f90 mem.o grid.o stars.o dust_transfer.o dust_ray_tracing.o io_prodimo.o optical_depth.o scattering.o dust.o output.o benchmarks.o input.o molecules.o modules.o utils.o

@@ -6,7 +6,6 @@ module input
   use molecular_emission
   use em_th
   use grains
-  use disk
   use read_DustEM
   use utils, only : in_dir
   use messages

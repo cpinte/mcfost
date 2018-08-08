@@ -2,7 +2,6 @@ module dust_prop
 
   use parametres
   use grains
-  use disk, only : n_zones
   use em_th
   use constantes
   use opacity

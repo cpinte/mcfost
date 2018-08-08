@@ -1,93 +1,3 @@
-module disk
-!****************************
-! Parametres du disque
-!****************************
-
-  use mcfost_env, only : dp
-
-  implicit none
-  save
-
-  real :: distance ! Distance du disque en pc
-  real(kind=dp) :: map_size
-
-  ! Disque decrit en une ou n zones
-  integer :: n_zones, n_regions
-
-  type disk_zone_type
-     real(kind=dp) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
-     real(kind=dp) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
-     integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
-     integer :: region
-  end type disk_zone_type
-
-  type disk_region_type
-     integer :: n_zones
-     real(kind=dp) :: Rmin, Rmax
-     integer :: iRmin, iRmax
-     integer, dimension(:), allocatable :: zones
-  end type disk_region_type
-
-  type cavity_type
-     real(kind=dp) ::  exp_beta, sclht, Rref
-  end type cavity_type
-
-  type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
-  type(disk_region_type), dimension(:), allocatable, target :: regions
-  type(cavity_type) :: cavity
-
-  real(kind=dp) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
-
-  real :: r_subdivide
-  logical :: lr_subdivide
-
-  ! La densite(z=0) evolue comme r**(surf-exp_beta)
-
-  ! Dullemond et Dubrulle
-  real :: alpha
-
-  !! Loi de puissance
-  real :: exp_strat, a_strat! = 0.7
-  !! Loi exp (Garaud , Barriere 2004)
-  !!  real, parameter :: fact_strat = 0.3
-
-  real(kind=dp), dimension(:,:,:), allocatable :: disk_origin
-  real(kind=dp), dimension(:,:), allocatable :: star_origin
-  real(kind=dp) :: frac_star_origin
-
-  real, dimension(:), allocatable :: E_disk !n_lambda
-
-  real :: w0_sup, w0_inf
-
-  real :: z_warp, tilt_angle
-
-  ! Description analytique du puffed-up inner rim
-  real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
-  logical :: lpuffed_rim
-
-  character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
-  character(len=512), dimension(:), allocatable :: sh_file
-
-  ! Correction locale de la densite (dans un anneau)
-  real :: correct_density_factor, correct_density_Rin, correct_density_Rout, z_scaling_env
-
-  logical :: lgap_Gaussian
-  real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
-
-  ! Fichier de Gasp pour la structure du disque
-  real :: struct_file_rin, struct_file_rout, struct_file_zmax, struct_file_beta
-  real :: struct_file_amin, struct_file_amax,  struct_file_rref
-  integer :: struct_file_n_grains, struct_file_nspecies
-
-  ! SPH
-  real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH, lfix_star
-
-
-end module disk
-
-!********************************************************************
-
 module prop_star
 
   use mcfost_env, only : dp
@@ -365,6 +275,9 @@ module em_th
 
   ! Biais de l'emission vers la surface du disque
   real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
+
+  real, dimension(:), allocatable :: E_disk !n_lambda
+
 
 end module em_th
 

@@ -121,4 +121,60 @@ module parametres
   logical :: ldudt_implicit
   real(kind=dp) :: ufac_implicit
 
+
+  ! Disk parameters
+  real :: distance ! Distance du disque en pc
+  real(kind=dp) :: map_size
+
+  integer :: n_zones, n_regions
+
+  type disk_zone_type
+     real(kind=dp) :: Rin, Rmin, Rc, Rout, Rmax, Rref, edge, exp_beta, surf
+     real(kind=dp) :: moins_gamma_exp, sclht, diskmass, gas_to_dust, vert_exponent
+     integer :: geometry ! 1=disk, 2=tappered-disk, 3=envelope
+     integer :: region
+  end type disk_zone_type
+
+  type disk_region_type
+     integer :: n_zones
+     real(kind=dp) :: Rmin, Rmax
+     integer :: iRmin, iRmax
+     integer, dimension(:), allocatable :: zones
+  end type disk_region_type
+
+  type cavity_type
+     real(kind=dp) ::  exp_beta, sclht, Rref
+  end type cavity_type
+
+  type(disk_zone_type), dimension(:), allocatable, target :: disk_zone
+  type(disk_region_type), dimension(:), allocatable, target :: regions
+  type(cavity_type) :: cavity
+
+  real(kind=dp) :: Rmin, Rmax, Rmax2, diskmass, correct_Rsub
+
+  real :: exp_strat, a_strat
+  real :: alpha
+
+  ! Description analytique du puffed-up inner rim
+  logical :: lpuffed_rim
+  real :: puffed_rim_h, puffed_rim_r, puffed_rim_delta_r
+
+  real :: z_warp, tilt_angle
+
+  ! SPH
+  real :: SPH_keep_particles, planet_az, scale_SPH
+  logical :: lplanet_az, lscale_SPH, lfix_star
+
+  logical :: lgap_Gaussian
+  real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
+
+  ! Correction locale de la densite (dans un anneau)
+  real :: correct_density_factor, correct_density_Rin, correct_density_Rout
+
+  ! Vertical scaling of the envelope
+  real :: z_scaling_env
+
+  character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
+  character(len=512), dimension(:), allocatable :: sh_file
+
 end module parametres

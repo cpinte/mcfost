@@ -3,7 +3,6 @@ module mol_transfer
   use parametres
   use molecular_emission
   use naleat
-  use disk
   use resultats
   use utils
   use opacity

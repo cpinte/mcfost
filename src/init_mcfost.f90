@@ -1,7 +1,6 @@
 module init_mcfost
 
   use parametres
-  use disk
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
   use density, only : specie_removed, T_rm
@@ -65,7 +64,6 @@ subroutine set_default_variables()
   loutput_J = .false.
   loutput_J_step1 = .false.
   laverage_grain_size = .false.
-  lr_subdivide=.false.
   lfreeze_out = .false.
   lphoto_dissociation = .false.
   lphoto_desorption = .false.
@@ -564,12 +562,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,Tfile)
         i_arg = i_arg + 1
-     case("-r_subdivide")
-        i_arg = i_arg + 1
-        lr_subdivide=.true.
-        call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1
-        read(s,*) r_subdivide
      case("-freeze_out","-freeze-out")
         i_arg = i_arg + 1
         lfreeze_out=.true.
@@ -1337,8 +1329,6 @@ subroutine display_help()
   write(*,*) "                         gas_density.fits.gz and dust_density.fits.gz -> density map"
   write(*,*) "                         grid.fits.gz -> radii and height in the grid"
   write(*,*) "                         volume.fits.gz -> volume per cell at each radius"
-  write(*,*) "        : -r_subdivide <radius>  : forces cell subdivision elsewhere"
-  write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
   write(*,*) "        : -tilt : <angle> [degrees]"
