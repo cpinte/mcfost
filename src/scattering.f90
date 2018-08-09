@@ -3,11 +3,10 @@ module scattering
   use parametres
   use constantes
   use opacity
-  use em_th
+  use wavelengths
   use grains
-  use input
-
   use utils
+  use input
 
   implicit none
 

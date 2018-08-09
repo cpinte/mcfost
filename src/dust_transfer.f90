@@ -4,7 +4,8 @@ module dust_transfer
   use grains
   use naleat, only : seed, stream, gtype
   use opacity
-  use em_th
+  use temperature
+  use thermal_emission
   use constantes
   use ray_tracing
   use scattering
@@ -191,7 +192,7 @@ subroutine transfert_poussiere()
            call lect_Temperature()
         endif
      else ! Seule l'étoile émet
-        Temperature=0.0
+        Tdust=0.0
      endif !l_em_disk_image
 
   else ! not lmono

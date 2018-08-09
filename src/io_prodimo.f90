@@ -2,7 +2,6 @@ module ProDiMo
 
   use parametres
   use opacity
-  use em_th
   use constantes
   use molecular_emission
   use utils, only: get_NH, Blambda, Bnu
@@ -13,6 +12,9 @@ module ProDiMo
   use sha
   use utils, only : appel_syst
   use messages
+  use thermal_emission
+  use mcfost_env
+  use temperature
 
   implicit none
 
@@ -567,7 +569,7 @@ contains
     !if (lRE_nLTE) then
     !   do ri=1, n_rad
     !      do zj=1, nz
-    !         Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
+    !         Tdust(ri,zj,1) = sum( Tdust_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
     !      enddo !j
     !   enddo !i
     !
@@ -581,7 +583,7 @@ contains
     !endif
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,Temperature,status)
+    call ftppre(unit,group,fpixel,nelements,Tdust,status)
 
     !------------------------------------------------------------------------------
     ! HDU 3 : Longueurs d'onde
@@ -1003,9 +1005,9 @@ contains
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
-                   Ttmp = temperature_1grain_nRE(l,icell)
+                   Ttmp = Tdust_1grain_nRE(l,icell)
                 else
-                   Ttmp = temperature_1grain(l,icell)
+                   Ttmp = Tdust_1grain(l,icell)
                 endif
                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(l,icell)
                 norme = norme + densite_pouss(l,icell)
@@ -1098,7 +1100,7 @@ contains
              do zj=1, nz
                 icell = cell_map(ri,zj,1)
                 if (tab_region(i) > 0) then
-                   P_TPAH(:,ri,zj,1) = Proba_Temperature(:,tab_region(ri),icell)
+                   P_TPAH(:,ri,zj,1) = Proba_Tdust(:,tab_region(ri),icell)
                 else
                    P_TPAH(:,ri,zj,1) = 0.0
                 endif

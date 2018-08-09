@@ -5,7 +5,6 @@ module benchmarks
   use constantes
   use grains
   use opacity
-  use em_th
   use molecular_emission
   use messages
   use wavelengths

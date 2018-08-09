@@ -3,7 +3,6 @@ module optical_depth
   use parametres
   use opacity
   use constantes
-  use em_th
   use molecular_emission
   use ray_tracing
   use utils

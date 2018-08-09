@@ -2,7 +2,7 @@ module output
 
   use parametres
   use grains
-  use em_th
+  use temperature
   use radiation_field, only : J0, xJ_abs
   use thermal_emission, only : E_totale, nbre_reemission
   use constantes
@@ -15,8 +15,10 @@ module output
   use fits_utils, only : cfitsWrite, print_error
   use wavelengths
   use stars, only : E_stars
+  use thermal_emission, only : L_packet_th
 
   implicit none
+  save
 
   real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI, STOKEQ, STOKEU, STOKEV !id,lambda,x,y,n_thet,n_phi
   real(kind=dp), dimension(:,:,:,:,:,:), allocatable :: STOKEI_star, STOKEI_star_scat, STOKEI_disk, STOKEI_disk_scat
@@ -2382,7 +2384,7 @@ subroutine ecriture_temperature(iTemperature)
      fpixel=1
 
      ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,temperature(1:n_cells),status)
+     call ftppre(unit,group,fpixel,nelements,Tdust(1:n_cells),status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
@@ -2446,7 +2448,7 @@ subroutine ecriture_temperature(iTemperature)
      fpixel=1
 
      ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,temperature_1grain,status)
+     call ftppre(unit,group,fpixel,nelements,Tdust_1grain,status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
@@ -2510,7 +2512,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,temperature_1grain_nRE,status)
+     call ftppre(unit,group,fpixel,nelements,Tdust_1grain_nRE,status)
 
      !------------------------------------------------------------------------------
      ! 2eme HDU : is the grain at equilibrium ?
@@ -2612,7 +2614,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      ! le e signifie real*4
-     call ftppre(unit,group,fpixel,nelements,Proba_Temperature,status)
+     call ftppre(unit,group,fpixel,nelements,Proba_Tdust,status)
 
      !  Close the file and free the unit number.
      call ftclos(unit, status)
@@ -3331,7 +3333,7 @@ subroutine write_temperature_for_phantom(n_SPH)
 
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
-       if (i_SPH > 0) T_SPH(i_SPH) = Temperature(icell)
+       if (i_SPH > 0) T_SPH(i_SPH) = Tdust(icell)
     enddo
 
     open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')

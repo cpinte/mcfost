@@ -2,10 +2,10 @@ module read_params
 
   use parametres
   use grains
-  use em_th
   use molecular_emission
   use ray_tracing
-  use input
+  use wavelengths
+  use constantes
   use sha
   use messages
 

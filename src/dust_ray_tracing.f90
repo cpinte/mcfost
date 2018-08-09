@@ -9,13 +9,14 @@ module dust_ray_tracing
 
   use parametres
   use constantes
-  use em_th
   use opacity
   use ray_tracing
   use stars, only : E_stars
+  use scattering
+  use Temperature
   !$ use omp_lib
 
-  use scattering
+
 
   implicit none
 
@@ -758,11 +759,11 @@ subroutine calc_Jth(lambda)
         cst_E=2.0*hp*c_light**2
         !$omp parallel &
         !$omp default(none) &
-        !$omp shared(n_cells,Temperature,wl,lambda,kappa_abs_LTE,cst_E,J_th) &
+        !$omp shared(n_cells,Tdust,wl,lambda,kappa_abs_LTE,cst_E,J_th) &
         !$omp private(icell,Temp,cst_wl,coeff_exp)
         !$omp do
         do icell=1, n_cells
-           Temp=Temperature(icell) ! que LTE pour le moment
+           Temp=Tdust(icell) ! que LTE pour le moment
            if (Temp*wl > 3.e-4) then
               cst_wl=cst_th/(Temp*wl)
               coeff_exp=exp(cst_wl)
@@ -779,7 +780,7 @@ subroutine calc_Jth(lambda)
         cst_E=2.0*hp*c_light**2
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Temperature_1grain(l,icell)
+              Temp=Tdust_1grain(l,icell)
               if (Temp*wl > 3.e-4) then
                  cst_wl=cst_th/(Temp*wl)
                  coeff_exp=exp(cst_wl)
@@ -794,7 +795,7 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
-                 Temp=Temperature_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
+                 Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
                  if (Temp*wl > 3.e-4) then
                     cst_wl=cst_th/(Temp*wl)
                     coeff_exp=exp(cst_wl)
@@ -808,7 +809,7 @@ subroutine calc_Jth(lambda)
                        cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Temperature(T,l,icell)
+                            C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE

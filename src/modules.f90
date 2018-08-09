@@ -76,35 +76,6 @@ end module grains
 
 !********************************************************************
 
-module naleat
-!**********************************************************
-! Parametres des nombres aleatoires
-!**********************************************************
-! SPRNG renvoie un nbre aleatoire dans [0,1[
-! faire attention a conversion dp -> sp sur machine 64 bits
-! qui peut donner 1.0 -> BUG
-!**********************************************************
-
-  implicit none
-  save
-
-#include "sprng_f.h"
-
-  integer :: seed = 269753
-
-  integer :: gtype = 2
-  ! 0 -> Additive Lagged Fibonacci Generator
-  ! 1 -> 48 bit Linear Congruential Generator with Prime Addend
-  ! 2 -> 64 bit Linear Congruential Generator with Prime Addend
-  ! 3 -> Combined multiple recursive generator
-  ! 4 -> Multiplicative Lagged Fibonacci Generator
-
-  SPRNG_POINTER, dimension(:), allocatable :: stream
-
-end module naleat
-
-!********************************************************************
-
 module opacity
 
   use mcfost_env, only : dp
@@ -161,41 +132,6 @@ module opacity
 
 end module opacity
 
-
-!********************************************************************
-
-module em_th
-
-  use mcfost_env, only : dp
-
-  implicit none
-  save
-
-  real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
-
-
-  ! Nbre de temperatures utilisee pour pretabule kplanck et prob_delta_T
-  ! et temperature echantillonee
-  integer  :: n_T
-  real, dimension(:), allocatable :: tab_Temp
-  real(kind=dp) :: E_abs_nRE
-
-  real, dimension(:), allocatable :: Temperature, Temperature_old !n_rad,nz,n_az
-  real, dimension(:,:), allocatable :: Temperature_1grain, Temperature_1grain_nRE !n_rad,nz, n_grains
-  real, dimension(:,:), allocatable :: Temperature_1grain_old, Temperature_1grain_nRE_old, maxP_old !n_rad,nz, n_grains
-  integer, dimension(:,:), allocatable :: Tpeak_old
-  real, dimension(:,:,:), allocatable :: Proba_Temperature !n_T, n_cells,, n_grains
-  logical, dimension(:,:), allocatable :: l_RE, lchange_nRE ! n_grains, n_cells
-
-  real :: nbre_photons_tot, L_packet_th
-
-  ! Biais de l'emission vers la surface du disque
-  real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
-
-  real, dimension(:), allocatable :: E_disk !n_lambda
-
-
-end module em_th
 
 !********************************************************************
 

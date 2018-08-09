@@ -2,11 +2,9 @@ module dust_prop
 
   use parametres
   use grains
-  use em_th
   use constantes
   use opacity
   use ray_tracing
-
   use scattering
   use coated_sphere
   use input

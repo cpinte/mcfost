@@ -4,12 +4,12 @@ module input
   use mcfost_env
   use constantes
   use molecular_emission
-  use em_th
   use grains
   use read_DustEM
   use utils, only : in_dir
   use messages
   use wavelengths
+  use temperature
 
   implicit none
 
@@ -17,8 +17,6 @@ module input
   character(len=512) :: Tfile_nLTE = "./data_th/Temperature_nLTE.fits.gz"
   character(len=512) :: Tfile_Diff_approx = "./data_th/Temperature_DA.fits.gz"
   character(len=512) :: Tfile_nRE = "./data_th/Temperature_nRE.fits.gz"
-
-  real, dimension(:), allocatable :: s11_file
 
   contains
 
@@ -601,7 +599,7 @@ subroutine lect_Temperature()
 
      nbuffer=npixels
      ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,temperature,anynull,status)
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust,anynull,status)
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -649,7 +647,7 @@ subroutine lect_Temperature()
 
      nbuffer=npixels
      ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain,anynull,status)
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust_1grain,anynull,status)
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -697,7 +695,7 @@ subroutine lect_Temperature()
      endif
      nbuffer=npixels
      ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,Temperature_1grain_nRE,anynull,status)
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,Tdust_1grain_nRE,anynull,status)
 
      ! HDU 2 : is_eq
      call ftmahd(unit,2,hdutype,status)
@@ -750,7 +748,7 @@ subroutine lect_Temperature()
      endif
      nbuffer=npixels
      ! read_image
-     call ftgpve(unit,group,firstpix,nbuffer,nullval,Proba_Temperature,anynull,status)
+     call ftgpve(unit,group,firstpix,nbuffer,nullval,Proba_Tdust,anynull,status)
 
      call ftclos(unit, status)
      call ftfiou(unit, status)
@@ -951,24 +949,6 @@ subroutine lect_lambda()
   return
 
 end subroutine lect_lambda
-
-!***************************************************
-
-subroutine init_tab_Temp()
-
-  real(kind=dp) :: delta_T
-  integer :: t
-
-  tab_Temp=0.0
-  ! Echantillonage temperature
-  !delta_T=(T_max)**(1.0/(n_T-1))
-  delta_T=exp((1.0_dp/(real(n_T,kind=dp)))*log(T_max/T_min))
-  tab_Temp(1)=T_min*sqrt(delta_T)
-   do t=2,n_T
-     tab_Temp(t)=delta_T*tab_Temp(t-1)
-  enddo
-
-end subroutine init_tab_Temp
 
 !***************************************************
 

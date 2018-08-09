@@ -31,7 +31,7 @@ contains
 
 subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
-  use dust_ray_tracing, only : calc_xI_scatt, calc_xi_scatt_pola
+  use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola
 
   integer, intent(in) :: id,lambda,p_lambda,icell0
   real(kind=dp), dimension(4), intent(in) :: Stokes

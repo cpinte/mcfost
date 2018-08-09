@@ -3,9 +3,10 @@ module diffusion
   use parametres
   use constantes
   use opacity
-  use em_th
   use messages
   use wavelengths
+  use thermal_emission
+  use temperature
 
   implicit none
 
@@ -32,7 +33,7 @@ subroutine setDiffusion_coeff(i)
      do j=j_start, nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
-        !Temp=Temperature(i,j,k)
+        !Temp=Tdust(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
            ! On met a jour le coeff
        !    write(*,*) "update", i,j, DensE(i,j,k), DensE_m1(i,j,k)
@@ -88,7 +89,7 @@ subroutine setDiffusion_coeff0(i)
      do j=j_start,nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
-        Temp=Temperature(icell)
+        Temp=Tdust(icell)
         cst=cst_th/Temp
         somme=0.0_dp
         do lambda=1, n_lambda
@@ -135,7 +136,7 @@ subroutine Temperature_to_DensE(ri)
      if (j==0) cycle
      do k=1,n_az
         icell = cell_map(ri,j,k)
-        DensE(ri,j,k) =  Temperature(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
+        DensE(ri,j,k) =  Tdust(icell)**4 ! On se tappe de la constante non ??? 4.*sigma/c
      enddo
   enddo
 
@@ -161,7 +162,7 @@ subroutine DensE_to_temperature()
   do k=1,n_az
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1,zj_sup_dark_zone(i,1) + delta_cell_dark_zone
-           Temperature(cell_map(i,j,k)) = DensE(i,j,k)**0.25
+           Tdust(cell_map(i,j,k)) = DensE(i,j,k)**0.25
         enddo !j
      enddo !j
   enddo !k
@@ -181,7 +182,7 @@ subroutine clean_temperature()
   do k=1,n_az
      do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
         do j=1,zj_sup_dark_zone(i,1)
-           Temperature(cell_map(i,j,k)) = T_min
+           Tdust(cell_map(i,j,k)) = T_min
         enddo !j
      enddo !j
   enddo !k
@@ -215,8 +216,8 @@ subroutine Temp_approx_diffusion()
   stabilite=10.
 
 
-  Temperature_old = T_min
-  Temp0 = Temperature
+  Tdust_old = T_min
+  Temp0 = Tdust
 
   do while (.not.lconverged)
 
@@ -248,13 +249,13 @@ subroutine Temp_approx_diffusion()
         if (.not.lconverged) then
            stabilite = 0.5 * stabilite
            precision = 0.1 * precision
-           Temperature = Temp0
-           Temperature_old = T_min
+           Tdust = Temp0
+           Tdust_old = T_min
            exit infinie
         endif
 
         ! C'est debile : temp pas definie
-!        Temperature_old = Temperature
+!        Tdust_old = Tdust
 
 !        write(*,*) n_iter, max_delta_E_r, precision  !, maxval(DensE)
 
@@ -299,8 +300,8 @@ subroutine Temp_approx_diffusion_vertical()
   call clean_temperature()
 
   ! Pour initier la premiere boucle
-  !-- Temperature_old = T_min
-  !-- Temp0 = Temperature
+  !-- Tdust_old = T_min
+  !-- Temp0 = Tdust
 
   k=1 ! variable azimuth
   !$omp parallel &
@@ -335,8 +336,8 @@ subroutine Temp_approx_diffusion_vertical()
           !-- if (.not.lconverged) then
           !--    stabilite = 0.5 * stabilite
           !--    precision = 0.1 * precision
-          !--    Temperature(i,:,:) = Temp0(i,:,:)
-          !--    Temperature_old = T_min
+          !--    Tdust(i,:,:) = Temp0(i,:,:)
+          !--    Tdust_old = T_min
           !--    exit infinie
           !-- endif
 
@@ -595,7 +596,7 @@ subroutine diffusion_approx_nLTE_nRE()
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
               icell = cell_map(i,j,k)
-              Temperature_1grain(:,icell) = Temperature(icell)
+              Tdust_1grain(:,icell) = Tdust(icell)
            enddo !j
         enddo !j
      enddo !k
@@ -606,7 +607,7 @@ subroutine diffusion_approx_nLTE_nRE()
         do i=ri_in_dark_zone(k), ri_out_dark_zone(k)
            do j=1,zj_sup_dark_zone(i,1)
               icell = cell_map(i,j,k)
-              Temperature_1grain_nRE(:,icell) = Temperature(icell)
+              Tdust_1grain_nRE(:,icell) = Tdust(icell)
               l_RE(:,icell) = .true.
            enddo !j
         enddo !j

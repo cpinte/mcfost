@@ -18,6 +18,7 @@ module parametres
   integer :: nbre_photons_loop, nbre_photons_eq_th, nbre_photons_lambda, nbre_photons_image, nbre_photons_spectre
   real :: nbre_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
   integer :: nnfot1
+  real :: nbre_photons_tot
   real(kind=dp) :: E_paquet
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
@@ -205,5 +206,11 @@ module parametres
   ! ray-tracing 2 : sauve l'intensite specifique
 
   integer :: n_pop
+
+
+  real :: T_max, T_min, Tmax_PAH ! Temp_sublimation et Temp nuage
+  integer  :: n_T
+
+  real, dimension(:), allocatable :: s11_file
 
 end module parametres

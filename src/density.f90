@@ -4,7 +4,7 @@ module density
   use constantes
   use molecular_emission
   use opacity
-  use em_th
+  use temperature
   use grains
   use grid
   use utils
@@ -1871,7 +1871,7 @@ subroutine remove_specie()
   do icell=1,n_cells
      do k=1,n_grains_tot
         if (grain(k)%pop==specie_removed) then
-           if (Temperature(icell) > T_rm) densite_pouss(k,icell) = 0.0
+           if (Tdust(icell) > T_rm) densite_pouss(k,icell) = 0.0
         endif
      enddo
   enddo

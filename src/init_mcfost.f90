@@ -9,7 +9,7 @@ module init_mcfost
   !$ use omp_lib
   use benchmarks
   use read_params
-  use input, only : Tfile
+  use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
 

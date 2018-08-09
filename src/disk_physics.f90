@@ -3,12 +3,12 @@ module disk_physics
   use grains
   use mcfost_env
   use opacity
-  use em_th
   use molecular_emission, only : densite_gaz
   use constantes
   use stars, only : spectre_etoiles
   use messages
   use wavelengths
+  use temperature
 
   implicit none
 
@@ -141,7 +141,7 @@ subroutine sublimate_dust()
               ipop = grain(k)%pop
 
               if (.not.dust_pop(ipop)%is_PAH) then
-                 if (Temperature(icell) > dust_pop(ipop)%T_sub) then
+                 if (Tdust(icell) > dust_pop(ipop)%T_sub) then
                     densite_pouss(k,icell) = 0.0
                  endif
               endif
@@ -204,9 +204,9 @@ subroutine equilibre_hydrostatique()
         do j = 2, nz
            icell = cell_map(i,j,k)
            icell_m1 = cell_map(i,j-1,k)
-           dTdz = (Temperature(icell)-Temperature(icell_m1)) * dz_m1
+           dTdz = (Tdust(icell)-Tdust(icell_m1)) * dz_m1
            fac1 = cst * z_grid(icell)/ (r_grid(icell)**3)
-           fac2 = -1.0 * (dTdz + fac1) / Temperature(icell)
+           fac2 = -1.0 * (dTdz + fac1) / Tdust(icell)
            ln_rho(j) = ln_rho(j-1) + fac2 * dz
            rho(j) = exp(ln_rho(j))
            somme = somme + rho(j)

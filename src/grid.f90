@@ -4,7 +4,6 @@ module grid
   use constantes
   use opacity
   use grains
-  use em_th
   use utils
 
   use cylindrical_grid

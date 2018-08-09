@@ -1,12 +1,12 @@
 module molecules
 
   use parametres
-  use em_th
+  use temperature
   use molecular_emission
   use opacity
   use grid
   use dust_prop
-  !use ProDiMo, only : m2p ! to get the continuum radiation field
+  use input
 
   implicit none
 
@@ -67,7 +67,7 @@ subroutine init_GG_Tau_mol()
   ldust_mol = .true.
 
   do icell=1,n_cells
-     Temperature(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
+     Tdust(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
      Tcin(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
   enddo
 
@@ -89,7 +89,7 @@ subroutine init_HH_30_mol()
   ldust_mol = .true.
 
   do icell=1,n_cells
-     Temperature(icell) = 12.0 * (r_grid(icell)/100.)**(-0.55)
+     Tdust(icell) = 12.0 * (r_grid(icell)/100.)**(-0.55)
      vfield(icell) = 2.0 * (r_grid(icell)/100.)**(-0.55)
   enddo
 
@@ -108,7 +108,7 @@ subroutine init_benchmark_vanZadelhoff1()
   ldust_mol = .false.
 
   v_turb = 150._dp !m.s-1
-  Temperature = 20.
+  Tdust = 20.
   Tcin = 20._dp
   vfield(:) = 0.0
 
@@ -188,7 +188,7 @@ subroutine init_benchmark_vanzadelhoff2()
         k=1
         icell = cell_map(ri,zj,k)
         densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
-        Temperature(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
+        Tdust(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         vfield(icell) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
         v_turb(icell) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
@@ -328,7 +328,7 @@ subroutine init_benchmark_water3()
            k=1
            icell = cell_map(ri,zj,k)
            densite_gaz(icell) = tmp_nH2(1)
-           Temperature(icell) = tmp_T(1)
+           Tdust(icell) = tmp_T(1)
            Tcin(icell) =  tmp_Tkin(1)
         enddo
 
@@ -348,7 +348,7 @@ subroutine init_benchmark_water3()
            k=1
            icell = cell_map(ri,zj,k)
            densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
-           Temperature(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
+           Tdust(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
            Tcin(icell) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
 
            if (rayon < 5.95) then
@@ -399,9 +399,9 @@ subroutine init_molecular_disk(imol)
   ! Temperature gaz = poussiere
   if (lcorrect_Tgas) then
      write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:) = Temperature(:)  * correct_Tgas
+     Tcin(:) = Tdust(:)  * correct_Tgas
   else
-     Tcin(:) = Temperature(:)
+     Tcin(:) = Tdust(:)
   endif
 
   ! En m.s-1
@@ -450,9 +450,9 @@ subroutine init_molecular_Voronoi(imol)
   ! Temperature gaz = poussiere
   if (lcorrect_Tgas) then
      write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:) = Temperature(:)  * correct_Tgas
+     Tcin(:) = Tdust(:)  * correct_Tgas
   else
-     Tcin(:) = Temperature(:)
+     Tcin(:) = Tdust(:)
   endif
 
   ! Vitesse de turbulence
@@ -823,7 +823,7 @@ subroutine init_dust_mol(imol)
            !--    Jnu = 0.0 ! todo : pour prendre en compte scattering
            !-- endif
 
-           T = Temperature(icell)
+           T = Tdust(icell)
            ! On ne fait que du scattering isotropique dans les raies pour le moment ...
            emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
         enddo ! icell
@@ -868,7 +868,7 @@ subroutine equilibre_LTE_mol()
              exp(- hp * Transfreq(l-1)/ (kb*Tcin(icell)))
      enddo
      ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
-     ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Temperature(i,j,1)))
+     ! write(*,*) "Verif", i, j, tab_nLevel(i,j,l) * Bul(l-1) / (tab_nLevel(i,j,l-1) * Blu(l-1)) ,  exp(- hp * Transfreq(l-1)/ (kb*Tdust(i,j,1)))
      ! read(*,*)
 
      ! Normalisation
@@ -897,7 +897,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
 
   integer, intent(in) :: id, icell
 
-  real :: Temp, Tdust
+  real :: Temp
   real(kind=dp), dimension(nLevels,nLevels) :: A, C
   real(kind=dp), dimension(nLevels) :: B
   real(kind=dp), dimension(nLevels) :: cTot
@@ -915,9 +915,6 @@ subroutine equilibre_rad_mol_loc(id,icell)
   ! Matrice d'excitations/desexcitations collisionnelles
   Temp = Tcin(icell)
   nH2 = densite_gaz(icell) * cm_to_m**3
-
-  ! Pour test
-  Tdust = Temperature(icell)
 
   C = 0._dp
   do iPart = 1, nCollPart
@@ -1272,7 +1269,7 @@ subroutine freeze_out()
 
   do icell=1,n_cells
      ldeplete = .false.
-     if (Temperature(icell) < T_freeze_out)  then
+     if (Tdust(icell) < T_freeze_out)  then
         if (lphoto_desorption) then
            CD = compute_vertical_CD(icell)
            if (CD < threshold_CD) then
