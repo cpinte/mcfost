@@ -5,7 +5,6 @@ module init_mcfost
   use grains, only : aggregate_file, mueller_aggregate_file
   use density, only : specie_removed, T_rm
   use molecular_emission
-  use ray_tracing
   !$ use omp_lib
   use benchmarks
   use read_params

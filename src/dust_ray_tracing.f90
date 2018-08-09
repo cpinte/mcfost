@@ -1,24 +1,61 @@
-! TODO : benchmark 2009
-! large g
-! optimization memoire (ie, dimension 1 de eps_dust1)
-
-! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode prefere pour SED et pour 3D
-! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode preferee pour image 2D
-
 module dust_ray_tracing
+  ! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode prefere pour SED et pour 3D
+  ! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode preferee pour image 2D
 
   use parametres
   use constantes
   use opacity
-  use ray_tracing
   use stars, only : E_stars
   use scattering
   use Temperature
   !$ use omp_lib
 
-
-
   implicit none
+  save
+
+  real, dimension(:), allocatable :: tab_RT_incl, tab_RT_az
+  real(kind=dp), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
+  real(kind=dp), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt
+
+  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes
+
+  ! Sauvegarde champ de radiation pour rt2
+  integer ::  n_phi_I,  n_theta_I ! 15 et 9 ok avec 30 et 30 en mode SED
+  ! Pour rt 2 : nbre d'angle de visee en azimuth. TODO : calculer automatiquement en fct de la fct de phase + interpolation
+  integer :: nang_ray_tracing, nang_ray_tracing_star
+
+  ! rt1 : dimension of specific intensity array
+  integer :: n_az_rt, n_theta_rt
+
+  ! intensite specifique
+  real, dimension(:), allocatable :: J_th ! n_cells
+  real, dimension(:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
+  real(kind=dp), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
+
+  ! methode RT 1 : saving scattered specific intensity (SED + image 3D)
+  ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
+
+  integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=dp), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
+  real(kind=dp), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
+
+  ! methode RT 2 : saving specific intensity (image 2D)
+  real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus
+  real, dimension(:,:), allocatable :: I_spec_star ! n_cells, ncpus
+
+  ! Fonction source: Ok en simple
+  real, dimension(:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_cells
+  real, dimension(:,:,:,:), allocatable ::  eps_dust2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
+  real, dimension(:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
+
+  real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
+  real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
+
+  real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
+
+  real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
+  real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
+
 
   contains
 

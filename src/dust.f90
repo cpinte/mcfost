@@ -4,7 +4,6 @@ module dust_prop
   use grains
   use constantes
   use opacity
-  use ray_tracing
   use scattering
   use coated_sphere
   use input
@@ -886,7 +885,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   if (lscatt_ray_tracing) then
      do thetaj=0,nang_scatt
         angle = real(thetaj)/real(nang_scatt)*pi
-        tab_cos_scatt(thetaj) = cos(angle)
+        !tab_cos_scatt(thetaj) = cos(angle)
      enddo
   endif
 

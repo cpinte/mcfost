@@ -8,7 +8,7 @@ module output
   use constantes
   use opacity
   use molecular_emission
-  use ray_tracing
+  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface, stars_map
   use utils
   use Voronoi_grid
   use grid

@@ -52,8 +52,6 @@ module grains
 
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
-  ! Tab de lambda
-
   ! Parametres de diffusion des grains
   real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
   real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs, C_abs_norm !n_grains, n_lambda
@@ -83,11 +81,10 @@ module opacity
   implicit none
   save
 
+  ! grid.f90
   integer, dimension(:), allocatable :: lexit_cell
   real(kind=dp), dimension(:), allocatable :: zmax !n_rad
   real(kind=dp), dimension(:), allocatable :: volume !n_rad en AU^3
-  real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
-  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
   real(kind=dp), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
   real(kind=dp), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
   real(kind=dp), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
@@ -101,16 +98,20 @@ module opacity
   integer, dimension(:,:,:), allocatable :: cell_map
   integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
 
+
+  ! density.f90
+  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  integer :: icell_not_empty
+  real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
+
+
+  ! dust ?
   real, dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
   real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, proba_abs_RE_LTE_p_nLTE
   real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
-  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
-
-  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
-  integer :: icell_not_empty
-
   real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
   !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
   !* certaine taille de grain. Ce tableau est utilise pour le tirage
@@ -118,15 +119,18 @@ module opacity
   !* en compte le nombre de grains en meme temps que leur probabilite
   !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
+  ! thermal emission.f90
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
   logical :: l_is_dark_zone
   logical, dimension(:), allocatable :: l_dark_zone !n_cells
   integer, parameter :: delta_cell_dark_zone=3
-
   integer, dimension(:), allocatable :: ri_in_dark_zone, ri_out_dark_zone !n_az
   integer, dimension(:,:), allocatable :: zj_sup_dark_zone, zj_inf_dark_zone !n_rad, n_az
 
+  ! PAH.f90 ?
   logical, dimension(:,:), allocatable :: l_emission_pah !0:n_rad+1,0:nz+1
 
+  ! diffusion.f90
   real(kind=dp), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
   real, dimension(:,:,:), allocatable :: DensE, DensE_m1 !n_rad, 0:n_z, n_az
 
@@ -229,70 +233,5 @@ module molecular_emission
 
 
 end module molecular_emission
-
-!***********************************************************
-
-module ray_tracing
-
-  use mcfost_env, only : dp
-  use parametres, only : nang_scatt
-
-  implicit none
-  save
-
-
-  real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes
-
-
-  ! inclinaisons
-  real :: RT_imin, RT_imax, RT_az_min, RT_az_max
-  integer ::  RT_n_incl, RT_n_az
-  logical :: lRT_i_centered
-
-  real, dimension(:), allocatable :: tab_RT_incl, tab_RT_az
-  real(kind=dp), dimension(:), allocatable :: tab_uv_rt, tab_w_rt
-  real(kind=dp), dimension(:,:), allocatable :: tab_u_rt, tab_v_rt
-
-  ! Sauvegarde champ de radiation pour rt2
-  integer ::  n_phi_I,  n_theta_I ! 15 et 9 ok avec 30 et 30 en mode SED
-
-  ! Pour rt 2 : nbre d'angle de visee en azimuth
-  ! TODO : calculer automatiquement en fct de la fct de phase + interpolation
-  integer :: nang_ray_tracing, nang_ray_tracing_star
-
-  real, dimension(:,:,:), allocatable :: tab_s11_ray_tracing, tab_s12_ray_tracing, tab_s33_ray_tracing, tab_s34_ray_tracing ! 0:nang_scatt, n_cells, n_lambda
-  real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing, omega_ray_tracing ! nang_ray_tracing, 2 (+z et -z), nb_proc
-  real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
-
-  real, dimension(0:nang_scatt) :: tab_cos_scatt
-
-  ! intensite specifique
-  real, dimension(:), allocatable :: J_th ! n_cells
-
-  ! methode RT 1 : saving scattered specific intensity (SED + image 3D)
-  ! todo faire sauter le 2 pour gagner une dimension et rester sous la limite de 7
-  integer :: n_az_rt, n_theta_rt
-  real, dimension(:,:,:,:,:,:), allocatable ::  xI_scatt ! 4, RT_n_incl * RT_n_az, n_cells, n_az_rt, n_theta_rt, ncpus
-  real(kind=dp), dimension(:,:,:), allocatable ::  I_scatt ! 4, n_az_rt, 2
-  integer, dimension(:,:,:), allocatable :: itheta_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=dp), dimension(:,:,:), allocatable ::  sin_omega_rt1, cos_omega_rt1, sin_scatt_rt1 ! RT_n_incl,RT_n_az,nb_proc
-  real(kind=dp), dimension(:,:,:,:), allocatable ::  eps_dust1 !N_type_flux, n_cells, n_az_rt,n_theta_rt
-
-  ! methode RT 2 : saving specific intensity (image 2D)
-  real, dimension(:,:,:,:,:), allocatable :: I_spec ! 4, n_theta_I, n_phi_I, n_cells, ncpus
-  real, dimension(:,:), allocatable :: I_spec_star ! n_cells, ncpus
-
-  ! Fonction source: Ok en simple
-  real, dimension(:,:,:,:), allocatable ::  I_sca2 ! n_type_flux, nang_ray_tracing, 2, n_cells
-  real, dimension(:,:,:,:), allocatable ::  eps_dust2 ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
-  real, dimension(:,:,:,:), allocatable ::  eps_dust2_star ! n_type_flux, nang_ray_tracing, 2, n_rad, nz
-
-  real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
-  real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
-  real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
-
-  real, dimension(:,:,:,:,:), allocatable :: weight_Inu_fct_phase ! n_rayon_rt, dir, n_theta_I, n_phi_I, nang_scatt
-
-end module ray_tracing
 
 !********************************************************************

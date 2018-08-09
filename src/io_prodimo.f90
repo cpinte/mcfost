@@ -5,7 +5,6 @@ module ProDiMo
   use constantes
   use molecular_emission
   use utils, only: get_NH, Blambda, Bnu
-  use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use radiation_field, only : xN_abs, xJ_abs
   use stars, only : spectre_etoiles, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
@@ -15,6 +14,7 @@ module ProDiMo
   use thermal_emission
   use mcfost_env
   use temperature
+  use dust_ray_tracing, only : n_phot_envoyes
 
   implicit none
 

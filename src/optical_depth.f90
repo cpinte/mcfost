@@ -4,14 +4,11 @@ module optical_depth
   use opacity
   use constantes
   use molecular_emission
-  use ray_tracing
   use utils
   use molecules
-
   use dust_ray_tracing
   use grid
   use cylindrical_grid, only : prec_grille
-
   use radiation_field, only : save_radiation_field
 
   implicit none

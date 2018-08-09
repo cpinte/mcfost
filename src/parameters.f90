@@ -213,4 +213,12 @@ module parametres
 
   real, dimension(:), allocatable :: s11_file
 
+  ! inclinaisons
+  real :: RT_imin, RT_imax, RT_az_min, RT_az_max
+  integer ::  RT_n_incl, RT_n_az
+  logical :: lRT_i_centered
+
+
+
+
 end module parametres

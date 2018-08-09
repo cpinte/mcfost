@@ -7,7 +7,6 @@ module dust_transfer
   use temperature
   use thermal_emission
   use constantes
-  use ray_tracing
   use scattering
   use grid
   use optical_depth

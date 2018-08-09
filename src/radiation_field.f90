@@ -3,7 +3,6 @@ module radiation_field
   use parametres
   use mcfost_env
   use constantes
-  use ray_tracing, only : n_theta_I, n_phi_I, n_az_rt, I_spec, I_spec_star
   use opacity, only : kappa_abs_LTE
   use messages
   use wavelengths
@@ -31,7 +30,7 @@ contains
 
 subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
-  use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola
+  use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola, n_az_rt, n_phi_I, n_theta_I, I_spec_star, I_spec
 
   integer, intent(in) :: id,lambda,p_lambda,icell0
   real(kind=dp), dimension(4), intent(in) :: Stokes

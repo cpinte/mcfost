@@ -3,7 +3,6 @@ module read_params
   use parametres
   use grains
   use molecular_emission
-  use ray_tracing
   use wavelengths
   use constantes
   use sha

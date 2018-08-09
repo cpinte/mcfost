@@ -5,7 +5,6 @@ module mem
   use opacity
   use naleat
   use molecular_emission
-  use ray_tracing
   use utils
   use messages
   use wavelengths
