@@ -3,7 +3,7 @@ module disk_physics
   use grains
   use mcfost_env
   use opacity
-  use molecular_emission, only : densite_gaz
+  use density, only : densite_gaz
   use constantes
   use stars, only : spectre_etoiles
   use messages

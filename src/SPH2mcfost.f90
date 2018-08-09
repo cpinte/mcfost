@@ -109,7 +109,7 @@ contains
 
     use Voronoi_grid
     use opacity, only : densite_pouss, masse
-    use molecular_emission, only : densite_gaz, masse_gaz
+    use density, only : densite_gaz, masse_gaz
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem

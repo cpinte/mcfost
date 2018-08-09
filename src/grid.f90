@@ -19,6 +19,9 @@ module grid
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
 
+
+  real, dimension(:), allocatable :: vfield, vfield_x, vfield_y, vfield_z ! n_cells
+
   contains
 
  subroutine order_zones()

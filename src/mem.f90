@@ -9,6 +9,7 @@ module mem
   use messages
   use wavelengths
   use output
+  use density
 
   implicit none
 

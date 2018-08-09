@@ -5,7 +5,6 @@ module optical_depth
   use constantes
   use molecular_emission
   use utils
-  use molecules
   use dust_ray_tracing
   use grid
   use cylindrical_grid, only : prec_grille

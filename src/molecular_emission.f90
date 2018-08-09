@@ -1,14 +1,88 @@
-module molecules
+module molecular_emission
 
   use parametres
   use temperature
-  use molecular_emission
-  use opacity
+  use constantes
   use grid
-  use dust_prop
-  use input
+  use density
 
   implicit none
+  save
+
+  logical :: ldouble_RT
+
+  real, dimension(:), allocatable :: Level_energy
+  integer, dimension(:), allocatable ::  j_qnb
+  ! g est dp car les calculs utilisant g sont en dp
+  real(kind=dp), dimension(:), allocatable :: poids_stat_g
+  integer :: nTrans_tot
+
+  real(kind=dp), dimension(:), allocatable :: Aul, Blu, Bul, fAul, fBlu, fBul, transfreq
+  integer, dimension(:), allocatable :: itransUpper, itransLower
+  integer :: nCollPart
+  character(len=512), dimension(:), allocatable :: collBetween
+  integer, dimension(:), allocatable :: nCollTrans, nCollTemps
+  real, dimension(:,:), allocatable :: collTemps
+
+  integer, dimension(:,:), pointer :: iCollUpper, iCollLower
+  real, dimension(:,:,:), pointer :: collRates
+
+  real, dimension(:), allocatable :: Tcin ! Temperature cinetique
+  real :: correct_Tgas
+  logical :: lcorrect_Tgas
+
+  real :: nH2, masse_mol
+  ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
+  real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
+  real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_cells, nLevels
+
+  real, dimension(:), allocatable :: v_turb, v_line ! n_cells
+
+  real ::  vitesse_turb, dv, dnu
+  integer, parameter :: n_largeur_Doppler = 15
+  real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
+
+  real(kind=dp), dimension(:,:), allocatable :: ds
+  real(kind=dp), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus
+  real(kind=dp), dimension(:,:,:), allocatable :: I0c ! Intensite dans le continu: nTrans,iray,ncpus
+  real(kind=dp), dimension(:,:,:), allocatable :: Doppler_P_x_freq
+
+  real(kind=dp), dimension(:,:), allocatable :: Jmol, Jmol2 ! nTrans, n_cpu
+  real(kind=dp), dimension(:), allocatable :: tab_Cmb_mol ! nTrans
+
+  logical :: linfall, lkeplerian, lcylindrical_rotation
+  real :: chi_infall
+
+  real(kind=dp), dimension(:), allocatable :: deltaVmax ! n_cells
+  real(kind=dp), dimension(:), allocatable :: tab_dnu_o_freq ! n_cells
+  real(kind=dp), dimension(:), allocatable :: norme_phiProf_m1, sigma2_phiProf_m1 ! n_cells
+
+  real, dimension(:), allocatable :: tab_abundance ! n_cells
+  logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
+
+  logical ::  lfreeze_out, lphoto_dissociation, lphoto_desorption
+  real :: T_freeze_out, freeze_out_depletion
+
+  real(kind=dp), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
+
+  integer :: RT_line_method, n_molecules
+
+  type molecule
+     integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
+     real :: vmax_center_rt, extra_deltaV_rt, abundance
+     logical :: lcst_abundance, lline
+     character(len=512) :: abundance_file, filename
+     character(len=32) :: name
+     integer, dimension(100) :: indice_Trans_rayTracing
+  end type molecule
+
+  type(molecule), dimension(:), allocatable :: mol
+
+  real(kind=dp), dimension(:), allocatable :: tab_speed_rt
+
+  real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
+
 
   contains
 
@@ -55,426 +129,6 @@ real function tau_collision(temperature, iPart, iTrans)
   return
 
 end function tau_collision
-
-!***********************************************************
-
-subroutine init_GG_Tau_mol()
-
-  implicit none
-
-  integer :: icell
-
-  ldust_mol = .true.
-
-  do icell=1,n_cells
-     Tdust(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
-     Tcin(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
-  enddo
-
-  icell = icell_ref
-  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
-
-  return
-
-end subroutine init_GG_Tau_mol
-
-!***********************************************************
-
-subroutine init_HH_30_mol()
-
-  implicit none
-
-  integer :: icell
-
-  ldust_mol = .true.
-
-  do icell=1,n_cells
-     Tdust(icell) = 12.0 * (r_grid(icell)/100.)**(-0.55)
-     vfield(icell) = 2.0 * (r_grid(icell)/100.)**(-0.55)
-  enddo
-
-  v_turb = 230.
-
-  return
-
-end subroutine init_HH_30_mol
-
-!***********************************************************
-
-subroutine init_benchmark_vanZadelhoff1()
-
-  implicit none
-
-  ldust_mol = .false.
-
-  v_turb = 150._dp !m.s-1
-  Tdust = 20.
-  Tcin = 20._dp
-  vfield(:) = 0.0
-
-  masse_mol = 1.0
-
-  linfall = .true.
-  lkeplerian = .false.
-
-  tab_abundance = abundance
-
-  write(*,*) "Density", real(densite_gaz(icell_ref) * &
-       (r_grid(icell_ref)**2 + z_grid(icell_ref)**2)/rmin**2)
-
-  return
-
-end subroutine init_benchmark_vanZadelhoff1
-
-!***********************************************************
-
-subroutine init_benchmark_vanzadelhoff2()
-  ! Lecture de la structure du modele de van Zadelhoff 2a/b
-  ! et ajustement sur la grille de mcfost
-  ! C. Pinte
-  ! 13/07/07
-
-  implicit none
-
-  integer, parameter :: n_lines = 50
-
-  integer :: i, j, ri, l, icell, zj, k
-  real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_T, tmp_v, tmp_vturb, log_tmp_r, log_tmp_nH2
-
-  real :: junk, rayon, log_rayon, frac
-
-  ldust_mol = .false.
-
-  ! Lecture du fichier modele
-  open(unit=1,file="model_1.d",status="old")
-  do i=1,7
-     read(1,*)
-  enddo
-  do i=1,n_lines
-     j = n_lines - i + 1
-     read(1,*) tmp_r(j), tmp_nH2(j), junk, tmp_T(j), tmp_v(j), tmp_vturb(j)
-  enddo
-  close(unit=1)
-
-  ! Conversion en AU
-  tmp_r(:) = tmp_r(:) * cm_to_AU
-
-  ! Interpolation sur la grille de mcfost
-  ! Distance en log
-  ! densite en log
-  ! T, V et vturb en lineaire cf Fig 2 van Zadelhoff 2002
-  log_tmp_r(:) = log(tmp_r(:))
-  log_tmp_nH2(:) = log(tmp_nH2(:))
-
-  do ri=1, n_rad
-     ! Recherche rayon dans def bench
-     icell = cell_map(ri,1,1)
-     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
-     log_rayon = log(rayon)
-
-     l=2
-     ! rayon est entre tmp_r(l-1) et tmp_r(l)
-     search : do i=l, n_lines
-        if (tmp_r(i) >= rayon) then
-           l = i
-           exit search
-        endif
-     enddo search
-     if (l > n_lines) l = n_lines
-
-     frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
-
-     do zj=1, nz
-        k=1
-        icell = cell_map(ri,zj,k)
-        densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
-        Tdust(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
-        Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
-        vfield(icell) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
-        v_turb(icell) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
-     enddo
-  enddo
-
-  ! Conversion vitesses en m.s-1
-  vfield = vfield * 1.0e3
-  v_turb = v_turb * 1.0e3
-
-  ! Conversion part.m-3
-  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
-
-  linfall = .true.
-  lkeplerian = .false.
-
-  tab_abundance = abundance
-
-  return
-
-end subroutine init_benchmark_vanzadelhoff2
-
-!***********************************************************
-
-subroutine init_benchmark_water1()
-  ! Initialisation de la structure du modele d'eau 1
-  ! C. Pinte
-  ! 15/10/07
-
-  implicit none
-
-  ldust_mol = .false.
-
-  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
-  Tcin = 40.
-  vfield = 0.0
-  v_turb = 0.0
-
-  linfall = .true.
-  lkeplerian = .false.
-
-  tab_abundance = abundance
-
-
-  ! Pas de Cmb
-  tab_Cmb_mol = 0.0
-
-  return
-
-end subroutine init_benchmark_water1
-
-!***********************************************************
-
-subroutine init_benchmark_water2()
-  ! Initialisation de la structure du modele d'eau 2
-  ! C. Pinte
-  ! 15/10/07
-
-  implicit none
-
-  integer :: icell
-
-  ldust_mol = .false.
-
-  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
-  Tcin = 40.
-  v_turb = 0.0
-
-  do icell=1, n_cells
-     vfield(icell) = 1e5 * sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_pc
-  enddo
-
-  linfall = .true.
-  lkeplerian = .false.
-
-  tab_abundance = abundance
-
-  ! Pas de Cmb
-  tab_Cmb_mol = 0.0
-
-  return
-
-end subroutine init_benchmark_water2
-
-!***********************************************************
-
-subroutine init_benchmark_water3()
-  ! Initialisation de la structure du modele d'eau 2
-  ! C. Pinte
-  ! 15/10/07
-
-  implicit none
-
-  integer, parameter :: n_lines = 100
-
-  integer :: i, j, ri, l, zj, k, icell
-  real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
-  real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
-
-  real :: rayon, log_rayon, frac
-
-  ldust_mol = .true.
-
-  ! Lecture du fichier modele
-  open(unit=1,file="mc_100.d",status="old")
-  read(1,*)
-  !  radius [cm]  n(H2) [cm^-3] Tkin [K]    Tdust [K]   Vrad [km/s] FWHM [km/s]
-  do i=1,n_lines
-     j = n_lines - i + 1
-     read(1,*) tmp_r(j), tmp_nH2(j), tmp_Tkin(j), tmp_T(j), tmp_v(j), tmp_vturb(j)
-  enddo
-  close(unit=1)
-
-  ! Conversion en AU
-  tmp_r(:) = tmp_r(:) * cm_to_AU
-
-  ! Interpolation sur la grille de mcfost
-  ! Distance en log
-  ! densite en log
-  ! Tkin, T, V et vturb
-  log_tmp_r(:) = log(tmp_r(:))
-  log_tmp_nH2(:) = log(tmp_nH2(:))
-  log_tmp_T(:) = log(tmp_T(:))
-  log_tmp_Tkin(:) = log(tmp_Tkin(:))
-  log_tmp_v(:) = log(tmp_v(:) + 1.0e-30)
-
-
-  do ri=1, n_rad
-     ! Recherche rayon dans def bench
-     icell = cell_map(ri,1,1)
-     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
-     log_rayon = log(rayon)
-
-
-     if (rayon < 2.0) then
-        do zj=1, nz
-           k=1
-           icell = cell_map(ri,zj,k)
-           densite_gaz(icell) = tmp_nH2(1)
-           Tdust(icell) = tmp_T(1)
-           Tcin(icell) =  tmp_Tkin(1)
-        enddo
-
-     else
-        l=2
-        ! rayon est entre tmp_r(l-1) et tmp_r(l)
-        search : do i=l, n_lines
-           if (tmp_r(i) >= rayon) then
-              l = i
-              exit search
-           endif
-        enddo search
-        if (l > n_lines) l = n_lines
-
-        frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
-        do zj=1, nz
-           k=1
-           icell = cell_map(ri,zj,k)
-           densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
-           Tdust(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
-           Tcin(icell) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
-
-           if (rayon < 5.95) then
-              vfield(icell) = 0.0
-              v_turb(icell) = 3.
-           else
-              vfield(icell) =  exp( log_tmp_v(l-1) + frac * (log_tmp_v(l) - log_tmp_v(l-1)) )
-              v_turb(icell) = 1.
-           endif
-        enddo
-     endif
-
-  enddo
-
-  ! Conversion FWHM ---> vitesse
-  v_turb = v_turb / (2.*sqrt(log(2.)))
-
-  ! Conversion vitesses en m.s-1
-  vfield = vfield * 1.0e3
-  v_turb = v_turb * 1.0e3
-
-  ! Conversion part.m-3
-  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
-
-  linfall = .true.
-  lkeplerian = .false.
-
-  tab_abundance = abundance
-
-  return
-
-end subroutine init_benchmark_water3
-
-!***********************************************************
-
-subroutine init_molecular_disk(imol)
-  ! definie les tableaux vfield, v_turb et tab_abundance
-  ! et lcompute_molRT
-
-  implicit none
-
-  integer, intent(in) :: imol
-  integer :: icell
-
-  ldust_mol  = .true.
-  lkeplerian = .true.
-
-  ! Temperature gaz = poussiere
-  if (lcorrect_Tgas) then
-     write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:) = Tdust(:)  * correct_Tgas
-  else
-     Tcin(:) = Tdust(:)
-  endif
-
-  ! En m.s-1
-  ! Warning : assume all stars are at the center of the disk
-  if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-     do icell=1, n_cells
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-     enddo
-  else ! dependance en z
-     do icell=1, n_cells
-        vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-             ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-     enddo
-  endif
-
-  v_turb = vitesse_turb
-
-  ! Abondance
-  if (mol(imol)%lcst_abundance) then
-     write(*,*) "Setting constant abundance"
-     tab_abundance = mol(imol)%abundance
-  else
-     call read_abundance(imol)
-  endif
-
-  do icell=1, n_cells
-     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
-          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
-  enddo
-
-  return
-
-end subroutine init_molecular_disk
-
-!***********************************************************
-
-subroutine init_molecular_Voronoi(imol)
-  ! Velocities are defined from SPH files
-
-  integer, intent(in) :: imol
-  integer :: icell
-
-  ldust_mol  = .true.
-  lkeplerian = .true.
-
-  ! Temperature gaz = poussiere
-  if (lcorrect_Tgas) then
-     write(*,*) "Correcting Tgas by", correct_Tgas
-     Tcin(:) = Tdust(:)  * correct_Tgas
-  else
-     Tcin(:) = Tdust(:)
-  endif
-
-  ! Vitesse de turbulence
-  v_turb = vitesse_turb
-
-  ! Abondance
-  if (mol(imol)%lcst_abundance) then
-     write(*,*) "Setting constant abundance"
-     tab_abundance = mol(imol)%abundance
-  else
-     call read_abundance(imol)
-  endif
-
-  do icell=1, n_cells
-     !  550398
-     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
-          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
-  enddo
-
-  return
-
-end subroutine init_molecular_Voronoi
 
 !***********************************************************
 
@@ -713,133 +367,6 @@ subroutine opacite_mol_loc(icell,imol)
   return
 
 end subroutine opacite_mol_loc
-
-!***********************************************************
-
-subroutine init_dust_mol(imol)
-  ! calcul les opacites et emissivites des cellules
-  ! aux longueurs d'onde des raies moleculaires
-  ! pour prendre en compte l'interaction radiative entre
-  ! les 2 phases.
-  ! C. Pinte
-  ! 17/10/07
-  ! TODO : gerer le cas ou l'albedo (et donc scattering) non negligeable
-
-  use mem, only : realloc_dust_mol, clean_mem_dust_mol
-
-  implicit none
-
-  integer, intent(in) :: imol
-  integer :: iTrans, p_lambda, icell
-  real(kind=dp) :: freq!, Jnu
-  real :: T, wl, kap
-
-  real(kind=dp) :: cst_E
-
-  real, parameter :: gas_dust = 100
-  real, parameter :: delta_lambda = 0.025
-
-  cst_E=2.0*hp*c_light**2
-
-  ! Reallocation des tableaux de proprietes de poussiere
-  ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
-  n_lambda =   nTrans_tot ! opacites dust considerees cst sur le profil de raie
-
-
-  ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
-  ! -> pas de polarisation, on utilise une HG
-  scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
-  aniso_method = 2 ; lmethod_aniso1 = .false.
-
-  lsepar_pola = .false.
-  ltemp = .false.
-  lmono = .true. ! equivalent au mode sed2
-
-  call realloc_dust_mol()
-
-  if (ldust_mol) then
-     ! Tableau de longeur d'onde
-     do iTrans=1,nTrans_tot
-        tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
-        tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
-        tab_lambda_sup(iTrans)= tab_lambda(iTrans)/delta_lambda
-        tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
-     enddo
-
-     if (lbenchmark_water3) then ! opacite en loi de puissance
-        write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
-
-        do iTrans=1,nTrans_tot
-           wl = tab_lambda(iTrans)
-
-           ! Loi d'opacite (cm^2 par g de poussiere)
-           if (wl > 250) then
-              kap = 10. * (wl/250.)**(-2.0)
-           else
-              kap = 10. * (wl/250.)**(-1.3)
-           endif
-
-           ! Multiplication par densite
-           ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
-           do icell=1,n_cells
-              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
-                   gas_dust / cm_to_AU
-           enddo
-
-        enddo ! iTrans
-
-        ! Pas de scattering
-        kappa(:,:) = kappa_abs_LTE(:,:)
-
-     else ! cas par defaut
-        call init_indices_optiques()
-
-        ! On recalcule les proprietes optiques
-        write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
-        do iTrans=1,nTrans_tot
-           call prop_grains(iTrans)
-           call opacite(iTrans, iTrans, no_scatt=.true.)
-        enddo
-     endif
-
-
-     ! Changement d'unite : kappa en m-1 pour le TR dans les raies !!!!!!!
-     ! Sera reconverti en AU-1 dans opacite_mol_loc
-     !kappa = kappa * m_to_AU
-     !kappa_abs_eg = kappa_abs_eg * m_to_AU
-
-     ! calcul de l'emissivite de la poussiere
-     do iTrans=1,nTrans_tot
-        freq = Transfreq(iTrans)
-
-        ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
-        ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
-        ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
-        do icell=1, n_cells
-           !-- ! Interpolation champ de radiation en longeur d'onde
-           !-- if (lProDiMo2mcfost) then
-           !--    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
-           !-- else
-           !--    Jnu = 0.0 ! todo : pour prendre en compte scattering
-           !-- endif
-
-           T = Tdust(icell)
-           ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-           emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
-        enddo ! icell
-     enddo ! itrans
-
-  else ! .not.ldust_mol
-     kappa = 0.0
-     emissivite_dust = 0.0
-  endif
-
-  ! Deallocation les tableaux dont on a pas besoin pour la suite
-  call clean_mem_dust_mol()
-
-  return
-
-end subroutine init_dust_mol
 
 !***********************************************************
 
@@ -1360,4 +887,6 @@ function compute_vertical_CD(icell) result(CD)
 
 end function compute_vertical_CD
 
-end module molecules
+!***********************************************************
+
+end module molecular_emission

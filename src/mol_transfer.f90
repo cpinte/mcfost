@@ -1,17 +1,15 @@
 module mol_transfer
 
   use parametres
-  use molecular_emission
   use naleat
   use utils
   use opacity
-  use molecules
+  use molecular_emission
   !$ use omp_lib
 
   use input
   use benchmarks
   use output
-  use molecules
   use dust_prop
   use scattering
   use optical_depth
@@ -55,9 +53,7 @@ subroutine mol_line_transfer()
      ! Champ externe
      call init_tab_Cmb_mol()
 
-     if (lVoronoi) then
-        call init_molecular_Voronoi(imol)
-     else if (lDutrey94) then
+     if (lDutrey94) then
         call init_GG_Tau_mol()
         call init_molecular_disk(imol)
      else if (lHH30mol) then
@@ -830,6 +826,189 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   return
 
 end subroutine intensite_pixel_mol
+
+!***********************************************************
+
+subroutine init_dust_mol(imol)
+  ! calcul les opacites et emissivites des cellules
+  ! aux longueurs d'onde des raies moleculaires
+  ! pour prendre en compte l'interaction radiative entre
+  ! les 2 phases.
+  ! C. Pinte
+  ! 17/10/07
+  ! TODO : gerer le cas ou l'albedo (et donc scattering) non negligeable
+
+  use mem, only : realloc_dust_mol, clean_mem_dust_mol
+
+  implicit none
+
+  integer, intent(in) :: imol
+  integer :: iTrans, p_lambda, icell
+  real(kind=dp) :: freq!, Jnu
+  real :: T, wl, kap
+
+  real(kind=dp) :: cst_E
+
+  real, parameter :: gas_dust = 100
+  real, parameter :: delta_lambda = 0.025
+
+  cst_E=2.0*hp*c_light**2
+
+  ! Reallocation des tableaux de proprietes de poussiere
+  ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
+  n_lambda =   nTrans_tot ! opacites dust considerees cst sur le profil de raie
+
+
+  ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
+  ! -> pas de polarisation, on utilise une HG
+  scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+  aniso_method = 2 ; lmethod_aniso1 = .false.
+
+  lsepar_pola = .false.
+  ltemp = .false.
+  lmono = .true. ! equivalent au mode sed2
+
+  call realloc_dust_mol()
+
+  if (ldust_mol) then
+     ! Tableau de longeur d'onde
+     do iTrans=1,nTrans_tot
+        tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
+        tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
+        tab_lambda_sup(iTrans)= tab_lambda(iTrans)/delta_lambda
+        tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
+     enddo
+
+     if (lbenchmark_water3) then ! opacite en loi de puissance
+        write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
+
+        do iTrans=1,nTrans_tot
+           wl = tab_lambda(iTrans)
+
+           ! Loi d'opacite (cm^2 par g de poussiere)
+           if (wl > 250) then
+              kap = 10. * (wl/250.)**(-2.0)
+           else
+              kap = 10. * (wl/250.)**(-1.3)
+           endif
+
+           ! Multiplication par densite
+           ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
+           do icell=1,n_cells
+              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
+                   gas_dust / cm_to_AU
+           enddo
+
+        enddo ! iTrans
+
+        ! Pas de scattering
+        kappa(:,:) = kappa_abs_LTE(:,:)
+
+     else ! cas par defaut
+        call init_indices_optiques()
+
+        ! On recalcule les proprietes optiques
+        write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
+        do iTrans=1,nTrans_tot
+           call prop_grains(iTrans)
+           call opacite(iTrans, iTrans, no_scatt=.true.)
+        enddo
+     endif
+
+
+     ! Changement d'unite : kappa en m-1 pour le TR dans les raies !!!!!!!
+     ! Sera reconverti en AU-1 dans opacite_mol_loc
+     !kappa = kappa * m_to_AU
+     !kappa_abs_eg = kappa_abs_eg * m_to_AU
+
+     ! calcul de l'emissivite de la poussiere
+     do iTrans=1,nTrans_tot
+        freq = Transfreq(iTrans)
+
+        ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)
+        ! TODO : generaliser pour tous les types de grains (ca doit deja exister non ???)
+        ! TODO : ca peut aussi servir pour faire du ray-tracing ds le continu 8-)
+        do icell=1, n_cells
+           !-- ! Interpolation champ de radiation en longeur d'onde
+           !-- if (lProDiMo2mcfost) then
+           !--    Jnu = interp(m2p%Jnu(ri,zj,:), m2p%wavelengths, real(tab_lambda(iTrans)))
+           !-- else
+           !--    Jnu = 0.0 ! todo : pour prendre en compte scattering
+           !-- endif
+
+           T = Tdust(icell)
+           ! On ne fait que du scattering isotropique dans les raies pour le moment ...
+           emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+        enddo ! icell
+     enddo ! itrans
+
+  else ! .not.ldust_mol
+     kappa = 0.0
+     emissivite_dust = 0.0
+  endif
+
+  ! Deallocation les tableaux dont on a pas besoin pour la suite
+  call clean_mem_dust_mol()
+
+  return
+
+end subroutine init_dust_mol
+
+!***********************************************************
+
+subroutine init_molecular_disk(imol)
+  ! definie les tableaux vfield, v_turb et tab_abundance
+  ! et lcompute_molRT
+
+  implicit none
+
+  integer, intent(in) :: imol
+  integer :: icell
+
+  ldust_mol  = .true.
+  lkeplerian = .true.
+
+  ! Temperature gaz = poussiere
+  if (lcorrect_Tgas) then
+     write(*,*) "Correcting Tgas by", correct_Tgas
+     Tcin(:) = Tdust(:)  * correct_Tgas
+  else
+     Tcin(:) = Tdust(:)
+  endif
+
+  ! Velocity field in  m.s-1
+  ! Warning : assume all stars are at the center of the disk
+  if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
+     if (lcylindrical_rotation) then ! Midplane Keplerian velocity
+        do icell=1, n_cells
+           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+        enddo
+     else ! dependance en z
+        do icell=1, n_cells
+           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
+        enddo
+     endif
+  endif
+
+  v_turb = vitesse_turb
+
+  ! Abondance
+  if (mol(imol)%lcst_abundance) then
+     write(*,*) "Setting constant abundance"
+     tab_abundance = mol(imol)%abundance
+  else
+     call read_abundance(imol)
+  endif
+
+  do icell=1, n_cells
+     lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
+          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
+  enddo
+
+  return
+
+end subroutine init_molecular_disk
 
 !***********************************************************
 

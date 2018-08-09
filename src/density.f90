@@ -2,7 +2,6 @@ module density
 
   use parametres
   use constantes
-  use molecular_emission
   use opacity
   use temperature
   use grains
@@ -16,10 +15,16 @@ module density
   integer, public :: specie_removed
   real, public :: T_rm
 
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane
+
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, reduce_density
 
   private
+
+  real(kind=dp), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
+  real(kind=dp), dimension(:), allocatable :: Surface_density
 
   real :: coeff_exp, coeff1, coeff2, rcyl
 

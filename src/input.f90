@@ -419,7 +419,7 @@ subroutine readmolecule(imol)
   character(len=515) :: filename, dir
   character(len=80) :: junk
   integer :: i, j, iLow, iUp, iPart, ios
-  real :: a, freq, eu
+  real :: a, freq, eu, molecularWeight
   real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
 
   write(*,*) ""

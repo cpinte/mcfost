@@ -219,6 +219,8 @@ module parametres
   logical :: lRT_i_centered
 
 
+  integer :: nLevels
+  real(kind=dp) :: largeur_profile
 
 
 end module parametres
