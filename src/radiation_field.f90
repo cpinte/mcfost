@@ -3,7 +3,7 @@ module radiation_field
   use parametres
   use mcfost_env
   use constantes
-  use opacity, only : kappa_abs_LTE
+  use dust, only : kappa_abs_LTE
   use messages
   use wavelengths
 

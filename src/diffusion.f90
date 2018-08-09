@@ -2,13 +2,15 @@ module diffusion
 
   use parametres
   use constantes
-  use opacity
+  use dust
   use messages
   use wavelengths
   use thermal_emission
   use temperature
+  use cylindrical_grid
 
   implicit none
+  save
 
   contains
 

@@ -6,7 +6,7 @@ module output
   use radiation_field, only : J0, xJ_abs
   use thermal_emission, only : E_totale, nbre_reemission
   use constantes
-  use opacity
+  use dust
   use molecular_emission
   use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface, stars_map
   use utils
@@ -16,6 +16,7 @@ module output
   use wavelengths
   use stars, only : E_stars
   use thermal_emission, only : L_packet_th
+  use density
 
   implicit none
   save
@@ -3325,23 +3326,25 @@ end subroutine ecriture_spectre
 
 subroutine write_temperature_for_phantom(n_SPH)
 
-    integer, intent(in) :: n_SPH
-    integer :: i_SPH, icell
-    real, dimension(n_SPH) :: T_SPH
+  integer, intent(in) :: n_SPH
+  integer :: i_SPH, icell
+  real, dimension(n_SPH) :: T_SPH
 
-    T_SPH = -1.0 ;
+  T_SPH = -1.0 ;
 
-    do icell=1, n_cells
-       i_SPH = Voronoi(icell)%id
-       if (i_SPH > 0) T_SPH(i_SPH) = Tdust(icell)
-    enddo
+  do icell=1, n_cells
+     i_SPH = Voronoi(icell)%id
+     if (i_SPH > 0) T_SPH(i_SPH) = Tdust(icell)
+  enddo
 
-    open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
-    write(1) T_SPH
-    close(unit=1)
+  open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
+  write(1) T_SPH
+  close(unit=1)
 
-    return
+  return
 
-  end subroutine write_temperature_for_phantom
+end subroutine write_temperature_for_phantom
+
+!**********************************************************************
 
 end module output

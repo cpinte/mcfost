@@ -5,6 +5,7 @@ module molecular_emission
   use constantes
   use grid
   use density
+  use dust
 
   implicit none
   save
@@ -83,6 +84,7 @@ module molecular_emission
 
   real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
 
+  real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
   contains
 

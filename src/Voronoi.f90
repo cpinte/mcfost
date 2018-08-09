@@ -5,7 +5,7 @@ module Voronoi_grid
   use parametres
   use utils, only : bubble_sort, appel_syst
   use naleat, only : seed, stream, gtype
-  use opacity, only : volume
+  use cylindrical_grid, only : volume
   use kdtree2_module
   use messages
 

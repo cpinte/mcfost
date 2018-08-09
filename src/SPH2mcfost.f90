@@ -108,8 +108,7 @@ contains
        SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
-    use opacity, only : densite_pouss, masse
-    use density, only : densite_gaz, masse_gaz
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem

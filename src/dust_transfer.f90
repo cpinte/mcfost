@@ -3,7 +3,7 @@ module dust_transfer
   use parametres
   use grains
   use naleat, only : seed, stream, gtype
-  use opacity
+  use dust
   use temperature
   use thermal_emission
   use constantes
@@ -18,7 +18,6 @@ module dust_transfer
   use input
   use benchmarks
   use diffusion
-  use dust_prop
   use stars
   use mem
   use utils

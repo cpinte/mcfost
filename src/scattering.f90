@@ -2,13 +2,13 @@ module scattering
 
   use parametres
   use constantes
-  use opacity
   use wavelengths
   use grains
   use utils
-  use input
+  use read_opacity
 
   implicit none
+  save
 
   contains
 
@@ -730,92 +730,6 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
 end subroutine mueller_opacity_file
 
 !**********************************************************************
-
-integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
-!-----------------------------------------------------
-!  Nouvelle version : janvier 04
-!  la dichotomie se fait en comparant les indices
-!  et non plus en utilisant la taille du pas
-!  --> plus precis, important quand on reduit n_grains_tot
-!
-!  23 Fevrier 04 : ajout d'une prediction avant la
-!  premiere iteration de la dichotomie
-!-----------------------------------------------------
-
-  implicit none
-
-  integer, intent(in) :: lambda, icell
-  real, intent(in) :: aleat
-  real :: prob
-  integer :: kmin, kmax
-
-  prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
-
-  ! dichotomie
-  kmin = 0
-  kmax = n_grains_tot
-  k=(kmin + kmax)/2
-
-  do while (ksca_CDF(k,icell,lambda) /= prob)
-     if (ksca_CDF(k,icell,lambda) < prob) then
-        kmin = k
-     else
-        kmax = k
-     endif
-
-     k = (kmin + kmax)/2
-     if ((kmax-kmin) <= 1) then
-        exit ! Sortie du while
-     endif
-  enddo   ! while
-  k=kmax
-
-  return
-
-end function select_grainsize_high_mem
-
-!***************************************************
-
-integer function select_scattering_grain(lambda,icell, aleat) result(k)
-  ! This routine will select randomly the scattering grain from the CDF of ksca
-  ! Because we cannot store all the CDF for all cells (n_grains x ncells x n_lambda),
-  ! the CDF is recomputed on the fly here.
-  ! The normalization is saved via kappa_sca, so we do not need to compute the whole CDF.
-
-  implicit none
-
-  integer, intent(in) :: lambda, icell
-  real, intent(in) :: aleat
-  real :: prob, CDF, norm
-
-  if (low_mem_scattering) then
-     ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
-     norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
-
-     if (aleat < 0.5) then ! We start from first grain
-        prob = aleat * norm
-        CDF = 0.0
-        do k=1, n_grains_tot
-           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
-           if (CDF > prob) exit
-        enddo
-     else ! We start from the end of the grain size distribution
-        prob = (1.0-aleat) * norm
-        CDF = 0.0
-        do k=n_grains_tot, 1, -1
-           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
-           if (CDF > prob) exit
-        enddo
-     endif
-  else
-     k = select_grainsize_high_mem(lambda,aleat, icell) ! is this ever used ?
-  endif
-
-  return
-
-end function select_scattering_grain
-
-!*******************************************************************
 
 subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
 !***********************************************************

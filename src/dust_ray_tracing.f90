@@ -4,10 +4,11 @@ module dust_ray_tracing
 
   use parametres
   use constantes
-  use opacity
   use stars, only : E_stars
   use scattering
   use Temperature
+  use cylindrical_grid
+  use dust
   !$ use omp_lib
 
   implicit none

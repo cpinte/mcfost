@@ -3,14 +3,13 @@ module mol_transfer
   use parametres
   use naleat
   use utils
-  use opacity
   use molecular_emission
   !$ use omp_lib
 
   use input
   use benchmarks
   use output
-  use dust_prop
+  use dust
   use scattering
   use optical_depth
   use ProDiMo, only: read_ProDiMo2mcfost

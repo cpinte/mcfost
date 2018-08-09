@@ -2,7 +2,7 @@ module mem
 
   use parametres
   use grains
-  use opacity
+  use dust
   use naleat
   use molecular_emission
   use utils
@@ -10,6 +10,7 @@ module mem
   use wavelengths
   use output
   use density
+  use cylindrical_grid
 
   implicit none
 
@@ -251,14 +252,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux prop d'emission des cellules
   ! **************************************************
-  allocate(l_emission_pah(0:n_rad+1,0:nz+1), stat=alloc_status) ! OUTDATED
-  if (alloc_status > 0) call error('Allocation error l_emission_pah')
-  l_emission_pah = .false.
-
-  if (lweight_emission) then
-     call allocate_weight_proba_emission(Nc)
-  endif
-
+  if (lweight_emission) call allocate_weight_proba_emission(Nc)
   if (lorigine) call allocate_origin()
 
   ! **************************************************
@@ -351,7 +345,6 @@ subroutine deallocate_em_th_mol()
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
 
-  deallocate(l_emission_pah) ! OUTDATED
   if (lorigine) call deallocate_origin()
 
   if (lTemp) call deallocate_thermal_emission()

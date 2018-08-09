@@ -2,9 +2,8 @@ module PAH
 
   use parametres
   use grains
-  use opacity
   use constantes
-  use dust_prop
+  use dust
   use utils, only : interp
 
   implicit none

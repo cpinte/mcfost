@@ -1,7 +1,7 @@
 module ProDiMo
 
   use parametres
-  use opacity
+  use dust
   use constantes
   use molecular_emission
   use utils, only: get_NH, Blambda, Bnu
@@ -15,6 +15,7 @@ module ProDiMo
   use mcfost_env
   use temperature
   use dust_ray_tracing, only : n_phot_envoyes
+  use density
 
   implicit none
 

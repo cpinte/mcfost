@@ -2,7 +2,6 @@ module density
 
   use parametres
   use constantes
-  use opacity
   use temperature
   use grains
   use grid
@@ -10,12 +9,13 @@ module density
   use messages
 
   implicit none
+  save
 
   ! Suppresion de grains
   integer, public :: specie_removed
   real, public :: T_rm
 
-  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, reduce_density
@@ -27,6 +27,11 @@ module density
   real(kind=dp), dimension(:), allocatable :: Surface_density
 
   real :: coeff_exp, coeff1, coeff2, rcyl
+
+  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  integer :: icell_not_empty
+  real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
 
   contains
 

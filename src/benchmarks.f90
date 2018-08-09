@@ -4,7 +4,6 @@ module benchmarks
   use mcfost_env
   use constantes
   use grains
-  use opacity
   use messages
   use molecular_emission
   use wavelengths
@@ -37,48 +36,48 @@ end subroutine init_Pascucci_benchmark
 
 !*************************************************************
 
-subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
-! Lecture table section efficace
-! Benchmark Pascucci et al. 2004
-! bande V : ligne 15
-
-  use utils, only : in_dir
-
-  implicit none
-
-  integer, intent(in) :: lambda
-  real, intent(out) :: Cext, Csca
-
-  integer :: l, ios
-  real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
-
-  character(len=512) :: filename, dir
-
-  if (lambda == 1) then
-     filename = dust_pop(1)%indices(1)
-     dir = in_dir(filename, dust_dir,  status=ios)
-     if (ios /=0) call error("dust file cannot be found:"//trim(filename))
-     filename = trim(dir)//trim(filename) ;
-
-     open(unit=1,file=filename,status="old")
-     ! Skipping header
-     do l=1,11
-        read(1,*)
-     enddo
-
-     do l=1,n_lambda
-        read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
-     enddo
-     close(unit=1)
-  endif
-
-  ! Convert to mum**2
-  Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
-  Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
-
-  return
-
-end subroutine read_Pascucci_cross_sections
+!-- subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
+!-- ! Lecture table section efficace
+!-- ! Benchmark Pascucci et al. 2004
+!-- ! bande V : ligne 15
+!--
+!--   use utils, only : in_dir
+!--
+!--   implicit none
+!--
+!--   integer, intent(in) :: lambda
+!--   real, intent(out) :: Cext, Csca
+!--
+!--   integer :: l, ios
+!--   real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
+!--
+!--   character(len=512) :: filename, dir
+!--
+!--   if (lambda == 1) then
+!--      filename = dust_pop(1)%indices(1)
+!--      dir = in_dir(filename, dust_dir,  status=ios)
+!--      if (ios /=0) call error("dust file cannot be found:"//trim(filename))
+!--      filename = trim(dir)//trim(filename) ;
+!--
+!--      open(unit=1,file=filename,status="old")
+!--      ! Skipping header
+!--      do l=1,11
+!--         read(1,*)
+!--      enddo
+!--
+!--      do l=1,n_lambda
+!--         read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
+!--      enddo
+!--      close(unit=1)
+!--   endif
+!--
+!--   ! Convert to mum**2
+!--   Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
+!--   Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
+!--
+!--   return
+!--
+!-- end subroutine read_Pascucci_cross_sections
 
 !*************************************************************
 

@@ -2,7 +2,6 @@ module grid
 
   use parametres
   use constantes
-  use opacity
   use grains
   use utils
 

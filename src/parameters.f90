@@ -170,8 +170,6 @@ module parametres
   real :: z_scaling_env
 
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
-  character(len=512), dimension(:), allocatable :: sh_file
-
 
   ! Stars
   type star_type

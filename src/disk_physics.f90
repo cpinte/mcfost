@@ -2,13 +2,14 @@ module disk_physics
 
   use grains
   use mcfost_env
-  use opacity
-  use density, only : densite_gaz
+  use dust
+  use density, only : densite_gaz, densite_pouss
   use constantes
   use stars, only : spectre_etoiles
   use messages
   use wavelengths
   use temperature
+  use cylindrical_grid
 
   implicit none
 
@@ -214,9 +215,9 @@ subroutine equilibre_hydrostatique()
 
         ! Renormalisation
         do j = 1, nz
-           icell = cell_map(i,j,k)
-           fac = gas_dust * masse_rayon(i,k) / (volume(icell) * somme) ! TODO : densite est en particule, non ???
-           densite_gaz(icell) =  rho(j) * fac
+          ! icell = cell_map(i,j,k)
+          ! fac = gas_dust * masse_rayon(i,k) / (volume(icell) * somme) ! TODO : densite est en particule, non ???
+          ! densite_gaz(icell) =  rho(j) * fac
         enddo
 
      enddo !i

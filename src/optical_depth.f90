@@ -1,14 +1,15 @@
 module optical_depth
 
   use parametres
-  use opacity
+  use dust
   use constantes
   use molecular_emission
   use utils
   use dust_ray_tracing
   use grid
-  use cylindrical_grid, only : prec_grille
+  use cylindrical_grid
   use radiation_field, only : save_radiation_field
+  use density
 
   implicit none
 

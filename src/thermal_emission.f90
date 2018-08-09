@@ -3,7 +3,7 @@ module thermal_emission
   use parametres
   use constantes
   use grains
-  use opacity
+  use dust
   !$ use omp_lib
   use temperature
   use utils
@@ -11,11 +11,14 @@ module thermal_emission
   use grid
   use stars, only : spectre_etoiles, E_ISM, E_stars
   use input
+  use density
+  use cylindrical_grid
 
   implicit none
   save
 
-  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, correct_E_emission
+  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, correct_E_emission, &
+       DensE, DensE_m1, Dcoeff
 
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
        allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
@@ -59,6 +62,11 @@ module thermal_emission
 
   ! Biais de l'emission vers la surface du disque
   real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
+
+  real, dimension(:,:,:), allocatable :: DensE, DensE_m1 !n_rad, 0:n_z, n_az
+  real(kind=dp), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
+
+
 
   contains
 
