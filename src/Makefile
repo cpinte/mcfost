@@ -171,8 +171,8 @@ include .depend
 
 all : mcfost libmcfost.a
 
-mcfost :  $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o
-	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o  cockchafer.o mcfost.o $(LDFLAGS)
+mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
+	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
@@ -201,8 +201,8 @@ io_phantom_utils.o :  io_phantom_utils.f90
 voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CXX) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
-cockchafer.o :  cockchafer.cpp
-	$(CXX) $(CCFLAGS) -c  cockchafer.cpp  -I$(MCFOST_INSTALL)/include
+xgboost_wrapper.o :  xgboost_wrapper.cpp
+	$(CXX) $(CCFLAGS) -c xgboost_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90  modules.o
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
