@@ -93,7 +93,7 @@ module parametres
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs
-  logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lgadget2_file, lascii_SPH_file, llimits_file
+  logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lgadget2_file, lascii_SPH_file, llimits_file
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
@@ -170,6 +170,8 @@ module parametres
   real :: z_scaling_env
 
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
+  character(len=512), dimension(:), allocatable :: density_files
+  integer :: n_phantom_files
 
   ! Stars
   type star_type

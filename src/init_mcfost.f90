@@ -77,6 +77,7 @@ subroutine set_default_variables()
   ldensity_file=.false.
   lvelocity_file=.false.
   lphantom_file=.false.
+  lphantom_multi = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -180,7 +181,7 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, i
   integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
@@ -627,8 +628,26 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        n_phantom_files = 1
+        allocate(density_files(n_phantom_files))
+        density_files(1) = s
         i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-phantom-multi")
+        i_arg = i_arg + 1
+        lphantom_file=.true.
+        lphantom_multi = .true. ! not used in practise
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) n_phantom_files
+        allocate(density_files(n_phantom_files))
+        do i=1, n_phantom_files
+           call get_command_argument(i_arg,s)
+           i_arg = i_arg + 1
+           density_files(i) = s
+        enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
      case("-ascii_SPH")
         i_arg = i_arg + 1

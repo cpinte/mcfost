@@ -11,7 +11,7 @@ contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
-    use read_phantom, only : read_phantom_file
+    use read_phantom, only : read_phantom_files
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
@@ -27,13 +27,20 @@ contains
     real, allocatable, dimension(:) :: extra_heating
 
     real(dp), dimension(6) :: SPH_limits
-    integer :: ndusttypes, ierr
+    integer :: ndusttypes, ierr, i
     character(len=100) :: line_buffer
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
-       write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file,x,y,z,h,vx,vy,vz, &
+       if (n_phantom_files==1) then
+          write(*,*) "Reading phantom density file: "//trim(density_files(1))  ! todo : update: we do not use SPH_file anymore
+       else
+          write(*,*) "Reading phantom density files: "
+          do i=1,n_phantom_files
+             write(*,*) " - "//trim(density_files(i))  ! todo : update: we do not use SPH_file anymore
+          enddo
+       endif
+       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
