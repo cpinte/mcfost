@@ -27,10 +27,12 @@ module read_phantom
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
- integer, parameter :: maxtypes = 10
- integer :: npartoftype(maxtypes)
- real(dp) :: massoftype(maxtypes),hfact,umass,utime,udist
- integer(kind=1), allocatable, dimension(:) :: itype
+ integer, parameter :: maxtypes = 6
+ integer, parameter :: maxfiles = 3
+ integer, allocatable, dimension(:) :: npartoftype
+ real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
+ real(dp) :: hfact,umass,utime,udist
+ integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp
@@ -38,13 +40,16 @@ module read_phantom
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
- integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max
 
+
+ massoftype=0.
 
  ! We first read the number of particules in each phantom file
  np_tot = 0
  np_max = 0
  ntypes_tot = 0
+ ntypes_max = 0
  do ifile=1, n_files
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
@@ -71,12 +76,13 @@ module read_phantom
     np_tot = np_tot + np
     np_max = max(np_max,np)
     ntypes_tot = ntypes_tot + ntypes
+    ntypes_max = max(ntypes_max,ntypes)
     close(iunit)
  enddo ! ifile
 
  allocate(xyzh(4,np_tot),itype(np_tot),tmp(np_max),vxyzu(4,np_tot),tmp_dp(np_max))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
- allocate(dudt(np_tot))
+ allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
 
 
  np0 = 0
@@ -123,7 +129,7 @@ module read_phantom
     endif
 
     ! extract info from real header
-    call extract('massoftype',massoftype(ntypes0+1:ntypes0+ntypes),hdr,ierr)   ! todo !!! ntype0
+    call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
     call extract('hfact',hfact,hdr,ierr)
     if (ndusttypes > 0) then
        call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
@@ -212,6 +218,8 @@ module read_phantom
                          matched = .true.
                          got_itype = .true.
                          read(iunit,iostat=ierr) itype(np0+1:np0+np)
+                         itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
+                         write(*,*) "MAX", maxval(itype(np0+1:np0+np)), ntypes0
                       case default
                          read(iunit,iostat=ierr)
                       end select
@@ -262,14 +270,17 @@ module read_phantom
           enddo
        enddo
     enddo ! block
-
     close(iunit)
-    np0 = np0 + np
- enddo ! ifile
 
- if (.not. got_itype) then
-    itype = 1
- endif
+    ifiles(np0+1:np0+np) = ifile ! index of the file
+
+    if (.not. got_itype) then
+       itype(np0+1:np0+np) =  1
+    endif
+
+    np0 = np0 + np
+    ntypes0 = ntypes0 + ntypes
+ enddo ! ifile
 
  if ((ndusttypes > 0) .and. .not. got_dustfrac) then
     dustfrac = 0.
@@ -282,9 +293,9 @@ module read_phantom
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np_tot,nptmass,ntypes_tot,ndusttypes,dustfluidtype,xyzh,&
-         vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes_tot),xyzmh_ptmass,&
-         hfact,umass,utime,udist,graindens,ndudt,dudt,&
+    call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
+         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,&
+         hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
@@ -301,9 +312,9 @@ end subroutine read_phantom_files
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
-     utime, udist,graindens,ndudt,dudt,&
+     utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
      SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
 
@@ -315,13 +326,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
 
-  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
+  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-  integer(kind=1), dimension(np), intent(in) :: iphase
+  integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
-  real(dp), dimension(ntypes), intent(in) :: massoftype
+  real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
   real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
@@ -337,7 +348,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   real(dp), intent(in), optional :: T_to_u
 
 
-  integer  :: i,j,k,itypei,alloc_status,i_etoiles
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
@@ -350,7 +361,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   uvelocity =  udist / (m_to_cm) / utime ! m/s
   usolarmass = umass / Msun_to_g
 
-
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
     use_dust_particles = .false.
@@ -360,7 +370,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  if (use_dust_particles) then
     write(*,*) '*** Using dust particles for Voronoi mesh ***'
  else
-    write(*,*) '*** Using gas particles for Voronoi mesh ***'
+    write(*,*) '*** Using gas particles for Voronoi mesh ***', n_files
  endif
 
  ! convert to dust and gas density
@@ -398,6 +408,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
 
  j = 0
  do i=1,np
+    ifile = ifiles(i)
+
     xi = xyzh(1,i)
     yi = xyzh(2,i)
     zi = xyzh(3,i)
@@ -421,10 +433,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhodusti = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhodusti = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
-          massdust(1,j) = massoftype(itypei) * usolarmass ! Msun
+          massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
           rhogas(j) = gasfraci*rhodusti
           massgas(j) = gasfraci*massdust(1,j)
        elseif (.not. use_dust_particles .and. itypei==1) then
@@ -439,14 +451,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhogasi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhogasi = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
           if (dustfluidtype==2) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi
           endif
-          massgas(j) =  massoftype(itypei) * usolarmass ! Msun
+          massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
           do k=1,ndusttypes
              rhodust(k,j) = dustfrac(k,i)*rhogasi
              massdust(k,j) = dustfrac(k,i)*massgas(j)
@@ -461,7 +473,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
 
  write(*,*) ''
  write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
- write(*,*) 'SPH dust mass is ', real(sum(massdust)), 'Msun'
+ write(*,*) 'SPH dust mass is ', real(sum(massdust)),'Msun'
  write(*,*) ''
 
  lextra_heating = .false. ; ldudt_implicit = .false.
