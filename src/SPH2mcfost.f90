@@ -129,7 +129,7 @@ contains
     logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: density_factor = 1 !e-6
-    logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
+    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust

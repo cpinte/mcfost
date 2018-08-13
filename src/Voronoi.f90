@@ -492,6 +492,7 @@ module Voronoi_grid
     else
        lcompute = .true.
     endif
+
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
        volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0. ; was_cell_cut = .false.
@@ -545,6 +546,8 @@ module Voronoi_grid
     else
        write(*,*) "Reading previous Voronoi tesselation"
     endif
+    write(*,*) "Tesselation done"
+
 
     ! Conversion to Fortran indices
     Voronoi(:)%first_neighbour = first_neighbours(:) + 1
@@ -659,7 +662,7 @@ module Voronoi_grid
     character(len=512) :: filename
     character(len=40) :: voronoi_sha1
 
-    call get_voronoi_sha1(density_file, voronoi_sha1)
+    call get_voronoi_sha1(density_files(1), voronoi_sha1)
 
     filename = "_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
@@ -697,7 +700,7 @@ module Voronoi_grid
 
     lcompute = .true.
 
-    call get_voronoi_sha1(density_file, voronoi_sha1)
+    call get_voronoi_sha1(density_files(1), voronoi_sha1)
 
     filename = "_voronoi.tmp"
     ! check if there is a Voronoi file
