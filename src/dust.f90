@@ -1019,12 +1019,9 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! tab_s11_pos soit normalisee a k_sca_tot
            tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
            if (lsepar_pola) then
-              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s12(:,k,lambda) * S_grain(k) * density
-              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s33(:,k,lambda) * S_grain(k) * density
-              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s34(:,k,lambda) * S_grain(k) * density
+              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + tab_s12(:,k,lambda) * S_grain(k) * density
+              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + tab_s33(:,k,lambda) * S_grain(k) * density
+              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + tab_s34(:,k,lambda) * S_grain(k) * density
            endif
         endif !aniso_method
      enddo !k

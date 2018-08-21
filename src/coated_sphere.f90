@@ -145,10 +145,10 @@ contains
 
     integer :: i,j, nang, ipop
 
-    real :: qext_HS, qsca_HS, qbs_HS, gqsc_HS, gsca_HS ! pour 1 HS
-    complex, dimension(nang_scatt+1) :: S1,S2, s1_HS, s2_HS
+    real :: Qext_HS, Qsca_HS, Qabs_HS, gqsc_HS, gsca_HS ! pour 1 HS
+    complex, dimension(nang_scatt+1) :: s1,s2, s1_HS, s2_HS
 
-    real :: a, rcore, rshell, wvno, factor, cext, csca
+    real :: a, rcore, rshell, wvno, factor, Cext, Csca
     real :: vi1, vi2, norme, somme_prob, theta, dtheta, x
     complex :: refrel, refrel_coat
     real, dimension(0:nang_scatt) :: S11,S12,S33,S34
@@ -183,26 +183,26 @@ contains
     call GauLeg(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),f,wf,N_vf) ; wf = wf/sum(wf)
     ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
 
-    cext=0 ; csca=0 ; gsca=0 ; s1=0 ; s2=0
+    Cext=0 ; Csca=0 ; gsca=0 ; s1=0 ; s2=0
     do i=1,N_vf
        rshell = a/((1.-f(i))**un_tiers)
        rcore = rshell * f(i)**un_tiers
 
-       call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, qext_HS,qsca_HS,qbs_HS,gqsc_HS,s1_HS,s2_HS)
+       call dMilay(rcore,rshell,wvno,refrel_coat,refrel,nang, Qext_HS,Qsca_HS,Qabs_HS,gqsc_HS,s1_HS,s2_HS)
        gsca_HS = gqsc_HS / qsca_HS ! dmilay return gsca * qsca
 
        if(qext_HS < 0_dp) qext_HS = 0_dp
        if(qsca_HS < 0_dp) qsca_HS = 0_dp
 
        factor = pi*rshell**2 * wf(i)
-       cext = cext + factor * qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
-       csca = csca + factor * qsca_HS
-       gsca = gsca + factor * qsca_HS * gsca_HS
+       Cext = Cext + factor * Qext_HS  ! pas sur que ce soit bon, verifier normalization qext, (rshell/lambda)**2 doit deja y etre
+       Csca = Csca + factor * Qsca_HS
+       gsca = gsca + factor * gqsc_HS ! gqsc_HS == gsca_HS * qsca_HS
 
        s1 = s1 + s1_HS * wf(i)
        s2 = s2 + s2_HS * wf(i)
     enddo
-    if (csca > 0.) gsca = gsca/csca
+    if (Csca > 0.) gsca = gsca/Csca
 
     if (lforce_HG) gsca = forced_g
 
@@ -217,12 +217,12 @@ contains
        ! Calcul des elements de la matrice de diffusion
        ! indices decales de 1 par rapport a bhmie
        do J=0,nang_scatt
-          vi1 = cabs(S2(J+1))*cabs(S2(J+1))
-          vi2 = cabs(S1(J+1))*cabs(S1(J+1))
+          vi1 = cabs(s2(j+1))*cabs(s2(j+1))
+          vi2 = cabs(s1(j+1))*cabs(s1(j+1))
           s11(j) = 0.5*(vi1 + vi2)
           s12(j) = 0.5*(vi1 - vi2)
-          s33(j)=real(S2(J+1)*conjg(S1(J+1)))
-          s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
+          s33(j)=real(s2(j+1)*conjg(s1(j+1)))
+          s34(j)=aimag(s2(j+1)*conjg(s1(j+1)))
        enddo !j
 
        prob_s11(lambda,taille_grain,0)=0.0
