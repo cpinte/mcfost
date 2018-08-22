@@ -434,10 +434,6 @@ subroutine define_cylindrical_grid()
      zmaxmax = maxval(zmax)
 
   else !lspherical
-     izone=1
-     dz=disk_zone(izone)
-
-
      ! tab_r est en spherique ici
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
@@ -465,11 +461,6 @@ subroutine define_cylindrical_grid()
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
         enddo
-
-        if (rsph > dz%Rmax) then
-           izone = izone +1
-           dz=disk_zone(izone)
-        endif
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
            V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)

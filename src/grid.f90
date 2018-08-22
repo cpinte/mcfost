@@ -145,6 +145,24 @@ subroutine define_physical_zones()
      enddo !i
   enddo !ir
 
+  ! Adjusting grid for prolate or oblate envelope
+  if (z_scaling_env > 1.) then
+     regions(:)%Rmax = regions(:)%Rmax * z_scaling_env
+  endif
+  if (z_scaling_env < 1.) then
+     regions(:)%Rmin = regions(:)%Rmin * z_scaling_env
+  endif
+
+  Rmin = minval(regions(:)%Rmin)
+  Rmax = maxval(regions(:)%Rmax)
+
+  if (Rmin < 0.0) call error("R_min < 0.0")
+  do i=1, n_etoiles
+     if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
+        if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
+     endif
+  enddo
+
   write(*,fmt='(" Number of regions detected:",i2)') n_regions
 
   do i=1, n_zones

@@ -1188,9 +1188,6 @@ subroutine initialisation_mcfost()
      write(*,*) "Spot will be applied on star #1"
   endif
 
-  ! Adjusting grid for prolate or oblate envelope
-  if (z_scaling_env > 1.) Rmax = Rmax * z_scaling_env
-  if (z_scaling_env < 1.) Rmin = Rmin * z_scaling_env
 
   if (lpara) then
      if (nb_proc==1) then
