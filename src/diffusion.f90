@@ -2,7 +2,7 @@ module diffusion
 
   use parametres
   use constantes
-  use dust
+  use dust_prop
   use messages
   use wavelengths
   use thermal_emission

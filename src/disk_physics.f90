@@ -2,7 +2,7 @@ module disk_physics
 
   use grains
   use mcfost_env
-  use dust
+  use dust_prop
   use density, only : densite_gaz, densite_pouss
   use constantes
   use stars, only : spectre_etoiles

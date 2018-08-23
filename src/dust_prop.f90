@@ -1,4 +1,4 @@
-module dust
+module dust_prop
 
   use mcfost_env
   use parametres
@@ -1278,4 +1278,4 @@ subroutine write_dust_prop()
 
 end subroutine write_dust_prop
 
-end module dust
+end module dust_prop

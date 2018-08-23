@@ -6,7 +6,7 @@ module output
   use radiation_field, only : J0, xJ_abs
   use thermal_emission, only : E_totale, nbre_reemission
   use constantes
-  use dust
+  use dust_prop
   use molecular_emission
   use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface, stars_map
   use utils

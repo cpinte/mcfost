@@ -3,7 +3,7 @@ module thermal_emission
   use parametres
   use constantes
   use grains
-  use dust
+  use dust_prop
   !$ use omp_lib
   use temperature
   use utils

@@ -1,7 +1,7 @@
 module ProDiMo
 
   use parametres
-  use dust
+  use dust_prop
   use constantes
   use molecular_emission
   use utils, only: get_NH, Blambda, Bnu

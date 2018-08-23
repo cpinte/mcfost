@@ -1,7 +1,7 @@
 module optical_depth
 
   use parametres
-  use dust
+  use dust_prop
   use constantes
   use molecular_emission
   use utils

@@ -3,7 +3,7 @@ module PAH
   use parametres
   use grains
   use constantes
-  use dust
+  use dust_prop
   use utils, only : interp
 
   implicit none

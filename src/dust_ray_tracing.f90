@@ -8,7 +8,7 @@ module dust_ray_tracing
   use scattering
   use Temperature
   use cylindrical_grid
-  use dust
+  use dust_prop
   !$ use omp_lib
 
   implicit none

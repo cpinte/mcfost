@@ -2,7 +2,7 @@ module mem
 
   use parametres
   use grains
-  use dust
+  use dust_prop
   use naleat
   use molecular_emission
   use utils

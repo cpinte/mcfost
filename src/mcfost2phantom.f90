@@ -10,7 +10,7 @@ contains
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
-    use dust, only : build_grain_size_distribution, init_indices_optiques, prop_grains
+    use dust_prop, only : build_grain_size_distribution, init_indices_optiques, prop_grains
     use grid, only : define_physical_zones, order_zones
     use wavelengths, only : init_lambda, n_lambda
     use optical_depth, only : no_dark_zone

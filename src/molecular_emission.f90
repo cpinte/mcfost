@@ -5,7 +5,7 @@ module molecular_emission
   use constantes
   use grid
   use density
-  use dust
+  use dust_prop
 
   implicit none
   save
