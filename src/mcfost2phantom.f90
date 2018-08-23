@@ -10,9 +10,9 @@ contains
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
     use read_params, only : read_para
-    use disk, only : n_zones, SPH_keep_particles
-    use dust_prop, only : build_grain_size_distribution, init_indices_optiques, prop_grains
-    use grid, only : define_physical_zones, order_zones, init_lambda
+    use dust, only : build_grain_size_distribution, init_indices_optiques, prop_grains
+    use grid, only : define_physical_zones, order_zones
+    use wavelengths, only : init_lambda, n_lambda
     use optical_depth, only : no_dark_zone
     use mem, only : alloc_dust_prop
     use SPH2mcfost, only : read_SPH_limits_file
@@ -127,27 +127,28 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
     npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tdust,Frad,mu_gas,ierr,write_T_files,ISM,T_to_u)
+    Tphantom,Frad,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
     use constantes, only : mu
     use read_phantom
-    use prop_star, only : n_etoiles, E_ISM
-    use em_th, only : temperature, E_abs_nRE
+    use stars, only : E_ISM
     use radiation_field, only : reset_radiation_field
     use thermal_emission, only : select_wl_em, repartition_energie, init_reemission, &
-         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, reset_temperature
+         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, reset_temperature, E_abs_nRE
     use mem, only : alloc_dynamique, deallocate_densities
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
     use Voronoi_grid, only : Voronoi, deallocate_Voronoi
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
-    use dust_prop, only : opacite
     use stars, only : repartition_energie_etoiles, repartition_energie_ISM
     use grid,only : setup_grid
-    use optical_depth, only : no_dark_zone, integ_tau
-    use grains, only : tab_lambda
+    use scattering, only : setup_scattering
+    use optical_depth, only : no_dark_zone, integ_tau, opacite
+    use wavelengths, only : n_lambda, tab_lambda
+    use Temperature, only : Tdust
+    use mcfost_env
     !$ use omp_lib
 
 #include "sprng_f.h"
@@ -162,6 +163,9 @@ contains
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
 
+    integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
+    integer(kind=1), dimension(1) :: ifiles
+
     logical, intent(in), optional :: write_T_files
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
@@ -172,7 +176,7 @@ contains
 
     integer, intent(in) :: ISM ! ISM heating: 0 -> no ISM radiation field, 1 -> ProDiMo, 2 -> Bate & Keto
 
-    real(sp), dimension(np), intent(out) :: Tdust ! mcfost stores Tdust as real, not dp
+    real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
     real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
@@ -198,6 +202,7 @@ contains
 
     integer :: i_Phantom
 
+    ifiles = 1
     write(*,*)
     write(*,*) "------------------------------"
     write(*,*) "Running MCFOST via the library"
@@ -212,9 +217,9 @@ contains
     mu_gas = mu ! Molecular weight
     Frad = 0.
 
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
-         umass,utime,udist,graindens,ndudt,dudt,&
+         umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
 
@@ -353,7 +358,7 @@ contains
     endif
 
     call set_min_Temperature(Tmin)
-    Tdust = -1.0 ;
+    Tphantom = -1.0 ;
 
     if (present(write_T_files)) then
        if (write_T_files) call write_mcfost2phantom_temperature()
@@ -363,7 +368,7 @@ contains
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
-          Tdust(i_Phantom) = Temperature(icell)
+          Tphantom(i_Phantom) = Tdust(icell)
        endif
     enddo
 
@@ -398,10 +403,10 @@ contains
     endif
 
     ! Verifications et codes d'erreur
-    if (maxval(Tdust) < 0.) then
+    if (maxval(Tphantom) < 0.) then
        write(*,*) "***********************************************"
        write(*,*) "ERROR : PB setting T_DUST", n_cells
-       write(*,*) minval(Temperature), maxval(Temperature)
+       write(*,*)  minval(Tphantom), maxval(Tphantom)
        write(*,*) "***********************************************"
 
        ierr = 1
@@ -422,7 +427,7 @@ contains
 
   subroutine write_mcfost2phantom_temperature()
 
-    use parametres, only : data_dir
+    use mcfost_env, only : data_dir
     use utils, only : appel_syst
     use output, only : ecriture_temperature, write_disk_struct
     use messages, only : error
