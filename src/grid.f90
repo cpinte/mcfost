@@ -159,7 +159,10 @@ subroutine define_physical_zones()
   if (Rmin < 0.0) call error("R_min < 0.0")
   do i=1, n_etoiles
      if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-        if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
+        if (etoile(i)%r > Rmin) then
+           write(*,*) "Rstar =", etoile(i)%r, "Rmin=", Rmin
+           call error("inner disk radius is smaller than stellar radius")
+        endif
      endif
   enddo
 
