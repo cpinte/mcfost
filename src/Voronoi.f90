@@ -106,7 +106,7 @@ module Voronoi_grid
 
       PS%n_faces = n_faces
       PS%radius_o_h = radius_o_h ! We have the input value just in case
-      allocate(PS%vectors(3,n_faces))
+      if (.not.allocated(PS%vectors)) allocate(PS%vectors(3,n_faces))
 
       if (n_faces == 12) then ! regular dodecahedron
          ! a is the edge length
