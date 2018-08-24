@@ -164,7 +164,7 @@ contains
     integer, dimension(ntypes), intent(in) :: npoftype
 
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
-    integer(kind=1), dimension(1) :: ifiles
+    integer(kind=1), dimension(np) :: ifiles
 
     logical, intent(in), optional :: write_T_files
 
@@ -187,6 +187,7 @@ contains
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
+    real(dp), dimension(n_files,ntypes) :: massoftype2
 
     real(kind=dp), dimension(4) :: Stokes
     real(kind=dp) :: nnfot2
@@ -202,7 +203,9 @@ contains
 
     integer :: i_Phantom
 
-    ifiles = 1
+    ! We use the phantom_2_mcfost interface with 1 file
+    ifiles(:) = 1 ; massoftype2(1,:) = massoftype(:)
+
     write(*,*)
     write(*,*) "------------------------------"
     write(*,*) "Running MCFOST via the library"
@@ -218,7 +221,7 @@ contains
     Frad = 0.
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,iphase,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,hfact,&
+         vxyzu,iphase,grainsize,dustfrac,massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
