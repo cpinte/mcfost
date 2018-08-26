@@ -78,6 +78,7 @@ subroutine set_default_variables()
   lvelocity_file=.false.
   lphantom_file=.false.
   lphantom_multi = .false.
+  lphantom_avg = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -633,7 +634,8 @@ subroutine initialisation_mcfost()
         density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-phantom-multi")
+     case("-phantom-multi","-phantom-add","-phantom-avg")
+        if (s == "-phantom-avg") lphantom_avg = .true.
         i_arg = i_arg + 1
         lphantom_file=.true.
         lphantom_multi = .true. ! not used in practise

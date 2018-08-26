@@ -27,6 +27,7 @@ contains
     real, allocatable, dimension(:) :: extra_heating
 
     real(dp), dimension(6) :: SPH_limits
+    real :: factor
     integer :: ndusttypes, ierr, i
     character(len=100) :: line_buffer
 
@@ -42,6 +43,15 @@ contains
        endif
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+
+       if (lphantom_avg) then ! We are averaging the dump
+          factor = 1.0/n_phantom_files
+          massgas = massgas * factor
+          massdust = massdust * factor
+          rho = rho * factor
+          rhodust = rhodust * factor
+       endif
+
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
