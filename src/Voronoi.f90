@@ -933,17 +933,16 @@ module Voronoi_grid
   end subroutine cross_Voronoi_cell
 
   !----------------------------------------
-  subroutine cross_Voronoi_cell_vect(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s)
+
+  subroutine cross_Voronoi_cell_vect(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s, s_contrib, s_void_before)
 
     integer, intent(in) :: icell, previous_cell
     real(kind=dp), intent(in) :: x,y,z, u,v,w
 
-    real(kind=dp), intent(out) ::  s
+    real(kind=dp), intent(out) :: x1, y1, z1, s, s_contrib, s_void_before
     integer, intent(out) :: next_cell
 
     integer :: i, id_n, l
-
-    real(kind=dp), intent(out) :: x1, y1, z1
 
     integer, dimension(100) :: tab_id, tab_id_wall
 
@@ -951,7 +950,11 @@ module Voronoi_grid
     real, dimension(3) :: r, k
     real, dimension(3,100) :: n, p_r
     real, dimension(100) :: den, num, s_tmp
+
+
+    real(kind=dp), dimension(3) :: delta_r
     real :: s_tmp_wall
+    real(kind=dp) :: b, c, delta, rac, s1, s2
 
     integer :: n_neighbours, n_wall
 
@@ -960,7 +963,6 @@ module Voronoi_grid
 
     s = 1e30 !huge_real
     next_cell = 0
-
 
     ! Counting number of neighbouring cells and walls
     n_neighbours = 0
@@ -1020,39 +1022,6 @@ module Voronoi_grid
        enddo
     endif
 
-!    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-!       id_n = neighbours_list(i) ! id du voisin
-!
-!       if (id_n==previous_cell) cycle nb_loop
-!
-!       if (id_n > 0) then ! cellule
-!          ! unnormalized vector to plane
-!          n(:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
-!
-!          ! test direction
-!          den = dot_product(n, k)
-!          if (den <= 0.) cycle nb_loop ! car s_tmp sera < 0
-!
-!          ! point on the plane
-!          p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
-!
-!          s_tmp = dot_product(n, p-r) / den
-!
-!          if (s_tmp < 0.) s_tmp = huge(1.0)
-!       else ! i < 0 ; le voisin est un wall
-!          s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
-!
-!          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
-!          if (s_tmp < 0.) s_tmp = huge(1.0)
-!       endif
-!
-!       if (s_tmp < s) then
-!          s = s_tmp
-!          next_cell = id_n
-!       endif
-!
-!    enddo nb_loop ! i
-
     x1 = x + u*s
     y1 = y + v*s
     z1 = z + w*s
@@ -1068,6 +1037,45 @@ module Voronoi_grid
        else
           next_cell = -1 ! the exact index does not matter
        endif
+    endif
+
+    if (Voronoi(icell)%was_cut) then
+       ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
+       ! centered on the center of the cell
+       delta_r = (/x,y,z/) - Voronoi(icell)%xyz(:)
+       b = dot_product(delta_r,(/u,v,w/))
+       c = dot_product(delta_r,delta_r) - (Voronoi(icell)%h * PS%cutting_distance_o_h)**2
+       delta = b*b - c
+
+       if (delta < 0.) then ! the packet never encounters the sphere
+          s_void_before = s
+          s_contrib = 0.0_dp
+       else ! the packet encounters the sphere
+          rac = sqrt(delta)
+          s1 = -b - rac
+          s2 = -b + rac
+
+          if (s1 < 0) then ! we already entered the sphere
+             if (s2 < 0) then ! we already exited the sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             else ! We are still in the sphere and will exit it
+                s_void_before = 0.0_dp
+                s_contrib = min(s2,s)
+             endif
+          else ! We will enter in the sphere (both s1 and s2 are > 0)
+             if (s1 < s) then ! We will enter the sphere in this cell
+                s_void_before = s1
+                s_contrib = min(s2,s) - s1
+             else ! We will not enter the sphere in this sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             endif
+          endif
+       endif ! delta < 0
+    else ! the cell was not cut
+       s_void_before = 0.0_dp
+       s_contrib = s
     endif
 
     return
