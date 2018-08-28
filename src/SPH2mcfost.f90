@@ -50,6 +50,7 @@ contains
           massdust = massdust * factor
           rho = rho * factor
           rhodust = rhodust * factor
+          h = h/(n_phantom_files**(1./3.))
        endif
 
        ! Todo : extra heating must be passed to mcfost
