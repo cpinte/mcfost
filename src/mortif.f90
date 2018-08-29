@@ -1,25 +1,34 @@
-!< MORTIF, MORTon Indexer (Z-order) Fortran environment.
+! From https://github.com/szaghi/MORTIF/blob/master/src/lib/mortif.f90
+!
 module mortif
-!< MORTIF, MORTon Indexer (Z-order) Fortran environment.
-!<
-!> A library to encode/decode integer indexes into Morton's (Z-order) ordering.
-!> Morton's code (Z-order) is a scheme to map multi-dimensional arrays onto to a linear with a great deal of spatial locality.
-!<
-!<#### References
-!<
-!< [1] *A Computer Oriented Geodetic Data Base and a New Technique in File Sequencing*, Morton G.M., technical report, IBM, 1966.
-!< [2] *On Spatial Orders and Location Codes*, Stocco, LJ and Schrack, G, IEEE Transaction on Computers, vol 58, n 3, March 2009.
-!< [3] *Out-of-Core Construction of Sparse Voxel Octrees*, J. Baert, A. Lagae and Ph. Dutré, Proceedings of the Fifth ACM
-!< SIGGRAPH/Eurographics conference on High-Performance Graphics, 2013.
 !-----------------------------------------------------------------------------------------------------------------------------------
-use penf
+! MORTIF, MORTon Indexer (Z-order) Fortran environment.
+!
+!  A library to encode/decode integer indexes into Morton's (Z-order) ordering.
+!  Morton's code (Z-order) is a scheme to map multi-dimensional arrays onto to a linear with a great deal of spatial locality.
+!
+! #### References
+!  [1] *A Computer Oriented Geodetic Data Base and a New Technique in File Sequencing*, Morton G.M., technical report, IBM, 1966.
+!  [2] *On Spatial Orders and Location Codes*, Stocco, LJ and Schrack, G, IEEE Transaction on Computers, vol 58, n 3, March 2009.
+!  [3] *Out-of-Core Construction of Sparse Voxel Octrees*, J. Baert, A. Lagae and Ph. Dutre, Proceedings of the Fifth ACM
+!  SIGGRAPH/Eurographics conference on High-Performance Graphics, 2013.
 !-----------------------------------------------------------------------------------------------------------------------------------
 
-!-----------------------------------------------------------------------------------------------------------------------------------
-implicit none
-save
-private
-public :: morton2D, demorton2D, morton3D, demorton3D
+  use iso_fortran_env
+
+  implicit none
+
+
+  integer, parameter :: I8P = INT64
+  integer, parameter :: I4P = INT32
+  integer, parameter :: I2P = INT16
+  integer, parameter :: I1P = INT8
+
+  integer, parameter :: R4P = REAL32
+
+  save
+  private
+  public :: morton2D, demorton2D, morton3D, demorton3D
 !-----------------------------------------------------------------------------------------------------------------------------------
 
 !-----------------------------------------------------------------------------------------------------------------------------------
