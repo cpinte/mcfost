@@ -1,3 +1,5 @@
+! From : https://github.com/pdebuyl-lab/RMPCDMD/blob/master/src/hilbert.f90
+!
 ! This file is part of RMPCDMD
 ! Copyright (c) 2015-2016 Pierre de Buyl and contributors
 ! License: BSD 3-clause (see file LICENSE)
@@ -6,8 +8,6 @@
 !!
 !! Ref. \cite hamilton_compact_hilbert_tr
 !
-! From : https://github.com/pdebuyl-lab/RMPCDMD/blob/master/src/hilbert.f90
-
 module hilbert
   implicit none
   private
