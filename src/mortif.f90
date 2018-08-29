@@ -1,4 +1,5 @@
 ! From https://github.com/szaghi/MORTIF/blob/master/src/lib/mortif.f90
+! There might be a bug : https://github.com/szaghi/MORTIF/issues/2
 !
 module mortif
 !-----------------------------------------------------------------------------------------------------------------------------------
