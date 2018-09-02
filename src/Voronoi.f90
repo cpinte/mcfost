@@ -10,8 +10,10 @@ module Voronoi_grid
   use messages
 
   implicit none
+  save
 
   integer, parameter :: max_wall_neighbours = 100000
+  integer, parameter :: n_saved_neighbours = 30
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
@@ -52,6 +54,7 @@ module Voronoi_grid
 
   type(Voronoi_cell), dimension(:), allocatable :: Voronoi
   real, dimension(:,:), allocatable :: Voronoi_xyz
+  real, dimension(:,:,:), allocatable :: Voronoi_neighbour_xyz
   type(Voronoi_wall), dimension(:), allocatable :: wall
   integer, dimension(:), allocatable :: neighbours_list
 
@@ -384,7 +387,7 @@ module Voronoi_grid
 
     ! Ordering of particles
     real(kind=dp) :: xmin,xmax,dx_inv
-    integer :: Imax, ii
+    integer :: Imax, ii, l
     integer, dimension(3) :: ix3
     integer(kind=int64), dimension(:), allocatable :: z_index
     integer, dimension(:), allocatable :: order
@@ -515,7 +518,8 @@ module Voronoi_grid
     write(*,*) "Done"
 
 
-    allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
+    allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
+         delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
     volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
@@ -610,7 +614,6 @@ module Voronoi_grid
     endif
     write(*,*) "Tesselation done"
 
-
     ! Conversion to Fortran indices
     Voronoi(:)%first_neighbour = first_neighbours(:) + 1
     Voronoi(:)%last_neighbour = last_neighbours(:) + 1
@@ -621,6 +624,18 @@ module Voronoi_grid
     Voronoi(:)%was_cut = was_cell_cut(:)
     deallocate(delta_edge, delta_centroid,was_cell_cut)
 
+    ! Saving position of the first neighbours to save time on memory access
+    allocate(Voronoi_neighbour_xyz(3,n_saved_neighbours,n_cells)) ! tried 4 to align vectors, does not help
+    do icell=1, n_cells
+       l=0
+       do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
+          l = l+1
+          if (l <= n_saved_neighbours) then
+             j = neighbours_list(k)
+             Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+          endif
+       enddo
+    enddo
 
     ! We check if we get the same test between Fortran and C++
 !--    write(*,*) "TESTING TESSELATION"
@@ -651,7 +666,6 @@ module Voronoi_grid
 !--    enddo
 !--    write(*,*) "TESTING OK"
 
-
     ! Setting-up the walls
     n_missing_cells = 0
     do icell=1, n_cells
@@ -674,7 +688,12 @@ module Voronoi_grid
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
        enddo ! k
-    enddo ! i
+    enddo ! icell
+
+
+
+
+
 
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
@@ -1043,13 +1062,20 @@ module Voronoi_grid
     n_walls=0
     lhit_wall = .false.
 
+    l=0
     do i=ifirst,ilast
-       id_n = neighbours_list(i) ! id du voisin : values are all the place : many cache misses
+       l = l+1
+       id_n = neighbours_list(i) ! id du voisin : values are all over the place : many cache misses
+
        if (id_n==previous_cell) cycle
 
-       r_neighbour(:) = Voronoi(id_n)%xyz(:)
-       !r_neighbour(:) = Voronoi_xyz(:,id_n)
        if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
           n1(:) = r_neighbour(:) - r_cell(:) ! 1 normal vector
           den1 = dot_product(n1, k)
           if (den1 > 0) then ! we keep that cell and start filling some arrays
