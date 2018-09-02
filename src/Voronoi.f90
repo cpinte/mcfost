@@ -905,13 +905,14 @@ module Voronoi_grid
     integer, intent(out) :: next_cell
 
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
-    integer :: i, id_n
+    integer :: i, id_n, l, ifirst, ilast
 
-    real(kind=dp) :: b, c, delta, rac, s1, s2
+    real(kind=dp) :: b, c, delta, rac, s1, s2, h
     real(kind=dp), dimension(3) :: delta_r
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real, dimension(3) :: n, p, r, k
+    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+    logical :: was_cut
 
     r(1) = x ; r(2) = y ; r(3) = z
     k(1) = u ; k(2) = v ; k(3) = w
@@ -919,21 +920,36 @@ module Voronoi_grid
     s = 1e30 !huge_real
     next_cell = 0
 
-    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+    ! We do all the access to Voronoi(icell) now
+    r_cell(:) = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+    was_cut = Voronoi(icell)%was_cut
+    h = Voronoi(icell)%h
+
+    l=0
+    nb_loop : do i=ifirst,ilast
+       l = l+1
        id_n = neighbours_list(i) ! id du voisin
 
        if (id_n==previous_cell) cycle nb_loop
 
        if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
           ! unnormalized vector to plane
-          n(:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
+          n(:) = r_neighbour(:) - r_cell(:)
 
           ! test direction
           den = dot_product(n, k)
           if (den <= 0.) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
-          p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
+          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
 
           s_tmp = dot_product(n, p-r) / den
 
@@ -969,12 +985,12 @@ module Voronoi_grid
        endif
     endif
 
-    if (Voronoi(icell)%was_cut) then
+    if (was_cut) then
        ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
        ! centered on the center of the cell
-       delta_r = r - Voronoi(icell)%xyz(:)
+       delta_r = r - r_cell(:)
        b = dot_product(delta_r,k)
-       c = dot_product(delta_r,delta_r) - (Voronoi(icell)%h * PS%cutting_distance_o_h)**2
+       c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
        delta = b*b - c
 
        if (delta < 0.) then ! the packet never encounters the sphere
@@ -1028,8 +1044,6 @@ module Voronoi_grid
     integer, dimension(100) :: tab_id, tab_id_wall
     real, dimension(3,100) :: n, p_r
     real, dimension(100) :: den, num, s_tmp
-
-
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: r, k, r_cell, r_neighbour
