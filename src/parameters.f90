@@ -113,8 +113,8 @@ module parametres
   logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
 
   ! Phantom
-  logical :: ldudt_implicit
-  real(kind=dp) :: ufac_implicit
+  logical :: ldudt_implicit,lscale_units
+  real(kind=dp) :: ufac_implicit,scale_units_factor
 
 
   ! Disk parameters

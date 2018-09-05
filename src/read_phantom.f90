@@ -336,16 +336,17 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
+  use parametres, only : lscale_units,scale_units_factor
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
-  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
+  real(dp), dimension(4,np), intent(inout) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
-  real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
+  real(dp), dimension(n_files,ntypes), intent(inout) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -416,6 +417,21 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        write(*,*) "Exiting"
     endif
  endif
+
+  if (lscale_units) then
+     print*,'Lengths are rescaled by ',scale_units_factor
+   ! Rescale units associated with particles first
+     xyzh = xyzh * scale_units_factor
+     vxyzu = vxyzu * scale_units_factor
+     massoftype(:,1) = massoftype(:,1) * (scale_units_factor**3)
+
+     if (use_dust_particles .and. dustfluidtype==2) massoftype(:,2) = massoftype(:,2) * (scale_units_factor**3)
+
+     if (nptmass > 0) then
+        xyzmh_ptmass(1:3,:) = xyzmh_ptmass(1:3,:) * scale_units_factor
+        xyzmh_ptmass(4,:) = xyzmh_ptmass(4,:) * (scale_units_factor**3)
+     endif
+  endif
 
  j = 0
  do i=1,np

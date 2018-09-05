@@ -124,6 +124,7 @@ subroutine set_default_variables()
   lplanet_az = .false.
   lscale_SPH = .false.
   lfix_star = .false.
+  lscale_units = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -963,6 +964,12 @@ subroutine initialisation_mcfost()
      case("-fix_star")
         i_arg = i_arg + 1
         lfix_star=.true.
+     case("-scale_units")
+        lscale_units = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) scale_units_factor
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1294,7 +1301,7 @@ subroutine display_help()
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
   write(*,*) "        : -p2m : reads the results from ProDiMo"
   write(*,*) "        : -astrochem : creates the files for astrochem"
-  write(*,*) "        : -phamtom : reads a phantom dump file"
+  write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
   write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
@@ -1362,6 +1369,7 @@ subroutine display_help()
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
+  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
