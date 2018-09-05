@@ -42,8 +42,6 @@ module read_phantom
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max, ndustsmall, ndustlarge
 
- massoftype=0.
-
  ! We first read the number of particules in each phantom file
  np_tot = 0
  np_max = 0
