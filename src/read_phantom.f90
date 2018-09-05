@@ -40,8 +40,7 @@ module read_phantom
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
- integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max
-
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max, ndustsmall, ndustlarge
 
  massoftype=0.
 
@@ -70,7 +69,14 @@ module read_phantom
        return
     endif
     call extract('nparttot',np,hdr,ierr)
-    call extract('ndusttypes',ndusttypes,hdr,ierr,default=0) ! ndusttype must be the same for all files : todo : add a test
+    call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+    if (ierr /= 0) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+       call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
     call extract('ntypes',ntypes,hdr,ierr)
 
     np_tot = np_tot + np
@@ -114,6 +120,13 @@ module read_phantom
     call extract('ntypes',ntypes,hdr,ierr)
     call extract('npartoftype',npartoftype(ntypes0+1:ntypes0+ntypes),hdr,ierr)
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+    if (ierr /= 0) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+       call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
     call extract('nptmass',nptmass,hdr,ierr,default=0)
     !call extract('isink',isink,hdr,ierr,default=0)
 
