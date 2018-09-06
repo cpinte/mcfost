@@ -10,8 +10,10 @@ module Voronoi_grid
   use messages
 
   implicit none
+  save
 
   integer, parameter :: max_wall_neighbours = 100000
+  integer, parameter :: n_saved_neighbours = 30
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
@@ -51,6 +53,8 @@ module Voronoi_grid
   real(kind=dp), dimension(:,:,:), allocatable :: wall_cells ! 3, n_cells_wall, n_walls
 
   type(Voronoi_cell), dimension(:), allocatable :: Voronoi
+  real, dimension(:,:), allocatable :: Voronoi_xyz
+  real, dimension(:,:,:), allocatable :: Voronoi_neighbour_xyz
   type(Voronoi_wall), dimension(:), allocatable :: wall
   integer, dimension(:), allocatable :: neighbours_list
 
@@ -313,6 +317,9 @@ module Voronoi_grid
        Voronoi(icell)%xyz(1) = x_tmp
        Voronoi(icell)%xyz(2) = y_tmp
        Voronoi(icell)%xyz(3) = z_tmp
+
+       Voronoi_xyz(:,icell) = Voronoi(icell)%xyz(:)
+
        Volume(icell) = vol
        ! todo : find the cells touching the walls
        do k=1, n_neighbours
@@ -345,6 +352,7 @@ module Voronoi_grid
 
   subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
 
+    use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
     !$ use omp_lib
 
@@ -370,10 +378,11 @@ module Voronoi_grid
     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
-    integer :: icell_start, icell_end, id, row
+    integer :: icell_start, icell_end, id, row, l
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     real(kind=dp) :: cutting_distance
+
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -386,7 +395,7 @@ module Voronoi_grid
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles),stat=alloc_status)
+         SPH_id(n_points+n_etoiles),  stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
     do istar=1, n_etoiles
@@ -454,7 +463,8 @@ module Voronoi_grid
     enddo
     n_cells = icell
 
-    allocate(Voronoi(n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
+    allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
+         delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
     volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
@@ -476,6 +486,7 @@ module Voronoi_grid
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
        Voronoi(icell)%xyz(3) = z_tmp(icell)
+       Voronoi_xyz(:,icell) = Voronoi(icell)%xyz(:)
        Voronoi(icell)%h      = h_tmp(icell)
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
@@ -548,7 +559,6 @@ module Voronoi_grid
     endif
     write(*,*) "Tesselation done"
 
-
     ! Conversion to Fortran indices
     Voronoi(:)%first_neighbour = first_neighbours(:) + 1
     Voronoi(:)%last_neighbour = last_neighbours(:) + 1
@@ -559,6 +569,18 @@ module Voronoi_grid
     Voronoi(:)%was_cut = was_cell_cut(:)
     deallocate(delta_edge, delta_centroid,was_cell_cut)
 
+    ! Saving position of the first neighbours to save time on memory access
+    allocate(Voronoi_neighbour_xyz(3,n_saved_neighbours,n_cells)) ! tried 4 to align vectors, does not help
+    do icell=1, n_cells
+       l=0
+       do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
+          l = l+1
+          if (l <= n_saved_neighbours) then
+             j = neighbours_list(k)
+             Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+          endif
+       enddo
+    enddo
 
     ! We check if we get the same test between Fortran and C++
 !--    write(*,*) "TESTING TESSELATION"
@@ -589,7 +611,6 @@ module Voronoi_grid
 !--    enddo
 !--    write(*,*) "TESTING OK"
 
-
     ! Setting-up the walls
     n_missing_cells = 0
     do icell=1, n_cells
@@ -612,7 +633,12 @@ module Voronoi_grid
              wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
           endif ! wall
        enddo ! k
-    enddo ! i
+    enddo ! icell
+
+
+
+
+
 
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
@@ -640,7 +666,6 @@ module Voronoi_grid
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
     write(*,*) "Voronoi volume =", sum(volume)
 
-    deallocate(x_tmp, y_tmp, z_tmp, SPH_id)
     !i = 1
     !write(*,*) i, real(Voronoi(i)%xyz(1)), real(Voronoi(i)%xyz(2)), real(Voronoi(i)%xyz(3)), real(volume(i)), Voronoi(i)%last_neighbour-Voronoi(i)%first_neighbour+1, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
 
@@ -825,13 +850,14 @@ module Voronoi_grid
     integer, intent(out) :: next_cell
 
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
-    integer :: i, id_n
+    integer :: i, id_n, l, ifirst, ilast
 
-    real(kind=dp) :: b, c, delta, rac, s1, s2
+    real(kind=dp) :: b, c, delta, rac, s1, s2, h
     real(kind=dp), dimension(3) :: delta_r
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real, dimension(3) :: n, p, r, k
+    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+    logical :: was_cut
 
     r(1) = x ; r(2) = y ; r(3) = z
     k(1) = u ; k(2) = v ; k(3) = w
@@ -839,21 +865,36 @@ module Voronoi_grid
     s = 1e30 !huge_real
     next_cell = 0
 
-    nb_loop : do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
+    ! We do all the access to Voronoi(icell) now
+    r_cell(:) = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+    was_cut = Voronoi(icell)%was_cut
+    h = Voronoi(icell)%h
+
+    l=0
+    nb_loop : do i=ifirst,ilast
+       l = l+1
        id_n = neighbours_list(i) ! id du voisin
 
        if (id_n==previous_cell) cycle nb_loop
 
        if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
           ! unnormalized vector to plane
-          n(:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
+          n(:) = r_neighbour(:) - r_cell(:)
 
           ! test direction
           den = dot_product(n, k)
           if (den <= 0.) cycle nb_loop ! car s_tmp sera < 0
 
           ! point on the plane
-          p(:) = 0.5 * (Voronoi(id_n)%xyz(:) + Voronoi(icell)%xyz(:))
+          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
 
           s_tmp = dot_product(n, p-r) / den
 
@@ -889,12 +930,12 @@ module Voronoi_grid
        endif
     endif
 
-    if (Voronoi(icell)%was_cut) then
+    if (was_cut) then
        ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
        ! centered on the center of the cell
-       delta_r = (/x,y,z/) - Voronoi(icell)%xyz(:)
-       b = dot_product(delta_r,(/u,v,w/))
-       c = dot_product(delta_r,delta_r) - (Voronoi(icell)%h * PS%cutting_distance_o_h)**2
+       delta_r = r - r_cell(:)
+       b = dot_product(delta_r,k)
+       c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
        delta = b*b - c
 
        if (delta < 0.) then ! the packet never encounters the sphere
@@ -931,6 +972,186 @@ module Voronoi_grid
     return
 
   end subroutine cross_Voronoi_cell
+
+  !----------------------------------------
+
+  subroutine cross_Voronoi_cell_vect(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s, s_contrib, s_void_before)
+
+    integer, intent(in) :: icell, previous_cell
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
+
+    real(kind=dp), intent(out) :: x1, y1, z1, s, s_contrib, s_void_before
+    integer, intent(out) :: next_cell
+
+    integer :: i, id_n, l
+
+
+    integer, dimension(100) :: tab_id, tab_id_wall
+    real, dimension(3,100) :: n, p_r
+    real, dimension(100) :: den, num, s_tmp
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real, dimension(3) :: r, k, r_cell, r_neighbour
+
+    real, dimension(3) :: n1
+    real(kind=dp), dimension(3) :: delta_r
+    real :: s_tmp_wall, den1
+    real(kind=dp) :: b, c, delta, rac, s1, s2, h
+
+    integer :: n_neighbours, n_wall, ifirst, ilast, id_min, id_max
+
+    logical :: lhit_wall, was_cut
+
+
+    r(1) = x ; r(2) = y ; r(3) = z
+    k(1) = u ; k(2) = v ; k(3) = w
+
+    ! We do all the access to Voronoi(icell) now
+    r_cell = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+    was_cut = Voronoi(icell)%was_cut
+    h = Voronoi(icell)%h
+
+    s = 1e30 !huge_real
+    next_cell = 0
+
+    ! Counting number of neighbouring cells and walls
+    n_neighbours = 0
+    n_walls=0
+    lhit_wall = .false.
+
+    l=0
+    do i=ifirst,ilast
+       l = l+1
+       id_n = neighbours_list(i) ! id du voisin : values are all over the place : many cache misses
+
+       if (id_n==previous_cell) cycle
+
+       if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
+          n1(:) = r_neighbour(:) - r_cell(:) ! 1 normal vector
+          den1 = dot_product(n1, k)
+          if (den1 > 0) then ! we keep that cell and start filling some arrays
+             n_neighbours = n_neighbours + 1
+             tab_id(n_neighbours) = id_n
+
+             n(:,n_neighbours) = n1(:)
+             den(n_neighbours) = den1
+
+             p_r(:,n_neighbours) = 0.5 * (r_neighbour(:) + r_cell(:)) - r(:) ! we can save an operation here
+          endif
+       else
+          lhit_wall = .true.
+          n_walls = n_walls + 1
+          tab_id_wall(n_walls) = id_n
+       endif
+    enddo
+
+    ! Allocate arrays
+    !allocate(n(3,n_neighbours), p_r(3,n_neighbours), den(n_neighbours), num(n_neighbours), s_tmp(n_neighbours))
+
+    ! Array of vectors
+  !  do i=1,n_neighbours
+  !     id_n = tab_id(i)
+  !     !n(i,:) = Voronoi(id_n)%xyz(:) - Voronoi(icell)%xyz(:)
+  !     p_r(i,:) = 0.5 * (Voronoi(id_n)%xyz(:) + r_cell(:)) - r(:) ! we can save an operation here
+  !  enddo
+
+    num(1:n_neighbours) = n(1,1:n_neighbours) * p_r(1,1:n_neighbours) + n(2,1:n_neighbours) * p_r(2,1:n_neighbours) + n(3,1:n_neighbours) * p_r(3,1:n_neighbours)
+    s_tmp(1:n_neighbours) = num(1:n_neighbours)/den(1:n_neighbours)
+
+    s = huge(1.0)
+    do i=1,n_neighbours
+       if (s_tmp(i) > 0) then
+          if (s_tmp(i) < s) then
+             s = s_tmp(i)
+             next_cell = tab_id(i)
+          endif
+       endif
+    enddo
+
+    ! We test for walls now
+    if (lhit_wall) then
+       do i=1, n_walls
+          id_n = tab_id_wall(i)
+
+          s_tmp_wall = distance_to_wall(x,y,z, u,v,w, -id_n) ;
+
+          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
+          if (s_tmp_wall < 0.) s_tmp_wall = huge(1.0)
+
+          if (s_tmp_wall < s) then
+             s = s_tmp_wall
+             next_cell = id_n
+          endif
+       enddo
+    endif
+
+    x1 = x + u*s
+    y1 = y + v*s
+    z1 = z + w*s
+
+    if (next_cell == 0) then ! there is a rounding-off error somewehere
+       ! We correct the cell index and do not move the packet
+       x1 = x ; y1 = y ; z1 = z ; s = 0.0
+       if (is_in_volume(x,y,z)) then
+          call indice_cellule_voronoi(x,y,z, next_cell)
+          if (icell == next_cell) then ! that means we are out of the grid already
+             next_cell = -1 ! the exact index does not matter
+          endif
+       else
+          next_cell = -1 ! the exact index does not matter
+       endif
+    endif
+
+    if (was_cut) then
+       ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
+       ! centered on the center of the cell
+       delta_r = r(:) - r_cell(:)
+       b = dot_product(delta_r,k)
+       c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
+       delta = b*b - c
+
+       if (delta < 0.) then ! the packet never encounters the sphere
+          s_void_before = s
+          s_contrib = 0.0_dp
+       else ! the packet encounters the sphere
+          rac = sqrt(delta)
+          s1 = -b - rac
+          s2 = -b + rac
+
+          if (s1 < 0) then ! we already entered the sphere
+             if (s2 < 0) then ! we already exited the sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             else ! We are still in the sphere and will exit it
+                s_void_before = 0.0_dp
+                s_contrib = min(s2,s)
+             endif
+          else ! We will enter in the sphere (both s1 and s2 are > 0)
+             if (s1 < s) then ! We will enter the sphere in this cell
+                s_void_before = s1
+                s_contrib = min(s2,s) - s1
+             else ! We will not enter the sphere in this sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             endif
+          endif
+       endif ! delta < 0
+    else ! the cell was not cut
+       s_void_before = 0.0_dp
+       s_contrib = s
+    endif
+
+    return
+
+  end subroutine cross_Voronoi_cell_vect
 
   !----------------------------------------
 
