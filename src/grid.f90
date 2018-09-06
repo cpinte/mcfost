@@ -2,16 +2,12 @@ module grid
 
   use parametres
   use constantes
-  use disk
-  use opacity
   use grains
-  use em_th
-  use prop_star
   use utils
+
   use cylindrical_grid
   use spherical_grid
   use Voronoi_grid
-  use ray_tracing, only : lscatt_ray_tracing
 
   implicit none
 
@@ -21,6 +17,9 @@ module grid
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
+
+
+  real, dimension(:), allocatable :: vfield, vfield_x, vfield_y, vfield_z ! n_cells
 
   contains
 
@@ -146,6 +145,27 @@ subroutine define_physical_zones()
      enddo !i
   enddo !ir
 
+  ! Adjusting grid for prolate or oblate envelope
+  if (z_scaling_env > 1.) then
+     regions(:)%Rmax = regions(:)%Rmax * z_scaling_env
+  endif
+  if (z_scaling_env < 1.) then
+     regions(:)%Rmin = regions(:)%Rmin * z_scaling_env
+  endif
+
+  Rmin = minval(regions(:)%Rmin)
+  Rmax = maxval(regions(:)%Rmax)
+
+  if (Rmin < 0.0) call error("R_min < 0.0")
+  do i=1, n_etoiles
+     if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
+        if (etoile(i)%r > Rmin) then
+           write(*,*) "Rstar =", etoile(i)%r, "Rmin=", Rmin
+           call error("inner disk radius is smaller than stellar radius")
+        endif
+     endif
+  enddo
+
   write(*,fmt='(" Number of regions detected:",i2)') n_regions
 
   do i=1, n_zones
@@ -173,8 +193,6 @@ end subroutine define_physical_zones
 !******************************************************************************
 
 subroutine setup_grid()
-
-  use dust_ray_tracing, only : select_scattering_method
 
   logical, save :: lfirst = .true.
   integer :: mem_size
@@ -205,6 +223,7 @@ subroutine setup_grid()
      lcylindrical = .false.
      lspherical = .false.
      cross_cell => cross_Voronoi_cell
+     !cross_cell => cross_Voronoi_cell_vect
      pos_em_cellule => pos_em_cellule_Voronoi
      move_to_grid => move_to_grid_Voronoi
      indice_cellule => indice_cellule_Voronoi
@@ -263,97 +282,10 @@ subroutine setup_grid()
      endif
   endif
 
-  ! parametrage methode de diffusion en fonction de la taille de la grille
-  ! 1 : per dust grain
-  ! 2 : per cell
-  call select_scattering_method(p_n_cells)
-
-  lMueller_pos_multi = .false.
-  if (lmono) then
-     p_n_lambda_pos = 1
-  else
-     if (scattering_method==1) then
-        p_n_lambda_pos = 1
-     else
-        p_n_lambda_pos = n_lambda
-        lMueller_pos_multi = .true.
-     endif
-  endif
-
   return
 
 end subroutine setup_grid
 
 !******************************************************************************
-
-subroutine init_lambda()
-  ! Initialisation table de longueurs d'onde
-
-  integer :: i, alloc_status
-
-  allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_lambda')
-  tab_lambda=0.0 ;  tab_lambda_inf=0.0 ; tab_lambda_sup=0.0 ; tab_delta_lambda=0.0
-
-  allocate(tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_amu')
-  tab_amu1=0.0; tab_amu2=0.0;
-
-  allocate(tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_amu_coating')
-  tab_amu1_coating=0.0; tab_amu2_coating=0.0;
-
-  if (lmono0) then
-     ! Lecture longueur d'onde
-     read(band,*) tab_lambda(1)
-     tab_delta_lambda(1) = 1.0
-     tab_lambda_inf(1) = tab_lambda(1)
-     tab_lambda_sup(1) = tab_lambda(1)
-
-  else
-     ! Initialisation longueurs d'onde
-     !delta_lambda = (lambda_max/lambda_min)**(1.0/real(n_lambda))
-     delta_lambda =  exp( (1.0_dp/real(n_lambda,kind=dp)) * log(lambda_max/lambda_min) )
-
-     tab_lambda_inf(1) = lambda_min
-     tab_lambda(1)=lambda_min*sqrt(delta_lambda)
-     tab_lambda_sup(1) = lambda_min*delta_lambda
-     do i=2, n_lambda
-        tab_lambda(i)= tab_lambda(i-1)*delta_lambda
-        tab_lambda_sup(i)= tab_lambda_sup(i-1)*delta_lambda
-        tab_lambda_inf(i)= tab_lambda_sup(i-1)
-     enddo
-
-     do i=1, n_lambda
-        tab_delta_lambda(i) = tab_lambda_sup(i) - tab_lambda_inf(i)
-     enddo
-
-  endif
-
-end subroutine init_lambda
-
-!**********************************************************************
-
-subroutine init_lambda2()
-  ! Initialisation table en lambda sed
-
-  implicit none
-
-  integer :: i
-
-  n_lambda=n_lambda2
-  do i=1, n_lambda2
-     tab_lambda(i)= tab_lambda2(i)
-     tab_lambda_inf(i)= tab_lambda2_inf(i)
-     tab_lambda_sup(i)= tab_lambda2_sup(i)
-     tab_delta_lambda(i)= tab_delta_lambda2(i)
-  enddo
-
-  return
-
-end subroutine init_lambda2
-
-!**********************************************************************
-
 
 end module grid

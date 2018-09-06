@@ -2,9 +2,7 @@ module PAH
 
   use parametres
   use grains
-  use opacity
   use constantes
-  use em_th
   use dust_prop
   use utils, only : interp
 

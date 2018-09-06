@@ -8,11 +8,11 @@ module read_phantom
 
   contains
 
-    subroutine read_phantom_file(iunit,filename, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+    subroutine read_phantom_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
          rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
- integer,               intent(in) :: iunit
- character(len=*),      intent(in) :: filename
+ integer,               intent(in) :: iunit, n_files
+ character(len=*),dimension(n_files), intent(in) :: filenames
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
@@ -27,220 +27,271 @@ module read_phantom
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
- integer, parameter :: maxtypes = 10
- integer :: npartoftype(maxtypes)
- real(dp) :: massoftype(maxtypes),hfact,umass,utime,udist
- integer(kind=1), allocatable, dimension(:) :: itype
+ integer, parameter :: maxtypes = 6
+ integer, parameter :: maxfiles = 3
+ integer, allocatable, dimension(:) :: npartoftype
+ real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
+ real(dp) :: hfact,umass,utime,udist
+ integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:) :: tmp
- real(dp), allocatable, dimension(:) :: grainsize
- real(dp) :: graindens
+ real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
- ! open file for read
- call open_dumpfile_r(iunit,filename,fileid,ierr,requiretags=.true.)
- if (ierr /= 0) then
-    write(*,"(/,a,/)") ' *** ERROR - '//trim(get_error_text(ierr))//' ***'
-    return
- endif
- print "(1x,a)",trim(fileid)
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max, ndustsmall, ndustlarge
 
- if (fileid(2:2)=='T') then
-    tagged = .true.
- else
-    tagged = .false.
- endif
- call read_header(iunit,hdr,tagged,ierr)
- if (.not.tagged) then
-    write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
-    ierr = 1000
-    return
- endif
- !print*,hdr%inttags(:)
- !print*,hdr%realtags(:)
+ ! We first read the number of particules in each phantom file
+ np_tot = 0
+ np_max = 0
+ ntypes_tot = 0
+ ntypes_max = 0
+ do ifile=1, n_files
+    ! open file for read
+    call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
+    if (ierr /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - '//trim(get_error_text(ierr))//' ***'
+       return
+    endif
 
- ! get nblocks
- call extract('nblocks',nblocks,hdr,ierr,default=1)
- call extract('nparttot',np,hdr,ierr)
- call extract('ntypes',ntypes,hdr,ierr)
- call extract('npartoftype',npartoftype(1:ntypes),hdr,ierr)
- call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
- call extract('nptmass',nptmass,hdr,ierr,default=0)
- !call extract('isink',isink,hdr,ierr,default=0)
+    if (fileid(2:2)=='T') then
+       tagged = .true.
+    else
+       tagged = .false.
+    endif
+    call read_header(iunit,hdr,tagged,ierr)
+    if (.not.tagged) then
+       write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
+       ierr = 1000
+       return
+    endif
+    call extract('nparttot',np,hdr,ierr)
+    call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+    if (ierr /= 0) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+       call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
+    call extract('ntypes',ntypes,hdr,ierr)
 
- write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
- write(*,*) ' npartoftype = ',npartoftype(1:ntypes)
- write(*,*) ' nptmass = ', nptmass
+    np_tot = np_tot + np
+    np_max = max(np_max,np)
+    ntypes_tot = ntypes_tot + ntypes
+    ntypes_max = max(ntypes_max,ntypes)
+    close(iunit)
+ enddo ! ifile
 
- if (npartoftype(2) > 0) then
-    dustfluidtype = 2
-    write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
- else
-    dustfluidtype = 1
- endif
+ allocate(xyzh(4,np_tot),itype(np_tot),tmp(np_max),vxyzu(4,np_tot),tmp_dp(np_max))
+ allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
+ allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
 
- allocate(xyzh(4,np),itype(np),tmp(np),vxyzu(4,np),tmp_dp(np))
- allocate(dustfrac(ndusttypes,np),grainsize(ndusttypes))
- allocate(dudt(np))
 
- !allocate(xyzmh_ptmass(5,nptmass)) ! HACK : Bug :  nptmass not defined yet, the keyword does not exist in the dump
- ! itype = 1
+ np0 = 0
+ ntypes0 = 0
+ do ifile=1, n_files
+    ! open file for read
+    call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
+    if (ierr /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - '//trim(get_error_text(ierr))//' ***'
+       return
+    endif
+    print "(1x,a)",trim(fileid)
 
- ! extract info from real header
- call extract('massoftype',massoftype(1:ntypes),hdr,ierr)
- call extract('hfact',hfact,hdr,ierr)
- if (ndusttypes > 0) then
-    call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
-    call extract('graindens',graindens,hdr,ierr)
- endif
- !write(*,*) ' hfact = ',hfact
- !write(*,*) ' massoftype = ',massoftype(1:ntypes)
+    if (fileid(2:2)=='T') then
+       tagged = .true.
+    else
+       tagged = .false.
+    endif
+    call read_header(iunit,hdr,tagged,ierr)
+    if (.not.tagged) then
+       write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
+       ierr = 1000
+       return
+    endif
 
- call extract('umass',umass,hdr,ierr)
- call extract('utime',utime,hdr,ierr)
- call extract('udist',udist,hdr,ierr)
+    ! get nblocks
+    call extract('nblocks',nblocks,hdr,ierr,default=1)
+    call extract('nparttot',np,hdr,ierr)
+    call extract('ntypes',ntypes,hdr,ierr)
+    call extract('npartoftype',npartoftype(ntypes0+1:ntypes0+ntypes),hdr,ierr)
+    call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+    if (ierr /= 0) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+       call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
+    call extract('nptmass',nptmass,hdr,ierr,default=0)
+    !call extract('isink',isink,hdr,ierr,default=0)
 
- read (iunit, iostat=ierr) number
- if (ierr /= 0) return
- narraylengths = number/nblocks
+    write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
+    write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
+    write(*,*) ' nptmass = ', nptmass
 
- got_h = .false.
- got_dustfrac = .false.
- got_itype = .false.
- ! skip each block that is too small
- nblockarrays = narraylengths*nblocks
+    if (npartoftype(2) > 0) then
+       dustfluidtype = 2
+       write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
+    else
+       dustfluidtype = 1
+    endif
 
- ndudt = 0
- ngrains = 0
- do iblock = 1,nblocks
-    call read_block_header(narraylengths,number8,nums,iunit,ierr)
-    do j=1,narraylengths
-       !write(*,*) 'block ',iblock, j, number8(j)
-       do i=1,ndatatypes
-          !print*,' data type ',i,' arrays = ',nums(i,j)
-          do k=1,nums(i,j)
-             if (j==1 .and. number8(j)==np) then
-                read(iunit, iostat=ierr) tag
-                !write(*,"(1x,a)",advance='no') trim(tag)
-                matched = .true.
-                if (i==i_real .or. i==i_real8) then
-                   select case(trim(tag))
-                   case('x')
-                      read(iunit,iostat=ierr) tmp_dp ; xyzh(1,1:np) = tmp_dp
-                   case('y')
-                      read(iunit,iostat=ierr) tmp_dp ; xyzh(2,1:np) = tmp_dp
-                   case('z')
-                      read(iunit,iostat=ierr) tmp_dp ; xyzh(3,1:np) = tmp_dp
-                   case('h')
-                      read(iunit,iostat=ierr) tmp_dp ; xyzh(4,1:np) = tmp_dp
-                      got_h = .true.
-                   case('vx')
-                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(1,1:np) = tmp_dp
-                   case('vy')
-                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(2,1:np) = tmp_dp
-                   case('vz')
-                      read(iunit,iostat=ierr) tmp_dp ; vxyzu(3,1:np) = tmp_dp
-                   case('dustfrac')
-                      ngrains = ngrains + 1
-                      if (ngrains > ndusttypes) then
-                         write(*,*) "ERROR ngrains > ndusttypes:", ngrains, ndusttypes
-                         ierr = 1 ;
-                         return
-                      endif
-                      read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
-                      got_dustfrac = .true.
-                   case default
-                      matched = .false.
+    ! extract info from real header
+    call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
+    call extract('hfact',hfact,hdr,ierr)
+    if (ndusttypes > 0) then
+       call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
+       call extract('graindens',graindens(1:ndusttypes),hdr,ierr)
+    endif
+
+    call extract('umass',umass,hdr,ierr)
+    call extract('utime',utime,hdr,ierr)
+    call extract('udist',udist,hdr,ierr)
+
+    read (iunit, iostat=ierr) number
+    if (ierr /= 0) return
+    narraylengths = number/nblocks
+
+    got_h = .false.
+    got_dustfrac = .false.
+    got_itype = .false.
+    ! skip each block that is too small
+    nblockarrays = narraylengths*nblocks
+
+    ndudt = 0
+    ngrains = 0
+    do iblock = 1,nblocks
+       call read_block_header(narraylengths,number8,nums,iunit,ierr)
+       do j=1,narraylengths
+          !write(*,*) 'block ',iblock, j, number8(j)
+          do i=1,ndatatypes
+             !print*,' data type ',i,' arrays = ',nums(i,j)
+             do k=1,nums(i,j)
+                if (j==1 .and. number8(j)==np) then
+                   read(iunit, iostat=ierr) tag
+                   !write(*,"(1x,a)",advance='no') trim(tag)
+                   matched = .true.
+                   if (i==i_real .or. i==i_real8) then
+                      select case(trim(tag))
+                      case('x')
+                         read(iunit,iostat=ierr) tmp_dp ; xyzh(1,np0+1:np0+np) = tmp_dp
+                      case('y')
+                         read(iunit,iostat=ierr) tmp_dp ; xyzh(2,np0+1:np0+np) = tmp_dp
+                      case('z')
+                         read(iunit,iostat=ierr) tmp_dp ; xyzh(3,np0+1:np0+np) = tmp_dp
+                      case('h')
+                         read(iunit,iostat=ierr) tmp_dp ; xyzh(4,np0+1:np0+np) = tmp_dp
+                         got_h = .true.
+                      case('vx')
+                         read(iunit,iostat=ierr) tmp_dp ; vxyzu(1,np0+1:np0+np) = tmp_dp
+                      case('vy')
+                         read(iunit,iostat=ierr) tmp_dp ; vxyzu(2,np0+1:np0+np) = tmp_dp
+                      case('vz')
+                         read(iunit,iostat=ierr) tmp_dp ; vxyzu(3,np0+1:np0+np) = tmp_dp
+                      case('dustfrac')
+                         ngrains = ngrains + 1
+                         if (ngrains > ndusttypes) then
+                            write(*,*) "ERROR ngrains > ndusttypes:", ngrains, ndusttypes
+                            ierr = 1 ;
+                            return
+                         endif
+                         read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
+                         got_dustfrac = .true.
+                      case default
+                         matched = .false.
+                         read(iunit,iostat=ierr)
+                      end select
+                   elseif (i==i_real4) then
+                      select case(trim(tag))
+                      case('h')
+                         read(iunit,iostat=ierr) tmp(1:np)
+                         xyzh(4,np0+1:np0+np) = real(tmp(1:np),kind=dp)
+                         got_h = .true.
+                      case('dustfrac')
+                         ngrains = ngrains + 1
+                         read(iunit,iostat=ierr) tmp(1:np)
+                         dustfrac(ngrains,np0+1:np0+np) = real(tmp(1:np),kind=dp)
+                         got_dustfrac = .true.
+                      case('luminosity')
+                         read(iunit,iostat=ierr) tmp(1:np)
+                         dudt(np0+1:np0+np) = real(tmp(1:np),kind=dp)
+                         ndudt = np
+                      case default
+                         matched = .false.
+                         read(iunit,iostat=ierr)
+                      end select
+                   elseif (i==i_int1) then
+                      select case(trim(tag))
+                      case('itype')
+                         matched = .true.
+                         got_itype = .true.
+                         read(iunit,iostat=ierr) itype(np0+1:np0+np)
+                         itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
+                         write(*,*) "MAX", maxval(itype(np0+1:np0+np)), ntypes0
+                      case default
+                         read(iunit,iostat=ierr)
+                      end select
+                   else
                       read(iunit,iostat=ierr)
-                   end select
-                elseif (i==i_real4) then
-                   select case(trim(tag))
-                   case('h')
-                      read(iunit,iostat=ierr) tmp(1:np)
-                      xyzh(4,1:np) = real(tmp(1:np),kind=dp)
-                      got_h = .true.
-                   case('dustfrac')
-                      ngrains = ngrains + 1
-                      read(iunit,iostat=ierr) tmp(1:np)
-                      dustfrac(ngrains,1:np) = real(tmp(1:np),kind=dp)
-                      got_dustfrac = .true.
-                   case('luminosity')
-                      read(iunit,iostat=ierr) tmp(1:np)
-                      dudt(1:np) = real(tmp(1:np),kind=dp)
-                      ndudt = np
-                   case default
-                      matched = .false.
-                      read(iunit,iostat=ierr)
-                   end select
-                elseif (i==i_int1) then
-                   select case(trim(tag))
-                   case('itype')
-                      matched = .true.
-                      got_itype = .true.
-                      read(iunit,iostat=ierr) itype(1:np)
-                   case default
-                      read(iunit,iostat=ierr)
-                   end select
-                else
-                   read(iunit,iostat=ierr)
-                endif
-              !  if (matched) then
-              !     write(*,"(a)") '->'//trim(tag)
-              !  else
-              !     write(*,"(a)")
-              !  endif
-            !elseif (j==1 .and. number8(j)==nptmass) then
-             elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
-                nptmass = number8(j) ! HACK
-                if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
-
-                read(iunit,iostat=ierr) tag
-                matched = .true.
-                if (i==i_real .or. i==i_real8) then
-                   ipos = 0
-                   select case(trim(tag))
-                   case('x')
-                      ipos = 1
-                   case('y')
-                      ipos = 2
-                   case('z')
-                      ipos = 3
-                   case('m')
-                      ipos = 4
-                   case('h')
-                      ipos = 5
-                   case default
-                      matched = .false.
-                   end select
-                   if (ipos > 0) then
-                      read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
                    endif
+                !elseif (j==1 .and. number8(j)==nptmass) then
+                elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
+                   nptmass = number8(j) ! HACK
+                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
+
+                   read(iunit,iostat=ierr) tag
+                   matched = .true.
+                   if (i==i_real .or. i==i_real8) then
+                      ipos = 0
+                      select case(trim(tag))
+                      case('x')
+                         ipos = 1
+                      case('y')
+                         ipos = 2
+                      case('z')
+                         ipos = 3
+                      case('m')
+                         ipos = 4
+                      case('h')
+                         ipos = 5
+                      case default
+                         matched = .false.
+                      end select
+                      if (ipos > 0) then
+                         read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
+                      endif
+                   else
+                      matched = .false.
+                      read(iunit,iostat=ierr)
+                   endif
+                   !     if (matched) then
+                   !        write(*,"(a)") '->',trim(tag)
+                   !     else
+                   !        write(*,"(a)")
+                   !     endif
                 else
-                   matched = .false.
-                   read(iunit,iostat=ierr)
+                   read(iunit, iostat=ierr) tag ! tag
+                   !print*,tagarr(1)
+                   read(iunit, iostat=ierr) ! array
                 endif
-           !     if (matched) then
-           !        write(*,"(a)") '->',trim(tag)
-           !     else
-           !        write(*,"(a)")
-           !     endif
-             else
-                read(iunit, iostat=ierr) tag ! tag
-                !print*,tagarr(1)
-                read(iunit, iostat=ierr) ! array
-             endif
+             enddo
           enddo
        enddo
-    enddo
- enddo ! block
+    enddo ! block
+    close(iunit)
 
- close(iunit)
+    ifiles(np0+1:np0+np) = ifile ! index of the file
 
- if (.not. got_itype) then
-    itype = 1
- endif
+    if (.not. got_itype) then
+       itype(np0+1:np0+np) =  1
+    endif
+
+    np0 = np0 + np
+    ntypes0 = ntypes0 + ntypes
+ enddo ! ifile
 
  if ((ndusttypes > 0) .and. .not. got_dustfrac) then
     dustfrac = 0.
@@ -253,9 +304,9 @@ module read_phantom
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh,&
-         vxyzu,itype,grainsize,dustfrac,massoftype(1:ntypes),xyzmh_ptmass,&
-         hfact,umass,utime,udist,graindens,ndudt,dudt,&
+    call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
+         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,&
+         hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
@@ -268,13 +319,13 @@ module read_phantom
  deallocate(xyzh,itype,tmp,vxyzu,tmp_dp)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
-end subroutine read_phantom_file
+end subroutine read_phantom_files
 
 !*************************************************************************
 
-subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
+subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
-     utime, udist,graindens,ndudt,dudt,&
+     utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
      SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
 
@@ -284,20 +335,18 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   ! extra_heating is in W
 
   use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
-  use prop_star
-  use parametres, only : ldudt_implicit,ufac_implicit
-  use ray_tracing, only: RT_az_min, RT_az_max, RT_n_az
-  use disk, only : lplanet_az, planet_az
+  use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
+  use parametres, only : lscale_units,scale_units_factor
 
-  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype
-  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-  integer(kind=1), dimension(np), intent(in) :: iphase
+  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
+  real(dp), dimension(4,np), intent(inout) :: xyzh,vxyzu
+  integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
-  real(dp), intent(in) :: graindens
-  real(dp), dimension(ntypes), intent(in) :: massoftype
+  real(dp), dimension(ndusttypes),    intent(in) :: graindens
+  real(dp), dimension(n_files,ntypes), intent(inout) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -311,7 +360,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   real(dp), intent(in), optional :: T_to_u
 
 
-  integer  :: i,j,k,itypei,alloc_status,i_etoiles
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
@@ -324,7 +373,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
   uvelocity =  udist / (m_to_cm) / utime ! m/s
   usolarmass = umass / Msun_to_g
 
-
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
     use_dust_particles = .false.
@@ -334,7 +382,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
  if (use_dust_particles) then
     write(*,*) '*** Using dust particles for Voronoi mesh ***'
  else
-    write(*,*) '*** Using gas particles for Voronoi mesh ***'
+    write(*,*) '*** Using gas particles for Voronoi mesh ***', n_files
  endif
 
  ! convert to dust and gas density
@@ -370,8 +418,25 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
     endif
  endif
 
+  if (lscale_units) then
+     print*,'Lengths are rescaled by ',scale_units_factor
+   ! Rescale units associated with particles first
+     xyzh = xyzh * scale_units_factor
+     vxyzu = vxyzu * scale_units_factor
+     massoftype(:,1) = massoftype(:,1) * (scale_units_factor**3)
+
+     if (use_dust_particles .and. dustfluidtype==2) massoftype(:,2) = massoftype(:,2) * (scale_units_factor**3)
+
+     if (nptmass > 0) then
+        xyzmh_ptmass(1:3,:) = xyzmh_ptmass(1:3,:) * scale_units_factor
+        xyzmh_ptmass(4,:) = xyzmh_ptmass(4,:) * (scale_units_factor**3)
+     endif
+  endif
+
  j = 0
  do i=1,np
+    ifile = ifiles(i)
+
     xi = xyzh(1,i)
     yi = xyzh(2,i)
     zi = xyzh(3,i)
@@ -395,10 +460,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhodusti = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhodusti = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
-          massdust(1,j) = massoftype(itypei) * usolarmass ! Msun
+          massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
           rhogas(j) = gasfraci*rhodusti
           massgas(j) = gasfraci*massdust(1,j)
        elseif (.not. use_dust_particles .and. itypei==1) then
@@ -413,14 +478,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhogasi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhogasi = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
           if (dustfluidtype==2) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi
           endif
-          massgas(j) =  massoftype(itypei) * usolarmass ! Msun
+          massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
           do k=1,ndusttypes
              rhodust(k,j) = dustfrac(k,i)*rhogasi
              massdust(k,j) = dustfrac(k,i)*massgas(j)
@@ -435,7 +500,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
 
  write(*,*) ''
  write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
- write(*,*) 'SPH dust mass is ', real(sum(massdust)), 'Msun'
+ write(*,*) 'SPH dust mass is ', real(sum(massdust)),'Msun'
  write(*,*) ''
 
  lextra_heating = .false. ; ldudt_implicit = .false.
@@ -485,43 +550,32 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,dustfluidtype,xyzh, &
     write(*,*) "WARNING: updating the azimuth to:", RT_az_min
  endif
 
- write(*,*) ""
- write(*,*) "Updating the stellar properties:"
- write(*,*) "There are", n_etoiles, "stars in the model"
- if (allocated(etoile)) deallocate(etoile)
- allocate(etoile(n_etoiles))
+ if (lfix_star) then
+    write(*,*) ""
+    write(*,*) "Stellar parameters will not be updated"
+ else
+    write(*,*) ""
+    write(*,*) "Updating the stellar properties:"
+    write(*,*) "There are", n_etoiles, "stars in the model"
+    if (allocated(etoile)) deallocate(etoile)
+    allocate(etoile(n_etoiles))
 
- i_etoiles = 0
- do i=1,nptmass
-    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-       i_etoiles = i_etoiles + 1
-       etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
-       etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
-       etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
-       etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
-    endif
- enddo
+    i_etoiles = 0
+    do i=1,nptmass
+       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+          i_etoiles = i_etoiles + 1
+          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
+          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
+          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
+          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
+       endif
+    enddo
+ endif
 
  return
 
 end subroutine phantom_2_mcfost
 
 !*************************************************************************
-
-subroutine read_phantom_input_file(filename,iunit,graintype,graindens,ierr)
-
-  use infile_utils
-  integer, intent(in) :: iunit
-  character(len=*), intent(in) :: filename
-  real, intent(out) :: graintype,graindens
-  integer,  intent(out) :: ierr
-  type(inopts), allocatable :: dbin(:)
-
-  call open_db_from_file(dbin,filename,iunit,ierr)
-  call read_inopt(graindens,'graindens',dbin,ierr)
-  call read_inopt(graintype,'graintype',dbin,ierr)
-  call close_db(dbin)
-
-end subroutine read_phantom_input_file
 
 end module read_phantom

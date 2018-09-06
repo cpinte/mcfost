@@ -32,7 +32,7 @@
   T	                  axial symmetry (important only if N_phi > 1)
 
 #Disk physics
-  1     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
+  0     0.50  1.0	  dust_settling (0=no settling, 1=parametric, 2=Dubrulle, 3=Fromang), exp_strat, a_strat (for parametric settling)
   F                       dust radial migration
   F		  	  sublimate dust
   F                       hydostatic equilibrium
@@ -63,11 +63,10 @@
   1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
   0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
 
-
   2  Number of species
   Mie   2 2    0.0  0.999   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
   Draine_Si_sUV.dat  0.8  Optical indices file, volume fraction
-  ice_opct.dat  0.2  Optical indices file, volume fraction
+  ice_opct.dat       0.2  Optical indices file, volume fraction
   2	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
   0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
 

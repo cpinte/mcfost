@@ -1,5 +1,7 @@
 module ML_ProDiMo
 
+  use mcfost_env
+  use wavelengths
   use prodimo, only : n_phot_envoyes_ISM ! todo : move out of prodimo module
   use constantes
 
@@ -92,13 +94,14 @@ contains
     ! sauvegarde le champ de radiation pour ProDiMo
     ! avant et apres le calcul du champ ISM
 
-    use resultats, only : n_phot_envoyes
+    use dust_ray_tracing, only : n_phot_envoyes
     use radiation_field, only : xJ_abs, xN_abs
     use prodimo, only : chi_ISM, R_ISM, T_ISM_stars, Wdil, Tcmb
-    use disk, only : Rmax, E_disk
-    use opacity, only : volume
-    use grains, only : tab_lambda
-    use prop_star, only : E_stars
+    use parametres, only : Rmax
+    use temperature, only : E_disk
+    use cylindrical_grid, only : volume
+    use wavelengths, only : tab_lambda
+    use stars, only : E_stars
     use utils, only : Blambda
 
     integer, intent(in) :: lambda
@@ -145,10 +148,10 @@ contains
   subroutine xgb_compute_features()
 
     use grains, only : grain, r_grain, n_grains_tot
-    use density, only : compute_CD
-    use opacity, only : densite_pouss, r_grid, z_grid
+    use density, only : compute_CD, densite_pouss
+    use cylindrical_grid, only : r_grid, z_grid
     use molecular_emission, only : densite_gaz, Tcin
-    use em_th, only : Temperature
+    use temperature, only : Tdust
     use Voronoi_grid, only : Voronoi
 
     real, dimension(0:3,n_cells) :: N_grains
@@ -191,7 +194,7 @@ contains
           feature_Tgas(1,:) = r_grid(:)
           feature_Tgas(2,:) = z_grid(:)
        endif
-       feature_Tgas(3,:) = temperature(:)
+       feature_Tgas(3,:) = Tdust(:)
        feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
        feature_Tgas(5:43,:) = J_ML(:,:)
        feature_Tgas(44:47,:) = N_grains(:,:)
@@ -199,7 +202,7 @@ contains
           feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
        enddo
     else if (n_features == 45) then
-       feature_Tgas(1,:) = temperature(:)
+       feature_Tgas(1,:) = Tdust(:)
        feature_Tgas(2,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
        feature_Tgas(3:41,:) = J_ML(:,:)
        feature_Tgas(42:45,:) = N_grains(:,:)

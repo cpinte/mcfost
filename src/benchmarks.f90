@@ -1,12 +1,12 @@
 module benchmarks
 
   use parametres
+  use mcfost_env
   use constantes
   use grains
-  use opacity
-  use em_th
-  use molecular_emission
   use messages
+  use molecular_emission
+  use wavelengths
 
   implicit none
 
@@ -36,48 +36,48 @@ end subroutine init_Pascucci_benchmark
 
 !*************************************************************
 
-subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
-! Lecture table section efficace
-! Benchmark Pascucci et al. 2004
-! bande V : ligne 15
-
-  use utils, only : in_dir
-
-  implicit none
-
-  integer, intent(in) :: lambda
-  real, intent(out) :: Cext, Csca
-
-  integer :: l, ios
-  real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
-
-  character(len=512) :: filename, dir
-
-  if (lambda == 1) then
-     filename = dust_pop(1)%indices(1)
-     dir = in_dir(filename, dust_dir,  status=ios)
-     if (ios /=0) call error("dust file cannot be found:"//trim(filename))
-     filename = trim(dir)//trim(filename) ;
-
-     open(unit=1,file=filename,status="old")
-     ! Skipping header
-     do l=1,11
-        read(1,*)
-     enddo
-
-     do l=1,n_lambda
-        read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
-     enddo
-     close(unit=1)
-  endif
-
-  ! Convert to mum**2
-  Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
-  Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
-
-  return
-
-end subroutine read_Pascucci_cross_sections
+!-- subroutine read_Pascucci_cross_sections(lambda, Cext, Csca)
+!-- ! Lecture table section efficace
+!-- ! Benchmark Pascucci et al. 2004
+!-- ! bande V : ligne 15
+!--
+!--   use utils, only : in_dir
+!--
+!--   implicit none
+!--
+!--   integer, intent(in) :: lambda
+!--   real, intent(out) :: Cext, Csca
+!--
+!--   integer :: l, ios
+!--   real, dimension(61), save :: Cext_Pascucci, Csca_Pascucci
+!--
+!--   character(len=512) :: filename, dir
+!--
+!--   if (lambda == 1) then
+!--      filename = dust_pop(1)%indices(1)
+!--      dir = in_dir(filename, dust_dir,  status=ios)
+!--      if (ios /=0) call error("dust file cannot be found:"//trim(filename))
+!--      filename = trim(dir)//trim(filename) ;
+!--
+!--      open(unit=1,file=filename,status="old")
+!--      ! Skipping header
+!--      do l=1,11
+!--         read(1,*)
+!--      enddo
+!--
+!--      do l=1,n_lambda
+!--         read(1,*) tab_lambda(l), Csca_Pascucci(l), Cext_Pascucci(l)
+!--      enddo
+!--      close(unit=1)
+!--   endif
+!--
+!--   ! Convert to mum**2
+!--   Cext = Cext_Pascucci(lambda) * (m_to_mum)**2
+!--   Csca = Csca_Pascucci(lambda) * (m_to_mum)**2
+!--
+!--   return
+!--
+!-- end subroutine read_Pascucci_cross_sections
 
 !*************************************************************
 
@@ -171,6 +171,8 @@ subroutine readMolecule_benchmark2()
   character(len=80) :: junk
   integer :: i, iPart
 
+  real :: molecularWeight
+
   open(1, file=mol(1)%filename, status="old", form="formatted")
 
   read(1,'(a)') mol(1)%name
@@ -247,5 +249,330 @@ subroutine readMolecule_benchmark2()
 end subroutine readMolecule_benchmark2
 
 !*************************************************************
+
+subroutine init_GG_Tau_mol()
+
+  implicit none
+
+  integer :: icell
+
+  ldust_mol = .true.
+
+  do icell=1,n_cells
+     Tdust(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
+     Tcin(icell) = 30.0 * (r_grid(icell)/100.)**(-0.5)
+  enddo
+
+  icell = icell_ref
+  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
+
+  return
+
+end subroutine init_GG_Tau_mol
+
+!***********************************************************
+
+subroutine init_HH_30_mol()
+
+  implicit none
+
+  integer :: icell
+
+  ldust_mol = .true.
+
+  do icell=1,n_cells
+     Tdust(icell) = 12.0 * (r_grid(icell)/100.)**(-0.55)
+     vfield(icell) = 2.0 * (r_grid(icell)/100.)**(-0.55)
+  enddo
+
+  v_turb = 230.
+
+  return
+
+end subroutine init_HH_30_mol
+
+!***********************************************************
+
+subroutine init_benchmark_vanZadelhoff1()
+
+  implicit none
+
+  ldust_mol = .false.
+
+  v_turb = 150._dp !m.s-1
+  Tdust = 20.
+  Tcin = 20._dp
+  vfield(:) = 0.0
+
+  masse_mol = 1.0
+
+  linfall = .true.
+  lkeplerian = .false.
+
+  !tab_abundance = abundance
+
+  write(*,*) "Density", real(densite_gaz(icell_ref) * &
+       (r_grid(icell_ref)**2 + z_grid(icell_ref)**2)/rmin**2)
+
+  return
+
+end subroutine init_benchmark_vanZadelhoff1
+
+!***********************************************************
+
+subroutine init_benchmark_vanzadelhoff2()
+  ! Lecture de la structure du modele de van Zadelhoff 2a/b
+  ! et ajustement sur la grille de mcfost
+  ! C. Pinte
+  ! 13/07/07
+
+  implicit none
+
+  integer, parameter :: n_lines = 50
+
+  integer :: i, j, ri, l, icell, zj, k
+  real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_T, tmp_v, tmp_vturb, log_tmp_r, log_tmp_nH2
+
+  real :: junk, rayon, log_rayon, frac
+
+  ldust_mol = .false.
+
+  ! Lecture du fichier modele
+  open(unit=1,file="model_1.d",status="old")
+  do i=1,7
+     read(1,*)
+  enddo
+  do i=1,n_lines
+     j = n_lines - i + 1
+     read(1,*) tmp_r(j), tmp_nH2(j), junk, tmp_T(j), tmp_v(j), tmp_vturb(j)
+  enddo
+  close(unit=1)
+
+  ! Conversion en AU
+  tmp_r(:) = tmp_r(:) * cm_to_AU
+
+  ! Interpolation sur la grille de mcfost
+  ! Distance en log
+  ! densite en log
+  ! T, V et vturb en lineaire cf Fig 2 van Zadelhoff 2002
+  log_tmp_r(:) = log(tmp_r(:))
+  log_tmp_nH2(:) = log(tmp_nH2(:))
+
+  do ri=1, n_rad
+     ! Recherche rayon dans def bench
+     icell = cell_map(ri,1,1)
+     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+     log_rayon = log(rayon)
+
+     l=2
+     ! rayon est entre tmp_r(l-1) et tmp_r(l)
+     search : do i=l, n_lines
+        if (tmp_r(i) >= rayon) then
+           l = i
+           exit search
+        endif
+     enddo search
+     if (l > n_lines) l = n_lines
+
+     frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
+
+     do zj=1, nz
+        k=1
+        icell = cell_map(ri,zj,k)
+        densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+        Tdust(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
+        Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
+        vfield(icell) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
+        v_turb(icell) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
+     enddo
+  enddo
+
+  ! Conversion vitesses en m.s-1
+  vfield = vfield * 1.0e3
+  v_turb = v_turb * 1.0e3
+
+  ! Conversion part.m-3
+  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
+
+  linfall = .true.
+  lkeplerian = .false.
+
+  !tab_abundance = abundance
+
+  return
+
+end subroutine init_benchmark_vanzadelhoff2
+
+!***********************************************************
+
+subroutine init_benchmark_water1()
+  ! Initialisation de la structure du modele d'eau 1
+  ! C. Pinte
+  ! 15/10/07
+
+  implicit none
+
+  ldust_mol = .false.
+
+  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
+  Tcin = 40.
+  vfield = 0.0
+  v_turb = 0.0
+
+  linfall = .true.
+  lkeplerian = .false.
+
+  !tab_abundance = abundance
+
+  ! Pas de Cmb
+  tab_Cmb_mol = 0.0
+
+  return
+
+end subroutine init_benchmark_water1
+
+!***********************************************************
+
+subroutine init_benchmark_water2()
+  ! Initialisation de la structure du modele d'eau 2
+  ! C. Pinte
+  ! 15/10/07
+
+  implicit none
+
+  integer :: icell
+
+  ldust_mol = .false.
+
+  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
+  Tcin = 40.
+  v_turb = 0.0
+
+  do icell=1, n_cells
+     vfield(icell) = 1e5 * sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_pc
+  enddo
+
+  linfall = .true.
+  lkeplerian = .false.
+
+  !tab_abundance = abundance
+
+  ! Pas de Cmb
+  tab_Cmb_mol = 0.0
+
+  return
+
+end subroutine init_benchmark_water2
+
+!***********************************************************
+
+subroutine init_benchmark_water3()
+  ! Initialisation de la structure du modele d'eau 2
+  ! C. Pinte
+  ! 15/10/07
+
+  implicit none
+
+  integer, parameter :: n_lines = 100
+
+  integer :: i, j, ri, l, zj, k, icell
+  real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
+  real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
+
+  real :: rayon, log_rayon, frac
+
+  ldust_mol = .true.
+
+  ! Lecture du fichier modele
+  open(unit=1,file="mc_100.d",status="old")
+  read(1,*)
+  !  radius [cm]  n(H2) [cm^-3] Tkin [K]    Tdust [K]   Vrad [km/s] FWHM [km/s]
+  do i=1,n_lines
+     j = n_lines - i + 1
+     read(1,*) tmp_r(j), tmp_nH2(j), tmp_Tkin(j), tmp_T(j), tmp_v(j), tmp_vturb(j)
+  enddo
+  close(unit=1)
+
+  ! Conversion en AU
+  tmp_r(:) = tmp_r(:) * cm_to_AU
+
+  ! Interpolation sur la grille de mcfost
+  ! Distance en log
+  ! densite en log
+  ! Tkin, T, V et vturb
+  log_tmp_r(:) = log(tmp_r(:))
+  log_tmp_nH2(:) = log(tmp_nH2(:))
+  log_tmp_T(:) = log(tmp_T(:))
+  log_tmp_Tkin(:) = log(tmp_Tkin(:))
+  log_tmp_v(:) = log(tmp_v(:) + 1.0e-30)
+
+
+  do ri=1, n_rad
+     ! Recherche rayon dans def bench
+     icell = cell_map(ri,1,1)
+     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+     log_rayon = log(rayon)
+
+
+     if (rayon < 2.0) then
+        do zj=1, nz
+           k=1
+           icell = cell_map(ri,zj,k)
+           densite_gaz(icell) = tmp_nH2(1)
+           Tdust(icell) = tmp_T(1)
+           Tcin(icell) =  tmp_Tkin(1)
+        enddo
+
+     else
+        l=2
+        ! rayon est entre tmp_r(l-1) et tmp_r(l)
+        search : do i=l, n_lines
+           if (tmp_r(i) >= rayon) then
+              l = i
+              exit search
+           endif
+        enddo search
+        if (l > n_lines) l = n_lines
+
+        frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
+        do zj=1, nz
+           k=1
+           icell = cell_map(ri,zj,k)
+           densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+           Tdust(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
+           Tcin(icell) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
+
+           if (rayon < 5.95) then
+              vfield(icell) = 0.0
+              v_turb(icell) = 3.
+           else
+              vfield(icell) =  exp( log_tmp_v(l-1) + frac * (log_tmp_v(l) - log_tmp_v(l-1)) )
+              v_turb(icell) = 1.
+           endif
+        enddo
+     endif
+
+  enddo
+
+  ! Conversion FWHM ---> vitesse
+  v_turb = v_turb / (2.*sqrt(log(2.)))
+
+  ! Conversion vitesses en m.s-1
+  vfield = vfield * 1.0e3
+  v_turb = v_turb * 1.0e3
+
+  ! Conversion part.m-3
+  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
+
+  linfall = .true.
+  lkeplerian = .false.
+
+  !tab_abundance = abundance
+
+  return
+
+end subroutine init_benchmark_water3
+
+!***********************************************************
 
 end module benchmarks

@@ -1,15 +1,12 @@
 module dust_transfer
 
   use parametres
-  use disk
   use grains
   use naleat, only : seed, stream, gtype
-  use resultats
-  use opacity
-  use em_th
-  use prop_star
+  use dust_prop
+  use temperature
+  use thermal_emission
   use constantes
-  use ray_tracing
   use scattering
   use grid
   use optical_depth
@@ -21,7 +18,6 @@ module dust_transfer
   use input
   use benchmarks
   use diffusion
-  use dust_prop
   use stars
   use mem
   use utils
@@ -107,6 +103,7 @@ subroutine transfert_poussiere()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
+  call setup_scattering()
 
   ! Allocation dynamique de tous les autres tableaux
   call alloc_dust_prop()
@@ -195,7 +192,7 @@ subroutine transfert_poussiere()
            call lect_Temperature()
         endif
      else ! Seule l'étoile émet
-        Temperature=0.0
+        Tdust=0.0
      endif !l_em_disk_image
 
   else ! not lmono

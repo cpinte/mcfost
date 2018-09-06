@@ -1,19 +1,31 @@
 module dust_prop
 
+  use mcfost_env
   use parametres
   use grains
-  use disk, only : n_zones
-  use em_th
   use constantes
-  use opacity
-  use ray_tracing
-  use dust_ray_tracing
-
+  use wavelengths
+  use density
+  use cylindrical_grid
+  use utils
   use scattering
   use coated_sphere
-  use input
+  use read_opacity
 
   implicit none
+
+  real, dimension(:,:), allocatable :: kappa !n_cells, n_lambda
+  real, dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
+  real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
+  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, proba_abs_RE_LTE_p_nLTE
+  real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
+
+  real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
+  !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
+  !* certaine taille de grain. Ce tableau est utilise pour le tirage
+  !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
+  !* en compte le nombre de grains en meme temps que leur probabilite
+  !* individuelle de diffuser (donnee par qsca*pi*a**2).
 
   contains
 
@@ -533,7 +545,7 @@ subroutine prop_grains(lambda)
   ! sortie des routines opacite
   ! C. Pinte 7/01/05
 
-  use benchmarks, only : read_Pascucci_cross_sections
+  !use benchmarks, only : read_Pascucci_cross_sections
 
   implicit none
 
@@ -890,7 +902,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   if (lscatt_ray_tracing) then
      do thetaj=0,nang_scatt
         angle = real(thetaj)/real(nang_scatt)*pi
-        tab_cos_scatt(thetaj) = cos(angle)
+        !tab_cos_scatt(thetaj) = cos(angle)
      enddo
   endif
 
@@ -967,65 +979,6 @@ end subroutine opacite
 
 !******************************************************************************
 
-subroutine write_dust_prop()
-
-  use fits_utils, only : cfitsWrite
-
-  integer :: icell, l
-
-  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
-  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
-
-  write(*,*) "Writing dust properties"
-  ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
-
-  ! Only do it after the last pass through the wavelength table
-  ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
-  allocate(kappa_lambda(n_lambda))
-  allocate(albedo_lambda(n_lambda))
-  allocate(g_lambda(n_lambda))
-  allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
-  allocate(kappa_grain(n_lambda,n_grains_tot))
-
-  icell = icell_ref
-  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
-  albedo_lambda=tab_albedo_pos(icell,:)
-
-
-  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
-  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
-  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
-
-  if (aniso_method==2) then
-     g_lambda=tab_g_pos(icell,:)
-     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
-  endif
-
-  do l=1, n_lambda
-     kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
-  enddo
-  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
-
-  do l=1, n_lambda
-     S11_lambda_theta(l,:)= tab_s11_pos(:,icell,l)
-  enddo
-  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
-
-  if (lsepar_pola) then
-     do l=1, n_lambda
-        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,icell,l) ! Deja normalise par S11
-     enddo
-     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
-  endif
-
-  deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
-
-  return
-
-end subroutine write_dust_prop
-
-!**********************************************************************
-
 subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
   integer, intent(in) :: lambda, p_lambda
@@ -1066,12 +1019,9 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! tab_s11_pos soit normalisee a k_sca_tot
            tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
            if (lsepar_pola) then
-              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s12(:,k,lambda) * S_grain(k) * density
-              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s33(:,k,lambda) * S_grain(k) * density
-              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + &
-                   tab_s34(:,k,lambda) * S_grain(k) * density
+              tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + tab_s12(:,k,lambda) * S_grain(k) * density
+              tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + tab_s33(:,k,lambda) * S_grain(k) * density
+              tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + tab_s34(:,k,lambda) * S_grain(k) * density
            endif
         endif !aniso_method
      enddo !k
@@ -1183,5 +1133,149 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 end subroutine calc_local_scattering_matrices
 
 !******************************************************************************
+
+integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
+!-----------------------------------------------------
+!  Nouvelle version : janvier 04
+!  la dichotomie se fait en comparant les indices
+!  et non plus en utilisant la taille du pas
+!  --> plus precis, important quand on reduit n_grains_tot
+!
+!  23 Fevrier 04 : ajout d'une prediction avant la
+!  premiere iteration de la dichotomie
+!-----------------------------------------------------
+
+  implicit none
+
+  integer, intent(in) :: lambda, icell
+  real, intent(in) :: aleat
+  real :: prob
+  integer :: kmin, kmax
+
+  prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
+
+  ! dichotomie
+  kmin = 0
+  kmax = n_grains_tot
+  k=(kmin + kmax)/2
+
+  do while (ksca_CDF(k,icell,lambda) /= prob)
+     if (ksca_CDF(k,icell,lambda) < prob) then
+        kmin = k
+     else
+        kmax = k
+     endif
+
+     k = (kmin + kmax)/2
+     if ((kmax-kmin) <= 1) then
+        exit ! Sortie du while
+     endif
+  enddo   ! while
+  k=kmax
+
+  return
+
+end function select_grainsize_high_mem
+
+!***************************************************
+
+integer function select_scattering_grain(lambda,icell, aleat) result(k)
+  ! This routine will select randomly the scattering grain from the CDF of ksca
+  ! Because we cannot store all the CDF for all cells (n_grains x ncells x n_lambda),
+  ! the CDF is recomputed on the fly here.
+  ! The normalization is saved via kappa_sca, so we do not need to compute the whole CDF.
+
+  implicit none
+
+  integer, intent(in) :: lambda, icell
+  real, intent(in) :: aleat
+  real :: prob, CDF, norm
+
+  if (low_mem_scattering) then
+     ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
+     norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
+
+     if (aleat < 0.5) then ! We start from first grain
+        prob = aleat * norm
+        CDF = 0.0
+        do k=1, n_grains_tot
+           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     else ! We start from the end of the grain size distribution
+        prob = (1.0-aleat) * norm
+        CDF = 0.0
+        do k=n_grains_tot, 1, -1
+           CDF = CDF + C_sca(k,lambda) * densite_pouss(k,icell)
+           if (CDF > prob) exit
+        enddo
+     endif
+  else
+     k = select_grainsize_high_mem(lambda,aleat, icell) ! is this ever used ?
+  endif
+
+  return
+
+end function select_scattering_grain
+
+!*******************************************************************
+
+subroutine write_dust_prop()
+
+  use fits_utils, only : cfitsWrite
+  use density, only : masse
+
+  integer :: icell, l
+
+  real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
+  real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
+
+  write(*,*) "Writing dust properties"
+  ! Rewrite step2 on top of step1 (we still get step 1 if step 2 does not finish)
+
+  ! Only do it after the last pass through the wavelength table
+  ! in order to populate the tab_s11_pos and tab_s12_pos tables first!
+  allocate(kappa_lambda(n_lambda))
+  allocate(albedo_lambda(n_lambda))
+  allocate(g_lambda(n_lambda))
+  allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
+  allocate(kappa_grain(n_lambda,n_grains_tot))
+
+  icell = icell_ref
+  kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
+  albedo_lambda=tab_albedo_pos(icell,:)
+
+
+  call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
+  call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
+  call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
+
+  if (aniso_method==2) then
+     g_lambda=tab_g_pos(icell,:)
+     call cfitsWrite("!data_dust/g.fits.gz",g_lambda,shape(g_lambda))
+  endif
+
+  do l=1, n_lambda
+     kappa_grain(l,:) = C_abs(:,l) * mum_to_cm**2 / M_grain(:) ! cm^2/g
+  enddo
+  call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
+
+  do l=1, n_lambda
+     S11_lambda_theta(l,:)= tab_s11_pos(:,icell,l)
+  enddo
+  call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
+
+  if (lsepar_pola) then
+     do l=1, n_lambda
+        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,icell,l) ! Deja normalise par S11
+     enddo
+     call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
+  endif
+
+  deallocate(kappa_lambda,albedo_lambda,g_lambda,S11_lambda_theta,pol_lambda_theta,kappa_grain)
+
+  return
+
+end subroutine write_dust_prop
 
 end module dust_prop

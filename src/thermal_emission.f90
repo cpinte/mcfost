@@ -2,21 +2,23 @@ module thermal_emission
 
   use parametres
   use constantes
-  use em_th
   use grains
-  use opacity
-  use prop_star
-  use disk
+  use dust_prop
   !$ use omp_lib
-
+  use temperature
   use utils
   use PAH
   use grid
-  use stars, only : spectre_etoiles
+  use stars, only : spectre_etoiles, E_ISM, E_stars
+  use input
+  use density
+  use cylindrical_grid
 
   implicit none
+  save
 
-  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk
+  public :: prob_E_cell, E_totale, nbre_reemission, frac_E_stars, frac_E_disk, L_packet_th, E_abs_nRE, correct_E_emission, &
+       DensE, DensE_m1, Dcoeff
 
   public :: allocate_temperature, deallocate_temperature_calculation, realloc_emitting_fractions, &
        allocate_thermal_emission, deallocate_thermal_emission, allocate_weight_proba_emission, &
@@ -55,6 +57,16 @@ module thermal_emission
 
   real(kind=dp), dimension(:,:), allocatable :: nbre_reemission ! n_cells, id
 
+  real(kind=dp) :: E_abs_nRE
+  real :: L_packet_th
+
+  ! Biais de l'emission vers la surface du disque
+  real, dimension(:), allocatable :: weight_proba_emission, correct_E_emission
+
+  real, dimension(:,:,:), allocatable :: DensE, DensE_m1 !n_rad, 0:n_z, n_az
+  real(kind=dp), dimension(:,:,:), allocatable :: Dcoeff !n_rad, n_z, n_az
+
+
 
   contains
 
@@ -64,9 +76,9 @@ subroutine allocate_thermal_energy(Nc)
 
   integer :: alloc_status
 
-  allocate(frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
+  allocate(E_disk(n_lambda), frac_E_stars(n_lambda), frac_E_disk(n_lambda), E_totale(n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error frac_E_stars')
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+  E_disk = 0.0 ; frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   allocate(prob_E_cell(0:Nc,n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error( 'Allocation error prob_E_cell 1')
@@ -165,9 +177,9 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
         E_em_1grain_nRE=0.0
         log_E_em_1grain_nRE=0.0
 
-        allocate(Temperature_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error Temperature_1grain_nRE_old')
-        Temperature_1grain_nRE_old =0.0
+        allocate(Tdust_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error Tdust_1grain_nRE_old')
+        Tdust_1grain_nRE_old =0.0
 
         allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
              maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
@@ -185,9 +197,9 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
         kdB_dT_1grain_nRE_CDF=0.0
 
         if (lRE_nlTE) then
-           allocate(Temperature_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-           if (alloc_status > 0) call error('Allocation error Temperature_1grain_old')
-           Temperature_old=0.
+           allocate(Tdust_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
+           if (alloc_status > 0) call error('Allocation error Tdust_1grain_old')
+           Tdust_old=0.
         endif
      endif
 
@@ -234,8 +246,8 @@ subroutine deallocate_temperature_calculation()
   if (lreemission_stats) deallocate(nbre_reemission)
   if (lnRE) then
      deallocate(kdB_dT_1grain_nRE_CDF,E_em_1grain_nRE,log_E_em_1grain_nRE,xT_ech_1grain_nRE)
-     deallocate(Temperature_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old)
-     if (lRE_nlTE) deallocate(Temperature_1grain_old)
+     deallocate(Tdust_1grain_nRE_old,Emissivite_nRE_old,Tpeak_old)
+     if (lRE_nlTE) deallocate(Tdust_1grain_old)
   endif
   call deallocate_radiation_field()
 
@@ -250,10 +262,10 @@ subroutine realloc_emitting_fractions()
   integer :: alloc_status
 
   alloc_status = 0
-  deallocate(frac_E_stars, frac_E_disk, E_totale)
-  allocate(frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
+  deallocate(E_disk, frac_E_stars, frac_E_disk, E_totale)
+  allocate(E_disk(n_lambda2), frac_E_stars(n_lambda2), frac_E_disk(n_lambda2), E_totale(n_lambda2), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error frac_E_stars')
-  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
+  E_disk = 0.0 ; frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 
   deallocate(prob_E_cell)
   allocate(prob_E_cell(0:n_cells,n_lambda2), stat=alloc_status)
@@ -273,14 +285,14 @@ subroutine allocate_temperature(Nc)
 
   integer :: alloc_status
 
-  allocate(Temperature(Nc), Temperature_old(Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error Temperature')
-  Temperature = 0.0 ; Temperature_old=0.0
+  allocate(Tdust(Nc), Tdust_old(Nc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error Tdust')
+  Tdust = 0.0 ; Tdust_old=0.0
 
   if (lRE_nLTE) then
-     allocate(Temperature_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error Temperature_1grain')
-     Temperature_1grain = 0.0
+     allocate(Tdust_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Tdust_1grain')
+     Tdust_1grain = 0.0
   endif
 
   if (lnRE) then
@@ -290,11 +302,11 @@ subroutine allocate_temperature(Nc)
         tab_Temp = 0.0
      endif
 
-     allocate(Proba_Temperature(n_T,grain_nRE_start:grain_nRE_end,Nc), &
-          Temperature_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error Proba_Temperature')
-     Proba_Temperature=0.0
-     Temperature_1grain_nRE=0.0
+     allocate(Proba_Tdust(n_T,grain_nRE_start:grain_nRE_end,Nc), &
+          Tdust_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Proba_Tdust')
+     Proba_Tdust=0.0
+     Tdust_1grain_nRE=0.0
 
      allocate(l_RE(grain_nRE_start:grain_nRE_end,Nc), lchange_nRE(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error l_RE')
@@ -885,11 +897,11 @@ subroutine Temp_finale()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(icell,Temp,Ti) &
-  !$omp shared(Temperature,n_cells)
+  !$omp shared(Tdust,n_cells)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      call Temp_LTE(icell, Ti, Temp)
-     Temperature(icell) = Temp
+     Tdust(icell) = Temp
   enddo !icell
   !$omp enddo
   !$omp end parallel
@@ -897,11 +909,11 @@ subroutine Temp_finale()
 
 ! if (l3D)  Temperature(:,0,1) = T_min
 
-  if (maxval(Temperature) > T_max) then
+  if (maxval(Tdust) > T_max) then
      write(*,*) "WARNING : temperature > sublimation temperature"
-     write(*,*) "WARNING : temperature = ", maxval(Temperature)
+     write(*,*) "WARNING : temperature = ", maxval(Tdust)
   else
-     write(*,*) "Max. temperature = ", maxval(Temperature)
+     write(*,*) "Max. temperature = ", maxval(Tdust)
   endif
 
   return
@@ -918,13 +930,13 @@ subroutine set_min_temperature(Tmin)
 
   i=0
   do icell=1, n_cells
-     if (Temperature(icell) < Tmin) then
-        Temperature(icell) = Tmin
+     if (Tdust(icell) < Tmin) then
+        Tdust(icell) = Tmin
         i = i+1
      endif
   end do
 
-  write(*,*) "Temperature was set to ", Tmin, "in", i, "cells"
+  write(*,*) "Tdust was set to ", Tmin, "in", i, "cells"
 
   return
 
@@ -953,8 +965,8 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,L_packet_th,Temperature,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
-  !$omp shared(xJ_abs,densite_pouss,Temperature_1grain, xT_ech_1grain,log_E_em_1grain) &
+  !$omp shared(J_absorbe,L_packet_th,Tdust,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
+  !$omp shared(xJ_abs,densite_pouss,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
@@ -968,12 +980,12 @@ subroutine Temp_finale_nLTE()
            ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
            J_absorbe = J_absorbe*L_packet_th/volume(icell)
            if (J_absorbe < tiny_dp) then
-              Temperature_1grain(k,icell) = T_min
+              Tdust_1grain(k,icell) = T_min
            else
               log_E_abs=log(J_absorbe)
 
               if (log_E_abs <  log_E_em_1grain(k,1)) then
-                 Temperature_1grain(k,icell) = T_min
+                 Tdust_1grain(k,icell) = T_min
               else
                  ! Temperature echantillonee juste sup. a la temperature de la cellule
                  T_int=maxval(xT_ech_1grain(k,icell,:))
@@ -993,22 +1005,22 @@ subroutine Temp_finale_nLTE()
                  Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
                  ! Save
-                 Temperature_1grain(k,icell)=Temp
+                 Tdust_1grain(k,icell)=Temp
               endif
            endif
         else
-           Temperature_1grain(k,icell)=0.0
+           Tdust_1grain(k,icell)=0.0
         endif
      enddo !k
   enddo !icell
   !$omp enddo
   !$omp end parallel
 
-  if (maxval(Temperature_1grain) > T_max) then
+  if (maxval(Tdust_1grain) > T_max) then
      write(*,*) "WARNING : temperature > sublimation temperature"
-     write(*,*) "WARNING : temperature = ", maxval(Temperature_1grain)
+     write(*,*) "WARNING : temperature = ", maxval(Tdust_1grain)
   else
-     write(*,*) "Max. temperature NLTE = ", maxval(Temperature_1grain)
+     write(*,*) "Max. temperature NLTE = ", maxval(Tdust_1grain)
   endif
 
   return
@@ -1120,9 +1132,9 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
      !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, disk_zone,etoile) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
-     !$omp shared(delta_nu_bin,Proba_temperature, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Temperature_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
-     !$omp shared(densite_pouss,l_dark_zone,Temperature,lchange_nRE)
+     !$omp shared(delta_nu_bin,Proba_Tdust, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
+     !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid) &
+     !$omp shared(densite_pouss,l_dark_zone,Tdust,lchange_nRE)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
@@ -1225,12 +1237,12 @@ subroutine Temp_nRE(lconverged)
 
               ! Calcul Temperature equilibre
               if (Int_k_lambda_Jlambda < tiny_real) then
-                 Temperature_1grain_nRE(l,icell) = T_min
+                 Tdust_1grain_nRE(l,icell) = T_min
               else
                  log_E_abs=log(Int_k_lambda_Jlambda)
 
                  if (log_E_abs <  log_E_em_1grain_nRE(l,1)) then
-                    Temperature_1grain_nRE(l,icell) = T_min
+                    Tdust_1grain_nRE(l,icell) = T_min
                  else
                     T_int=2
                     do while((log_E_em_1grain_nRE(l,T_int) < log_E_abs).and.(T_int < n_T))
@@ -1245,16 +1257,16 @@ subroutine Temp_nRE(lconverged)
                     Temp1=tab_Temp(T1)
                     frac=(log_E_abs-log_E_em_1grain_nRE(l,T1))/&
                          (log_E_em_1grain_nRE(l,T2)-log_E_em_1grain_nRE(l,T1))
-                    Temperature_1grain_nRE(l,icell)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
+                    Tdust_1grain_nRE(l,icell)=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
                  endif
               endif
 
-              if (Temperature_1grain_nRE(l,icell) > T_max) then
+              if (Tdust_1grain_nRE(l,icell) > T_max) then
                  ! Impossible de definir proba de temperature
                  t_cool = 1.0 ; t_abs = 0.0
                  write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
                  write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(densite_pouss(l,icell)), &
-                      real(Temperature_1grain_nRE(l,icell))
+                      real(Tdust_1grain_nRE(l,icell))
                  write(*,*) "Exiting"
                  call exit(1)
               endif
@@ -1325,7 +1337,7 @@ subroutine Temp_nRE(lconverged)
                  X(:,id)=X(:,id)/sum(X(:,id))
 
                  do T=1, n_T ! boucle car passage tableau double -> simple bug avec ifort
-                    Proba_Temperature(T,l,icell) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
+                    Proba_Tdust(T,l,icell) = X(T,id) ! P(T).dT, probability of being in bin of temperature T
                  enddo
 
               else  ! test : t_cool > t_abs : on est a a l'equilibre
@@ -1353,34 +1365,34 @@ subroutine Temp_nRE(lconverged)
   ! Verification convergence sur la temperature
   if (lRE_LTE) then
      do icell=1,n_cells
-        delta_T = Temperature(icell) - Temperature_old(icell)
-        if (delta_T > precision * Temperature_old(icell)) lconverged = .false.
+        delta_T = Tdust(icell) - Tdust_old(icell)
+        if (delta_T > precision * Tdust_old(icell)) lconverged = .false.
      enddo
-     Temperature_old = Temperature
+     Tdust_old = Tdust
   endif
 
   if (lRE_nLTE) then
      do icell=1, n_cells
         do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-           delta_T = Temperature_1grain(l,icell) - Temperature_1grain_old(l,icell)
-           if (delta_T > precision * Temperature_1grain_old(l,icell)) lconverged = .false.
+           delta_T = Tdust_1grain(l,icell) - Tdust_1grain_old(l,icell)
+           if (delta_T > precision * Tdust_1grain_old(l,icell)) lconverged = .false.
         enddo
      enddo
-     Temperature_1grain_old = Temperature_1grain
+     Tdust_1grain_old = Tdust_1grain
   endif
 
   do icell=1, n_cells
      do l=grain_nRE_start, grain_nRE_end
         if (l_RE(l,icell)) then
-           delta_T = Temperature_1grain_nRE(l,icell) - Temperature_1grain_nRE_old(l,icell)
-           if (delta_T > precision * Temperature_1grain_nRE_old(l,icell)) lconverged = .false.
-           Temperature_1grain_nRE_old(l,icell) =  Temperature_1grain_nRE(l,icell)
+           delta_T = Tdust_1grain_nRE(l,icell) - Tdust_1grain_nRE_old(l,icell)
+           if (delta_T > precision * Tdust_1grain_nRE_old(l,icell)) lconverged = .false.
+           Tdust_1grain_nRE_old(l,icell) =  Tdust_1grain_nRE(l,icell)
         else
            Tpeak = 1
-           maxP =  Proba_Temperature(1,l,icell)
+           maxP =  Proba_Tdust(1,l,icell)
            do T=2, n_T
-              if (Proba_Temperature(T,l,icell) > maxP) then
-                 maxP=Proba_Temperature(T,l,icell)
+              if (Proba_Tdust(T,l,icell) > maxP) then
+                 maxP=Proba_Tdust(T,l,icell)
                  Tpeak=T
               endif
            enddo
@@ -1401,13 +1413,13 @@ subroutine Temp_nRE(lconverged)
         do icell=1, n_cells
            somme1=0.0
            somme2=0.0
-           !temp=Temperature_1grain(i,j,l) ! Tab_Temp(100)
+           !temp=Tdust_1grain(i,j,l) ! Tab_Temp(100)
            do lambda=1, n_lambda
               somme1 = somme1 + C_abs_norm(l,lambda)  * lambda_Jlambda(lambda,1)
               wl = tab_lambda(lambda)*1.0e-6
               delta_wl = tab_delta_lambda(lambda)*1.0e-6
               if (l_RE(l,icell)) then
-                 Temp = Temperature_1grain_nRE(l,icell)
+                 Temp = Tdust_1grain_nRE(l,icell)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < 500.) then
                     somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
@@ -1418,16 +1430,16 @@ subroutine Temp_nRE(lconverged)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < 500.) then
                        somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
-                            Proba_Temperature(T,l,icell)
+                            Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo
               endif
            enddo ! lambda
 
            somme2=somme2*2.0*hp*c_light**2
-           !write(*,*) i,j,l,l_RE(i,j,l), Temperature_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
+           !write(*,*) i,j,l,l_RE(i,j,l), Tdust_1grain_nRE(i,j,l), real(somme1), real(somme2), real(somme1/somme2)
            if (somme2 > tiny_dp) then
-              Proba_Temperature(:,l,icell)  = Proba_Temperature(:,l,icell) * real(somme1/somme2)
+              Proba_Tdust(:,l,icell)  = Proba_Tdust(:,l,icell) * real(somme1/somme2)
            endif
         enddo !icell
      enddo ! l
@@ -1648,7 +1660,7 @@ subroutine emission_nRE()
      !$omp parallel default(none) &
      !$omp private(k,E_emise,Temp,cst_wl,T,icell) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
-     !$omp shared(n_cells,l_RE, Temperature_1grain_nRE,n_T,C_abs_norm,densite_pouss,volume,tab_Temp,Proba_Temperature) &
+     !$omp shared(n_cells,l_RE, Tdust_1grain_nRE,n_T,C_abs_norm,densite_pouss,volume,tab_Temp,Proba_Tdust) &
      !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE)
      !$omp do
      do icell=1,n_cells
@@ -1656,7 +1668,7 @@ subroutine emission_nRE()
         do k=grain_nRE_start,grain_nRE_end
            if (l_RE(k,icell)) then ! le grain a une temperature
               if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
-                 Temp = Temperature_1grain_nRE(k,icell)
+                 Temp = Tdust_1grain_nRE(k,icell)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
@@ -1669,7 +1681,7 @@ subroutine emission_nRE()
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* volume(icell)/ &
-                         ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell) * delta_wl
+                         ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell) * delta_wl
                  endif !cst_wl
               enddo !T
            endif
@@ -1747,7 +1759,7 @@ subroutine init_emissivite_nRE()
      E_emise = 0.0_dp
      do icell=1,n_cells
         do k=grain_nRE_start,grain_nRE_end
-           E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* volume(icell) * facteur !* Proba_Temperature = 1 pour Tmin
+           E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
         enddo !k
         Emissivite_nRE_old(icell,lambda) = E_emise
      enddo !icell
@@ -1798,7 +1810,7 @@ subroutine repartition_energie(lambda)
   if (lRE_LTE) then
      do icell=1, n_cells
         if (.not.l_dark_zone(icell)) then
-           Temp=Temperature(icell)
+           Temp=Tdust(icell)
            if (Temp < tiny_real) then
               ! E_cell(icell) = 0.0_dp
            else
@@ -1819,7 +1831,7 @@ subroutine repartition_energie(lambda)
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Temperature_1grain(k,icell)
+              Temp=Tdust_1grain(k,icell)
               if (Temp < tiny_real) then
                  !E_emise = E_emise + 0.0
               else
@@ -1854,7 +1866,7 @@ subroutine repartition_energie(lambda)
         if (.not.l_dark_zone(icell)) then
            do k=grain_nRE_start,grain_nRE_end
               if (l_RE(k,icell)) then ! le grain a une temperature
-                 temp=Temperature_1grain_nRE(k,icell)
+                 temp=Tdust_1grain_nRE(k,icell)
                  cst_wl=cst_th/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
                     E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
@@ -1866,7 +1878,7 @@ subroutine repartition_energie(lambda)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
                        E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*densite_pouss(k,icell)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Temperature(T,k,icell)
+                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
                     endif !cst_wl
                  enddo !T
               endif ! l_RE
@@ -2131,7 +2143,7 @@ subroutine reset_temperature()
   endif
   if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
   xT_ech = 2
-  Temperature = 1.0
+  Tdust = 1.0
 
   return
 

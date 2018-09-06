@@ -1,16 +1,14 @@
 module init_mcfost
 
   use parametres
-  use disk
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
   use density, only : specie_removed, T_rm
   use molecular_emission
-  use ray_tracing
   !$ use omp_lib
   use benchmarks
   use read_params
-  use input, only : Tfile
+  use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
 
@@ -65,7 +63,6 @@ subroutine set_default_variables()
   loutput_J = .false.
   loutput_J_step1 = .false.
   laverage_grain_size = .false.
-  lr_subdivide=.false.
   lfreeze_out = .false.
   lphoto_dissociation = .false.
   lphoto_desorption = .false.
@@ -80,6 +77,8 @@ subroutine set_default_variables()
   ldensity_file=.false.
   lvelocity_file=.false.
   lphantom_file=.false.
+  lphantom_multi = .false.
+  lphantom_avg = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -125,6 +124,8 @@ subroutine set_default_variables()
   lplanet_az = .false.
   lscale_SPH = .false.
   lML = .false.
+  lfix_star = .false.
+  lscale_units = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -184,7 +185,7 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, i
   integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
@@ -565,12 +566,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,Tfile)
         i_arg = i_arg + 1
-     case("-r_subdivide")
-        i_arg = i_arg + 1
-        lr_subdivide=.true.
-        call get_command_argument(i_arg,s)
-        i_arg = i_arg + 1
-        read(s,*) r_subdivide
      case("-freeze_out","-freeze-out")
         i_arg = i_arg + 1
         lfreeze_out=.true.
@@ -637,8 +632,27 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        n_phantom_files = 1
+        allocate(density_files(n_phantom_files))
+        density_files(1) = s
         i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-phantom-multi","-phantom-add","-phantom-avg")
+        if (s == "-phantom-avg") lphantom_avg = .true.
+        i_arg = i_arg + 1
+        lphantom_file=.true.
+        lphantom_multi = .true. ! not used in practise
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) n_phantom_files
+        allocate(density_files(n_phantom_files))
+        do i=1, n_phantom_files
+           call get_command_argument(i_arg,s)
+           i_arg = i_arg + 1
+           density_files(i) = s
+        enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
      case("-ascii_SPH")
         i_arg = i_arg + 1
@@ -952,6 +966,15 @@ subroutine initialisation_mcfost()
      case("-ML","-ml")
         i_arg = i_arg + 1
         lML=.true.
+     case("-fix_star")
+        i_arg = i_arg + 1
+        lfix_star=.true.
+     case("-scale_units")
+        lscale_units = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) scale_units_factor
+        i_arg = i_arg + 1
      case default
         call display_help()
      end select
@@ -1031,14 +1054,14 @@ subroutine initialisation_mcfost()
 
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(base_para)
+     call save_data_prop(base_para)
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data(base_para)
+     call save_data_prop(base_para)
   endif
 
   if (ln_zone) then
@@ -1186,9 +1209,6 @@ subroutine initialisation_mcfost()
      write(*,*) "Spot will be applied on star #1"
   endif
 
-  ! Adjusting grid for prolate or oblate envelope
-  if (z_scaling_env > 1.) Rmax = Rmax * z_scaling_env
-  if (z_scaling_env < 1.) Rmin = Rmin * z_scaling_env
 
   if (lpara) then
      if (nb_proc==1) then
@@ -1298,7 +1318,7 @@ subroutine display_help()
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
   write(*,*) "        : -p2m : reads the results from ProDiMo"
   write(*,*) "        : -astrochem : creates the files for astrochem"
-  write(*,*) "        : -phamtom : reads a phantom dump file"
+  write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
   write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
@@ -1350,8 +1370,6 @@ subroutine display_help()
   write(*,*) "                         gas_density.fits.gz and dust_density.fits.gz -> density map"
   write(*,*) "                         grid.fits.gz -> radii and height in the grid"
   write(*,*) "                         volume.fits.gz -> volume per cell at each radius"
-  write(*,*) "        : -r_subdivide <radius>  : forces cell subdivision elsewhere"
-  write(*,*) "                                   than at inner radius"
   write(*,*) "        : -3D : 3D geometrical grid"
   write(*,*) "        : -warp : <h_warp> @ reference radius"
   write(*,*) "        : -tilt : <angle> [degrees]"
@@ -1368,11 +1386,13 @@ subroutine display_help()
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
+  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
   write(*,*) "        : -age <age>"
+  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
@@ -1472,6 +1492,41 @@ end subroutine display_disclaimer
 
 !********************************************************************
 
+subroutine save_data_prop(para)
+
+  character(len=*), intent(in) :: para
+
+  character(len=1024) :: cmd
+  integer ::  syst_status
+
+  if (is_dir(trim(data_dir))) then
+     write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
+     cmd = 'rm -Rf '//trim(data_dir)
+     call appel_syst(cmd,syst_status)
+  endif
+
+  ! Cree le dossier data
+  write (*,*) 'Creating directory '//trim(data_dir)
+  cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
+       ! copie le fichier de parametres
+       'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
+       ! options de la ligne de commande
+       'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! date du calcul
+       'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! machine de calcul
+       'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       ! id SHA
+       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
+  call appel_syst(cmd,syst_status)
+
+  return
+
+end subroutine save_data_prop
+
+!********************************************************************
+
 subroutine save_data(para)
   !*************************************************
   ! Si le dossier data existe on le sauve
@@ -1491,111 +1546,82 @@ subroutine save_data(para)
   lmove_data = .false.
 
   if (lonly_diff_approx) return
-  !if (lsed.and.(.not.ltemp)) return
 
-  if (ldust_prop .or. ldisk_struct) then
-     if (is_dir(trim(data_dir))) then
-        write(*,*) "Directory "//trim(data_dir)//" already exists! Erasing it..."
-        cmd = 'rm -Rf '//trim(data_dir)
-        call appel_syst(cmd,syst_status)
-     endif
-
-     ! Cree le dossier data
-     write (*,*) 'Creating directory '//trim(data_dir)
-     cmd = 'mkdir -p '//trim(data_dir)//" ; "// &
-          ! copie le fichier de parametres
-          'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
-          ! options de la ligne de commande
-          'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! date du calcul
-          'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! machine de calcul
-          'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
-          ! id SHA
-          'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
-     call appel_syst(cmd,syst_status)
-
+  if (lmono0) then
+     etape_start=1
+     etape_end=1
   else
-
-     if (lmono0) then
+     if (ltemp.or.lsed) then
         etape_start=1
-        etape_end=1
      else
-        if (ltemp.or.lsed) then
-           etape_start=1
-        else
-           etape_start=2
-        endif
-        if (lemission_mol) then
-           etape_end=1+n_molecules
-        else
-           etape_end=1
-        endif
+        etape_start=2
+     endif
+     if (lemission_mol) then
+        etape_end=1+n_molecules
+     else
+        etape_end=1
+     endif
+  endif
+
+  do etape=etape_start,etape_end
+
+     if (etape == 1) then
+        local_data_dir = data_dir
+        local_basename_data_dir = basename_data_dir
+     else
+        local_data_dir = data_dir2(etape-1)
+        local_basename_data_dir = basename_data_dir2(etape-1)
      endif
 
-     do etape=etape_start,etape_end
 
-        if (etape == 1) then
-           local_data_dir = data_dir
-           local_basename_data_dir = basename_data_dir
+     if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
+        if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
+           ! le dossier data existe
+           lnew_run = .true.
+           lmove_data=.true.
+        else ! le dossier data n'existe pas
+           lnew_run=.true.
+           lmove_data=.false.
+        endif ! if y a un dossier data
+     else
+        lnew_run = .true. ! le dossier data n'existe pas
+     endif
+
+     if (lmove_data) then
+        if (lno_backup) then
+           call error('Directory '//trim(local_data_dir)//' already exists : exiting!')
         else
-           local_data_dir = data_dir2(etape-1)
-           local_basename_data_dir = basename_data_dir2(etape-1)
-        endif
-
-
-        if (is_dir(trim(root_dir)//"/"//trim(seed_dir))) then
-           if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir))) then
-              ! le dossier data existe
-              lnew_run = .true.
-              lmove_data=.true.
-           else ! le dossier data n'existe pas
-              lnew_run=.true.
-              lmove_data=.false.
-           endif ! if y a un dossier data
-        else
-           lnew_run = .true. ! le dossier data n'existe pas
-        endif
-
-        if (lmove_data) then
-           if (lno_backup) then
-              call error('Directory '//trim(local_data_dir)//' already exists : exiting!')
-
-           else
-              write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
-              if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
-                 call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
-              endif
-              cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
-              call appel_syst(cmd,syst_status)
+           write (*,*) 'Directory '//trim(local_data_dir)//' already exists : backing it up in '//trim(local_data_dir)//'_old'
+           if (is_dir(trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(local_basename_data_dir)//'_old')) then
+              call error('Directory '//trim(local_data_dir)//'_old already exists : exiting!')
            endif
-        endif
-
-        if (lnew_run) then
-           ! Cree le dossier data
-           write (*,*) 'Creating directory '//trim(local_data_dir)
-           cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
-                ! copie le fichier de parametres
-                'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
-                ! options de la ligne de commande
-                'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! date du calcul
-                'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! machine de calcul
-                'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-                ! id SHA
-                'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
-           ! Copie du fichier lambda si besoin
-           if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
-              cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
-           endif
+           cmd = 'mv '//trim(local_data_dir)//' '//trim(local_data_dir)//'_old'
            call appel_syst(cmd,syst_status)
         endif
-      enddo ! etape
+     endif
 
-  endif ! ldust_prop
+     if (lnew_run) then
+        ! Cree le dossier data
+        write (*,*) 'Creating directory '//trim(local_data_dir)
+        cmd = 'mkdir -p '//trim(local_data_dir)//" ; "// &
+             ! copie le fichier de parametres
+             'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
+             ! options de la ligne de commande
+             'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! date du calcul
+             'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! machine de calcul
+             'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             ! id SHA
+             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
+        ! Copie du fichier lambda si besoin
+        if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
+           cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)
+        endif
+        call appel_syst(cmd,syst_status)
+     endif
+  enddo ! etape
 
   return
 

@@ -1,10 +1,11 @@
 module radiation_field
 
   use parametres
+  use mcfost_env
   use constantes
-  use ray_tracing, only : lscatt_ray_tracing1, lscatt_ray_tracing2, n_theta_I, n_phi_I, n_az_rt, I_spec, I_spec_star
-  use opacity, only : kappa_abs_LTE
+  use dust_prop, only : kappa_abs_LTE
   use messages
+  use wavelengths
 
   implicit none
 
@@ -25,12 +26,11 @@ module radiation_field
   real(kind=dp), dimension(:), allocatable :: E0 ! n_cells
   real(kind=dp), dimension(:,:), allocatable :: J0 !n_cells, n_lambda, n_rad, nz, n_az
 
-
 contains
 
 subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
-  use dust_ray_tracing, only : calc_xI_scatt, calc_xi_scatt_pola
+  use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola, n_az_rt, n_phi_I, n_theta_I, I_spec_star, I_spec
 
   integer, intent(in) :: id,lambda,p_lambda,icell0
   real(kind=dp), dimension(4), intent(in) :: Stokes

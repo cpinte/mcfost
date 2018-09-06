@@ -1,6 +1,6 @@
 PAH.o : PAH.f90 utils.o dust.o modules.o
 SPH2mcfost.o : SPH2mcfost.f90 mem.o disk_physics.o modules.o Voronoi.o io_phantom_utils.o read_gadget2.o read_phantom.o density.o utils.o
-Voronoi.o : Voronoi.f90 messages.o kdtree2.o modules.o utils.o
+Voronoi.o : Voronoi.f90 messages.o kdtree2.o modules.o utils.o stars.o
 benchmarks.o : benchmarks.f90 messages.o utils.o
 coated_sphere.o : coated_sphere.f90 messages.o utils.o modules.o
 cylindrical_grid.o : cylindrical_grid.f90 messages.o modules.o
@@ -8,19 +8,19 @@ density.o : density.f90 messages.o utils.o grid.o modules.o
 diffusion.o : diffusion.f90 messages.o modules.o
 disk_physics.o : disk_physics.f90 messages.o stars.o
 dust.o : dust.f90 fits_utils.o input.o coated_sphere.o scattering.o dust_ray_tracing.o modules.o benchmarks.o
-dust_ray_tracing.o : dust_ray_tracing.f90 scattering.o modules.o
-dust_transfer.o : dust_transfer.f90 SPH2mcfost.o init_mcfost.o io_prodimo.o utils.o mem.o stars.o dust.o diffusion.o benchmarks.o input.o output.o disk_physics.o thermal_emission.o PAH.o density.o optical_depth.o grid.o scattering.o modules.o system.o
+dust_ray_tracing.o : dust_ray_tracing.f90 scattering.o modules.o stars.o
+dust_transfer.o : dust_transfer.f90 SPH2mcfost.o init_mcfost.o io_prodimo.o utils.o mem.o stars.o dust.o diffusion.o benchmarks.o input.o output.o disk_physics.o thermal_emission.o PAH.o density.o optical_depth.o grid.o scattering.o modules.o mcfost_env.o
 fits_utils.o : fits_utils.f90
 grid.o : grid.f90 modules.o Voronoi.o spherical_grid.o cylindrical_grid.o utils.o dust_ray_tracing.o
-init_mcfost.o : init_mcfost.f90 utils.o io_prodimo.o input.o read_param.o benchmarks.o modules.o density.o system.o
+init_mcfost.o : init_mcfost.f90 utils.o io_prodimo.o input.o read_param.o benchmarks.o modules.o density.o mcfost_env.o
 input.o : input.f90 modules.o messages.o utils.o read_DustEM.o
 io_phantom_infiles.o : io_phantom_infiles.f90
 io_phantom_utils.o : io_phantom_utils.f90
-io_prodimo.o : io_prodimo.f90 fits_utils.o messages.o read_param.o radiation_field.o utils.o modules.o system.o
+io_prodimo.o : io_prodimo.f90 fits_utils.o messages.o read_param.o radiation_field.o utils.o modules.o mcfost_env.o
 kdtree2.o : kdtree2.f90 messages.o
 mcfost.o : mcfost.f90 mol_transfer.o dust_transfer.o init_mcfost.o modules.o
-mcfost2phantom.o : mcfost2phantom.f90 output.o stars.o utils.o dust_transfer.o Voronoi.o thermal_emission.o radiation_field.o read_phantom.o SPH2mcfost.o mem.o optical_depth.o grid.o dust.o read_param.o init_mcfost.o modules.o system.o
-mem.o : mem.f90 radiation_field.o thermal_emission.o stars.o messages.o utils.o modules.o dust_ray_tracing.f90
+mcfost2phantom.o : mcfost2phantom.f90 output.o stars.o utils.o dust_transfer.o Voronoi.o thermal_emission.o radiation_field.o read_phantom.o SPH2mcfost.o mem.o optical_depth.o grid.o dust.o read_param.o init_mcfost.o modules.o mcfost_env.o
+mem.o : mem.f90 radiation_field.o thermal_emission.o stars.o messages.o utils.o modules.o dust_ray_tracing.o output.o
 messages.o : messages.f90
 modules.o : modules.f90
 mol_transfer.o : mol_transfer.f90 mem.o grid.o stars.o dust_transfer.o dust_ray_tracing.o io_prodimo.o optical_depth.o scattering.o dust.o output.o benchmarks.o input.o molecules.o modules.o utils.o
@@ -37,5 +37,4 @@ scattering.o : scattering.f90 utils.o input.o modules.o
 spherical_grid.o : spherical_grid.f90 messages.o cylindrical_grid.o modules.o
 stars.o : stars.f90 messages.o grid.o io_prodimo.o modules.o utils.o
 thermal_emission.o : thermal_emission.f90 radiation_field.o stars.o grid.o PAH.o utils.o modules.o
-utils.o : utils.f90 messages.o modules.o system.o
-ML_prodimo.o : ML_prodimo.f90 fits_utils.o density.o utils.o radiation_field.o messages.o modules.o io_prodimo.o Voronoi.o
+utils.o : utils.f90 messages.o modules.o mcfost_env.o

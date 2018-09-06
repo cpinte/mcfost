@@ -2,12 +2,9 @@ module read_params
 
   use parametres
   use grains
-  use disk
-  use prop_star
-  use em_th
   use molecular_emission
-  use ray_tracing
-  use input
+  use wavelengths
+  use constantes
   use sha
   use messages
 
@@ -268,11 +265,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ----------------
     ! Grain properties
@@ -480,11 +473,6 @@ contains
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
-
-       if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-          if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
-       endif
-
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
@@ -665,11 +653,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -876,11 +860,6 @@ contains
        endif
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
-
-       if ( (abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real).and.(abs(etoile(i)%x) < tiny_real) ) then
-          if (etoile(i)%r > Rmin) call error("inner disk radius is smaller than stellar radius")
-       endif
-
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
@@ -1055,11 +1034,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -1419,11 +1394,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -1772,11 +1743,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -2128,11 +2095,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -2481,11 +2444,7 @@ contains
     enddo ! n_zones
 
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (Rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity
@@ -2826,11 +2785,7 @@ end subroutine read_para215
 
     disk_zone(:)%gas_to_dust = gas_dust
     disk_zone(:)%rmin = disk_zone(:)%rin - 5*disk_zone(:)%edge
-    Rmin = minval(disk_zone(:)%Rmin)
-    Rmax = maxval(disk_zone(:)%Rmax)
     diskmass = sum(disk_zone(:)%diskmass)
-
-    if (rmin < 0.0) call error("r_min < 0.0")
 
     ! ------
     ! Cavity

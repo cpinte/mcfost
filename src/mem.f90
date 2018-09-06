@@ -2,14 +2,15 @@ module mem
 
   use parametres
   use grains
-  use opacity
-  use resultats
-  use prop_star
+  use dust_prop
   use naleat
   use molecular_emission
-  use ray_tracing
   use utils
   use messages
+  use wavelengths
+  use output
+  use density
+  use cylindrical_grid
 
   implicit none
 
@@ -116,6 +117,7 @@ subroutine alloc_dynamique(n_cells_max)
   use stars, only : allocate_stellar_spectra
   use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
        allocate_weight_proba_emission, allocate_thermal_energy
+  use output, only : allocate_origin
 
   integer, intent(in), optional :: n_cells_max
 
@@ -139,10 +141,8 @@ subroutine alloc_dynamique(n_cells_max)
      p_Nc = p_n_cells
   endif
 
-  allocate(stream(nb_proc), gauss_random_saved(nb_proc), lgauss_random_saved(nb_proc), stat=alloc_status)
+  allocate(stream(nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error random number stream')
-  gauss_random_saved = 0.0_dp
-  lgauss_random_saved = .false.
 
   allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
@@ -252,20 +252,8 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux prop d'emission des cellules
   ! **************************************************
-  allocate(l_emission_pah(0:n_rad+1,0:nz+1), stat=alloc_status) ! OUTDATED
-  if (alloc_status > 0) call error('Allocation error l_emission_pah')
-  l_emission_pah = .false.
-
-  if (lweight_emission) then
-     call allocate_weight_proba_emission(Nc)
-  endif
-
-
-  if (lorigine) then
-     allocate(disk_origin(n_lambda, Nc, nb_proc), star_origin(n_lambda, nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error disk_origin')
-     disk_origin = 0.0 ; star_origin = 0.0
-  endif
+  if (lweight_emission) call allocate_weight_proba_emission(Nc)
+  if (lorigine) call allocate_origin()
 
   ! **************************************************
   ! Tableaux de temperature
@@ -280,96 +268,12 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux SEDs
   ! **************************************************
-  if (lTemp.or.lsed) then
-     allocate(sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed')
-     sed = 0.0
-
-     allocate(sed_q(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_q')
-     sed_q = 0.0
-
-     allocate(sed_u(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_u')
-     sed_u = 0.0
-
-     allocate(sed_v(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_v')
-     sed_v = 0.0
-
-     allocate(sed_star(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_star')
-     sed_star = 0.0
-
-     allocate(sed_star_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_star_scat')
-     sed_star_scat = 0.0
-
-     allocate(sed_disk(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_disk')
-     sed_disk = 0.0
-
-     allocate(sed_disk_scat(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_disk_scat')
-     sed_disk_scat = 0.0
-
-     allocate(n_phot_sed(n_lambda,N_thet,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error n_phot_sed')
-     n_phot_sed = 0.0
-
-     allocate(sed1_io(n_lambda,N_thet,N_phi),sed2_io(n_lambda,N_thet,N_phi,9),wave2_io(n_lambda,2), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error sed_io')
-     sed1_io=0.0
-     sed2_io=0.0
-     wave2_io=0.0
-  endif ! ltemp.or.lSED
-
+  if (lTemp.or.lsed) call allocate_sed()
 
   ! **************************************************
   ! Tableaux relatifs aux images
   ! **************************************************
-  if (lmono0.and.loutput_mc) then
-     allocate(STOKE_io(npix_x,npix_y,capt_debut:capt_fin,N_phi,N_type_flux), stat=alloc_status)
-     if (alloc_status > 0) call error( 'Allocation error STOKE_io')
-     STOKE_io = 0.0
-
-     allocate(STOKEI(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error STOKEI')
-     STOKEI = 0.0
-
-     if (lsepar_pola) then
-        allocate(STOKEQ(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEQ')
-        STOKEQ = 0.0
-
-        allocate(STOKEU(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEU')
-        STOKEU=0.0
-
-        allocate(STOKEV(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEV')
-        STOKEV = 0.0
-     endif
-
-     if (lsepar_contrib) then
-        allocate(STOKEI_star(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEI_star')
-        STOKEI_star = 0.0
-
-        allocate(STOKEI_star_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEI_star_scat')
-        STOKEI_star_scat = 0.0
-
-        allocate(STOKEI_disk(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEI_disk')
-        STOKEI_disk = 0.0
-
-        allocate(STOKEI_disk_scat(n_lambda,npix_x,npix_y,capt_debut:capt_fin,N_phi,nb_proc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error STOKEI_disk_scat')
-        STOKEI_disk_scat = 0.0
-     endif !lsepar
-
-  endif ! lmono0
+  if (lmono0.and.loutput_mc) call allocate_mc_images()
 
   ! **************************************************
   ! Tableaux relatifs a l'emission moleculaire
@@ -409,6 +313,7 @@ subroutine deallocate_em_th_mol()
 
   use thermal_emission, only : deallocate_thermal_emission
   use stars, only : deallocate_stellar_spectra
+   use output, only : deallocate_origin
 
   deallocate(n_phot_envoyes)
 
@@ -440,16 +345,11 @@ subroutine deallocate_em_th_mol()
 
   deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
 
-  deallocate(l_emission_pah) ! OUTDATED
-  if (lorigine) deallocate(disk_origin,star_origin)
+  if (lorigine) call deallocate_origin()
 
   if (lTemp) call deallocate_thermal_emission()
 
-  if (lTemp.or.lsed) then
-     deallocate(sed,sed_q,sed_u,sed_v)
-     deallocate(sed_star,sed_star_scat,sed_disk,sed_disk_scat,n_phot_sed)
-     deallocate(sed1_io,sed2_io,wave2_io)
-  endif ! ltemp.or.lSED
+  if (lTemp.or.lsed) call deallocate_sed()
 
   return
 
@@ -525,10 +425,10 @@ end subroutine clean_mem_dust_mol
 subroutine realloc_step2()
 
   use dust_ray_tracing, only : select_scattering_method
-
   use radiation_field, only : allocate_radiation_field_step2
   use stars, only : allocate_stellar_spectra, deallocate_stellar_spectra
   use thermal_emission, only : deallocate_temperature_calculation, realloc_emitting_fractions
+  use output, only : allocate_origin
 
   integer :: alloc_status, mem_size, p_n_lambda2_pos
 
@@ -557,62 +457,13 @@ subroutine realloc_step2()
   tab_lambda=0.0 ; tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda=0.0
   tab_amu1=0.0 ; tab_amu2=0.0 ;  tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
 
-  deallocate(sed)
-  allocate(sed(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed')
-  sed = 0.0
-
-
-  deallocate(sed_q)
-  allocate(sed_q(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_q')
-  sed_q = 0.0
-
-  deallocate(sed_u)
-  allocate(sed_u(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_u')
-  sed_u = 0.0
-
-  deallocate(sed_v)
-  allocate(sed_v(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_v')
-  sed_v = 0.0
-
-  deallocate(sed_star)
-  allocate(sed_star(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_star')
-  sed_star = 0.0
-
-  deallocate(sed_star_scat)
-  allocate(sed_star_scat(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_star_scat')
-  sed_star_scat = 0.0
-
-  deallocate(sed_disk)
-  allocate(sed_disk(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_disk')
-  sed_disk = 0.0
-
-  deallocate(sed_disk_scat)
-  allocate(sed_disk_scat(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed_disk_scat')
-  sed_disk_scat = 0.0
-
-  deallocate(n_phot_sed)
-  allocate(n_phot_sed(n_lambda2,N_thet,N_phi,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error n_phot_sed')
-  n_phot_sed = 0.0
-
-  deallocate(sed2_io, wave2_io)
-  allocate(sed2_io(n_lambda2,N_thet,N_phi,9),wave2_io(n_lambda2,2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error sed2_io')
-  sed2_io=0.0
-  wave2_io=0.0
-
   deallocate(n_phot_envoyes)
   allocate(n_phot_envoyes(n_lambda2,nb_proc),  stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
   n_phot_envoyes = 0.0
+
+  call deallocate_sed()
+  call allocate_sed()
 
   call deallocate_stellar_spectra()
   call allocate_stellar_spectra(n_lambda2)
@@ -735,13 +586,7 @@ subroutine realloc_step2()
      kappa_abs_nLTE=0.0
   endif
 
-  if (lorigine) then
-     deallocate(disk_origin, star_origin)
-     allocate(disk_origin(n_lambda2, n_cells, nb_proc), star_origin(n_lambda2, nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error disk_origin')
-     disk_origin = 0.0
-     star_origin = 0.0
-  endif
+  if (lorigine) call allocate_origin()
 
   return
 
@@ -791,12 +636,11 @@ end subroutine realloc_ray_tracing_scattering_matrix
 subroutine alloc_emission_mol(imol)
 
   integer, intent(in) :: imol
-  integer :: alloc_status, n_speed, n_speed_rt, nTrans_raytracing
+  integer :: alloc_status, n_speed
 
   alloc_status = 0
+
   n_speed = mol(imol)%n_speed_rt ! I use the same now
-  n_speed_rt = mol(imol)%n_speed_rt
-  nTrans_raytracing = mol(imol)%nTrans_raytracing
 
   allocate(kappa_mol_o_freq(n_cells,nTrans_tot), emissivite_mol_o_freq(n_cells,nTrans_tot), &
        stat=alloc_status)
@@ -843,23 +687,7 @@ subroutine alloc_emission_mol(imol)
      Jmol2 = 0.0_dp
   endif
 
-  ! Methode d'echantillonnage
-  if (npix_x_save > 1) then
-     RT_line_method = 2 ! creation d'une carte avec pixels carres
-     npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
-
-     write(*,*) "WARNING : memory size if lots of pixels"
-     allocate(spectre(npix_x,npix_y,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
-          continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
-  else
-     RT_line_method = 1 ! utilisation de pixels circulaires
-     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
-          continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1,1), stat=alloc_status)
-  endif
-  if (alloc_status > 0) call error('Allocation error spectre')
-  spectre=0.0
-  continu=0.0
-  stars_map=0.0
+  call allocate_mol_maps(imol)
 
   return
 
@@ -882,7 +710,9 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, spectre,continu, stars_map, tab_Cmb_mol, Jmol, maser_map)
+       tab_v, stars_map, tab_Cmb_mol, Jmol, maser_map)
+
+  call deallocate_mol_maps()
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 

@@ -2,10 +2,9 @@ module spherical_grid
 
   use constantes
   use parametres
-  use opacity, only :  cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
+  use cylindrical_grid, only: cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
        delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
-       n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
-  use cylindrical_grid, only: cell2cylindrical
+       volume, l_dark_zone, zmax
   use messages
 
   implicit none

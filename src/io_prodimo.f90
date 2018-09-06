@@ -1,20 +1,21 @@
 module ProDiMo
 
   use parametres
-  use opacity
-  use em_th
+  use dust_prop
   use constantes
   use molecular_emission
-  use disk
-  use resultats
   use utils, only: get_NH, Blambda, Bnu
-  use ray_tracing, only:  RT_imin, RT_imax, RT_n_incl, lRT_i_centered
   use radiation_field, only : xN_abs, xJ_abs
-  use prop_star, only : spectre_etoiles
+  use stars, only : spectre_etoiles, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
   use utils, only : appel_syst
   use messages
+  use thermal_emission
+  use mcfost_env
+  use temperature
+  use dust_ray_tracing, only : n_phot_envoyes
+  use density
 
   implicit none
 
@@ -40,15 +41,8 @@ module ProDiMo
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
   character(len=32), parameter :: DENT_tab_wavelength = "DENT.lambda"
 
-  ! Pour champ ISM
-  real, parameter :: Wdil =  9.85357e-17
-  real, parameter :: TCmb = 2.73
-  real, parameter :: T_ISM_stars = 20000.
-
   real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes_ISM
-
-  real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   ! ProDiMo2mcfost
   integer,parameter :: MC_NSP=5      ! number of species
@@ -576,7 +570,7 @@ contains
     !if (lRE_nLTE) then
     !   do ri=1, n_rad
     !      do zj=1, nz
-    !         Temperature(ri,zj,1) = sum( Temperature_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
+    !         Tdust(ri,zj,1) = sum( Tdust_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
     !      enddo !j
     !   enddo !i
     !
@@ -590,7 +584,7 @@ contains
     !endif
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,Temperature,status)
+    call ftppre(unit,group,fpixel,nelements,Tdust,status)
 
     !------------------------------------------------------------------------------
     ! HDU 3 : Longueurs d'onde
@@ -1010,9 +1004,9 @@ contains
              norme = 0.0
              do l= iPAH_start, iPAH_end
                 if (lPAH_nRE) then
-                   Ttmp = temperature_1grain_nRE(l,icell)
+                   Ttmp = Tdust_1grain_nRE(l,icell)
                 else
-                   Ttmp = temperature_1grain(l,icell)
+                   Ttmp = Tdust_1grain(l,icell)
                 endif
                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(l,icell)
                 norme = norme + densite_pouss(l,icell)
@@ -1105,7 +1099,7 @@ contains
              do zj=1, nz
                 icell = cell_map(ri,zj,1)
                 if (tab_region(i) > 0) then
-                   P_TPAH(:,ri,zj,1) = Proba_Temperature(:,tab_region(ri),icell)
+                   P_TPAH(:,ri,zj,1) = Proba_Tdust(:,tab_region(ri),icell)
                 else
                    P_TPAH(:,ri,zj,1) = 0.0
                 endif

@@ -1,21 +1,15 @@
 module optical_depth
 
   use parametres
-  use disk
-  use opacity
+  use dust_prop
   use constantes
-  use em_th
   use molecular_emission
-  use ray_tracing
-  use grains, only : tab_lambda
   use utils
-  use molecules
-
   use dust_ray_tracing
   use grid
-  use cylindrical_grid, only : prec_grille
-
+  use cylindrical_grid
   use radiation_field, only : save_radiation_field
+  use density
 
   implicit none
 

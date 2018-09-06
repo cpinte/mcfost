@@ -11,13 +11,10 @@ contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
-    use read_phantom, only : read_phantom_file, read_phantom_input_file
+    use read_phantom, only : read_phantom_files
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
-    use prop_star, only : etoile
-    use disk, only : lscale_SPH, scale_SPH
-
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
     integer, intent(out) :: n_SPH
@@ -30,14 +27,32 @@ contains
     real, allocatable, dimension(:) :: extra_heating
 
     real(dp), dimension(6) :: SPH_limits
-    integer :: ndusttypes, ierr
+    real :: factor
+    integer :: ndusttypes, ierr, i
     character(len=100) :: line_buffer
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
-       write(*,*) "Reading phantom density file: "//trim(SPH_file)
-       call read_phantom_file(iunit,SPH_file,x,y,z,h,vx,vy,vz, &
+       if (n_phantom_files==1) then
+          write(*,*) "Reading phantom density file: "//trim(density_files(1))  ! todo : update: we do not use SPH_file anymore
+       else
+          write(*,*) "Reading phantom density files: "
+          do i=1,n_phantom_files
+             write(*,*) " - "//trim(density_files(i))  ! todo : update: we do not use SPH_file anymore
+          enddo
+       endif
+       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+
+       if (lphantom_avg) then ! We are averaging the dump
+          factor = 1.0/n_phantom_files
+          massgas = massgas * factor
+          massdust = massdust * factor
+          rho = rho * factor
+          rhodust = rhodust * factor
+          h = h/(n_phantom_files**(1./3.))
+       endif
+
        ! Todo : extra heating must be passed to mcfost
        if (ierr /=0) then
           write(*,*) "Error code =", ierr,  get_error_text(ierr)
@@ -54,7 +69,7 @@ contains
     endif
     write(*,*) "Done"
 
-    if (lphantom_file .or. lgadget2_file) call compute_stellar_parameters()
+    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
     if (lscale_SPH) then
        write(*,*) "**************************************************"
@@ -111,8 +126,7 @@ contains
        SPH_limits, check_previous_tesselation)
 
     use Voronoi_grid
-    use opacity, only : densite_pouss, masse
-    use molecular_emission, only : densite_gaz, masse_gaz
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -126,7 +140,7 @@ contains
     logical, intent(in) :: check_previous_tesselation
 
     real, parameter :: density_factor = 1 !e-6
-    logical :: lwrite_ASCII = .true. ! produce an ASCII file for yorick
+    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust
@@ -144,10 +158,6 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    !if (ndusttypes==1) then
-    !   call read_phantom_input_file("hltau.in",iunit,grainsize,graindens,ierr)
-    !   write(*,*) grainsize,graindens
-    !endif
     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
 
     if (lwrite_ASCII) then
@@ -435,8 +445,6 @@ contains
   !*********************************************************
 
   subroutine compute_stellar_parameters()
-
-    use prop_star
 
     integer :: i
 

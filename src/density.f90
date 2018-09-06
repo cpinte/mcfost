@@ -2,21 +2,20 @@ module density
 
   use parametres
   use constantes
-  use molecular_emission
-  use opacity
-  use em_th
-  use prop_star
+  use temperature
   use grains
-  use disk
   use grid
   use utils
   use messages
 
   implicit none
+  save
 
   ! Suppresion de grains
   integer, public :: specie_removed
   real, public :: T_rm
+
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, &
@@ -24,7 +23,16 @@ module density
 
   private
 
+  real(kind=dp), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
+  real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
+  real(kind=dp), dimension(:), allocatable :: Surface_density
+
   real :: coeff_exp, coeff1, coeff2, rcyl
+
+  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  integer :: icell_not_empty
+  real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
+  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
 
   contains
 
@@ -48,6 +56,7 @@ subroutine define_gas_density()
   integer :: i,j, k, izone, alloc_status, icell
   real(kind=dp), dimension(n_zones) :: cst_gaz
   real(kind=dp) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
+  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rsph0
 
   type(disk_zone_type) :: dz
 
@@ -175,9 +184,12 @@ subroutine define_gas_density()
         enddo ! i
 
      else if (dz%geometry == 3) then ! envelope
+        rin2 = dz%rin**2
+        rmin2 = dz%rmin**2
+        rmax2 = dz%rmax**2
+
         do i=1, n_rad
-           bz_env : do j=j_start,nz
-              if (j==0) cycle bz_env
+           do j=j_start,nz
               do k=1, n_az
                  if (j==0) then
                     icell = cell_map(i,1,k)
@@ -188,25 +200,29 @@ subroutine define_gas_density()
                     rcyl = r_grid(icell)
                     z = z_grid(icell)
                  endif
-                 rsph = sqrt(rcyl**2 + (z/z_scaling_env)**2)
 
-                 ! Setup densite du gaz
-                 if (rsph > dz%rmax) then
+                 rcyl2 = rcyl**2
+                 z2 = (z/z_scaling_env)**2
+                 !rsph0 = sqrt(rcyl2 + z**2)
+                 rsph = sqrt(rcyl2 + z2)
+
+                 if (rcyl2 > rmax2 - z2) then
                     density = 0.0
-                 else if (rsph < dz%rmin) then
+                 else if (rcyl2 < rmin2 - z2) then
                     density = 0.0
-                 else if (rsph < dz%rin) then
+                 else if (rcyl2 < rin2 - z2) then
                     density = cst_gaz(izone) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
                  else
                     density = cst_gaz(izone) * rsph**(dz%surf)
                  endif
-              if (j/=0) then
-                 densite_gaz_tmp(icell) = density
-              else
-                 densite_gaz_midplane_tmp(i) = density
-              endif
+
+                 if (j/=0) then
+                    densite_gaz_tmp(icell) = density
+                 else
+                    densite_gaz_midplane_tmp(i) = density
+                 endif
               enddo !k
-           enddo bz_env !j
+           enddo !j
         enddo !i
 
      else if (dz%geometry == 4) then ! debris
@@ -336,7 +352,7 @@ subroutine define_dust_density()
 
   real(kind=dp), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme
+  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme, rcyl2, z2, rmin2, rin2, rmax2, rsph0
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: d_p
@@ -703,32 +719,39 @@ subroutine define_dust_density()
         endif ! migration
 
      else if (dz%geometry == 3) then ! envelope
-        do i=1, n_rad
-           bz_env : do j=j_start,nz
-              if (j==0) cycle bz_env
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 ! On calcule la densite au milieu de la cellule
-                 rcyl = r_grid(icell)
-                 z = z_grid(icell)
-                 rsph = sqrt(rcyl**2+z**2)
+        rin2 = dz%rin**2
+        rmin2 = dz%rmin**2
+        rmax2 = dz%rmax**2
 
-                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    if (rsph > dz%rmax) then
-                       density = 0.0
-                    else if (rsph < dz%rmin) then
-                       density = 0.0
-                    else if (rsph < dz%rin) then
-                       density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
-                    else
-                       density = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
-                    endif
-                    densite_pouss(l,icell) = density
-                 enddo !l
+        do icell=1, n_cells
+           ! On calcule la densite au milieu de la cellule
+           rcyl = r_grid(icell)
+           z = z_grid(icell)
 
-              enddo ! k
-           enddo bz_env !j
-        enddo ! i
+           rcyl2 = rcyl**2
+           z2 = (z/z_scaling_env)**2
+           !rsph0 = sqrt(rcyl2 + z**2)
+           rsph  = sqrt(rcyl2 + z2)
+
+           if (rcyl2 > rmax2 - z2) then
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 densite_pouss(l,icell) = 1e-20
+              enddo
+           else if (rcyl2 < rmin2 - z2) then
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 densite_pouss(l,icell) = 1e-20
+              enddo
+           else if (rcyl2 < rin2 - z2) then
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+              enddo
+           else
+              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
+              enddo
+           endif
+
+        enddo ! icell
 
      else if (dz%geometry == 4) then ! disque de debris
         do i=1, n_rad
@@ -1874,7 +1897,7 @@ subroutine remove_specie()
   do icell=1,n_cells
      do k=1,n_grains_tot
         if (grain(k)%pop==specie_removed) then
-           if (Temperature(icell) > T_rm) densite_pouss(k,icell) = 0.0
+           if (Tdust(icell) > T_rm) densite_pouss(k,icell) = 0.0
         endif
      enddo
   enddo

@@ -1,24 +1,44 @@
 module cylindrical_grid
 
   use constantes
-  use parametres !, only : dp, icell_ref
-  use disk, only : disk_zone_type, disk_zone
-  use opacity, only :  cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
-       delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
-       n_regions, regions, n_zones, zmax, Rmax2, Rmax, rmin, volume, l_dark_zone
-  use prop_star, only : R_ISM, centre_ISM
+  use parametres
   use messages
 
   implicit none
 
   public :: cell2cylindrical, cross_cylindrical_cell, pos_em_cellule_cyl, indice_cellule_cyl, test_exit_grid_cyl, &
-       move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping
+       move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
+       cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, &
+       z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, volume, l_dark_zone, zmax, delta_cell_dark_zone, &
+       ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
 
   private
 
   real(kind=dp) :: zmaxmax
+
+  integer, dimension(:), allocatable :: lexit_cell
+  real(kind=dp), dimension(:), allocatable :: zmax !n_rad
+  real(kind=dp), dimension(:), allocatable :: volume !n_rad en AU^3
+  real(kind=dp), dimension(:), allocatable :: delta_z ! taille verticale des cellules cylindriques
+  real(kind=dp), dimension(:), allocatable :: dr2_grid ! differentiel en r^2 des cellules
+  real(kind=dp), dimension(:), allocatable :: r_grid, z_grid ! Position en cylindrique !!! des cellules
+  real(kind=dp), dimension(:), allocatable :: phi_grid
+  real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
+  real(kind=dp), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
+  real(kind=dp), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
+  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
+  integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
+
+  integer, dimension(:,:,:), allocatable :: cell_map
+  integer, dimension(:), allocatable :: cell_map_i, cell_map_j, cell_map_k
+
+  logical :: l_is_dark_zone
+  logical, dimension(:), allocatable :: l_dark_zone !n_cells
+  integer, parameter :: delta_cell_dark_zone=3
+  integer, dimension(:), allocatable :: ri_in_dark_zone, ri_out_dark_zone !n_az
+  integer, dimension(:,:), allocatable :: zj_sup_dark_zone, zj_inf_dark_zone !n_rad, n_az
 
 contains
 
@@ -229,14 +249,6 @@ subroutine define_cylindrical_grid()
   endif
   ! end allocation
 
-  ! Defining the ISM sphere
-  if (lcylindrical) then
-     R_ISM = 1.000001_dp * (sqrt(Rmax**2 + zmax(n_rad)**2))
-  else ! lspherical
-     R_ISM = 1.000001_dp * Rmax
-  endif
-  centre_ISM(:) = 0._dp ;
-
   Rmax2 = Rmax*Rmax
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
@@ -422,10 +434,6 @@ subroutine define_cylindrical_grid()
      zmaxmax = maxval(zmax)
 
   else !lspherical
-     izone=1
-     dz=disk_zone(izone)
-
-
      ! tab_r est en spherique ici
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
@@ -453,11 +461,6 @@ subroutine define_cylindrical_grid()
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
         enddo
-
-        if (rsph > dz%Rmax) then
-           izone = izone +1
-           dz=disk_zone(izone)
-        endif
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
            V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
