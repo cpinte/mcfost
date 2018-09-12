@@ -339,14 +339,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   use parametres, only : lscale_units,scale_units_factor
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
-  real(dp), dimension(4,np), intent(inout) :: xyzh,vxyzu
+  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
-  real(dp), dimension(n_files,ntypes), intent(inout) :: massoftype
+  real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -362,7 +362,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-  real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+  real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity,scale_units_factor3
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
@@ -418,33 +418,26 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
-  if (lscale_units) then
-     print*,'Lengths are rescaled by ',scale_units_factor
-   ! Rescale units associated with particles first
-     xyzh = xyzh * scale_units_factor
-     vxyzu = vxyzu * scale_units_factor
-     massoftype(:,1) = massoftype(:,1) * (scale_units_factor**3)
-
-     if (use_dust_particles .and. dustfluidtype==2) massoftype(:,2) = massoftype(:,2) * (scale_units_factor**3)
-
-     if (nptmass > 0) then
-        xyzmh_ptmass(1:3,:) = xyzmh_ptmass(1:3,:) * scale_units_factor
-        xyzmh_ptmass(4,:) = xyzmh_ptmass(4,:) * (scale_units_factor**3)
-     endif
-  endif
+ if (lscale_units) then
+    write(*,*) 'Lengths are rescaled by ',scale_units_factor
+    scale_units_factor3 = scale_units_factor**3
+ else
+    scale_units_factor = 1
+    scale_units_factor3 = 1
+ endif
 
  j = 0
  do i=1,np
-    ifile = ifiles(i)
+     ifile = ifiles(i)
 
-    xi = xyzh(1,i)
-    yi = xyzh(2,i)
-    zi = xyzh(3,i)
-    hi = xyzh(4,i)
+    xi = xyzh(1,i) * scale_units_factor
+    yi = xyzh(2,i) * scale_units_factor
+    zi = xyzh(3,i) * scale_units_factor
+    hi = xyzh(4,i) * scale_units_factor
 
-    vxi = vxyzu(1,i)
-    vyi = vxyzu(2,i)
-    vzi = vxyzu(3,i)
+    vxi = vxyzu(1,i) * scale_units_factor
+    vyi = vxyzu(2,i) * scale_units_factor
+    vzi = vxyzu(3,i) * scale_units_factor
 
     itypei = abs(iphase(i))
     if (hi > 0.) then
@@ -460,10 +453,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhodusti = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhodusti = massoftype(ifile,itypei) * scale_units_factor3 *(hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
-          massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
+          massdust(1,j) = massoftype(ifile,itypei) * scale_units_factor3 * usolarmass ! Msun
           rhogas(j) = gasfraci*rhodusti
           massgas(j) = gasfraci*massdust(1,j)
        elseif (.not. use_dust_particles .and. itypei==1) then
@@ -478,14 +471,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhogasi = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhogasi = massoftype(ifile,itypei) * scale_units_factor3 *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
           if (dustfluidtype==2) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi
           endif
-          massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
+          massgas(j) =  massoftype(ifile,itypei) * scale_units_factor3 * usolarmass ! Msun
           do k=1,ndusttypes
              rhodust(k,j) = dustfrac(k,i)*rhogasi
              massdust(k,j) = dustfrac(k,i)*massgas(j)
@@ -535,9 +528,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  write(*,*) "# Sink particles:"
  n_etoiles = 0
  do i=1,nptmass
-    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
-    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_units_factor3), "Msun"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1)) * scale_units_factor), "au"
+    if (xyzmh_ptmass(4,i) * scale_units_factor3 > 0.0124098) then ! 13 Jupiter masses
        n_etoiles = n_etoiles + 1
     endif
  enddo
@@ -562,12 +555,12 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
     i_etoiles = 0
     do i=1,nptmass
-       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
+       if (xyzmh_ptmass(4,i) * scale_units_factor3 > 0.0124098) then ! 13 Jupiter masses
           i_etoiles = i_etoiles + 1
-          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
-          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
-          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
-          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
+          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * scale_units_factor * ulength_au
+          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * scale_units_factor * ulength_au
+          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * scale_units_factor * ulength_au
+          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * scale_units_factor3 * usolarmass
        endif
     enddo
  endif
