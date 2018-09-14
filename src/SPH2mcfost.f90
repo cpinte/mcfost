@@ -139,7 +139,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
 
-    real, parameter :: density_factor = 1 !e-6
+    real, parameter :: density_factor = 1e-6
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
@@ -402,7 +402,7 @@ contains
        ! Removing cells at the "surface" of the SPH model:
        ! density is reduced so that they do not appear in images or cast artificial shadows,
        ! but we can still compute a temperature (forcing them to be optically thin)
-       n_force_empty = 0.0
+       n_force_empty = 0
        cell_loop : do icell=1,n_cells
           ! We reduce the density on cells that are very elongated
           if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
