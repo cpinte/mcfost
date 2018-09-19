@@ -1154,6 +1154,7 @@ subroutine initialisation_mcfost()
   if (.not.limg) loutput_mc = .true.
 
   if (lPA) ang_disque = PA
+  ang_disque = - ang_disque ! rotation North vers East
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1260,12 +1261,6 @@ subroutine initialisation_mcfost()
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
-
-  ! Pour rotation du disque (signe - pour convention astro)
-  cos_disk = cos(ang_disque/180.*pi)
-  sin_disk = -sin(ang_disque/180.*pi)
-  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
-  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   ! Signal handler
   ! do i=1,17

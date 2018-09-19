@@ -38,6 +38,10 @@ module output
   real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
   real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
 
+
+  real(kind=dp) :: sin_disk, cos_disk
+
+
   contains
 
 subroutine allocate_mc_images()
@@ -83,6 +87,9 @@ subroutine allocate_mc_images()
      if (alloc_status > 0) call error('Allocation error STOKEI_disk_scat')
      STOKEI_disk_scat = 0.0
   endif !lsepar
+
+  cos_disk = cos(ang_disque * deg_to_rad)
+  sin_disk = sin(ang_disque * deg_to_rad)
 
   return
 
@@ -544,6 +551,11 @@ subroutine write_stokes_fits()
   real :: o_star, frac_star, somme_disk
   real, dimension(n_cells) :: o_disk
 
+  real(kind=dp) :: cos_disk_x2, sin_disk_x2
+
+  cos_disk_x2 = cos(2.* ang_disque * deg_to_rad)
+  sin_disk_x2 = sin(2.* ang_disque * deg_to_rad)
+
   if (lorigine) then
 
      o_star = sum(star_origin(1,:))
@@ -733,6 +745,9 @@ subroutine ecriture_map_ray_tracing()
   character(len = 512) :: filename
   logical :: simple, extend
   real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+  real(kind=dp) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
+
+
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -747,6 +762,11 @@ subroutine ecriture_map_ray_tracing()
      if (alloc_status > 0) call error('Allocation error RT image')
      image = 0.0 ;
   endif
+
+  cos_disk = cos(ang_disque * deg_to_rad)
+  sin_disk = sin(ang_disque * deg_to_rad)
+  cos_disk_x2 = cos(2.* ang_disque * deg_to_rad)
+  sin_disk_x2 = sin(2.* ang_disque * deg_to_rad)
 
   lambda=1
   filename = trim(data_dir)//"/RT.fits.gz"
