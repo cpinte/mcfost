@@ -157,7 +157,7 @@ subroutine define_gas_density()
                  else
                     density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
                  endif
-                 if (j>0) then
+                 if (j/=0) then
                     densite_gaz_tmp(icell) = density
                  else
                     densite_gaz_midplane_tmp(i) = density
