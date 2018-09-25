@@ -362,16 +362,23 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-  real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity,scale_units_factor3
+  real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
-  udens = umass/udist**3
-  uerg_per_s = umass*udist**2/utime**3
+
+ if (lscale_units) then
+    write(*,*) 'Lengths are rescaled by ', scale_units_factor
+    udist_scaled = udist * scale_units_factor
+    umass_scaled = umass * scale_units_factor**3
+ endif
+
+  udens = umass_scaled/udist_scaled**3
+  uerg_per_s = umass_scaled*udist_scaled**2/utime**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist/ (au_to_cm)
-  uvelocity =  udist / (m_to_cm) / utime ! m/s
-  usolarmass = umass / Msun_to_g
+  ulength_au = udist_scaled/ (au_to_cm)
+  uvelocity =  udist_scaled / (m_to_cm) / utime ! m/s
+  usolarmass = umass_scaled / Msun_to_g
 
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
@@ -406,7 +413,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  endif
 
  ! Dust grain sizes in microns
- SPH_grainsizes(:) = grainsize(:) * udist * cm_to_mum
+ SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
 
 
@@ -418,26 +425,18 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
- if (lscale_units) then
-    write(*,*) 'Lengths are rescaled by ',scale_units_factor
-    scale_units_factor3 = scale_units_factor**3
- else
-    scale_units_factor = 1
-    scale_units_factor3 = 1
- endif
-
  j = 0
  do i=1,np
      ifile = ifiles(i)
 
-    xi = xyzh(1,i) * scale_units_factor
-    yi = xyzh(2,i) * scale_units_factor
-    zi = xyzh(3,i) * scale_units_factor
-    hi = xyzh(4,i) * scale_units_factor
+    xi = xyzh(1,i)
+    yi = xyzh(2,i)
+    zi = xyzh(3,i)
+    hi = xyzh(4,i)
 
-    vxi = vxyzu(1,i) * scale_units_factor
-    vyi = vxyzu(2,i) * scale_units_factor
-    vzi = vxyzu(3,i) * scale_units_factor
+    vxi = vxyzu(1,i)
+    vyi = vxyzu(2,i)
+    vzi = vxyzu(3,i)
 
     itypei = abs(iphase(i))
     if (hi > 0.) then
@@ -453,10 +452,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhodusti = massoftype(ifile,itypei) * scale_units_factor3 *(hfact/hi)**3  * udens ! g/cm**3
+          rhodusti = massoftype(ifile,itypei) * (hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
-          massdust(1,j) = massoftype(ifile,itypei) * scale_units_factor3 * usolarmass ! Msun
+          massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
           rhogas(j) = gasfraci*rhodusti
           massgas(j) = gasfraci*massdust(1,j)
        elseif (.not. use_dust_particles .and. itypei==1) then
@@ -471,14 +470,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhogasi = massoftype(ifile,itypei) * scale_units_factor3 *(hfact/hi)**3  * udens ! g/cm**3
+          rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
           if (dustfluidtype==2) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi
           endif
-          massgas(j) =  massoftype(ifile,itypei) * scale_units_factor3 * usolarmass ! Msun
+          massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
           do k=1,ndusttypes
              rhodust(k,j) = dustfrac(k,i)*rhogasi
              massdust(k,j) = dustfrac(k,i)*massgas(j)
@@ -528,9 +527,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  write(*,*) "# Sink particles:"
  n_etoiles = 0
  do i=1,nptmass
-    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_units_factor3), "Msun"
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1)) * scale_units_factor), "au"
-    if (xyzmh_ptmass(4,i) * scale_units_factor3 > 0.0124098) then ! 13 Jupiter masses
+    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
+    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
        n_etoiles = n_etoiles + 1
     endif
  enddo
@@ -555,12 +554,12 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
     i_etoiles = 0
     do i=1,nptmass
-       if (xyzmh_ptmass(4,i) * scale_units_factor3 > 0.0124098) then ! 13 Jupiter masses
+       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
           i_etoiles = i_etoiles + 1
-          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * scale_units_factor * ulength_au
-          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * scale_units_factor * ulength_au
-          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * scale_units_factor * ulength_au
-          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * scale_units_factor3 * usolarmass
+          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
+          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
+          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
+          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
        endif
     enddo
  endif
