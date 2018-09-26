@@ -577,7 +577,7 @@ module Voronoi_grid
           l = l+1
           if (l <= n_saved_neighbours) then
              j = neighbours_list(k)
-             Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
           endif
        enddo
     enddo

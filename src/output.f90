@@ -1384,7 +1384,8 @@ subroutine write_column_density()
            CD(icell,direction) = CD(icell,direction) + (l_contrib * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
 
            if (lVoronoi) then
-              ltest = (next_cell > 0).and.(.not.Voronoi(next_cell)%is_star)
+              ltest = (next_cell > 0)
+              if (ltest) ltest = (.not.Voronoi(next_cell)%is_star)
            else
               ltest = (next_cell <= n_cells)
            endif
