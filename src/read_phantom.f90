@@ -371,6 +371,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     write(*,*) 'Lengths are rescaled by ', scale_units_factor
     udist_scaled = udist * scale_units_factor
     umass_scaled = umass * scale_units_factor**3
+ else
+    udist_scaled = udist
+    umass_scaled = umass
  endif
 
   udens = umass_scaled/udist_scaled**3
@@ -415,7 +418,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  ! Dust grain sizes in microns
  SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
-
 
  if (lemission_mol) then
     allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
@@ -472,7 +474,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           endif
           rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
-          if (dustfluidtype==2) then
+          if (dustfluidtype==1) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi
