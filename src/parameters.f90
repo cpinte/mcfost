@@ -113,7 +113,7 @@ module parametres
 
   ! Phantom
   logical :: ldudt_implicit,lscale_units
-  real(kind=dp) :: ufac_implicit,scale_units_factor
+  real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells
 
 
   ! Disk parameters
@@ -157,7 +157,7 @@ module parametres
 
   ! SPH
   real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH, lfix_star
+  logical :: lplanet_az, lscale_SPH, lfix_star, lcorrect_density_elongated_cells
 
   logical :: lgap_Gaussian
   real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian

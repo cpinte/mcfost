@@ -123,6 +123,7 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   lscale_SPH = .false.
+  lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_units = .false.
 
@@ -958,6 +959,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) scale_SPH
         i_arg = i_arg + 1
+     case("-correct_density_elongated_cells")
+        i_arg = i_arg+1
+        lcorrect_density_elongated_cells=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,* ) correct_density_factor_elongated_cells
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
@@ -1365,6 +1372,7 @@ subroutine display_help()
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
+  write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
