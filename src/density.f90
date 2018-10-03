@@ -1060,7 +1060,7 @@ subroutine read_density_file()
   write(*,*) "read_gas_density =", read_gas_density
   lread_gas_density = (read_gas_density == 1)
 
-  ! Do we read the gas density ?
+  ! Do we read the gas velocity ?
   status = 0
   call ftgkyj(unit,"read_gas_velocity",read_gas_density,comment,status)
   if (status /=0) read_gas_velocity = 0
@@ -1074,8 +1074,8 @@ subroutine read_density_file()
 
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 4) then
-     write(*,*) "I found", nfound, "axis instead of 4"
+  if ((nfound /= 3) .and. (nfound /= 4)) then
+     write(*,*) "I found", nfound, "axis instead of 3 or 4"
      call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
   endif
 
@@ -1087,9 +1087,15 @@ subroutine read_density_file()
      !write(*,*) naxes(4), n_a
      call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
   endif
-  n_a = naxes(4)
-  write(*,*) n_a, "grain sizes found"
-  npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  if (nfound == 3) then
+     n_a = 1
+     write(*,*) n_a, "No grain size found"
+       npixels=naxes(1)*naxes(2)*naxes(3)
+  else
+     n_a = naxes(4)
+     write(*,*) n_a, "grain sizes found"
+     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  endif
 
   if (naxes(2) == 2*nz+1) then
      l3D_file = .true.
