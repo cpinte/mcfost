@@ -635,11 +635,6 @@ module Voronoi_grid
        enddo ! k
     enddo ! icell
 
-
-
-
-
-
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
 

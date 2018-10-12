@@ -1092,6 +1092,10 @@ subroutine read_density_file()
      write(*,*) "No grain size found"
      npixels=naxes(1)*naxes(2)*naxes(3)
   else
+     if (lvariable_dust == .false.) then
+        call warning("Forcing variable dust")
+        lvariable_dust = .true.
+     endif
      n_a = naxes(4)
      write(*,*) n_a, "grain sizes found"
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
@@ -1570,12 +1574,11 @@ subroutine normalize_dust_density(disk_dust_mass)
   ! puis on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
      somme=0.0
-
      do icell=1,n_cells
         if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum dennsite_pouss = 1  dans le disque
+     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
   search_not_empty : do l=1,n_grains_tot

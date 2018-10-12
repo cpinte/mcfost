@@ -2068,7 +2068,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! Wrting the column density
-  call write_column_density()
+  !call write_column_density()
 
   if (lstop_after_init) then
      write(*,*) "Exiting"
