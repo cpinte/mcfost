@@ -1,0 +1,13 @@
+MODULE Opacity
+
+ IMPLICIT NONE
+
+ CONTAINS
+
+ SUBROUTINE AtomicOpacity()
+
+ RETURN
+ END SUBROUTINE AtomicOpacity
+
+
+END MODULE Opacity

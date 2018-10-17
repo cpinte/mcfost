@@ -150,8 +150,23 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 opera
 	io_phantom_infiles.f90 io_phantom_utils.f90 read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90 \
 	dust_transfer.f90 mol_transfer.f90
 
-OBJECTS= $(SOURCES:.f90=.o)
+#------------------------------------------------------------------------------#
+#Atomic line transfer
+Atom_dir = Atoms
+SOURCES_ATOM = $(Atom_dir)/math.f90 $(Atom_dir)/atom_type.f90 $(Atom_dir)/zeeman.f90 \
+	$(Atom_dir)/getline.f90 $(Atom_dir)/constant.f90 $(Atom_dir)/voigtfunctions.f90 \
+	$(Atom_dir)/uplow.f90 $(Atom_dir)/grid_type.f90 $(Atom_dir)/getlambda.f90 \
+	$(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90 $(Atom_dir)/readatom.f90 \
+	$(Atom_dir)/collision.f90 $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
+	$(Atom_dir)/broad.f90  $(Atom_dir)/profilefunctions.f90 \
+	$(Atom_dir)/rayleigh_scattering.f90 $(Atom_dir)/thomson_scattering.f90 \
+	$(Atom_dir)/hydrogen.f90  $(Atom_dir)/opacity.f90  $(Atom_dir)/planck.f90 \
+	$(Atom_dir)/metal.f90 $(Atom_dir)/project.f90 $(Atom_dir)/accelerate.f90
 
+#$(Atom_dir)/atomictransfer.f90 $(Atom_dir)/readatmos.f90
+
+SOURCES+= $(SOURCES_ATOM)
+OBJECTS= $(SOURCES:.f90=.o)
 
 #------------------------------------------------------------------------------#
 # Compile
@@ -288,7 +303,7 @@ wardlaw :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
+	rm -rf *.o $(Atom_dir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :
