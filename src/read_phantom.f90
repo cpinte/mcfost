@@ -339,14 +339,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   use parametres, only : lscale_units,scale_units_factor
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
-  real(dp), dimension(4,np), intent(inout) :: xyzh,vxyzu
+  real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
-  real(dp), dimension(n_files,ntypes), intent(inout) :: massoftype
+  real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -362,16 +362,26 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-  real(dp) :: udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+  real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
-  udens = umass/udist**3
-  uerg_per_s = umass*udist**2/utime**3
+
+ if (lscale_units) then
+    write(*,*) 'Lengths are rescaled by ', scale_units_factor
+    udist_scaled = udist * scale_units_factor
+    umass_scaled = umass * scale_units_factor**3
+ else
+    udist_scaled = udist
+    umass_scaled = umass
+ endif
+
+  udens = umass_scaled/udist_scaled**3
+  uerg_per_s = umass_scaled*udist_scaled**2/utime**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist/ (au_to_cm)
-  uvelocity =  udist / (m_to_cm) / utime ! m/s
-  usolarmass = umass / Msun_to_g
+  ulength_au = udist_scaled/ (au_to_cm)
+  uvelocity =  udist_scaled / (m_to_cm) / utime ! m/s
+  usolarmass = umass_scaled / Msun_to_g
 
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
@@ -406,9 +416,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  endif
 
  ! Dust grain sizes in microns
- SPH_grainsizes(:) = grainsize(:) * udist * cm_to_mum
+ SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
-
 
  if (lemission_mol) then
     allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
@@ -418,24 +427,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
-  if (lscale_units) then
-     print*,'Lengths are rescaled by ',scale_units_factor
-   ! Rescale units associated with particles first
-     xyzh = xyzh * scale_units_factor
-     vxyzu = vxyzu * scale_units_factor
-     massoftype(:,1) = massoftype(:,1) * (scale_units_factor**3)
-
-     if (use_dust_particles .and. dustfluidtype==2) massoftype(:,2) = massoftype(:,2) * (scale_units_factor**3)
-
-     if (nptmass > 0) then
-        xyzmh_ptmass(1:3,:) = xyzmh_ptmass(1:3,:) * scale_units_factor
-        xyzmh_ptmass(4,:) = xyzmh_ptmass(4,:) * (scale_units_factor**3)
-     endif
-  endif
-
  j = 0
  do i=1,np
-    ifile = ifiles(i)
+     ifile = ifiles(i)
 
     xi = xyzh(1,i)
     yi = xyzh(2,i)
@@ -460,7 +454,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhodusti = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhodusti = massoftype(ifile,itypei) * (hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
           massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
@@ -478,9 +472,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
-          rhogasi = massoftype(ifile,itypei)*(hfact/hi)**3  * udens ! g/cm**3
+          rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
-          if (dustfluidtype==2) then
+          if (dustfluidtype==1) then
              rhogas(j) = rhogasi
           else
              rhogas(j) = (1 - dustfraci)*rhogasi

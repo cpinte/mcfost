@@ -28,7 +28,6 @@ subroutine mol_line_transfer()
 
   implicit none
 
-  real(kind=dp) :: u0, v0, w0
   integer :: imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
@@ -108,8 +107,6 @@ subroutine mol_line_transfer()
 
      !--- Creation carte emission moleculaire : ray-tracing
      if (mol(imol)%lline) then
-        u0 = sin(angle_interet/180._dp*pi) ;  v0=0.0_dp ; w0 = sqrt(1.0_dp - u0*u0)
-
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               call emission_line_map(imol,ibin,iaz)
@@ -372,7 +369,6 @@ subroutine NLTE_mol_line_transfer(imol)
                  ! Integration le long du rayon
                  call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs, ispeed,tab_speed(:,id), &
                       nTrans_tot, tab_Trans)
-
               enddo ! iray
 
 
@@ -576,7 +572,6 @@ subroutine emission_line_map(imol,ibin,iaz)
 
      fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-
      ! Boucle sur les rayons d'echantillonnage
      !$omp parallel &
      !$omp default(none) &
@@ -590,7 +585,6 @@ subroutine emission_line_map(imol,ibin,iaz)
      else
         cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
      endif
-
 
      !$omp do schedule(dynamic,1)
      do ri_RT=1, n_rad_RT

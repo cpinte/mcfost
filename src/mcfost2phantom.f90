@@ -59,7 +59,7 @@ contains
 
     if (lnRE) then
        call error("Non-equilibrium grains are not yet implemented in libmcfost",ierr=ierr)
-       if (ierr) return
+       if (ierr /= 0) return
     endif
 
     ! Setting option for the mcfost2phantom interface
@@ -71,7 +71,7 @@ contains
 
     if (n_zones > 1) then
        call error("mcfost2phantom only works with a 1zone parameter file",ierr=ierr)
-       if (ierr) return
+       if (ierr /= 0) return
     endif
 
     ! Building the wavelength & basic dust properties grid

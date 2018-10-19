@@ -1708,7 +1708,7 @@ function interpolate_Stokes_QU(PI_deuxtheta1,PI_deuxtheta2,frac1)
   endif
   deux_theta = deux_theta2 * (1.0_dp-frac1) + deux_theta1 * frac1
 
-  interpolate_Stokes_QU = PxI * [cos(deux_theta),sin(deux_theta)]
+  interpolate_Stokes_QU = PxI * [cos(deux_theta),-sin(deux_theta)] ! - sign to match IAU convention
 
   return
 

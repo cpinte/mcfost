@@ -493,7 +493,7 @@ module Voronoi_grid
 
     do i=1, n_etoiles
        Voronoi(etoile(i)%icell)%is_star = .true.
-    end do
+    enddo
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
@@ -577,7 +577,7 @@ module Voronoi_grid
           l = l+1
           if (l <= n_saved_neighbours) then
              j = neighbours_list(k)
-             Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
           endif
        enddo
     enddo
@@ -614,8 +614,10 @@ module Voronoi_grid
     ! Setting-up the walls
     n_missing_cells = 0
     do icell=1, n_cells
+       ! We check first that there is no issue in the tesselation
        if (volume(icell) < tiny_real) then
           n_missing_cells = n_missing_cells + 1
+          write(*,*) "WARNING: cell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
        endif
 
        ! todo : find the cells touching the walls
@@ -635,20 +637,15 @@ module Voronoi_grid
        enddo ! k
     enddo ! icell
 
-
-
-
-
+    if (n_missing_cells > 0) then
+       write(*,*) "*******************************************"
+       write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       write(*,*) "*******************************************"
+    endif
+    !
 
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
-
-    if (n_missing_cells > 0) then
-       write(*,*) "*******************************************"
-       write(*,*) "WARNING:", n_missing_cells, "are missing"
-       write(*,*) "*******************************************"
-    endif
-    !write(*,*) "icell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
 
     call system_clock(time2)
     time=(time2 - time1)/real(time_tick)

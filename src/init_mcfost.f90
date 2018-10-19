@@ -124,6 +124,7 @@ subroutine set_default_variables()
   lplanet_az = .false.
   lscale_SPH = .false.
   lML = .false.
+  lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_units = .false.
 
@@ -960,6 +961,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) scale_SPH
         i_arg = i_arg + 1
+     case("-correct_density_elongated_cells")
+        i_arg = i_arg+1
+        lcorrect_density_elongated_cells=.true.
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,* ) correct_density_factor_elongated_cells
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
@@ -1178,6 +1185,7 @@ subroutine initialisation_mcfost()
   if (.not.limg) loutput_mc = .true.
 
   if (lPA) ang_disque = PA
+  ang_disque = - ang_disque ! rotation North vers East
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1277,12 +1285,6 @@ subroutine initialisation_mcfost()
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
-
-  ! Pour rotation du disque (signe - pour convention astro)
-  cos_disk = cos(ang_disque/180.*pi)
-  sin_disk = -sin(ang_disque/180.*pi)
-  cos_disk_x2 = cos(2.*ang_disque/180.*pi)
-  sin_disk_x2 = -sin(2.*ang_disque/180.*pi)
 
   ! Signal handler
   ! do i=1,17
@@ -1387,6 +1389,7 @@ subroutine display_help()
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
+  write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"

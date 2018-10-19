@@ -139,7 +139,11 @@ subroutine transfert_poussiere()
      if (lastrochem) then
         call write_disk_struct(.true.)
      else
-        call write_disk_struct(.false.)
+        if (n_cells <= 1000000) then
+           call write_disk_struct(.true.)
+        else ! We do not write the density as the file is big
+           call write_disk_struct(.false.)
+        endif
      endif
   endif
 

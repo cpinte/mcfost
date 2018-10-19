@@ -1,20 +1,12 @@
 #------------------------------------------------------------------------------#
 # Makefile for Monte Carlo radiative transfer code MCFOST
 #------------------------------------------------------------------------------#
-
-
-#------------------------------------------------------------------------------#
-# Initialization
-
 # Linux compiling server
 LINUX_SERVER= ozstar
 
 KNOWN_SYSTEM= no
 
 LIB= $(MCFOST_INSTALL)/lib
-
-LDFLAGS=
-INCLUDE=
 
 ifndef SYSTEM
     SYSTEM= ifort
@@ -99,7 +91,7 @@ endif
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
     FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math -ffree-line-length-none -fbacktrace
+             -fno-trapping-math -ffree-line-length-none -fbacktrace  -static-libgcc -static-libstdc++
     DBLFLAG= -fdefault-real-8 -fdefault-double-8
     DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function \
                -Wuninitialized -fbacktrace
@@ -239,6 +231,8 @@ mcfost2prodimo :  mcfost mcfost2prodimo.o
 
 release : main
 	- git tag -d release
+	git tag release
+	git push github
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/macos
@@ -246,8 +240,7 @@ release : main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
 	mv mcfost_bin.tgz web/macos/
-	rsync -Pu *.f90 Makefile $(LINUX_SERVER):mcfost/src
-	ssh $(LINUX_SERVER) "cd mcfost/src ; MCFOST_GIT=0 ; export MAKEFLAGS=-j ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src ; git pull ; git checkout release ; export MCFOST_GIT=1 ; export MAKEFLAGS= ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
@@ -258,8 +251,7 @@ release : main
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update"
 	rm -rf yorick web
-	pushd . ; cd ../docs ; make html ; scp -r _build/* horus:/user/publicdir/pintec/mcfost/docs ; popd
-	git tag release
+	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
@@ -320,8 +312,8 @@ cleanall : clean cleandata
 
 save :
 	#git push phare
-	git push bitbucket
-	git push github
+	git push bitbucket --mirror
+	git push github --mirror
 	#git push dmz
 
 #------------------------------------------------------------------------------#

@@ -158,7 +158,7 @@ subroutine define_gas_density()
                  else
                     density = cst_gaz(izone)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2)/(coeff_exp))
                  endif
-                 if (j>0) then
+                 if (j/=0) then
                     densite_gaz_tmp(icell) = density
                  else
                     densite_gaz_midplane_tmp(i) = density
@@ -1061,7 +1061,7 @@ subroutine read_density_file()
   write(*,*) "read_gas_density =", read_gas_density
   lread_gas_density = (read_gas_density == 1)
 
-  ! Do we read the gas density ?
+  ! Do we read the gas velocity ?
   status = 0
   call ftgkyj(unit,"read_gas_velocity",read_gas_density,comment,status)
   if (status /=0) read_gas_velocity = 0
@@ -1075,12 +1075,12 @@ subroutine read_density_file()
 
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 4) then
-     write(*,*) "I found", nfound, "axis instead of 4"
+  if ((nfound /= 3) .and. (nfound /= 4)) then
+     write(*,*) "I found", nfound, "axis instead of 3 or 4"
      call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
   endif
 
-  if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
+  if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
@@ -1088,19 +1088,29 @@ subroutine read_density_file()
      !write(*,*) naxes(4), n_a
      call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
   endif
-  n_a = naxes(4)
-  write(*,*) n_a, "grain sizes found"
-  npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  if (nfound == 3) then
+     n_a = 1
+     write(*,*) "No grain size found"
+     npixels=naxes(1)*naxes(2)*naxes(3)
+  else
+     if (lvariable_dust == .false.) then
+        call warning("Forcing variable dust")
+        lvariable_dust = .true.
+     endif
+     n_a = naxes(4)
+     write(*,*) n_a, "grain sizes found"
+     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  endif
 
-  if (naxes(2) == 2*nz+1) then
+  if (naxes(2) == 2*nz) then
      l3D_file = .true.
   else
-     write(*,*) "The density file only has > 0 z, making it symmetric"
+     write(*,*) "The density file only has positive z, making it symmetric"
      l3D_file = .false.
   endif
 
   if (l3D_file) then
-     allocate(sph_dens(n_rad,-nz:nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+     allocate(sph_dens(n_rad,2*nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
   else
      allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
   endif
@@ -1114,7 +1124,7 @@ subroutine read_density_file()
      call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
   else if (bitpix==-64) then
      if (l3D_file) then
-        allocate(sph_dens_dp(n_rad,-nz:nz,n_az,n_a))
+        allocate(sph_dens_dp(n_rad,2*nz,n_az,n_a))
      else
         allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
      endif
@@ -1270,7 +1280,7 @@ subroutine read_density_file()
      dz%gas_to_dust = gas2dust
 
      if (l3D_file) then
-        allocate(sph_gas_dens(n_rad,-nz:nz,n_az))
+        allocate(sph_gas_dens(n_rad,2*nz,n_az))
      else
         allocate(sph_gas_dens(n_rad,nz,n_az))
      endif
@@ -1289,7 +1299,7 @@ subroutine read_density_file()
         call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
      endif
 
-     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az) ) then
+     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
         write(*,*) "# fits_file vs mcfost_grid"
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
@@ -1306,7 +1316,7 @@ subroutine read_density_file()
         call ftgpve(unit,group,firstpix,npixels,nullval,sph_gas_dens,anynull,status)
      else if (bitpix==-64) then
         if (l3D_file) then
-           allocate(sph_gas_dens_dp(n_rad,-nz:nz,n_az))
+           allocate(sph_gas_dens_dp(n_rad,2*nz,n_az))
         else
            allocate(sph_gas_dens_dp(n_rad,nz,n_az))
         endif
@@ -1333,7 +1343,7 @@ subroutine read_density_file()
      lvelocity_file = .true.
 
      if (l3D_file) then
-        allocate(sph_gas_velocity(n_rad,-nz:nz,n_az,3))
+        allocate(sph_gas_velocity(n_rad,2*nz,n_az,3))
      else
         allocate(sph_gas_velocity(n_rad,nz,n_az,3))
      endif
@@ -1352,7 +1362,7 @@ subroutine read_density_file()
         call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
      endif
 
-     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz+1)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
+     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
         write(*,*) "# fits_file vs mcfost_grid"
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
@@ -1370,7 +1380,7 @@ subroutine read_density_file()
         call ftgpve(unit,group,firstpix,npixels,nullval,sph_gas_velocity,anynull,status)
      else if (bitpix==-64) then
         if (l3D_file) then
-           allocate(sph_V_dp(n_rad,-nz:nz,n_az,3))
+           allocate(sph_V_dp(n_rad,2*nz,n_az,3))
         else
            allocate(sph_V_dp(n_rad,nz,n_az,3))
         endif
@@ -1395,6 +1405,11 @@ subroutine read_density_file()
      do j=j_start,nz
         if (l3D_file) then
            jj = j
+           if (jj > 0) then
+              jj = nz + jj
+           else
+              jj = nz+1 + jj
+           endif
         else
            jj = abs(j)
         endif
@@ -1452,7 +1467,11 @@ subroutine read_density_file()
               do j=j_start,nz
                  if (j==0) cycle
                  if (l3D_file) then
-                    jj = j
+                    if (j > 0) then
+                       jj = j + nz
+                    else
+                       jj = j + nz + 1
+                    endif
                  else
                     jj = abs(j)
                  endif
@@ -1466,7 +1485,11 @@ subroutine read_density_file()
            do phik=1, n_az
               do j=j_start,nz
                  if (l3D_file) then
-                    jj = j
+                    if (j > 0) then
+                       jj = j + nz
+                    else
+                       jj = j + nz + 1
+                    endif
                  else
                     jj = abs(j)
                  endif
@@ -1484,8 +1507,12 @@ subroutine read_density_file()
               do j=j_start,nz
                  if (j==0) cycle
                  if (l3D_file) then
-                    jj = j
-                 else
+                    if (j > 0) then
+                       jj = j + nz
+                    else
+                       jj = j + nz + 1
+                    endif
+              else
                     jj = abs(j)
                  endif
                  do i=1, n_rad
@@ -1503,7 +1530,11 @@ subroutine read_density_file()
            do j=j_start,nz
               if (j==0) cycle
               if (l3D_file) then
-                 jj = j
+                 if (j > 0) then
+                    jj = j + nz
+                 else
+                    jj = j + nz + 1
+                 endif
               else
                  jj = abs(j)
               endif
@@ -1544,12 +1575,11 @@ subroutine normalize_dust_density(disk_dust_mass)
   ! puis on a 1 grain en tout dans le disque
   do l=1,n_grains_tot
      somme=0.0
-
      do icell=1,n_cells
         if (densite_pouss(l,icell) <= 0.0) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum dennsite_pouss = 1  dans le disque
+     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
   search_not_empty : do l=1,n_grains_tot

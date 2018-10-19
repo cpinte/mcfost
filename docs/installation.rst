@@ -30,8 +30,8 @@ be optmized for most architectures.
    where you want mcfost to store its data files. E.g. edit your
    shell startup files to include either:
 
-   - ``setenv MCFOST\_UTILS /path/you/put/the/files`` [tcsh or csh shell], or
-   - ``export MCFOST\_UTILS=/path/you/put/the/files`` [bash or bash-like shell]
+   - ``setenv MCFOST_UTILS /path/you/put/the/files`` [tcsh or csh shell], or
+   - ``export MCFOST_UTILS=/path/you/put/the/files`` [bash or bash-like shell]
 5. run ``mcfost -setup`` to download mcfost data files, current reference parameter files.
 
 

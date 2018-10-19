@@ -17,7 +17,7 @@
 
 #Maps
   401 401 700.            grid (nx,ny), size [AU]
-  0.  90.  10  F          RT: imin, imax, n_incl, centered ?
+  12.5  77.5  2  F          RT: imin, imax, n_incl, centered ?
   0    0.   1             RT: az_min, az_max, n_az angles
   140.0			  distance (pc)
   0.			  disk PA
