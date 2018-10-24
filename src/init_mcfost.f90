@@ -1106,9 +1106,9 @@ subroutine initialisation_mcfost()
      lmono0=.true.
      n_lambda=1
      if (wvl <= 1.0) then ! mcfost fait meme les accords grammaticaux 8-)
-        write(*,*) "Calculating image at wavelength =", wvl," micron"
+        write(*,*) "Calculating image at wavelength =", real(wvl)," micron"
      else
-        write(*,*) "Calculating image at wavelength =", wvl," microns"
+        write(*,*) "Calculating image at wavelength =", real(wvl)," microns"
      endif
      basename_data_dir = "data_"//trim(band)
      if (lreemission_stats) then
