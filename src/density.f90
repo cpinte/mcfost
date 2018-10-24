@@ -1249,7 +1249,9 @@ subroutine read_density_file()
            if (a_sph(i) < tiny_real) call error("grain sizes must be > 0")
            if (n_a_sph(i) / tmp < tiny_real) call error("grain number density must be > 0")
         enddo
-        write(*,*) "They will be used to set the integrated grain size distribution"
+        write(*,*) "These sizes will be used to set the integrated grain size distribution"
+        write(*,*) "Densities will be interpolated on the grain sizes defined"
+        write(*,*) "in the parameter file"
 
         if (n_pop > 1) call error("density fits interface only works for 1 dust pop")
 
