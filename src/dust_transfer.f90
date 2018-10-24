@@ -102,20 +102,8 @@ subroutine transfert_poussiere()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
-  call setup_scattering()
-
-  ! Allocation dynamique de tous les autres tableaux
-  call alloc_dust_prop()
-  call alloc_dynamique()
 
   laffichage=.true.
-
-  stream = 0.0
-  do i=1, nb_proc
-     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-  enddo
-
-  if (lProDiMo) call setup_ProDiMo()
 
   if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
@@ -131,6 +119,19 @@ subroutine transfert_poussiere()
      endif
      if (lwall) call define_density_wall3D()
   endif
+
+  call setup_scattering()
+  ! Allocation dynamique de tous les autres tableaux
+  call alloc_dust_prop()
+
+  call alloc_dynamique()
+
+  stream = 0.0
+  do i=1, nb_proc
+     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+  enddo
+
+  if (lProDiMo) call setup_ProDiMo()
 
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation

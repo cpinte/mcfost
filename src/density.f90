@@ -1087,6 +1087,7 @@ subroutine read_density_file()
      !write(*,*) naxes(4), n_a
      call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
   endif
+
   if (nfound == 3) then
      n_a = 1
      write(*,*) "No grain size found"
@@ -1099,6 +1100,14 @@ subroutine read_density_file()
      n_a = naxes(4)
      write(*,*) n_a, "grain sizes found"
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  endif
+
+  if (lvariable_dust) then
+     p_n_cells = n_cells
+     p_n_rad=n_rad ; p_nz = nz
+  else
+     p_n_cells = 1
+     p_n_rad=1 ;  p_nz=1
   endif
 
   if (naxes(2) == 2*nz) then
