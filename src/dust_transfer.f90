@@ -86,10 +86,6 @@ subroutine transfert_poussiere()
   if (lbenchmark_Pascucci) call init_Pascucci_benchmark()
   call init_indices_optiques()
 
-
-  ! Building the dust grain population
-  call build_grain_size_distribution()
-
   ! Building the model volume and corresponding grid
   call order_zones()
   call define_physical_zones()
@@ -104,6 +100,9 @@ subroutine transfert_poussiere()
   endif
 
   laffichage=.true.
+
+  ! Building the dust grain population
+  call build_grain_size_distribution()
 
   if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
