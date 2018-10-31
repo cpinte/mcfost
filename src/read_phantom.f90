@@ -23,12 +23,13 @@ module read_phantom
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
- integer :: nblocks,narraylengths,nblockarrays,number
+ integer :: nblocks,narraylengths,nblockarrays,number,idust
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
  integer, parameter :: maxtypes = 6
  integer, parameter :: maxfiles = 3
+ integer, parameter :: maxinblock = 128
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
  real(dp) :: hfact,umass,utime,udist
@@ -74,6 +75,19 @@ module read_phantom
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
+
+       ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
+       if (ndusttypes==0 .and. ierr/=0) then
+             ! For older files where ndusttypes is not output to the header
+          idust = 0
+          do i = 1,maxinblock
+             if (hdr%realtags(i)=='grainsize') idust = idust + 1
+          enddo
+          write(*,"(a)")    ' Warning! Could not find ndusttypes in header'
+          write(*,"(a,I4)") '          ...counting grainsize arrays...ndusttypes =',idust
+          ndusttypes = idust
+       endif
+
     endif
     call extract('ntypes',ntypes,hdr,ierr)
 
@@ -124,6 +138,19 @@ module read_phantom
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
+
+       ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
+       if (ndusttypes==0 .and. ierr/=0) then
+             ! For older files where ndusttypes is not output to the header
+          idust = 0
+          do i = 1,maxinblock
+             if (hdr%realtags(i)=='grainsize') idust = idust + 1
+          enddo
+          write(*,"(a)")    ' Warning! Could not find ndusttypes in header'
+          write(*,"(a,I4)") '          ...counting grainsize arrays...ndusttypes =',idust
+          ndusttypes = idust
+      endif
+
     endif
     call extract('nptmass',nptmass,hdr,ierr,default=0)
     !call extract('isink',isink,hdr,ierr,default=0)
