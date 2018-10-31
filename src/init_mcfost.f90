@@ -122,6 +122,7 @@ subroutine set_default_variables()
   ltau1_surface=.false.
   lcasa=.false.
   lplanet_az = .false.
+  which_planet = 0
   lscale_SPH = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
@@ -953,6 +954,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) planet_az
         i_arg = i_arg + 1
+     case("-planet")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) which_planet
+        write(*,*) "PLANET", which_planet, "AZ=", planet_az
+        i_arg = i_arg + 1
      case("-scale_SPH")
         lscale_SPH = .true.
         i_arg = i_arg + 1
@@ -1331,6 +1338,8 @@ subroutine display_help()
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
   write(*,*) "        : -planet_az <angle> [deg] : adjust the model azimuth so that the planet is at"
   write(*,*) "                                     desired azimuth in the map"
+  write(*,*) "        : -planet <sink_particle_number> : select the sink particle used to"
+  write(*,*) "                                           perform the dump rotation"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"

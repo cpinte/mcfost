@@ -564,10 +564,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  enddo
 
  if (lplanet_az) then
-    if (nptmass /= 2) call error("option -planet_az only works with 2 sink particles")
+    if ((nptmass /= 2).and.(which_planet==0)) call error("option -planet_az: you need to specify the sink particle with -planet option")
+    if (nptmass == 2) which_planet=2
+    if (which_planet > nptmass) call error("specified sink particle does not exist")
+
     RT_n_az = 1
-    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,2) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,2) - xyzmh_ptmass(1,1)) / deg_to_rad
+    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) / deg_to_rad
     RT_az_max = RT_az_min
+    write(*,*) "Moving sink particle #", which_planet, "to azimuth =", planet_az
     write(*,*) "WARNING: updating the azimuth to:", RT_az_min
  endif
 
