@@ -1345,7 +1345,6 @@ subroutine read_density_file()
      sph_gas_dens = max(sph_gas_dens,1e10*tiny_real)
   endif ! lread_gas_density
 
-
   !------------------------
   ! Velocity field
   !------------------------

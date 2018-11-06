@@ -49,6 +49,8 @@ module read_phantom
  ntypes_tot = 0
  ntypes_max = 0
  do ifile=1, n_files
+    write(*,*) "---- Reading header file #", ifile
+
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
@@ -95,7 +97,11 @@ module read_phantom
     np_max = max(np_max,np)
     ntypes_tot = ntypes_tot + ntypes
     ntypes_max = max(ntypes_max,ntypes)
+
+    call free_header(hdr, ierr)
+
     close(iunit)
+    write(*,*) "---- Done"
  enddo ! ifile
 
  allocate(xyzh(4,np_tot),itype(np_tot),tmp(np_max),vxyzu(4,np_tot),tmp_dp(np_max))
@@ -106,6 +112,8 @@ module read_phantom
  np0 = 0
  ntypes0 = 0
  do ifile=1, n_files
+    write(*,*) "---- Reading data file #", ifile
+
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
@@ -193,13 +201,15 @@ module read_phantom
     do iblock = 1,nblocks
        call read_block_header(narraylengths,number8,nums,iunit,ierr)
        do j=1,narraylengths
-          !write(*,*) 'block ',iblock, j, number8(j)
+          write(*,*) 'block ',iblock, j, number8(j), np
           do i=1,ndatatypes
-             !print*,' data type ',i,' arrays = ',nums(i,j)
+             print*,' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
                 if (j==1 .and. number8(j)==np) then
                    read(iunit, iostat=ierr) tag
-                   !write(*,"(1x,a)",advance='no') trim(tag)
+                   if (ierr /= 0) call error('READING TAG')
+
+                   write(*,"(1x,a)",advance='no') trim(tag)
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
@@ -308,7 +318,12 @@ module read_phantom
           enddo
        enddo
     enddo ! block
+
+    call free_header(hdr, ierr)
+    write(*,*) "---- Done"
     close(iunit)
+
+
 
     ifiles(np0+1:np0+np) = ifile ! index of the file
 
@@ -553,7 +568,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
+
  write(*,*) "# Sink particles:"
+
  n_etoiles = 0
  do i=1,nptmass
     write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
