@@ -41,11 +41,10 @@ module read_phantom
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
- integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max, ndustsmall, ndustlarge
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
  ! We first read the number of particules in each phantom file
  np_tot = 0
- np_max = 0
  ntypes_tot = 0
  ntypes_max = 0
  do ifile=1, n_files
@@ -69,6 +68,7 @@ module read_phantom
        ierr = 1000
        return
     endif
+
     call extract('nparttot',np,hdr,ierr)
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
     if (ierr /= 0) then
@@ -94,7 +94,6 @@ module read_phantom
     call extract('ntypes',ntypes,hdr,ierr)
 
     np_tot = np_tot + np
-    np_max = max(np_max,np)
     ntypes_tot = ntypes_tot + ntypes
     ntypes_max = max(ntypes_max,ntypes)
 
@@ -104,7 +103,7 @@ module read_phantom
     write(*,*) "---- Done"
  enddo ! ifile
 
- allocate(xyzh(4,np_tot),itype(np_tot),tmp(np_max),vxyzu(4,np_tot),tmp_dp(np_max))
+ allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
 
@@ -158,14 +157,17 @@ module read_phantom
           write(*,"(a,I4)") '          ...counting grainsize arrays...ndusttypes =',idust
           ndusttypes = idust
       endif
-
     endif
+    call extract('ntypes',ntypes,hdr,ierr)
+
     call extract('nptmass',nptmass,hdr,ierr,default=0)
     !call extract('isink',isink,hdr,ierr,default=0)
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
     write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
+
+    allocate(tmp(np), tmp_dp(np))
 
     if (npartoftype(2) > 0) then
        dustfluidtype = 2
@@ -200,16 +202,19 @@ module read_phantom
     ngrains = 0
     do iblock = 1,nblocks
        call read_block_header(narraylengths,number8,nums,iunit,ierr)
+       if (ierr /= 0) call error('Reading block header')
        do j=1,narraylengths
-          write(*,*) 'block ',iblock, j, number8(j), np
+          !write(*,*) 'block ',iblock, j, number8(j), np
           do i=1,ndatatypes
-             print*,' data type ',i,' arrays = ',nums(i,j)
+             !write(*,*) ' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
+                !write(*,*) "k=", k, np0, np
+
                 if (j==1 .and. number8(j)==np) then
                    read(iunit, iostat=ierr) tag
-                   if (ierr /= 0) call error('READING TAG')
+                   if (ierr /= 0) call error('Reading tag')
+                   !write(*,"(1x,a)",advance='no') trim(tag)
 
-                   write(*,"(1x,a)",advance='no') trim(tag)
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
@@ -274,6 +279,7 @@ module read_phantom
                    else
                       read(iunit,iostat=ierr)
                    endif
+                   if (ierr /= 0) call error("Error reading tag: "//trim(tag))
                 !elseif (j==1 .and. number8(j)==nptmass) then
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass = number8(j) ! HACK
@@ -319,11 +325,10 @@ module read_phantom
        enddo
     enddo ! block
 
+    deallocate(tmp, tmp_dp)
     call free_header(hdr, ierr)
     write(*,*) "---- Done"
     close(iunit)
-
-
 
     ifiles(np0+1:np0+np) = ifile ! index of the file
 
@@ -358,7 +363,7 @@ module read_phantom
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp,vxyzu,tmp_dp)
+ deallocate(xyzh,itype,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_files
