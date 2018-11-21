@@ -313,6 +313,7 @@ MODULE AtomicTransfer
   double precision, dimension(n_rad_RT) :: tab_r
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
+  logical :: lresolved = .false.
   
 npix_x = 101; npix_y = 101
 
@@ -347,6 +348,8 @@ npix_x = 101; npix_y = 101
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
+     lresolved = .true.
+     
      write(*,*) taille_pix, map_size, zoom, npix_x, npix_y, RT_n_incl, RT_n_az
 
      dx(:) = x_plan_image * taille_pix
@@ -388,13 +391,13 @@ npix_x = 101; npix_y = 101
   ! --------------------------
   ! Ajout Flux etoile
   ! --------------------------
-!   do i = 1, NLTEspec%Nwaves
-!    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy)
-! !    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
-! !       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-!    NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
-!    NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
-!   end do
+  do i = 1, NLTEspec%Nwaves
+   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
+!    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
+!       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
+   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
+   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
+  end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -525,6 +528,8 @@ npix_x = 101; npix_y = 101
   if (allocated(kappa)) deallocate(kappa)
   allocate(kappa(n_cells,n_lambda))
   kappa = 0.0
+  !kappa will be computed on the fly in  optical_length_tot()
+  !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
   ! Velocity field in  m.s-1
@@ -570,12 +575,7 @@ npix_x = 101; npix_y = 101
 !    end do
 ! 
 !! -------------------------------------------------------- !!
-! calc kappa 
-do icell=1,n_cells
- CALL Background(icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0)
- kappa(icell,:) = NLTEspec%ActiveSet%chi_c_bf
- CALL initAS(re_init=.true.)
-end do
+
 
 !  CALL ContributionFunction()
 
