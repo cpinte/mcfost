@@ -170,8 +170,6 @@ MODULE hydrogen_opacities
     allocate(iLam(continuum%Nlambda)) !not used yet
     iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /)
 
-!    where ((NLTEspec%lambda.le.lambdaEdge).and. &
-!      (NLTEspec%lambda.ge.continuum%lambda(1)))
    ! lambda has to be lower than the edge but greater than
    ! lambda0, see Hubeny & Mihalas chap. 7 photoionisation
    ! and Rutten hydrogen bound-free parts.
@@ -196,9 +194,6 @@ MODULE hydrogen_opacities
      sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / &
       (Hydrogen%stage(i)+1)**2 !m^2
 
-    !!write(*,*) "lambda, n, g_bf, sigma for level ", i, &
-    !!     Hydrogen%label(i)
-    !!write(*,*) lambda, n_eff, g_bf, sigma, sigma0
 
     !! or use this (with sigma02)
     !sigma2 = &
@@ -218,18 +213,9 @@ MODULE hydrogen_opacities
     eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np
      !write(*,*) lambda, i, kr, eta(k), chi(k)
      !write(*,*) np(k), npstar(k), Hydrogen%nstar(i,k), sigma, expla, gijk
-!    end where
+
     deallocate(iLam)
   end do
-
-  ! can be zero if T to low, so we test that at the begining
-!   if ((MAXVAL(chi).gt.0.).and.(MAXVAL(eta).gt.0)) then
-!     res=.true. ! else not computed return false
-!    !because we do all wavelength at a time, should never return false !!
-!    ! it can be false if one wavelength per wavelength (RH like)
-!   else
-!    write(*,*) "Error in Hydrogen_bf()"
-!   end if
 
  RETURN
  END FUNCTION Hydrogen_bf
