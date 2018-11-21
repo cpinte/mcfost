@@ -11,9 +11,9 @@ MODULE getlambda
  ! -- q[N-1] = qwing
 
   use atom_type, only : AtomicContinuum, AtomicLine, AtomType
-  use grid_type, only : atmos
+  use atmos_type, only : atmos
   use constant
-  use math, only : SQ, CUBE, sort
+  use math, only : SQ, CUBE, locate, sort
 
   IMPLICIT NONE
 
@@ -54,7 +54,8 @@ MODULE getlambda
    end if
 
    !store in unit of lambda0 instead of adimensional values
-   q_to_lambda = line%lambda0 * (atmos%vmicro_char/CLIGHT)
+   !deltaLambda / lambda0 = deltav/c
+   q_to_lambda = line%lambda0 * (atmos%v_char/CLIGHT)
 
    g_lande_eff = line%g_lande_eff
 
@@ -113,7 +114,7 @@ MODULE getlambda
       !characteristic Zeeman splitting
       qB_char = g_lande_eff * (Q_ELECTRON/(4*PI*M_ELECTRON))*&
            (line%lambda0*NM_TO_M) * atmos%B_char / &
-            atmos%vmicro_char
+            atmos%v_char
 
     if (qB_char/2. .ge.line%qcore) then
       write(*,*) "Characteristic Zeeman Splitting >= qcore ",&
@@ -173,6 +174,7 @@ MODULE getlambda
 
     if (line%Ncomponent.gt.1) then
      CALL sort(line%lambda, line%Nlambda)
+     !!CALL hpsort(line%Nlambda, line%lambda) ! NumRec
     end if
 
    end if
@@ -222,16 +224,23 @@ MODULE getlambda
   RETURN
   END FUNCTION
 
-  SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid)
+  SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, wl_ref)
   ! construct un sort a wavelength grid for NLTE line transfer
-   type (AtomType), intent(in), dimension(Natom) :: Atoms
+  ! after the grid has been constructed, saves Nblue for continuum
+  ! and bound-bound transitions: The bluest absolute index of the extent of the
+  ! transitions.
+  ! Note that because duplicate wavelengths are removed, a new %Nlambda for
+  ! each line and continuum are recomputed.
+   type (AtomType), intent(inout), dimension(Natom) :: Atoms
    integer, intent(in) :: Natom
+   double precision, intent(in) :: wl_ref
    type (AtomicLine), allocatable, dimension(:) :: alllines
    type (AtomicContinuum), allocatable, dimension(:) :: allcont
    double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
-   integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot
-   integer :: la, nn, compar
+   integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot, idx
+   integer :: la, nn, compar, Nred, Nlambda_original !read from model
    double precision, allocatable, dimension(:) :: tempgrid
+   double precision :: l0, l1 !ref wavelength of each transitions
 
    nn = 0
    allocate(alllines(MAX_ACTIVE_TRANSITIONS))
@@ -266,16 +275,20 @@ MODULE getlambda
     allcont(Nctot) = Atoms(n)%continua(kc)
    end do
   end do ! end loop over atoms
+
+  ! add ref wavelength if any and allocate temp array
+  if (wl_ref.gt.0.) then
+   Nspect = Nspect + 1
+   nn = 1
+   allocate(tempgrid(Nspect))
+   tempgrid(1)=wl_ref
+  else
+   allocate(tempgrid(Nspect))
+  end if
+
   write(*,*) "Adding ", Nspect," lines and continua"
 
-  if (atmos%wavelength_ref.gt.0.) then
-  Nspect = Nspect + 1
-  nn = 1
-  allocate(tempgrid(Nspect))
-  tempgrid(1)=atmos%wavelength_ref
-  else
-  allocate(tempgrid(Nspect))
-  end if
+
 
   ! add wavelength from mcfost inoutgrid if any
   ! convert it to nm
@@ -305,11 +318,14 @@ MODULE getlambda
   CALL sort(tempgrid, Nspect)
 
   !check for dupplicates
-  Nwaves = 1
+  !tempgrid(1) already set
+  Nwaves = 2
   do la=2,Nspect
+  !write(*,*) "dlam>0", tempgrid(la)-tempgrid(la-1)
    if (tempgrid(la).gt.tempgrid(la-1)) then
-    Nwaves = Nwaves + 1
+   !write(*,*) "T"
     tempgrid(Nwaves) = tempgrid(la)
+    Nwaves = Nwaves + 1
    end if
   end do
   write(*,*) Nwaves, " unique wavelengths, ", Nspect-Nwaves,&
@@ -318,11 +334,39 @@ MODULE getlambda
   allocate(inoutgrid(Nwaves))
   do la=1,Nwaves
    inoutgrid(la) = tempgrid(la)
+   !write(*,*) "lam(la) =", inoutgrid(la)
   end do
+
+  !should not dot that but error somewhere if many atoms
+  CALL sort(inoutgrid, Nwaves)
 
   deallocate(tempgrid)
   deallocate(alllines)
   deallocate(allcont)
+
+  ! Now replace the line%Nlambda and continuum%Nlambda by the new values.
+  ! we do that even for PASSIVE atoms
+  do n=1,Natom
+   Nred = 0
+   !first continuum transitions
+   do kc=1,Atoms(n)%Ncont
+    Nlambda_original = Atoms(n)%continua(kc)%Nlambda
+    l0 = Atoms(n)%continua(kc)%lambda(1)
+    l1 = Atoms(n)%continua(kc)%lambda(Nlambda_original)
+    Atoms(n)%continua(kc)%Nblue = locate(inoutgrid,l0)
+    Nred = locate(inoutgrid,l1)
+    Atoms(n)%continua(kc)%Nlambda = Nred - Atoms(n)%continua(kc)%Nblue
+   end do
+   !then bound-bound transitions
+   do kr=1,Atoms(n)%Nline
+    Nlambda_original = Atoms(n)%lines(kr)%Nlambda
+    l0 = Atoms(n)%lines(kr)%lambda(1)
+    l1 = Atoms(n)%lines(kr)%lambda(Nlambda_original)
+    Atoms(n)%lines(kr)%Nblue = locate(inoutgrid,l0)
+    Nred = locate(inoutgrid,l1)
+    Atoms(n)%lines(kr)%Nlambda = Nred - Atoms(n)%lines(kr)%Nblue
+   end do
+  end do !over atoms
 
   RETURN
   END SUBROUTINE make_wavelength_grid

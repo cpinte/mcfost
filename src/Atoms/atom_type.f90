@@ -17,7 +17,7 @@ MODULE atom_type
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicLine
-   !type (AtomType), pointer   :: atom 
+   !type (AtomType), pointer   :: atom
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PRD=.false.,&
       damping_initialized=.false.
@@ -32,7 +32,7 @@ MODULE atom_type
    double precision, allocatable, dimension(:)  :: lambda, Rij, Rji, wphi, c_shift, c_fraction
    double precision :: Qelast, adamp
    real(8), allocatable, dimension(:,:) :: rho_prd
-   !!type (AtomType), pointer :: atom
+   !type (AtomType), pointer :: atom
    character :: file_GII
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -41,7 +41,7 @@ MODULE atom_type
    integer :: i, j, Nlambda, Nblue
    real(8) :: lambda0, isotope_Frac, alpha0
    real(8), allocatable, dimension(:)  :: lambda, alpha, Rji, Rij
-   !!type (AtomType), pointer :: atom
+   !type (AtomType), pointer :: atom
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -55,7 +55,7 @@ MODULE atom_type
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomType
    character(len=ATOM_ID_WIDTH) :: ID
-   character (len=15)             :: popsinFile, popsoutFile
+   character (len=15)             :: dataFile!popsinFile, popsoutFile
    character(len=28) :: inputFile
    character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
    logical                :: NLTEpops, active
@@ -191,9 +191,37 @@ MODULE atom_type
    !       123456
    !label='H I 10S 2SE         '
 
-   st = 5 !always at this position because
+
+   if (label(2:2)==" ") then !"H X ..." case
+    if (label(4:4)=="I") then !case H II
+     st = 6
+    else
+     st = 5
+    end if !always at this position for HI because
           !label of HI is always 'H I NX.....'
-          !or 'H I NNX.....'
+          !or 'H I NNX....'!1234567     123456
+   else !other than H e.g., CA II ...., CA I ...
+    if (label(6:6)=="I") then
+     write(*,*) "(1) Case not handled for parsing principal"
+     determined = .false.
+     RETURN
+    else if (label(4:4)=="I") then
+     if (label(5:5)=="I") then
+      st = 7
+     else if (label(5:5)==" ") then
+       st = 7
+     else
+      write(*,*) "(2) Error parsing label for principal quantum number"
+      determined = .false.
+      RETURN
+     end if
+    else
+      write(*,*) "(3) Error parsing label for principal quantum number"
+      determined = .false.
+      RETURN
+    end if
+   end if
+
    read(label(st:st+1),*,iostat=err) n
    ! if error, label(st+1) is a string,
    ! meaning that len(n) = 1 (one digit)
@@ -284,4 +312,3 @@ MODULE atom_type
   END FUNCTION wKul
 
 END MODULE atom_type
-

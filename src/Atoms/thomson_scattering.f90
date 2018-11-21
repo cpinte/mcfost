@@ -1,6 +1,6 @@
 MODULE thomson_scattering
 
- use grid_type, only: atmos
+ use atmos_type, only: atmos
  use constant
  use math, only : dpow
 

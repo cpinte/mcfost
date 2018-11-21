@@ -7,7 +7,7 @@ MODULE broad
 
  use constant
  use atom_type
- use grid_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium
  use math, only : dpow, SQ, CUBE
 
  IMPLICIT NONE
@@ -199,7 +199,7 @@ MODULE broad
      (SQ(neff_u*(5.0*SQ(neff_u) + 1.0)) - SQ(neff_l* &
      (5.0*SQ(neff_l) + 1.0)))
    cStark23 = 11.37 * dpow(line%cStark * C4,6.6666667d-1)
-   
+
     vrel = dpow(C*atmos%T(icell),1.6666667d-1) * Cm
     GStark = cStark23 * vrel * atmos%ne(icell)
   end if
@@ -227,16 +227,18 @@ MODULE broad
   line = atom%lines(kr)
 
   ! or n_lower = dsqrt(atom%g(i)/2.) !with g the statistical weight
-  if (.not.getPrincipal(atom%label(line%i),n_lower)) then
-   write(*,*) "Cannot find principal quantum number for label ", &
-    atom%label(line%i), " exiting..."
-   stop
-  end if
-  if (.not.getPrincipal(atom%label(line%j),n_upper)) then
-   write(*,*) "Cannot find principal quantum number for label ", &
-   atom%label(line%j), " exiting..."
-   stop
-  end if
+  n_lower = dsqrt(atom%g(line%i)/2.)
+  n_upper = dsqrt(atom%g(line%j)/2.) !works because stark only for Hydrogen.
+!   if (.not.getPrincipal(atom%label(line%i),n_lower)) then
+!    write(*,*) "Cannot find principal quantum number for label ", &
+!     atom%label(line%i), " exiting..."
+!    stop
+!   end if
+!   if (.not.getPrincipal(atom%label(line%j),n_upper)) then
+!    write(*,*) "Cannot find principal quantum number for label ", &
+!    atom%label(line%j), " exiting..."
+!    stop
+!   end if
 
   if ((n_upper-n_lower).eq.1) then
    a1 = 0.642
@@ -244,7 +246,7 @@ MODULE broad
    a1 = 1.
   end if
   C = a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * SQ(CM_TO_M)
-  
+
    GStark = C*dpow(atmos%ne(icell), 6.6666667d-1)
 
  RETURN
@@ -261,7 +263,7 @@ MODULE broad
   double precision :: Qelast
 
   Qelast = 0.0
-  
+
   line=atom%lines(kr)
   !write(*,*) "Computing damping for line ",line%j,"-",line%i
 

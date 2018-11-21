@@ -1,7 +1,6 @@
 MODULE Planck
 
  use constant
- use math, only : CUBEarr
 
  IMPLICIT NONE
 
@@ -13,7 +12,7 @@ MODULE Planck
  ! -----------------------------------------------------
  ! Return an array of planck functions at all wavelengths
  ! for the cell temperature.
- ! Bnu in W/m2/Hz/sr
+ ! Bnu in J/s/m2/Hz/sr
  ! lambda in nm
  ! -----------------------------------------------------
   integer, intent(in) :: Nlam
@@ -22,7 +21,7 @@ MODULE Planck
   double precision, intent(in), dimension(Nlam) :: lambda
   double precision, dimension(Nlam) :: hnu_kT, twohnu3_c2
 
-   twohnu3_c2 = 2.*HPLANCK*CLIGHT / CUBEarr(Nlam, NM_TO_M * lambda)
+   twohnu3_c2 = 2.*HPLANCK*CLIGHT / (NM_TO_M * lambda)**3
 
    hnu_kT = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*lambda*T)
    where(hnu_kT.lt.MAX_EXPONENT)

@@ -19,7 +19,7 @@
 
 MODULE solvene
 
- use grid_type, only : atmos, Nelem !in atmos%Elements
+ use atmos_type, only : atmos, Nelem !in atmos%Elements
  use atom_type, only : Element, AtomType
  use math, only : interp1D
  use constant
@@ -30,9 +30,7 @@ MODULE solvene
 
  real(8), parameter :: MAX_ELECTRON_ERROR=1e-5
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=30
- integer, parameter :: N_MAX_ELEMENT=100 !
- character(len=6), parameter :: ELECTRON_FILE="ne.dat"
-
+ integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
 
  CONTAINS
 
@@ -211,6 +209,8 @@ END FUNCTION getPartitionFunctionk
      np=Hydrogen%n(Hydrogen%Nlevel,:)
 
   do k=1,atmos%Nspace
+   if (.not.atmos%lcompute_atomRT(k)) CYCLE
+   !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
 
    if (initial.eq."NPROTON") then
     ne_old = np(k)
@@ -262,17 +262,22 @@ END FUNCTION getPartitionFunctionk
           (1.-atmos%nHtot(k)*sum)
     dne = dabs((ne(k)-ne_old)/ne_old)
     ne_old = ne(k)
-    
-    
+
+
     if (dne.le.MAX_ELECTRON_ERROR) then
+      !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",ne(k)
      exit
-    else
-      write(*,*) "k=",k," dne = ",dne, " ne=",ne(k)
+    !else
+      !write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
+      !         "dne = ",dne, " ne=",ne(k)
     end if
     niter = niter + 1
    end do !while loop
   end do !loop over spatial points
 
+  write(*,*) "maxium electron density (m^-3) =", MAXVAL(atmos%ne), &
+            " minimum electron density (m^-3) =", MINVAL(atmos%ne)
+  deallocate(fjk, dfjk)
  RETURN
  END SUBROUTINE SolveElectronDensity
 

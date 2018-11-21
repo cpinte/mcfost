@@ -2,6 +2,7 @@ MODULE math
 
   IMPLICIT NONE
 
+
   CONTAINS
 
    FUNCTION SQ(x) result(y)
@@ -10,18 +11,6 @@ MODULE math
    RETURN
    END FUNCTION SQ
 
-   FUNCTION SQarr(N, x) result(y)
-    integer :: N
-    double precision, dimension(N) :: x
-    double precision :: y(N)
-    integer :: la
-
-    do la=1,N
-     y(la) = SQ(x(la))
-    end do
-    return
-   END FUNCTION SQarr
-
 
    FUNCTION CUBE(x) result(y)
     real(8) :: x, y
@@ -29,17 +18,6 @@ MODULE math
    RETURN
    END FUNCTION CUBE
 
-   FUNCTION CUBEarr(N, x) result(y)
-    integer :: N
-    real(8), dimension(N) :: x
-    integer :: la
-    real(8), dimension(N) :: y
-
-    do la=1, N
-     y(la) = CUBE(x(la))
-    end do
-   RETURN
-   END FUNCTION CUBEarr
 
    FUNCTION dPOW(x,a) result(y)
     ! ------------------------------
@@ -70,6 +48,8 @@ MODULE math
    RETURN
    END FUNCTION dPOW
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The following three functions will be removed in the futur
    FUNCTION dPOWarr(N, x,a) result(y)
     ! ------------------------------
     ! double precision pow function
@@ -85,6 +65,30 @@ MODULE math
 
    RETURN
    END FUNCTION dPOWarr
+   FUNCTION SQarr(N, x) result(y)
+    integer :: N
+    double precision, dimension(N) :: x
+    double precision :: y(N)
+    integer :: la
+
+    do la=1,N
+     y(la) = SQ(x(la))
+    end do
+    return
+   END FUNCTION SQarr
+   FUNCTION CUBEarr(N, x) result(y)
+    integer :: N
+    real(8), dimension(N) :: x
+    integer :: la
+    real(8), dimension(N) :: y
+
+    do la=1, N
+     y(la) = CUBE(x(la))
+    end do
+   RETURN
+   END FUNCTION CUBEarr
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
   FUNCTION E1 (x) result (y)
    !First exponential integral
@@ -273,6 +277,18 @@ MODULE math
   RETURN
   END FUNCTION
 
+  FUNCTION interp1Darr(x1a,ya,x1) result(y)
+   REAL(8), dimension(:) :: x1a
+   REAL(8), DIMENSION(:) :: ya
+   REAL(8), dimension(:) :: x1
+   REAL(8), dimension(size(x1)) :: y
+
+   call bezier3_interp(size(x1a),x1a,ya,size(x1), x1,y)
+   !call bezier2_interp(size(x1a),x1a,ya,1, tmp1,tmp3)
+
+  RETURN
+  END FUNCTION
+
   FUNCTION interp2D(x1a,x2a,ya,x1,x2) result(y)
    ! interpolate at points x1 and x2
    ! inside the grid vectors x1a and x2a.
@@ -356,72 +372,76 @@ MODULE math
   END FUNCTION gammln
 
 
-  SUBROUTINE SORT(X,N)
-    ! Modified NetlibLapack sort function
-    integer, intent(in) :: N
-    double precision, intent(inout) :: X(N)
-    double precision :: S,T, Y(N)
-    INTEGER I,J,K,L,M
+      SUBROUTINE SORT(X,N)
+      ! Modified NetlibLapack sort function
+      integer, intent(in) :: N
+      double precision, intent(inout) :: X(N)
+      double precision :: S,T, Y(N)
+      INTEGER I,J,K,L,M
 
-    Y(:) = X(:)
-    I = 1
-10  K = I
-20  J = I
-    I = I + 1
-    IF ( J .EQ. N ) GOTO 30
-    IF ( X(I) .GE. X(J) ) GOTO 20
-    Y(K) = I
-    GOTO 10
-30  IF ( K .EQ. 1 ) RETURN
-    Y(K) = N + 1
-40  M = 1
-    L = 1
-50  I = L
-    IF ( I .GT. N ) GOTO 120
-    S = X(I)
-    J = Y(I)
-    K = J
-    IF ( J .GT. N ) GOTO 100
-    T = X(J)
-    L = Y(J)
-    X(I) = L
-60  IF ( S .GT. T ) GOTO 70
-    Y(M) = S
-    M = M + 1
-    I = I + 1
-    IF ( I .EQ. K ) GOTO 80
-    S = X(I)
-    GOTO 60
-70  Y(M)= T
-    M = M + 1
-    J = J + 1
-    IF ( J .EQ. L ) GOTO 110
-    T = X(J)
-    GOTO 60
-80  Y(M) = T
-    K = M + L - J
-    I = J - M
-90  M = M + 1
-    IF ( M .EQ. K ) GOTO 50
-    Y(M) = X(M+I)
-    GOTO 90
-100 X(I) = J
-    L = J
-110 Y(M) = S
-    K = M + K - I
-    I = I - M
-    GOTO 90
-120 I = 1
-130 K = I
-    J = X(I)
-140 X(I) = Y(I)
-    I = I + 1
-    IF ( I .LT. J ) GOTO 140
-    Y(K) = I
-    IF ( I .LE. N ) GOTO 130
-    IF ( K .EQ. 1 ) RETURN
-    GOTO 40
-  END SUBROUTINE SORT
+      Y(:) = X(:)
+      I = 1
+10    K = I
+20    J = I
+      I = I + 1
+      IF ( J .EQ. N ) GOTO 30
+      IF ( X(I) .GE. X(J) ) GOTO 20
+      Y(K) = I
+      GOTO 10
+30    IF ( K .EQ. 1 ) RETURN
+      Y(K) = N + 1
+40    M = 1
+      L = 1
+50    I = L
+      IF ( I .GT. N ) GOTO 120
+      S = X(I)
+      J = Y(I)
+      K = J
+      IF ( J .GT. N ) GOTO 100
+      T = X(J)
+      L = Y(J)
+      X(I) = L
+60    IF ( S .GT. T ) GOTO 70
+      Y(M) = S
+      M = M + 1
+      I = I + 1
+      IF ( I .EQ. K ) GOTO 80
+      S = X(I)
+      GOTO 60
+70    Y(M)= T
+      M = M + 1
+      J = J + 1
+      IF ( J .EQ. L ) GOTO 110
+      T = X(J)
+      GOTO 60
+80    Y(M) = T
+      K = M + L - J
+      I = J - M
+90    M = M + 1
+      IF ( M .EQ. K ) GOTO 50
+      Y(M) = X(M+I)
+      GOTO 90
+100   X(I) = J
+      L = J
+110   Y(M) = S
+      K = M + K - I
+      I = I - M
+      GOTO 90
+120   I = 1
+130   K = I
+      J = X(I)
+140   X(I) = Y(I)
+      I = I + 1
+      IF ( I .LT. J ) GOTO 140
+      Y(K) = I
+      IF ( I .LE. N ) GOTO 130
+      IF ( K .EQ. 1 ) RETURN
+      GOTO 40
+      END
+
+
+
+
 
 
   FUNCTION fact(N) result (f)
@@ -436,6 +456,8 @@ MODULE math
    end do
   RETURN
   END FUNCTION
+
+
 
 
  SUBROUTINE SolveLinearEq(N, A, b, improve_sol)
@@ -453,32 +475,32 @@ MODULE math
   logical, intent(in) :: improve_sol
   double precision :: A_copy(N,N), b_copy(N), residual(N), d
 
-  if (improve_sol) then
-   do i=1,N
-    b_copy(i) = b(i)
-    do j=1,N
-     A_copy(i,j) = A(i,j)
-    end do
-   end do
-  end if
-
-  ! - initial solution
-  CALL ludcmp(A,index,d,error)
-  CALL lubksb(A,index,B)
-  ! leave here if not improve_sol
-  if (improve_sol) then
-   do i=1,N
-    residual(i) = b_copy(i)
-    do j=1,N
-     residual(i) = residual(i) - A_copy(i,j)*b(j)
-    end do
-   end do
-   CALL lubksb(A,index,B)
-   ! - correct the initial solution
-   do i=1,N
-    b(i) = b(i) + residual(i)
-   end do
-  end if
+ !  if (improve_sol) then
+!    do i=1,N
+!     b_copy(i) = b(i)
+!     do j=1,N
+!      A_copy(i,j) = A(i,j)
+!     end do
+!    end do
+!   end if
+!
+!   ! - initial solution
+!   CALL ludcmp(A,index,d,error)
+!   CALL lubksb(A,index,B)
+!   ! leave here if not improve_sol
+!   if (improve_sol) then
+!    do i=1,N
+!     residual(i) = b_copy(i)
+!     do j=1,N
+!      residual(i) = residual(i) - A_copy(i,j)*b(j)
+!     end do
+!    end do
+!    CALL lubksb(A,index,B)
+!    ! - correct the initial solution
+!    do i=1,N
+!     b(i) = b(i) + residual(i)
+!    end do
+!   end if
 
 
  RETURN
@@ -596,7 +618,7 @@ MODULE math
     write(*,*) "theta", theta
     if (abs(w6js) < 1.d-8) w6js = 0.d0
 
-    RETURN
+1000        RETURN
   END FUNCTION w6js
 
 !----------------------------------------------------------------
@@ -630,5 +652,7 @@ MODULE math
   w9js = x
  RETURN
  END FUNCTION w9js
+
+
 
 END MODULE math

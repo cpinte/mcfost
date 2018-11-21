@@ -5,7 +5,7 @@
 MODULE lte
 
  use atom_type, only : AtomType, element
- use grid_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use math
  use collision, only : CollisionRate, openCollisionFile
@@ -156,6 +156,10 @@ MODULE lte
   end if
 
    do k=1,atmos%Nspace
+    if (.not.atmos%lcompute_atomRT(k)) CYCLE
+    !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
+                                                ! cell is free of (significant) gas
+
     if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
     sum = 1.
     phik = atmos%ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
@@ -208,17 +212,23 @@ MODULE lte
      ! further, n1 + n2+n3+nij sum over all stage of each level
      ! gives ntotal.
      ! Therefore n1 = atom%ntotal/sum
-    write(*,*) "-------------------"
-    write(*,*) "Atom=",atom%ID, " A=", atom%Abund
-    write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
+    !write(*,*) "-------------------"
+    !write(*,*) "Atom=",atom%ID, " A=", atom%Abund
+    !write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%ntotal(k)/sum
-    write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
+    !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-      write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+      !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
     end do
+
+    if (MAXVAL(atom%nstar) <= 0d0) then
+     write(*,*) k, "Error, 0 or negative pops in LTE.f90"
+     write(*,*) "Exciting..."
+     stop !beware if low T, np -> 0, check to not divide by 0 density
+    end if
    end do
-    write(*,*) "-------------------"
+    !write(*,*) "-------------------"
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
@@ -256,15 +266,18 @@ MODULE lte
   !init
   !nj(1,:) is set to 1 -> nj(j>1,:) normalised to nj(1,:)
   do k=1,atmos%Nspace
+   if (.not.atmos%lcompute_atomRT(k)) CYCLE
    sum(k) = 1.
    elem%n(1,k) = 1.
   end do
+  if (MAXVAL(elem%n(1,:)) == 0d0) RETURN !no element elem here.
 
   do j=2,elem%Nstage !next ion stage
    pfel = elem%pf(j,:)
    CALL  bezier3_interp(atmos%Npf, atmos%Tpf, pfel, &
        atmos%Nspace, atmos%T, Ukp1)
    do k=1,atmos%Nspace
+
     phik = phi_jl(k, 10**(Uk(k)), 10**(Ukp1(k)),&
                   elem%ionpot(j-1))
     ! Saha equation here elem%n(j,k)=&
@@ -286,6 +299,7 @@ MODULE lte
    end do
   end do
 
+  !because of the CYCLE statement, here sum(k) is at least 1
   do k=1,atmos%Nspace
    elem%n(1,k) = elem%abund*atmos%nHtot(k)/sum(k)
   end do
@@ -309,11 +323,11 @@ MODULE lte
   logical :: debeye=.true.
   double precision :: PhiHmin
 
-  write(*,*) "Setting LTE coefficients..."
+  write(*,*) "Setting LTE populations..."
   do n=1,atmos%Natom
 
    ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%atoms(n),debeye) 
+   CALL LTEpops(atmos%atoms(n),debeye)
      if (atmos%Atoms(n)%active) then
        allocate(atmos%Atoms(n)%C(atmos%atoms(n)%Nlevel*atmos%atoms(n)%Nlevel))
        !open collision file
@@ -322,7 +336,11 @@ MODULE lte
   end do
 
   ! if (.not.chemEquil) then
+  atmos%nHmin = 0d0 !init
   do k=1, atmos%Nspace
+   if (.not.atmos%lcompute_atomRT(k)) CYCLE
+   !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
+                                                ! cell is free of (significant) gas
    PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
    ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
    ! nHmin is proportial to the total number of neutral Hydrogen
@@ -331,7 +349,6 @@ MODULE lte
    ! number density. Remember:
    ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
    ! j = -1 for Hminus (l=element=H)
-   atmos%nHmin(k) = 0. !init
    do j=1,Hydrogen%Nlevel - 1
     atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
    end do
@@ -340,7 +357,7 @@ MODULE lte
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
    !!   ", nHmin(k), np(k)"
-   !!write(*,*) k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
+   !!write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
    !! atmos%Atoms(1)%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k)
   end do
   ! end if

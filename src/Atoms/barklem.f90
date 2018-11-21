@@ -1,5 +1,4 @@
-!See:
-!  - Anstee & O'Mara 1995, MNRAS 276, 859-866 (s-p, p-s)
+!See: - Anstee & O'Mara 1995, MNRAS 276, 859-866 (s-p, p-s)
 !  - Barklem & O'Mara 1997, MNRAS 290, 102 (p-d, d-p)
 !  - Barklem, O'Mara & Ross 1998, MNRAS 296, 1057-1060 (d-f, f-d)
 !  - Barklem, O'Mara 1998, MNRAS 300, 863-871
@@ -8,24 +7,28 @@ MODULE barklem
 
   use atom_type, only : AtomType, determinate, ATOM_LABEL_WIDTH
   use getline
-  use math, only : interp2D, locate, gammln, Hunt
+  use math, only : interp2D, locate, gammln!, Hunt!, cubeconvol
   use constant
+
+  !MCFOST's originals
+  use mcfost_env, only : mcfost_utils! convert from the relative location of atomic data
+                                      ! to mcfost's environnement folders.
 
   IMPLICIT NONE
 
-  character(len=*), parameter :: BARKLEM_SP_DATA="../../utils/Atoms/Barklem_spdata.dat"
+  character(len=*), parameter :: BARKLEM_SP_DATA="/Atoms/Barklem_spdata.dat"
   integer, parameter :: BARKLEM_SP_NS=21
   integer, parameter :: BARKLEM_SP_NP=18
   real, parameter :: BARKLEM_SP_NEFF1=1.0
   real, parameter :: BARKLEM_SP_NEFF2=1.3
 
-  character(len=*), parameter :: BARKLEM_PD_DATA="../../utils/Atoms/Barklem_pddata.dat"
+  character(len=*), parameter :: BARKLEM_PD_DATA="/Atoms/Barklem_pddata.dat"
   integer, parameter :: BARKLEM_PD_NP=18
   integer, parameter :: BARKLEM_PD_ND=18
   real, parameter :: BARKLEM_PD_NEFF1=1.3
   real, parameter :: BARKLEM_PD_NEFF2=2.3
 
-  character(len=*), parameter :: BARKLEM_DF_DATA="../../utils/Atoms/Barklem_dfdata.dat"
+  character(len=*), parameter :: BARKLEM_DF_DATA="/Atoms/Barklem_dfdata.dat"
   integer, parameter :: BARKLEM_DF_ND=18
   integer, parameter :: BARKLEM_DF_NF=18
   real, parameter :: BARKLEM_DF_NEFF1=2.3
@@ -99,7 +102,7 @@ MODULE barklem
      allocate(bs%alpha(bs%N1,bs%N2))
 
      ! read data
-     open(unit=2,file=trim(barklem_data),status="old")
+     open(unit=2,file=trim(mcfost_utils)//trim(barklem_data),status="old")
 
      do i=1,bs%N1+bs%N1
       if (i.le.bs%N1) then

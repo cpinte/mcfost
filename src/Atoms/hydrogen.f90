@@ -28,10 +28,10 @@
 MODULE hydrogen_opacities
 
  use atom_type, only : AtomicContinuum
- use grid_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use spectrum_type, only : NLTEspec
- use math, only : SQ, dpow, CUBE, bezier3_interp, interp2Darr, dPowarr, CUBEarr, SQarr
+ use math, only : SQ, dpow, CUBE, bezier3_interp, interp2Darr, dPowarr
 
  IMPLICIT NONE
 
@@ -75,7 +75,7 @@ MODULE hydrogen_opacities
        (HPLANCK*CLIGHT)
 
   gIII = 1.0 + 0.1728*x3 * (1.0 + y) - &
-        0.0496*SQarr(size(x),x3) * (1.0 + (1.0 + y)*0.33333333*y)
+        0.0496*(x3*x3) * (1.0 + (1.0 + y)*0.33333333*y)
 
   where (GIII.le.1.) gIII = 1.
 
@@ -95,35 +95,47 @@ MODULE hydrogen_opacities
       chi, eta
   logical  :: res
   type (AtomicContinuum) :: continuum
-  integer :: i, kr, k
+  integer :: i, kr, k, nc
+  integer, dimension(:), allocatable :: iLam
   double precision :: lambdaEdge, sigma(NLTEspec%Nwaves), sigma0, g_bf(NLTEspec%Nwaves), &
-    twohnu3_c2(NLTEspec%Nwaves), twohc, gijk(NLTEspec%Nwaves), hc_k, hc_kla(NLTEspec%Nwaves), & 
+    twohnu3_c2(NLTEspec%Nwaves), twohc, gijk(NLTEspec%Nwaves), hc_k, hc_kla(NLTEspec%Nwaves), &
     expla(NLTEspec%Nwaves), n_eff,npstar, sigma02, sigma2(NLTEspec%Nwaves), np
-  res = .false.
 
-  if (Hydrogen%active) then
-    write(*,*) "Do not compute Hydrogen bound-free here, if Hydrogen is NLTE"
-    res = .false.
-    RETURN
-  end if
+  res = .true. !always, passive H is tested outside
+!   if (Hydrogen%active) then
+!     write(*,*) "Do not compute Hydrogen bound-free here, if Hydrogen is NLTE"
+!     res = .false.
+!     RETURN
+!   end if
 
   ! initialize for this cell point
    chi = 0.
    eta = 0.
-
+   uu = 0d0
+   g_bf = 0d0
+   sigma = 0d0
 
   twohc = (2.*HPLANCK * CLIGHT) / CUBE(NM_TO_M)
   hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
           dpow(HPLANCK,3d0) / (CLIGHT * &
           SQ(M_ELECTRON*Q_ELECTRON))
+
+
+
+  ! the facotre 1/NM_TO_M per lambda is in hc_k and twohc
+  hc_kla = hc_k / NLTEspec%lambda
+  twohnu3_c2 = twohc / (NLTEspec%lambda)**3 !J/s/m2/Hz/sr
+  ! because Planck'law (nu) = c*U(nu) / 4pi = m/s/sr * &
+  !     unit(spectral energy density)
+
          ! = 7.907d-22 ! m^2
   !! Or use this
   !sigma02 = (1.)/(PI*48.*sqrt(3d0)) * M_ELECTRON * &
   !     dpow(Q_ELECTRON,10d0) / (CLIGHT * dpow(HPLANCK,6d0) * &
   !     dpow(EPSILON_0,5d0)) !2.8154d25 ! m^2 * Hz^3
 
-  res = .false.
+
   ! LTE number of protons (H+)
   npstar = Hydrogen%nstar(Hydrogen%Nlevel,icell)
   do kr=1,Hydrogen%Ncont
@@ -137,10 +149,29 @@ MODULE hydrogen_opacities
     ! Principal quantum number n from statistical weight
     ! of the continuum level
     n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
-    np = Hydrogen%n(Hydrogen%Nlevel,icell) 
+    np = Hydrogen%n(Hydrogen%Nlevel,icell)
 
-   where ((NLTEspec%lambda.le.lambdaEdge).and. &
-     (NLTEspec%lambda.ge.continuum%lambda(1)))
+    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) CYCLE
+    ! -> prevents dividing by zero
+!     if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) then
+! !       write(*,*) "(Hydrogen_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+!        if (npstar <= 0) then
+! !          write(*,*) "np density <= 0"
+! !          write(*,*) "skipping this level"
+!          CYCLE
+!        else
+! !          write(*,*) "Hydrogen%n(i) density <= 0 for i=", i
+! !          write(*,*) "skipping this level"
+!          CYCLE
+!        end if
+!      end if
+
+
+    allocate(iLam(continuum%Nlambda)) !not used yet
+    iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /)
+
+!    where ((NLTEspec%lambda.le.lambdaEdge).and. &
+!      (NLTEspec%lambda.ge.continuum%lambda(1)))
    ! lambda has to be lower than the edge but greater than
    ! lambda0, see Hubeny & Mihalas chap. 7 photoionisation
    ! and Rutten hydrogen bound-free parts.
@@ -154,15 +185,15 @@ MODULE hydrogen_opacities
 
 
     ! u = n**2 * h * nu / (Z**2 * R) - 1
-    uu = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda) / &
+    uu(ilam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(ilam)) / &
       ((Hydrogen%stage(i)+1)* &
        (Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
 
-    g_bf = Gaunt_bf(NLTEspec%Nwaves, uu, n_eff)
+    g_bf(ilam) = Gaunt_bf(continuum%Nlambda, uu(ilam), n_eff)
 
     ! Z scaled law
-    sigma = &
-     sigma0 * g_bf * CUBEarr(NLTEspec%Nwaves, NLTEspec%lambda/lambdaEdge) * n_eff / &
+    sigma(ilam) = &
+     sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / &
       (Hydrogen%stage(i)+1)**2 !m^2
 
     !!write(*,*) "lambda, n, g_bf, sigma for level ", i, &
@@ -176,31 +207,29 @@ MODULE hydrogen_opacities
     !   (dpow(n_eff,5d0) * &
     !     CUBEarr(NLTEspec%lambda*NM_TO_M/(HPLANCK*CLIGHT)))
 
-    ! the facotre 1/NM_TO_M per lambda is in hc_k and twohc
-    hc_kla = hc_k / NLTEspec%lambda
-    twohnu3_c2 = twohc / CUBEarr(NLTEspec%Nwaves, NLTEspec%lambda) !J/s/m2/Hz/sr
-    ! because Planck'law (nu) = c*U(nu) / 4pi = m/s/sr * &
-    !     unit(spectral energy density)
 
     ! now computes emissivity and extinction
-    expla = dexp(-hc_kla/atmos%T(icell))
-    gijk = Hydrogen%nstar(i,icell)/npstar * expla
+    expla(iLam) = dexp(-hc_kla(iLam)/atmos%T(icell))
+    gijk(iLam) = Hydrogen%nstar(i,icell)/npstar * expla(iLam)
      ! at LTE only for chi
      ! see Hubeny & Mihalas eq. 14.16 to 14.18
      ! if LTE Hydrogen%n points to %nstar
-    chi = chi + sigma * (1.-expla) * Hydrogen%n(i,icell)
-    eta = eta + twohnu3_c2 * gijk * sigma * np
+    chi(iLam) = chi(iLam) + sigma(iLam) * (1.-expla(iLam)) * Hydrogen%n(i,icell)
+    eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np
      !write(*,*) lambda, i, kr, eta(k), chi(k)
      !write(*,*) np(k), npstar(k), Hydrogen%nstar(i,k), sigma, expla, gijk
-   end where
+!    end where
+    deallocate(iLam)
   end do
-  if ((MAXVAL(chi).gt.0.).and.(MAXVAL(eta).gt.0)) then
-    res=.true. ! else not computed return false
-   !because we do all wavelength at a time, should never return false !!
-   ! it can be false if one wavelength per wavelength (RH like)
-  else
-   write(*,*) "Error in Hydrogen_bf()"
-  end if
+
+  ! can be zero if T to low, so we test that at the begining
+!   if ((MAXVAL(chi).gt.0.).and.(MAXVAL(eta).gt.0)) then
+!     res=.true. ! else not computed return false
+!    !because we do all wavelength at a time, should never return false !!
+!    ! it can be false if one wavelength per wavelength (RH like)
+!   else
+!    write(*,*) "Error in Hydrogen_bf()"
+!   end if
 
  RETURN
  END FUNCTION Hydrogen_bf
@@ -210,7 +239,7 @@ MODULE hydrogen_opacities
  ! takes place at LTE because it is collisional
   integer, intent(in) :: icell
   double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
-  double precision :: gff(NLTEspec%Nwaves), hc_kla(NLTEspec%Nwaves), & 
+  double precision :: gff(NLTEspec%Nwaves), hc_kla(NLTEspec%Nwaves), &
      stim(NLTEspec%Nwaves), nu3(NLTEspec%Nwaves), np, sigma0, charge, e0cgs, KBcgs
 
   charge = 1d0
@@ -220,8 +249,8 @@ MODULE hydrogen_opacities
   sigma0 = dsqrt(32.*PI) / (3.*dsqrt(3d0)) * &
     SQ(CUBE(e0cgs)) / (1d2*CLIGHT*1d7 * HPLANCK*dsqrt(KBcgs*&
       CUBE(1d3*M_ELECTRON))) !cm^5 K^1/2 Hz^3
-  ! = 3.6923284d8 ! cm^5 K^1/2 Hz^3  
-  nu3 = CUBEarr(NLTEspec%Nwaves, NLTEspec%lambda*NM_TO_M/CLIGHT) !inverse of nu3=1/nu3
+  ! = 3.6923284d8 ! cm^5 K^1/2 Hz^3
+  nu3 = (NLTEspec%lambda*NM_TO_M/CLIGHT)**3 !inverse of nu3=1/nu3
   hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*NLTEspec%lambda)
 
   np = Hydrogen%n(Hydrogen%Nlevel,icell) !nH+=Nion H
@@ -234,7 +263,7 @@ MODULE hydrogen_opacities
   chi = 1d-10 * gff * charge*charge*sigma0 / &
     dsqrt(atmos%T(icell)) * nu3 * atmos%ne(icell) * np * stim
    !write(*,*) chi(k), 1d-10 * sigma0, nu3, atmos%ne(k), np(k), stim, gff
-  
+
  RETURN
  END SUBROUTINE Hydrogen_ff
 
@@ -276,7 +305,7 @@ MODULE hydrogen_opacities
 
   ! hnu/kB
   hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NLTEspec%lambda*NM_TO_M)
-  twohnu3_c2 = (2.*HPLANCK*CLIGHT) / CUBEarr(NLTEspec%Nwaves, NM_TO_M*NLTEspec%lambda)
+  twohnu3_c2 = (2.*HPLANCK*CLIGHT) / (NM_TO_M*NLTEspec%lambda)**3
 
   stimEmis = dexp(-hc_kla/atmos%T(icell))
    ! note that nhmin is deduced from hydrogen%ntotal
@@ -317,13 +346,13 @@ MODULE hydrogen_opacities
 
   lambda_mu = NLTEspec%lambda / MICRON_TO_NM
   lambda_inv = 1. / lambda_mu
-  
+
   do n=1,NJOHN
-   Clam(n,:) = SQarr(NLTEspec%Nwaves, lambda_mu) * AJ(n) + BJ(n) + lambda_inv * &
+   Clam(n,:) = (lambda_mu)**2 * AJ(n) + BJ(n) + lambda_inv * &
     (CJ(n) + lambda_inv*(DJ(n) + lambda_inv*(EJ(n) + &
       lambda_inv*FJ(n))))
   end do
-  
+
   theta_n = 1.
   sqrt_theta = dsqrt(THETA0/atmos%T(icell))
   do n=2,NJOHN

@@ -14,11 +14,13 @@ program BIGCRUNCH
   use init_mcfost
   use dust_transfer
   use mol_transfer
+  use AtomicTransfer
 
   implicit none
 
   integer :: itime
   real :: time, cpu_time_begin, cpu_time_end
+  logical :: lemission_atom=.false.
 
   ! debut de l'execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -39,6 +41,15 @@ program BIGCRUNCH
   ! Emission moleculaire ...
   if (lemission_mol) then
      call mol_line_transfer()
+  endif
+
+  lemission_atom =.true.
+  if (lemission_atom) then
+     write(*,*) ""
+     write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
+     write(*,*) '* Solving for the radiative transfer equation for atomic lines. *'
+     write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
+     call Atomic_Transfer()
   endif
 
   ! Temps d'execution

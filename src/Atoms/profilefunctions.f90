@@ -1,7 +1,7 @@
 MODULE ProfileFunctions
 
  use atom_type, only : AtomicLine, AtomType, ZeemanType
- use grid_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium
  use voigtfunctions, only : Voigt
  use broad, only : Damping
  use zeeman, only : ZeemanMultiplet

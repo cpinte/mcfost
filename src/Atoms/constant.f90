@@ -33,7 +33,6 @@ MODULE constant
   real(8), parameter ::  MEGABARN_TO_M2=1.0d-22
   real(8), parameter ::  ATM_TO_PA=1.0135d+05 !Atm to Pascal (N/m^2)
 
-
  ! --- Mathematical constants ---
 
 

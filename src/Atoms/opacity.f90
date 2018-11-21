@@ -4,10 +4,10 @@ MODULE Opacity
 
  CONTAINS
 
- SUBROUTINE AtomicOpacity()
+ SUBROUTINE NLTEOpacity()
 
  RETURN
- END SUBROUTINE AtomicOpacity
+ END SUBROUTINE NLTEOpacity
 
 
 END MODULE Opacity

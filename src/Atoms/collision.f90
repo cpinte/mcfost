@@ -67,7 +67,7 @@ MODULE collision
  use constant
  use atom_type, only : AtomType, ATOM_ID_WIDTH
  use readatom,only : path_to_atoms
- use grid_type, only : atomZnumber, atmos, PTrowcol, Hydrogen, Helium
+ use atmos_type, only : atomZnumber, atmos, PTrowcol, Hydrogen, Helium
  use getline
 
  IMPLICIT NONE

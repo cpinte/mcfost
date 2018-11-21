@@ -6,28 +6,28 @@
 
 MODULE project
 
- use grid_type, only : atmos, cell_point
+ use atmos_type, only : atmos!, cell_point
 
  IMPLICIT NONE
 
  CONTAINS
 
-! Taken from MCFOST
- FUNCTION vproject(icell) result(y)
-  ! velocity is taken from the model
-  integer :: icell
-  double precision :: y
-
-  y = atmos%ux(icell) * cell_point%u + atmos%uy(icell) * cell_point%v + &
-      atmos%uz(icell) * cell_point%w
-
- RETURN
- END FUNCTION
+!!! Taken from MCFOST
+!  FUNCTION vproject(icell) result(y)
+!   velocity is taken from the model
+!   integer :: icell
+!   double precision :: y
+!
+!   y = atmos%ux(icell) * cell_point%u + atmos%uy(icell) * cell_point%v + &
+!       atmos%uz(icell) * cell_point%w
+!
+!  RETURN
+!  END FUNCTION
 
  FUNCTION Bproject(icell) result(y)
   integer :: icell
   double precision :: y
-  
+
   y = 0.
 
  END FUNCTION
