@@ -10,6 +10,10 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
+  
+  !B. Tessore
+  use metal, only : Background
+  use spectrum_type, only : NLTEspec, initAS
 
   implicit none
 
@@ -239,7 +243,9 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   real(kind=dp), intent(out) :: lmin,lmax
 
 
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+  !real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+  double precision :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+
   integer :: icell0, previous_cell, next_cell
 
   correct_plus = 1.0_dp + prec_grille
@@ -274,9 +280,31 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      else
         opacite = 0.0_dp
      endif
-
+     
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+     
+     ! ------------------------------------------------------------------ !
+     !special for atomic line RT.
+     ! because n_Cells could be large and so does n_lambda for
+     ! atomic line opacities, it could be better to compute the opacities
+     ! on the fly. Note that because line profiles are most of time far
+     ! from gaussians, it is not easy to factorised their profiles.
+     ! but kappa is allocated in initialised to 0 in atomic_transfer().
+     ! To do: add a case in Background to compute opac at lambda
+     ! instead of at all lambda
+     !
+     ! kappa is set to 0d0 in case of lemission_atom to prevent
+     ! problem with opacite=kappa(icell0,lambda) above.
+     if ((lemission_atom).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
+      CALL Background(icell0, x0, y0, z0, u, v, w)
+      opacite = NLTEspec%ActiveSet%chi(lambda) + &
+                             NLTEspec%ActiveSet%chi_c(lambda)
+      opacite = opacite / AU_to_m
+      if ((opacite /= opacite).or.(opacite+1==opacite)) write(*,*) lambda, icell0, opacite
+      CALL initAS(.true.) !set opac to zero for next icell.
+     end if
+     ! ------------------------------------------------------------------ !
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
 
