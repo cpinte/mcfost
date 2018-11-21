@@ -370,6 +370,19 @@ MODULE math
    gammln=tmp+log(stp*ser/x)
   RETURN
   END FUNCTION gammln
+  
+  FUNCTION locate(xx,x) result(y)
+
+  double precision, dimension(:), intent(in) :: xx
+  double precision, intent(in) :: x
+  integer :: y
+
+  
+  ! 1D array
+  y = minloc((xx(:)-x)*(xx(:)-x),1)
+
+  RETURN
+  END FUNCTION locate
 
 
       SUBROUTINE SORT(X,N)
@@ -464,10 +477,7 @@ MODULE math
  ! -----------------------------------------------------------
  ! Solves for a linear system equation from a squared matrix !
  ! the system to solve is Ax=b for instance A=A(Nlevel, Nlevel)
- ! and b(Nlevel) the population of each level
- ! A the matrix to decompose, note that ludcmp modify A
- ! b the right hand side vector. Note that b is modified
- ! in lubksb and contains the solution
+ ! and b(Nlevel) the population of each level.
  ! -----------------------------------------------------------
   integer, intent(in) :: N
   integer :: index(N), error, i, j
@@ -475,32 +485,7 @@ MODULE math
   logical, intent(in) :: improve_sol
   double precision :: A_copy(N,N), b_copy(N), residual(N), d
 
- !  if (improve_sol) then
-!    do i=1,N
-!     b_copy(i) = b(i)
-!     do j=1,N
-!      A_copy(i,j) = A(i,j)
-!     end do
-!    end do
-!   end if
-!
-!   ! - initial solution
-!   CALL ludcmp(A,index,d,error)
-!   CALL lubksb(A,index,B)
-!   ! leave here if not improve_sol
-!   if (improve_sol) then
-!    do i=1,N
-!     residual(i) = b_copy(i)
-!     do j=1,N
-!      residual(i) = residual(i) - A_copy(i,j)*b(j)
-!     end do
-!    end do
-!    CALL lubksb(A,index,B)
-!    ! - correct the initial solution
-!    do i=1,N
-!     b(i) = b(i) + residual(i)
-!    end do
-!   end if
+
 
 
  RETURN
