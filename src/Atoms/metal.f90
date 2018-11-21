@@ -262,7 +262,6 @@ MODULE metal
        phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2) * line%c_fraction(nc)
       end do
      end if
-
      !Sum up all contributions for this line with the other
      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
      chi(iLam) = chi(iLam) + Vij(iLam) * (atom%n(i,icell)-gij*atom%n(j,icell))
@@ -276,8 +275,8 @@ MODULE metal
 
  END FUNCTION Metal_bb
 
- SUBROUTINE Background(icell,x,y,z,u,v,w)
-  integer, intent(in) :: icell
+ SUBROUTINE Background(id,icell,x,y,z,u,v,w)
+  integer, intent(in) :: icell, id
   double precision, intent(in) :: &
               x, y, z, u, v, w!only relevant for b-b when vector fields are present
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, Bpnu, chip
@@ -303,32 +302,32 @@ MODULE metal
    chip = 0.
 
 
-   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%ActiveSet%sca_c = sca
-   NLTEspec%ActiveSet%sca_c =  NLTEspec%ActiveSet%sca_c + Thomson(icell)
+   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%ActiveSet%sca_c(id,:) = sca
+   NLTEspec%ActiveSet%sca_c(id,:) =  NLTEspec%ActiveSet%sca_c(id,:) + Thomson(icell)
    if (associated(Helium)) then
-    if (Rayleigh(icell, Helium, sca)) NLTEspec%ActiveSet%sca_c = &
-          NLTEspec%ActiveSet%sca_c + sca
+    if (Rayleigh(icell, Helium, sca)) NLTEspec%ActiveSet%sca_c(id,:) = &
+          NLTEspec%ActiveSet%sca_c(id,:) + sca
    end if
 
-   NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%sca_c
+   NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%sca_c(id,:)
 
    CALL Hydrogen_ff(icell, chi)
-   NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-   NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + chi * Bpnu
+   NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+   NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + chi * Bpnu
 
    if (Hminus_bf(icell, chi,eta)) then
-    NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-    NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + eta
+    NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+    NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
    end if
 
    CALL Hminus_ff(icell, chi)
-    NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-    NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + chi * Bpnu
+    NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+    NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + chi * Bpnu
 
    if (.not.Hydrogen%active) then !passive bound-free
     if (Hydrogen_bf(icell, chi, eta)) then
-     NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-     NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + eta
+     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
     end if
    end if
 
@@ -338,24 +337,23 @@ MODULE metal
    if (.not.Hydrogen%active) Npassive = Npassive - 1
    if (Npassive>0) then !other metal passive ?
     if (Metal_bf(icell, chi, eta)) then
-     NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-     NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + eta
+     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
     end if
    end if
 
 
    !keep pure continuum opacities now
-   NLTEspec%ActiveSet%eta_c_bf = NLTEspec%ActiveSet%eta_c
-   NLTEspec%ActiveSet%chi_c_bf = NLTEspec%ActiveSet%chi_c
+   NLTEspec%ActiveSet%eta_c_bf(id,:) = NLTEspec%ActiveSet%eta_c(id,:)
+   NLTEspec%ActiveSet%chi_c_bf(id,:) = NLTEspec%ActiveSet%chi_c(id,:)
 
    Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
    if (Npassive > 0) then !go into it even if only H is passive
     if (Metal_bb(icell, x, y, z, u, v, w, chi, eta, chip)) then
-     NLTEspec%ActiveSet%chi_c = NLTEspec%ActiveSet%chi_c + chi
-     NLTEspec%ActiveSet%eta_c = NLTEspec%ActiveSet%eta_c + eta
+     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
+     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
     end if
    end if
-
 
  RETURN
  END SUBROUTINE Background

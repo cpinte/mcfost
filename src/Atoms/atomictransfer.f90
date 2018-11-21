@@ -74,7 +74,7 @@ MODULE AtomicTransfer
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau2
   double precision, dimension(NLTEspec%Nwaves) :: tau_c
   double precision, dimension(NLTEspec%Nwaves) :: dtau_c, Snu_c
-  integer :: nbr_cell, icell, next_cell, previous_cell
+  integer :: nbr_cell, icell, next_cell, previous_cell, ttestt
   double precision :: facteur_tau
   logical :: lcellule_non_vide
 
@@ -136,35 +136,37 @@ MODULE AtomicTransfer
 !         atmos_parcel%u = u
 !         atmos_parcel%v = v
 !         atmos_parcel%w = w
-!use next_cell to compute Snu1, Snu1_c and chi1 and chi1_c to interpolate the Sf
-!and give a better estimate of the integration --> no cause requires 3D integration on
-! neighbour cells. Cumbersome in 3D and Voronoi. But, increasing number of cell
-! should procude the same accuracy as interpolation. And a cell is assumed to be constant
-! in physical properties.
+
 
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     CALL Background(icell, x0, y0, z0, u, v, w) !x,y,z,u,v,w 
+     CALL Background(id, icell, x0, y0, z0, u, v, w) !x,y,z,u,v,w 
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
      ! Epaisseur optique
      ! dtau = -chi*ds --> ds < 0 and ds in meter
-     dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(:)+NLTEspec%ActiveSet%chi(:)) !scattering + thermal
-     dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(:)
+     dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(id,:)+NLTEspec%ActiveSet%chi(id,:)) !scattering + thermal
+     dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(id,:)
 
      ! Source function
      ! No dust yet
      ! J and Jc are the mean radiation field for total and continuum intensities
      ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
      ! scattering.
-     Snu = (NLTEspec%ActiveSet%eta_c + NLTEspec%ActiveSet%eta + & !NLTE lines 
-                  NLTEspec%ActiveSet%sca_c * NLTEspec%J(id,:)) / & !+(sca_c * (3mu2-1)*J20)
-                 (NLTEspec%ActiveSet%chi_c + NLTEspec%ActiveSet%chi) ! LTE+NLTE
+     Snu = (NLTEspec%ActiveSet%eta_c(id,:) + NLTEspec%ActiveSet%eta(id,:) + & !NLTE lines 
+                  NLTEspec%ActiveSet%sca_c(id,:) * NLTEspec%J(id,:)) / & !+(sca_c * (3mu2-1)*J20)
+                 (NLTEspec%ActiveSet%chi_c(id,:) + NLTEspec%ActiveSet%chi(id,:)) ! LTE+NLTE
      ! continuum source function
-     Snu_c = (NLTEspec%ActiveSet%eta_c_bf + & 
-            NLTEspec%ActiveSet%sca_c * NLTEspec%Jc(id,:)) / NLTEspec%ActiveSet%chi_c_bf
+     Snu_c = (NLTEspec%ActiveSet%eta_c_bf(id,:) + & 
+            NLTEspec%ActiveSet%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%ActiveSet%chi_c_bf(id,:)
 
-     !write(*,*) MAXVAL(NLTEspec%ActiveSet%chi_c), MINVAL(NLTEspec%ActiveSet%chi_c), id, iray
+     do ttestt=1,NLTEspec%Nwaves
+      if ((Snu(ttestt) /= Snu(ttestt)).or.(Snu(ttestt)+1 == Snu(ttestt))) &
+       !write(*,*) icell, id, NLTEspec%lambda(ttestt), Snu(ttestt), NLTEspec%ActiveSet%chi_c(id,ttestt)
+       Snu = 0d0
+       Snu_C = 0d0
+     end do
+     
      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-tau) * dtau
@@ -361,20 +363,20 @@ npix_x = 101; npix_y = 101
         npix_x_max = npix_x
      endif
 
-     !!!$omp parallel &
-     !!!$omp default(none) &
-     !!!$omp private(i,j,id) &
-     !!!$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
-     !!!$omp shared(n_iter_min,n_iter_max,ibin,iaz)
+     !$omp parallel &
+     !$omp default(none) &
+     !$omp private(i,j,id) &
+     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
+     !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
 
      ! loop on pixels
      id = 1 ! pour code sequentiel
      n_iter_min = 1 ! 3
      n_iter_max = 1 ! 6
      
-     !!!!$omp do schedule(dynamic,1)
+     !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
-        !!!$ id = omp_get_thread_num() + 1
+        !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
            !write(*,*) i,j
            ! Coin en bas gauche du pixel
@@ -384,20 +386,20 @@ npix_x = 101; npix_y = 101
                       i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
      enddo !i
-     !!!$omp end do
-     !!!$omp end parallel
+     !$omp end do
+     !$omp end parallel
      
 
   ! --------------------------
   ! Ajout Flux etoile
   ! --------------------------
-  do i = 1, NLTEspec%Nwaves
-   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
-!    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
-!       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
-   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
-  end do
+!   do i = 1, NLTEspec%Nwaves
+!    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
+! !    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
+! !       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
+!    NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
+!    NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
+!   end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -414,7 +416,10 @@ npix_x = 101; npix_y = 101
   integer :: icell !spatial variables
   integer :: ibin, iaz
   logical :: re_init, labs, lkeplerian
+  
+  !testing vars to deleted
   double precision :: Ttmp(n_cells), nHtot(n_cells), v_turb(n_cells), vchar, netmp(n_cells)
+  !!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! the following quantities are input parameters !!
   integer :: NiterMax = 20, Nrays = 1! Number of rays for angular integration and to compute Inu(mu)
@@ -527,7 +532,7 @@ npix_x = 101; npix_y = 101
   CALL deallocate_stellar_spectra()
   if (allocated(kappa)) deallocate(kappa)
   allocate(kappa(n_cells,n_lambda))
-  kappa = 0.0
+  kappa = 0.0 !Important to init !!
   !kappa will be computed on the fly in  optical_length_tot()
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
@@ -569,10 +574,10 @@ npix_x = 101; npix_y = 101
 !   ! Initialize at C=0.0 for each cell points.
 !   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open 
 !   ! before the transfer starts and closed at the end.
-!    do nact=1,atmos%Nactiveatoms 
+!   do nact=1,atmos%Nactiveatoms 
 !     if (atmos%ActiveAtoms(nact)%active) &
 !      CALL CollisionRate(icell, atmos%ActiveAtoms(nact)) 
-!    end do
+!   end do
 ! 
 !! -------------------------------------------------------- !!
 
@@ -714,199 +719,199 @@ npix_x = 101; npix_y = 101
  RETURN
  END SUBROUTINE WRITE_FLUX
  
- SUBROUTINE ContributionFunction()
-  integer :: icell, iray, id, NrecStokes, nbr_cell, previous_cell, next_cell,icellinf
-  double precision :: x0, y0, z0, norme, u0, v0, w0, x1, y1, z1
-  logical :: labs, lcellule_non_vide, lsubtract_avg, lonly_top, lonly_bottom
-  double precision :: ksi(NLTEspec%Nwaves,atmos%Nspace,atmos%Nrays,1), l
-                                                           !Replace 1 by 4 if pol.
-  double precision :: l_contrib, l_void_before, Ic(1,NLTEspec%Nwaves,atmos%Nrays)
-  double precision, dimension(NLTEspec%Nwaves) :: dtau, dtau_c, tau, tau_c, facteur_tau, Snu, Snu_c
-  ! for writing                                                        
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(7) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter
-  logical :: simple, extend
-  character(len=512) :: CNTRB_FILE
-  CNTRB_FILE = "CNTRB.fits.gz"
-
-  ! ------------------------------------------ !  
-  write(*,*) "Computing contribution function(s)..."
-  
-  NrecStokes = 1 !up to now
-  Ic = 0d0
-  dtau = 0d0
-  dtau_c = 0d0
-  tau = 0d0
-  tau_c = 0d0
-  nbr_cell = 0
-  Snu = 0d0
-  Snu_c = 0d0
-  id = 1 !sequentiel
-  do icell=1, n_cells
-   ! Propagation des rayons
-   do iray=1, atmos%Nrays
-    ! Position = milieu de la cellule
-    x0 = r_grid(icell)
-    y0 = 0.0_dp
-    z0 = z_grid(icell)
-
-    norme = sqrt(x0*x0 + y0*y0 + z0*z0)
-    if (iray==1) then
-     u0 = x0/norme
-     v0 = y0/norme
-     w0 = z0/norme
-    else
-     u0 = -x0/norme
-     v0 = -y0/norme
-     w0 = -z0/norme
-    end if
-    ! Integration le long du rayon
-    ! Boucle infinie sur les cellules
-    next_cell = icell
-    infinie : do ! Boucle infinie
-     ! Indice de la cellule
-     icellinf = next_cell
-     x0=x1 ; y0=y1 ; z0=z1
-     if (icellinf <= n_cells) then
-        lcellule_non_vide=.true.
-     else
-        lcellule_non_vide=.false.
-     endif
-     
-     ! Test sortie
-     if (test_exit_grid(icellinf, x0, y0, z0)) then
-        exit infinie
-     endif
-
-     nbr_cell = nbr_cell + 1
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     previous_cell = 0 ! unused, just for Voronoi
-     call cross_cell(x0,y0,z0, u0,v0,w0,  icellinf, previous_cell, x1,y1,z1, next_cell, &
-                     l, l_contrib, l_void_before)
-
-     if (lcellule_non_vide) then
-     lsubtract_avg = ((nbr_cell == 1).and.labs)
-
-      ! opacities in m^-1
-      l_contrib = l_contrib * AU_to_m
-
-
-      CALL Background(icellinf, x0, y0, z0, u0, v0, w0)
-      dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(:)+NLTEspec%ActiveSet%chi(:)) !scattering + thermal
-      dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(:)
-
-      Snu = (NLTEspec%ActiveSet%eta_c + & 
-                  NLTEspec%ActiveSet%eta) / &
-                 (NLTEspec%ActiveSet%chi_c + NLTEspec%ActiveSet%chi)
-      ! continuum source function
-      Snu_c = (NLTEspec%ActiveSet%eta_c_bf) / NLTEspec%ActiveSet%chi_c_bf
-
-      Ic(id,:,iray) = Ic(id,:,iray)*dexp(-dtau_c) + Snu_c * dexp(-dtau_c) * dtau_c
-
-      facteur_tau = 1d0
-      if (lonly_top    .and. z0 < 0.) facteur_tau = 0d0
-      if (lonly_bottom .and. z0 > 0.) facteur_tau = 0d0
-
-      tau = tau + dtau * facteur_tau
-      tau_c = tau_c + dtau_c
-
-        ! set opacities to 0.0 for next cell point.
-        CALL initAS(re_init=.true.)
-     end if  ! lcellule_non_vide
-    end do infinie
-  !---------------------------------------------!    
-    ksi(:,icell,iray,1) = (Ic(id, :, iray) - Snu)*dexp(-tau)
-    
-   end do ! iray
-  end do ! icell
-  
-  ! ------------------------------------------ !
-  ! Now write them to disk
-  status=0
-  CALL ftgiou (unit,status)
-
-  !  Create the new empty FITS file.
-  blocksize=1
-  CALL ftinit(unit,trim(CNTRB_FILE),blocksize,status)
-
-  simple=.true.
-  extend=.false.
-  if (NrecStokes > 1) extend = .true.
-  group=1
-  fpixel=1  
-  
-  bitpix=-64
-  naxes(1)=NLTEspec%Nwaves
-  if (lVoronoi) then
-   if (NrecStokes > 1) then 
-    naxis = 4
-    naxes(2)=n_cells
-    naxes(3)=atmos%Nrays
-    naxes(4)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-    nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-   else
-    naxis = 3 !only ksi_I
-    naxes(2)=n_cells
-    naxes(3)=atmos%Nrays
-    nelements=naxes(1)*naxes(2)*naxes(3)
-   end if
-  else
-   if (l3D) then
-    if (NrecStokes > 1) then 
-     naxis = 6
-     naxes(2) = n_rad
-     naxes(3) = 2*nz
-     naxes(4) = n_az
-     naxes(5)=atmos%Nrays
-     naxes(6)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
-    else
-     naxis = 5
-     naxes(2) = n_rad
-     naxes(3) = 2*nz
-     naxes(4) = n_az
-     naxes(5)=atmos%Nrays
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-    end if
-  else !not l3D
-    if (NrecStokes > 1) then 
-     naxis = 5
-     naxes(2) = n_rad
-     naxes(3) = nz
-     naxes(4)=atmos%Nrays
-     naxes(5)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-    else
-     naxis = 4
-     naxes(2) = n_rad
-     naxes(3) = nz
-     naxes(4)=atmos%Nrays
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-    end if
-  end if !not l3D
- end if !end if not Voronoi
-
-
-  !  Write the required header keywords.
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.sr-1",'ksi',status)
-
-  CALL ftpprd(unit,group,fpixel,nelements,ksi(:,:,:,1),status)
-!   if (NrecStokes > 1) then
-!    !write other ksi
-!   end if
-
-  !  Close the file and free the unit number.
-  CALL ftclos(unit, status)
-  CALL ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     CALL print_error(status)
-  endif 
- RETURN
- END SUBROUTINE ContributionFunction
+!  SUBROUTINE ContributionFunction()
+!   integer :: icell, iray, id, NrecStokes, nbr_cell, previous_cell, next_cell,icellinf
+!   double precision :: x0, y0, z0, norme, u0, v0, w0, x1, y1, z1
+!   logical :: labs, lcellule_non_vide, lsubtract_avg, lonly_top, lonly_bottom
+!   double precision :: ksi(NLTEspec%Nwaves,atmos%Nspace,atmos%Nrays,1), l
+!                                                            !Replace 1 by 4 if pol.
+!   double precision :: l_contrib, l_void_before, Ic(1,NLTEspec%Nwaves,atmos%Nrays)
+!   double precision, dimension(NLTEspec%Nwaves) :: dtau, dtau_c, tau, tau_c, facteur_tau, Snu, Snu_c
+!   ! for writing                                                        
+!   integer :: status,unit,blocksize,bitpix,naxis
+!   integer, dimension(7) :: naxes
+!   integer :: group,fpixel,nelements, i, xcenter
+!   logical :: simple, extend
+!   character(len=512) :: CNTRB_FILE
+!   CNTRB_FILE = "CNTRB.fits.gz"
+! 
+!   ! ------------------------------------------ !  
+!   write(*,*) "Computing contribution function(s)..."
+!   
+!   NrecStokes = 1 !up to now
+!   Ic = 0d0
+!   dtau = 0d0
+!   dtau_c = 0d0
+!   tau = 0d0
+!   tau_c = 0d0
+!   nbr_cell = 0
+!   Snu = 0d0
+!   Snu_c = 0d0
+!   id = 1 !sequentiel
+!   do icell=1, n_cells
+!    ! Propagation des rayons
+!    do iray=1, atmos%Nrays
+!     ! Position = milieu de la cellule
+!     x0 = r_grid(icell)
+!     y0 = 0.0_dp
+!     z0 = z_grid(icell)
+! 
+!     norme = sqrt(x0*x0 + y0*y0 + z0*z0)
+!     if (iray==1) then
+!      u0 = x0/norme
+!      v0 = y0/norme
+!      w0 = z0/norme
+!     else
+!      u0 = -x0/norme
+!      v0 = -y0/norme
+!      w0 = -z0/norme
+!     end if
+!     ! Integration le long du rayon
+!     ! Boucle infinie sur les cellules
+!     next_cell = icell
+!     infinie : do ! Boucle infinie
+!      ! Indice de la cellule
+!      icellinf = next_cell
+!      x0=x1 ; y0=y1 ; z0=z1
+!      if (icellinf <= n_cells) then
+!         lcellule_non_vide=.true.
+!      else
+!         lcellule_non_vide=.false.
+!      endif
+!      
+!      ! Test sortie
+!      if (test_exit_grid(icellinf, x0, y0, z0)) then
+!         exit infinie
+!      endif
+! 
+!      nbr_cell = nbr_cell + 1
+! 
+!      ! Calcul longeur de vol et profondeur optique dans la cellule
+!      previous_cell = 0 ! unused, just for Voronoi
+!      call cross_cell(x0,y0,z0, u0,v0,w0,  icellinf, previous_cell, x1,y1,z1, next_cell, &
+!                      l, l_contrib, l_void_before)
+! 
+!      if (lcellule_non_vide) then
+!      lsubtract_avg = ((nbr_cell == 1).and.labs)
+! 
+!       ! opacities in m^-1
+!       l_contrib = l_contrib * AU_to_m
+! 
+! 
+!       CALL Background(1,icellinf, x0, y0, z0, u0, v0, w0)
+!       dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(:)+NLTEspec%ActiveSet%chi(:)) !scattering + thermal
+!       dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(:)
+! 
+!       Snu = (NLTEspec%ActiveSet%eta_c + & 
+!                   NLTEspec%ActiveSet%eta) / &
+!                  (NLTEspec%ActiveSet%chi_c + NLTEspec%ActiveSet%chi)
+!       ! continuum source function
+!       Snu_c = (NLTEspec%ActiveSet%eta_c_bf) / NLTEspec%ActiveSet%chi_c_bf
+! 
+!       Ic(id,:,iray) = Ic(id,:,iray)*dexp(-dtau_c) + Snu_c * dexp(-dtau_c) * dtau_c
+! 
+!       facteur_tau = 1d0
+!       if (lonly_top    .and. z0 < 0.) facteur_tau = 0d0
+!       if (lonly_bottom .and. z0 > 0.) facteur_tau = 0d0
+! 
+!       tau = tau + dtau * facteur_tau
+!       tau_c = tau_c + dtau_c
+! 
+!         ! set opacities to 0.0 for next cell point.
+!         CALL initAS(re_init=.true.)
+!      end if  ! lcellule_non_vide
+!     end do infinie
+!   !---------------------------------------------!    
+!     ksi(:,icell,iray,1) = (Ic(id, :, iray) - Snu)*dexp(-tau)
+!     
+!    end do ! iray
+!   end do ! icell
+!   
+!   ! ------------------------------------------ !
+!   ! Now write them to disk
+!   status=0
+!   CALL ftgiou (unit,status)
+! 
+!   !  Create the new empty FITS file.
+!   blocksize=1
+!   CALL ftinit(unit,trim(CNTRB_FILE),blocksize,status)
+! 
+!   simple=.true.
+!   extend=.false.
+!   if (NrecStokes > 1) extend = .true.
+!   group=1
+!   fpixel=1  
+!   
+!   bitpix=-64
+!   naxes(1)=NLTEspec%Nwaves
+!   if (lVoronoi) then
+!    if (NrecStokes > 1) then 
+!     naxis = 4
+!     naxes(2)=n_cells
+!     naxes(3)=atmos%Nrays
+!     naxes(4)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
+!     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+!    else
+!     naxis = 3 !only ksi_I
+!     naxes(2)=n_cells
+!     naxes(3)=atmos%Nrays
+!     nelements=naxes(1)*naxes(2)*naxes(3)
+!    end if
+!   else
+!    if (l3D) then
+!     if (NrecStokes > 1) then 
+!      naxis = 6
+!      naxes(2) = n_rad
+!      naxes(3) = 2*nz
+!      naxes(4) = n_az
+!      naxes(5)=atmos%Nrays
+!      naxes(6)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
+!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
+!     else
+!      naxis = 5
+!      naxes(2) = n_rad
+!      naxes(3) = 2*nz
+!      naxes(4) = n_az
+!      naxes(5)=atmos%Nrays
+!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+!     end if
+!   else !not l3D
+!     if (NrecStokes > 1) then 
+!      naxis = 5
+!      naxes(2) = n_rad
+!      naxes(3) = nz
+!      naxes(4)=atmos%Nrays
+!      naxes(5)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
+!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+!     else
+!      naxis = 4
+!      naxes(2) = n_rad
+!      naxes(3) = nz
+!      naxes(4)=atmos%Nrays
+!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+!     end if
+!   end if !not l3D
+!  end if !end if not Voronoi
+! 
+! 
+!   !  Write the required header keywords.
+!   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+!   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.sr-1",'ksi',status)
+! 
+!   CALL ftpprd(unit,group,fpixel,nelements,ksi(:,:,:,1),status)
+! !   if (NrecStokes > 1) then
+! !    !write other ksi
+! !   end if
+! 
+!   !  Close the file and free the unit number.
+!   CALL ftclos(unit, status)
+!   CALL ftfiou(unit, status)
+! 
+!   !  Check for any error, and if so print out error messages
+!   if (status > 0) then
+!      CALL print_error(status)
+!   endif 
+!  RETURN
+!  END SUBROUTINE ContributionFunction
 
 END MODULE AtomicTransfer

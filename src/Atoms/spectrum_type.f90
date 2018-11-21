@@ -22,14 +22,13 @@ MODULE spectrum_type
   ! at all wavelength at a time
   TYPE ActiveSetType
    integer, allocatable, dimension(:,:) :: lower_levels, upper_levels
-   double precision, allocatable, dimension(:) :: chi, eta, chip, eta_c, chi_c, sca_c, &
+   double precision, allocatable, dimension(:,:) :: chi, eta, chip, eta_c, chi_c, sca_c, &
       eta_Q, eta_U, eta_c_bf, chi_c_bf ! *_bf is used for pure continuum opacities.
                ! Remember, chi_c, eta_c contain all opacities that are LTE (including lines of PASSIVE atoms)
                ! in case of Zeeman polarisation, chi, eta are 4*Nspace long instead of Nspace
    type (AtomicLine), allocatable, dimension(:,:) :: art
    type (AtomicContinuum), allocatable, dimension(:,:) :: crt
    double precision, allocatable, dimension(:) :: Psi
-   !type (MolecularLine) :: mrt
   END TYPE ActiveSetType
 
   TYPE Spectrum
@@ -40,7 +39,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:) :: lambda
    !nproc, nlambda, ncells
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
-   !nlambda, ncells
+   !nproc, nlambda
    double precision, allocatable, dimension(:,:) :: J, J20, Jc
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
@@ -120,29 +119,30 @@ CONTAINS
     ! allocate arrays for re_init = .False.
     ! if re_init is .true. only set opac arrays to 0 for next cell point.
     logical, intent(in) :: re_init
-    integer :: Nsize
+    integer :: Nproc, Nsize !, Nsize2
     
     Nsize = NLTEspec%Nwaves
+    Nproc = NLTEspec%NPROC
     !if mag field, Nsize=4*Nsize
      ! Nsize2 = 3*Nsize
    ! first time allocate space on the wavelength grid
    if (.not.re_init) then
     !if (NLTEspec%Nact.gt.0) then
-     allocate(NLTEspec%Activeset%chi(Nsize))
-    ! if mag field allocate(NLTEspec%Activesets%chip(NLTEspec%Nwaves))
-     allocate(NLTEspec%Activeset%eta(Nsize))
+     allocate(NLTEspec%Activeset%chi(Nproc,Nsize))
+    ! if mag field allocate(NLTEspec%Activesets%chip(Nproc,Nsize))
+     allocate(NLTEspec%Activeset%eta(Nproc,Nsize))
      NLTEspec%Activeset%chi = 0.
      NLTEspec%Activeset%eta = 0.
     !end if 
-    allocate(NLTEspec%Activeset%eta_c(Nsize))
-    allocate(NLTEspec%Activeset%chi_c(Nsize))
-    allocate(NLTEspec%Activeset%sca_c(Nsize))
-    allocate(NLTEspec%Activeset%eta_c_bf(Nsize))
-    allocate(NLTEspec%Activeset%chi_c_bf(Nsize))
+    allocate(NLTEspec%Activeset%eta_c(Nproc,Nsize))
+    allocate(NLTEspec%Activeset%chi_c(Nproc,Nsize))
+    allocate(NLTEspec%Activeset%sca_c(Nproc,Nsize))
+    allocate(NLTEspec%Activeset%eta_c_bf(Nproc,Nsize))
+    allocate(NLTEspec%Activeset%chi_c_bf(Nproc,Nsize))
 
    ! if line pol
-    !allocate(NLTEspec%Activesets%eta_Q(NLTEspec%Nwaves))
-     !allocate(NLTEspec%Activesets%eta_U(NLTEspec%Nwaves))
+    !allocate(NLTEspec%Activesets%eta_Q(Nproc,Nsize))
+     !allocate(NLTEspec%Activesets%eta_U(Nproc,Nsize))
      ! ...
     NLTEspec%Activeset%chi_c = 0.
     NLTEspec%Activeset%eta_c = 0.
@@ -176,7 +176,6 @@ CONTAINS
     !! etc etc ...
     if (NLTEspec%Nact.gt.0) then
      deallocate(NLTEspec%Activeset%chi)
-    ! if mag field allocate(NLTEspec%Activesets%chip(NLTEspec%Nwaves))
      deallocate(NLTEspec%Activeset%eta)
     end if 
     deallocate(NLTEspec%Activeset%eta_c)

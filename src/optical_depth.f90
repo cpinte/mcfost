@@ -297,9 +297,9 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      ! kappa is set to 0d0 in case of lemission_atom to prevent
      ! problem with opacite=kappa(icell0,lambda) above.
      if ((lemission_atom).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
-      CALL Background(icell0, x0, y0, z0, u, v, w)
-      opacite = NLTEspec%ActiveSet%chi_c_bf(lambda)!NLTEspec%ActiveSet%chi(lambda) + &
-                !             NLTEspec%ActiveSet%chi_c(lambda)
+      CALL Background(id, icell0, x0, y0, z0, u, v, w)
+      opacite = NLTEspec%ActiveSet%chi_c_bf(id, lambda)!NLTEspec%ActiveSet%chi(id,lambda) + &
+                !             NLTEspec%ActiveSet%chi_c(id,lambda)
       opacite = opacite / AU_to_m !because l_contrib is in AU ?
       if ((opacite /= opacite).or.(opacite+1==opacite)) write(*,*) lambda, icell0, opacite
       CALL initAS(.true.) !set opac to zero for next icell.
