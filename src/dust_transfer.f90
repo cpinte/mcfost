@@ -1448,7 +1448,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         icell = etoile(istar)%icell
 
         Stokes = 0.0_dp
-        call optical_length_tot(1,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
+        call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
         if (lresolved) then
