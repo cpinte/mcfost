@@ -2,7 +2,8 @@ MODULE spectrum_type
 
   use atom_type
   use atmos_type, only : GridType
-
+  use getlambda, only : make_wavelength_grid
+  
   !MCFOST's original modules
   use fits_utils, only : print_error
 
@@ -51,12 +52,68 @@ MODULE spectrum_type
 
 CONTAINS
 
+  SUBROUTINE initSpectrum(NPROC, lam0, vacuum_to_air, write_wavelength)
+   integer, intent(in) :: NPROC
+   double precision, optional :: lam0
+   logical, optional :: vacuum_to_air, write_wavelength
+   
+   NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
+   NLTEspec%NPROC = NPROC
+   
+   if (present(lam0)) NLTEspec%wavelength_ref = lam0
+   if (present(write_wavelength)) NLTEspec%write_wavelength_grid = write_wavelength
+   if (present(vacuum_to_air)) NLTEspec%vacuum_to_air = vacuum_to_air
+  
+   ! Initialize the wavelength grid depending on the number of transitions PASSIVE/ACTIVE
+   CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
+                        NLTEspec%lambda, NLTEspec%wavelength_ref)
+   NLTEspec%Nwaves = size(NLTEspec%lambda)
+   CALL writeWavelength()  
+  
+  RETURN
+  END SUBROUTINE initSpectrum
+
+  SUBROUTINE allocSpectrum(NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
+   integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
+   
+   if (allocated(NLTEspec%I)) then
+    write(*,*) "Error I already allocated"
+    stop
+   end if
+   
+   allocate(NLTEspec%I(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+   allocate(NLTEspec%Ic(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+
+   if (NLTEspec%atmos%Magnetized) then
+    allocate(NLTEspec%StokesQ(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), & 
+             NLTEspec%StokesU(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), &
+             NLTEspec%StokesV(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+   end if
+   allocate(NLTEspec%J(NLTEspec%NPROC, NLTEspec%Nwaves))
+   allocate(NLTEspec%Jc(NLTEspec%NPROC, NLTEspec%Nwaves))
+   !! allocate(NLTEspec%J20(NLTEspec%NPROC, NLTEspec%Nwaves))
+   
+   allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
+   allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
+   
+   ! --> initialised in integ_ray_line  
+   !   NLTEspec%I = 0.0
+   !   NLTEspec%Ic = 0.0
+   NLTEspec%Flux = 0.0
+   NLTEspec%Fluxc = 0.0
+   ! J and Jc are initialised in initAS()
+  
+  RETURN
+  END SUBROUTINE allocSpectrum
 
   SUBROUTINE freeSpectrum()
    deallocate(NLTEspec%lambda)
-   NULLIFY(NLTEspec%atmos)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
-
+   deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
+   if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
+   !! deallocate(NLTEspec%J20)
+   NULLIFY(NLTEspec%atmos)
+  RETURN
   END SUBROUTINE freeSpectrum
 
   SUBROUTINE initAS(re_init)
@@ -64,7 +121,7 @@ CONTAINS
     ! if re_init is .true. only set opac arrays to 0 for next cell point.
     logical, intent(in) :: re_init
     integer :: Nsize
-
+    
     Nsize = NLTEspec%Nwaves
     !if mag field, Nsize=4*Nsize
      ! Nsize2 = 3*Nsize
@@ -76,14 +133,12 @@ CONTAINS
      allocate(NLTEspec%Activeset%eta(Nsize))
      NLTEspec%Activeset%chi = 0.
      NLTEspec%Activeset%eta = 0.
-    !end if
+    !end if 
     allocate(NLTEspec%Activeset%eta_c(Nsize))
     allocate(NLTEspec%Activeset%chi_c(Nsize))
     allocate(NLTEspec%Activeset%sca_c(Nsize))
     allocate(NLTEspec%Activeset%eta_c_bf(Nsize))
     allocate(NLTEspec%Activeset%chi_c_bf(Nsize))
-    allocate(NLTEspec%J(NLTEspec%NPROC,NLTEspec%Nwaves))
-    allocate(NLTEspec%Jc(NLTEspec%NPROC,NLTEspec%Nwaves))
 
    ! if line pol
     !allocate(NLTEspec%Activesets%eta_Q(NLTEspec%Nwaves))
@@ -111,7 +166,7 @@ CONTAINS
     NLTEspec%J = 0.0
     NLTEspec%Jc = 0.0
    end if
-
+   
   RETURN
   END SUBROUTINE initAS
 
@@ -123,23 +178,23 @@ CONTAINS
      deallocate(NLTEspec%Activeset%chi)
     ! if mag field allocate(NLTEspec%Activesets%chip(NLTEspec%Nwaves))
      deallocate(NLTEspec%Activeset%eta)
-    end if
+    end if 
     deallocate(NLTEspec%Activeset%eta_c)
     deallocate(NLTEspec%Activeset%chi_c)
     deallocate(NLTEspec%Activeset%sca_c)
     deallocate(NLTEspec%Activeset%chi_c_bf)
     deallocate(NLTEspec%Activeset%eta_c_bf)
-
+    
    RETURN
   END SUBROUTINE freeAS
-
+  
   SUBROUTINE writeWavelength()
    ! Write wavelength grid build with each transition of each atom
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
    logical :: extend, simple
    character(len=6) :: comment="VACUUM"
    double precision :: lambda_vac(NLTEspec%Nwaves)
-
+   
    if (.not.allocated(NLTEspec%lambda).or.&
        .not.NLTEspec%write_wavelength_grid) RETURN !
    CALL ftgiou(unit,EOF)
@@ -148,25 +203,25 @@ CONTAINS
    simple = .true.
    group = 1
    fpixel = 1
-   extend = .false.
-   bitpix = -64
+   extend = .false. 
+   bitpix = -64   
    naxis = 1
    naxes(1) = NLTEspec%Nwaves
-
+   
    if (NLTEspec%vacuum_to_air) then
      comment="AIR"
      lambda_vac = NLTEspec%lambda
      NLTEspec%lambda = vacuum2air(NLTEspec%Nwaves, lambda_vac)
-   end if
-
+   end if 
+   
    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
    CALL ftpkys(unit, "UNIT", "nm", comment, EOF)
    CALL ftpprd(unit,group,fpixel,naxes(1),NLTEspec%lambda,EOF)
    CALL ftclos(unit, EOF)
    CALL ftfiou(unit, EOF)
-
-   if (EOF > 0) CALL print_error(EOF)
-
+   
+   if (EOF > 0) CALL print_error(EOF)       
+ 
   RETURN
   END SUBROUTINE writeWavelength
 
@@ -190,7 +245,7 @@ CONTAINS
 !     end if
 !    end do
 
-   where (lambda_vac.ge.VACUUM_TO_AIR_LIMIT)
+   where (lambda_vac.ge.VACUUM_TO_AIR_LIMIT) 
      sqwave = 1./(lambda_vac**2)
      reduction = 1. + 2.735182e-4 + &
             (1.314182 + 2.76249e+4 * sqwave) * sqwave
@@ -239,3 +294,4 @@ CONTAINS
 
 
 END MODULE spectrum_type
+
