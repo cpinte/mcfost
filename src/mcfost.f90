@@ -20,7 +20,6 @@ program BIGCRUNCH
 
   integer :: itime
   real :: time, cpu_time_begin, cpu_time_end
-  logical :: lemission_atom=.false.
 
   ! debut de l'execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -43,7 +42,7 @@ program BIGCRUNCH
      call mol_line_transfer()
   endif
 
-  lemission_atom =.true.
+  lemission_atom =.true. !will be added to mcfost init
   if (lemission_atom) then
      write(*,*) ""
      write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'

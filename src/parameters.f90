@@ -55,6 +55,9 @@ module parametres
 
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
+  
+  ! Atomic line radiative transfer
+  logical :: lemission_atom
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
