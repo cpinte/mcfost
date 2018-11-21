@@ -486,6 +486,7 @@ subroutine emission_line_map(imol,ibin,iaz)
 
   integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, lambda, iv
   real :: vmax_center_rt, extra_deltaV_rt
+  logical :: lresolved
 
  ! Direction de visee pour le ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
@@ -559,6 +560,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      dy(:) = 0.0_dp
      i = 1
      j = 1
+     lresolved = .false.
 
      rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
      rmax_RT = 2.0_dp * Rmax
@@ -604,6 +606,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      !$omp end parallel
 
   else ! method 2 : echantillonnage lineaire avec sous-pixels
+     lresolved = .true.
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
@@ -647,7 +650,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
-     call compute_stars_map(lambda, u, v, w, taille_pix, dx, dy)
+     call compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
 
      do iv =  -n_speed_rt, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
@@ -868,7 +871,7 @@ subroutine init_dust_mol(imol)
      do iTrans=1,nTrans_tot
         tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
         tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
-        tab_lambda_sup(iTrans)= tab_lambda(iTrans)/delta_lambda
+        tab_lambda_inf(iTrans)= tab_lambda(iTrans)/delta_lambda
         tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
      enddo
 

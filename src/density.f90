@@ -1088,6 +1088,7 @@ subroutine read_density_file()
      !write(*,*) naxes(4), n_a
      call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
   endif
+
   if (nfound == 3) then
      n_a = 1
      write(*,*) "No grain size found"
@@ -1100,6 +1101,14 @@ subroutine read_density_file()
      n_a = naxes(4)
      write(*,*) n_a, "grain sizes found"
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  endif
+
+  if (lvariable_dust) then
+     p_n_cells = n_cells
+     p_n_rad=n_rad ; p_nz = nz
+  else
+     p_n_cells = 1
+     p_n_rad=1 ;  p_nz=1
   endif
 
   if (naxes(2) == 2*nz) then
@@ -1241,7 +1250,9 @@ subroutine read_density_file()
            if (a_sph(i) < tiny_real) call error("grain sizes must be > 0")
            if (n_a_sph(i) / tmp < tiny_real) call error("grain number density must be > 0")
         enddo
-        write(*,*) "They will be used to set the integrated grain size distribution"
+        write(*,*) "These densities will be used to set the integrated grain size distribution"
+        write(*,*) "Densities will be interpolated on the grain sizes defined"
+        write(*,*) "in the parameter file"
 
         if (n_pop > 1) call error("density fits interface only works for 1 dust pop")
 
@@ -1334,7 +1345,6 @@ subroutine read_density_file()
      sph_gas_dens = sph_gas_dens/maxval(sph_gas_dens) ! normalization avant d'ajouter une constante
      sph_gas_dens = max(sph_gas_dens,1e10*tiny_real)
   endif ! lread_gas_density
-
 
   !------------------------
   ! Velocity field

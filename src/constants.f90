@@ -15,20 +15,20 @@ module constantes
   real(kind=dp), parameter :: un_tiers = 1.0_dp / 3.0_dp
 
   ! Constantes en SI
-  real, parameter :: hp = 6.6260693e-34    ! Planck (J.Hz-1)
-  real, parameter :: kb = 1.3806505e-23    ! Boltzmann (J.K^-1)
-  real(kind=dp), parameter :: c_light = 299792458.  ! vitesse lumiere (m.s^-1)
+  real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
+  real(kind=dp), parameter :: kb = 1.38064852e-23_dp   ! Boltzmann (J.K^-1) CODATA 2014
+  real(kind=dp), parameter :: c_light = 299792458._dp  ! vitesse lumiere (m.s^-1) CODATA 2014
   real, parameter :: cst_th=c_light*hp/kb  ! pour calcul de (h c)/(lambda k T)
-  real, parameter :: sigma = 5.6697e-8     ! Stefan (en W/(m^2.K^4))
+  real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
   real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3
-  real, parameter :: electron_charge = 1.6021766208e-19  ! Coulombs
+  real(kind=dp), parameter :: electron_charge = 1.6021766208e-19_dp  ! Coulombs CODATA 2014
 
-  real, parameter :: Na     = 6.022140857e23    ! Nombre d'Avogadro
-  real, parameter :: amu    = 1.660531000E-24   ! atomar mass unit
-  real, parameter :: masseH = 1.00794 * amu     ! masse d'un atome d'hydrogene en g
-  real, parameter :: mu = 2.3                   ! en g,  2.3 selon Walker 2004
+  real(kind=dp), parameter :: Na = 6.022140857e23_dp   ! Nombre d'Avogadro CODATA 2014
+  real(kind=dp), parameter :: amu = 1.0_dp/Na          ! atomic mass unit [g]
+  real(kind=dp), parameter :: masseH = 1.007825032231_dp * amu   ! H atom mass [g] CODATA 2014
+  real, parameter :: mu = 2.3                          ! [g]  2.3 following Walker 2004
   real, parameter :: masse_mol_gaz = mu * masseH
-  real, parameter :: T_Cmb = 2.73               ! K
+  real, parameter :: T_Cmb = 2.7260                    ! K
 
   ! Changements d'unites
   ! Angles
@@ -73,10 +73,10 @@ module constantes
   real(kind=dp), parameter :: sec_to_rad = AU_to_pc
 
   ! Energies
-  real(kind=dp), parameter :: eV_to_J = 1.60217653e-19_dp
+  real(kind=dp), parameter :: eV_to_J = electron_charge
   real(kind=dp), parameter :: erg_to_J = 1.0e-7_dp
   real, parameter :: jansky = 1.0e-26 ! W.m^-2.Hz-1 (F_nu en jansky)
-  real, parameter :: Lsun = 3.839e26 ! W
+  real, parameter :: Lsun = 3.828e26 ! [W] IAU 2015
 
   ! Masses
   real(kind=dp), parameter :: g_to_kg = 1.0e-3_dp

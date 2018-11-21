@@ -87,13 +87,12 @@ subroutine transfert_poussiere()
   if (lbenchmark_Pascucci) call init_Pascucci_benchmark()
   call init_indices_optiques()
 
-
-  ! Building the dust grain population
-  call build_grain_size_distribution()
-
   ! Building the model volume and corresponding grid
   call order_zones()
   call define_physical_zones()
+
+  ! Building the dust grain population
+  call build_grain_size_distribution()
 
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
@@ -103,21 +102,8 @@ subroutine transfert_poussiere()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
-  call setup_scattering()
-
-  ! Allocation dynamique de tous les autres tableaux
-  call alloc_dust_prop()
-  call alloc_dynamique()
 
   laffichage=.true.
-
-  stream = 0.0
-  do i=1, nb_proc
-     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-  enddo
-
-  if (lProDiMo) call setup_ProDiMo()
-  if (lML) call init_ML()
 
   if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
@@ -133,6 +119,20 @@ subroutine transfert_poussiere()
      endif
      if (lwall) call define_density_wall3D()
   endif
+
+  call setup_scattering()
+  ! Allocation dynamique de tous les autres tableaux
+  call alloc_dust_prop()
+
+  call alloc_dynamique()
+
+  stream = 0.0
+  do i=1, nb_proc
+     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+  enddo
+
+  if (lProDiMo) call setup_ProDiMo()
+  if (lML) call init_ML()
 
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation
@@ -1174,6 +1174,7 @@ subroutine dust_map(lambda,ibin,iaz)
   integer, parameter :: n_rad_RT = 128, n_phi_RT = 30  ! OK, ca marche avec n_rad_RT = 1000
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
+  logical :: lresolved
 
   if (lmono0) write(*,'(a16, $)') " Ray-tracing ..."
 
@@ -1221,6 +1222,7 @@ subroutine dust_map(lambda,ibin,iaz)
      dy(:) = 0.0_dp
      i = 1
      j = 1
+     lresolved = .false.
 
      rmin_RT = 0.01_dp * Rmin
      rmax_RT = 2.0_dp * Rmax
@@ -1267,6 +1269,7 @@ subroutine dust_map(lambda,ibin,iaz)
      !$omp end parallel
 
   else ! method 2 : echantillonnage lineaire avec sous-pixels
+     lresolved = .true.
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
@@ -1305,7 +1308,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda, u,v,w, taille_pix,dx,dy)
+  call compute_stars_map(lambda, u,v,w, taille_pix,dx,dy, lresolved)
 
   id = 1 ! We add the map on the first cpu id
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
@@ -1326,14 +1329,15 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
+subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolved)
   ! Make a ray-traced map of the stars
 
   use utils, only : interp
 
   integer, intent(in) :: lambda
   real(kind=dp), intent(in) :: u,v,w, taille_pix
-   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
+  real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
+  logical, intent(in) :: lresolved
 
   integer, parameter :: n_ray_star_SED = 1024
 
@@ -1407,7 +1411,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
-     !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star) &
+     !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme)
@@ -1447,13 +1451,13 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map)
         icell = etoile(istar)%icell
 
         Stokes = 0.0_dp
-        call optical_length_tot(1,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
+        call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
         ! Coordonnees pixel
-         if (lsed.and.(RT_sed_method == 1)) then
-           i=1 ; j=1
-        else
+        if (lresolved) then
            call find_pixel(x,y,z, taille_pix, dx_map, dy_map, i,j,in_map)
+        else
+           i=1 ; j=1
         endif
 
         if (in_map) then

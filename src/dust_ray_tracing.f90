@@ -592,7 +592,6 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
         S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
         S(1)=D(1)
         S(4)=D(4)
-        S(3)=-S(3)
 
         iRT = RT2d_to_RT1d(ibin, iaz)
         xI_scatt(phik,psup,1:4,iRT,icell,id) =  xI_scatt(phik,psup,1:4,iRT,icell,id) + l * S(:)

@@ -23,12 +23,13 @@ module read_phantom
  integer, parameter :: maxarraylengths = 12
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
- integer :: nblocks,narraylengths,nblockarrays,number
+ integer :: nblocks,narraylengths,nblockarrays,number,idust
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
  integer, parameter :: maxtypes = 6
  integer, parameter :: maxfiles = 3
+ integer, parameter :: maxinblock = 128
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
  real(dp) :: hfact,umass,utime,udist
@@ -40,14 +41,15 @@ module read_phantom
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
- integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, np_max, ntypes_max, ndustsmall, ndustlarge
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
  ! We first read the number of particules in each phantom file
  np_tot = 0
- np_max = 0
  ntypes_tot = 0
  ntypes_max = 0
  do ifile=1, n_files
+    write(*,*) "---- Reading header file #", ifile
+
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
@@ -66,6 +68,7 @@ module read_phantom
        ierr = 1000
        return
     endif
+
     call extract('nparttot',np,hdr,ierr)
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
     if (ierr /= 0) then
@@ -74,17 +77,33 @@ module read_phantom
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
+
+       ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
+       if (ndusttypes==0 .and. ierr/=0) then
+             ! For older files where ndusttypes is not output to the header
+          idust = 0
+          do i = 1,maxinblock
+             if (hdr%realtags(i)=='grainsize') idust = idust + 1
+          enddo
+          write(*,"(a)")    ' Warning! Could not find ndusttypes in header'
+          write(*,"(a,I4)") '          ...counting grainsize arrays...ndusttypes =',idust
+          ndusttypes = idust
+       endif
+
     endif
     call extract('ntypes',ntypes,hdr,ierr)
 
     np_tot = np_tot + np
-    np_max = max(np_max,np)
     ntypes_tot = ntypes_tot + ntypes
     ntypes_max = max(ntypes_max,ntypes)
+
+    call free_header(hdr, ierr)
+
     close(iunit)
+    write(*,*) "---- Done"
  enddo ! ifile
 
- allocate(xyzh(4,np_tot),itype(np_tot),tmp(np_max),vxyzu(4,np_tot),tmp_dp(np_max))
+ allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
 
@@ -92,6 +111,8 @@ module read_phantom
  np0 = 0
  ntypes0 = 0
  do ifile=1, n_files
+    write(*,*) "---- Reading data file #", ifile
+
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
@@ -124,13 +145,29 @@ module read_phantom
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
+
+       ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
+       if (ndusttypes==0 .and. ierr/=0) then
+             ! For older files where ndusttypes is not output to the header
+          idust = 0
+          do i = 1,maxinblock
+             if (hdr%realtags(i)=='grainsize') idust = idust + 1
+          enddo
+          write(*,"(a)")    ' Warning! Could not find ndusttypes in header'
+          write(*,"(a,I4)") '          ...counting grainsize arrays...ndusttypes =',idust
+          ndusttypes = idust
+      endif
     endif
+    call extract('ntypes',ntypes,hdr,ierr)
+
     call extract('nptmass',nptmass,hdr,ierr,default=0)
     !call extract('isink',isink,hdr,ierr,default=0)
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
     write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
+
+    allocate(tmp(np), tmp_dp(np))
 
     if (npartoftype(2) > 0) then
        dustfluidtype = 2
@@ -165,14 +202,19 @@ module read_phantom
     ngrains = 0
     do iblock = 1,nblocks
        call read_block_header(narraylengths,number8,nums,iunit,ierr)
+       if (ierr /= 0) call error('Reading block header')
        do j=1,narraylengths
-          !write(*,*) 'block ',iblock, j, number8(j)
+          !write(*,*) 'block ',iblock, j, number8(j), np
           do i=1,ndatatypes
-             !print*,' data type ',i,' arrays = ',nums(i,j)
+             !write(*,*) ' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
+                !write(*,*) "k=", k, np0, np
+
                 if (j==1 .and. number8(j)==np) then
                    read(iunit, iostat=ierr) tag
+                   if (ierr /= 0) call error('Reading tag')
                    !write(*,"(1x,a)",advance='no') trim(tag)
+
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
@@ -237,6 +279,7 @@ module read_phantom
                    else
                       read(iunit,iostat=ierr)
                    endif
+                   if (ierr /= 0) call error("Error reading tag: "//trim(tag))
                 !elseif (j==1 .and. number8(j)==nptmass) then
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass = number8(j) ! HACK
@@ -281,6 +324,10 @@ module read_phantom
           enddo
        enddo
     enddo ! block
+
+    deallocate(tmp, tmp_dp)
+    call free_header(hdr, ierr)
+    write(*,*) "---- Done"
     close(iunit)
 
     ifiles(np0+1:np0+np) = ifile ! index of the file
@@ -316,7 +363,7 @@ module read_phantom
  endif
 
  write(*,*) "Phantom dump file processed ok"
- deallocate(xyzh,itype,tmp,vxyzu,tmp_dp)
+ deallocate(xyzh,itype,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
 end subroutine read_phantom_files
@@ -526,7 +573,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
+
  write(*,*) "# Sink particles:"
+
  n_etoiles = 0
  do i=1,nptmass
     write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
@@ -537,10 +586,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  enddo
 
  if (lplanet_az) then
-    if (nptmass /= 2) call error("option -planet_az only works with 2 sink particles")
+    if ((nptmass /= 2).and.(which_planet==0)) call error("option -planet_az: you need to specify the sink particle with -planet option")
+    if (nptmass == 2) which_planet=2
+    if (which_planet > nptmass) call error("specified sink particle does not exist")
+
     RT_n_az = 1
-    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,2) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,2) - xyzmh_ptmass(1,1)) / deg_to_rad
+    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) / deg_to_rad
     RT_az_max = RT_az_min
+    write(*,*) "Moving sink particle #", which_planet, "to azimuth =", planet_az
     write(*,*) "WARNING: updating the azimuth to:", RT_az_min
  endif
 

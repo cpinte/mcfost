@@ -158,6 +158,7 @@ module parametres
   ! SPH
   real :: SPH_keep_particles, planet_az, scale_SPH
   logical :: lplanet_az, lscale_SPH, lfix_star, lcorrect_density_elongated_cells
+  integer :: which_planet
 
   logical :: lgap_Gaussian
   real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
