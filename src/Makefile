@@ -307,8 +307,8 @@ cleanall : clean cleandata
 
 save :
 	#git push phare
-	git push bitbucket --mirror
-	git push github --mirror
+	git push bitbucket --all
+	git push github --all
 	#git push dmz
 
 #------------------------------------------------------------------------------#
