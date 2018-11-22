@@ -407,7 +407,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), intent(in), optional :: T_to_u
 
 
-  integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
@@ -576,13 +576,12 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  write(*,*) "# Sink particles:"
 
+ n_etoiles_old = n_etoiles
  n_etoiles = 0
  do i=1,nptmass
+    n_etoiles = n_etoiles + 1
     write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
     if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
-    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-       n_etoiles = n_etoiles + 1
-    endif
  enddo
 
  if (lplanet_az) then
@@ -599,24 +598,27 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  if (lfix_star) then
     write(*,*) ""
-    write(*,*) "Stellar parameters will not be updated"
+    write(*,*) "Stellar parameters will not be updated, only the star positions"
+    if (n_etoiles > n_etoiles_old) then
+       write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored"
+       n_etoiles = n_etoiles_old
+    endif
+    do i_etoiles = 1, n_etoiles
+       etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
+       etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
+       etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+    enddo
  else
     write(*,*) ""
     write(*,*) "Updating the stellar properties:"
-    write(*,*) "There are", n_etoiles, "stars in the model"
+    write(*,*) "There are now", n_etoiles, "stars in the model"
     if (allocated(etoile)) deallocate(etoile)
     allocate(etoile(n_etoiles))
 
-    i_etoiles = 0
-    do i=1,nptmass
-       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          i_etoiles = i_etoiles + 1
-          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
-          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
-          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
-          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
-       endif
-    enddo
+    etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
+    etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
+    etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
+    etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
  endif
 
  return

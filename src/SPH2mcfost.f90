@@ -482,14 +482,25 @@ contains
     close(unit=1)
 
     ! interpoler L et T, les fonctions sont plus smooth
-    write(*,*) "New stellar parameters:"
+    write(*,*) "New stellar parameters (assuming a BB):", minM, maxM
     do i=1, n_etoiles
-       if ((etoile(i)%M < minM) .or. (etoile(i)%M > maxM))  then
-          write(*,*) "   *** WARNING : stellar object mass not in isochrone range"
-          write(*,*) "   *** object #", i, "M=", etoile(i)%M, "Msun"
+       if (etoile(i)%M < minM)  then
+          write(*,*) " "
+          write(*,*) "*** WARNING : stellar object mass is below isochrone range", etoile(i)%M < minM
+          write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
+          write(*,*) "*** The object will not radiate"
+          etoile(i)%T = 3.
+          etoile(i)%r = 0.01
+       else
+          if (etoile(i)%M > maxM)  then
+             write(*,*) " "
+             write(*,*) "*** WARNING : stellar object mass is above in isochrone range"
+             write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
+             write(*,*) "*** Stellar properties are extrapolated"
+          endif
+          etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
+          etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
        endif
-       etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
-       etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
 
        ! Pas de fUV et pas de spectre stellaire pour le moment
        etoile(i)%fUV = 0.0 ; etoile(i)%slope_UV = 0.0 ;
