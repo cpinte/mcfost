@@ -243,8 +243,8 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   real(kind=dp), intent(out) :: lmin,lmax
 
 
-  !real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
-  double precision :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+  !double precision :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
 
   integer :: icell0, previous_cell, next_cell
 
@@ -298,17 +298,18 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      ! problem with opacite=kappa(icell0,lambda) above.
      if ((icell0<=n_cells).and.(lemission_atom).and.&
            (NLTEspec%Atmos%lcompute_atomRT(icell0))) then
+      CALL initAS(id, .true.) !set opac to zero for this cell and thread.
       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
       opacite = NLTEspec%ActiveSet%chi(id,lambda) + &
                 NLTEspec%ActiveSet%chi_c(id,lambda)
       opacite = opacite / AU_to_m !because l_contrib is in AU ?
-      !write(*,*) id, NLTEspec%lambda(lambda), opacite
-      !stop
-      if ((opacite /= opacite).or.(opacite+1==opacite)) then
-       write(*,*) "(Error)", id, lambda, icell0, NLTEspec%lambda(lambda), opacite
-       stop
-      end if
-      CALL initAS(id, .true.) !set opac to zero for next icell and thread.
+!       write(*,*) id, NLTEspec%lambda(lambda), opacite
+!       stop
+!       if ((opacite /= opacite).or.(opacite+1==opacite)) then
+!        write(*,*) "(Error)", id, lambda, icell0, &
+!           NLTEspec%lambda(lambda), opacite, NLTEspec%ActiveSet%chi_c(id,lambda)
+!        stop
+!       end if
      end if
      ! ------------------------------------------------------------------ !
 

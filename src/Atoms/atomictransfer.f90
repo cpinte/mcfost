@@ -137,7 +137,7 @@ MODULE AtomicTransfer
 !         atmos_parcel%v = v
 !         atmos_parcel%w = w
 
-
+     CALL initAS(id, re_init=.true.) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
@@ -176,8 +176,8 @@ MODULE AtomicTransfer
 
      ! Define PSI Operators here
 
-     ! set opacities to 0.0 for next cell point, for the thread id.
-     CALL initAS(id, re_init=.true.)
+!      !set opacities to 0.0 for next cell point, for the thread id.
+!      CALL initAS(id, re_init=.true.)
     end if  ! lcellule_non_vide
   end do infinie
   !---------------------------------------------!
@@ -300,7 +300,7 @@ MODULE AtomicTransfer
 
   double precision, dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   double precision, dimension(3,nb_proc) :: pixelcorner
-  double precision:: taille_pix
+  double precision:: taille_pix, nuHz
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36
@@ -311,6 +311,7 @@ MODULE AtomicTransfer
   logical :: lresolved = .false.
   
 npix_x = 101; npix_y = 101
+  write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
@@ -345,7 +346,7 @@ npix_x = 101; npix_y = 101
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      lresolved = .true.
      
-     write(*,*) taille_pix, map_size, zoom, npix_x, npix_y, RT_n_incl, RT_n_az
+     !write(*,*) taille_pix, map_size, zoom, npix_x, npix_y, RT_n_incl, RT_n_az
 
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
@@ -386,12 +387,16 @@ npix_x = 101; npix_y = 101
   ! --------------------------
   ! Ajout Flux etoile
   ! --------------------------
+  write(*,*) " --> adding stellar flux map..."
   do i = 1, NLTEspec%Nwaves
+   nuHz = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nuHz = 1d0
+                                             !else it means that in FLUX_PIXEL_LINE, nuHz
+                                             !is 1d0 (to have flux in W/m2/Hz)
    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
 !    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
 !       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
-   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
+   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nuHz
+   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nuHz
   end do
 
  RETURN
@@ -428,7 +433,7 @@ npix_x = 101; npix_y = 101
    write(*,*) "Nrays should at least be 1!"
    stop
   end if
-! --> move elsewhere
+! --> move elsewhere (for instance before NLTE loop)
 !   if (atmos%Nrays==1) then
 !    write(*,*) "Solving for", atmos%Nrays,' direction.'
 !   else
@@ -439,7 +444,7 @@ npix_x = 101; npix_y = 101
   
    nHtot = 2d21 * densite_gaz/MAXVAL(densite_gaz)
    !nHtot =  1d6 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
-   Ttmp = Tdust * 50d0 !100d0, depends on the stellar flux
+   Ttmp = Tdust * 100d0 !100d0, depends on the stellar flux
    netmp = 1d-2 * nHtot
 !    nHtot = 1.7d15
 !    Ttmp = 9.400000d03
@@ -489,7 +494,7 @@ npix_x = 101; npix_y = 101
   CALL initSpectrum(nb_proc, 500d0, .false., .true.)
   re_init = .false. !first allocation it is done by setting re_init = .false.
   !when re_init is .false., table for opacities are allocated for all wavelengths and
-  !all threads.
+  !all threads, and set to 0d0.
   ! when it is .true., opacities are set to zero for next points, for a specific thread.
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
   CALL initAS(0, re_init) !zero because when re_init=.false. it is independent of the
