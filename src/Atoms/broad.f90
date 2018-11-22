@@ -1,7 +1,8 @@
 ! Routines for line broadening, including van der Waals and
 ! Stark broadening by electronic collisions.
 !
-! from RH.
+! Adapted from RH H. Uitenbroek
+
 
 MODULE broad
 

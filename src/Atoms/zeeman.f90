@@ -1,5 +1,5 @@
 MODULE zeeman
-
+ ! see LL04
  use atom_type, only : AtomType, ZeemanType, determinate, getorbital
 
  IMPLICIT NONE

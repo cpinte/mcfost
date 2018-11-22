@@ -1,5 +1,5 @@
 MODULE accelerate
-
+! Adapted from RH H. Uitenbroek
   !
   ! Implements Ng structure similar to RH for convergence
   ! acceleration

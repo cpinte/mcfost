@@ -3,11 +3,14 @@
 !  - Barklem, O'Mara & Ross 1998, MNRAS 296, 1057-1060 (d-f, f-d)
 !  - Barklem, O'Mara 1998, MNRAS 300, 863-871
 
+! Adapted from RH H. Uitenbroek
+
+
 MODULE barklem
 
   use atom_type, only : AtomType, determinate, ATOM_LABEL_WIDTH
   use getline
-  use math, only : interp2D, locate, gammln!, Hunt!, cubeconvol
+  use math, only : interp2D, locate, gammln
   use constant
 
   !MCFOST's originals
@@ -241,24 +244,9 @@ MODULE barklem
     RETURN
   end if
 
-  index = locate(bs%neff2,neff2)!minloc(abs(bs%neff2 - neff2), 1)
-  !!CALL Hunt(bs%neff2, neff2, index)
+  index = locate(bs%neff2,neff2)
   findex2 = index + &
           (neff2 - bs%neff2(index))/BARKLEM_DELTA_NEFF
-
-
-  !! STARTS interpolation 2D of the data !!
-  write(*,*) "Warning check the wraping of the 2D"
-  write(*,*) "(1D)Bezier interpolation"
-  write(*,*) "Implemtent 2D convolutional interp.."
-
-  ! cubicconvol(N1,N2,y,xi,yi), or interp2(x1,x2,y,xi,yi)
-  ! with xi/yi = findex1/findex2 for cubicconvol
-  ! and neff1/neff2 with interp2d
-
-  !testcc = &
-  !     cubeconvol(bs%N1,bs%N2,bs%cross,findex1,findex2)
-  !write(*,*) "cubicconvol = ", testcc
 
   atom%lines(kr)%cvdWaals(1) = &
     interp2D(bs%neff1,bs%neff2,bs%cross,neff1,neff2)
@@ -282,7 +270,6 @@ MODULE barklem
 !c = 396.000000, a = 0.283000
 !c_i = 407.162966, a_i = 0.271340
 
-  !! END interpolation 2D of the data !!
 
   reducemass = AMU/(1.0/atomic_weights(1) + &
             1./atom%weight)

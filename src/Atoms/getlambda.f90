@@ -1,4 +1,6 @@
 MODULE getlambda
+! Adapted from RH H. Uitenbroek
+
  ! --- Construct a wavelength grid that is approximately equidistant
  !in the core (q <= qcore) and equidistant in log(q) in the wings
  !(qcore < q <= qwing).

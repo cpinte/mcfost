@@ -1,6 +1,5 @@
 ! ----------------------------------------------------------------------
-!From RH
-!Author:        Han Uitenbroek (huitenbroek@nso.edu)
+! Adapted from RH H. Uitenbroek
 ! ----------------------------------------------------------------------
 ! --- Reads collisional data from atomic data file and computes
 ! collisional rates. ---
