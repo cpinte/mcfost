@@ -140,7 +140,7 @@ MODULE AtomicTransfer
 
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     CALL Background(id, icell, x0, y0, z0, u, v, w) !x,y,z,u,v,w 
+     CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
      ! Epaisseur optique
@@ -176,7 +176,7 @@ MODULE AtomicTransfer
 
      ! Define PSI Operators here
 
-     ! set opacities to 0.0 for next cell point.
+     ! set opacities to 0.0 for next cell point, for the thread id.
      CALL initAS(id, re_init=.true.)
     end if  ! lcellule_non_vide
   end do infinie
@@ -386,13 +386,13 @@ npix_x = 101; npix_y = 101
   ! --------------------------
   ! Ajout Flux etoile
   ! --------------------------
-!   do i = 1, NLTEspec%Nwaves
-!    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
-! !    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
-! !       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-!    NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
-!    NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
-!   end do
+  do i = 1, NLTEspec%Nwaves
+   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
+!    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
+!       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
+   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1)
+   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1)
+  end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -440,7 +440,7 @@ npix_x = 101; npix_y = 101
    nHtot = 2d21 * densite_gaz/MAXVAL(densite_gaz)
    !nHtot =  1d6 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
    Ttmp = Tdust * 50d0 !100d0, depends on the stellar flux
-   netmp = 1d-4 * nHtot
+   netmp = 1d-2 * nHtot
 !    nHtot = 1.7d15
 !    Ttmp = 9.400000d03
 !    netmp = 3.831726d15
@@ -488,10 +488,12 @@ npix_x = 101; npix_y = 101
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0, .false., .true.)
   re_init = .false. !first allocation it is done by setting re_init = .false.
-  !when re_init is .false., table for opacities are allocated for all wavelengths.
-  ! when it is .true., opacities are set to zero for next points.
+  !when re_init is .false., table for opacities are allocated for all wavelengths and
+  !all threads.
+  ! when it is .true., opacities are set to zero for next points, for a specific thread.
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  CALL initAS(0, re_init)
+  CALL initAS(0, re_init) !zero because when re_init=.false. it is independent of the
+  ! threads. 0 ensures that an error occurs if the allocation is thread-dependent.
   !Compute LTE populations for all atoms, nstar. Open collision file for active atoms
   ! compute nHmin density from neutral hydrogen density (sum over neutral levels)
   Call setLTEcoefficients ()

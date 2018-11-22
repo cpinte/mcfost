@@ -150,7 +150,7 @@ MODULE metal
  END FUNCTION Metal_bf
 
 
- FUNCTION Metal_bb (icell,x,y,z,u,v,w,chi, eta, chip) result(res)
+ FUNCTION Metal_bb (icell,x,y,z,x1,y1,z1,u,v,w,chi, eta, chip) result(res)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
   ! not treated in NLTE.
@@ -163,8 +163,8 @@ MODULE metal
   logical :: res
   integer :: kr, m, nc, i, j, NrecStokes
   integer, intent(in) :: icell
-  double precision, intent(in) :: x,y,z,u,v,w !positions and angles used to project
-                                              ! velocity field and magnetic field
+  double precision, intent(in) :: x,y,z,u,v,w,& !positions and angles used to project
+                                  x1,y1,z1      ! velocity field and magnetic field
   integer, dimension(:), allocatable :: iLam
   double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
@@ -186,8 +186,10 @@ MODULE metal
 
   ! v_proj in m/s at point icell
   v0 = 0d0
-  !if (atmos%moving) v0 = v_proj(icell,x,y,z,u,v,w)
-
+  !if (atmos%moving) then !note so easy beware, check local_line_prof in optical_depth.f90
+  !v0 = v_proj(icell,x,y,z,u,v,w)
+  !end if
+  
   if (atmos%magnetized) then
    write(*,*) "Passive bound-bound Zeeman transitions", &
      " not implemented yet!"
@@ -275,10 +277,10 @@ MODULE metal
 
  END FUNCTION Metal_bb
 
- SUBROUTINE Background(id,icell,x,y,z,u,v,w)
+ SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w)
   integer, intent(in) :: icell, id
-  double precision, intent(in) :: &
-              x, y, z, u, v, w!only relevant for b-b when vector fields are present
+  double precision, intent(in) :: x, y, z, u, v, w, &
+                                  x1, y1, z1!only relevant for b-b when vector fields are present
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, Bpnu, chip
   integer :: Npassive
 
@@ -349,7 +351,7 @@ MODULE metal
 
    Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
    if (Npassive > 0) then !go into it even if only H is passive
-    if (Metal_bb(icell, x, y, z, u, v, w, chi, eta, chip)) then
+    if (Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, chi, eta, chip)) then
      NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
      NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
     end if
