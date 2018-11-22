@@ -115,10 +115,13 @@ CONTAINS
   RETURN
   END SUBROUTINE freeSpectrum
 
-  SUBROUTINE initAS(re_init)
-    ! allocate arrays for re_init = .False.
+  SUBROUTINE initAS(id, re_init)
+    ! allocate arrays for re_init == FALSE
     ! if re_init is .true. only set opac arrays to 0 for next cell point.
+    ! when re_init is FALSE, opacities for all threads are initialised
+    ! so that initAS becomes independent on id
     logical, intent(in) :: re_init
+    integer, intent(in) :: id
     integer :: Nproc, Nsize !, Nsize2
     
     Nsize = NLTEspec%Nwaves
@@ -126,7 +129,7 @@ CONTAINS
     !if mag field, Nsize=4*Nsize
      ! Nsize2 = 3*Nsize
    ! first time allocate space on the wavelength grid
-   if (.not.re_init) then
+   if (.not.re_init) then !set to 0d0 for all threads
     !if (NLTEspec%Nact.gt.0) then
      allocate(NLTEspec%Activeset%chi(Nproc,Nsize))
     ! if mag field allocate(NLTEspec%Activesets%chip(Nproc,Nsize))
@@ -153,18 +156,18 @@ CONTAINS
     NLTEspec%Jc = 0.0
 
    else
-    !reset for next cell points
+    !reset for next cell points but only for a specific thread id
     !if (NLTEspec%Nact.gt.0) then
-     NLTEspec%Activeset%chi = 0.
-     NLTEspec%Activeset%eta = 0.
+     NLTEspec%Activeset%chi(id,:) = 0.
+     NLTEspec%Activeset%eta(id,:) = 0.
     !end if
-    NLTEspec%Activeset%chi_c = 0.
-    NLTEspec%Activeset%eta_c = 0.
-    NLTEspec%Activeset%sca_c = 0.
-    NLTEspec%Activeset%chi_c_bf = 0.
-    NLTEspec%Activeset%eta_c_bf = 0.
-    NLTEspec%J = 0.0
-    NLTEspec%Jc = 0.0
+    NLTEspec%Activeset%chi_c(id,:) = 0.
+    NLTEspec%Activeset%eta_c(id,:) = 0.
+    NLTEspec%Activeset%sca_c(id,:) = 0.
+    NLTEspec%Activeset%chi_c_bf(id,:) = 0.
+    NLTEspec%Activeset%eta_c_bf(id,:) = 0.
+    NLTEspec%J(id,:) = 0.0
+    NLTEspec%Jc(id,:) = 0.0
    end if
    
   RETURN

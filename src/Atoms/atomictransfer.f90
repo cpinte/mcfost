@@ -74,7 +74,7 @@ MODULE AtomicTransfer
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau2
   double precision, dimension(NLTEspec%Nwaves) :: tau_c
   double precision, dimension(NLTEspec%Nwaves) :: dtau_c, Snu_c
-  integer :: nbr_cell, icell, next_cell, previous_cell, ttestt
+  integer :: nbr_cell, icell, next_cell, previous_cell
   double precision :: facteur_tau
   logical :: lcellule_non_vide
 
@@ -160,13 +160,6 @@ MODULE AtomicTransfer
      Snu_c = (NLTEspec%ActiveSet%eta_c_bf(id,:) + & 
             NLTEspec%ActiveSet%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%ActiveSet%chi_c_bf(id,:)
 
-     do ttestt=1,NLTEspec%Nwaves
-      if ((Snu(ttestt) /= Snu(ttestt)).or.(Snu(ttestt)+1 == Snu(ttestt))) &
-       !write(*,*) icell, id, NLTEspec%lambda(ttestt), Snu(ttestt), NLTEspec%ActiveSet%chi_c(id,ttestt)
-       Snu = 0d0
-       Snu_C = 0d0
-     end do
-     
      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-tau) * dtau
@@ -184,7 +177,7 @@ MODULE AtomicTransfer
      ! Define PSI Operators here
 
      ! set opacities to 0.0 for next cell point.
-     CALL initAS(re_init=.true.)
+     CALL initAS(id, re_init=.true.)
     end if  ! lcellule_non_vide
   end do infinie
   !---------------------------------------------!
@@ -498,7 +491,7 @@ npix_x = 101; npix_y = 101
   !when re_init is .false., table for opacities are allocated for all wavelengths.
   ! when it is .true., opacities are set to zero for next points.
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  CALL initAS(re_init)
+  CALL initAS(0, re_init)
   !Compute LTE populations for all atoms, nstar. Open collision file for active atoms
   ! compute nHmin density from neutral hydrogen density (sum over neutral levels)
   Call setLTEcoefficients ()

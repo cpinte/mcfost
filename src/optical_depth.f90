@@ -302,7 +302,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
                 !             NLTEspec%ActiveSet%chi_c(id,lambda)
       opacite = opacite / AU_to_m !because l_contrib is in AU ?
       if ((opacite /= opacite).or.(opacite+1==opacite)) write(*,*) lambda, icell0, opacite
-      CALL initAS(.true.) !set opac to zero for next icell.
+      CALL initAS(id, .true.) !set opac to zero for next icell.
      end if
      ! ------------------------------------------------------------------ !
 
