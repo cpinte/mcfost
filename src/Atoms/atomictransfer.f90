@@ -125,7 +125,7 @@ MODULE AtomicTransfer
 
     if (lcellule_non_vide) then
      ! opacities in m^-1
-     l_contrib = l_contrib * AU_to_m
+     l_contrib = l_contrib * AU_to_m !l_contrib in AU
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m ! fabs(s(k+1)-s(k)) along a ray ??
      ! a quoi il sert lui ?
         
@@ -194,7 +194,7 @@ MODULE AtomicTransfer
    double precision, intent(in) :: pixelsize,u,v,w
    integer, parameter :: maxSubPixels = 32
    double precision :: x0,y0,z0,u0,v0,w0
-   double precision, dimension(NLTEspec%Nwaves) :: Iold, nuHz, I0, I0c
+   double precision, dimension(NLTEspec%Nwaves) :: Iold, nu, I0, I0c
    double precision, dimension(3) :: sdx, sdy
    double precision:: npix2, diff
    double precision, parameter :: precision = 1.e-2
@@ -278,10 +278,10 @@ MODULE AtomicTransfer
   !Prise en compte de la surface du pixel (en sr)
   !correction en D**2, en AU, 'cause pixelsize is in AU
   !distance = Rmax  ! (AU) je me mets au bord du modèle.
-  nuHz = 1d0 !c_light / NLTEspec%lambda * 1d9 !s^-1 !to get W/m2 instead of W/m2/Hz
+  nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !s^-1 !to get W/m2 instead of W/m2/Hz !in Hz
   ! Flux out of a pixel in W/m2/Hz
-  I0 = nuHz * I0 * (pixelsize / (distance*pc_to_AU) )**2
-  I0c = nuHz * I0c * (pixelsize / (distance*pc_to_AU) )**2
+  I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
+  I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
   
   ! adding to the total flux map.
   NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = NLTEspec%Flux(:,ipix,jpix,ibin,iaz) + I0
@@ -300,7 +300,7 @@ MODULE AtomicTransfer
 
   double precision, dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   double precision, dimension(3,nb_proc) :: pixelcorner
-  double precision:: taille_pix, nuHz
+  double precision:: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36
@@ -389,14 +389,14 @@ npix_x = 101; npix_y = 101
   ! --------------------------
   write(*,*) " --> adding stellar flux map..."
   do i = 1, NLTEspec%Nwaves
-   nuHz = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nuHz = 1d0
-                                             !else it means that in FLUX_PIXEL_LINE, nuHz
+   nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+                                             !else it means that in FLUX_PIXEL_LINE, nu
                                              !is 1d0 (to have flux in W/m2/Hz)
    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
 !    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
 !       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nuHz
-   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nuHz
+   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
   end do
 
  RETURN
@@ -426,6 +426,8 @@ npix_x = 101; npix_y = 101
                                    ! is .false.
   character(len=7) :: NE0 = "NEMODEL"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !because for now lemission_atom is not a case of readparameters
+if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
 
   atmos%Nrays = Nrays
@@ -442,10 +444,10 @@ npix_x = 101; npix_y = 101
   
 !! -------------------------------------------------------- !!
   
-   nHtot = 2d21 * densite_gaz/MAXVAL(densite_gaz)
+   nHtot = 1d15 * densite_gaz/MAXVAL(densite_gaz)
    !nHtot =  1d6 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
    Ttmp = Tdust * 100d0 !100d0, depends on the stellar flux
-   netmp = 1d-2 * nHtot
+   netmp = 1d-3 * nHtot
 !    nHtot = 1.7d15
 !    Ttmp = 9.400000d03
 !    netmp = 3.831726d15
@@ -458,7 +460,12 @@ npix_x = 101; npix_y = 101
 !   nHtot = 8.8304d15
 !   Ttmp = 1.452000d4
 !   netmp = 6.137226d16
-!  
+! 
+  !!!! Deep photosphere
+   Ttmp = 9.4d3
+   nHtot = 1.29d17 * 1d6
+   netmp = 3.8d15 * 1d6
+
   ! more or less the same role as init_molecular_disk
   CALL init_atomic_atmos(n_cells, Ttmp, netmp, nHtot)
  
