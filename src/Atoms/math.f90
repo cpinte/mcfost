@@ -6,14 +6,14 @@ MODULE math
   CONTAINS
 
    FUNCTION SQ(x) result(y)
-    real(8) :: x, y
+    double precision :: x, y
     y = x*x
    RETURN
    END FUNCTION SQ
 
 
    FUNCTION CUBE(x) result(y)
-    real(8) :: x, y
+    double precision :: x, y
     y = x*x*x
    RETURN
    END FUNCTION CUBE
@@ -47,6 +47,23 @@ MODULE math
 
    RETURN
    END FUNCTION dPOW
+   
+   
+   FUNCTION aSQ(x) result(y)
+    double precision, dimension(:) :: x
+    double precision, dimension(size(x)) :: y
+    y = x*x
+   RETURN
+   END FUNCTION aSQ
+
+
+   FUNCTION aCUBE(x) result(y)
+    double precision, dimension(:) :: x
+    double precision, dimension(size(x)) :: y
+    y = x*x*x
+   RETURN
+   END FUNCTION aCUBE
+
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! The following three functions will be removed in the futur
