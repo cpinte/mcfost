@@ -47,65 +47,6 @@ MODULE math
 
    RETURN
    END FUNCTION dPOW
-   
-   
-   FUNCTION aSQ(x) result(y)
-    double precision, dimension(:) :: x
-    double precision, dimension(size(x)) :: y
-    y = x*x
-   RETURN
-   END FUNCTION aSQ
-
-
-   FUNCTION aCUBE(x) result(y)
-    double precision, dimension(:) :: x
-    double precision, dimension(size(x)) :: y
-    y = x*x*x
-   RETURN
-   END FUNCTION aCUBE
-
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! The following three functions will be removed in the futur
-   FUNCTION dPOWarr(N, x,a) result(y)
-    ! ------------------------------
-    ! double precision pow function
-    ! ------------------------------
-    integer :: N
-    double precision :: x(N), a
-    double precision, dimension(N) :: y
-    integer :: la
-
-    do la=1,N
-     y(la) = dPOW(x(la),a)
-    end do
-
-   RETURN
-   END FUNCTION dPOWarr
-   FUNCTION SQarr(N, x) result(y)
-    integer :: N
-    double precision, dimension(N) :: x
-    double precision :: y(N)
-    integer :: la
-
-    do la=1,N
-     y(la) = SQ(x(la))
-    end do
-    return
-   END FUNCTION SQarr
-   FUNCTION CUBEarr(N, x) result(y)
-    integer :: N
-    real(8), dimension(N) :: x
-    integer :: la
-    real(8), dimension(N) :: y
-
-    do la=1, N
-     y(la) = CUBE(x(la))
-    end do
-   RETURN
-   END FUNCTION CUBEarr
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
   FUNCTION E1 (x) result (y)
    !First exponential integral
@@ -487,26 +428,6 @@ MODULE math
   RETURN
   END FUNCTION
 
-
-
-
- SUBROUTINE SolveLinearEq(N, A, b, improve_sol)
- ! -----------------------------------------------------------
- ! Solves for a linear system equation from a squared matrix !
- ! the system to solve is Ax=b for instance A=A(Nlevel, Nlevel)
- ! and b(Nlevel) the population of each level.
- ! -----------------------------------------------------------
-  integer, intent(in) :: N
-  integer :: index(N), error, i, j
-  double precision, intent(inout) :: A(N,N), b(N)
-  logical, intent(in) :: improve_sol
-  double precision :: A_copy(N,N), b_copy(N), residual(N), d
-
-
-
-
- RETURN
- END SUBROUTINE
 
   ! 3j, 6j and 9j symbols
   ! From A. A Ramos, Hazel

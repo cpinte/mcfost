@@ -31,7 +31,7 @@ MODULE hydrogen_opacities
  use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use spectrum_type, only : NLTEspec
- use math, only : SQ, dpow, CUBE, bezier3_interp, interp2Darr, dPowarr
+ use math, only : bezier3_interp, interp2Darr
 
  IMPLICIT NONE
 
@@ -46,9 +46,9 @@ MODULE hydrogen_opacities
   double precision :: n_eff, GII(Nl)
   double precision :: u(Nl), n23
 
-  n23 = dpow(n_eff,-6.6666666666667d-1) !n^-2/3
+  n23 = n_eff**(-6.6666666666667d-1) !n^-2/3
 
-  GII = 1.+0.1728 * n23 * dpowarr(size(u), u+1,-6.6666666666667d-1) * &
+  GII = 1.+0.1728 * n23 * ((u+1)**(-6.6666666666667d-1)) * &
       (u-1) - 0.0496*n23*n23 * (u*u + 4./3. * u + 1) !+...
 
   if (MAXVAL(GII).gt.2.) then
@@ -69,8 +69,8 @@ MODULE hydrogen_opacities
   double precision :: charge, T
 
   x = ((HPLANCK * CLIGHT)/(lambda * NM_TO_M)) / &
-       (E_RYDBERG * SQ(charge))
-  x3 = dpowarr(size(x), x, 3.3333333d-1)
+       (E_RYDBERG * (charge)**(2d0))
+  x3 = (x**(3.3333333d-1))
   y  = (2.0 * lambda * NM_TO_M * KBOLTZMANN*T) / &
        (HPLANCK*CLIGHT)
 
@@ -115,11 +115,11 @@ MODULE hydrogen_opacities
    g_bf = 0d0
    sigma = 0d0
 
-  twohc = (2.*HPLANCK * CLIGHT) / CUBE(NM_TO_M)
+  twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
-          dpow(HPLANCK,3d0) / (CLIGHT * &
-          SQ(M_ELECTRON*Q_ELECTRON))
+          (HPLANCK**(3d0)) / (CLIGHT * &
+          (M_ELECTRON*Q_ELECTRON)**(2d0))
 
 
 
@@ -233,8 +233,8 @@ MODULE hydrogen_opacities
   e0cgs = 4.80320427/(1d10) !Fr (ESU, Gaussian)
   KBcgs = 1.3806504/(1d16) !erg/K
   sigma0 = dsqrt(32.*PI) / (3.*dsqrt(3d0)) * &
-    SQ(CUBE(e0cgs)) / (1d2*CLIGHT*1d7 * HPLANCK*dsqrt(KBcgs*&
-      CUBE(1d3*M_ELECTRON))) !cm^5 K^1/2 Hz^3
+    ((e0cgs)**(6d0)) / (1d2*CLIGHT*1d7 * HPLANCK*dsqrt(KBcgs*&
+      (1d3*M_ELECTRON)**(3d0))) !cm^5 K^1/2 Hz^3
   ! = 3.6923284d8 ! cm^5 K^1/2 Hz^3
   nu3 = (NLTEspec%lambda*NM_TO_M/CLIGHT)**3 !inverse of nu3=1/nu3
   hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*NLTEspec%lambda)

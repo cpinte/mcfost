@@ -13,7 +13,7 @@ MODULE metal
 
  use atmos_type, only : atmos, Hydrogen, Helium, atmos_parcel
  use constant
- use math, only : CUBE, SQ,  bezier3_interp, interp1D, interp1Darr, SQarr, CUBEarr
+ use math, only : bezier3_interp
  use atom_type
  use spectrum_type, only : NLTEspec, initAtomOpac
  use hydrogen_opacities
@@ -53,7 +53,7 @@ MODULE metal
   res = .true. !always now, return condition tested outside
   obtained_n = .false. !true if the routine to read principal quantum number is fine
 
-  twohc = (2. * HPLANCK * CLIGHT) / CUBE (NM_TO_M)
+  twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
 
    chi = 0.
