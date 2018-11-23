@@ -1,21 +1,21 @@
-! ---------------------------------------------------------
+! ------------------------------------------------------------------- !
+! ------------------------------------------------------------------- !
 ! Module that solves for electron density for given
 ! temperature grid, Hydrogen total populations
 ! elements and their abundance and their LTE or NLTE populations.
 !
 !
-! If ne_fromscratch is true then first guess is computed using pure Hydrogen
-! ionisation (or +Helium)
-! else the value in ne is used as first guess.
-! This allows to iterate the electron density through the NLTE scheme
+! If ne_intial_slution is "NEMODEL" then first guess is computed using 
+! the value stored in atmos%ne as first guess.
+! This allows to iterate the electron density through the NLTE scheme.
 !
 ! See: Hubeny & Mihalas (2014)
 !         "Theory of Stellar Atmospheres",
 !                         from p. 588 to p. 593
 !
 !
-! ---------------------------------------------------------
-
+! ------------------------------------------------------------------- !
+! ------------------------------------------------------------------- !
 
 MODULE solvene
 
@@ -25,36 +25,38 @@ MODULE solvene
  use constant
  use lte
  !use accelerate, only : initNg, freeNg, NgAcceleration
+ 
+ !$ use omp_lib
 
  IMPLICIT NONE
 
- real(8), parameter :: MAX_ELECTRON_ERROR=1e-5
+ double precision, parameter :: MAX_ELECTRON_ERROR=1e-5
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=30
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
 
  CONTAINS
 
- ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
  ! do not forget to use the good value of parition function and potential
  ! parition function read in logarithm and used is 10**(U)
  ! potential in cm-1, converted in the routines in J.
- ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
 
 
  SUBROUTINE ne_Hionisation (k, U0, U1, ne)
- ! ---------------------------------------------------------
- !Application of eq. 4.35 of Hubeny & Mihalas to ionisation
- !of H.
- !Njl = Nj1l * ne * phi_jl
- !ne(H) = NH-1 / (NH * phi_-1l) chi = ionpot0
- !eq. 17.77 and 17.78
- !ne(H) = (sqrt(N*phiH + 1)-1)/phiH
- ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
+  ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+  ! of H.
+  ! Njl = Nj1l * ne * phi_jl
+  ! ne(H) = NH-1 / (NH * phi_-1l) chi = ionpot0
+  ! eq. 17.77 and 17.78
+  ! ne(H) = (sqrt(N*phiH + 1)-1)/phiH
+ ! ----------------------------------------------------------------------!
 
   integer, intent(in) :: k
-  real(8), intent(in) :: U0, U1
-  real(8) :: phiH
-  real(8), intent(out) :: ne
+  double precision, intent(in) :: U0, U1
+  double precision :: phiH
+  double precision, intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ionpot(1))
 
   !ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH)
@@ -64,15 +66,15 @@ MODULE solvene
  END SUBROUTINE ne_Hionisation
 
  SUBROUTINE ne_Metal(k, U0, U1, chi, A, ne)
- ! ---------------------------------------------------------
- !Application of eq. 4.35 of Hubeny & Mihalas to ionisation
- !of a single metal.
- ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
+  ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+  ! of a single metal.
+ ! ----------------------------------------------------------------------!
 
   integer, intent(in) :: k
-  real(8), intent(in) :: U0, U1, chi, A
-  real(8) :: phiM, alphaM
-  real(8), intent(out) :: ne
+  double precision, intent(in) :: U0, U1, chi, A
+  double precision :: phiM, alphaM
+  double precision, intent(out) :: ne
 
   phiM = phi_jl(k, U0, U1, chi)
   alphaM = A ! relative to H, for instance 1.-6 etc
@@ -83,9 +85,14 @@ MODULE solvene
 
 
  FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
+ ! ----------------------------------------------------------------------!
+  ! Interpolate the partition function of Element elem in ionisation stage
+  ! stage at cell point k.
+ ! ----------------------------------------------------------------------!
+
   type(Element) :: elem
   integer, intent(in) :: stage, k
-  real(8) :: Uk
+  double precision :: Uk
 
   Uk = Interp1D(atmos%Tpf,elem%pf(stage,:),atmos%T(k))
        !do not forget that Uk is base 10 logarithm !!
@@ -99,17 +106,19 @@ END FUNCTION getPartitionFunctionk
 
 
  SUBROUTINE getfjk (Elem, ne, k, fjk, dfjk)
- ! ---------------------------------------------------------
- ! fractional population f_j(ne,T)=N_j/N for element Elem
- ! and its partial derivative with ne
- ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
+  ! fractional population f_j(ne,T)=N_j/N for element Elem
+  ! and its partial derivative with ne. If Elem is an element with
+  ! detailed model and if NLTE populations for it exist, their are used
+  ! instead of LTE.
+ ! ----------------------------------------------------------------------!
 
-  real(8), intent(in) :: ne
+  double precision, intent(in) :: ne
   integer, intent(in) :: k
   type (Element), intent(in) :: Elem
   type (AtomType) :: atom
-  real(8), dimension(:), intent(inout) :: fjk, dfjk
-  real(8) :: Uk, Ukp1, sum1, sum2
+  double precision, dimension(:), intent(inout) :: fjk, dfjk
+  double precision :: Uk, Ukp1, sum1, sum2
   logical :: is_active=.false.
   integer :: nll, j, i
 
@@ -125,23 +134,21 @@ END FUNCTION getPartitionFunctionk
 
   if (is_active) then
    atom = Elem%model
-   do j=1,Elem%Nstage
-    fjk(j) = 0.
-    dfjk(j) = 0.
-   end do
-   do i=1,atom%Nlevel
-    fjk(atom%stage(i))=fjk(atom%stage(i))+atom%stage(i)*atom%n(i,k)
-   end do
-   do j=1,Elem%Nstage
-    fjk(j) = fjk(j)/atom%ntotal(k)
-   end do
+   fjk = 0d0
+   dfjk = 0d0
+
+   !For Nlevel, Nlevel stages
+   fjk(atom%stage(:))=fjk(atom%stage(:))+atom%stage(:)*atom%n(:,k)
+   !For Nstage
+   fjk(:) = fjk(:)/atom%ntotal(k)
+
   else !not active, whateveeer, use LTE
    fjk(1)=1.
    dfjk(1)=0.
    sum1 = 1.
    sum2 = 0.
    Uk = getPartitionFunctionk(elem,1,k)
-   do j=2,Elem%Nstage
+   do j=2,Elem%Nstage !-->vectorize ?
     Ukp1 = getPartitionFunctionk(elem,j,k)
     ! fjk(j) = fjk(j-1)/(phi*ne) Saha equation
     ! Nj = Nj-1/(phi*ne)
@@ -155,39 +162,39 @@ END FUNCTION getPartitionFunctionk
     sum2 = sum2 + dfjk(j)
     Uk = Ukp1
    end do
-   do j=1,elem%Nstage
-    fjk(j)=fjk(j)/sum1
-    dfjk(j)=(dfjk(j)-fjk(j)*sum2)/sum1
-    !write(*,*) j, fjk(j), dfjk(j)
-   end do
+   fjk(:)=fjk(:)/sum1
+   dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
   end if
 
  RETURN
  END SUBROUTINE getfjk
 
  SUBROUTINE SolveElectronDensity(ne, ne_initial_solution)
-  ! ---------------------------------------------------------
+ ! ----------------------------------------------------------------------!
   ! Solve for electron density for a set of elements
   ! stored in atmos%Elements. Elements up to N_MAX_ELEMENT are
-  ! used. If an element has also a atomic model, and if for
+  ! used. If an element has also an atomic model, and if for
   ! this element NLTE populations are known these pops are
   ! used to compute the electron density. Otherwise, LTE is used.
-  ! when ne_initial_solution is set to HIONISA, use
+  ! 
+  ! When ne_initial_solution is set to HIONISA, uses
   ! sole hydgrogen ionisation to estimate the initial ne density.
-  ! is set to NPROTON or NEMODEL, protons number or density
-  ! read from the model is used. Note that NPROTON suppose
+  ! If set to NPROTON or NEMODEL, protons number or density
+  ! read from the model are used. Note that NPROTON supposes
   ! that NLTE populations are present for hydrogen, since
   ! nprot = hydrogen%n(Nlevel,:).
   ! If keyword is not set, HIONISATION is used.
-  ! ---------------------------------------------------------
+  !
+  ! TO DO: vectorize it
+ ! ----------------------------------------------------------------------!
 
-  real(8), dimension(atmos%Nspace), intent(inout) :: ne
+  double precision, dimension(atmos%Nspace), intent(inout) :: ne
   character(len=7), optional :: ne_initial_solution
   character(len=7) :: initial
-  real(8) :: error, ne_old, akj, sum, Uk, dne, Ukp1
-  real(8) :: ne_oldM, UkM, PhiHmin
-  real(8), dimension(atmos%Nspace) :: np
-  real(8), dimension(:), allocatable :: fjk, dfjk
+  double precision :: error, ne_old, akj, sum, Uk, dne, Ukp1
+  double precision :: ne_oldM, UkM, PhiHmin
+  double precision, dimension(atmos%Nspace) :: np
+  double precision, dimension(:), allocatable :: fjk, dfjk
   integer :: Nmaxstage=0, n, k, niter, j
 
   if (.not. present(ne_initial_solution)) then
@@ -203,15 +210,26 @@ END FUNCTION getPartitionFunctionk
   allocate(dfjk(Nmaxstage))
 
   !np is the number of protons, by default the last level
-  !of Hydrogen
+  !of Hydrogen.
+  
+  !Note that will raise errors if np is 0d0 because Hydrogen pops are not
+  !known. np is known if:
+  ! 1) NLTE populations from previous run are read
+  ! 2) The routine is called in the NLTE loop meaning that all H levels are known
 
   if (initial.eq."NPROTON") &
      np=Hydrogen%n(Hydrogen%Nlevel,:)
 
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
+  !$omp private(dne, akj) &
+  !$omp shared(atmos, ne,initial,np)
+  
+  !$omp do
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
-   !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
-
+write(*,*) "The thread,",omp_get_thread_num() + 1 ," is doing the cell ", k
    if (initial.eq."NPROTON") then
     ne_old = np(k)
    else if (initial.eq."NEMODEL") then
@@ -274,6 +292,8 @@ END FUNCTION getPartitionFunctionk
     niter = niter + 1
    end do !while loop
   end do !loop over spatial points
+  !$omp end do
+  !$omp end parallel
 
   write(*,*) "maxium electron density (m^-3) =", MAXVAL(atmos%ne), &
             " minimum electron density (m^-3) =", MINVAL(atmos%ne)

@@ -1,6 +1,9 @@
-! ---------------------------------------------------------
-! Various routines to solve for LTE populations
-! ---------------------------------------------------------
+! -------------------------------------------------------------- !
+! -------------------------------------------------------------- !
+   ! Various routines to solve for LTE populations
+! -------------------------------------------------------------- !
+! -------------------------------------------------------------- !
+
 
 MODULE lte
 
@@ -9,29 +12,31 @@ MODULE lte
  use constant
  use math
  use collision, only : CollisionRate, openCollisionFile
+ 
+ !$ use omp_lib
 
  IMPLICIT NONE
 
  CONTAINS
 
  FUNCTION phi_jl(k, Ujl, Uj1l, ionpot) result(phi)
- ! ---------------------------------------------------------
- !Hubeny & Mihalas (2014)
- !"Theory of Stellar Atmospheres", p.  94, eq. 4.35
- !
- !
- !ionisation state j of element l ! (j1=j+1)
- !ionpot = ionpot of ion j of element l (ionpot0l(H) = 13.6 eV)
- !ionpot in J
- !
- !Njl = Nj1l * ne * phi_jl
- !--> SahaEq: Nj1l = Njl / (phi_jl * ne)
- !--> NH- = NH * ne * phi_jl
- !NH = NH+ * ne * phi_jl
- ! ---------------------------------------------------------
+  ! -------------------------------------------------------------- !
+  ! Hubeny & Mihalas (2014)
+  ! "Theory of Stellar Atmospheres", p.  94, eq. 4.35
+  !
+  !
+  ! ionisation state j of element l ! (j1=j+1)
+  ! ionpot = ionpot of ion j of element l (ionpot0l(H) = 13.6 eV)
+  ! ionpot in J
+  !
+  ! Njl = Nj1l * ne * phi_jl
+  ! --> SahaEq: Nj1l = Njl / (phi_jl * ne)
+  ! --> NH- = NH * ne * phi_jl
+  ! NH = NH+ * ne * phi_jl
+  ! -------------------------------------------------------------- !
   integer :: k
-  real(8) :: ionpot, C1, phi
-  real(8) :: Ujl, Uj1l
+  double precision :: ionpot, C1, phi
+  double precision :: Ujl, Uj1l
   C1 = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
   !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
   phi = C1 * (Ujl / Uj1l) * dexp(ionpot/(KBOLTZMANN*atmos%T(k))) / &
@@ -40,25 +45,25 @@ MODULE lte
   END FUNCTION phi_jl
 
   FUNCTION BoltzmannEq9dot1(k, Ei, gi, UI) result(ni_NI)
-  ! ---------------------------------------------------------
-  !Hubeny & Mihalas (2014)
-  !"Theory of Stellar Atmospheres" eq. 9.1
-  !
-  !ni_NI = (gi/UI)*exp(-Ei/kT)
-  !OR
-  ! nipjl/nijl = gipjl/gijl * exp(-(Eip-Ei)/kT)
-  !
-  !Ei = level energy measured from ground state in J
-  !
-  !UI = partition function of stage I (for instance the one of HI)
-  !
-  !gi = statistical weight of level i of atom in stage I
-  !
-  !NI represents the total number density of stage I
-  !ni population of level i belonging to NI
-  ! ---------------------------------------------------------
+  ! -------------------------------------------------------------- !
+   ! Hubeny & Mihalas (2014)
+   ! "Theory of Stellar Atmospheres" eq. 9.1
+   !
+   ! ni_NI = (gi/UI)*exp(-Ei/kT)
+   ! OR
+   ! nipjl/nijl = gipjl/gijl * exp(-(Eip-Ei)/kT)
+   !
+   ! Ei = level energy measured from ground state in J
+   !
+   ! UI = partition function of stage I (for instance the one of HI)
+   !
+   ! gi = statistical weight of level i of atom in stage I
+   !
+   ! NI represents the total number density of stage I
+   ! ni population of level i belonging to NI
+  ! -------------------------------------------------------------- !
 
-   real(8) :: Ei, gi, Ui, ni_NI, kT
+   double precision :: Ei, gi, Ui, ni_NI, kT
    integer :: k
 
    !Ei = Ei * 100.*HPLANCK*CLIGHT
@@ -68,22 +73,22 @@ MODULE lte
   END FUNCTION BoltzmannEq9dot1
 
   FUNCTION BoltzmannEq4dot20b(k, Ei, gi, gi1) result(ni1_ni)
-  ! ---------------------------------------------------------
-  !Hubeny & Mihalas (2014)
-  !"Theory of Stellar Atmospheres" eq. 4.20b
-  !
-  ! nipjl/nijl = gipjl/gijl * exp(-(Eip-Ei)/kT)
-  !
-  !Ei = level energy measured from ground state in J
-  !
-  !
-  !gi = statistical weight of level i of atom in stage I
-  !
-  !ni population of level i belonging to NI
-  ! ---------------------------------------------------------
+  ! -------------------------------------------------------------- !
+   ! Hubeny & Mihalas (2014)
+   ! "Theory of Stellar Atmospheres" eq. 4.20b
+   !
+   ! nipjl/nijl = gipjl/gijl * exp(-(Eip-Ei)/kT)
+   !
+   ! Ei = level energy measured from ground state in J
+   !
+   !
+   ! gi = statistical weight of level i of atom in stage I
+   !
+   ! ni population of level i belonging to NI
+  ! -------------------------------------------------------------- !
 
-  real(8) :: Ei,ni1_ni, kT
-  real(8) ::  gi, gi1
+  double precision :: Ei,ni1_ni, kT
+  double precision ::  gi, gi1
   integer :: k
 
   kT = KBOLTZMANN * atmos%T(k)
@@ -92,19 +97,19 @@ MODULE lte
   END FUNCTION BoltzmannEq4dot20b
 
   FUNCTION SahaEq(k, NI, UI1, UI, chi, ne) result(NI1)
-  ! ---------------------------------------------------------
-  !Hubeny & Mihalas (2014)
-  !"Theory of Stellar Atmospheres" eq. 9.2
-  !(here, the inverse, i.e., NI+1/NI)
+  ! -------------------------------------------------------------- !
+  ! Hubeny & Mihalas (2014)
+  ! "Theory of Stellar Atmospheres" eq. 9.2
+  ! (here, the inverse, i.e., NI+1/NI)
   !
-  !NI1 = NI * 2.*(h**2/(2pimkT))^-1.5 * &
+  ! NI1 = NI * 2.*(h**2/(2pimkT))^-1.5 * &
   !                   UI1_UI * np.exp(-chiI/kT) / ne
-  !NI1 = NI/(ne*phijl)
-  !where NI, NI1 are the total number of particles of an element
-  !in the stage I, I+1
-  ! ---------------------------------------------------------
+  ! NI1 = NI/(ne*phijl)
+  ! where NI, NI1 are the total number of particles of an element
+  ! in the stage I, I+1
+  ! -------------------------------------------------------------- !
    integer :: k
-   real(8) :: NI, UI1, UI, chi, ne, phi, NI1
+   double precision :: NI, UI1, UI, chi, ne, phi, NI1
    phi = phi_jl(k, UI, UI1, chi) ! chi in J
    NI1 = NI/(phi*ne)
   RETURN
@@ -113,15 +118,17 @@ MODULE lte
 
 
  SUBROUTINE LTEpops(atom, debeye)
-  ! ---------------------------------------------------------
-  ! Computes LTE populations of each level of the atom.
-  ! Distributes populations among each level (ni) according
-  ! to the total population (NI) of each stage (I),
-  ! for which a level i belongs (Boltzmann's equation)
-  ! ---------------------------------------------------------
+  ! -------------------------------------------------------------- !
+   ! Computes LTE populations of each level of the atom.
+   ! Distributes populations among each level (ni) according
+   ! to the total population (NI) of each stage (I),
+   ! for which a level i belongs (Boltzmann's equation)
+   !
+   ! TO DO: vectorize it
+  ! -------------------------------------------------------------- !
   type (Atomtype), intent(inout) :: atom
   logical, intent(in) :: debeye
-  real(8) :: dEion, dE, sum, c2, phik
+  double precision :: dEion, dE, sum, c2, phik
   integer :: Z, dZ, k, i, m
   integer, allocatable, dimension(:) :: nDebeye
 
@@ -135,8 +142,8 @@ MODULE lte
   ! dE_ion = -Z*(qel**2 / 4PI*EPS0) / D in J
   ! D = sqrt(EPS0/2qel**2) * sqrt(kT/ne) in m
 
-  !Hubeny & Mihalas (2014)
-  !"Theory of Stellar Atmospheres" p. 244-246
+  ! Hubeny & Mihalas (2014)
+  ! "Theory of Stellar Atmospheres" p. 244-246
 
   if (Debeye) then
    c2 = dsqrt(8.0*PI/KBOLTZMANN) * &
@@ -155,10 +162,14 @@ MODULE lte
    end do
   end if
 
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(k, phik, dEion,i,dZ,nDebeye,dE,m) &
+   !$omp shared(atmos,Hydrogen,c2,atom, Debeye,sum)
+   !$omp do
    do k=1,atmos%Nspace
     if (.not.atmos%lcompute_atomRT(k)) CYCLE
-    !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
-                                                ! cell is free of (significant) gas
+
 
     if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
     sum = 1.
@@ -217,45 +228,50 @@ MODULE lte
     !write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%ntotal(k)/sum
     !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
-    do i=2,atom%Nlevel
-      atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-      !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
-    end do
+!     do i=2,atom%Nlevel
+!       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
+!       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+!     end do
+    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
     if (MAXVAL(atom%nstar) <= 0d0) then
      write(*,*) k, "Error, 0 or negative pops in LTE.f90"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
     end if
-   end do
+   end do !over depth points
+   !$omp end do
+   !$omp  end parallel
     !write(*,*) "-------------------"
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
  END SUBROUTINE LTEpops
 
+ !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>!
+ !--> The following routine is here for learning purpose
  SUBROUTINE LTEpops_element(elem)
-  ! ---------------------------------------------------------
-  ! Obtains the TOTAL LTE populations of each stage (NI)
-  ! for an element. These populations are used
-  ! to compute the population of each level (ni)
-  ! using Boltzmann's equation, gi, gj and Ei, Ej.
-  ! this version is for testing,
-  ! electron density calculations
-  ! and LTE background 2-levels atoms
+  ! -------------------------------------------------------------- !
+   ! Obtains the TOTAL LTE populations of each stage (NI)
+   ! for an element. These populations are used
+   ! to compute the population of each level (ni)
+   ! using Boltzmann's equation, gi, gj and Ei, Ej.
+   ! this version is for testing,
+   ! electron density calculations
+   ! and LTE background 2-levels atoms
 
-  ! At this step, we do not know which two levels atom
-  ! transititions are used, so only total populations
-  ! of each ion is computed. These populations
-  ! can esealy give the population of each level with
-  ! Botlzmann's equation
-  ! ---------------------------------------------------------
+   ! At this step, we do not know which two levels atom
+   ! transititions are used, so only total populations
+   ! of each ion is computed. These populations
+   ! can esealy give the population of each level with
+   ! Botlzmann's equation
+  ! -------------------------------------------------------------- !
 
   type (Element), intent(inout) :: elem
   integer :: j, k
-  real(8), dimension(atmos%Nspace) :: Uk, Ukp1, sum
-  real(8), dimension(atmos%Npf) :: pfel
-  real(8) :: phik
+  double precision, dimension(atmos%Nspace) :: Uk, Ukp1, sum
+  double precision, dimension(atmos%Npf) :: pfel
+  double precision :: phik
 
   pfel = elem%pf(1,:)
 
@@ -310,15 +326,15 @@ MODULE lte
    end do
   end do
 
-
   RETURN
  END SUBROUTINE LTEpops_element
+ !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<!
 
  SUBROUTINE setLTEcoefficients ()
- ! -------------------------------------
- ! For each atom, fills LTE populations and
- ! fill collisional matrix.
- ! -------------------------------------
+  ! -------------------------------------------------------------- !
+   ! For each atom, fills LTE populations and
+   ! fill collisional matrix if it is active.
+  ! -------------------------------------------------------------- !
   integer n, k, j
   logical :: debeye=.true.
   double precision :: PhiHmin
@@ -327,7 +343,7 @@ MODULE lte
   do n=1,atmos%Natom
 
    ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%atoms(n),debeye)
+   CALL LTEpops(atmos%atoms(n),debeye) !it is parralel 
      if (atmos%Atoms(n)%active) then
        allocate(atmos%Atoms(n)%C(atmos%atoms(n)%Nlevel*atmos%atoms(n)%Nlevel))
        !open collision file
@@ -337,10 +353,14 @@ MODULE lte
 
   ! if (.not.chemEquil) then
   atmos%nHmin = 0d0 !init
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp private(k, PhiHmin) &
+  !$omp shared(atmos,Hydrogen)
+  !$omp do
   do k=1, atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
-   !if ((atmos%nHtot(k)==0d0).or.(atmos%T(k)==0d0)) CYCLE ! go to next depth point
-                                                ! cell is free of (significant) gas
+
    PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
    ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
    ! nHmin is proportial to the total number of neutral Hydrogen
@@ -349,18 +369,21 @@ MODULE lte
    ! number density. Remember:
    ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
    ! j = -1 for Hminus (l=element=H)
-   do j=1,Hydrogen%Nlevel - 1
-    atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
-   end do
-   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+!    do j=1,Hydrogen%Nlevel - 1
+!     atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
+!    end do
+!   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+   atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin
    !! comme %n pointe vers %nstar si pureETL (car pointeurs)
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
    !!   ", nHmin(k), np(k)"
    !!write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
    !! atmos%Atoms(1)%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k)
-  end do
-  ! end if
+  end do !over depth points
+  !$omp end do
+  !$omp  end parallel
+  ! end if !if chemical equilibrium
 
  RETURN
  END SUBROUTINE setLTEcoefficients
