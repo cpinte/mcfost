@@ -168,7 +168,7 @@ MODULE metal
   integer, dimension(:), allocatable :: iLam
   double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
-  double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0
+  double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0, v1, dv
   type (AtomicLine) :: line
   type (AtomType) :: atom
 
@@ -186,9 +186,16 @@ MODULE metal
 
   ! v_proj in m/s at point icell
   v0 = 0d0
-  !if (atmos%moving) then !note so easy beware, check local_line_prof in optical_depth.f90
-  !v0 = v_proj(icell,x,y,z,u,v,w)
-  !end if
+!   if (atmos%moving) then !note so easy beware, check local_line_prof in optical_depth.f90
+!    v0 = v_proj(icell,x,y,z,u,v,w)
+!    if (lVoronoi) then ! constant velocity accross cell
+!     
+!     else !velocity is varying accross cell
+!      v1 = v_proj(icell, x1,y1,z1,u,v,w)
+!      dv = dabs(v1-v0)
+!      !velocity between v0 and v1:
+!      
+!   end if !atmos is moving
   
   if (atmos%magnetized) then
    write(*,*) "Passive bound-bound Zeeman transitions", &
