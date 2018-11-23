@@ -5,7 +5,7 @@ MODULE accelerate
   ! acceleration
   !
   
-  use math, only : SolveLinearEq
+  !use some_modules, only : linear_eq_solver ??
 
   IMPLICIT NONE
   
@@ -105,7 +105,7 @@ MODULE accelerate
        end do
      end do
    
-     CALL SolveLinearEq(Ngs%Norder,Ngs%A,Ngs%b, improve_sol)
+     !CALL some_linear_solver(Ngs%Norder,Ngs%A,Ngs%b, improve_sol)
 
      i0 = MOD(Ngs%count -1, Ngs%Norder+2)
      do i=1,Ngs%Norder
