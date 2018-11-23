@@ -1,4 +1,5 @@
-!
+! ----------------------------------------------------------------------------------- !
+! ----------------------------------------------------------------------------------- !
 ! This module solves for the radiative transfer equation by ray-tracing for 
 ! multi-level atoms, using the MALI scheme.
 !
@@ -18,6 +19,9 @@
 ! mol_transfer.f90
 !
 ! Note: SI units, velocity in m/s, density in kg/m3, radius in m
+! ----------------------------------------------------------------------------------- !
+! ----------------------------------------------------------------------------------- !
+
 MODULE AtomicTransfer
 
  use metal, only : Background
@@ -51,6 +55,7 @@ MODULE AtomicTransfer
 
  
  SUBROUTINE INTEG_RAY_LINE(id,icell_in,x,y,z,u,v,w,iray,labs)
+ ! ------------------------------------------------------------------------------- !
   ! This routine performs integration of the transfer equation along a ray
   ! crossing different cells.
   ! --> Atomic Lines case.
@@ -61,6 +66,8 @@ MODULE AtomicTransfer
   ! if atmos%nHtot or atmos%T is 0, the cell is empty
   !
   ! id = processor information, iray = index of the running ray
+ ! ------------------------------------------------------------------------------- !
+
   integer, intent(in) :: id, icell_in, iray
   double precision, intent(in) :: u,v,w
   double precision, intent(in) :: x,y,z
@@ -72,7 +79,7 @@ MODULE AtomicTransfer
   double precision, dimension(NLTEspec%Nwaves) :: dtau_c, Snu_c
   integer :: nbr_cell, icell, next_cell, previous_cell
   double precision :: facteur_tau
-  logical :: lcellule_non_vide
+  logical :: lcellule_non_vide, lsubtract_avg
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -89,8 +96,10 @@ MODULE AtomicTransfer
   NLTEspec%I(id,:,iray) = 0d0
   NLTEspec%Ic(id,:,iray) = 0d0
 
+  ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
-  !---------------------------------------------!
+  ! -------------------------------------------------------------- !
+
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -120,18 +129,10 @@ MODULE AtomicTransfer
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
     if (lcellule_non_vide) then
+     lsubtract_avg = ((nbr_cell == 1).and.labs)
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
-     if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m ! fabs(s(k+1)-s(k)) along a ray ??
-     ! a quoi il sert lui ?
-        
-!bug here ?
-!         atmos_parcel%x = x0
-!         atmos_parcel%y = y0
-!         atmos_parcel%z = z0
-!         atmos_parcel%u = u
-!         atmos_parcel%v = v
-!         atmos_parcel%w = w
+     if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
@@ -140,18 +141,18 @@ MODULE AtomicTransfer
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
      ! Epaisseur optique
-     ! dtau = -chi*ds --> ds < 0 and ds in meter
-     dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)) !scattering + thermal
+     ! chi_p contains both thermal and continuum scattering extinction
+     dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
      dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
 
      ! Source function
      ! No dust yet
      ! J and Jc are the mean radiation field for total and continuum intensities
      ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
-     ! scattering.
-     Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + & !NLTE lines 
-                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & !+(sca_c * (3mu2-1)*J20)
-                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:)) ! LTE+NLTE
+     ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
+     Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
+                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
+                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
      ! continuum source function
      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
@@ -174,14 +175,19 @@ MODULE AtomicTransfer
 
     end if  ! lcellule_non_vide
   end do infinie
-  !---------------------------------------------!
+  ! -------------------------------------------------------------- !
+  ! -------------------------------------------------------------- !
+
   
   RETURN
   END SUBROUTINE INTEG_RAY_LINE
  
   SUBROUTINE FLUX_PIXEL_LINE(&
          id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
-  ! see: mol_transfer.f90/intensite_pixel_mol()
+  ! -------------------------------------------------------------- !
+   ! Computes the flux emerging out of a pixel.
+   ! see: mol_transfer.f90/intensite_pixel_mol()
+  ! -------------------------------------------------------------- !
 
    integer, intent(in) :: ipix,jpix,id, n_iter_min, n_iter_max, ibin, iaz
    double precision, dimension(3), intent(in) :: pixelcorner,dx,dy
@@ -193,7 +199,6 @@ MODULE AtomicTransfer
    double precision:: npix2, diff
    double precision, parameter :: precision = 1.e-2
    integer :: i, j, subpixels, iray, ri, zj, phik, icell, iter
-
    logical :: lintersect, labs
 
    labs = .false.
@@ -242,6 +247,7 @@ MODULE AtomicTransfer
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(id,:,iray)
              I0c = I0c + NLTEspec%Ic(id,:,iray)
+           !else !Outside the grid, no radiation flux
            endif
         end do !j
      end do !i
@@ -269,26 +275,34 @@ MODULE AtomicTransfer
      end if ! iter
      iter = iter + 1
    end do infinie
+   
   !Prise en compte de la surface du pixel (en sr)
-  !correction en D**2, en AU, 'cause pixelsize is in AU
-  !distance = Rmax  ! (AU) je me mets au bord du modèle.
-  nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !s^-1 !to get W/m2 instead of W/m2/Hz !in Hz
+
+  nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !to get W/m2 instead of W/m2/Hz !in Hz
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
   
   ! adding to the total flux map.
-  NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = NLTEspec%Flux(:,ipix,jpix,ibin,iaz) + I0
-  NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) + I0c
+  if (RT_line_method==1) then
+    NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0
+    NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c
+  else
+    NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = NLTEspec%Flux(:,ipix,jpix,ibin,iaz) + I0
+    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) + I0c  
+  end if
 
   RETURN
   END SUBROUTINE FLUX_PIXEL_LINE
   
  SUBROUTINE EMISSION_LINE_MAP(ibin,iaz)
-  ! Line emission map in a given direction n(ibin,iaz).
-  ! if only one pixel it gives the Flux.
+ ! -------------------------------------------------------------- !
+  ! Line emission map in a given direction n(ibin,iaz),
+  ! using ray-tracing.
+  ! if only one pixel it gives the total Flux.
   ! See: emission_line_map in mol_transfer.f90
-  
+ ! -------------------------------------------------------------- !
+ 
   integer, intent(in) :: ibin, iaz !define the direction in which the map is computed
   double precision :: x0,y0,z0,l,u,v,w
 
@@ -303,6 +317,8 @@ MODULE AtomicTransfer
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
   logical :: lresolved = .false.
+real(kind=dp) :: pi = 3.141592653589793238462643383279502884197_dp
+
   
 npix_x = 101; npix_y = 101
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
@@ -334,8 +350,63 @@ npix_x = 101; npix_y = 101
 
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
-  ! presently only squared pixels
+  
+  if (RT_line_method==1) then !log pixels
+    write(*,*) " WARNING: RT_line_method==1 not working correctly with AL-RT"
+    n_iter_min = 1
+    n_iter_max = 1
+    
+    dx(:) = 0.0_dp
+    dy(:) = 0.0_dp
+    i = 1
+    j = 1
+    lresolved = .false.
 
+    rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
+    rmax_RT = 2.0_dp * Rmax
+
+    tab_r(1) = rmin_RT
+    fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
+
+    do ri_RT = 2, n_rad_RT
+      tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
+    enddo
+
+    fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
+
+    ! Boucle sur les rayons d'echantillonnage
+    !$omp parallel &
+    !$omp default(none) &
+    !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
+    !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
+    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,pi) !remove pi
+    id =1 ! pour code sequentiel
+
+    if (l_sym_ima) then
+      cst_phi = pi  / real(n_phi_RT,kind=dp)
+    else
+      cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
+    endif
+
+     !$omp do schedule(dynamic,1)
+     do ri_RT=1, n_rad_RT
+        !$ id = omp_get_thread_num() + 1
+
+        r = tab_r(ri_RT)
+        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+
+        do phi_RT=1,n_phi_RT ! de 0 a pi
+           phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
+
+           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
+            ! C'est le centre en fait car dx = dy = 0.
+           CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
+                      i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+        end do !j
+     end do !i
+     !$omp end do
+     !$omp end parallel  
+  else !method 2  
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      lresolved = .true.
@@ -377,37 +448,41 @@ npix_x = 101; npix_y = 101
      !$omp end do
      !$omp end parallel
      
+  end if
 
-  ! --------------------------
-  ! Ajout Flux etoile
-  ! --------------------------
-!   write(*,*) " --> adding stellar flux map..."
-!   do i = 1, NLTEspec%Nwaves
-!    nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-!                                              !else it means that in FLUX_PIXEL_LINE, nu
-!                                              !is 1d0 (to have flux in W/m2/Hz)
-!    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
+ ! adding the stellar flux
+  write(*,*) " --> adding stellar flux map..."
+  do i = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+                                             !else it means that in FLUX_PIXEL_LINE, nu
+                                             !is 1d0 (to have flux in W/m2/Hz)
+   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
 !    write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(i), & 
 !        MAXVAL(NLTEspec%Flux(i,:,:,ibin,iaz))/MAXVAL(stars_map(:,:,1)), & 
-!        MINVAL(NLTEspec%Flux(i,:,:,ibin,iaz))/MINVAL(stars_map(:,:,1))
-!     NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!     NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!   end do
+!        MINVAL(NLTEspec%Flux(i,:,:,ibin,iaz)),MINVAL(stars_map(:,:,1))
+    NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+    NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+  end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
  
  ! NOTE: should inverse the order of frequencies and depth because in general
  !       n_cells >> n_lambda, in "real" cases.
+ ! npix_x, xpix_y, RT_line_method, constants like pi, lkeplerian etc
+ ! some of shared quantities by the code that i don't know were they are !!
  
  SUBROUTINE Atomic_transfer()
+ ! --------------------------------------------------------------------------- !
   ! This routine initialises the necessary quantities for atomic line transfer
   ! and calls the appropriate routines for LTE or NLTE transfer.
+ ! --------------------------------------------------------------------------- !
+
 #include "sprng_f.h"
 
   integer :: atomunit = 1, nact, nat, la !atoms and wavelength
   integer :: icell !spatial variables
-  integer :: ibin, iaz
+  integer :: ibin, iaz!, RT_line_method
   logical :: labs, lkeplerian
   
   !testing vars to deleted
@@ -419,7 +494,7 @@ npix_x = 101; npix_y = 101
   integer :: IterLimit
   logical :: SOLVE_FOR_NE = .false. !for calculation of electron density even if atmos%calc_ne
                                    ! is .false.
-  character(len=7) :: NE0 = "NEMODEL"
+  character(len=7) :: NE0 = "HIONIS"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !because for now lemission_atom is not a case of readparameters
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
@@ -439,34 +514,15 @@ npix_x = 101; npix_y = 101
   
 !! -------------------------------------------------------- !!
   
-   nHtot = 1d23 *densite_gaz/densite_gaz! * densite_gaz/MAXVAL(densite_gaz)
-   !nHtot =  1d6 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
-   Ttmp = 9000d0*Tdust/Tdust !100d0, depends on the stellar flux
-   netmp = 3.8d21 * densite_gaz/densite_gaz!1d-2 * nHtot
-!    nHtot = 1.7d15
-!    Ttmp = 9.400000d03
-!    netmp = 3.831726d15
-  
-  !!!! Lyman core
-!   nHtot = 2.2770d15
-!   Ttmp = 2.406000d4
-!   netmp = 4.291177d16
-  !!!! Lyman wing
-!   nHtot = 8.8304d15
-!   Ttmp = 1.452000d4
-!   netmp = 6.137226d16
-! 
-  !!!! Deep photosphere
-!   Ttmp = 0d0
-!   nHtot = 0d0
-!   netmp = 0d0
-!    Ttmp(53) = 9.4d3
-!    nHtot(53) = 1.29d17 * 1d6
-!    netmp(53) = 3.8d15 * 1d6
+   !nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
+   nHtot =  1d5 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
+   Ttmp = Tdust * 10d0!100d0, depends on the stellar flux
+   netmp = 1d-3 * nHtot
+
 
   ! more or less the same role as init_molecular_disk
   CALL init_atomic_atmos(n_cells, Ttmp, netmp, nHtot)
- 
+  atmos%moving=.false. !velocity fields not implemented yet
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
   CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
@@ -477,20 +533,6 @@ npix_x = 101; npix_y = 101
 
 !! -------------------------------------------------------- !!
 
-
-  ! if the electron density is not provided by the model or simply want to
-  ! recompute it
-  ! if atmos%ne given, but one want to recompute ne
-  ! else atmos%ne not given, its computation is mandatory
-  if (.not.atmos%calc_ne) atmos%calc_ne = SOLVE_FOR_NE
-  if (SOLVE_FOR_NE) write(*,*) "(Force) Solving for electron density"
-  if (atmos%calc_ne) CALL SolveElectronDensity(atmos%ne,NE0)
-  CALL writeElectron() !will be moved elsewhere
-  ! do it in the reading process
-  CALL writeHydrogenDensity()
-
-
-
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
@@ -498,11 +540,82 @@ npix_x = 101; npix_y = 101
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0, .false., .true.)
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  Call setLTEcoefficients ()
+  
+
+  ! if the electron density is not provided by the model or simply want to
+  ! recompute it
+  ! if atmos%ne given, but one want to recompute ne
+  ! else atmos%ne not given, its computation is mandatory
+  ! if NLTE pops are read in readAtomicModels, H%n(Nlevel,:) and atom%n
+  !can be used for the electron density calculation.
+  if (.not.atmos%calc_ne) atmos%calc_ne = SOLVE_FOR_NE
+  if (SOLVE_FOR_NE) write(*,*) "(Force) Solving for electron density"
+  if (atmos%calc_ne) CALL SolveElectronDensity(atmos%ne,NE0)
+  CALL writeElectron() !will be moved elsewhere
+  ! do it in the reading process
+  CALL writeHydrogenDensity()  
+
+  Call setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
+  CALL synchronize_with_mcfost()
+  ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
+
+  
+!! -------------------------------------------------------- !!
+!! For NLTE do not forget ->
+  !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
+  ! CALL initialSol()
+  ! for now initialSol() is replaced by this if loop on active atoms
+  if (atmos%Nactiveatoms.gt.0) then
+    write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
+    do nact=1,atmos%Nactiveatoms
+     write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ID, &
+      atmos%ActiveAtoms(nact)%active
+     atmos%ActiveAtoms(nact)%n = 1d0 * atmos%ActiveAtoms(nact)%nstar
+    end do
+  end if !end replacing initSol()
+!   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
+!   ! Initialize at C=0.0 for each cell points.
+!   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open 
+!   ! before the transfer starts and closed at the end.
+!   do nact=1,atmos%Nactiveatoms 
+!     if (atmos%ActiveAtoms(nact)%active) then
+!      CALL CollisionRate(icell, atmos%ActiveAtoms(nact)) 
+!      CALL initGamma(icell, atmos%ActiveAtoms(nact)) !set Gamma to C for each active atom
+!       !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
+!       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
+!      end if
+!   end do
+! 
+!! -------------------------------------------------------- !!
+
+
+!  CALL ContributionFunction()
+
+  write(*,*) "Computing emission flux map..."
+  do ibin=1,RT_n_incl
+     do iaz=1,RT_n_az
+       CALL EMISSION_LINE_MAP(ibin,iaz)
+     end do
+  end do
+  CALL WRITE_FLUX()
+
+ ! Transfer ends, save data, free some space and leave
+ do nact=1,atmos%Nactiveatoms
+  CALL closeCollisionFile(atmos%ActiveAtoms(nact)) !if opened
+ end do
+ CALL freeSpectrum() !deallocate spectral variables
+ CALL free_atomic_atmos()  
+ deallocate(ds)
+
+ RETURN
+ END SUBROUTINE
+ 
+ SUBROUTINE synchronize_with_mcfost()
   !--> should move them to init_atomic_atmos ? or elsewhere
-  !need to be deallocated at the end of molecule RT or its okey ?
+  !need to be deallocated at the end of molecule RT or its okey ?`
+  integer :: icell, la
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
@@ -550,354 +663,134 @@ npix_x = 101; npix_y = 101
                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
         enddo
      endif
-  endif
-  ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
-
-  
-!! -------------------------------------------------------- !!
-!! For NLTE do not forget ->
-  !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
-  ! CALL initialSol()
-  ! for now initialSol() is replaced by this if loop on active atoms
-  if (atmos%Nactiveatoms.gt.0) then
-    write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
-    do nact=1,atmos%Nactiveatoms
-     write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ID, &
-      atmos%ActiveAtoms(nact)%active
-     atmos%ActiveAtoms(nact)%n = 1d0 * atmos%ActiveAtoms(nact)%nstar
-    end do
-  end if !end replacing initSol()
-!   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
-!   ! Initialize at C=0.0 for each cell points.
-!   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open 
-!   ! before the transfer starts and closed at the end.
-!   do nact=1,atmos%Nactiveatoms 
-!     if (atmos%ActiveAtoms(nact)%active) &
-!      CALL CollisionRate(icell, atmos%ActiveAtoms(nact)) 
-!   end do
-! 
-!! -------------------------------------------------------- !!
-
-
-!  CALL ContributionFunction()
-
-  write(*,*) "Computing emission flux map..."
-  do ibin=1,RT_n_incl
-     do iaz=1,RT_n_az
-       CALL EMISSION_LINE_MAP(ibin,iaz)
-     end do
-  end do
-  CALL WRITE_FLUX()
-
- ! Transfer ends, save data, free some space and leave
- do nact=1,atmos%Nactiveatoms
-  CALL closeCollisionFile(atmos%ActiveAtoms(nact)) !if opened
- end do
- CALL freeSpectrum() !deallocate spectral variables
- CALL free_atomic_atmos()  
- deallocate(ds)
-
+  endif 
+ 
  RETURN
- END SUBROUTINE
+ END SUBROUTINE synchronize_with_mcfost
 
- SUBROUTINE WRITE_FLUX()
-
-  character(len=512) :: filename !in case
-
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter
-  logical :: simple, extend
-  !integer :: a,b,c,d=1,e=1, idL
-  real :: pixel_scale_x, pixel_scale_y 
-npix_x = 101; npix_y = 101
-  write(*,*) "Writing Flux-map"
-   !  Get an unused Logical Unit Number to use to open the FITS file.
-   status=0
-   CALL ftgiou (unit,status)
-
-   !  Create the new empty FITS file.
-   blocksize=1
-   CALL ftinit(unit,trim(FLUX_FILE),blocksize,status)
-
-   simple=.true.
-   extend=.true.
-   group=1
-   fpixel=1
-
-   !------------------------------------------------------------------------------
-   ! FLUX map
-   !------------------------------------------------------------------------------
-   bitpix=-64
-   naxis=5
-   !only squared pixels for now
-!      if (RT_line_method==1) then
-!         naxes(2)=1
-!         naxes(3)=1
-!      else
-   naxes(1)=NLTEspec%Nwaves!1!1 if only one wavelength
-   naxes(2)=npix_x
-   naxes(3)=npix_y
-!     endif
-   naxes(4)=RT_n_incl
-   naxes(5)=RT_n_az
-   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-  ! write(*,*) (naxes(i), i=1,naxis)
-
-  !  Write the required header keywords.
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-!   !!RAC, DEC, reference pixel & pixel scale en degres
+!  SUBROUTINE WRITE_FLUX()
+!  ! -------------------------------------------------- !
+!   ! Write the spectral Flux map on disk.
+!   ! FLUX map:
+!   ! NLTEspec%Flux total and NLTEspec%Flux continuum
+!  ! --------------------------------------------------- !
+!   character(len=512) :: filename !in case
+! 
+!   integer :: status,unit,blocksize,bitpix,naxis
+!   integer, dimension(5) :: naxes
+!   integer :: group,fpixel,nelements, i, xcenter
+!   logical :: simple, extend
+!   !integer :: a,b,c,d=1,e=1, idL
+!   real :: pixel_scale_x, pixel_scale_y 
+!   integer :: RT_line_method = 2
+! npix_x = 101; npix_y = 101
+!   write(*,*) "Writing Flux-map"
+!    !  Get an unused Logical Unit Number to use to open the FITS file.
+!    status=0
+!    CALL ftgiou (unit,status)
+! 
+!    !  Create the new empty FITS file.
+!    blocksize=1
+!    CALL ftinit(unit,trim(FLUX_FILE),blocksize,status)
+! 
+!    simple=.true.
+!    extend=.true.
+!    group=1
+!    fpixel=1
+! 
+!    bitpix=-64
+!    naxis=5
+!    naxes(1)=NLTEspec%Nwaves!1!1 if only one wavelength
+! 
+!    if (RT_line_method==1) then
+!      naxes(2)=1
+!      naxes(3)=1
+!    else
+!      naxes(2)=npix_x
+!      naxes(3)=npix_y
+!    endif
+!    naxes(4)=RT_n_incl
+!    naxes(5)=RT_n_az
+!    nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+!   ! write(*,*) (naxes(i), i=1,naxis)
+! 
+!   !  Write the required header keywords.
+!   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 
+!    !!RAC, DEC, reference pixel & pixel scale en degres
 !   CALL ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
 !   CALL ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
 !   CALL ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
 !   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
 !   CALL ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
-! 
+!  
 !   CALL ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
 !   CALL ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
 !   CALL ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
 !   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
 !   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-
-  CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-  
-  if (l_sym_ima) then 
-     !if (RT_line_method==1) then
-     !squared pixels still
-     !else
-        xcenter = npix_x/2 + modulo(npix_x,2)
-        do i=xcenter+1,npix_x
-          NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-          NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-        end do
-     !endif 
-  endif ! l_sym_image
-
-  !  Write the array to the FITS file.
-!   do a=1,NLTEspec%Nwaves
-!   do b=1,npix_x
-!   do c=1,npix_y
-!      if (NLTEspec%Flux(a,b,c,d,e)-1 == NLTEspec%Flux(a,b,c,d,e)) then 
-!       write(*,*) "Infinite"
-!       exit
-!      end if
-!      if (NLTEspec%Flux(a,b,c,d,e) /= NLTEspec%Flux(a,b,c,d,e)) then 
-!       write(*,*) "Nan"
-!       exit
-!      end if
-!   end do
-!   end do
-!   end do
-  !idL = locate(NLTEspec%lambda,121.582d0)!121.568d0)
-  !write(*,*) idL, NLTEspec%lambda(idL)
-  !write(*,*) "max(II)=",MAXVAL(II), " min(II)",MINVAL(II)
-  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
-  
-  ! create new hdu for continuum
-  CALL ftcrhd(unit, status)
-
-  !  Write the required header keywords.
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
-
-
-  !  Close the file and free the unit number.
-  CALL ftclos(unit, status)
-  CALL ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     CALL print_error(status)
-  endif
-
- RETURN
- END SUBROUTINE WRITE_FLUX
- 
-!  SUBROUTINE ContributionFunction()
-!   integer :: icell, iray, id, NrecStokes, nbr_cell, previous_cell, next_cell,icellinf
-!   double precision :: x0, y0, z0, norme, u0, v0, w0, x1, y1, z1
-!   logical :: labs, lcellule_non_vide, lsubtract_avg, lonly_top, lonly_bottom
-!   double precision :: ksi(NLTEspec%Nwaves,atmos%Nspace,atmos%Nrays,1), l
-!                                                            !Replace 1 by 4 if pol.
-!   double precision :: l_contrib, l_void_before, Ic(1,NLTEspec%Nwaves,atmos%Nrays)
-!   double precision, dimension(NLTEspec%Nwaves) :: dtau, dtau_c, tau, tau_c, facteur_tau, Snu, Snu_c
-!   ! for writing                                                        
-!   integer :: status,unit,blocksize,bitpix,naxis
-!   integer, dimension(7) :: naxes
-!   integer :: group,fpixel,nelements, i, xcenter
-!   logical :: simple, extend
-!   character(len=512) :: CNTRB_FILE
-!   CNTRB_FILE = "CNTRB.fits.gz"
 ! 
-!   ! ------------------------------------------ !  
-!   write(*,*) "Computing contribution function(s)..."
+!   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+! 
+!   if (l_sym_ima) then 
+! !      if (RT_line_method==1) then ! what should I do in my case ?
+! !       ! I do not add the two halfs of the spectrum because I compute my spectrum
+! !       ! on lambda and not vel ?
+! !      else
+!       xcenter = npix_x/2 + modulo(npix_x,2)
+! !       if (lkeplerian) then !line profile reversed
+! !        do i=xcenter+1,npix_x
+! !         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+! !         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)       
+! !        end do
+! !       else ! infall
+!        do i=xcenter+1,npix_x
+!         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+!         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+!        end do
+! !       end if !lkeplerian
+! !      endif !RT_line_method
+!   endif ! l_sym_image
+! 
+!   !  Write the array to the FITS file.
+! !   do a=1,NLTEspec%Nwaves
+! !   do b=1,npix_x
+! !   do c=1,npix_y
+! !      if (NLTEspec%Flux(a,b,c,d,e)-1 == NLTEspec%Flux(a,b,c,d,e)) then 
+! !       write(*,*) "Infinite"
+! !       exit
+! !      end if
+! !      if (NLTEspec%Flux(a,b,c,d,e) /= NLTEspec%Flux(a,b,c,d,e)) then 
+! !       write(*,*) "Nan"
+! !       exit
+! !      end if
+! !   end do
+! !   end do
+! !   end do
+!   !idL = locate(NLTEspec%lambda,121.582d0)!121.568d0)
+!   !write(*,*) idL, NLTEspec%lambda(idL)
+!   !write(*,*) "max(II)=",MAXVAL(II), " min(II)",MINVAL(II)
+!   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
 !   
-!   NrecStokes = 1 !up to now
-!   Ic = 0d0
-!   dtau = 0d0
-!   dtau_c = 0d0
-!   tau = 0d0
-!   tau_c = 0d0
-!   nbr_cell = 0
-!   Snu = 0d0
-!   Snu_c = 0d0
-!   id = 1 !sequentiel
-!   do icell=1, n_cells
-!    ! Propagation des rayons
-!    do iray=1, atmos%Nrays
-!     ! Position = milieu de la cellule
-!     x0 = r_grid(icell)
-!     y0 = 0.0_dp
-!     z0 = z_grid(icell)
-! 
-!     norme = sqrt(x0*x0 + y0*y0 + z0*z0)
-!     if (iray==1) then
-!      u0 = x0/norme
-!      v0 = y0/norme
-!      w0 = z0/norme
-!     else
-!      u0 = -x0/norme
-!      v0 = -y0/norme
-!      w0 = -z0/norme
-!     end if
-!     ! Integration le long du rayon
-!     ! Boucle infinie sur les cellules
-!     next_cell = icell
-!     infinie : do ! Boucle infinie
-!      ! Indice de la cellule
-!      icellinf = next_cell
-!      x0=x1 ; y0=y1 ; z0=z1
-!      if (icellinf <= n_cells) then
-!         lcellule_non_vide=.true.
-!      else
-!         lcellule_non_vide=.false.
-!      endif
-!      
-!      ! Test sortie
-!      if (test_exit_grid(icellinf, x0, y0, z0)) then
-!         exit infinie
-!      endif
-! 
-!      nbr_cell = nbr_cell + 1
-! 
-!      ! Calcul longeur de vol et profondeur optique dans la cellule
-!      previous_cell = 0 ! unused, just for Voronoi
-!      call cross_cell(x0,y0,z0, u0,v0,w0,  icellinf, previous_cell, x1,y1,z1, next_cell, &
-!                      l, l_contrib, l_void_before)
-! 
-!      if (lcellule_non_vide) then
-!      lsubtract_avg = ((nbr_cell == 1).and.labs)
-! 
-!       ! opacities in m^-1
-!       l_contrib = l_contrib * AU_to_m
-! 
-! 
-!       CALL Background(1,icellinf, x0, y0, z0, u0, v0, w0)
-!       dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(:)+NLTEspec%ActiveSet%chi(:)) !scattering + thermal
-!       dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(:)
-! 
-!       Snu = (NLTEspec%ActiveSet%eta_c + & 
-!                   NLTEspec%ActiveSet%eta) / &
-!                  (NLTEspec%ActiveSet%chi_c + NLTEspec%ActiveSet%chi)
-!       ! continuum source function
-!       Snu_c = (NLTEspec%ActiveSet%eta_c_bf) / NLTEspec%ActiveSet%chi_c_bf
-! 
-!       Ic(id,:,iray) = Ic(id,:,iray)*dexp(-dtau_c) + Snu_c * dexp(-dtau_c) * dtau_c
-! 
-!       facteur_tau = 1d0
-!       if (lonly_top    .and. z0 < 0.) facteur_tau = 0d0
-!       if (lonly_bottom .and. z0 > 0.) facteur_tau = 0d0
-! 
-!       tau = tau + dtau * facteur_tau
-!       tau_c = tau_c + dtau_c
-! 
-!         ! set opacities to 0.0 for next cell point.
-!         CALL initAS(re_init=.true.)
-!      end if  ! lcellule_non_vide
-!     end do infinie
-!   !---------------------------------------------!    
-!     ksi(:,icell,iray,1) = (Ic(id, :, iray) - Snu)*dexp(-tau)
-!     
-!    end do ! iray
-!   end do ! icell
-!   
-!   ! ------------------------------------------ !
-!   ! Now write them to disk
-!   status=0
-!   CALL ftgiou (unit,status)
-! 
-!   !  Create the new empty FITS file.
-!   blocksize=1
-!   CALL ftinit(unit,trim(CNTRB_FILE),blocksize,status)
-! 
-!   simple=.true.
-!   extend=.false.
-!   if (NrecStokes > 1) extend = .true.
-!   group=1
-!   fpixel=1  
-!   
-!   bitpix=-64
-!   naxes(1)=NLTEspec%Nwaves
-!   if (lVoronoi) then
-!    if (NrecStokes > 1) then 
-!     naxis = 4
-!     naxes(2)=n_cells
-!     naxes(3)=atmos%Nrays
-!     naxes(4)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-!     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-!    else
-!     naxis = 3 !only ksi_I
-!     naxes(2)=n_cells
-!     naxes(3)=atmos%Nrays
-!     nelements=naxes(1)*naxes(2)*naxes(3)
-!    end if
-!   else
-!    if (l3D) then
-!     if (NrecStokes > 1) then 
-!      naxis = 6
-!      naxes(2) = n_rad
-!      naxes(3) = 2*nz
-!      naxes(4) = n_az
-!      naxes(5)=atmos%Nrays
-!      naxes(6)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
-!     else
-!      naxis = 5
-!      naxes(2) = n_rad
-!      naxes(3) = 2*nz
-!      naxes(4) = n_az
-!      naxes(5)=atmos%Nrays
-!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-!     end if
-!   else !not l3D
-!     if (NrecStokes > 1) then 
-!      naxis = 5
-!      naxes(2) = n_rad
-!      naxes(3) = nz
-!      naxes(4)=atmos%Nrays
-!      naxes(5)=NrecStokes !if only Q NrecStokes = 2 for IQ etc
-!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-!     else
-!      naxis = 4
-!      naxes(2) = n_rad
-!      naxes(3) = nz
-!      naxes(4)=atmos%Nrays
-!      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-!     end if
-!   end if !not l3D
-!  end if !end if not Voronoi
-! 
+!   ! create new hdu for continuum
+!   CALL ftcrhd(unit, status)
 ! 
 !   !  Write the required header keywords.
 !   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-!   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.sr-1",'ksi',status)
+!   CALL ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+!   CALL ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+!   CALL ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+!   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+!   CALL ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+!  
+!   CALL ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+!   CALL ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+!   CALL ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+!   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+!   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+!   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+!   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
 ! 
-!   CALL ftpprd(unit,group,fpixel,nelements,ksi(:,:,:,1),status)
-! !   if (NrecStokes > 1) then
-! !    !write other ksi
-! !   end if
 ! 
 !   !  Close the file and free the unit number.
 !   CALL ftclos(unit, status)
@@ -906,8 +799,9 @@ npix_x = 101; npix_y = 101
 !   !  Check for any error, and if so print out error messages
 !   if (status > 0) then
 !      CALL print_error(status)
-!   endif 
+!   endif
+! 
 !  RETURN
-!  END SUBROUTINE ContributionFunction
+!  END SUBROUTINE WRITE_FLUX
 
 END MODULE AtomicTransfer

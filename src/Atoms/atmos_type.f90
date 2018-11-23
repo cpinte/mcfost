@@ -14,6 +14,8 @@ MODULE atmos_type
 
   integer, parameter :: Nelem=99
 
+  ! relative location in mcfost/utils/ specified by the mcfost environnement
+  ! variables.
   character(len=50), parameter :: ABUNDANCE_FILE="/Atoms/abundance.input"
   character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
 

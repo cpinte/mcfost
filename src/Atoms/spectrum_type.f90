@@ -160,7 +160,6 @@ CONTAINS
   SUBROUTINE initAtomOpac(id)
     ! set opacities to 0d0 for thread id
     integer, intent(in) :: id
-    integer :: Nproc, Nsize !, Nsize2
 
     NLTEspec%AtomOpac%chi(id,:) = 0d0
     NLTEspec%AtomOpac%eta(id,:) = 0d0
@@ -174,6 +173,150 @@ CONTAINS
   
   RETURN
   END SUBROUTINE initAtomOpac
+  
+
+ SUBROUTINE WRITE_FLUX()
+ ! -------------------------------------------------- !
+  ! Write the spectral Flux map on disk.
+  ! FLUX map:
+  ! NLTEspec%Flux total and NLTEspec%Flux continuum
+ ! --------------------------------------------------- !
+   
+  use input
+  use parametres
+ 
+  character(len=512) :: filename !in case
+
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(5) :: naxes
+  integer :: group,fpixel,nelements, i, xcenter
+  logical :: simple, extend
+  !integer :: a,b,c,d=1,e=1, idL
+  real :: pixel_scale_x, pixel_scale_y 
+
+npix_x = 101; npix_y = 101
+  write(*,*) "Writing Flux-map"
+  write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
+  if (l_sym_ima) write(*,*) " image is symmetric."
+
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+   status=0
+   CALL ftgiou (unit,status)
+
+   !  Create the new empty FITS file.
+   blocksize=1
+   CALL ftinit(unit,trim(FLUX_FILE),blocksize,status)
+
+   simple=.true.
+   extend=.true.
+   group=1
+   fpixel=1
+
+   bitpix=-64
+   naxis=5
+   naxes(1)=NLTEspec%Nwaves!1!1 if only one wavelength
+
+   if (RT_line_method==1) then
+     naxes(2)=1
+     naxes(3)=1
+   else
+     naxes(2)=npix_x
+     naxes(3)=npix_y
+   endif
+   naxes(4)=RT_n_incl
+   naxes(5)=RT_n_az
+   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+  ! write(*,*) (naxes(i), i=1,naxis)
+
+  !  Write the required header keywords.
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+   !!RAC, DEC, reference pixel & pixel scale en degres
+  CALL ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  CALL ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+  CALL ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  CALL ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+ 
+  CALL ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  CALL ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+  CALL ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+  CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+  CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+
+  if (l_sym_ima) then 
+!      if (RT_line_method==1) then ! what should I do in my case ?
+!       ! I do not add the two halfs of the spectrum because I compute my spectrum
+!       ! on lambda and not vel ?
+!      else
+      xcenter = npix_x/2 + modulo(npix_x,2)
+!       if (lkeplerian) then !line profile reversed
+!        do i=xcenter+1,npix_x
+!         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+!         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)       
+!        end do
+!       else ! infall
+       do i=xcenter+1,npix_x
+        NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+        NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+       end do
+!       end if !lkeplerian
+!      endif !RT_line_method
+  endif ! l_sym_image
+
+  !  Write the array to the FITS file.
+!   do a=1,NLTEspec%Nwaves
+!   do b=1,npix_x
+!   do c=1,npix_y
+!      if (NLTEspec%Flux(a,b,c,d,e)-1 == NLTEspec%Flux(a,b,c,d,e)) then 
+!       write(*,*) "Infinite"
+!       exit
+!      end if
+!      if (NLTEspec%Flux(a,b,c,d,e) /= NLTEspec%Flux(a,b,c,d,e)) then 
+!       write(*,*) "Nan"
+!       exit
+!      end if
+!   end do
+!   end do
+!   end do
+  !idL = locate(NLTEspec%lambda,121.582d0)!121.568d0)
+  !write(*,*) idL, NLTEspec%lambda(idL)
+  !write(*,*) "max(II)=",MAXVAL(II), " min(II)",MINVAL(II)
+  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
+  
+  ! create new hdu for continuum
+  CALL ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  CALL ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  CALL ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+  CALL ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  CALL ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+ 
+  CALL ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  CALL ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+  CALL ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+  CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+  CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
+
+
+  !  Close the file and free the unit number.
+  CALL ftclos(unit, status)
+  CALL ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     CALL print_error(status)
+  endif
+
+ RETURN
+ END SUBROUTINE WRITE_FLUX
   
   SUBROUTINE writeWavelength()
    ! Write wavelength grid build with each transition of each atom
@@ -218,19 +361,6 @@ CONTAINS
    double precision, dimension(:), intent(in) :: lambda_vac
    double precision, dimension(Nlambda) :: lambda_air
    double precision, dimension(Nlambda) :: sqwave, reduction
-!   integer :: la
-!   double precision :: sqwave, reduction
-
-!    do la=0,Nlambda
-!     if (lambda_vac(la).ge.VACUUM_TO_AIR_LIMIT) then
-!      sqwave = 1./(lambda_vac(la)**2)
-!      reduction = 1. + 2.735182e-4 + &
-!             (1.314182 + 2.76249e+4 * sqwave) * sqwave
-!      lambda_air(la) = lambda_vac(la) / reduction
-!     else
-!      lambda_air(la) = lambda_vac(la)
-!     end if
-!    end do
 
    where (lambda_vac.ge.VACUUM_TO_AIR_LIMIT) 
      sqwave = 1./(lambda_vac**2)
@@ -251,20 +381,6 @@ CONTAINS
   double precision, dimension(:), intent(in) :: lambda_air
   double precision, dimension(Nlambda) :: lambda_vac
   double precision, dimension(Nlambda) :: sqwave, increase
-!   integer :: la
-!   double precision :: sqwave, increase
-
-!   do la=0,Nlambda
-!    if (lambda_air(la).ge.AIR_TO_VACUUM_LIMIT) then
-!     sqwave = (1.0e+7 / lambda_air(la))**2
-!     increase = 1.0000834213E+00 + &
-!             2.406030E+06/(1.30E+10 - sqwave) + &
-!             1.5997E+04/(3.89E+09 - sqwave)
-!     lambda_vac(la) = lambda_air(la) * increase
-!    else
-!     lambda_vac(la) = lambda_air(la)
-!    end if
-!   end do
 
    where (lambda_air.ge.AIR_TO_VACUUM_LIMIT)
     sqwave = (1.0e+7 / lambda_air)**2
@@ -278,7 +394,6 @@ CONTAINS
 
   RETURN
   END FUNCTION air2vacuum
-
 
 END MODULE spectrum_type
 
