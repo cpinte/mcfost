@@ -439,9 +439,8 @@ MODULE collision
         sqrt(8.0/(PI*KBOLTZMANN))
 
   ! -- Initialise the collisional matrix at each cell--
-  do ij=1,atom%Nlevel*atom%Nlevel
-    atom%C(ij) = 0.
-  end do
+  atom%C = 0d0
+
 
 
   key="        "
