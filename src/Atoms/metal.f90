@@ -15,7 +15,7 @@ MODULE metal
  use constant
  use math, only : CUBE, SQ,  bezier3_interp, interp1D, interp1Darr, SQarr, CUBEarr
  use atom_type
- use spectrum_type, only : NLTEspec, ActiveSetType, initAS
+ use spectrum_type, only : NLTEspec, initAtomOpac
  use hydrogen_opacities
  use voigtfunctions, only : Voigt
  use broad, only : Damping
@@ -304,32 +304,32 @@ MODULE metal
    chip = 0.
 
 
-   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%ActiveSet%sca_c(id,:) = sca
-   NLTEspec%ActiveSet%sca_c(id,:) =  NLTEspec%ActiveSet%sca_c(id,:) + Thomson(icell)
+   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%sca_c(id,:) = sca
+   NLTEspec%AtomOpac%sca_c(id,:) =  NLTEspec%AtomOpac%sca_c(id,:) + Thomson(icell)
    if (associated(Helium)) then
-    if (Rayleigh(icell, Helium, sca)) NLTEspec%ActiveSet%sca_c(id,:) = &
-          NLTEspec%ActiveSet%sca_c(id,:) + sca
+    if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%sca_c(id,:) = &
+          NLTEspec%AtomOpac%sca_c(id,:) + sca
    end if
 
-   NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%sca_c(id,:)
+   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%sca_c(id,:)
 
    CALL Hydrogen_ff(icell, chi)
-   NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-   NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + chi * Bpnu
+   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+   NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + chi * Bpnu
 
    if (Hminus_bf(icell, chi,eta)) then
-    NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-    NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
+    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+    NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
    end if
 
    CALL Hminus_ff(icell, chi)
-    NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-    NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + chi * Bpnu
+    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+    NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + chi * Bpnu
 
    if (.not.Hydrogen%active) then !passive bound-free
     if (Hydrogen_bf(icell, chi, eta)) then
-     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
+     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
     end if
    end if
 
@@ -339,21 +339,21 @@ MODULE metal
    if (.not.Hydrogen%active) Npassive = Npassive - 1
    if (Npassive>0) then !other metal passive ?
     if (Metal_bf(icell, chi, eta)) then
-     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
+     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
     end if
    end if
 
 
    !keep pure continuum opacities now
-   NLTEspec%ActiveSet%eta_c_bf(id,:) = NLTEspec%ActiveSet%eta_c(id,:)
-   NLTEspec%ActiveSet%chi_c_bf(id,:) = NLTEspec%ActiveSet%chi_c(id,:)
+   NLTEspec%AtomOpac%eta_c(id,:) = NLTEspec%AtomOpac%eta_p(id,:)
+   NLTEspec%AtomOpac%chi_c(id,:) = NLTEspec%AtomOpac%chi_p(id,:)
 
    Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
    if (Npassive > 0) then !go into it even if only H is passive
     if (Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, chi, eta, chip)) then
-     NLTEspec%ActiveSet%chi_c(id,:) = NLTEspec%ActiveSet%chi_c(id,:) + chi
-     NLTEspec%ActiveSet%eta_c(id,:) = NLTEspec%ActiveSet%eta_c(id,:) + eta
+     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
     end if
    end if
 

@@ -47,7 +47,6 @@ MODULE AtomicTransfer
  
  IMPLICIT NONE
 
-
  CONTAINS
 
  
@@ -66,9 +65,6 @@ MODULE AtomicTransfer
   double precision, intent(in) :: u,v,w
   double precision, intent(in) :: x,y,z
   logical, intent(in) :: labs
-
-
-  logical :: re_init ! to reset opac to 0 for next cell point
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: dtau, dtau2, Snu
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau2
@@ -137,7 +133,7 @@ MODULE AtomicTransfer
 !         atmos_parcel%v = v
 !         atmos_parcel%w = w
 
-     CALL initAS(id, re_init=.true.) !set opac to 0 for this cell and thread id
+     CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
@@ -145,25 +141,25 @@ MODULE AtomicTransfer
                                 !at each spatial location.
      ! Epaisseur optique
      ! dtau = -chi*ds --> ds < 0 and ds in meter
-     dtau(:) =  l_contrib * (NLTEspec%ActiveSet%chi_c(id,:)+NLTEspec%ActiveSet%chi(id,:)) !scattering + thermal
-     dtau_c(:) = l_contrib * NLTEspec%ActiveSet%chi_c_bf(id,:)
+     dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)) !scattering + thermal
+     dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
 
      ! Source function
      ! No dust yet
      ! J and Jc are the mean radiation field for total and continuum intensities
      ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
      ! scattering.
-     Snu = (NLTEspec%ActiveSet%eta_c(id,:) + NLTEspec%ActiveSet%eta(id,:) + & !NLTE lines 
-                  NLTEspec%ActiveSet%sca_c(id,:) * NLTEspec%J(id,:)) / & !+(sca_c * (3mu2-1)*J20)
-                 (NLTEspec%ActiveSet%chi_c(id,:) + NLTEspec%ActiveSet%chi(id,:)) ! LTE+NLTE
+     Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + & !NLTE lines 
+                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & !+(sca_c * (3mu2-1)*J20)
+                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:)) ! LTE+NLTE
      ! continuum source function
-     Snu_c = (NLTEspec%ActiveSet%eta_c_bf(id,:) + & 
-            NLTEspec%ActiveSet%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%ActiveSet%chi_c_bf(id,:)
+     Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
+            NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
 
      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-tau) * dtau
-!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + Snu_c * exp(-tau_c) * dtau_c
+!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-dtau) * dtau
+!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + Snu_c * exp(-dtau_c) * dtau_c
 
      ! surface superieure ou inf
      facteur_tau = 1.0
@@ -176,8 +172,6 @@ MODULE AtomicTransfer
 
      ! Define PSI Operators here
 
-!      !set opacities to 0.0 for next cell point, for the thread id.
-!      CALL initAS(id, re_init=.true.)
     end if  ! lcellule_non_vide
   end do infinie
   !---------------------------------------------!
@@ -387,17 +381,18 @@ npix_x = 101; npix_y = 101
   ! --------------------------
   ! Ajout Flux etoile
   ! --------------------------
-  write(*,*) " --> adding stellar flux map..."
-  do i = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-                                             !else it means that in FLUX_PIXEL_LINE, nu
-                                             !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
-!    write(*,*) "Adding the star", NLTEspec%lambda(i), tab_lambda(i)*1000, & 
-!       " maxFstar = ", MAXVAL(stars_map(:,:,1)), MINVAL(stars_map(:,:,1))
-   NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-   NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-  end do
+!   write(*,*) " --> adding stellar flux map..."
+!   do i = 1, NLTEspec%Nwaves
+!    nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+!                                              !else it means that in FLUX_PIXEL_LINE, nu
+!                                              !is 1d0 (to have flux in W/m2/Hz)
+!    CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
+!    write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(i), & 
+!        MAXVAL(NLTEspec%Flux(i,:,:,ibin,iaz))/MAXVAL(stars_map(:,:,1)), & 
+!        MINVAL(NLTEspec%Flux(i,:,:,ibin,iaz))/MINVAL(stars_map(:,:,1))
+!     NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!     NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!   end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -413,7 +408,7 @@ npix_x = 101; npix_y = 101
   integer :: atomunit = 1, nact, nat, la !atoms and wavelength
   integer :: icell !spatial variables
   integer :: ibin, iaz
-  logical :: re_init, labs, lkeplerian
+  logical :: labs, lkeplerian
   
   !testing vars to deleted
   double precision :: Ttmp(n_cells), nHtot(n_cells), v_turb(n_cells), vchar, netmp(n_cells)
@@ -444,10 +439,10 @@ npix_x = 101; npix_y = 101
   
 !! -------------------------------------------------------- !!
   
-   nHtot = 1d15 * densite_gaz/MAXVAL(densite_gaz)
+   nHtot = 1d23 *densite_gaz/densite_gaz! * densite_gaz/MAXVAL(densite_gaz)
    !nHtot =  1d6 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
-   Ttmp = Tdust * 100d0 !100d0, depends on the stellar flux
-   netmp = 1d-3 * nHtot
+   Ttmp = 9000d0*Tdust/Tdust !100d0, depends on the stellar flux
+   netmp = 3.8d21 * densite_gaz/densite_gaz!1d-2 * nHtot
 !    nHtot = 1.7d15
 !    Ttmp = 9.400000d03
 !    netmp = 3.831726d15
@@ -462,9 +457,12 @@ npix_x = 101; npix_y = 101
 !   netmp = 6.137226d16
 ! 
   !!!! Deep photosphere
-   Ttmp = 9.4d3
-   nHtot = 1.29d17 * 1d6
-   netmp = 3.8d15 * 1d6
+!   Ttmp = 0d0
+!   nHtot = 0d0
+!   netmp = 0d0
+!    Ttmp(53) = 9.4d3
+!    nHtot(53) = 1.29d17 * 1d6
+!    netmp(53) = 3.8d15 * 1d6
 
   ! more or less the same role as init_molecular_disk
   CALL init_atomic_atmos(n_cells, Ttmp, netmp, nHtot)
@@ -499,15 +497,7 @@ npix_x = 101; npix_y = 101
   CALL readAtomicModels(atomunit)
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0, .false., .true.)
-  re_init = .false. !first allocation it is done by setting re_init = .false.
-  !when re_init is .false., table for opacities are allocated for all wavelengths and
-  !all threads, and set to 0d0.
-  ! when it is .true., opacities are set to zero for next points, for a specific thread.
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  CALL initAS(0, re_init) !zero because when re_init=.false. it is independent of the
-  ! threads. 0 ensures that an error occurs if the allocation is thread-dependent.
-  !Compute LTE populations for all atoms, nstar. Open collision file for active atoms
-  ! compute nHmin density from neutral hydrogen density (sum over neutral levels)
   Call setLTEcoefficients ()
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
@@ -603,7 +593,6 @@ npix_x = 101; npix_y = 101
  do nact=1,atmos%Nactiveatoms
   CALL closeCollisionFile(atmos%ActiveAtoms(nact)) !if opened
  end do
- CALL freeAS() !deallocate opacity arrays
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()  
  deallocate(ds)

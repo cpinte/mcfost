@@ -19,17 +19,22 @@ MODULE spectrum_type
    ! I(x,y,0,lambda,imu), not used yet
    !character(len=*), parameter :: SPEC_FILE="spectrum.fits.gz"
 
-  ! at all wavelength at a time
-  TYPE ActiveSetType
-   integer, allocatable, dimension(:,:) :: lower_levels, upper_levels
-   double precision, allocatable, dimension(:,:) :: chi, eta, chip, eta_c, chi_c, sca_c, &
-      eta_Q, eta_U, eta_c_bf, chi_c_bf ! *_bf is used for pure continuum opacities.
-               ! Remember, chi_c, eta_c contain all opacities that are LTE (including lines of PASSIVE atoms)
-               ! in case of Zeeman polarisation, chi, eta are 4*Nspace long instead of Nspace
-   type (AtomicLine), allocatable, dimension(:,:) :: art
-   type (AtomicContinuum), allocatable, dimension(:,:) :: crt
-   double precision, allocatable, dimension(:) :: Psi
-  END TYPE ActiveSetType
+  !Like RH, should vanish in the futur
+!   TYPE ActiveSetType
+!    integer, allocatable, dimension(:,:) :: lower_levels, upper_levels
+!    type (AtomicLine), allocatable, dimension(:,:) :: art
+!    type (AtomicContinuum), allocatable, dimension(:,:) :: crt
+!    double precision, allocatable, dimension(:,:) :: Psi !proc and wavelength
+!   END TYPE ActiveSetType
+  
+  TYPE AtomicOpacity
+   !active opacities
+   double precision, allocatable, dimension(:,:) :: chi, eta, rho
+   !passive opacities
+   double precision, allocatable, dimension(:,:) :: rho_p, eta_p, chi_p
+   double precision, allocatable, dimension(:,:) :: eta_c, chi_c, sca_c
+   !type (ActiveSetType) :: ActiveSet
+  END TYPE AtomicOpacity
 
   TYPE Spectrum
    type  (GridType), pointer :: atmos
@@ -43,7 +48,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:) :: J, J20, Jc
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   type (ActiveSetType) :: ActiveSet !one active set for all wavelength at a cell point
+   type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
   END TYPE Spectrum
 
@@ -64,6 +69,7 @@ CONTAINS
    if (present(vacuum_to_air)) NLTEspec%vacuum_to_air = vacuum_to_air
   
    ! Initialize the wavelength grid depending on the number of transitions PASSIVE/ACTIVE
+   ! and allocate NLTEspec%lambda
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
@@ -74,6 +80,11 @@ CONTAINS
 
   SUBROUTINE allocSpectrum(NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
+   
+   integer :: Nsize
+   
+   Nsize = NLTEspec%Nwaves
+   ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
    
    if (allocated(NLTEspec%I)) then
     write(*,*) "Error I already allocated"
@@ -91,17 +102,38 @@ CONTAINS
    allocate(NLTEspec%J(NLTEspec%NPROC, NLTEspec%Nwaves))
    allocate(NLTEspec%Jc(NLTEspec%NPROC, NLTEspec%Nwaves))
    !! allocate(NLTEspec%J20(NLTEspec%NPROC, NLTEspec%Nwaves))
-   
+   NLTEspec%J = 0.0
+   NLTEspec%Jc = 0.0
+      
    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
+   !create pol flux map or add to Flux
    
    ! --> initialised in integ_ray_line  
    !   NLTEspec%I = 0.0
    !   NLTEspec%Ic = 0.0
    NLTEspec%Flux = 0.0
    NLTEspec%Fluxc = 0.0
-   ! J and Jc are initialised in initAS()
-  
+   allocate(NLTEspec%AtomOpac%chi(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%eta(NLTEspec%NPROC,Nsize))
+   ! if pol allocate AtomOpac%rho
+   NLTEspec%AtomOpac%chi = 0.
+   NLTEspec%AtomOpac%eta = 0.
+
+   allocate(NLTEspec%AtomOpac%eta_c(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%chi_c(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%eta_p(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%chi_p(NLTEspec%NPROC,Nsize))
+   !allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%NPROC,Nsize))
+   ! if pol same as atice opac case
+   
+   NLTEspec%AtomOpac%chi_c = 0.
+   NLTEspec%AtomOpac%eta_c = 0.
+   NLTEspec%AtomOpac%sca_c = 0.
+   NLTEspec%AtomOpac%chi_p = 0.
+   NLTEspec%AtomOpac%eta_p = 0.
+
   RETURN
   END SUBROUTINE allocSpectrum
 
@@ -111,84 +143,37 @@ CONTAINS
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
    if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
    !! deallocate(NLTEspec%J20)
+   
+   deallocate(NLTEspec%AtomOpac%chi)
+   deallocate(NLTEspec%AtomOpac%eta)
+
+   deallocate(NLTEspec%AtomOpac%eta_c)
+   deallocate(NLTEspec%AtomOpac%chi_c)
+   deallocate(NLTEspec%AtomOpac%sca_c)
+   deallocate(NLTEspec%AtomOpac%eta_p)
+   deallocate(NLTEspec%AtomOpac%chi_p)
+   !deallocate(NLTEspec%AtomOpac%rho_p)
    NULLIFY(NLTEspec%atmos)
   RETURN
   END SUBROUTINE freeSpectrum
 
-  SUBROUTINE initAS(id, re_init)
-    ! allocate arrays for re_init == FALSE
-    ! if re_init is .true. only set opac arrays to 0 for next cell point.
-    ! when re_init is FALSE, opacities for all threads are initialised
-    ! so that initAS becomes independent on id
-    logical, intent(in) :: re_init
+  SUBROUTINE initAtomOpac(id)
+    ! set opacities to 0d0 for thread id
     integer, intent(in) :: id
     integer :: Nproc, Nsize !, Nsize2
-    
-    Nsize = NLTEspec%Nwaves
-    Nproc = NLTEspec%NPROC
-    !if mag field, Nsize=4*Nsize
-     ! Nsize2 = 3*Nsize
-   ! first time allocate space on the wavelength grid
-   if (.not.re_init) then !set to 0d0 for all threads
-    !if (NLTEspec%Nact.gt.0) then
-     allocate(NLTEspec%Activeset%chi(Nproc,Nsize))
-    ! if mag field allocate(NLTEspec%Activesets%chip(Nproc,Nsize))
-     allocate(NLTEspec%Activeset%eta(Nproc,Nsize))
-     NLTEspec%Activeset%chi = 0.
-     NLTEspec%Activeset%eta = 0.
-    !end if 
-    allocate(NLTEspec%Activeset%eta_c(Nproc,Nsize))
-    allocate(NLTEspec%Activeset%chi_c(Nproc,Nsize))
-    allocate(NLTEspec%Activeset%sca_c(Nproc,Nsize))
-    allocate(NLTEspec%Activeset%eta_c_bf(Nproc,Nsize))
-    allocate(NLTEspec%Activeset%chi_c_bf(Nproc,Nsize))
 
-   ! if line pol
-    !allocate(NLTEspec%Activesets%eta_Q(Nproc,Nsize))
-     !allocate(NLTEspec%Activesets%eta_U(Nproc,Nsize))
-     ! ...
-    NLTEspec%Activeset%chi_c = 0.
-    NLTEspec%Activeset%eta_c = 0.
-    NLTEspec%Activeset%sca_c = 0.
-    NLTEspec%Activeset%chi_c_bf = 0.
-    NLTEspec%Activeset%eta_c_bf = 0.
-    NLTEspec%J = 0.0
-    NLTEspec%Jc = 0.0
-
-   else
-    !reset for next cell points but only for a specific thread id
-    !if (NLTEspec%Nact.gt.0) then
-     NLTEspec%Activeset%chi(id,:) = 0.
-     NLTEspec%Activeset%eta(id,:) = 0.
-    !end if
-    NLTEspec%Activeset%chi_c(id,:) = 0.
-    NLTEspec%Activeset%eta_c(id,:) = 0.
-    NLTEspec%Activeset%sca_c(id,:) = 0.
-    NLTEspec%Activeset%chi_c_bf(id,:) = 0.
-    NLTEspec%Activeset%eta_c_bf(id,:) = 0.
-    NLTEspec%J(id,:) = 0.0
-    NLTEspec%Jc(id,:) = 0.0
-   end if
-   
+    NLTEspec%AtomOpac%chi(id,:) = 0d0
+    NLTEspec%AtomOpac%eta(id,:) = 0d0
+    NLTEspec%AtomOpac%chi_c(id,:) = 0d0
+    NLTEspec%AtomOpac%eta_c(id,:) = 0d0
+    NLTEspec%AtomOpac%sca_c(id,:) = 0d0
+    NLTEspec%AtomOpac%chi_p(id,:) = 0d0
+    NLTEspec%AtomOpac%eta_p(id,:) = 0d0
+    NLTEspec%J(id,:) = 0d0
+    NLTEspec%Jc(id,:) = 0d0
+  
   RETURN
-  END SUBROUTINE initAS
-
-  SUBROUTINE freeAS()
-    type (ActiveSetType) :: as
-
-    !! etc etc ...
-    if (NLTEspec%Nact.gt.0) then
-     deallocate(NLTEspec%Activeset%chi)
-     deallocate(NLTEspec%Activeset%eta)
-    end if 
-    deallocate(NLTEspec%Activeset%eta_c)
-    deallocate(NLTEspec%Activeset%chi_c)
-    deallocate(NLTEspec%Activeset%sca_c)
-    deallocate(NLTEspec%Activeset%chi_c_bf)
-    deallocate(NLTEspec%Activeset%eta_c_bf)
-    
-   RETURN
-  END SUBROUTINE freeAS
+  END SUBROUTINE initAtomOpac
   
   SUBROUTINE writeWavelength()
    ! Write wavelength grid build with each transition of each atom
