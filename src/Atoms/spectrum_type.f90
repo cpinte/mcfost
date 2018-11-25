@@ -191,6 +191,8 @@ CONTAINS
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
   logical :: simple, extend
+  character(len=6) :: comment="VACUUM"
+  double precision :: lambda_vac(NLTEspec%Nwaves)
   !integer :: a,b,c,d=1,e=1, idL
   real :: pixel_scale_x, pixel_scale_y 
 
@@ -304,7 +306,21 @@ npix_x = 101; npix_y = 101
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
-
+  
+  
+  ! create new hdu for wavelength grid
+  CALL ftcrhd(unit, status)
+   if (NLTEspec%vacuum_to_air) then
+     comment="AIR"
+     lambda_vac = NLTEspec%lambda
+     NLTEspec%lambda = vacuum2air(NLTEspec%Nwaves, lambda_vac)
+   end if 
+   
+   naxis = 1
+   naxes(1) = NLTEspec%Nwaves
+   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+   CALL ftpkys(unit, "UNIT", "nm", comment, status)
+   CALL ftpprd(unit,group,fpixel,naxes(1),NLTEspec%lambda,status)
 
   !  Close the file and free the unit number.
   CALL ftclos(unit, status)

@@ -540,7 +540,7 @@ npix_x = 101; npix_y = 101
   write(*,*) "ok"
   
   NLTEspec%atmos => atmos
-  CALL initSpectrum(nb_proc, 500d0, .false., .true.)
+  CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
   
 
