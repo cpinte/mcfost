@@ -33,15 +33,16 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use readatmos, only : readatmos_1D !for testing
+ use simple_models, only : radial_model, prop_law_model
  
  !$ use omp_lib
  
  !MCFOST's original modules
  use input
  use parametres
- use grid
- use density
- use dust_prop
+ !use grid
+ !use density
+ !use dust_prop
  use dust_transfer, only : compute_stars_map
  use dust_ray_tracing, only : init_directions_ray_tracing , & 
                               tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, tab_RT_incl, & 
@@ -514,19 +515,22 @@ npix_x = 101; npix_y = 101
   
 !! -------------------------------------------------------- !!
   
-   !nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
-   nHtot =  1d5 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
-   Ttmp = Tdust * 10d0!100d0, depends on the stellar flux
-   netmp = 1d-3 * nHtot
-
-
-  ! more or less the same role as init_molecular_disk
-  CALL init_atomic_atmos(n_cells, Ttmp, netmp, nHtot)
-  atmos%moving=.false. !velocity fields not implemented yet
+   !!nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
+!    nHtot =  1d5 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
+!    Ttmp = Tdust * 10d0!100d0, depends on the stellar flux
+!    netmp = 1d-3 * nHtot
+!   !!more or less the same role as init_molecular_disk
+!   write(*,*) maxval(nHtot), maxval(Ttmp), maxval(netmp)
+!   CALL init_atomic_atmos(n_cells, Ttmp, netmp, nHtot)
+!  atmos%moving=.false. !velocity fields not implemented yet
+  CALL prop_law_model()
+  
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
-  CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
+  !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
   
+  !CALL radial_model()
+
   write(*,*) "maxTgas = ", MAXVAL(atmos%T), " minTgas = ", MINVAL(atmos%T)
   write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)
   write(*,*) "maxNE = ", MAXVAL(atmos%ne), " minNE = ", MINVAL(atmos%ne)
@@ -537,7 +541,6 @@ npix_x = 101; npix_y = 101
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
-  write(*,*) "ok"
   
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
