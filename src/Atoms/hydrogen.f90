@@ -96,7 +96,7 @@ MODULE hydrogen_opacities
   logical  :: res
   type (AtomicContinuum) :: continuum
   integer :: i, kr, k, nc
-  integer, dimension(:), allocatable :: iLam
+!  integer, dimension(:), allocatable :: iLam
   double precision :: lambdaEdge, sigma(NLTEspec%Nwaves), sigma0, g_bf(NLTEspec%Nwaves), &
     twohnu3_c2(NLTEspec%Nwaves), twohc, gijk(NLTEspec%Nwaves), hc_k, hc_kla(NLTEspec%Nwaves), &
     expla(NLTEspec%Nwaves), n_eff,npstar, sigma02, sigma2(NLTEspec%Nwaves), np
@@ -167,8 +167,8 @@ MODULE hydrogen_opacities
 !      end if
 
 
-    allocate(iLam(continuum%Nlambda)) !not used yet
-    iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /)
+!     allocate(iLam(continuum%Nlambda)) !not used yet
+!     iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /)
 
    ! lambda has to be lower than the edge but greater than
    ! lambda0, see Hubeny & Mihalas chap. 7 photoionisation
@@ -183,16 +183,23 @@ MODULE hydrogen_opacities
 
 
     ! u = n**2 * h * nu / (Z**2 * R) - 1
-    uu(ilam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(ilam)) / &
-      ((Hydrogen%stage(i)+1)* &
-       (Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
-
-    g_bf(ilam) = Gaunt_bf(continuum%Nlambda, uu(ilam), n_eff)
-
+!     uu(ilam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(ilam)) / &
+!       ((Hydrogen%stage(i)+1)* (Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
+    uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+      n_eff*n_eff*HPLANCK*CLIGHT/ & 
+       (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) / &
+      ((Hydrogen%stage(i)+1)*(Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
+!    g_bf(ilam) = Gaunt_bf(continuum%Nlambda, uu(ilam), n_eff)
+    g_bf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     Gaunt_bf(&
+      continuum%Nlambda, uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1), n_eff)
     ! Z scaled law
-    sigma(ilam) = &
-     sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / &
-      (Hydrogen%stage(i)+1)**2 !m^2
+!     sigma(ilam) = &
+!      sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / (Hydrogen%stage(i)+1)**2 !m^2
+    sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     sigma0 * g_bf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+       (NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/lambdaEdge)**3 * &
+       n_eff / (Hydrogen%stage(i)+1)**2 !m^2
 
 
     !! or use this (with sigma02)
@@ -204,17 +211,29 @@ MODULE hydrogen_opacities
 
 
     ! now computes emissivity and extinction
-    expla(iLam) = dexp(-hc_kla(iLam)/atmos%T(icell))
-    gijk(iLam) = Hydrogen%nstar(i,icell)/npstar * expla(iLam)
+!     expla(iLam) = dexp(-hc_kla(iLam)/atmos%T(icell))
+    expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     dexp(-hc_kla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/atmos%T(icell))
+!     gijk(iLam) = Hydrogen%nstar(i,icell)/npstar * expla(iLam)
+    gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     Hydrogen%nstar(i,icell)/npstar * &
+      expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)
      ! at LTE only for chi
      ! see Hubeny & Mihalas eq. 14.16 to 14.18
      ! if LTE Hydrogen%n points to %nstar
-    chi(iLam) = chi(iLam) + sigma(iLam) * (1.-expla(iLam)) * Hydrogen%n(i,icell)
-    eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np
-     !write(*,*) lambda, i, kr, eta(k), chi(k)
-     !write(*,*) np(k), npstar(k), Hydrogen%nstar(i,k), sigma, expla, gijk
+!    chi(iLam) = chi(iLam) + sigma(iLam) * (1.-expla(iLam)) * Hydrogen%n(i,icell)
+    chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
+      sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+       (1.-expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) * Hydrogen%n(i,icell)
+!   eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np       
+    eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+     eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
+      twohnu3_c2(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+       gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+        sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * np
 
-    deallocate(iLam)
+!    deallocate(iLam)
   end do
 
  RETURN
