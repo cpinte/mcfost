@@ -184,7 +184,6 @@ subroutine integ_tau(lambda)
   Stokes = 0.0_dp ; Stokes(1) = 1.0_dp
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
-
   call indice_cellule(x0,y0,z0, icell)
   call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
 
