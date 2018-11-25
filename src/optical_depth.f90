@@ -243,7 +243,6 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
-  !double precision :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
 
   integer :: icell0, previous_cell, next_cell
 
@@ -292,7 +291,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      !
      ! Background() returns the opacity at all wavelength. But here we need
      ! the opacity at lambda only. Is it slow to use the full wavelength
-     ! calculations and then take the opac at lambda when using the vecotized
+     ! calculations and then take the opac at lambda when using the vectorized
      ! capabilities of fortran ?
      !
      ! but kappa is allocated and initialised to 0 in atomic_transfer().
