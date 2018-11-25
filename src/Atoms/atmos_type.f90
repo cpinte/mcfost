@@ -32,8 +32,10 @@ MODULE atmos_type
    ! Each component of the velocity is a function of x, y, z so
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
-   integer :: velocity_law = 0
-   double precision, allocatable, dimension(:) :: Vmap
+   integer :: velocity_law = 0 !use this integer to specify different velocity than
+    !infall or keplerian ?, or remove it
+   double precision, allocatable, dimension(:) :: Vmap !remove when Vfield is
+    ! correctly used from MCFOST
    type (Element), dimension(:), allocatable :: Elements
    type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms 
    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
@@ -399,7 +401,7 @@ MODULE atmos_type
    double precision, intent(in), dimension(Nspace) :: T, ne, nHtot
    double precision :: maxNe = 0
    integer :: k
-   double precision :: tiny_nH = 1d3, tiny_T = 5d2!nHtot = 1 atom/m3, T = 400 K
+   double precision :: tiny_nH = 1d2, tiny_T = 5d2!nHtot = 1 atom/m3, T = 400 K
    
    if (allocated(atmos%T).or.(allocated(atmos%nHtot)) & 
        .or.(allocated(atmos%ne))) then
@@ -453,13 +455,13 @@ MODULE atmos_type
    end if
    
    !check where to solve for the line radiative transfer equation.
-   atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
-!    do k=1,Nspace
-!     atmos%lcompute_atomRT(k) = (atmos%nHtot(k) > tiny_nH) .and. (atmos%T(k) > tiny_T)
-!     !knowing that we will have populations and ne only if nHtot and T are different from 0.
-!     !Still, some levels of an atom can have 0 pops depending on the Temperature threashold
-!     !and some others can have non zero pops for the same T.
-!    end do
+   !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) !??? not working
+   do k=1,Nspace
+    atmos%lcompute_atomRT(k) = (atmos%nHtot(k) > tiny_nH) .and. (atmos%T(k) > tiny_T)
+    !knowing that we will have populations and ne only if nHtot and T are different from 0.
+    !Still, some levels of an atom can have 0 pops depending on the Temperature threashold
+    !and some others can have non zero pops for the same T.
+   end do
    
 !! Test of defining v_char automatically
 !   do n=1,atmos%Natom

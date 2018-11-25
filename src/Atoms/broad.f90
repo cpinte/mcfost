@@ -187,9 +187,11 @@ MODULE broad
         ic.lt.atom%Nlevel)
     ic = ic + 1
    end do
+   
    if (atom%stage(ic).eq.atom%stage(line%i)) then
-    write(*,*) "Cannot find overlying continuum for level ",&
-      line%i," exiting..."
+    write(*,*) "(Broad.Stark) Cannot find overlying continuum for level ",&
+      line%i," of atom ",atom%ID," exiting..."
+    write(*,*) atom%stage(ic), atom%stage(line%i)
     stop
    end if
    ERYDBERG = E_RYDBERG / (1.+M_ELECTRON / (atom%weight*AMU))

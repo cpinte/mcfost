@@ -144,9 +144,9 @@ MODULE readatom
     atom%ntotal = atom%Abund * atmos%nHtot
 !     do k=1,atmos%Nspace
 !      atom%ntotal(k) = atom%Abund * atmos%nHtot(k)
-!      !write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
+!      write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
 !      atom%vbroad(k) = dsqrt(vtherm*atmos%T(k) + atmos%vturb(k)**2) !vturb in m/s
-!      !!write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
+!      write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
 !     !however, in 3D we do not use micro turbulence
 !     ! all the essence of turbulence is in the MHD
 !     ! velocity
@@ -312,7 +312,8 @@ MODULE readatom
 !             !  " has ",  atom%lines(kr)%Ncomponent," components"
 !         end if
 
-!     else !default is Voigt ! line%voigt is default .true.
+     else !default is Voigt ! line%voigt is default .true.
+      line%Voigt = .true.
         !write(*,*) "Using Voigt profile for that line"
         !allocate(atom%lines(kr)%c_shift(1))
         !allocate(atom%lines(kr)%c_fraction(1))
