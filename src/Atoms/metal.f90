@@ -161,7 +161,7 @@ MODULE metal
   ! cell point we are computing the opacities.
   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
   logical :: res
-  integer :: kr, m, nc, i, j, NrecStokes
+  integer :: kr, m, i, j, NrecStokes, nc
   integer, intent(in) :: icell
   double precision, intent(in) :: x,y,z,u,v,w,& !positions and angles used to project
                                   x1,y1,z1      ! velocity field and magnetic field
@@ -254,22 +254,21 @@ MODULE metal
      vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
          CLIGHT / (line%lambda0 * atom%vbroad(icell))
 
-     if (line%voigt) then
-      do nc=1,line%Ncomponent !add multicomponent if any, else Ncomponent=1
-       vvoigt(iLam) = vvoigt(iLam) - line%c_shift(nc) * &
-             CLIGHT / (line%lambda0 * atom%vbroad(icell)) - v0 / atom%vbroad(icell) !add velocity field
+     if (line%voigt) then !- line%c_shift(nc) * &
+             !CLIGHT / (line%lambda0 * atom%vbroad(icell))
+      !do nc=1,line%Ncomponent !add multicomponent if any, else Ncomponent=1
+       vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
        phi(iLam) = phi(iLam) + Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
-                phip, 'ARMSTRONG ') * line%c_fraction(nc)
+                phip, 'ARMSTRONG ')! * line%c_fraction(nc)
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
        phiPol(iLam) = phiPol(iLam) + phip(iLam)
-      end do
+      !end do
      else !Gaussian
-      do nc=1,line%Ncomponent
-       vvoigt(iLam) = vvoigt(iLam) - line%c_shift(nc) * &
-             CLIGHT / (line%lambda0 * atom%vbroad(icell)) - v0 / atom%vbroad(icell)
-       phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2) * line%c_fraction(nc)
-      end do
+      !do nc=1,line%Ncomponent
+       vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
+       phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2)! * line%c_fraction(nc)
+      !end do
      end if
      !Sum up all contributions for this line with the other
      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))

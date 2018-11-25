@@ -537,6 +537,8 @@ npix_x = 101; npix_y = 101
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
+  write(*,*) "ok"
+  
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0, .false., .true.)
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)

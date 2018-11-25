@@ -72,7 +72,7 @@ MODULE getlambda
   ! Because atmos will be often moving, line
   ! will be always asymmetric
   if ((atmos%Magnetized .and. line%polarizable) .or. &
-     atmos%moving .or. line%Ncomponent.gt.1) then
+     atmos%moving) then
      line%symmetric=.false.
   end if
 
@@ -155,13 +155,14 @@ MODULE getlambda
    else !not symmetric
     !write(*,*) "Setting up grid for asymmetric line"
     ! minus - 1 to force it to be odd
-    line%Nlambda = (2*Nlambda-1) * line%Ncomponent
+    line%Nlambda = (2*Nlambda-1)! * line%Ncomponent
     !!write(*,*) Nlambda, 2*Nlambda-1, line%Nlambda
     allocate(line%lambda(line%Nlambda))
-    do n=1,line%Ncomponent
+    !do n=1,line%Ncomponent
+    n = 1
      !in c, n=0,Ncompo - 1
      Nmid = (n-1)*(2*Nlambda-1) + Nlambda -1
-     lambda0 = line%lambda0 + line%c_shift(n)
+     lambda0 = line%lambda0! + line%c_shift(n)
      line%lambda(Nmid) = lambda0
       do la=1,Nlambda !la=Nlambda->
         ! Nlambda-1 +Nlambda = 2*Nlambda-1, last point
@@ -172,12 +173,12 @@ MODULE getlambda
       !do la=1,line%Nlambda
       ! write(*,*) line%lambda(la)
       !end do
-    end do
+    !end do
 
-    if (line%Ncomponent.gt.1) then
-     CALL sort(line%lambda, line%Nlambda)
-     !!CALL hpsort(line%Nlambda, line%lambda) ! NumRec
-    end if
+!     if (line%Ncomponent.gt.1) then
+!      CALL sort(line%lambda, line%Nlambda)
+!      !!CALL hpsort(line%Nlambda, line%lambda) ! NumRec
+!     end if
 
    end if
 

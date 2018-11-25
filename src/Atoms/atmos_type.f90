@@ -126,10 +126,10 @@ MODULE atmos_type
       if (allocated(line%Rji)) deallocate(line%Rji)
       if (allocated(line%wphi)) deallocate(line%wphi)
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
-      if (allocated(line%c_shift)) deallocate(line%c_shift)
-      if (allocated(line%c_fraction)) deallocate(line%c_fraction)
+      !if (allocated(line%c_shift)) deallocate(line%c_shift)
+      !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
       !if (allocated(line%adamp)) deallocate(line%adamp)
-      if (allocated(line%rho_prd)) deallocate(line%rho_prd)
+      if (allocated(line%rho_pfr)) deallocate(line%rho_pfr)
      end do
 !      deallocate(atom%lines)
      end if
