@@ -488,6 +488,7 @@ subroutine transfert_poussiere()
         write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
      endif
 
+
      ! Les pointeurs (meme les tab) doivent être privés !!! COPYIN
      !$omp parallel &
      !$omp default(none) &
@@ -1173,7 +1174,7 @@ subroutine dust_map(lambda,ibin,iaz)
   real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   logical :: lresolved
 
-  if (lmono0) write(*,'(a16, $)') " Ray-tracing ..."
+  if (lmono0) write(*,*) "Ray-tracing ..."
 
   ! Direction de visee pour le ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
@@ -1339,7 +1340,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02
+  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
   real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
@@ -1394,7 +1395,9 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         Q_1star(:,:,:) = 0.0
         U_1star(:,:,:) = 0.0
      endif
+
      norme = 0.0_dp
+     tau_avg = 0.0_dp
 
      ! Etoile ponctuelle
      !  x0=0.0_dp ;  y0= 0.0_dp ; z0= 0.0_dp
@@ -1407,11 +1410,11 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
      !$omp parallel &
      !$omp default(none) &
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
-     !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola) &
+     !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola,lmono0) &
      !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
-     !$omp reduction(+:norme)
+     !$omp reduction(+:norme,tau_avg)
      in_map = .true. ! for SED
      LimbDarkening = 1.0
 
@@ -1450,6 +1453,9 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         Stokes = 0.0_dp
         call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
+        ! Average optical depth to the star
+        if (lmono0) tau_avg = tau_avg + tau
+
         ! Coordonnees pixel
         if (lresolved) then
            call find_pixel(x,y,z, taille_pix, dx_map, dy_map, i,j,in_map)
@@ -1486,6 +1492,11 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         ! Normalizing maps and adding all the stars
         stars_map(:,:,2) = stars_map(:,:,2) + sum(Q_1star(:,:,:),dim=3) * facteur2
         stars_map(:,:,3) = stars_map(:,:,3) + sum(U_1star(:,:,:),dim=3) * facteur2
+     endif
+
+     if (lmono0) then
+        tau_avg = tau_avg/n_ray_star(istar)
+        write(*,fmt='(" Optical depth from star #", i2, " is ", E12.5)') istar, tau_avg
      endif
   enddo ! n_stars
 
