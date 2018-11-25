@@ -367,11 +367,11 @@ MODULE lte
    ! number density. Remember:
    ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
    ! j = -1 for Hminus (l=element=H)
-!     do j=1,Hydrogen%Nlevel - 1
-!      atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
-!     end do
-   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
-   atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+    do j=1,Hydrogen%Nlevel - 1
+     atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
+    end do
+!    atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+!    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
    !! comme %n pointe vers %nstar si pureETL (car pointeurs)
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
