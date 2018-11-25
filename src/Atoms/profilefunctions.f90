@@ -41,12 +41,12 @@ MODULE ProfileFunctions
   Nlamu = line%Nlambda
 
   ! Initialize the ratio between emission and absorption coefficient
-  ! if PRD is included
-  if (line%PRD) then
-  allocate(line%rho_prd(Nlamu,atmos%Nspace))
+  ! if PFR is included
+  if (line%PFR) then
+  allocate(line%rho_pfr(Nlamu,atmos%Nspace))
   do k=1,atmos%Nspace
    do la=1,Nlamu
-    line%rho_prd(la,k) = 1.
+    line%rho_pfr(la,k) = 1.
    end do
   end do
   end if

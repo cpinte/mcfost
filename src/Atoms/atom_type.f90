@@ -8,10 +8,10 @@ MODULE atom_type
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2
    integer, parameter :: MOLECULE_ID_WIDTH=10
-   real, parameter    :: PRD_QCORE=2.0
-   real, parameter    :: PRD_QWING=4.0
-   real, parameter    :: PRD_QSPREAD=5.0
-   real, parameter    :: PRD_DQ =0.25
+   real, parameter    :: PFR_QCORE=2.0
+   real, parameter    :: PFR_QWING=4.0
+   real, parameter    :: PFR_QSPREAD=5.0
+   real, parameter    :: PFR_DQ =0.25
 
 
 
@@ -19,19 +19,19 @@ MODULE atom_type
   TYPE AtomicLine
    !type (AtomType), pointer   :: atom
    logical           :: symmetric, polarizable
-   logical           :: Voigt=.true., PRD=.false.,&
+   logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false.
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE"
    ! i, j start at 1 (not 0 like in C)
-   integer :: i, j, Nlambda, Nblue, Ncomponent, Nxrd, fd_profile
+   integer :: i, j, Nlambda, Nblue, Nxrd, fd_profile !,Ncomponent
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing
    real(8), dimension(4) :: cvdWaals
    real(8), allocatable, dimension(:,:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
-   double precision, allocatable, dimension(:)  :: lambda, Rij, Rji, wphi, c_shift, c_fraction
+   double precision, allocatable, dimension(:)  :: lambda, Rij, Rji, wphi!, c_shift, c_fraction
    double precision :: Qelast, adamp
-   real(8), allocatable, dimension(:,:) :: rho_prd
+   real(8), allocatable, dimension(:,:) :: rho_pfr
    !type (AtomType), pointer :: atom
    character :: file_GII
   END TYPE AtomicLine
@@ -62,7 +62,7 @@ MODULE atom_type
    ! atom can be passive but NLTEpops true. This is the case of
    ! populations read from previous run
    character(len=15)      :: initial_solution
-   integer                :: Nlevel, Nline, Ncont, Nfixed, Nprd=0
+   integer                :: Nlevel, Nline, Ncont, Nfixed, Npfr=0
    integer                :: periodic_table, activeindex
    ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionised
    ! ions etc ...

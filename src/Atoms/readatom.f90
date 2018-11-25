@@ -18,7 +18,7 @@ MODULE readatom
   character, parameter :: COMMENT_CHAR="#"
   character(len=*), parameter :: ATOMS_INPUT = "/Atoms/atoms.input"
   character(len=*), parameter :: path_to_atoms = "/Atoms/"
-  real, parameter :: MAX_ABUND_ERROR=0.001
+  !real, parameter :: MAX_ABUND_ERROR=0.001
 
 
   CONTAINS
@@ -45,7 +45,7 @@ MODULE readatom
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
     real(8) :: C1, vtherm, f, lambdaji
-    real(8) :: c_sum, lambdamin, geff
+    real(8) :: lambdamin, geff !, c_sum
     EOF = 0
     !write(*,*) "Atom is part of the active atoms ?", atom%active
 
@@ -140,15 +140,17 @@ MODULE readatom
     allocate(atom%ntotal(atmos%Nspace))
     allocate(atom%vbroad(atmos%Nspace))
     vtherm = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
-    do k=1,atmos%Nspace
-     atom%ntotal(k) = atom%Abund * atmos%nHtot(k)
-     !write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
-     atom%vbroad(k) = dsqrt(vtherm*atmos%T(k) + atmos%vturb(k)**2) !vturb in m/s
-     !!write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
-    !however, in 3D we do not use micro turbulence
-    ! all the essence of turbulence is in the MHD
-    ! velocity
-    end do
+    atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
+    atom%ntotal = atom%Abund * atmos%nHtot
+!     do k=1,atmos%Nspace
+!      atom%ntotal(k) = atom%Abund * atmos%nHtot(k)
+!      !write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
+!      atom%vbroad(k) = dsqrt(vtherm*atmos%T(k) + atmos%vturb(k)**2) !vturb in m/s
+!      !!write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
+!     !however, in 3D we do not use micro turbulence
+!     ! all the essence of turbulence is in the MHD
+!     ! velocity
+!     end do
     ! condition over isum if used here
     ! isum is used in NLTE to replace one row by
     ! conservation equation
@@ -156,7 +158,7 @@ MODULE readatom
     !! DO NOT USE i as a loop index here !!
 
     !Now read all bound-bound transitions
-    atom%Nprd = 0 !but already initialised in atom_type.f90
+    atom%Npfr = 0 !but already initialised in atom_type.f90
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
@@ -271,53 +273,52 @@ MODULE readatom
       !           " Bij = ", atom%lines(kr)%Bij
 
      ! Now parse line string, used to construct the profile function
-     if (trim(shapeChar).ne."PRD" .and. trim(shapeChar).ne."VOIGT" &
-         .and. trim(shapeChar).ne. "GAUSS" .and. &
-         trim(shapeChar).ne."COMPOSIT") then
+     if (trim(shapeChar).ne."PFR" .and. trim(shapeChar).ne."VOIGT" &
+         .and. trim(shapeChar).ne. "GAUSS") then
          write(*,*) "Invalid value for line-shape string"
          write(*,*) "exiting..."
          stop
-     else if (trim(shapeChar).eq."PRD") then
-        write(*,*) "Presently PRD transitions not allowed"
+     else if (trim(shapeChar).eq."PFR") then
+        write(*,*) "Presently PFR transitions not allowed"
         stop
-        atom%Nprd = atom%Nprd  + 1
-        atom%lines(kr)%PRD = .true.
+        atom%Npfr = atom%Npfr  + 1
+        atom%lines(kr)%PFR = .true.
      else if (trim(shapeChar).eq."GAUSS") then
         !write(*,*) "Using Gaussian profile for that line"
         atom%lines(kr)%Voigt = .false.
-     else if (trim(shapeChar).eq."COMPOSIT") then
-        !write(*,*) "Using a Multi-component profile for that line"
-        ! frist read the number of component
-        CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
-        read(inputline,*) atom%lines(kr)%Ncomponent
-        !write(*,*) "Line has ", atom%lines(kr)%Ncomponent, " components"
-        ! read shift and fraction
-        allocate(atom%lines(kr)%c_shift(atom%lines(kr)%Ncomponent))
-        allocate(atom%lines(kr)%c_fraction(atom%lines(kr)%Ncomponent))
-        c_sum = 0.
-        do nc=1, atom%lines(kr)%Ncomponent
-         CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
-         read(inputline, *) atom%lines(kr)%c_shift(nc), &
-                           atom%lines(kr)%c_fraction(nc)
-         c_sum = c_sum + atom%lines(kr)%c_fraction(nc);
-        end do
-        if (c_sum.gt.(1.+MAX_ABUND_ERROR) .or. &
-            c_sum.lt.(1.-MAX_ABUND_ERROR)) then
-            write(*,*) "Line component fractions do not add up to unity"
-            write(*,*) "exiting..."
-            stop
-        else
-            !write(*,*) "Line ",atom%lines(kr)%j, "->",atom%lines(kr)%i,&
-            !  " has ",  atom%lines(kr)%Ncomponent," components"
-        end if
+!      else if (trim(shapeChar).eq."COMPOSIT") then
+!         !write(*,*) "Using a Multi-component profile for that line"
+!         ! frist read the number of component
+!         CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
+!         read(inputline,*) atom%lines(kr)%Ncomponent
+!         !write(*,*) "Line has ", atom%lines(kr)%Ncomponent, " components"
+!         ! read shift and fraction
+!         allocate(atom%lines(kr)%c_shift(atom%lines(kr)%Ncomponent))
+!         allocate(atom%lines(kr)%c_fraction(atom%lines(kr)%Ncomponent))
+!         c_sum = 0.
+!         do nc=1, atom%lines(kr)%Ncomponent
+!          CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
+!          read(inputline, *) atom%lines(kr)%c_shift(nc), &
+!                            atom%lines(kr)%c_fraction(nc)
+!          c_sum = c_sum + atom%lines(kr)%c_fraction(nc);
+!         end do
+!         if (c_sum.gt.(1.+MAX_ABUND_ERROR) .or. &
+!             c_sum.lt.(1.-MAX_ABUND_ERROR)) then
+!             write(*,*) "Line component fractions do not add up to unity"
+!             write(*,*) "exiting..."
+!             stop
+!         else
+!             !write(*,*) "Line ",atom%lines(kr)%j, "->",atom%lines(kr)%i,&
+!             !  " has ",  atom%lines(kr)%Ncomponent," components"
+!         end if
 
-     else !default is Voigt
+!     else !default is Voigt ! line%voigt is default .true.
         !write(*,*) "Using Voigt profile for that line"
-        allocate(atom%lines(kr)%c_shift(1))
-        allocate(atom%lines(kr)%c_fraction(1))
-        atom%lines(kr)%Ncomponent = 1
-        atom%lines(kr)%c_shift(1) = 0.0
-        atom%lines(kr)%c_fraction(1) = 1.
+        !allocate(atom%lines(kr)%c_shift(1))
+        !allocate(atom%lines(kr)%c_fraction(1))
+        !atom%lines(kr)%Ncomponent = 1
+        !atom%lines(kr)%c_shift(1) = 0.0
+        !atom%lines(kr)%c_fraction(1) = 1.
      end if
 
      !Now parse Broedening recipe
@@ -369,13 +370,13 @@ MODULE readatom
           abs(atom%qJ(atom%lines(kr)%i) - &
            atom%qJ(atom%lines(kr)%j)).le.1.) then
 
-       if (atom%lines(kr)%Ncomponent.gt.1) then
-           !write(*,*) &
-           !"Cannot treat composite line with polar"
-           atom%lines(kr)%polarizable=.false.
-       else
+!        if (atom%lines(kr)%Ncomponent.gt.1) then
+!            !write(*,*) &
+!            !"Cannot treat composite line with polar"
+!            atom%lines(kr)%polarizable=.false.
+!        else
          atom%lines(kr)%polarizable=.true.
-       end if
+!        end if
       end if
      else
       !write(*,*) "Treating line ",atom%lines(kr)%j,&
@@ -492,7 +493,6 @@ MODULE readatom
      ! atom%lines(kr)%lambda(1)," lammax = ", &
      ! atom%lines(kr)%lambda(atom%lines(kr)%Nlambda)
   end do
-
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
     if (atom%ID(2:2) .eq." ") then
@@ -515,8 +515,8 @@ MODULE readatom
 !     !write(*,*) "Populations file for writing: .", &
 !     !         trim(atom%popsoutFile),"."
 
-    if (atom%Nprd.gt.0) then
-     write(*,*) "PRD not implemented yet, do not write file"
+    if (atom%Npfr.gt.0) then
+     write(*,*) "PFR not implemented yet, do not write file"
     end if
     if (atmos%XRD) then
      write(*,*) "Cross redistribution ", &
@@ -648,11 +648,9 @@ MODULE readatom
 
    ! read and fill atomic structures saved in atmos%atoms
    ! create an alias for Hydrogen
-
    CALL readModelAtom(unit+nmet, atmos%Atoms(nmet), &
         trim(mcfost_utils)//TRIM(path_to_atoms)//trim(filename))
    !write(*,*) "IS ACTIVE = ", atmos%Atoms(nmet)%active
-
   end do
   close(unit)
   ! Alias to the most importent one

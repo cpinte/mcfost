@@ -287,9 +287,9 @@ MODULE broad
     Qelast = Qelast + adamp
     !write(*,*) "LStark(k)=",adamp(k), Qelast(k)
   end if
-  ! Store Qelast, total rate of elastic collisions, if PRD only
-  if (line%PRD) then
-   write(*,*) "PRD not handled yet, avoiding"
+  ! Store Qelast, total rate of elastic collisions, if PFR only
+  if (line%PFR) then
+   write(*,*) "PFR not handled yet, avoiding"
    ! line%Qelast = Qelast
   end if
 
