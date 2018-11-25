@@ -162,14 +162,13 @@ MODULE lte
    end do
   end if
 
-   !$omp parallel &
-   !$omp default(none) &
-   !$omp private(k, phik, dEion,i,dZ,nDebeye,dE,m) &
-   !$omp shared(atmos,Hydrogen,c2,atom, Debeye,sum)
-   !$omp do
+   !!!$omp parallel &
+   !!!$omp default(none) &
+   !!!$omp private(k, phik, dEion,i,dZ,nDebeye,dE,m,sum) &
+   !!!$omp shared(atmos,Hydrogen,c2,atom, Debeye)
+   !!!$omp do
    do k=1,atmos%Nspace
     if (.not.atmos%lcompute_atomRT(k)) CYCLE
-
 
     if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
     sum = 1.
@@ -180,8 +179,8 @@ MODULE lte
      dE = atom%E(i) - atom%E(1) ! relative to ground level
      dZ = atom%stage(i) - atom%stage(1) !stage is 0 for neutrals
 
-     !write(*,*) "dZ = ", dZ," nDebeye*dEion=",nDebeye(i)*dEion*&
-     !    JOULE_TO_EV, " dEion=",dEion*JOULE_TO_EV
+!    write(*,*) "dZ = ", dZ," nDebeye*dEion=",nDebeye(i)*dEion*&
+!         JOULE_TO_EV, " dEion=",dEion*JOULE_TO_EV
 
      if (Debeye) dE = dE - nDebeye(i)*dEion !J
 
@@ -192,10 +191,10 @@ MODULE lte
 
      atom%nstar(i,k)=&
        BoltzmannEq4dot20b(k, dE, atom%g(1), atom%g(i))
-     !write(*,*) "Atom=",atom%ID, " A=", atom%Abund
+!     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
      !!relative to n1j(1)
-     !write(*,*) k-1, "level=", i-1, " stage=", atom%stage(i), &
-     !           "n(i,k)=",atom%nstar(i,k)
+!     write(*,*) k-1, "level=", i-1, " stage=", atom%stage(i), &
+!                "n(i,k)=",atom%nstar(i,k)
 
      ! ---------- Saha equation ---------- !
      ! for this level i in stage stage(i),
@@ -214,7 +213,6 @@ MODULE lte
 
      ! by doing so we avoid the easiest case of using
      ! partition function.
-
      sum = sum+atom%nstar(i,k) !compute total pop
     end do
      ! now we have, 1 + n2/n1 + ni/n1 = sum over all levels
@@ -223,14 +221,14 @@ MODULE lte
      ! further, n1 + n2+n3+nij sum over all stage of each level
      ! gives ntotal.
      ! Therefore n1 = atom%ntotal/sum
-    !write(*,*) "-------------------"
-    !write(*,*) "Atom=",atom%ID, " A=", atom%Abund
-    !write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
+!    write(*,*) "-------------------"
+!    write(*,*) "Atom=",atom%ID, " A=", atom%Abund
+!    write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%ntotal(k)/sum
-    !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
+!    write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
 !     do i=2,atom%Nlevel
 !       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-!       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+!       write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
 !     end do
     atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
@@ -240,9 +238,9 @@ MODULE lte
      stop !beware if low T, np -> 0, check to not divide by 0 density
     end if
    end do !over depth points
-   !$omp end do
-   !$omp  end parallel
-    !write(*,*) "-------------------"
+   !!!$omp end do
+   !!!$omp  end parallel
+!    write(*,*) "-------------------"
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
@@ -353,11 +351,11 @@ MODULE lte
 
   ! if (.not.chemEquil) then
   atmos%nHmin = 0d0 !init
-  !$omp parallel &
-  !$omp default(none) &
-  !$omp private(k, PhiHmin) &
-  !$omp shared(atmos,Hydrogen)
-  !$omp do
+  !!!$omp parallel &
+  !!!$omp default(none) &
+  !!!$omp private(k, PhiHmin,j) &
+  !!!$omp shared(atmos,Hydrogen)
+  !!!$omp do
   do k=1, atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
@@ -369,11 +367,11 @@ MODULE lte
    ! number density. Remember:
    ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
    ! j = -1 for Hminus (l=element=H)
-!    do j=1,Hydrogen%Nlevel - 1
-!     atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
-!    end do
-!   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
-   atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin
+!     do j=1,Hydrogen%Nlevel - 1
+!      atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
+!     end do
+   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+   atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
    !! comme %n pointe vers %nstar si pureETL (car pointeurs)
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
@@ -381,8 +379,8 @@ MODULE lte
    !!write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
    !! atmos%Atoms(1)%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k)
   end do !over depth points
-  !$omp end do
-  !$omp  end parallel
+  !!!$omp end do
+  !!!$omp  end parallel
   ! end if !if chemical equilibrium
 
  RETURN

@@ -42,7 +42,7 @@ MODULE metal
   integer :: icell
   logical :: res, obtained_n
   integer :: m, kr, i, j, Z, nc
-  integer, dimension(:), allocatable :: iLam
+! integer, dimension(:), allocatable :: iLam
   type (AtomType) :: metal
   type (AtomicContinuum) :: continuum
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: eta, chi
@@ -102,8 +102,8 @@ MODULE metal
        CYCLE
     end if
 
-     allocate(iLam(continuum%Nlambda))
-     iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /) !from Nblue to Nblue + Nlambda
+!      allocate(iLam(continuum%Nlambda))
+!      iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /) !from Nblue to Nblue + Nlambda
 
      Z = metal%stage(i) + 1
      !! Only for Hydrogen n_eff = dsqrt(metal%g(i)/2.)
@@ -116,9 +116,12 @@ MODULE metal
      alpha_la = 0d0
 
      if (.not.continuum%Hydrogenic) then
-
+!        CALL bezier3_interp(continuum%Nlambda,continuum%lambda,continuum%alpha, &
+!              continuum%Nlambda,  NLTEspec%lambda(ilam), alpha_la(ilam)
        CALL bezier3_interp(continuum%Nlambda,continuum%lambda,continuum%alpha, &
-             continuum%Nlambda, NLTEspec%lambda(iLam), alpha_la(iLam))
+             continuum%Nlambda, &
+             NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1), &
+             alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1))
 
      else
 
@@ -131,17 +134,34 @@ MODULE metal
          ! alpha_la(lambda=lambdaEdge)=alpha0 (containing
          ! already the gaunt factor !! and factor 1/Z^2)
 
-        uu(iLam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(iLam)) /(Z*Z * E_RYDBERG)
-        gbf(iLam) = Gaunt_bf(continuum%Nlambda, uu, n_eff)
-        alpha_la(iLam) = gbf(iLam) * &
-                continuum%alpha0*((NLTEspec%lambda(iLam)/lambdaEdge)**3)*n_eff/gbf_0(1)
+!         uu(iLam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(iLam)) /(Z*Z * E_RYDBERG)
+!         gbf(iLam) = Gaunt_bf(continuum%Nlambda, uu, n_eff)
+!         alpha_la(iLam) = gbf(iLam) * &
+!                 continuum%alpha0*((NLTEspec%lambda(iLam)/lambdaEdge)**3)*n_eff/gbf_0(1)
+        uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+         n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) /(Z*Z * E_RYDBERG)
+        gbf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+         Gaunt_bf(continuum%Nlambda, uu, n_eff)
+        alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+         gbf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+                continuum%alpha0*((NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/lambdaEdge)**3)*n_eff/gbf_0(1)
 
      end if !continuum type
-     gijk(iLam) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(iLam)
-     chi(iLam) = chi(iLam) + alpha_la(iLam) * (1.-expla(iLam))*metal%n(i,icell)
-     eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * alpha_la(iLam)*metal%n(j,icell)
-     !write(*,*) MAXVAL(chi), MAXVAL(eta), metal%ID
-     deallocate(iLam)
+!      gijk(iLam) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(iLam)
+!      chi(iLam) = chi(iLam) + alpha_la(iLam) * (1.-expla(iLam))*metal%n(i,icell)
+!      eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * alpha_la(iLam)*metal%n(j,icell)
+     gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+      metal%nstar(i,icell)/metal%nstar(j,icell) * expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)
+     chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+      chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
+       alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+        (1.-expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1))*metal%n(i,icell)
+     eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+      eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
+       twohnu3_c2(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+        gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+         alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)*metal%n(j,icell)
+!     deallocate(iLam)
     end do ! loop over Ncont
   end do !loop over metals
 
@@ -165,7 +185,7 @@ MODULE metal
   integer, intent(in) :: icell
   double precision, intent(in) :: x,y,z,u,v,w,& !positions and angles used to project
                                   x1,y1,z1      ! velocity field and magnetic field
-  integer, dimension(:), allocatable :: iLam
+!  integer, dimension(:), allocatable :: iLam
   double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0, v1, dv
@@ -206,9 +226,6 @@ MODULE metal
   do m=1,atmos%Natom ! go over all atoms
    atom = atmos%Atoms(m)
    if (atom%active) CYCLE ! go to next passive atom
-    ! I use atom%n(level,icell) !if NLTE pops exist for this atom, atom%n != atom%nstar
-    ! else atom%n = atom%nstar.
-
     do kr=1,atom%Nline ! for this atom go over all transitions
                        ! bound-bound
      line = atom%lines(kr)
@@ -230,10 +247,9 @@ MODULE metal
      ! using directly line%Nblue:line%Nblue+line%Nlambda-1 instead of iLam
      ! could save time, because for each line we allocate/deallocate iLam.
      ! just for a more readable code, which is not negligible at all.
-     allocate(iLam(line%Nlambda))
-     iLam = (/ (nc, nc=line%Nblue, line%Nblue+line%Nlambda-1) /)
-     !from Nblue to Nblue + Nlambda !try with line%Nblue:line%Nblue+line%Nlambda-1
-                                      !instead of iLam if not working
+!      allocate(iLam(line%Nlambda))
+!      iLam = (/ (nc, nc=line%Nblue, line%Nblue+line%Nlambda-1) /)
+
      phi = 0d0
      phip = 0d0
      phiPol = 0d0
@@ -243,39 +259,52 @@ MODULE metal
      line%damping_initialized=.false.
      if (line%Voigt) CALL Damping(icell, atom, kr, line%adamp)
 
-     !dlambda is the line domain. Extending up to qwing*l0/c
-     !corrected by the typical (micro-turbulent) veloctity.
-
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
-
     !convert to doppler units
+    
     ! init for this line of this atom
-     vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
+!      vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
+!          CLIGHT / (line%lambda0 * atom%vbroad(icell))
+     vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
          CLIGHT / (line%lambda0 * atom%vbroad(icell))
-
-     if (line%voigt) then !- line%c_shift(nc) * &
-             !CLIGHT / (line%lambda0 * atom%vbroad(icell))
-      !do nc=1,line%Ncomponent !add multicomponent if any, else Ncomponent=1
-       vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
-       phi(iLam) = phi(iLam) + Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
-                phip, 'ARMSTRONG ')! * line%c_fraction(nc)
+     if (line%voigt) then
+!        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
+!        phi(iLam) = phi(iLam) + Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
+!                 phip, 'ARMSTRONG ')
+       vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell) !add velocity field
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        phi(line%Nblue:line%Nblue+line%Nlambda-1) + &
+         Voigt(line%Nlambda, line%adamp, vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, 'ARMSTRONG ')
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
-       phiPol(iLam) = phiPol(iLam) + phip(iLam)
-      !end do
+!       phiPol(iLam) = phiPol(iLam) + phip(iLam)
+       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        phiPol(line%Nblue:line%Nblue+line%Nlambda-1) + phip(line%Nblue:line%Nblue+line%Nlambda-1)
      else !Gaussian
-      !do nc=1,line%Ncomponent
-       vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
-       phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2)! * line%c_fraction(nc)
-      !end do
+!        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
+       vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell)
+!        phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2)
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        phi(line%Nblue:line%Nblue+line%Nlambda-1) + dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2)
      end if
      !Sum up all contributions for this line with the other
-     Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
-     chi(iLam) = chi(iLam) + Vij(iLam) * (atom%n(i,icell)-gij*atom%n(j,icell))
-     eta(iLam) = eta(iLam) + twohnu3_c2 * gij * Vij(iLam) * atom%n(j,icell)
+!      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
+     Vij(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      hc_4PI * line%Bij * phi(line%Nblue:line%Nblue+line%Nlambda-1) / (SQRTPI * atom%vbroad(icell))
+!      chi(iLam) = chi(iLam) + Vij(iLam) * (atom%n(i,icell)-gij*atom%n(j,icell))
+     chi(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      chi(line%Nblue:line%Nblue+line%Nlambda-1) + &
+       Vij(line%Nblue:line%Nblue+line%Nlambda-1) * (atom%n(i,icell)-gij*atom%n(j,icell))
+!      eta(iLam) = eta(iLam) + twohnu3_c2 * gij * Vij(iLam) * atom%n(j,icell)
+     eta(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      eta(line%Nblue:line%Nblue+line%Nlambda-1) + &
+       twohnu3_c2 * gij * Vij(line%Nblue:line%Nblue+line%Nlambda-1) * atom%n(j,icell)
      !dealloc indexes for next line
-     deallocate(iLam)
+!     deallocate(iLam)
     end do !end loop on lines for this atom
   end do !end loop over Natom
 
