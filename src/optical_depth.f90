@@ -289,7 +289,13 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      ! atomic line opacities, it could be better to compute the opacities
      ! on the fly. Note that because line profiles are most of time far
      ! from gaussians, it is not easy to factorised their profiles.
-     ! but kappa is allocated in initialised to 0 in atomic_transfer().
+     !
+     ! Background() returns the opacity at all wavelength. But here we need
+     ! the opacity at lambda only. Is it slow to use the full wavelength
+     ! calculations and then take the opac at lambda when using the vecotized
+     ! capabilities of fortran ?
+     !
+     ! but kappa is allocated and initialised to 0 in atomic_transfer().
      ! To do: add a case in Background to compute opac at lambda
      ! instead of at all lambda
      !
