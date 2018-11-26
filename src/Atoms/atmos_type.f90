@@ -5,6 +5,8 @@ MODULE atmos_type
   use uplow
   use constant
   
+  !$ use omp_lib
+  
   !MCFOST's originals
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
@@ -397,6 +399,8 @@ MODULE atmos_type
 
   SUBROUTINE init_atomic_atmos(Nspace, T, ne, nHtot)
   ! as arguments are passed only necessary quantities
+  ! Modify optional values only after init_atomic_atmos has been called.
+  ! otherwise could lead to some memory allocation erros.
    integer, intent(in) :: Nspace
    double precision, intent(in), dimension(Nspace) :: T, ne, nHtot
    double precision :: maxNe = 0
@@ -455,14 +459,21 @@ MODULE atmos_type
    end if
    
    !check where to solve for the line radiative transfer equation.
-   !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) !??? not working
-   do k=1,Nspace
-    atmos%lcompute_atomRT(k) = (atmos%nHtot(k) > tiny_nH) .and. (atmos%T(k) > tiny_T)
-    !knowing that we will have populations and ne only if nHtot and T are different from 0.
-    !Still, some levels of an atom can have 0 pops depending on the Temperature threashold
-    !and some others can have non zero pops for the same T.
-   end do
-   
+   atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) !??? not working
+   !!!$omp parallel &
+   !!!$omp default(none) &
+   !!!$omp private(k) &
+   !!!$omp shared(atmos,tiny_nH, tiny_T,Nspace)
+   !!!$omp do
+!    do k=1,Nspace
+!     atmos%lcompute_atomRT(k) = (atmos%nHtot(k) > tiny_nH) .and. (atmos%T(k) > tiny_T)
+!     !knowing that we will have populations and ne only if nHtot and T are different from 0.
+!     !Still, some levels of an atom can have 0 pops depending on the Temperature threashold
+!     !and some others can have non zero pops for the same T.
+!    end do
+  !!!!$omp end do
+  !!!$omp  end parallel
+     
 !! Test of defining v_char automatically
 !   do n=1,atmos%Natom
 !    if (atmos%v_char<MAXVAL(atmos%Atoms(n)%vbroad)) &

@@ -221,16 +221,17 @@ MODULE lte
      ! further, n1 + n2+n3+nij sum over all stage of each level
      ! gives ntotal.
      ! Therefore n1 = atom%ntotal/sum
-!    write(*,*) "-------------------"
-!    write(*,*) "Atom=",atom%ID, " A=", atom%Abund
-!    write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
+!     write(*,*) "-------------------"
+!     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
+!     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%ntotal(k)/sum
-!    write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
-!     do i=2,atom%Nlevel
-!       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
+!     write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
+    do i=2,atom%Nlevel !debug
+      atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
 !       write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
-!     end do
-    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
+    end do
+    !faster ? 
+!    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
     if (MAXVAL(atom%nstar) <= 0d0) then
      write(*,*) k, "Error, 0 or negative pops in LTE.f90"
@@ -351,11 +352,11 @@ MODULE lte
 
   ! if (.not.chemEquil) then
   atmos%nHmin = 0d0 !init
-  !!!$omp parallel &
-  !!!$omp default(none) &
-  !!!$omp private(k, PhiHmin,j) &
-  !!!$omp shared(atmos,Hydrogen)
-  !!!$omp do
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp private(k, PhiHmin,j) &
+  !$omp shared(atmos,Hydrogen)
+  !$omp do
   do k=1, atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
@@ -370,8 +371,8 @@ MODULE lte
     do j=1,Hydrogen%Nlevel - 1
      atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
     end do
-!    atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
-!    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+   atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+!     atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
    !! comme %n pointe vers %nstar si pureETL (car pointeurs)
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
@@ -379,8 +380,8 @@ MODULE lte
    !!write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
    !! atmos%Atoms(1)%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k)
   end do !over depth points
-  !!!$omp end do
-  !!!$omp  end parallel
+  !$omp end do
+  !$omp  end parallel
   ! end if !if chemical equilibrium
 
  RETURN

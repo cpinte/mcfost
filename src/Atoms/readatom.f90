@@ -9,6 +9,8 @@ MODULE readatom
   use getline
   use barklem, only : getBarklem
 
+  !$ use omp_lib
+
   !MCFOST's originals
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
@@ -86,8 +88,8 @@ MODULE readatom
     !read Nlevel, Nline, Ncont and Nfixed transitions
     CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
     read(inputline,*) atom%Nlevel, atom%Nline, atom%Ncont, atom%Nfixed
-    !write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
-    !           " Ncont=", atom%Ncont, " Nfixed=", atom%Nfixed
+    write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
+              " Ncont=", atom%Ncont, " Nfixed=", atom%Nfixed
 
     !read for each level, Energie (%E), statistical weight (%g), label,
     ! stage and levelNo
@@ -111,9 +113,9 @@ MODULE readatom
      read(inputline,*) atom%E(i), atom%g(i), atom%label(i), &
                        atom%stage(i), levelNumber(i)
      atom%E(i) = atom%E(i) * HPLANCK*CLIGHT / (CM_TO_M)
-     !write(*,*) "E(cm^-1) = ", atom%E(i) * JOULE_TO_EV, &
-     !           "g = ", atom%g(i), "label = ", atom%label(i), &
-     !           "stage = ", atom%stage(i)
+!      write(*,*) "E(cm^-1) = ", atom%E(i) * JOULE_TO_EV, &
+!                "g = ", atom%g(i), "label = ", atom%label(i), &
+!                "stage = ", atom%stage(i)
 
       !Default value:  Note that -99 is used for
       !unknown values:
@@ -140,21 +142,26 @@ MODULE readatom
     allocate(atom%ntotal(atmos%Nspace))
     allocate(atom%vbroad(atmos%Nspace))
     vtherm = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
+    !which is faster?
     atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
     atom%ntotal = atom%Abund * atmos%nHtot
+    !!!$omp parallel &
+    !!!$omp default(none) &
+    !!!$omp private(k) &
+    !!!$omp shared(atmos,atom,vtherm)
+    !!!$omp do
 !     do k=1,atmos%Nspace
 !      atom%ntotal(k) = atom%Abund * atmos%nHtot(k)
-!      write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
+!      !write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
 !      atom%vbroad(k) = dsqrt(vtherm*atmos%T(k) + atmos%vturb(k)**2) !vturb in m/s
-!      write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
+!      !write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
 !     !however, in 3D we do not use micro turbulence
 !     ! all the essence of turbulence is in the MHD
 !     ! velocity
 !     end do
-    ! condition over isum if used here
-    ! isum is used in NLTE to replace one row by
-    ! conservation equation
-
+   !!!$omp end do
+   !!!$omp  end parallel
+  
     !! DO NOT USE i as a loop index here !!
 
     !Now read all bound-bound transitions
@@ -165,7 +172,7 @@ MODULE readatom
      !atom%lines(kr)%atom => atom !hmm work this?
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
-     atom%lines(kr)%Nblue = -1
+!      atom%lines(kr)%Nblue = 0
      !atom%lines(kr)%trtype="ATOMIC_LINE"
      CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
      Nread = len(trim(inputline)) ! because, if blanck
@@ -191,19 +198,19 @@ MODULE readatom
        write(*,*) "exiting.."
        stop
      end if
-     !write(*,*)  j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
-      !symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
-      !atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
-      !atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
-      !atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
-      !atom%lines(kr)%g_Lande_eff
-
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
       atom%lines(kr)%i = min(i,j)
       atom%lines(kr)%j = max(i,j)
+      
+!       write(*,*)  j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
+!       symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
+!       atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
+!       atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
+!       atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
+!       atom%lines(kr)%g_Lande_eff
 
       ! filling S (2S+1), J and Lorbit for each line level
       !determine only for lines
@@ -395,7 +402,7 @@ MODULE readatom
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      !atom%continua(kr)%trtype="ATOMIC_CONTINUUM"
-     atom%continua(kr)%Nblue = -1
+!      atom%continua(kr)%Nblue = 0
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)

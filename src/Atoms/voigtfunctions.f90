@@ -1,3 +1,6 @@
+! --------------------------------------------------------------------------- !
+ ! Implements Voigt functions generator for atomic line radiative transfer
+! --------------------------------------------------------------------------- !
 MODULE voigtfunctions
 
  use constant
@@ -25,7 +28,7 @@ MODULE voigtfunctions
 
  CONTAINS
 
- ! VoigtAtmostrong function generators
+
  FUNCTION VoigtK1(N, a,v) result(L)
   double precision :: a, v(:), c(NC)
   integer :: N
@@ -147,9 +150,11 @@ MODULE voigtfunctions
  END FUNCTION VoigtK3
 
  FUNCTION VoigtArmstrong(N, a, v) result(L)
- ! Armstrong 1967, JQSRT 7, pp. 61-88
- ! (slow for damping parameters larger than 1.5, accurate to
- ! 6 significant figures).
+ ! --------------------------------------------------------------------------- !
+  ! Armstrong 1967, JQSRT 7, pp. 61-88
+  ! (slow for damping parameters larger than 1.5, accurate to
+  ! 6 significant figures).
+ ! --------------------------------------------------------------------------- !
   integer :: N
   double precision :: L(N)
   double precision :: a, v(:)
@@ -183,71 +188,6 @@ MODULE voigtfunctions
  RETURN
  END FUNCTION VoigtArmstrong
 
- FUNCTION VoigtHui(N, a, v, F) result(L)
- ! Hui, Armstrong & Wray 1978, JQSRT 19, pp. 509-516
- ! (same speed in whole parameter space, faster than Armstrong for
- ! large a, otherwise comparable, only 1% accurate for larger v).
-  double precision :: a, v(:)
-  integer :: N
-  double precision :: L(N)
-  double precision, intent(out) :: F(N)
-
-  L = 0d0
-  F = 0d0
-  write(*,*) "Not implemented yet, exiting..."
-  stop
- RETURN
- END FUNCTION VoigtHui
-
- FUNCTION VoigtRybicki(N, a, v) result(L)
- ! George Rybicki's accurate (Ref)
- ! (accurate to at least 8 significant figures, but a factor 2
- ! slower than Armstrong and Hui et al.)
-  double precision :: a, v(:), c(NGR)
-  integer :: N
-  double precision :: L(N)
-  integer :: m, nn
-  double precision :: a1, a2, b1(N), b2(N), e, s(N), t(N), zi(N), zr(N)
-
-  m = -15
-  do nn=1,NGR
-    c(nn) = C0 * dexp(-(real(m*m,kind=8))/9.)
-    m = m+1
-  end do
-  if (a.eq.0.0) then
-   L = dexp(-v*v) !Doppler profile
-   RETURN
-  end if
-
-  a1 = 3. * a
-  a2 = a*a
-  e = dexp(-THREEPI*a)
-  if (a.lt.0.) then
-   zr = 0.5*(e+1./e)*cos(THREEPI*v)
-   zi = 0.5*(e-1./e)*sin(THREEPI*v)
-   L = INVSQRTPI*dexp(a2-v*v)*cos(2*a*v)
-  else
-   zr = e*cos(THREEPI*v)
-   zi = e*sin(THREEPI*v)
-   L = 0.
-  end if
-  b1 = (1-zr)*a*1.5
-  b2 = -zi
-  s = -8. - 1.5*v
-  t = s*s + 2.25 * a2
-  do nn=1,NGR
-   t = t+s+0.25
-   s = s+0.5
-   b1 = a1-b1
-   b2 = -b2
-   L = L - c(nn)*s*C1
-   where (t > 2.5d-12)
-     L = L + c(nn)*(b1+b2*s)/t
-   end where
-  end do
-  L = L * SQRTPI
- RETURN
- END FUNCTION VoigtRybicki
 
  SUBROUTINE Humlicek(N, a, v, W)
   ! W = L + i*F
@@ -286,9 +226,11 @@ MODULE voigtfunctions
  END SUBROUTINE Humlicek
 
  FUNCTION VoigtHumlicek(N, a,v, F) result(L)
- ! Humlicek 1982, JQSRT 27, p. 437
- ! Relative accuracy 1.0E-04. Also calculates Faraday-Voigt
- ! function needed in Stokes radiative transfer.
+ ! --------------------------------------------------------------------------- !
+  ! Humlicek 1982, JQSRT 27, p. 437
+  ! Relative accuracy 1.0E-04. Also calculates Faraday-Voigt
+  ! function needed in Stokes radiative transfer.
+ ! --------------------------------------------------------------------------- !
   double precision :: a, v(:)
   integer :: N
   double precision :: L(N)
@@ -302,34 +244,7 @@ MODULE voigtfunctions
   L = real(W) !factor 2 here or not ?
  RETURN
  END FUNCTION VoigtHumlicek
-
- FUNCTION VoigtLookup(N, a, v) result(L)
- ! Voigt function from file or lookup table
-  double precision :: a, v(:)
-  integer :: N
-  double precision :: L(N)
-
-  L = 0d0
-  write(*,*) "Not implemented yet, exiting..."
-  stop
- RETURN
- END FUNCTION VoigtLookup
-
- FUNCTION VoigtLookup2(N, a, v, F) result(L)
- ! Voigt function from file or lookup table
- ! including dispersion profile
-  double precision :: a, v(:)
-  integer :: N
-  double precision :: L(N)
-  double precision, intent(out) :: F(N)
-
-  L = 0d0
-  F = 0d0
-  write(*,*) "Not implemented yet, exiting..."
-  stop
- RETURN
- END FUNCTION VoigtLookup2
-
+ 
  ! FUNCTION Voigt[...] (N, a, v, F) result(L)
  !  double precision :: a, v, F, L
  !  ! ...
@@ -337,44 +252,31 @@ MODULE voigtfunctions
  ! END FUNCTION Voigt[...]
 
  FUNCTION Voigt(N, a, v, F, VoigtAlgorithm) result (L)
+ ! --------------------------------------------------------------------------- !
   ! RETURN THE VOIGT FUNCTION FOR A LINE PROFILE
   ! ACCORDING TO A DETERMINED ALGORITHM
   ! L-> Voigt function, F->Dispersion profile
   ! if desired (when polarisation is desired in fact)
   ! VoigtAlgorithm-> aglorithm for the voigt function
+ ! --------------------------------------------------------------------------- !
   double precision :: a, v(:)
   integer :: N !size of the final voigt
   double precision, intent(out) :: F(:)
   double precision :: L(N)
-  character(len=10), optional :: VoigtAlgorithm
-  character(len=10) :: Algorithm
+  character(len=*), optional :: VoigtAlgorithm
 
-  if (.not. present(VoigtAlgorithm)) then
-   Algorithm="ARMSTRONG "
-  else
-   Algorithm = VoigtAlgorithm
-  end if
+  if (.not. present(VoigtAlgorithm)) VoigtAlgorithm="ARMSTRONG"
 
-  SELECT CASE (Algorithm)
-  CASE ("ARMSTRONG ")
+  SELECT CASE (VoigtAlgorithm)
+  CASE ("ARMSTRONG")
    L = VoigtArmstrong(N, a, v)
-  CASE ("HUMLICEK  ")
+  CASE ("HUMLICEK")
    !Zeeman Case
    L = VoigtHumlicek(N, a,v, F)
-  CASE ("RYBICKI   ")
-   L = VoigtRybicki(N, a, v)
-   ! -- Not implemented yet --!
-  CASE ("HUI_ETAL  ")
-   L = VoigtHui(N, a, v, F)
-  CASE ("LOOKUP    ")
-   L = VoigtLookup(N, a, v)
-  CASE ("LOOKUP_2  ")
-   L = VoigtLookup2(N, a, v, F)
-  ! -- Not implemented yet --!
   CASE DEFAULT
-   write(*,*) "Algorithm ",Algorithm, &
+   write(*,*) "Algorithm ",VoigtAlgorithm, &
        " for voigt function unkown!"
-   write(*,*) "len=",len(Algorithm)
+   write(*,*) "len=",len(VoigtAlgorithm)
    write(*,*) "Exciting..."
    stop
   END SELECT

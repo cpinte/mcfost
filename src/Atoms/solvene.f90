@@ -225,11 +225,11 @@ END FUNCTION getPartitionFunctionk
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj) &
   !$omp shared(atmos, ne,initial,np)
-  
   !$omp do
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
-write(*,*) "The thread,",omp_get_thread_num() + 1 ," is doing the cell ", k
+
+write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."NPROTON") then
     ne_old = np(k)
    else if (initial.eq."NEMODEL") then

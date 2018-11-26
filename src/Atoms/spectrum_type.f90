@@ -160,6 +160,11 @@ CONTAINS
   SUBROUTINE initAtomOpac(id)
     ! set opacities to 0d0 for thread id
     integer, intent(in) :: id
+    
+    if (id <= 0) then
+     write(*,*) "(initAtomOpac) thread id has to be >= 1!"
+     stop
+    end if
 
     NLTEspec%AtomOpac%chi(id,:) = 0d0
     NLTEspec%AtomOpac%eta(id,:) = 0d0
@@ -260,6 +265,7 @@ npix_x = 101; npix_y = 101
 !         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)       
 !        end do
 !       else ! infall
+       write(*,*) xcenter, npix_x, shape(NLTEspec%Flux)
        do i=xcenter+1,npix_x
         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
@@ -285,7 +291,6 @@ npix_x = 101; npix_y = 101
 !   end do
   !idL = locate(NLTEspec%lambda,121.582d0)!121.568d0)
   !write(*,*) idL, NLTEspec%lambda(idL)
-  !write(*,*) "max(II)=",MAXVAL(II), " min(II)",MINVAL(II)
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
   
   ! create new hdu for continuum

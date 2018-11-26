@@ -160,8 +160,8 @@ MODULE AtomicTransfer
 
      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-!  NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-dtau)! * dtau
-!  NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + Snu_c * exp(-dtau_c)! * dtau_c
+!  NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-dtau) * dtau
+!  NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + Snu_c * exp(-dtau_c) * dtau_c
 
      ! surface superieure ou inf
      facteur_tau = 1.0
@@ -497,6 +497,13 @@ npix_x = 101; npix_y = 101
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
 
+!! ---------------- ---------------------------------------- !!
+  
+  atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic
+  if (atmos%Nrays == 0) then
+   write(*,*) "Nrays should at least be 1!"
+   stop
+  end if
 
 !! ----------------------- Read Model ---------------------- !!
   CALL uniform_law_model()
@@ -508,27 +515,16 @@ npix_x = 101; npix_y = 101
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
   !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
-
+  
   write(*,*) "maxTgas = ", MAXVAL(atmos%T), " minTgas = ", MINVAL(atmos%T)
-  write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)
-  write(*,*) "maxNE = ", MAXVAL(atmos%ne), " minNE = ", MINVAL(atmos%ne)
+  write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)  
 !! --------------------------------------------------------- !!
+
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
-  
-  atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic
-  if (atmos%Nrays == 0) then
-   write(*,*) "Nrays should at least be 1!"
-   stop
-  end if
-
-  NLTEspec%atmos => atmos
-  CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
-  CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  
 
   ! if the electron density is not provided by the model or simply want to
   ! recompute it
@@ -544,6 +540,15 @@ npix_x = 101; npix_y = 101
   CALL writeHydrogenDensity()  
 
   Call setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
+
+  write(*,*) "maxNE = ", MAXVAL(atmos%ne), " minNE = ", MINVAL(atmos%ne)
+  write(*,*) "maxnHmin = ", MAXVAL(atmos%nHmin), " minnHmin = ", MINVAL(atmos%nHmin)
+
+!! --------------------------------------------------------- !!
+
+  NLTEspec%atmos => atmos
+  CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
+  CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL synchronize_with_mcfost()
@@ -593,6 +598,16 @@ npix_x = 101; npix_y = 101
      end do
   end do
   CALL WRITE_FLUX()
+  
+!   open(10*atomunit, file="Snu.dat",action="write",status="unknown")
+!   CALL initAtomOpac(1)
+!   CALL Background(1, 1, 0d0,0d0, 0d0, 0d0, 0d0,0d0, 0d0,0d0,0d0)
+!   do la=1,NLTEspec%Nwaves
+!    ! write(*,*) NLTEspec%lambda(la), (NLTEspec%AtomOpac%eta_p(1,la)) / (NLTEspec%AtomOpac%chi_p(1,la)) 
+!    write(10*atomunit,*) NLTEspec%lambda(la), (NLTEspec%AtomOpac%eta_p(1,la)) / & 
+!     (NLTEspec%AtomOpac%chi_p(1,la)) 
+!   end do
+!   close(10*atomunit)
 
  ! Transfer ends, save data, free some space and leave
  do nact=1,atmos%Nactiveatoms

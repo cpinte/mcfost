@@ -188,7 +188,7 @@ MODULE metal
 !  integer, dimension(:), allocatable :: iLam
   double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
-  double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0, v1, dv
+  double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0, v1, dv, dlambda
   type (AtomicLine) :: line
   type (AtomType) :: atom
 
@@ -231,6 +231,14 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i
      j = line%j
+     
+!      dlambda = line%qwing * line%lambda0 * atmos%v_char/CLIGHT
+!      if ((dabs(line%lambda0 - NLTEspec%lambda(line%Nblue)) > dlambda) .or. &
+!         (dabs(line%lambda0 - NLTEspec%lambda(line%Nblue+line%Nlambda-1)) > dlambda)) CYCLE
+
+     ! now at each cell we compute it !!
+     ! intialized is .true. if damping are stored on the whole grid
+     line%damping_initialized=.false. !always now, because we compute damping at each icell
 
 
      if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
@@ -254,11 +262,6 @@ MODULE metal
      phip = 0d0
      phiPol = 0d0
 
-    ! now at each cell we compute it !!
-    ! intialized is .true. if damping are stored on the whole grid
-     line%damping_initialized=.false.
-     if (line%Voigt) CALL Damping(icell, atom, kr, line%adamp)
-
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
     !convert to doppler units
@@ -270,26 +273,25 @@ MODULE metal
       (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
          CLIGHT / (line%lambda0 * atom%vbroad(icell))
      if (line%voigt) then
+      CALL Damping(icell, atom, kr, line%adamp)
+      
 !        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
-!        phi(iLam) = phi(iLam) + Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
+!        phi(iLam) = Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
 !                 phip, 'ARMSTRONG ')
        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
         vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell) !add velocity field
-       phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
-        phi(line%Nblue:line%Nblue+line%Nlambda-1) + &
-         Voigt(line%Nlambda, line%adamp, vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, 'ARMSTRONG ')
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = Voigt(line%Nlambda, line%adamp, &
+          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, 'HUMLICEK')
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
-!       phiPol(iLam) = phiPol(iLam) + phip(iLam)
-       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = &
-        phiPol(line%Nblue:line%Nblue+line%Nlambda-1) + phip(line%Nblue:line%Nblue+line%Nlambda-1)
+!       phiPol(iLam) = phip(iLam)
+       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = phip(line%Nblue:line%Nblue+line%Nlambda-1)
      else !Gaussian
 !        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
         vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell)
-!        phi(iLam) = phi(iLam) + dexp(-(vvoigt(iLam))**2)
-       phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
-        phi(line%Nblue:line%Nblue+line%Nlambda-1) + dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2)
+!        phi(iLam) = dexp(-(vvoigt(iLam))**2)
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2)
      end if
      !Sum up all contributions for this line with the other
 !      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
@@ -303,6 +305,12 @@ MODULE metal
      eta(line%Nblue:line%Nblue+line%Nlambda-1) = &
       eta(line%Nblue:line%Nblue+line%Nlambda-1) + &
        twohnu3_c2 * gij * Vij(line%Nblue:line%Nblue+line%Nlambda-1) * atom%n(j,icell)
+       
+!      write(*,*) atom%ID, line%j,"->",line%i, NLTEspec%lambda(line%NBlue+(line%Nlambda-1)/2) - line%lambda0, &
+!       " nspect=", line%NBlue+(line%Nlambda-1)/2 - 1
+!      write(*,*) Vij(line%NBlue+(line%Nlambda-1)/2), &
+!         phi(line%Nblue+(line%Nlambda-1)/2), gij, line%adamp
+       
      !dealloc indexes for next line
 !     deallocate(iLam)
     end do !end loop on lines for this atom
