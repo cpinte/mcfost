@@ -162,11 +162,11 @@ MODULE lte
    end do
   end if
 
-   !!!$omp parallel &
-   !!!$omp default(none) &
-   !!!$omp private(k, phik, dEion,i,dZ,nDebeye,dE,m,sum) &
-   !!!$omp shared(atmos,Hydrogen,c2,atom, Debeye)
-   !!!$omp do
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(k, phik, dEion,i,dZ,dE,m,sum) &
+   !$omp shared(atmos,Hydrogen,c2,atom, Debeye,nDebeye)
+   !$omp do
    do k=1,atmos%Nspace
     if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
@@ -233,15 +233,23 @@ MODULE lte
     !faster ? 
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
-    if (MAXVAL(atom%nstar) <= 0d0) then
-     write(*,*) k, "Error, 0 or negative pops in LTE.f90"
+    if (MAXVAL(atom%nstar(:,k)) <= 0d0) then !at the cell
+     write(*,*) "cell=",k, atom%ID, atom%nstar(:,k)
+     write(*,*) "Error, zero or negative populations for this atom at this cell point"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
     end if
    end do !over depth points
-   !!!$omp end do
-   !!!$omp  end parallel
+   !$omp end do
+   !$omp  end parallel
 !    write(*,*) "-------------------"
+
+   if (MAXVAL(atom%nstar) <= 0d0) then !Total
+     write(*,*) "cell=",k, atom%ID
+     write(*,*) "Error, zero oor negative populations for this atom on the grid!"
+     write(*,*) "Exciting..."
+     stop !beware if low T, np -> 0, check to not divide by 0 density
+   end if
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
