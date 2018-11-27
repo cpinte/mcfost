@@ -245,6 +245,33 @@ MODULE voigtfunctions
  RETURN
  END FUNCTION VoigtHumlicek
  
+ FUNCTION VoigtLookup (N, a, v, F) result(L)
+ 
+  use spectrum_type, only : NLTEspec
+  use math, only : interp2Darr
+ 
+  integer :: N
+  double precision :: a, v(:)
+  double precision :: L(N)
+  double precision, intent(out) :: F(N)
+  double precision :: y(N,1), xa(1)
+
+  
+  if (.not.NLTEspec%precomputed_voigt) then
+   write(*,*) "Error: Trying to use precomputed voigt table that does not exist"
+   stop
+  end if
+  
+  xa(1) = a
+  y = interp2Darr(size(NLTEspec%v_values), NLTEspec%v_values, &
+          size(NLTEspec%a_values), NLTEspec%a_values, NLTEspec%VoigtTable, &
+          N, v, 1, xa)
+  L = y(:,1)
+  F = 0
+  
+ RETURN
+ END FUNCTION VoigtLookup
+ 
  ! FUNCTION Voigt[...] (N, a, v, F) result(L)
  !  double precision :: a, v, F, L
  !  ! ...
@@ -273,6 +300,8 @@ MODULE voigtfunctions
   CASE ("HUMLICEK")
    !Zeeman Case
    L = VoigtHumlicek(N, a,v, F)
+  CASE ("LookupTable")
+   L = VoigtLookup(N,a,v,F)
   CASE DEFAULT
    write(*,*) "Algorithm ",VoigtAlgorithm, &
        " for voigt function unkown!"

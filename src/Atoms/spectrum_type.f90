@@ -3,9 +3,11 @@ MODULE spectrum_type
   use atom_type
   use atmos_type, only : GridType
   use getlambda, only : make_wavelength_grid
+  use voigtfunctions, only : Voigt
   
   !MCFOST's original modules
   use fits_utils, only : print_error
+  use utils, only : spanl, span
 
   IMPLICIT NONE
 
@@ -42,6 +44,9 @@ MODULE spectrum_type
    integer :: Nwaves, Nact, NPROC
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
+   logical :: precomputed_voigt = .false.
+   double precision, allocatable, dimension(:) :: a_values, v_values
+   double precision, allocatable, dimension(:,:) :: VoigtTable, FvoigtTable
    !nproc, nlambda, ncells
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nproc, nlambda
@@ -81,7 +86,8 @@ CONTAINS
   SUBROUTINE allocSpectrum(NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
-   integer :: Nsize
+   integer :: Nsize, maxNlambda=0, Nadmp = 50, iv, ia, n, kr
+   double precision, allocatable, dimension(:) :: F
    
    Nsize = NLTEspec%Nwaves
    ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
@@ -133,12 +139,40 @@ CONTAINS
    NLTEspec%AtomOpac%sca_c = 0.
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
+   
+    
+  ! Generate look-up table for voigt functions before the transfer starts
+  ! and interpolate the line profiles on this table instead of computing on the fly
+  if (NLTEspec%precomputed_voigt) then
+    do n=1,NLTEspec%atmos%Natom
+     do kr=1,NLTEspec%atmos%Atoms(n)%Ncont
+      maxNlambda = max(NLTEspec%atmos%Atoms(n)%continua(kr)%Nlambda,maxNlambda)
+     end do
+     do kr=1,NLTEspec%atmos%Atoms(n)%Nline
+      maxNlambda = max(NLTEspec%atmos%Atoms(n)%lines(kr)%Nlambda,maxNlambda)
+     end do
+    end do 
+   write(*,*) "VoigtTable size: Nmax = ", maxNlambda, " Nadmp = ", Nadmp
+   allocate(NLTEspec%VoigtTable(maxNlambda, Nadmp))
+   !if (NLTEspec%atmos%magnetized) allocate(NLTEspec%FvoigtTable(maxNlambda, Nadmp), F(maxNlambda))
+   allocate(NLTEspec%a_values(Nadmp))
+   allocate(NLTEspec%v_values(maxNlambda), F(maxNlambda))
+   NLTEspec%a_values = spanl(0.00005,1.,Nadmp)
+   NLTEspec%v_values = span(-30.,30.,maxNlambda)
+   do n=1,size(NLTEspec%a_values)
+    !write(*,*) n,  NLTEspec%a_values(n), NLTEspec%v_values
+    NLTEspec%VoigtTable(:,n) = Voigt(maxNlambda, NLTEspec%a_values(n), NLTEspec%v_values(:), F, 'HUMLICEK')
+    !if (NLTEspec%atmos%magnetized) NLTEspec%FvoigtTable(:,n) = F
+   end do
+   deallocate(F)
+  end if
 
   RETURN
   END SUBROUTINE allocSpectrum
 
   SUBROUTINE freeSpectrum()
    deallocate(NLTEspec%lambda)
+   if (NLTEspec%precomputed_voigt) deallocate(NLTEspec%VoigtTable)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
    if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
@@ -265,7 +299,7 @@ npix_x = 101; npix_y = 101
 !         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)       
 !        end do
 !       else ! infall
-       write(*,*) xcenter, npix_x, shape(NLTEspec%Flux)
+!       write(*,*) xcenter, npix_x, shape(NLTEspec%Flux)
        do i=xcenter+1,npix_x
         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)

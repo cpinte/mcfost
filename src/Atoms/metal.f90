@@ -185,6 +185,7 @@ MODULE metal
   integer, intent(in) :: icell
   double precision, intent(in) :: x,y,z,u,v,w,& !positions and angles used to project
                                   x1,y1,z1      ! velocity field and magnetic field
+  character(len=20) :: VoigtMethod = "HUMLICEK"
 !  integer, dimension(:), allocatable :: iLam
   double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
@@ -196,7 +197,8 @@ MODULE metal
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
-
+  
+  if (NLTEspec%precomputed_voigt) VoigtMethod = "LookupTable"
 
   !NrecStokes = 1 in unpolarised transfer and 4 in Stokes tranfer (I,Q,U,V)
   chi = 0.  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
@@ -277,15 +279,15 @@ MODULE metal
       
 !        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
 !        phi(iLam) = Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
-!                 phip, 'ARMSTRONG ')
+!                 phip, VoigtMethod)
        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
         vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell) !add velocity field
        phi(line%Nblue:line%Nblue+line%Nlambda-1) = Voigt(line%Nlambda, line%adamp, &
-          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, 'HUMLICEK')
+          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, VoigtMethod)
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
 !       phiPol(iLam) = phip(iLam)
-       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = phip(line%Nblue:line%Nblue+line%Nlambda-1)
+!       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = phip(line%Nblue:line%Nblue+line%Nlambda-1)
      else !Gaussian
 !        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &

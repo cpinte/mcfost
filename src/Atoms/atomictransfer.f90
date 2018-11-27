@@ -67,19 +67,20 @@ MODULE AtomicTransfer
   ! if atmos%nHtot or atmos%T is 0, the cell is empty
   !
   ! id = processor information, iray = index of the running ray
+  ! what is labs? lsubtract_avg?
  ! ------------------------------------------------------------------------------- !
 
   integer, intent(in) :: id, icell_in, iray
   double precision, intent(in) :: u,v,w
   double precision, intent(in) :: x,y,z
-  logical, intent(in) :: labs
+  logical, intent(in) :: labs !used in NLTE but why?
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-  double precision, dimension(NLTEspec%Nwaves) :: dtau, dtau2, Snu
-  double precision, dimension(NLTEspec%Nwaves) :: tau, tau2
-  double precision, dimension(NLTEspec%Nwaves) :: tau_c
-  double precision, dimension(NLTEspec%Nwaves) :: dtau_c, Snu_c
+  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, Snu1, Snu1_c
+  double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
   integer :: nbr_cell, icell, next_cell, previous_cell
-  double precision :: facteur_tau
+  double precision :: facteur_tau !used only in molecular line to have emission for one
+                                  !  half of the disk only. Note used in AL-RT.
+                                  !  this is passed through the lonly_top or lonly_bottom.
   logical :: lcellule_non_vide, lsubtract_avg
 
   x1=x;y1=y;z1=z
@@ -114,7 +115,7 @@ MODULE AtomicTransfer
      lcellule_non_vide=.false.
     endif
        
-    ! Test sortie
+    ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) then 
      RETURN
     end if
@@ -129,7 +130,7 @@ MODULE AtomicTransfer
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
-    if (lcellule_non_vide) then
+    if (lcellule_non_vide) then !count opacity only if the cell is filled, else go to next cell
      lsubtract_avg = ((nbr_cell == 1).and.labs)
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
@@ -157,18 +158,30 @@ MODULE AtomicTransfer
      ! continuum source function
      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
+            
+!      CALL initAtomOpac(id)       
+!      CALL Background(id, next_cell, x0, y0, z0, x1, y1, z1, u, v, w)
+!      Snu1 = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
+!                   NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
+!                  (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
+!      Snu1_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
+!             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
+!      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + 0.5*(Snu + Snu1) * dtau
+!      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + 0.5*(Snu_c + Snu1_c) * dtau_c 
 
-     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-!  NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + Snu * exp(-dtau) * dtau
-!  NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + Snu_c * exp(-dtau_c) * dtau_c
-
-     ! surface superieure ou inf
+    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+    NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
+!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*(1d0-dtau) + dtau*Snu
+!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*(1d0-dtau_c) + dtau_c*Snu_c
+ 
+     
+!      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
-     if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
-     if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+!      if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+!      if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
 
      ! Mise a jour profondeur optique pour cellule suivante
+     ! dtau = chi * ds
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
@@ -243,7 +256,6 @@ MODULE AtomicTransfer
            CALL move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 !            write(*,*) i, j, lintersect, labs, icell, x0, y0, z0, u0, v0, w0
 !            stop
-           
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(id,:,iray)
@@ -548,8 +560,8 @@ npix_x = 101; npix_y = 101
 
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
+!NLTEspec%precomputed_voigt = .true.
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL synchronize_with_mcfost()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
@@ -599,7 +611,7 @@ npix_x = 101; npix_y = 101
   end do
   CALL WRITE_FLUX()
   
-!   open(10*atomunit, file="Snu.dat",action="write",status="unknown")
+!   open(10*atomunit, file="Snu_0.dat",action="write",status="unknown")
 !   CALL initAtomOpac(1)
 !   CALL Background(1, 1, 0d0,0d0, 0d0, 0d0, 0d0,0d0, 0d0,0d0,0d0)
 !   do la=1,NLTEspec%Nwaves
@@ -672,7 +684,7 @@ npix_x = 101; npix_y = 101
         enddo
      endif
   endif 
- 
+  atmos%Vmap = Vfield
  RETURN
  END SUBROUTINE synchronize_with_mcfost
 

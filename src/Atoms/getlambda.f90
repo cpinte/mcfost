@@ -291,8 +291,6 @@ MODULE getlambda
 
   write(*,*) "Adding ", Nspect," lines and continua"
 
-
-
   ! add wavelength from mcfost inoutgrid if any
   ! convert it to nm
   if (allocated(inoutgrid)) then
