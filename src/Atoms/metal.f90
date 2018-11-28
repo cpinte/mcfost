@@ -197,8 +197,6 @@ MODULE metal
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
-  
-  if (NLTEspec%precomputed_voigt) VoigtMethod = "LookupTable"
 
   !NrecStokes = 1 in unpolarised transfer and 4 in Stokes tranfer (I,Q,U,V)
   chi = 0.  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
@@ -321,6 +319,90 @@ MODULE metal
  RETURN
 
  END FUNCTION Metal_bb
+ 
+ SUBROUTINE BackgroundContinua (icell)
+  integer, intent(in) :: icell
+  double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, Bpnu
+  integer :: Npassive
+
+  if (.not.atmos%lcompute_atomRT(icell)) RETURN
+  
+  CALL Bplanck(atmos%T(icell), NLTEspec%Nwaves, NLTEspec%lambda, Bpnu)
+
+   chi = 0.
+   eta = 0.
+   sca = 0.
+
+
+   NLTEspec%AtomOpac%Kc(icell,:,1) = Thomson(icell)
+
+   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = & 
+     NLTEspec%AtomOpac%Kc(icell,:,1) + sca
+   if (associated(Helium)) then
+    if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = &
+          NLTEspec%AtomOpac%Kc(icell,:,1) + sca
+   end if
+
+   NLTEspec%AtomOpac%Kc(:,:,2) = NLTEspec%AtomOpac%Kc(:,:,1)
+
+   CALL Hydrogen_ff(icell, chi)
+   NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
+   NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
+
+   if (Hminus_bf(icell, chi,eta)) then
+    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
+    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
+   end if
+
+   CALL Hminus_ff(icell, chi)
+    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
+    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
+
+   if (.not.Hydrogen%active) then !passive bound-free
+    if (Hydrogen_bf(icell, chi, eta)) then
+     NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
+     NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
+    end if
+   end if
+
+   Npassive = atmos%Natom - atmos%Nactiveatoms
+   if (Npassive == 0) RETURN !no passive bound-bound and bound-free
+   ! remove H if passive because it is computed in Hydrogen_bf()
+   if (.not.Hydrogen%active) Npassive = Npassive - 1
+   if (Npassive>0) then !other metal passive ?
+    if (Metal_bf(icell, chi, eta)) then
+     NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
+     NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
+    end if
+   end if
+
+ RETURN
+ END SUBROUTINE BackgroundContinua
+ 
+ SUBROUTINE BackgroundLines(id, icell,x,y,z,x1,y1,z1,u,v,w)
+  integer, intent(in) :: icell, id
+  double precision, intent(in) :: x, y, z, u, v, w, &
+                                  x1, y1, z1
+  double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, chip
+  integer :: Npassive
+
+  if (.not.atmos%lcompute_atomRT(icell)) RETURN 
+
+   chi = 0.
+   eta = 0.
+   sca = 0.
+   chip = 0.
+
+   Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
+   if (Npassive > 0) then !go into it even if only H is passive
+    if (Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, chi, eta, chip)) then
+     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+    end if
+   end if
+
+ RETURN
+ END SUBROUTINE BackgroundLines
 
  SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w)
   integer, intent(in) :: icell, id

@@ -24,7 +24,7 @@
 
 MODULE AtomicTransfer
 
- use metal, only : Background
+ use metal, only : Background, BackgroundContinua, BackgroundLines
  use spectrum_type
  use atmos_type
  use readatom
@@ -139,24 +139,40 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
+     if (NLTEspec%AtomOpac%store_opac) then
+      CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w)
+      dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
+                    NLTEspec%AtomOpac%Kc(icell,:,1))
+      dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
+
+
+      Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
+               NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
+                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / & 
+                 (NLTEspec%AtomOpac%Kc(icell,:,1) + &
+                 NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
+
+      Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
+            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)      
+     else
+      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
-     ! Epaisseur optique
-     ! chi_p contains both thermal and continuum scattering extinction
-     dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
-     dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
+      ! Epaisseur optique
+      ! chi_p contains both thermal and continuum scattering extinction
+      dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
+      dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
 
-     ! Source function
-     ! No dust yet
-     ! J and Jc are the mean radiation field for total and continuum intensities
-     ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
-     ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
-     Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
+      ! Source function
+      ! No dust yet
+      ! J and Jc are the mean radiation field for total and continuum intensities
+      ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
+      ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
+      Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
                   NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
                  (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
-     ! continuum source function
-     Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
+      ! continuum source function
+      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
             
 !      CALL initAtomOpac(id)       
@@ -168,7 +184,7 @@ MODULE AtomicTransfer
 !             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
 !      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + 0.5*(Snu + Snu1) * dtau
 !      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + 0.5*(Snu_c + Snu1_c) * dtau_c 
-
+    end if
     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*(1d0-dtau) + dtau*Snu
@@ -465,16 +481,36 @@ npix_x = 101; npix_y = 101
 
  ! adding the stellar flux
   write(*,*) " --> adding stellar flux map..."
-  do i = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(i) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+!  !! the following is only True if the stellar radiation is flat across a spectral line !
+!   do i = 1, atmos%Natom
+!    do j = 1, atmos%Atoms(i)%Ncont
+!    lambda = (atmos%Atoms(i)%continua(j)%Nlambda - 1)/2
+!    nu = c_light / NLTEspec%lambda(lambda) * 1d9
+!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!    end do
+!    do j = 1, atmos%Atoms(i)%Nline
+!    lambda = (atmos%Atoms(i)%lines(j)%Nlambda - 1)/2
+!    nu = c_light / NLTEspec%lambda(lambda) * 1d9
+!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+!    end do   
+!   end do
+  
+  do lambda = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
                                              !else it means that in FLUX_PIXEL_LINE, nu
                                              !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(i, u, v, w, taille_pix, dx, dy, lresolved)
-!     write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(i), & 
-!         MAXVAL(NLTEspec%Flux(i,:,:,ibin,iaz))/MAXVAL(stars_map(:,:,1)), & 
-!         MINVAL(NLTEspec%Flux(i,:,:,ibin,iaz)),MINVAL(stars_map(:,:,1))
-    NLTEspec%Flux(i,:,:,ibin,iaz) = NLTEspec%Flux(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-    NLTEspec%Fluxc(i,:,:,ibin,iaz) = NLTEspec%Fluxc(i,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!     write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(lambda), & 
+!         MAXVAL(NLTEspec%Flux(lambda,:,:,ibin,iaz))/MAXVAL(stars_map(:,:,1)), & 
+!         MINVAL(NLTEspec%Flux(lambda,:,:,ibin,iaz)),MINVAL(stars_map(:,:,1))
+    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+                                         stars_map(:,:,1) / nu
+    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+                                         stars_map(:,:,1) / nu
   end do
 
  RETURN
@@ -501,9 +537,11 @@ npix_x = 101; npix_y = 101
   !! the following quantities are input parameters !!
   integer :: NiterMax = 20, Nrays = 1! Number of rays for angular integration and to compute Inu(mu)
   integer :: IterLimit
-  logical :: SOLVE_FOR_NE = .false. !for calculation of electron density even if atmos%calc_ne
+  logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
                                    ! is .false.
   character(len=7) :: NE0 = "HIONIS"
+  logical :: lvoigt_table = .false.
+  logical :: lstore_opac = .true.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !because for now lemission_atom is not a case of readparameters
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
@@ -544,8 +582,8 @@ npix_x = 101; npix_y = 101
   ! else atmos%ne not given, its computation is mandatory
   ! if NLTE pops are read in readAtomicModels, H%n(Nlevel,:) and atom%n
   !can be used for the electron density calculation.
-  if (.not.atmos%calc_ne) atmos%calc_ne = SOLVE_FOR_NE
-  if (SOLVE_FOR_NE) write(*,*) "(Force) Solving for electron density"
+  if (.not.atmos%calc_ne) atmos%calc_ne = lsolve_for_ne
+  if (lsolve_for_ne) write(*,*) "(Force) Solving for electron density"
   if (atmos%calc_ne) CALL SolveElectronDensity(atmos%ne,NE0)
   CALL writeElectron() !will be moved elsewhere
   ! do it in the reading process
@@ -560,8 +598,24 @@ npix_x = 101; npix_y = 101
 
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
-!NLTEspec%precomputed_voigt = .true.
+  NLTEspec%precomputed_voigt = lvoigt_table
+  NLTEspec%AtomOpac%store_opac = lstore_opac
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
+  if (NLTEspec%AtomOpac%store_opac) then !only Background lines and active transitions
+                                         ! chi and eta, are computed on the fly.
+                                         ! Background continua (=ETL) are kept in memory.
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(icell) &
+   !$omp shared(atmos) 
+   !$omp do
+   do icell=1,atmos%Nspace
+    CALL BackgroundContinua(icell)
+   end do
+   !$omp end do
+   !$omp end parallel
+  end if
+  
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL synchronize_with_mcfost()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!

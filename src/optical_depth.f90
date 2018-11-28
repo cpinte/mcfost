@@ -12,7 +12,7 @@ module optical_depth
   use density
   
   !B. Tessore
-  use metal, only : Background
+  use metal, only : Background, BackgroundLines
   use spectrum_type, only : NLTEspec, initAtomOpac
 
   implicit none
@@ -303,10 +303,16 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      if ((icell0<=n_cells).and.(lemission_atom).and.&
            (NLTEspec%Atmos%lcompute_atomRT(icell0))) then
       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-      CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
-      opacite = NLTEspec%AtomOpac%chi(id,lambda) + &
+      if (NLTEspec%AtomOpac%store_opac) then
+       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+                NLTEspec%AtomOpac%chi_p(id,lambda) + NLTEspec%AtomOpac%Kc(icell0,lambda,1)) * &
+                AU_to_m
+      else
+       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       opacite = NLTEspec%AtomOpac%chi(id,lambda) + &
                 NLTEspec%AtomOpac%chi_p(id,lambda)
-      opacite = opacite * AU_to_m !because l_contrib is in AU
+       opacite = opacite * AU_to_m !because l_contrib is in AU
 !       write(*,*) id, NLTEspec%lambda(lambda), opacite
 !       stop
 !       if ((opacite /= opacite).or.(opacite+1==opacite)) then
@@ -314,6 +320,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 !           NLTEspec%lambda(lambda), opacite, NLTEspec%AtomOpac%chi_c(id,lambda)
 !        stop
 !       end if
+      end if
      end if
      ! ------------------------------------------------------------------ !
 

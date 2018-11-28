@@ -30,11 +30,13 @@ MODULE spectrum_type
 !   END TYPE ActiveSetType
   
   TYPE AtomicOpacity
+   logical :: store_opac=.false.
    !active opacities
    double precision, allocatable, dimension(:,:) :: chi, eta, rho
    !passive opacities
    double precision, allocatable, dimension(:,:) :: rho_p, eta_p, chi_p
    double precision, allocatable, dimension(:,:) :: eta_c, chi_c, sca_c
+   double precision, allocatable                 :: Kc(:,:,:), jc(:,:)
    !type (ActiveSetType) :: ActiveSet
   END TYPE AtomicOpacity
 
@@ -44,9 +46,9 @@ MODULE spectrum_type
    integer :: Nwaves, Nact, NPROC
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
-   logical :: precomputed_voigt = .false.
-   double precision, allocatable, dimension(:) :: a_values, v_values
-   double precision, allocatable, dimension(:,:) :: VoigtTable, FvoigtTable
+   logical :: precomputed_voigt = .false.! -->beta test
+   double precision, allocatable, dimension(:) :: a_values, v_values! -->beta test
+   double precision, allocatable, dimension(:,:) :: VoigtTable, FvoigtTable! -->beta test
    !nproc, nlambda, ncells
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nproc, nlambda
@@ -120,27 +122,38 @@ CONTAINS
    !   NLTEspec%Ic = 0.0
    NLTEspec%Flux = 0.0
    NLTEspec%Fluxc = 0.0
+   
+   !Now opacities
+   if (NLTEspec%AtomOpac%store_opac) then !keep continuum LTE opacities in memory
+     !sca_c = Kc(:,:,2), chi_c = Kc(:,:,1), eta_c = jc
+     allocate(NLTEspec%AtomOpac%Kc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,2), &
+       NLTEspec%AtomOpac%jc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves))
+     NLTEspec%AtomOpac%Kc = 0d0
+     NLTEspec%AtomOpac%jc = 0d0
+   else
+    allocate(NLTEspec%AtomOpac%eta_c(NLTEspec%NPROC,Nsize))
+    allocate(NLTEspec%AtomOpac%chi_c(NLTEspec%NPROC,Nsize))
+    allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%NPROC,NLTEspec%Nwaves))
+    NLTEspec%AtomOpac%chi_c = 0.
+    NLTEspec%AtomOpac%eta_c = 0.
+    NLTEspec%AtomOpac%sca_c = 0.
+   end if
+   
    allocate(NLTEspec%AtomOpac%chi(NLTEspec%NPROC,Nsize))
    allocate(NLTEspec%AtomOpac%eta(NLTEspec%NPROC,Nsize))
    ! if pol allocate AtomOpac%rho
    NLTEspec%AtomOpac%chi = 0.
    NLTEspec%AtomOpac%eta = 0.
 
-   allocate(NLTEspec%AtomOpac%eta_c(NLTEspec%NPROC,Nsize))
-   allocate(NLTEspec%AtomOpac%chi_c(NLTEspec%NPROC,Nsize))
-   allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%NPROC,Nsize))
    allocate(NLTEspec%AtomOpac%eta_p(NLTEspec%NPROC,Nsize))
    allocate(NLTEspec%AtomOpac%chi_p(NLTEspec%NPROC,Nsize))
    !allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%NPROC,Nsize))
    ! if pol same as atice opac case
-   
-   NLTEspec%AtomOpac%chi_c = 0.
-   NLTEspec%AtomOpac%eta_c = 0.
-   NLTEspec%AtomOpac%sca_c = 0.
+
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
    
-    
+!-> this is in beta
   ! Generate look-up table for voigt functions before the transfer starts
   ! and interpolate the line profiles on this table instead of computing on the fly
   if (NLTEspec%precomputed_voigt) then
@@ -178,15 +191,21 @@ CONTAINS
    if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
    !! deallocate(NLTEspec%J20)
    
+   !active
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
 
-   deallocate(NLTEspec%AtomOpac%eta_c)
-   deallocate(NLTEspec%AtomOpac%chi_c)
-   deallocate(NLTEspec%AtomOpac%sca_c)
-   deallocate(NLTEspec%AtomOpac%eta_p)
+   !passive
+   deallocate(NLTEspec%AtomOpac%eta_p) !contains only passive lines if store_opac
    deallocate(NLTEspec%AtomOpac%chi_p)
    !deallocate(NLTEspec%AtomOpac%rho_p)
+   if (NLTEspec%AtomOpac%store_opac) then !keep continuum LTE opacities in memory
+     deallocate(NLTEspec%AtomOpac%Kc,  NLTEspec%AtomOpac%jc)
+   else !they are not allocated if we store background continua on ram
+    deallocate(NLTEspec%AtomOpac%eta_c)
+    deallocate(NLTEspec%AtomOpac%chi_c)
+    deallocate(NLTEspec%AtomOpac%sca_c)
+   end if
    NULLIFY(NLTEspec%atmos)
   RETURN
   END SUBROUTINE freeSpectrum
@@ -202,9 +221,11 @@ CONTAINS
 
     NLTEspec%AtomOpac%chi(id,:) = 0d0
     NLTEspec%AtomOpac%eta(id,:) = 0d0
-    NLTEspec%AtomOpac%chi_c(id,:) = 0d0
-    NLTEspec%AtomOpac%eta_c(id,:) = 0d0
-    NLTEspec%AtomOpac%sca_c(id,:) = 0d0
+    if (.not.NLTEspec%AtomOpac%store_opac) then
+      NLTEspec%AtomOpac%chi_c(id,:) = 0d0
+      NLTEspec%AtomOpac%eta_c(id,:) = 0d0
+      NLTEspec%AtomOpac%sca_c(id,:) = 0d0
+    end if !else thay are not allocated
     NLTEspec%AtomOpac%chi_p(id,:) = 0d0
     NLTEspec%AtomOpac%eta_p(id,:) = 0d0
     NLTEspec%J(id,:) = 0d0
