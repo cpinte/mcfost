@@ -77,6 +77,7 @@ MODULE voigtfunctions
   ! Rapidly convergent series for high-accuracy calculation of the
   ! Voigt function
   !
+  ! Accuracy up to 1d-13 ?
   ! TBD: Faraday-Voigt profile
  ! --------------------------------------------------------------------------- !
   double precision              :: a
