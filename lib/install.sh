@@ -81,6 +81,7 @@ echo "CFITSIO done !"
 #-------------------------------------------
 # Downloading last version tested with mcfost : git clone git@bitbucket.org:cpinte/voro.git
 # Original voro++ can be obtained from svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro
+echo "Fetching VORO++..."
 svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
 if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
@@ -95,6 +96,7 @@ make
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++ ; \cp src/*.hh ../include/voro++/
 cd ~1
+echo "VORO++ done !"
 
 # Put in final directory
 mkdir -p $MCFOST_INSTALL/include
