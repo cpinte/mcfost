@@ -45,13 +45,19 @@ make -B
 \cp lib/libsprng.a ../lib
 \cp include/*.h ../include
 cd ~1
+echo "SPRNG done !"
 
 #-------------------------------------------
 # cfitsio
 #-------------------------------------------
-# g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
-# wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
-tar xzvf cfitsio3420.tar.gz
+# g77 or f77 needed by configure to set up the fortran wrapper in Makefile
+echo "Fetching CFITSIO"
+CFITSIO="cfitsio3420.tar.gz"
+if [ ! -f $CFITSIO ] ; then
+    wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
+fi
+
+tar xzvf $CFITSIO
 if [ "$SYSTEM" = "ifort" ] ; then
     export CC="icc" ; export FC="ifort"
 elif [ "$SYSTEM" = "gfortran" ] ; then
@@ -68,6 +74,7 @@ cat Makefile | sed s/-DCFITSIO_HAVE_CURL=1// | sed s/-lcurl// >> Makefile.tmp &&
 make
 \cp libcfitsio.a ../lib
 cd ~1
+echo "CFITSIO done !"
 
 #-------------------------------------------
 # voro++
