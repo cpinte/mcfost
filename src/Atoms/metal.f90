@@ -11,27 +11,28 @@
 ! chi in m^-1, eta in J/m3/s/Hz/sr
 MODULE metal
 
- use atmos_type, only : atmos, Hydrogen, Helium, atmos_parcel
+ use atmos_type, only                : atmos, Hydrogen, Helium
  use constant
- use math, only : bezier3_interp
+ use math, only                      : bezier3_interp
  use atom_type
- use spectrum_type, only : NLTEspec, initAtomOpac
+ use spectrum_type, only			 : NLTEspec, initAtomOpac
  use hydrogen_opacities
- use voigtfunctions, only : Voigt
- use broad, only : Damping
+ use voigtfunctions, only 			 : Voigt
+ use broad, only 					 : Damping
  use thomson_scattering
  use Rayleigh_scattering
  use Planck
 
  ! MCFOST's original
- use molecular_emission, only : v_proj
+ use molecular_emission, only		 : v_proj, vfield
+ use Voronoi_grid
 
  IMPLICIT NONE
 
 
  CONTAINS
 
- FUNCTION Metal_bf(icell, chi, eta) result(res)
+ SUBROUTINE Metal_bf(icell, chi, eta)
  !cross-section in cm2 per particle is given by Kramers’ formula
   !with n the principal quantum number of the level i from
  !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
@@ -39,18 +40,19 @@ MODULE metal
  !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
  !being zero below it because the threshold energy is the required minimum. Think the
   ! inverse in terms of wavelengths
-  integer :: icell
-  logical :: res, obtained_n
-  integer :: m, kr, i, j, Z, nc
-! integer, dimension(:), allocatable :: iLam
-  type (AtomType) :: metal
-  type (AtomicContinuum) :: continuum
+  integer, intent(in)							            :: icell
+  logical 										            :: obtained_n
+  integer                                                   :: m, kr, i, j, Z, nc
+! integer, dimension(:), allocatable                        :: iLam
+  type (AtomType)                                           :: metal
+  type (AtomicContinuum)                                    :: continuum
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: eta, chi
-  double precision :: lambdaEdge, twohc, hc_k, n_eff
-  double precision, dimension(NLTEspec%Nwaves) :: gbf_0, uu, gbf
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, gijk, hc_kla, expla, alpha_la
+  double precision                                          :: lambdaEdge, twohc, hc_k, &
+       														   n_eff
+  double precision, dimension(NLTEspec%Nwaves)              :: gbf_0, uu, gbf
+  double precision, dimension(NLTEspec%Nwaves)              :: twohnu3_c2, gijk, hc_kla,&
+                                                               expla, alpha_la
 
-  res = .true. !always now, return condition tested outside
   obtained_n = .false. !true if the routine to read principal quantum number is fine
 
   twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
@@ -118,14 +120,16 @@ MODULE metal
      if (.not.continuum%Hydrogenic) then
 !        CALL bezier3_interp(continuum%Nlambda,continuum%lambda,continuum%alpha, &
 !              continuum%Nlambda,  NLTEspec%lambda(ilam), alpha_la(ilam)
-       CALL bezier3_interp(continuum%Nlambda,continuum%lambda,continuum%alpha, &
+       CALL bezier3_interp(continuum%Nlambda,&
+                           continuum%lambda, &
+                           continuum%alpha,  & !Now the interpolation grid
              continuum%Nlambda, &
              NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1), &
-             alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1))
+             alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) !end
 
      else
 
-        uu(1:1) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*lambdaEdge) /(Z*Z * E_RYDBERG)
+        uu(1:1)    = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*lambdaEdge) /(Z*Z * E_RYDBERG)
         gbf_0(1:1) = Gaunt_bf(1, uu, n_eff)
          !continuum%alpha0 is the result of the photoionisation
          !cross-section at lambdaEdge=continuum%lambda0
@@ -139,12 +143,17 @@ MODULE metal
 !         alpha_la(iLam) = gbf(iLam) * &
 !                 continuum%alpha0*((NLTEspec%lambda(iLam)/lambdaEdge)**3)*n_eff/gbf_0(1)
         uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-         n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) /(Z*Z * E_RYDBERG)
+           												n_eff*n_eff* HPLANCK*CLIGHT/&
+           (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) &
+           /(Z*Z * E_RYDBERG)
+           
         gbf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-         Gaunt_bf(continuum%Nlambda, uu, n_eff)
+                                                    Gaunt_bf(continuum%Nlambda, uu, n_eff)
         alpha_la(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-         gbf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
-                continuum%alpha0*((NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/lambdaEdge)**3)*n_eff/gbf_0(1)
+          gbf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
+           continuum%alpha0*&
+           ((NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/&
+           lambdaEdge)**3)*n_eff/gbf_0(1)
 
      end if !continuum type
 !      gijk(iLam) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(iLam)
@@ -166,11 +175,10 @@ MODULE metal
   end do !loop over metals
 
  RETURN
+ END SUBROUTINE Metal_bf
 
- END FUNCTION Metal_bf
 
-
- FUNCTION Metal_bb (icell,x,y,z,x1,y1,z1,u,v,w,chi, eta, chip) result(res)
+ SUBROUTINE Metal_bb (icell,x,y,z,x1,y1,z1,u,v,w,l,chi, eta, chip)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
   ! not treated in NLTE.
@@ -180,20 +188,24 @@ MODULE metal
   ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
   ! cell point we are computing the opacities.
   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
-  logical :: res
-  integer :: kr, m, i, j, NrecStokes, nc
-  integer, intent(in) :: icell
-  double precision, intent(in) :: x,y,z,u,v,w,& !positions and angles used to project
-                                  x1,y1,z1      ! velocity field and magnetic field
-  character(len=20) :: VoigtMethod = "HUMLICEK"
-!  integer, dimension(:), allocatable :: iLam
-  double precision, dimension(NLTEspec%Nwaves) :: phi, vvoigt, phiPol, phip, Vij
+  integer 													:: kr, m, i, j, NrecStokes
+  integer, intent(in) 							            :: icell
+  double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+                                				               x1,y1,z1, &      ! velocity field and magnetic field
+                                				               l !optical length of the cell
+  character(len=20)							                :: VoigtMethod = "HUMLICEK"
+!  integer, dimension(:), allocatable 			            :: iLam
+  double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
-  double precision :: twohnu3_c2, hc, fourPI, hc_4PI, gij, v0, v1, dv, dlambda
-  type (AtomicLine) :: line
-  type (AtomType) :: atom
+  double precision 											:: twohnu3_c2, hc, fourPI, &
+      														   hc_4PI, gij, v0, v1, dv
+  integer, parameter										:: NvspaceMax = 100
+  double precision, dimension(NvspaceMax)					:: omegav
+  integer													:: Nvspace, nv
+  double precision 											:: delta_vol_phi, xphi, yphi, zphi
+  type (AtomicLine)										    :: line
+  type (AtomType)											:: atom
 
-  res = .true.
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
@@ -203,19 +215,35 @@ MODULE metal
   eta = 0.  !NrecStokes per cell at each wavelength: Nspec sized in unpolarised
   chip = 0. !NrecStokes-1 per cell at each wavelength = Nsize=(NrecStokes-1)*Nwavelength
 
-
+  Vfield = atmos%Vmap !because vfield is not shared from atomictransfer to metal_bb to vproj?
   ! v_proj in m/s at point icell
-  v0 = 0d0
-!   if (atmos%moving) then !note so easy beware, check local_line_prof in optical_depth.f90
-!    v0 = v_proj(icell,x,y,z,u,v,w)
-!    if (lVoronoi) then ! constant velocity accross cell
-!     
-!     else !velocity is varying accross cell
-!      v1 = v_proj(icell, x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0)
-!      !velocity between v0 and v1:
-!      
-!   end if !atmos is moving
+  omegav = 0d0
+  Nvspace = 1
+  if (atmos%moving) then
+   v0 = v_proj(icell,x,y,z,u,v,w)
+   if (atmos%Voronoi) then 
+    omegav(Nvspace) = v0 !velocity constant in the cell
+   else !3D, 2D etc
+    v1 = v_proj(icell,x1,y1,z1,u,v,w)
+    dv = dabs(v1-v0)
+    Nvspace = NvspaceMax !in this case this is the same for all atoms and lines
+                         ! MCFOST defines it line by line with 
+                         ! Nvspace=min(max(2,nint(dv/atom%vbroad(icell))),NvspaceMax) 
+                         ! Because we will mainly use the Voronoi geometry it is not a
+                         ! problem.
+    !velocity projected along a path between one border of the cell to the other
+    do nv=2,Nvspace-1
+     delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+     xphi=x+delta_vol_phi*u
+     yphi=y+delta_vol_phi*v
+     zphi=z+delta_vol_phi*w
+     omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+    end do
+    omegav(1) = v0
+    omegav(Nvspace) = v1
+   end if 
+   !if lsubtract_avg 
+  end if !atmos is moving
   
   if (atmos%magnetized) then
    write(*,*) "Passive bound-bound Zeeman transitions", &
@@ -231,15 +259,6 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i
      j = line%j
-     
-!      dlambda = line%qwing * line%lambda0 * atmos%v_char/CLIGHT
-!      if ((dabs(line%lambda0 - NLTEspec%lambda(line%Nblue)) > dlambda) .or. &
-!         (dabs(line%lambda0 - NLTEspec%lambda(line%Nblue+line%Nlambda-1)) > dlambda)) CYCLE
-
-     ! now at each cell we compute it !!
-     ! intialized is .true. if damping are stored on the whole grid
-     line%damping_initialized=.false. !always now, because we compute damping at each icell
-
 
      if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
@@ -264,35 +283,39 @@ MODULE metal
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
-    !convert to doppler units
-    
-    ! init for this line of this atom
-!      vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
-!          CLIGHT / (line%lambda0 * atom%vbroad(icell))
-     vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
-      (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
-         CLIGHT / (line%lambda0 * atom%vbroad(icell))
+     
      if (line%voigt) then
+      !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
       CALL Damping(icell, atom, kr, line%adamp)
-      
-!        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell) !add velocity field
-!        phi(iLam) = Voigt(line%Nlambda, line%adamp, vvoigt(iLam), &
-!                 phip, VoigtMethod)
-       vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
-        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell) !add velocity field
-       phi(line%Nblue:line%Nblue+line%Nlambda-1) = Voigt(line%Nlambda, line%adamp, &
-          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, VoigtMethod)
+       ! init for this line of this atom accounting for Velocity fields
+       do nv=1, Nvspace !one iteration if 1) No velocity fields or .not.atmos%moving
+                      !                 2) Voronoi grid is used
+                      
+!       vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
+!          CLIGHT / (line%lambda0 * atom%vbroad(icell))
+        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
+         CLIGHT / (line%lambda0 * atom%vbroad(icell)) - omegav(nv) / atom%vbroad(icell)
+!        phi(iLam) = Voigt(line%Nlambda, line%adamp, vvoigt(iLam), phip, VoigtMethod)
+        phi(line%Nblue:line%Nblue+line%Nlambda-1) = Voigt(line%Nlambda, line%adamp, &
+          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, VoigtMethod) / Nvspace !1 if novel or Voronoi
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
 !       phiPol(iLam) = phip(iLam)
 !       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = phip(line%Nblue:line%Nblue+line%Nlambda-1)
+      end do
      else !Gaussian
-!        vvoigt(iLam) = vvoigt(iLam) - v0 / atom%vbroad(icell)
-       vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
-        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) - v0 / atom%vbroad(icell)
+      do nv=1, Nvspace
 !        phi(iLam) = dexp(-(vvoigt(iLam))**2)
-       phi(line%Nblue:line%Nblue+line%Nlambda-1) = dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2)
-     end if
+        vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
+      (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
+         CLIGHT / (line%lambda0 * atom%vbroad(icell)) - omegav(nv) / atom%vbroad(icell)
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = & 
+        dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2) / Nvspace
+      end do
+     end if !line%voigt
+    
+     
      !Sum up all contributions for this line with the other
 !      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
      Vij(line%Nblue:line%Nblue+line%Nlambda-1) = &
@@ -317,8 +340,7 @@ MODULE metal
   end do !end loop over Natom
 
  RETURN
-
- END FUNCTION Metal_bb
+ END SUBROUTINE Metal_bb
  
  SUBROUTINE BackgroundContinua (icell)
   integer, intent(in) :: icell
@@ -359,10 +381,9 @@ MODULE metal
     NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
 
    if (.not.Hydrogen%active) then !passive bound-free
-    if (Hydrogen_bf(icell, chi, eta)) then
+     CALL Hydrogen_bf(icell, chi, eta)
      NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
      NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
-    end if
    end if
 
    Npassive = atmos%Natom - atmos%Nactiveatoms
@@ -370,19 +391,18 @@ MODULE metal
    ! remove H if passive because it is computed in Hydrogen_bf()
    if (.not.Hydrogen%active) Npassive = Npassive - 1
    if (Npassive>0) then !other metal passive ?
-    if (Metal_bf(icell, chi, eta)) then
+     CALL Metal_bf(icell, chi, eta)
      NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
      NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
-    end if
    end if
 
  RETURN
  END SUBROUTINE BackgroundContinua
  
- SUBROUTINE BackgroundLines(id, icell,x,y,z,x1,y1,z1,u,v,w)
+ SUBROUTINE BackgroundLines(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer, intent(in) :: icell, id
   double precision, intent(in) :: x, y, z, u, v, w, &
-                                  x1, y1, z1
+                                  x1, y1, z1, l
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, chip
   integer :: Npassive
 
@@ -395,19 +415,18 @@ MODULE metal
 
    Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
    if (Npassive > 0) then !go into it even if only H is passive
-    if (Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, chi, eta, chip)) then
+     CALL Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
      NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
      NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-    end if
    end if
 
  RETURN
  END SUBROUTINE BackgroundLines
 
- SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w)
+ SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer, intent(in) :: icell, id
   double precision, intent(in) :: x, y, z, u, v, w, &
-                                  x1, y1, z1!only relevant for b-b when vector fields are present
+                                  x1, y1, z1, l!only relevant for b-b when vector fields are present
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, Bpnu, chip
   integer :: Npassive
 
@@ -453,11 +472,10 @@ MODULE metal
     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + chi * Bpnu
 
-   if (.not.Hydrogen%active) then !passive bound-free
-    if (Hydrogen_bf(icell, chi, eta)) then
+   if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
+     CALL Hydrogen_bf(icell, chi, eta)
      NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
      NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-    end if
    end if
 
    Npassive = atmos%Natom - atmos%Nactiveatoms
@@ -465,10 +483,9 @@ MODULE metal
    ! remove H if passive because it is computed in Hydrogen_bf()
    if (.not.Hydrogen%active) Npassive = Npassive - 1
    if (Npassive>0) then !other metal passive ?
-    if (Metal_bf(icell, chi, eta)) then
+     CALL Metal_bf(icell, chi, eta) !always true if we enter
      NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
      NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-    end if
    end if
 
 
@@ -478,10 +495,9 @@ MODULE metal
 
    Npassive = atmos%Natom - atmos%Nactiveatoms !including Hydrogen
    if (Npassive > 0) then !go into it even if only H is passive
-    if (Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, chi, eta, chip)) then
+     CALL Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
      NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
      NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-    end if
    end if
 
  RETURN

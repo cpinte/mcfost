@@ -240,6 +240,7 @@ MODULE getlambda
    type (AtomicLine), allocatable, dimension(:) :: alllines
    type (AtomicContinuum), allocatable, dimension(:) :: allcont
    double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
+   integer													  :: lam0_indexes
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot, idx
    integer :: la, nn, compar, Nred, Nlambda_original !read from model
    double precision, allocatable, dimension(:) :: tempgrid
@@ -289,7 +290,8 @@ MODULE getlambda
    allocate(tempgrid(Nspect))
   end if
 
-  write(*,*) "Adding ", Nspect," lines and continua"
+  write(*,*) "Adding ", Nspect," lines and continua, for a total of", Nlinetot+Nctot,&
+             " transitions."
 
   ! add wavelength from mcfost inoutgrid if any
   ! convert it to nm
@@ -347,6 +349,7 @@ MODULE getlambda
 
   ! Now replace the line%Nlambda and continuum%Nlambda by the new values.
   ! we do that even for PASSIVE atoms
+  !if (.not.allocated(lam0_indexes)) allocate(lam0_indexes(Nctot*Nlinetot))
   do n=1,Natom
    Nred = 0
    !first continuum transitions

@@ -363,13 +363,13 @@ end subroutine dust_and_mol_optical_length_tot
       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
       if (NLTEspec%AtomOpac%store_opac) then !ETL continua are kept on memory
                                              !Fast but memory expensive
-       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda) + &
                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
                   
       else !on the fly calculations, slow but cheap in memory
-       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
       end if

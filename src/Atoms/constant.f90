@@ -5,7 +5,7 @@ MODULE constant
    ! MCFOST and takes what it needs.
   ! ----------------------------------------------------------------- !
 
-  use constantes, only : PI! MCFOST
+  use constantes, only : PI, KM_TO_M! MCFOST
 
   integer, parameter :: NELEM_WEIGHTS = 99
 
@@ -30,7 +30,7 @@ MODULE constant
 
   double precision, parameter ::  NM_TO_M =1.0d-9
   double precision, parameter ::  CM_TO_M=1.0d-02
-  double precision, parameter ::  KM_TO_M =1.0d+03
+  !double precision, parameter ::  KM_TO_M =1.0d+03
   double precision, parameter ::  ERG_TO_JOULE=1.0d-07
   double precision, parameter ::  JOULE_TO_EV=1/EV!6.241506363094028e+18
   double precision, parameter ::  JOULE_TO_CM1=5.040963080525957d+22

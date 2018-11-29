@@ -28,6 +28,7 @@ MODULE atmos_type
    ! for each cell starting from 1 to n_cells
    integer :: Nspace, Npf, Nactiveatoms, Natom, Nrays
    double precision :: metallicity, totalAbund, avgWeight, wght_per_H
+   logical :: Voronoi = .false.
    ! an arrray containing the project local velocity
    ! in the cell, to be used to compute the local profile
    ! T is a function of x,y,z or T is a function of the cell point (T(Nspace))
@@ -36,8 +37,9 @@ MODULE atmos_type
    ! Don't know yet if it is useful here
    integer :: velocity_law = 0 !use this integer to specify different velocity than
     !infall or keplerian ?, or remove it
-   double precision, allocatable, dimension(:) :: Vmap !remove when Vfield is
-    ! correctly used from MCFOST
+   ! 0: Keplerian; -1: radial (type CAK); 1: frome file (used with Voronoi)
+   double precision, allocatable, dimension(:) :: Vmap !used if velocity fields
+   ! is not Keplerian nor read from file. Then Vmap is computed, and Vfield = Vmap.
    type (Element), dimension(:), allocatable :: Elements
    type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms 
    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
@@ -55,19 +57,12 @@ MODULE atmos_type
                    ! background opacities
    logical, dimension(:), allocatable :: lcompute_atomRT !where line RT is taken into account on the grid
   END TYPE GridType
-  
-  TYPE CellPoint
-    ! Some properties of a unique cell
-    double precision :: x, y, z
-    double precision :: u, v, w
-    double precision :: I_CMF ! comoving-frame I
-  END TYPE CellPoint
+
 
   TYPE (GridType), target :: atmos
   !alias to atmos%Atoms(1)
   TYPE (AtomType), pointer :: Hydrogen, Helium
-  !
-  TYPE (CellPoint), pointer :: atmos_parcel
+
 
   CONTAINS
 

@@ -20,7 +20,7 @@ MODULE atom_type
    !type (AtomType), pointer   :: atom
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PFR=.false.,&
-      damping_initialized=.false.
+      damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE"
    ! i, j start at 1 (not 0 like in C)

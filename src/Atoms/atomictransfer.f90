@@ -24,16 +24,17 @@
 
 MODULE AtomicTransfer
 
- use metal, only : Background, BackgroundContinua, BackgroundLines
+ use metal, only                        : Background, BackgroundContinua, BackgroundLines
  use spectrum_type
  use atmos_type
  use readatom
  use lte
+ use constant, only 					: MICRON_TO_NM
  use collision
  use solvene
  use writeatom
- use readatmos, only : readatmos_1D !for testing
- use simple_models, only : radial_model, prop_law_model, uniform_law_model
+ use readatmos, only				    : readatmos_1D, readPLUTO
+ use simple_models, only 				: radial_model, prop_law_model, uniform_law_model
  
  !$ use omp_lib
  
@@ -43,10 +44,10 @@ MODULE AtomicTransfer
  use grid
  use optical_depth
  use dust_prop
- use dust_transfer, only : compute_stars_map
- use dust_ray_tracing, only : init_directions_ray_tracing , & 
-                              tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, tab_RT_incl, & 
-                              stars_map, kappa
+ use dust_transfer, only 				: compute_stars_map
+ use dust_ray_tracing, only 			: init_directions_ray_tracing ,            & 
+                              			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
+                              			  tab_RT_incl, stars_map, kappa
  use stars
  use wavelengths
  use density
@@ -141,7 +142,7 @@ MODULE AtomicTransfer
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
      if (NLTEspec%AtomOpac%store_opac) then
-      CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w)
+      CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
@@ -156,7 +157,7 @@ MODULE AtomicTransfer
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)      
      else
-      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w) !x,y,z,u,v,w,x1,y1,z1 
+      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
       ! Epaisseur optique
@@ -347,8 +348,6 @@ MODULE AtomicTransfer
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
   logical :: lresolved = .false.
-real(kind=dp) :: pi = 3.141592653589793238462643383279502884197_dp
-
   
 npix_x = 101; npix_y = 101
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
@@ -408,7 +407,7 @@ npix_x = 101; npix_y = 101
     !$omp default(none) &
     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
     !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,pi) !remove pi
+    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz)
     id =1 ! pour code sequentiel
 
     if (l_sym_ima) then
@@ -479,25 +478,7 @@ npix_x = 101; npix_y = 101
   end if
 
  ! adding the stellar flux
-  write(*,*) " --> adding stellar flux map..."
-!  !! the following is only True if the stellar radiation is flat across a spectral line !
-!   do i = 1, atmos%Natom
-!    do j = 1, atmos%Atoms(i)%Ncont
-!    lambda = (atmos%Atoms(i)%continua(j)%Nlambda - 1)/2
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!    end do
-!    do j = 1, atmos%Atoms(i)%Nline
-!    lambda = (atmos%Atoms(i)%lines(j)%Nlambda - 1)/2
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-!    end do   
-!   end do
-  
+  write(*,*) " --> adding stellar flux map..."  
   do lambda = 1, NLTEspec%Nwaves
    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
                                              !else it means that in FLUX_PIXEL_LINE, nu
@@ -517,7 +498,7 @@ npix_x = 101; npix_y = 101
  
  ! NOTE: should inverse the order of frequencies and depth because in general
  !       n_cells >> n_lambda, in "real" cases.
- ! npix_x, xpix_y, RT_line_method, constants like pi, lkeplerian etc
+ ! npix_x, xpix_y, RT_line_method
  ! some of shared quantities by the code that i don't know were they are !!
  
  SUBROUTINE Atomic_transfer()
@@ -531,15 +512,17 @@ npix_x = 101; npix_y = 101
   integer :: atomunit = 1, nact, nat, la !atoms and wavelength
   integer :: icell !spatial variables
   integer :: ibin, iaz!, RT_line_method
-  logical :: labs, lkeplerian
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! the following quantities are input parameters !!
   integer :: NiterMax = 20, Nrays = 1! Number of rays for angular integration and to compute Inu(mu)
   integer :: IterLimit
   logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
-                                   ! is .false.
+                                     ! is .false.
   character(len=7) :: NE0 = "HIONIS"
   logical :: lstore_opac = .false.
+  logical :: lstatic !to change the default of atmos%moving (.true.) in .false.
+  					 ! should be considered only for testing purposes
+  					 !or special geometry with static atmospheres
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   optical_length_tot => atom_optical_length_tot
   
@@ -557,10 +540,10 @@ npix_x = 101; npix_y = 101
   end if
 
 !! ----------------------- Read Model ---------------------- !!
-  CALL uniform_law_model()
+  !CALL uniform_law_model()
  
-  !CALL prop_law_model()
-  
+  CALL prop_law_model()
+
   !CALL radial_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
@@ -619,8 +602,6 @@ npix_x = 101; npix_y = 101
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL adjusting_mcfost()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
-
-  
 !! --------------------- NLTE--------------------------------- !!
 !! For NLTE do not forget ->
   !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
@@ -655,7 +636,7 @@ npix_x = 101; npix_y = 101
 !! -------------------------------------------------------- !!
 
 
-!  CALL ContributionFunction()
+  write(*,*) lVoronoi, lkeplerian, lcylindrical_rotation, atmos%moving
 
   write(*,*) "Computing emission flux map..."
   do ibin=1,RT_n_incl
@@ -682,6 +663,7 @@ npix_x = 101; npix_y = 101
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()  
  deallocate(ds)
+ NULLIFY(optical_length_tot)
 
  RETURN
  END SUBROUTINE
@@ -701,7 +683,7 @@ npix_x = 101; npix_y = 101
   allocate(tab_lambda(n_lambda))
   if (allocated(tab_delta_lambda)) deallocate(tab_delta_lambda)
   allocate(tab_delta_lambda(n_lambda))
-  tab_lambda = NLTEspec%lambda * 1d-3 !nm to micron
+  tab_lambda = NLTEspec%lambda / MICRON_TO_NM
   tab_delta_lambda(1) = 0d0
   do la=2,NLTEspec%Nwaves
    tab_delta_lambda(la) = tab_delta_lambda(la) - tab_delta_lambda(la-1) 
@@ -723,10 +705,12 @@ npix_x = 101; npix_y = 101
   CALL repartition_energie_etoiles()
   ! Velocity field in  m.s-1
   if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
-  Vfield=atmos%Vmap !0 presently
+  Vfield=0d0
   lkeplerian = .true.
-  ! Warning : assume all stars are at the center of the disk
-  if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
+  atmos%velocity_law = 0
+  if (atmos%moving) then
+   ! Warning : assume all stars are at the center of the disk
+   if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
      if (lcylindrical_rotation) then ! Midplane Keplerian velocity
         do icell=1, n_cells
            vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
@@ -737,8 +721,9 @@ npix_x = 101; npix_y = 101
                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
         enddo
      endif
-  endif 
-  atmos%Vmap = Vfield
+   endif 
+   atmos%Vmap = Vfield !here vfield is not saved from here to Background.metal_bb to vproj?
+  end if
  RETURN
  END SUBROUTINE adjusting_mcfost
 
