@@ -29,8 +29,13 @@ pushd .
 #-------------------------------------------
 # SPRNG
 #-------------------------------------------
-# wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
-tar xzvf sprng2.0b.tar.gz
+echo "Fetching SPRNG..."
+SPRNG="sprng2.0b.tar.gz"
+if [ ! -f $SPRNG ] ; then
+   wget http://sprng.cs.fsu.edu/Version2.0/$SPRNG
+fi
+
+tar xzvf $SPRNG
 \cp -f $SYSTEM/make.CHOICES sprng2.0
 \cp -f $SYSTEM/make.INTEL sprng2.0/SRC
 if [ $(uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN) -eq 1 ]; then \cp -f macos/insertmenu.mac sprng2.0/SRC/insertmenu ; fi
