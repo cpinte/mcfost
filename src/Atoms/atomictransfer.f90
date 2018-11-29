@@ -41,7 +41,7 @@ MODULE AtomicTransfer
  use input
  use parametres
  use grid
- use density
+ use optical_depth
  use dust_prop
  use dust_transfer, only : compute_stars_map
  use dust_ray_tracing, only : init_directions_ray_tracing , & 
@@ -49,6 +49,7 @@ MODULE AtomicTransfer
                               stars_map, kappa
  use stars
  use wavelengths
+ use density
  
  IMPLICIT NONE
 
@@ -379,7 +380,6 @@ npix_x = 101; npix_y = 101
 
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
-  
   if (RT_line_method==1) then !log pixels
     write(*,*) " WARNING: RT_line_method==1 not working correctly with AL-RT"
     n_iter_min = 1
@@ -426,7 +426,6 @@ npix_x = 101; npix_y = 101
 
         do phi_RT=1,n_phi_RT ! de 0 a pi
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
-
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
             ! C'est le centre en fait car dx = dy = 0.
            CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
@@ -540,10 +539,12 @@ npix_x = 101; npix_y = 101
   logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
                                    ! is .false.
   character(len=7) :: NE0 = "HIONIS"
-  logical :: lvoigt_table = .false.
-  logical :: lstore_opac = .true.
+  logical :: lstore_opac = .false.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  optical_length_tot => atom_optical_length_tot
+  
   !because for now lemission_atom is not a case of readparameters
+  write(*,*) npix_x, npix_y
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
 
@@ -598,7 +599,6 @@ npix_x = 101; npix_y = 101
 
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
-  NLTEspec%precomputed_voigt = lvoigt_table
   NLTEspec%AtomOpac%store_opac = lstore_opac
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
   if (NLTEspec%AtomOpac%store_opac) then !only Background lines and active transitions
@@ -617,7 +617,7 @@ npix_x = 101; npix_y = 101
   end if
   
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
-  CALL synchronize_with_mcfost()
+  CALL adjusting_mcfost()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
 
   
@@ -686,7 +686,7 @@ npix_x = 101; npix_y = 101
  RETURN
  END SUBROUTINE
  
- SUBROUTINE synchronize_with_mcfost()
+ SUBROUTINE adjusting_mcfost()
   !--> should move them to init_atomic_atmos ? or elsewhere
   !need to be deallocated at the end of molecule RT or its okey ?`
   integer :: icell, la
@@ -714,10 +714,10 @@ npix_x = 101; npix_y = 101
   tab_lambda_sup = tab_lambda_inf + tab_delta_lambda
   ! computes stellar flux at the new wavelength points
   CALL deallocate_stellar_spectra()
-  if (allocated(kappa)) deallocate(kappa)
-  allocate(kappa(n_cells,n_lambda))
-  kappa = 0.0 !Important to init !!
-  !kappa will be computed on the fly in  optical_length_tot()
+  if (allocated(kappa)) deallocate(kappa) !do not use it anymore
+!   allocate(kappa(n_cells,n_lambda))
+!   kappa = 0.0 !Important to init !!
+!   !kappa will be computed on the fly in  optical_length_tot()
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
@@ -740,6 +740,6 @@ npix_x = 101; npix_y = 101
   endif 
   atmos%Vmap = Vfield
  RETURN
- END SUBROUTINE synchronize_with_mcfost
+ END SUBROUTINE adjusting_mcfost
 
 END MODULE AtomicTransfer

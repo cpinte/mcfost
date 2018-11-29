@@ -10,12 +10,10 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
-  
-  !B. Tessore
-  use metal, only : Background, BackgroundLines
-  use spectrum_type, only : NLTEspec, initAtomOpac
 
   implicit none
+
+  procedure(dust_and_mol_optical_length_tot), pointer :: optical_length_tot => null()
 
   contains
 
@@ -225,12 +223,13 @@ end subroutine integ_tau
 
 !***********************************************************
 
-subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+subroutine dust_and_mol_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
 ! Integration par calcul de la position de l'interface entre cellules
 ! de l'opacite totale dans une direction donnée
 ! Grille a geometrie cylindrique
 ! C. Pinte
 ! 19/04/05
+! Modified by B. Tessore 29/11/2018 -> this is optical_length_tot()
 
   implicit none
 
@@ -281,48 +280,6 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-     
-     ! ------------------------------------------------------------------ !
-     !special for atomic line RT.
-     ! because n_Cells could be large and so does n_lambda for
-     ! atomic line opacities, it could be better to compute the opacities
-     ! on the fly. Note that because line profiles are most of time far
-     ! from gaussians, it is not easy to factorised their profiles.
-     !
-     ! Background() returns the opacity at all wavelength. But here we need
-     ! the opacity at lambda only. Is it slow to use the full wavelength
-     ! calculations and then take the opac at lambda when using the vectorized
-     ! capabilities of fortran ?
-     !
-     ! but kappa is allocated and initialised to 0 in atomic_transfer().
-     ! To do: add a case in Background to compute opac at lambda
-     ! instead of at all lambda
-     !
-     ! kappa is set to 0d0 in case of lemission_atom to prevent
-     ! problem with opacite=kappa(icell0,lambda) above.
-     if ((icell0<=n_cells).and.(lemission_atom).and.&
-           (NLTEspec%Atmos%lcompute_atomRT(icell0))) then
-      CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-      if (NLTEspec%AtomOpac%store_opac) then
-       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
-       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
-                NLTEspec%AtomOpac%chi_p(id,lambda) + NLTEspec%AtomOpac%Kc(icell0,lambda,1)) * &
-                AU_to_m
-      else
-       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
-       opacite = NLTEspec%AtomOpac%chi(id,lambda) + &
-                NLTEspec%AtomOpac%chi_p(id,lambda)
-       opacite = opacite * AU_to_m !because l_contrib is in AU
-!       write(*,*) id, NLTEspec%lambda(lambda), opacite
-!       stop
-!       if ((opacite /= opacite).or.(opacite+1==opacite)) then
-!        write(*,*) "(Error)", id, lambda, icell0, &
-!           NLTEspec%lambda(lambda), opacite, NLTEspec%AtomOpac%chi_c(id,lambda)
-!        stop
-!       end if
-      end if
-     end if
-     ! ------------------------------------------------------------------ !
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
 
@@ -336,7 +293,103 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   write(*,*) "BUG"
   return
 
-end subroutine optical_length_tot
+end subroutine dust_and_mol_optical_length_tot
+
+ SUBROUTINE atom_optical_length_tot(&
+             id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+ ! ------------------------------------------------------------------ !
+  !special for atomic line RT.
+ ! ------------------------------------------------------------------ !
+  
+  use metal, only                         : Background, BackgroundLines
+  use spectrum_type, only                 : NLTEspec, initAtomOpac
+  
+  integer, intent(in)                    :: id, lambda, icell
+  real(kind=dp),dimension(4), intent(in) :: Stokes
+  real(kind=dp), intent(in)              :: u,v,w
+  real(kind=dp), intent(in)              :: xi,yi,zi
+  real, intent(out)                      :: tau_tot_out
+  real(kind=dp), intent(out)             :: lmin,lmax
+
+  real(kind=dp)                          :: x0, y0, z0, x1, y1, z1, l,   &
+                                            ltot, tau, opacite, tau_tot, &
+                                            correct_plus, correct_moins, &
+                                            l_contrib, l_void_before
+
+  integer                                :: icell0, previous_cell, next_cell
+
+  correct_plus = 1.0_dp + prec_grille
+  correct_moins = 1.0_dp - prec_grille
+
+  x1=xi;y1=yi;z1=zi
+
+  tau_tot=0.0_dp
+
+  lmin=0.0_dp
+  ltot=0.0_dp
+
+  next_cell = icell
+  icell0 = 0 ! for previous_cell, just for Voronoi
+
+  ! Boucle infinie sur les cellules
+  do ! Boucle infinie
+     ! Indice de la cellule
+     previous_cell = icell0
+     icell0 = next_cell
+     x0=x1;y0=y1;z0=z1
+
+     ! Test sortie
+     if (test_exit_grid(icell0, x0, y0, z0)) then
+        tau_tot_out=tau_tot
+        lmax=ltot
+        return
+     end if
+     
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, & 
+                     next_cell, l, l_contrib, l_void_before)
+     
+     
+     ! Background() returns the opacity at all wavelength. But here we need
+     ! the opacity at lambda only. Is it slow to use the full wavelength
+     ! calculations and then take the opac at lambda when using the vectorized
+     ! capabilities of fortran ?
+     !
+     ! but kappa is allocated and initialised to 0 in atomic_transfer().
+     ! To do: add a case in Background to compute opac at lambda
+     ! instead of at all lambda
+     !
+     if ((icell0<=n_cells).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
+      CALL initAtomOpac(id) !set opac to zero for this cell and thread.
+      if (NLTEspec%AtomOpac%store_opac) then !ETL continua are kept on memory
+                                             !Fast but memory expensive
+       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+                  NLTEspec%AtomOpac%chi_p(id,lambda) + &
+                  NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
+                  
+      else !on the fly calculations, slow but cheap in memory
+       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w)
+       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+                  NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
+      end if
+     else
+      opacite = 0d0 !cell is empty
+     end if
+
+     tau=l_contrib*opacite ! opacite constante dans la cellule
+
+     tau_tot = tau_tot + tau
+     ltot= ltot + l
+
+     if (tau_tot < tiny_real) lmin=ltot
+
+  end do ! boucle infinie
+
+  write(*,*) "BUG"
+  
+ RETURN
+ END SUBROUTINE atom_optical_length_tot
 
 !***********************************************************
 

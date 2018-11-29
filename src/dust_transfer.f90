@@ -73,6 +73,9 @@ subroutine transfert_poussiere()
 
   real, allocatable, dimension(:) :: extra_heating
 
+  !Default case for molecules and dust
+  optical_length_tot => dust_and_mol_optical_length_tot
+
   time_source_fct = 0 ; time_RT = 0
 
   lambda0 = -99 ; nnfot2=0.0_dp ; n_phot_sed2 = 0.0_dp
