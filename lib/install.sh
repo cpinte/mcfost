@@ -1,4 +1,9 @@
 #!/bin/bash
+for comm in svn make tar
+do
+    command -v $comm
+    if [ $? != 0 ] ; then echo "error: $comm command not found"; exit 1; fi
+done
 set -eu
 
 #preliminary checks
