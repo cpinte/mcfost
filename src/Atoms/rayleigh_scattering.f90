@@ -1,10 +1,10 @@
 MODULE rayleigh_scattering
 
- use atom_type, only : AtomType
- use atmos_type, only : atmos
- use spectrum_type, only : NLTEspec
+ use atom_type, only       : AtomType
+ use atmos_type, only      : atmos
+ use spectrum_type, only   : NLTEspec
  use constant
- use math, only : dpow, SQ
+ use math, only            : dpow, SQ
 
  IMPLICIT NONE
 
@@ -13,25 +13,30 @@ MODULE rayleigh_scattering
  CONTAINS
 
  FUNCTION Rayleigh(icell, atom, scatt) result(res)
- ! Rayleigh scattering by transitions from the ground state of
- ! neutral atoms.
- ! Sums scattering crosssections of all bound-bound
- ! transitions from the groundstate of the atom with lamda_red
- ! (the longest wavelength covered by the transition) less than wavelength lambda.
- !
- ! See:
- ! -- Hubeny & Mihalas 2014 p. 155, eq. 6.44-6.45
- ! SigmaR \propto sigmaT * sum(f/(lambda/lambda0 - 1))**2
- !
- !
- ! Return scattering cross-section for all wavelength
-  type (AtomType), intent(in) :: atom
-  integer, intent(in) :: icell
-  logical :: res
+ ! ------------------------------------------------------------- !
+  ! Rayleigh scattering by transitions from the ground state of
+  ! neutral atoms.
+  ! Sums scattering crosssections of all bound-bound
+  ! transitions from the groundstate of the atom with lamda_red
+  ! (the longest wavelength covered by the transition) less than wavelength 
+  ! lambda.
+  !
+  ! See:
+  ! -- Hubeny & Mihalas 2014 p. 155, eq. 6.44-6.45
+  ! SigmaR \propto sigmaT * sum(f/(lambda/lambda0 - 1))**2
+  !
+  !
+  ! Return scattering cross-section for all wavelengths
+ ! ------------------------------------------------------------- !
+  type (AtomType), intent(in)                               :: atom
+  integer, intent(in)                                       :: icell
+  logical                                                   :: res
   double precision, dimension(NLTEspec%Nwaves), intent(out) :: scatt
-  integer :: kr, k
-  real(8) :: lambda_red, lambda_limit, sigma_e
-  double precision, dimension(NLTEspec%Nwaves) :: fomega, lambda2
+  integer                                                   :: kr, k
+  double precision                                          :: lambda_red, lambda_limit, &
+   															   sigma_e
+  double precision, dimension(NLTEspec%Nwaves) 				:: fomega, lambda2
+  
   lambda_limit = LONG_RAYLEIGH_WAVE
   sigma_e = 8.0*PI/3.0 * &
          dpow(Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&

@@ -86,14 +86,13 @@ MODULE hydrogen_opacities
  END FUNCTION Gaunt_ff
 
 
- FUNCTION Hydrogen_bf (icell, chi, eta) result(res)
+ SUBROUTINE Hydrogen_bf (icell, chi, eta)
   ! Computes LTE hydrogen bound-free opacity
   ! See Hubeny & Mihalas 2014, chap. 7
   double precision, dimension(NLTEspec%Nwaves) :: uu
   integer, intent(in) :: icell
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: &
       chi, eta
-  logical  :: res
   type (AtomicContinuum) :: continuum
   integer :: i, kr, k, nc
 !  integer, dimension(:), allocatable :: iLam
@@ -101,12 +100,6 @@ MODULE hydrogen_opacities
     twohnu3_c2(NLTEspec%Nwaves), twohc, gijk(NLTEspec%Nwaves), hc_k, hc_kla(NLTEspec%Nwaves), &
     expla(NLTEspec%Nwaves), n_eff,npstar, sigma02, sigma2(NLTEspec%Nwaves), np
 
-  res = .true. !always, passive H is tested outside
-!   if (Hydrogen%active) then
-!     write(*,*) "Do not compute Hydrogen bound-free here, if Hydrogen is NLTE"
-!     res = .false.
-!     RETURN
-!   end if
 
   ! initialize for this cell point
    chi = 0.
@@ -237,7 +230,7 @@ MODULE hydrogen_opacities
   end do
 
  RETURN
- END FUNCTION Hydrogen_bf
+ END SUBROUTINE Hydrogen_bf
 
  SUBROUTINE Hydrogen_ff(icell, chi)
  ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)

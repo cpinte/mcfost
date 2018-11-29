@@ -1,19 +1,21 @@
 MODULE thomson_scattering
 
- use atmos_type, only: atmos
+ use atmos_type, only : atmos
  use constant
- use math, only : dpow
+ use math, only       : dpow
 
  IMPLICIT NONE
 
  CONTAINS
 
  FUNCTION Thomson(icell) result (scatt)
- ! Thomson scattering cross-section in non relativistic limit.
- ! (i.e., wavelength independent)
- ! unit m^2
-  integer :: icell
-  double precision :: sigma, scatt
+ ! ------------------------------------------------------------- !
+  ! Thomson scattering cross-section in non relativistic limit.
+  ! (i.e., wavelength independent)
+  ! unit m^2
+ ! ------------------------------------------------------------- !
+  integer 			:: icell
+  double precision  :: sigma, scatt
 
   sigma = 8.*PI/3. * dpow(Q_ELECTRON/(sqrt(4.0*PI*EPSILON_0)*&
           (sqrt(M_ELECTRON)*CLIGHT)), 4d0)

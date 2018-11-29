@@ -32,6 +32,11 @@ MODULE READATMOS
 
  CONTAINS
 
+ SUBROUTINE readPLUTO()
+ 
+ RETURN
+ END SUBROUTINE readPLUTO
+
  SUBROUTINE readatmos_1D(model1D)
   ! Reads 1D spherically symmetric models in fits.gz format
   ! then the model is mapped to mcfost grid
