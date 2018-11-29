@@ -3,7 +3,6 @@ MODULE spectrum_type
   use atom_type
   use atmos_type, only : GridType
   use getlambda, only : make_wavelength_grid
-  use voigtfunctions, only : Voigt
   
   !MCFOST's original modules
   use fits_utils, only : print_error
@@ -46,9 +45,6 @@ MODULE spectrum_type
    integer :: Nwaves, Nact, NPROC
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
-   logical :: precomputed_voigt = .false.! -->beta test
-   double precision, allocatable, dimension(:) :: a_values, v_values! -->beta test
-   double precision, allocatable, dimension(:,:) :: VoigtTable, FvoigtTable! -->beta test
    !nproc, nlambda, ncells
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nproc, nlambda
@@ -152,40 +148,12 @@ CONTAINS
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
-   
-!-> this is in beta
-  ! Generate look-up table for voigt functions before the transfer starts
-  ! and interpolate the line profiles on this table instead of computing on the fly
-  if (NLTEspec%precomputed_voigt) then
-    do n=1,NLTEspec%atmos%Natom
-     do kr=1,NLTEspec%atmos%Atoms(n)%Ncont
-      maxNlambda = max(NLTEspec%atmos%Atoms(n)%continua(kr)%Nlambda,maxNlambda)
-     end do
-     do kr=1,NLTEspec%atmos%Atoms(n)%Nline
-      maxNlambda = max(NLTEspec%atmos%Atoms(n)%lines(kr)%Nlambda,maxNlambda)
-     end do
-    end do 
-   write(*,*) "VoigtTable size: Nmax = ", maxNlambda, " Nadmp = ", Nadmp
-   allocate(NLTEspec%VoigtTable(maxNlambda, Nadmp))
-   !if (NLTEspec%atmos%magnetized) allocate(NLTEspec%FvoigtTable(maxNlambda, Nadmp), F(maxNlambda))
-   allocate(NLTEspec%a_values(Nadmp))
-   allocate(NLTEspec%v_values(maxNlambda), F(maxNlambda))
-   NLTEspec%a_values = spanl(0.00005,1.,Nadmp)
-   NLTEspec%v_values = span(-30.,30.,maxNlambda)
-   do n=1,size(NLTEspec%a_values)
-    !write(*,*) n,  NLTEspec%a_values(n), NLTEspec%v_values
-    NLTEspec%VoigtTable(:,n) = Voigt(maxNlambda, NLTEspec%a_values(n), NLTEspec%v_values(:), F, 'HUMLICEK')
-    !if (NLTEspec%atmos%magnetized) NLTEspec%FvoigtTable(:,n) = F
-   end do
-   deallocate(F)
-  end if
 
   RETURN
   END SUBROUTINE allocSpectrum
 
   SUBROUTINE freeSpectrum()
    deallocate(NLTEspec%lambda)
-   if (NLTEspec%precomputed_voigt) deallocate(NLTEspec%VoigtTable)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
    if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
