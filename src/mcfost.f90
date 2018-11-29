@@ -42,7 +42,6 @@ program BIGCRUNCH
      call mol_line_transfer()
   endif
 
-  lemission_atom =.true. !will be added to mcfost init
   if (lemission_atom) then
      write(*,*) ""
      write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'

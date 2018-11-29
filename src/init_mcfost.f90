@@ -57,6 +57,8 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  ! Atomic lines Radiative Transfer (AL-RT)
+  lemission_atom = .false.
   lpuffed_rim = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
@@ -542,6 +544,10 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+     case("-atom")
+        ! Option to solve for the RTE for atoms
+        i_arg = i_arg+1
+        lemission_atom=.true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -1003,6 +1009,7 @@ subroutine initialisation_mcfost()
   endif
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
+  if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
   if (map_size < tiny_real) call error("map size is set to 0")
 
   if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
@@ -1305,6 +1312,7 @@ subroutine display_help()
   write(*,*) " Main mcfost options"
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
   write(*,*) "        : -mol : calculates molecular emission"
+  write(*,*) "        : -atom : calculates atomic lines emission"
   write(*,*) " "
   write(*,*) " Coupling with other codes"
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
@@ -1421,6 +1429,9 @@ subroutine display_help()
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) " "
+  write(*,*) " Options related to atomic lines emission"
+  write(*,*) "        : R.A.S yet"
 
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
