@@ -3,6 +3,7 @@ module read_phantom
   use parametres
   use dump_utils
   use messages
+  use constantes
 
   implicit none
 
@@ -142,13 +143,15 @@ module read_phantom
     if (ierr /= 0) then
        ! ndusttypes is for pre-largegrain multigrain headers
        call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
+       if (ierr /= 0) call warning("could not read ndustsmall")
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
+
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
 
        ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
        if (ndusttypes==0 .and. ierr/=0) then
-             ! For older files where ndusttypes is not output to the header
+          ! For older files where ndusttypes is not output to the header
           idust = 0
           do i = 1,maxinblock
              if (hdr%realtags(i)=='grainsize') idust = idust + 1
@@ -159,7 +162,6 @@ module read_phantom
       endif
     endif
     call extract('ntypes',ntypes,hdr,ierr)
-
     call extract('nptmass',nptmass,hdr,ierr,default=0)
     !call extract('isink',isink,hdr,ierr,default=0)
 
@@ -204,7 +206,6 @@ module read_phantom
        call read_block_header(narraylengths,number8,nums,iunit,ierr)
        if (ierr /= 0) call error('Reading block header')
        do j=1,narraylengths
-          !write(*,*) 'block ',iblock, j, number8(j), np
           do i=1,ndatatypes
              !write(*,*) ' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
@@ -303,9 +304,7 @@ module read_phantom
                       case default
                          matched = .false.
                       end select
-                      if (ipos > 0) then
-                         read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
-                      endif
+                      if (ipos > 0) read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
                    else
                       matched = .false.
                       read(iunit,iostat=ierr)
@@ -407,7 +406,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), intent(in), optional :: T_to_u
 
 
-  integer  :: i,j,k,itypei,alloc_status,i_etoiles, ifile
+  integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
 
@@ -576,13 +575,16 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  write(*,*) "# Sink particles:"
 
+ n_etoiles_old = n_etoiles
  n_etoiles = 0
  do i=1,nptmass
-    write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
-    if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-       n_etoiles = n_etoiles + 1
+    n_etoiles = n_etoiles + 1
+    if (real(xyzmh_ptmass(4,i)) > 0.013) then
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
+    else
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)) * GxMsun/GxMjup, "Mjup"
     endif
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
  enddo
 
  if (lplanet_az) then
@@ -599,24 +601,27 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  if (lfix_star) then
     write(*,*) ""
-    write(*,*) "Stellar parameters will not be updated"
+    write(*,*) "Stellar parameters will not be updated, only the star positions"
+    if (n_etoiles > n_etoiles_old) then
+       write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
+       n_etoiles = n_etoiles_old
+    endif
+    do i_etoiles = 1, n_etoiles
+       etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
+       etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
+       etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+    enddo
  else
     write(*,*) ""
     write(*,*) "Updating the stellar properties:"
-    write(*,*) "There are", n_etoiles, "stars in the model"
+    write(*,*) "There are now", n_etoiles, "stars in the model"
     if (allocated(etoile)) deallocate(etoile)
     allocate(etoile(n_etoiles))
 
-    i_etoiles = 0
-    do i=1,nptmass
-       if (xyzmh_ptmass(4,i) > 0.0124098) then ! 13 Jupiter masses
-          i_etoiles = i_etoiles + 1
-          etoile(i_etoiles)%x = xyzmh_ptmass(1,i) * ulength_au
-          etoile(i_etoiles)%y = xyzmh_ptmass(2,i) * ulength_au
-          etoile(i_etoiles)%z = xyzmh_ptmass(3,i) * ulength_au
-          etoile(i_etoiles)%M = xyzmh_ptmass(4,i) * usolarmass
-       endif
-    enddo
+    etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
+    etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
+    etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
+    etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
  endif
 
  return

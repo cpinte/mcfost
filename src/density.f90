@@ -1094,7 +1094,7 @@ subroutine read_density_file()
      write(*,*) "No grain size found"
      npixels=naxes(1)*naxes(2)*naxes(3)
   else
-     if (lvariable_dust == .false.) then
+     if (.not.lvariable_dust) then
         call warning("Forcing variable dust")
         lvariable_dust = .true.
      endif
