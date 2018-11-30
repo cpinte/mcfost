@@ -5,7 +5,7 @@ module mcfost2phantom
 contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
-       keep_particles)
+       keep_particles, fix_star)
 
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -23,6 +23,7 @@ contains
     real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
+    logical, intent(in), optional :: fix_star
 
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
@@ -39,6 +40,11 @@ contains
     if (present(keep_particles)) then
        SPH_keep_particles = keep_particles
        write(*,*) "WARNING: updating SPH_keep_particles to" , SPH_keep_particles
+    endif
+
+    if (present(fix_star)) then
+       lfix_star = .true.
+       write(*,*) "WARNING: using mcfost parameters for the stars"
     endif
 
     ! Model limits
@@ -226,7 +232,7 @@ contains
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
 
-    call compute_stellar_parameters()
+    if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH, &
@@ -234,7 +240,7 @@ contains
 
     call setup_grid()
     call setup_scattering()
-    ! Allocation dynamique
+
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then
        call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
@@ -348,7 +354,6 @@ contains
     !$omp end do
     !$omp end parallel
     if (laffichage) call progress_bar(50)
-
 
     if (lRE_LTE) then
        call Temp_finale()
