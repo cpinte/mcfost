@@ -43,11 +43,14 @@ MODULE simple_models
     
    !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
-   atmos%moving = .false.
+   atmos%moving = .true.
    atmos%vturb = 9.506225d3 !m/s !idk=10
    !atmos%vturb = 1.696164d3 !idk = 75
    !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
+   if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+   atmos%Vmap = 0d0
+   atmos%velocity_law = 0 !keplerian
 
   RETURN
   END SUBROUTINE uniform_law_model
@@ -59,7 +62,7 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
 
-   !!nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
+   !nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
    nHtot =  1d9 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH
    T = Tdust * 100d0!100d0, depends on the stellar flux
    ne = 1d-2 * nHtot
@@ -67,7 +70,10 @@ MODULE simple_models
 !   !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving=.true.
-
+   if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+   atmos%Vmap = 0d0
+   atmos%velocity_law = 0 !keplerian
+   
   RETURN
   END SUBROUTINE prop_law_model
   
@@ -79,12 +85,13 @@ MODULE simple_models
   integer :: izone, i, j, k, icell, n_zones=1 !Only one component firstly
   double precision, dimension(n_cells) :: Vr, Tr,vturbr, nHtotr, ner
   type(disk_zone_type) :: dz ! to define the properties of the model
-  double precision :: r, nH0, ne0, T0, vt, rcyl, z
+  double precision :: r, nH0, ne0, T0, vt, rcyl, z, v0
   
   nH0 = 1d16
   ne0 = 1d-2 * nH0
   T0 = 1d4
   vt = 0d0
+  v0 = 40d3
   
   Tr = 1d0
   nHtotr = 1d0
@@ -95,36 +102,45 @@ MODULE simple_models
   do izone=1, n_zones
    !dz = disk_zone(izon) ! for now the parameters are hardcoded
     do i=1, n_rad
-     do j=j_start,nz
+     !do j=j_start,nz
+     j = 0
       do k=1, n_az
-       if (j==0) then !pourquoi ici
+       if (j==0) then !midplane
         icell = cell_map(i,1,k)
         rcyl = r_grid(icell) !AU
         z = 0.0_dp
-       else
-        icell = cell_map(i,j,k)
-        rcyl = r_grid(icell)
-        z = z_grid(icell)/z_scaling_env
-       endif
-       r = sqrt(rcyl**2 + z**2) !Rstar
-       if ((r <= 300).and.(r>=5).and.(j/=0)) then
-        Tr(icell) = T0 * 5d0/r
-        nHtotr(icell) = nH0 * 5d0/r
+        Tr(icell) = T0 * 5d0/rcyl
+        nHtotr(icell) = nH0 * 5d0/rcyl
         ner(icell) = 1d-2 * nHtotr(icell)
-        Vr(icell) = 0d0
+        Vr(icell) = v0 * dsqrt(1.-5d0/rcyl)**0.5 !m/s
         vturbr(icell) = vt
-        write(*,*) icell, r, Tr(icell), nHtotr(icell)
-       end if
+!        else
+!         icell = cell_map(i,j,k)
+!         rcyl = r_grid(icell)
+!         z = z_grid(icell)/z_scaling_env
+       endif
+!        r = sqrt(rcyl**2 + z**2)
+!        if ((r <= 300).and.(r>=5)) then
+!         Tr(icell) = T0 * 5d0/r
+!         nHtotr(icell) = nH0 * 5d0/r
+!         ner(icell) = 1d-2 * nHtotr(icell)
+!         Vr(icell) = v0 * 5d0/r !m/s
+!         vturbr(icell) = vt
+!        end if
       end do !k
-     end do !j
+     !end do !j
     end do !i
-  end do !over n_zeones
+  end do !over n_zones
  
 
   CALL init_atomic_atmos(n_cells, Tr, ner, nHtotr)
-  atmos%moving=.false.
-  atmos%Vmap = Vr
-  
+  atmos%moving=.true.
+  if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+  atmos%Vmap = 0d0
+  atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
+  				  ! otherwise vinfall/vkep = cte = expected.
+  atmos%velocity_law = -1
+  atmos%v_char = 0.5*MAXVAL(atmos%Vmap)
   RETURN
   END SUBROUTINE radial_model
 
@@ -230,7 +246,10 @@ MODULE simple_models
  neenv = 1d-4 * nHtot ! can be recomputed
  CALL init_atomic_atmos(n_cells, Tenv, neenv, nHtot)
  ! if commented, velocity from file or from keplerian is used
- atmos%Vmap = Venv
+  if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+  atmos%Vmap = 0d0
+  atmos%Vmap = Venv
+  atmos%velocity_law = -1
  
  RETURN
  END SUBROUTINE define_circumstellar_envelope

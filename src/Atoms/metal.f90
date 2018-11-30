@@ -24,8 +24,8 @@ MODULE metal
  use Planck
 
  ! MCFOST's original
- use molecular_emission, only		 : v_proj, vfield
- use Voronoi_grid
+ use mcfost_env, only : dp
+ use molecular_emission, only		 : v_proj
 
  IMPLICIT NONE
 
@@ -192,19 +192,21 @@ MODULE metal
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !optical length of the cell
+                                				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
 !  integer, dimension(:), allocatable 			            :: iLam
   double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phiPol, phip, Vij
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
-      														   hc_4PI, gij, v0, v1, dv
-  integer, parameter										:: NvspaceMax = 100
+      														   hc_4PI, gij
+  integer, parameter										:: NvspaceMax = 10
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
-  double precision 											:: delta_vol_phi, xphi, yphi, zphi
+  double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
+  															   v0, v1, dv
   type (AtomicLine)										    :: line
   type (AtomType)											:: atom
+  logical :: lkeplerian = .true.
 
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
@@ -214,13 +216,13 @@ MODULE metal
   chi = 0.  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
   eta = 0.  !NrecStokes per cell at each wavelength: Nspec sized in unpolarised
   chip = 0. !NrecStokes-1 per cell at each wavelength = Nsize=(NrecStokes-1)*Nwavelength
-
-  Vfield = atmos%Vmap !because vfield is not shared from atomictransfer to metal_bb to vproj?
+  
   ! v_proj in m/s at point icell
   omegav = 0d0
   Nvspace = 1
   if (atmos%moving) then
    v0 = v_proj(icell,x,y,z,u,v,w)
+   omegav(1) = v0
    if (atmos%Voronoi) then 
     omegav(Nvspace) = v0 !velocity constant in the cell
    else !3D, 2D etc
@@ -232,6 +234,7 @@ MODULE metal
                          ! Because we will mainly use the Voronoi geometry it is not a
                          ! problem.
     !velocity projected along a path between one border of the cell to the other
+    omegav(Nvspace) = v1
     do nv=2,Nvspace-1
      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
      xphi=x+delta_vol_phi*u
@@ -239,8 +242,6 @@ MODULE metal
      zphi=z+delta_vol_phi*w
      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
     end do
-    omegav(1) = v0
-    omegav(Nvspace) = v1
    end if 
    !if lsubtract_avg 
   end if !atmos is moving
@@ -294,23 +295,26 @@ MODULE metal
 !       vvoigt(iLam) = (NLTEspec%lambda(iLam)-line%lambda0) * &
 !          CLIGHT / (line%lambda0 * atom%vbroad(icell))
         vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
-      (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
-         CLIGHT / (line%lambda0 * atom%vbroad(icell)) - omegav(nv) / atom%vbroad(icell)
-!        phi(iLam) = Voigt(line%Nlambda, line%adamp, vvoigt(iLam), phip, VoigtMethod)
-        phi(line%Nblue:line%Nblue+line%Nlambda-1) = Voigt(line%Nlambda, line%adamp, &
-          vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), phip, VoigtMethod) / Nvspace !1 if novel or Voronoi
+              (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
+               CLIGHT / (line%lambda0 * atom%vbroad(icell)) - omegav(nv) / atom%vbroad(icell)
+!        phi(iLam) = phi(ilam) + Voigt(line%Nlambda, line%adamp, vvoigt(iLam), phip, VoigtMethod)
+        phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
+            phi(line%Nblue:line%Nblue+line%Nlambda-1) + &
+            Voigt(line%Nlambda, line%adamp,vvoigt(line%Nblue:line%Nblue+line%Nlambda-1), &
+                  phip, VoigtMethod) / Nvspace !1 if no vel or Voronoi
                 !phip is on the whole grid, you take indexes after. Otherwise the function
                 !Voigt will return an error
-!       phiPol(iLam) = phip(iLam)
-!       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = phip(line%Nblue:line%Nblue+line%Nlambda-1)
+!       phiPol(iLam) = phiPol(ilam) + phip(iLam)
+!       phiPol(line%Nblue:line%Nblue+line%Nlambda-1) = &
+!        phiPol(line%Nblue:line%Nblue+line%Nlambda-1) + phip(line%Nblue:line%Nblue+line%Nlambda-1)
       end do
      else !Gaussian
       do nv=1, Nvspace
-!        phi(iLam) = dexp(-(vvoigt(iLam))**2)
         vvoigt(line%Nblue:line%Nblue+line%Nlambda-1) = &
       (NLTEspec%lambda(line%Nblue:line%Nblue+line%Nlambda-1)-line%lambda0) * &
          CLIGHT / (line%lambda0 * atom%vbroad(icell)) - omegav(nv) / atom%vbroad(icell)
-       phi(line%Nblue:line%Nblue+line%Nlambda-1) = & 
+       phi(line%Nblue:line%Nblue+line%Nlambda-1) = &
+        phi(line%Nblue:line%Nblue+line%Nlambda-1) + & 
         dexp(-(vvoigt(line%Nblue:line%Nblue+line%Nlambda-1))**2) / Nvspace
       end do
      end if !line%voigt

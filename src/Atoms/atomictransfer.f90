@@ -128,7 +128,7 @@ MODULE AtomicTransfer
     previous_cell = 0 ! unused, just for Voronoi
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-                     
+                                        
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
@@ -187,10 +187,15 @@ MODULE AtomicTransfer
 !      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + 0.5*(Snu + Snu1) * dtau
 !      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + 0.5*(Snu_c + Snu1_c) * dtau_c 
     end if
+    !In ray-traced map (which is used this subroutine) we integrate from the observer
+    ! to the source(s), but we actually get the outgoing intensity/flux. Direct
+    !intgreation of the RTE from the observer to the source result in having the
+    ! inward flux and intensity. Integration from the source to the observer is done
+    ! when computing the mean intensity: Sum_ray I*exp(-dtau)+S*(1-exp(-dtau))
     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*(1d0-dtau) + dtau*Snu
-!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*(1d0-dtau_c) + dtau_c*Snu_c
+!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + dtau*Snu*dexp(-tau)
+!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
  
      
 !      !!surface superieure ou inf, not used with AL-RT
@@ -241,8 +246,6 @@ MODULE AtomicTransfer
    ! Ray tracing : on se propage dans l'autre sens
    u0 = -u ; v0 = -v ; w0 = -w
 
-   Iold = 0d0
-
    ! le nbre de subpixel en x est 2^(iter-1)
    subpixels = 1
    iter = 1
@@ -273,7 +276,6 @@ MODULE AtomicTransfer
            ! On se met au bord de la grille : propagation a l'envers
            CALL move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 !            write(*,*) i, j, lintersect, labs, icell, x0, y0, z0, u0, v0, w0
-!            stop
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(id,:,iray)
@@ -319,8 +321,8 @@ MODULE AtomicTransfer
     NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0
     NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c
   else
-    NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = NLTEspec%Flux(:,ipix,jpix,ibin,iaz) + I0
-    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) + I0c  
+    NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
+    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c  
   end if
 
   RETURN
@@ -347,13 +349,15 @@ MODULE AtomicTransfer
   double precision, dimension(n_rad_RT) :: tab_r
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
-  logical :: lresolved = .false.
+  logical :: lresolved
+logical :: lbottom_irradiated = .false. !to switch off the star in the map creation
   
 npix_x = 101; npix_y = 101
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
+  write(*,*) "u=", u, "v=",v, "w=",w
 
   ! Definition des vecteurs de base du plan image dans le repere universel
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
@@ -379,6 +383,7 @@ npix_x = 101; npix_y = 101
 
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
+
   if (RT_line_method==1) then !log pixels
     write(*,*) " WARNING: RT_line_method==1 not working correctly with AL-RT"
     n_iter_min = 1
@@ -467,7 +472,6 @@ npix_x = 101; npix_y = 101
            !write(*,*) i,j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
-
            CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
                       i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         enddo !j
@@ -478,6 +482,7 @@ npix_x = 101; npix_y = 101
   end if
 
  ! adding the stellar flux
+ if (lbottom_irradiated) then
   write(*,*) " --> adding stellar flux map..."  
   do lambda = 1, NLTEspec%Nwaves
    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
@@ -492,6 +497,7 @@ npix_x = 101; npix_y = 101
     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
                                          stars_map(:,:,1) / nu
   end do
+ end if
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -500,6 +506,7 @@ npix_x = 101; npix_y = 101
  !       n_cells >> n_lambda, in "real" cases.
  ! npix_x, xpix_y, RT_line_method
  ! some of shared quantities by the code that i don't know were they are !!
+ ! lkeplerian, linfall, lvoro wjere to declare them
  
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
@@ -519,7 +526,7 @@ npix_x = 101; npix_y = 101
   logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
                                      ! is .false.
   character(len=7) :: NE0 = "HIONIS"
-  logical :: lstore_opac = .false.
+  logical :: lstore_opac = .true.
   logical :: lstatic !to change the default of atmos%moving (.true.) in .false.
   					 ! should be considered only for testing purposes
   					 !or special geometry with static atmospheres
@@ -542,9 +549,9 @@ npix_x = 101; npix_y = 101
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
  
-  CALL prop_law_model()
+  !CALL prop_law_model()
 
-  !CALL radial_model()
+  CALL radial_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -579,7 +586,6 @@ npix_x = 101; npix_y = 101
   write(*,*) "maxnHmin = ", MAXVAL(atmos%nHmin), " minnHmin = ", MINVAL(atmos%nHmin)
 
 !! --------------------------------------------------------- !!
-
   NLTEspec%atmos => atmos
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
   NLTEspec%AtomOpac%store_opac = lstore_opac
@@ -636,7 +642,8 @@ npix_x = 101; npix_y = 101
 !! -------------------------------------------------------- !!
 
 
-  write(*,*) lVoronoi, lkeplerian, lcylindrical_rotation, atmos%moving
+  write(*,*) "Voronoi?",lVoronoi, " keplerian?",lkeplerian, &
+    " cylindrical?", lcylindrical_rotation, " moving?", atmos%moving
 
   write(*,*) "Computing emission flux map..."
   do ibin=1,RT_n_incl
@@ -705,12 +712,14 @@ npix_x = 101; npix_y = 101
   CALL repartition_energie_etoiles()
   ! Velocity field in  m.s-1
   if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
-  Vfield=0d0
-  lkeplerian = .true.
-  atmos%velocity_law = 0
+  lkeplerian = .false.
+  linfall = .false.
+  Vfield=atmos%Vmap !0d0 by default or something if velocity_law != 0
   if (atmos%moving) then
-   ! Warning : assume all stars are at the center of the disk
-   if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
+   if (atmos%velocity_law == 0) then !default is 0 for keplerian vel
+    lkeplerian = .true.
+    ! Warning : assume all stars are at the center of the disk
+    if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
      if (lcylindrical_rotation) then ! Midplane Keplerian velocity
         do icell=1, n_cells
            vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
@@ -719,11 +728,18 @@ npix_x = 101; npix_y = 101
         do icell=1, n_cells
            vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-        enddo
+        end do
      endif
-   endif 
-   atmos%Vmap = Vfield !here vfield is not saved from here to Background.metal_bb to vproj?
-  end if
+    endif
+   else if (atmos%velocity_law == -1) then 
+    linfall=.true.
+!      write(*,*) linfall, atmos%velocity_law, MAXVAL(Vfield)
+!      stop
+   end if
+   if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
+  else
+   deallocate(Vfield)						! allocated only if moving
+  end if 
  RETURN
  END SUBROUTINE adjusting_mcfost
 

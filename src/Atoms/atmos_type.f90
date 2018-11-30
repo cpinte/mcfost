@@ -262,7 +262,8 @@ MODULE atmos_type
   if (allocated(atmos%T)) deallocate(atmos%T)
   if (allocated(atmos%vturb)) deallocate(atmos%vturb)
   if (allocated(atmos%nHmin)) deallocate(atmos%nHmin)
-  if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)
+  !if (atmos%moving) &
+  !if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)!-> free after Vfield is set
   if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
 
   !write(*,*) "Free Atoms"
@@ -410,8 +411,9 @@ MODULE atmos_type
    
    if (.not.allocated(atmos%T)) allocate(atmos%T(Nspace))
    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
-   if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(Nspace))
-   atmos%Vmap = 0d0
+   !allocated elsewhere
+!    if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(Nspace))
+!    atmos%Vmap = 0d0
 
    atmos%velocity_law = 0
    ! %velocity_law=0 for v read from file
