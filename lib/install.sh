@@ -1,7 +1,13 @@
 #!/bin/bash
 set -eu
 
-#preliminary checks
+#-- Preliminary checks
+for comm in svn make tar git-lfs
+do
+    command -v $comm
+    if [ $? != 0 ] ; then echo "error: $comm command not found"; exit 1; fi
+done
+
 if [ ! $# = 0 ]; then SYSTEM=$1 ; fi
 
 set +u # personalized error messages
@@ -19,17 +25,17 @@ else
     echo "Unknown system to build mcfost: "$SYSTEM"\nPlease choose ifort or gfortran\ninstall.sh <system>\nExiting" ; exit 1
 fi
 
-rm -rf lib include sprng2.0 cfitsio voro # Clean previous files if any
 
-
-echo "Installing MCFOST libraries in "$MCFOST_INSTALL/lib/$SYSTEM
+#-- Clean previous files if any
+rm -rf lib include sprng2.0 cfitsio voro
 mkdir lib include
 pushd .
 
 #-------------------------------------------
 # SPRNG
 #-------------------------------------------
-# wget http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
+echo "Compiling sprng ..."
+#Original version from http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
 tar xzvf sprng2.0b.tar.gz
 \cp -f $SYSTEM/make.CHOICES sprng2.0
 \cp -f $SYSTEM/make.INTEL sprng2.0/SRC
@@ -40,12 +46,14 @@ make -B
 \cp lib/libsprng.a ../lib
 \cp include/*.h ../include
 cd ~1
+echo "Done"
 
 #-------------------------------------------
 # cfitsio
 #-------------------------------------------
+echo "Compiling cfitsio ..."
 # g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
-# wget ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
+# Original version from ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
 tar xzvf cfitsio3420.tar.gz
 if [ "$SYSTEM" = "ifort" ] ; then
     export CC="icc" ; export FC="ifort"
@@ -63,10 +71,12 @@ cat Makefile | sed s/-DCFITSIO_HAVE_CURL=1// | sed s/-lcurl// >> Makefile.tmp &&
 make
 \cp libcfitsio.a ../lib
 cd ~1
+echo "Done"
 
 #-------------------------------------------
 # voro++
 #-------------------------------------------
+echo "Compiling voro++ ..."
 # Downloading last version tested with mcfost : git clone git@bitbucket.org:cpinte/voro.git
 # Original voro++ can be obtained from svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro
 svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
@@ -83,13 +93,15 @@ make
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++ ; \cp src/*.hh ../include/voro++/
 cd ~1
+echo "Done"
 
-# Put in final directory
+#-- Put in final directory
+echo "Installing MCFOST libraries in "$MCFOST_INSTALL/lib/$SYSTEM
 mkdir -p $MCFOST_INSTALL/include
 \cp -r include/*.h include/voro++ $MCFOST_INSTALL/include/
 mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
 \cp -r lib/*.a $MCFOST_INSTALL/lib/$SYSTEM/
 
-# Final cleaning
+#-- Final cleaning
 rm -rf lib include sprng2.0 cfitsio voro
 popd
