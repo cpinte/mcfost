@@ -7,11 +7,6 @@ MODULE atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2
-   integer, parameter :: MOLECULE_ID_WIDTH=10
-   real, parameter    :: PFR_QCORE=2.0
-   real, parameter    :: PFR_QWING=4.0
-   real, parameter    :: PFR_QSPREAD=5.0
-   real, parameter    :: PFR_DQ =0.25
 
 
 
@@ -24,7 +19,7 @@ MODULE atom_type
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE"
    ! i, j start at 1 (not 0 like in C)
-   integer :: i, j, Nlambda, Nblue, Nxrd, fd_profile !,Ncomponent
+   integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing
    real(8), dimension(4) :: cvdWaals
@@ -33,12 +28,11 @@ MODULE atom_type
    double precision :: Qelast, adamp
    real(8), allocatable, dimension(:,:) :: rho_pfr
    !type (AtomType), pointer :: atom
-   character :: file_GII
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
    logical :: hydrogenic
-   integer :: i, j, Nlambda, Nblue
+   integer :: i, j, Nlambda, Nblue = 0, Nred = 0
    real(8) :: lambda0, isotope_Frac, alpha0
    real(8), allocatable, dimension(:)  :: lambda, alpha, Rji, Rij
    !type (AtomType), pointer :: atom
@@ -81,10 +75,6 @@ MODULE atom_type
    ! normally in rhthreads
    real, allocatable, dimension(:)  :: gij, Vij, wla, chi_up, chi_down, Uji_down, eta
   END TYPE AtomType
-
-  TYPE MoleculeType
-   character(len=MOLECULE_ID_WIDTH) :: ID
-  END TYPE MoleculeType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !building
   TYPE AtomicTransition

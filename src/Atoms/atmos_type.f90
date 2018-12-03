@@ -26,7 +26,7 @@ MODULE atmos_type
   TYPE GridType
    ! Nspace is the number of cells, n_cells meaning that all quantities are computed
    ! for each cell starting from 1 to n_cells
-   integer :: Nspace, Npf, Nactiveatoms, Natom, Nrays
+   integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays
    double precision :: metallicity, totalAbund, avgWeight, wght_per_H
    logical :: Voronoi = .false.
    ! an arrray containing the project local velocity
@@ -41,7 +41,7 @@ MODULE atmos_type
    double precision, allocatable, dimension(:) :: Vmap !used if velocity fields
    ! is not Keplerian nor read from file. Then Vmap is computed, and Vfield = Vmap.
    type (Element), dimension(:), allocatable :: Elements
-   type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms 
+   type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms 
    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
@@ -401,7 +401,7 @@ MODULE atmos_type
    double precision, intent(in), dimension(Nspace) :: T, ne, nHtot
    double precision :: maxNe = 0
    integer :: k
-   double precision :: tiny_nH = 1d2, tiny_T = 5d2!nHtot = 1 atom/m3, T = 400 K
+   double precision :: tiny_nH = 1d2, tiny_T = 1d1
    
    if (allocated(atmos%T).or.(allocated(atmos%nHtot)) & 
        .or.(allocated(atmos%ne))) then

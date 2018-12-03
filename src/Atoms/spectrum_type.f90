@@ -97,11 +97,16 @@ CONTAINS
    
    allocate(NLTEspec%I(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
    allocate(NLTEspec%Ic(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+   NLTEspec%I = 0d0
+   NLTEspec%Ic = 0d0
 
    if (NLTEspec%atmos%Magnetized) then
     allocate(NLTEspec%StokesQ(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), & 
              NLTEspec%StokesU(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), &
              NLTEspec%StokesV(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+    NLTEspec%StokesQ=0d0
+    NLTEspec%StokesU=0d0
+    NLTEspec%StokesV=0d0
    end if
    allocate(NLTEspec%J(NLTEspec%NPROC, NLTEspec%Nwaves))
    allocate(NLTEspec%Jc(NLTEspec%NPROC, NLTEspec%Nwaves))
@@ -113,9 +118,6 @@ CONTAINS
    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
    !create pol flux map or add to Flux
    
-   ! --> initialised in integ_ray_line  
-   !   NLTEspec%I = 0.0
-   !   NLTEspec%Ic = 0.0
    NLTEspec%Flux = 0.0
    NLTEspec%Fluxc = 0.0
    

@@ -337,7 +337,7 @@ MODULE math
 
   
   ! 1D array
-  y = minloc((xx(:)-x)*(xx(:)-x),1)
+  y = minloc((xx-x)**2,1) !(xx(:)-x)*(xx(:)-x)
 
   RETURN
   END FUNCTION locate

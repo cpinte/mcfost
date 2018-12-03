@@ -246,7 +246,7 @@ MODULE lte
 
    if (MAXVAL(atom%nstar) <= 0d0) then !Total
      write(*,*) "cell=",k, atom%ID
-     write(*,*) "Error, zero oor negative populations for this atom on the grid!"
+     write(*,*) "Error, zero or negative populations for this atom on the grid!"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
    end if

@@ -34,7 +34,8 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use readatmos, only				    : readatmos_1D, readPLUTO
- use simple_models, only 				: radial_model, prop_law_model, uniform_law_model
+ use simple_models, only 				: spherically_symmetric_model, &
+ 										  prop_law_model, uniform_law_model
  
  !$ use omp_lib
  
@@ -111,7 +112,7 @@ MODULE AtomicTransfer
     icell = next_cell
     x0=x1 ; y0=y1 ; z0=z1
 
-    if (icell <= n_cells) then
+    if (icell <= n_cells) then ! .and. atmos%lcompute_atomRT(icell)
      lcellule_non_vide=.true.
     else
      lcellule_non_vide=.false.
@@ -155,7 +156,7 @@ MODULE AtomicTransfer
                  NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
-            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)      
+            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
@@ -192,12 +193,25 @@ MODULE AtomicTransfer
     !intgreation of the RTE from the observer to the source result in having the
     ! inward flux and intensity. Integration from the source to the observer is done
     ! when computing the mean intensity: Sum_ray I*exp(-dtau)+S*(1-exp(-dtau))
-    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-    NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
+    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + & 
+                             exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+    NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + &
+                             exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
  
-     
+    if (MINVAL(NLTEspec%I(id,:,iray))<0) then
+     if (NLTEspec%AtomOpac%store_opac) then
+      write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
+       MINVAL(NLTEspec%AtomOpac%jc(icell,:))
+      stop
+     else
+      write(*,*) id, icell, MINVAL(Snu),&
+      MINVAL(NLTEspec%AtomOpac%eta_p(id,:)),MINVAL(NLTEspec%AtomOpac%chi_p(id,:)),&
+      MINVAL(NLTEspec%AtomOpac%sca_c(id,:)), MINVAL(NLTEspec%AtomOpac%eta_c(id,:)), MINVAL(NLTEspec%AtomOpac%chi_c(id,:))
+      stop
+     end if
+    end if
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
 !      if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
@@ -458,7 +472,7 @@ npix_x = 101; npix_y = 101
      !$omp default(none) &
      !$omp private(i,j,id) &
      !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
-     !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
+     !$omp shared(n_iter_min,n_iter_max,ibin,iaz) 
 
      ! loop on pixels
      id = 1 ! pour code sequentiel
@@ -480,7 +494,6 @@ npix_x = 101; npix_y = 101
      !$omp end parallel
      
   end if
-
  ! adding the stellar flux
  if (lbottom_irradiated) then
   write(*,*) " --> adding stellar flux map..."  
@@ -516,7 +529,7 @@ npix_x = 101; npix_y = 101
 
 #include "sprng_f.h"
 
-  integer :: atomunit = 1, nact, nat, la !atoms and wavelength
+  integer :: atomunit = 1, nact,npass,  nat, la !atoms and wavelength
   integer :: icell !spatial variables
   integer :: ibin, iaz!, RT_line_method
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -548,10 +561,8 @@ npix_x = 101; npix_y = 101
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
- 
-  !CALL prop_law_model()
-
-  CALL radial_model()
+  CALL prop_law_model()
+  !CALL spherically_symmetric_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -604,7 +615,7 @@ npix_x = 101; npix_y = 101
    !$omp end do
    !$omp end parallel
   end if
-  
+
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL adjusting_mcfost()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!

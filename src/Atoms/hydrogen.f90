@@ -51,7 +51,13 @@ MODULE hydrogen_opacities
   GII = 1.+0.1728 * n23 * ((u+1)**(-6.6666666666667d-1)) * &
       (u-1) - 0.0496*n23*n23 * (u*u + 4./3. * u + 1) !+...
 
-  if (MAXVAL(GII).gt.2.) then
+  if (MINVAL(GII) < 0d0) then
+   !write(*,*) "Warning, Gaunt factor is less than 0"
+   !write(*,*) Nl, minval(u), maxval(u), n_eff, minval(GII)
+   GII = dabs(GII)
+  end if
+
+  if (MAXVAL(GII) > 2d0) then
     write(*,*) "Bound-free Gaunt factor gII = ", MAXVAL(GII)
   end if
 
@@ -77,9 +83,9 @@ MODULE hydrogen_opacities
   gIII = 1.0 + 0.1728*x3 * (1.0 + y) - &
         0.0496*(x3*x3) * (1.0 + (1.0 + y)*0.33333333*y)
 
-  where (GIII.le.1.) gIII = 1.
+  where (GIII <= 1d0) gIII = 1.
 
-  if (MAXVAL(GIII).gt.2) write(*,*) "free-free Gaunt factor gIII = ", &
+  if (MAXVAL(GIII) > 2d0) write(*,*) "free-free Gaunt factor gIII = ", &
       MAXVAL(gIII)
 
  RETURN
@@ -178,20 +184,19 @@ MODULE hydrogen_opacities
     ! u = n**2 * h * nu / (Z**2 * R) - 1
 !     uu(ilam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(ilam)) / &
 !       ((Hydrogen%stage(i)+1)* (Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
-    uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
+    uu(continuum%Nblue:continuum%Nred) = &
       n_eff*n_eff*HPLANCK*CLIGHT/ & 
-       (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) / &
+       (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nred)) / &
       ((Hydrogen%stage(i)+1)*(Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
 !    g_bf(ilam) = Gaunt_bf(continuum%Nlambda, uu(ilam), n_eff)
-    g_bf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     Gaunt_bf(&
-      continuum%Nlambda, uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1), n_eff)
+    g_bf(continuum%Nblue:continuum%Nred) = &
+     Gaunt_bf(continuum%Nlambda, uu(continuum%Nblue:continuum%Nred), n_eff)
     ! Z scaled law
 !     sigma(ilam) = &
 !      sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / (Hydrogen%stage(i)+1)**2 !m^2
-    sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     sigma0 * g_bf(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
-       (NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/lambdaEdge)**3 * &
+    sigma(continuum%Nblue:continuum%Nred) = &
+     sigma0 * g_bf(continuum%Nblue:continuum%Nred) * &
+       (NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3 * &
        n_eff / (Hydrogen%stage(i)+1)**2 !m^2
 
 
@@ -205,26 +210,20 @@ MODULE hydrogen_opacities
 
     ! now computes emissivity and extinction
 !     expla(iLam) = dexp(-hc_kla(iLam)/atmos%T(icell))
-    expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     dexp(-hc_kla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)/atmos%T(icell))
+    expla(continuum%Nblue:continuum%Nred) = dexp(-hc_kla(continuum%Nblue:continuum%Nred)/atmos%T(icell))
 !     gijk(iLam) = Hydrogen%nstar(i,icell)/npstar * expla(iLam)
-    gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     Hydrogen%nstar(i,icell)/npstar * &
-      expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)
+    gijk(continuum%Nblue:continuum%Nred) = Hydrogen%nstar(i,icell)/npstar * &
+      expla(continuum%Nblue:continuum%Nred)
      ! at LTE only for chi
      ! see Hubeny & Mihalas eq. 14.16 to 14.18
      ! if LTE Hydrogen%n points to %nstar
 !    chi(iLam) = chi(iLam) + sigma(iLam) * (1.-expla(iLam)) * Hydrogen%n(i,icell)
-    chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     chi(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
-      sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
-       (1.-expla(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)) * Hydrogen%n(i,icell)
+    chi(continuum%Nblue:continuum%Nred) = chi(continuum%Nblue:continuum%Nred) + &
+      sigma(continuum%Nblue:continuum%Nred) * (1.-expla(continuum%Nblue:continuum%Nred)) * Hydrogen%n(i,icell)
 !   eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np       
-    eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-     eta(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) + &
-      twohnu3_c2(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
-       gijk(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * &
-        sigma(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) * np
+    eta(continuum%Nblue:continuum%Nred) = eta(continuum%Nblue:continuum%Nred) + &
+      twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
+        sigma(continuum%Nblue:continuum%Nred) * np
 
 !    deallocate(iLam)
   end do
@@ -265,7 +264,7 @@ MODULE hydrogen_opacities
  RETURN
  END SUBROUTINE Hydrogen_ff
 
- FUNCTION Hminus_bf(icell, chi, eta) result(res)
+ SUBROUTINE Hminus_bf(icell, chi, eta)
  ! H minus bound-free coefficients from RH
  ! in units of 1e-21 m^2
  ! See: Geltman 1962, ApJ 136, 935-945 and
@@ -291,21 +290,22 @@ MODULE hydrogen_opacities
                  3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
                  1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
 
-  res = .false.
-  if ((MINVAL(NLTEspec%lambda).le.lambdaBF(1)).or.&
-      (MAXVAL(NLTEspec%lambda).ge.lambdaBF(NBF))) RETURN !res=.false.
+  chi = 0d0
+  eta = 0d0
 
 
   ! interpolate cross-section at lambda
   !!alpha = 1e-21 * interp1D(lambdaBF,alphaBF,lambda) !m^2
   CALL bezier3_interp(NBF, lambdaBF, alphaBF, NLTEspec%Nwaves, NLTEspec%lambda, alpha)
   alpha = alpha * 1d-21
-
+  
   ! hnu/kB
   hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NLTEspec%lambda*NM_TO_M)
   twohnu3_c2 = (2.*HPLANCK*CLIGHT) / (NM_TO_M*NLTEspec%lambda)**3
-
   stimEmis = dexp(-hc_kla/atmos%T(icell))
+  
+  !non zero only in this region
+  where((NLTEspec%lambda > lambdaBF(1)).and.(NLTEspec%lambda < lambdaBF(NBF)))
    ! note that nhmin is deduced from hydrogen%ntotal
    ! which is the total number of hydrogen in neutral and
    ! ionised form (H and H+).
@@ -313,10 +313,10 @@ MODULE hydrogen_opacities
    ! all form = HI, HII, H-, H2, CH etc etc
    chi = atmos%nHmin(icell) * (1.-stimEmis) * alpha
    eta = atmos%nHmin(icell) * twohnu3_c2 * stimEmis * alpha
-  res = .true.
+  end where
 
  RETURN
- END FUNCTION
+ END SUBROUTINE Hminus_bf
 
  SUBROUTINE Hminus_ff_longwavelength(icell, chi)
  ! H- free-free opacity for wavelength beyond 9113.0 nm
@@ -325,7 +325,7 @@ MODULE hydrogen_opacities
  ! K. A. Berrington (1987), J. Phys. B 20, 801-806.
   integer :: k, n
   integer, intent(in) :: icell
-  double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi
+  double precision, intent(inout), dimension(NLTEspec%Nwaves) :: chi
   double precision, dimension(NJOHN) :: AJ, BJ, CJ, DJ, EJ, FJ
   double precision, dimension(NJOHN,NLTEspec%Nwaves) :: Clam
   double precision, dimension(NLTEspec%Nwaves) :: lambda_mu, lambda_inv
@@ -338,7 +338,7 @@ MODULE hydrogen_opacities
   data EJ / 0.000, -1341.537,  5303.609, -7510.494,4400.067,  -901.788 /
   data FJ / 0.000,   208.952,  -812.939,  1132.738, -655.020, 132.985  /
 
-  chi = 0
+  chi = 0d0
 
   CK= (KBOLTZMANN * THETA0 * 1.0E-32);
 
@@ -358,7 +358,6 @@ MODULE hydrogen_opacities
     chi = chi + theta_n * Clam(n,:)
   end do
   chi= chi* Hydrogen%n(1,icell) * (atmos%ne(icell)*CK)
-   !!write(*,*) lambda, " chi_ff=",chi(k)
 
  RETURN
  END SUBROUTINE Hminus_ff_longwavelength
@@ -436,13 +435,9 @@ MODULE hydrogen_opacities
     5.19d1,5.62d1, 6.04d1, 6.45d1, 6.84d1, 7.23d1,&
     7.60d1,7.97d1, 8.32d1, 8.67d1, 9.01d1 /
 
+  chi = 0d0
 
-  ! for long wavelength
-  if (MAXVAL(NLTEspec%lambda).ge.lambdaFF(NFF)) then
-   CALL Hminus_ff_longwavelength(icell, chi)
-   RETURN
-  end if
-
+  pe = atmos%ne(icell) * KBOLTZMANN * atmos%T(icell)
   ! 2-dimensionalize kappaFF_flat for interp2D
   kappaFF = RESHAPE(kappaFF_flat,(/NTHETA, NFF/))
   !!write(*,*) "Check reshape + interp2D"
@@ -452,15 +447,26 @@ MODULE hydrogen_opacities
   !     kappaFF_flat(NTHETA*(index-1)+index2)
   ! end do
   !end do
+  
+  ! for long wavelengths
+  ! Can do more efficiently !! that computing for all wavelength
+  ! as it was all long wavelength and then computing
+  ! only where it is below for the other wavelengths
+  if ((MAXVAL(NLTEspec%lambda) >= lambdaFF(NFF)) .or. &
+       (MINVAL(NLTEspec%lambda) >= lambdaFF(NFF))) then !if at least one
+   CALL Hminus_ff_longwavelength(icell, chi)
+   !!RETURN
+  end if
 
-   pe = atmos%ne(icell) * KBOLTZMANN * atmos%T(icell)
-   theta(1) = THETA0 /  atmos%T(icell)
+   theta(1:1) = THETA0 /  atmos%T(icell)
    ! interpolate kappaFF at theta and lambda using
    ! 2x 1D cubic Bezier splines
    kappa = interp2Darr(NTHETA, thetaFF,NFF,lambdaFF,kappaFF,&
                   1,theta,NLTEspec%Nwaves, NLTEspec%lambda)
+   where(NLTEspec%lambda < lambdaFF(NFF))
    chi = (Hydrogen%n(1,icell)*1d-29) * pe * kappa(1,:)
-   !write(*,*) kappa, chi(k)
+   end where
+
 
  RETURN
  END SUBROUTINE Hminus_ff

@@ -165,14 +165,12 @@ MODULE readatom
     !! DO NOT USE i as a loop index here !!
 
     !Now read all bound-bound transitions
-    atom%Npfr = 0 !but already initialised in atom_type.f90
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
      !atom%lines(kr)%atom => atom !hmm work this?
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
-!      atom%lines(kr)%Nblue = 0
      !atom%lines(kr)%trtype="ATOMIC_LINE"
      CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
      Nread = len(trim(inputline)) ! because, if blanck
@@ -402,7 +400,6 @@ MODULE readatom
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      !atom%continua(kr)%trtype="ATOMIC_CONTINUUM"
-!      atom%continua(kr)%Nblue = 0
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
@@ -424,11 +421,8 @@ MODULE readatom
      !    " type = ", nuDepChar," lambda min = ",&
      !     lambdamin," nm"
 
-     allocate(atom%continua(kr)%&
-        lambda(atom%continua(kr)%Nlambda))
-
-     allocate(atom%continua(kr)%&
-       alpha(atom%continua(kr)%Nlambda))
+     allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
+     allocate(atom%continua(kr)%alpha(atom%continua(kr)%Nlambda))
 
 
      if (trim(nuDepChar).eq."EXPLICIT") then
@@ -462,7 +456,7 @@ MODULE readatom
         stop
        end if
        !input and fill wavelength grid for HYRDROGENIC
-       CALL getLambdaCont(atom%continua(kr), lambdamin)
+       CALL getLambdaCont(atom%continua(kr), lambdamin) !already allocated
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
      else
@@ -496,10 +490,16 @@ MODULE readatom
   do kr=1,atom%Nline
      !write(*,*) atom%lines(kr)%symmetric,&
      !           atom%lines(kr)%polarizable
-     CALL getLambdaLine(atom%lines(kr))
-     !write(*,*) "lammin = ", &
-     ! atom%lines(kr)%lambda(1)," lammax = ", &
-     ! atom%lines(kr)%lambda(atom%lines(kr)%Nlambda)
+     !CALL getLambdaLine(atom%lines(kr)) !allocated inside
+     CALL getLambdaLine_2(atom%lines(kr), 1.5*MAXVAL(atom%vbroad))
+     if (kr==3) then
+      write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
+       atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda
+      do la=1,atom%lines(kr)%Nlambda
+       write(*,*) la, atom%lines(kr)%lambda(la)
+      end do
+      stop
+     end if
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
@@ -569,7 +569,7 @@ MODULE readatom
   SUBROUTINE readAtomicModels(unit)
   !Read all atomic files present in atoms.input file
   !successive call of readModelAtom()
-  integer :: EOF=0,Nread, nmet, mmet, nblancks, nact
+  integer :: EOF=0,Nread, nmet, mmet, nblancks, nact, npass
   integer, intent(in) :: unit
   character(len=MAX_LENGTH) :: inputline
   character(len=15) :: FormatLine
@@ -585,6 +585,7 @@ MODULE readatom
 
 
   atmos%Nactiveatoms = 0
+  atmos%Npassiveatoms = 0
   open(unit=unit,file=trim(mcfost_utils)//TRIM(ATOMS_INPUT), status="old")
 
   !get number of atomic models to read
@@ -631,6 +632,7 @@ MODULE readatom
      atmos%Nactiveatoms = atmos%Nactiveatoms+1
    else
      atmos%atoms(nmet)%active=.false.
+     atmos%NpassiveAtoms = atmos%NpassiveAtoms+1
      !write(*,*) "atom is passive"
    end if
 !   ! just opoen the model to check that Hydrogen is the first model
@@ -669,6 +671,13 @@ MODULE readatom
      nact = 1
     allocate(atmos%ActiveAtoms(atmos%Nactiveatoms))
   end if
+  if (atmos%Natom - atmos%Nactiveatoms == atmos%Npassiveatoms) then
+   allocate(atmos%PassiveAtoms(atmos%Npassiveatoms))
+   npass = 1
+  else
+   write(*,*) "Error, number of passive atoms is not N-Nactive"
+   stop
+  end if
 
   ! keep a duplicate in Elements
   write(*,*) "order#     ID   periodic-table#    ACTIVE    #lines   #continua"
@@ -683,8 +692,16 @@ MODULE readatom
    if (atmos%atoms(nmet)%periodic_table.eq.2)  &
            Helium => atmos%Atoms(nmet)
    if (associated(atmos%ActiveAtoms)) then
-     atmos%ActiveAtoms(nact:nact) => atmos%Atoms(nmet:nmet)
-     nact = nact + 1
+     if (atmos%Atoms(nmet)%active) then 
+      atmos%ActiveAtoms(nact:nact) => atmos%Atoms(nmet:nmet)
+      nact = nact + 1 !got the next index of active atoms
+     end if
+   end if
+   if (associated(atmos%PassiveAtoms)) then
+     if (.not.atmos%Atoms(nmet)%active) then
+      atmos%PassiveAtoms(npass:npass) => atmos%Atoms(nmet:nmet)
+      npass = npass + 1
+     end if
    end if
   end do
 

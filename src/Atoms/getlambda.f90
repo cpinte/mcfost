@@ -27,9 +27,9 @@ MODULE getlambda
 
   SUBROUTINE getLambdaCont(continuum, lambdamin)
    type (AtomicContinuum), intent(inout) :: continuum
-   real(8), intent(in) :: lambdamin
+   double precision, intent(in) :: lambdamin
    integer :: la, Nlambda
-   real(8) :: dlambda
+   double precision :: dlambda
 
    Nlambda =  continuum%Nlambda
    dlambda = (continuum%lambda0 - lambdamin) / (Nlambda-1)
@@ -40,6 +40,37 @@ MODULE getlambda
 
   RETURN
   END SUBROUTINE getLambdaCont
+  
+  SUBROUTINE getLambdaLine_2(line, vWing)
+   type (AtomicLine), intent(inout) :: line
+   double precision, intent(in) :: vWing
+   double precision :: v_char
+   double precision, parameter :: resol = 1.78888 !km/s
+   integer :: la, Nlambda
+   integer, parameter :: NlambdaMax = 10000
+   double precision :: lam_grid(NlambdaMax), dlambda, l0, l1
+   
+   v_char = max(atmos%v_char, vWing)
+   
+   Nlambda = 2
+   dlambda = line%qwing * v_char / CLIGHT * line%lambda0
+   l1 = (line%lambda0 + dlambda) * (1 + 1d3 * resol/CLIGHT)
+   l0 = (line%lambda0 - dlambda) * (1 - 1d3 * resol/CLIGHT)
+   lam_grid(1) = l0
+    infinie : do
+    lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * resol / CLIGHT)
+     if (lam_grid(Nlambda) >= l1) exit infinie
+     Nlambda = Nlambda + 1
+     if (Nlambda > NlambdaMax) exit infinie
+   end do infinie
+
+   !if (MOD(Nlambda,2) == 0) Nlambda = Nlambda + 1 !to make it odd
+   line%Nlambda = Nlambda
+   allocate(line%lambda(line%Nlambda))
+   line%lambda = lam_grid(1:Nlambda) 
+
+  RETURN
+  END SUBROUTINE getLambdaLine_2
 
   SUBROUTINE getLambdaLine(line)
    type (AtomicLine), intent(inout) :: line
@@ -54,6 +85,8 @@ MODULE getlambda
     write(*,*) "exiting..."
     stop
    end if
+   
+   !write(*,*) line%j, "->", line%i, line%qcore, line%qwing
 
    !store in unit of lambda0 instead of adimensional values
    !deltaLambda / lambda0 = deltav/c
@@ -242,7 +275,7 @@ MODULE getlambda
    double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
    integer													  :: lam0_indexes
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot, idx
-   integer :: la, nn, compar, Nred, Nlambda_original !read from model
+   integer :: la, nn, compar, Nred, Nblue, Nlambda_original!read from model
    double precision, allocatable, dimension(:) :: tempgrid
    double precision :: l0, l1 !ref wavelength of each transitions
 
@@ -324,7 +357,7 @@ MODULE getlambda
   !tempgrid(1) already set
   Nwaves = 2
   do la=2,Nspect
-  !write(*,*) "dlam>0", tempgrid(la)-tempgrid(la-1)
+  write(*,*) "dlam>0", tempgrid(la)-tempgrid(la-1)
    if (tempgrid(la).gt.tempgrid(la-1)) then
    !write(*,*) "T"
     tempgrid(Nwaves) = tempgrid(la)
@@ -337,7 +370,7 @@ MODULE getlambda
   allocate(inoutgrid(Nwaves))
   do la=1,Nwaves
    inoutgrid(la) = tempgrid(la)
-   !write(*,*) "lam(la) =", inoutgrid(la)
+   write(*,*) "lam(la) =", inoutgrid(la)
   end do
 
   !should not dot that but error somewhere if many atoms
@@ -353,24 +386,45 @@ MODULE getlambda
   do n=1,Natom
    Nred = 0
    !first continuum transitions
+!   write(*,*) " ------------------------------------------------------------------ "
    do kc=1,Atoms(n)%Ncont
     Nlambda_original = Atoms(n)%continua(kc)%Nlambda
     l0 = Atoms(n)%continua(kc)%lambda(1)
     l1 = Atoms(n)%continua(kc)%lambda(Nlambda_original)
-    Atoms(n)%continua(kc)%Nblue = locate(inoutgrid,l0)
     Nred = locate(inoutgrid,l1)
-    Atoms(n)%continua(kc)%Nlambda = Nred - Atoms(n)%continua(kc)%Nblue
+    !Nblue = locate(inoutgrid,l0)
+!     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
+    Atoms(n)%continua(kc)%Nblue = locate(inoutgrid,l0)
+    Atoms(n)%continua(kc)%Nred = locate(inoutgrid,l1)
+    Atoms(n)%continua(kc)%Nlambda = Atoms(n)%continua(kc)%Nred - &
+                                    Atoms(n)%continua(kc)%Nblue + 1
+!     write(*,*) Atoms(n)%ID, " continuum:",kr, " Nlam_ori:", Nlambda_original, &
+!     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
+!       " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
+!       " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
    end do
    !then bound-bound transitions
    do kr=1,Atoms(n)%Nline
     Nlambda_original = Atoms(n)%lines(kr)%Nlambda
     l0 = Atoms(n)%lines(kr)%lambda(1)
     l1 = Atoms(n)%lines(kr)%lambda(Nlambda_original)
-    Atoms(n)%lines(kr)%Nblue = locate(inoutgrid,l0)
     Nred = locate(inoutgrid,l1)
-    Atoms(n)%lines(kr)%Nlambda = Nred - Atoms(n)%lines(kr)%Nblue
+   ! Nblue = locate(inoutgrid,l0)
+!     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
+    Atoms(n)%lines(kr)%Nblue = locate(inoutgrid,l0)!Nblue
+    Atoms(n)%lines(kr)%Nred = locate(inoutgrid,l1)
+    Atoms(n)%lines(kr)%Nlambda = Atoms(n)%lines(kr)%Nred - &
+                                 Atoms(n)%lines(kr)%Nblue + 1
+!     write(*,*) Atoms(n)%ID, " line:",kr, " Nlam_ori:", Nlambda_original, &
+!     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%lines(kr)%Nred, & 
+!       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, & 
+!       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
    end do
+!    write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
+  stop
+!deallocate line%lambda ?continuum%lambda because it will not correspond to the new
+! Nblue and Nlambda
 
   RETURN
   END SUBROUTINE make_wavelength_grid
