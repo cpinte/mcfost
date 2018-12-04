@@ -490,16 +490,16 @@ MODULE readatom
   do kr=1,atom%Nline
      !write(*,*) atom%lines(kr)%symmetric,&
      !           atom%lines(kr)%polarizable
-     !CALL getLambdaLine(atom%lines(kr)) !allocated inside
-     CALL getLambdaLine_2(atom%lines(kr), 1.5*MAXVAL(atom%vbroad))
-     if (kr==3) then
-      write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
-       atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda
-      do la=1,atom%lines(kr)%Nlambda
-       write(*,*) la, atom%lines(kr)%lambda(la)
-      end do
-      stop
-     end if
+!     CALL getLambdaLine(atom%lines(kr)) !allocated inside
+     CALL make_sub_wavelength_grid(atom%lines(kr), 5*MAXVAL(atom%vbroad))
+!      if (kr==3) then
+!       write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
+!        atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda
+!       do la=1,atom%lines(kr)%Nlambda
+!        write(*,*) la, atom%lines(kr)%lambda(la)
+!       end do
+!       stop
+!      end if
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.

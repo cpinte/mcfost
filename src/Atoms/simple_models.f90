@@ -74,7 +74,7 @@ MODULE simple_models
    
 !   !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
-   atmos%moving=.false.
+   atmos%moving=.true.
    if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
    atmos%Vmap = 0d0
    atmos%velocity_law = 0 !keplerian

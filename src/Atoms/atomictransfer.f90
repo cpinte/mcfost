@@ -748,6 +748,7 @@ npix_x = 101; npix_y = 101
 !      stop
    end if
    if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
+   atmos%v_char = MAXVAL(Vfield)
   else
    deallocate(Vfield)						! allocated only if moving
   end if 
