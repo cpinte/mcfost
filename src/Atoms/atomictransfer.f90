@@ -519,7 +519,7 @@ npix_x = 101; npix_y = 101
  !       n_cells >> n_lambda, in "real" cases.
  ! npix_x, xpix_y, RT_line_method
  ! some of shared quantities by the code that i don't know were they are !!
- ! lkeplerian, linfall, lvoro wjere to declare them
+ ! lkeplerian, linfall, lvoro wjere to declare them, lcylindrical ects
  
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
@@ -545,7 +545,6 @@ npix_x = 101; npix_y = 101
   					 !or special geometry with static atmospheres
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   optical_length_tot => atom_optical_length_tot
-  
   !because for now lemission_atom is not a case of readparameters
   write(*,*) npix_x, npix_y
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
@@ -561,8 +560,8 @@ npix_x = 101; npix_y = 101
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  CALL prop_law_model()
-  !CALL spherically_symmetric_model()
+  !CALL prop_law_model()
+  CALL spherically_symmetric_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -571,7 +570,6 @@ npix_x = 101; npix_y = 101
   write(*,*) "maxTgas = ", MAXVAL(atmos%T), " minTgas = ", MINVAL(atmos%T)
   write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)  
 !! --------------------------------------------------------- !!
-
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
@@ -597,7 +595,7 @@ npix_x = 101; npix_y = 101
   write(*,*) "maxnHmin = ", MAXVAL(atmos%nHmin), " minnHmin = ", MINVAL(atmos%nHmin)
 
 !! --------------------------------------------------------- !!
-  NLTEspec%atmos => atmos
+  NLTEspec%atmos => atmos !this one is important because atmos_Type : atmos is not used.
   CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
   NLTEspec%AtomOpac%store_opac = lstore_opac
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
@@ -725,7 +723,7 @@ npix_x = 101; npix_y = 101
   if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
   lkeplerian = .false.
   linfall = .false.
-  Vfield=atmos%Vmap !0d0 by default or something if velocity_law != 0
+  Vfield=0d0! by default or something if velocity_law != 0
   if (atmos%moving) then
    if (atmos%velocity_law == 0) then !default is 0 for keplerian vel
     lkeplerian = .true.
@@ -744,14 +742,17 @@ npix_x = 101; npix_y = 101
     endif
    else if (atmos%velocity_law == -1) then 
     linfall=.true.
+    Vfield = atmos%Vmap
 !      write(*,*) linfall, atmos%velocity_law, MAXVAL(Vfield)
 !      stop
    end if
    if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
-   atmos%v_char = MAXVAL(Vfield)
+   atmos%v_char = 5*MAXVAL(Vfield)
+   write(*,*), minval(Vfield), maxval(Vfield), atmos%v_char
   else
    deallocate(Vfield)						! allocated only if moving
   end if 
+
  RETURN
  END SUBROUTINE adjusting_mcfost
 

@@ -21,9 +21,9 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
 
-   nHtot =  1d23
-   T = 7000d0
-   ne = 1d-1 * nHtot
+   nHtot =  1d12
+   T = 3000d0
+   ne = 1d-2 * nHtot
 
 !    !idk = 10
 !    nHtot =  2.27414200581936d16
@@ -47,15 +47,17 @@ MODULE simple_models
     
    !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
-   atmos%moving = .false.
+   atmos%moving = .true.
    atmos%vturb = 0d0
    !atmos%vturb = 9.506225d3 !m/s !idk=10
    !atmos%vturb = 1.696164d3 !idk = 75
    !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
-   if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
-   atmos%Vmap = 0d0
    atmos%velocity_law = 0 !keplerian
+   if (atmos%moving.and.atmos%velocity_law /= 0) then
+     if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+     atmos%Vmap = 0d0
+   end if
 
   RETURN
   END SUBROUTINE uniform_law_model
@@ -67,17 +69,20 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
 
-   !nHtot = 1d23 * densite_gaz/MAXVAL(densite_gaz)
-   nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
+   nHtot = 1d15 * densite_gaz/MAXVAL(densite_gaz) + 1d12
+   !nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
    T = Tdust * 1d0 + 3000d0!10d0, depends on the stellar flux
-   ne = 1d-2 * nHtot
+   ne = 1d-2 * maxval(nHtot) * nHtot/maxval(nHtot)!1d-2 * nHtot
    
 !   !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving=.true.
-   if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
-   atmos%Vmap = 0d0
    atmos%velocity_law = 0 !keplerian
+   if (atmos%moving.and.atmos%velocity_law /= 0) then
+     if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+     atmos%Vmap = 0d0
+   end if
+   
   RETURN
   END SUBROUTINE prop_law_model
   
@@ -163,7 +168,6 @@ MODULE simple_models
   atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
   				  ! otherwise vinfall/vkep = cte = expected.
   atmos%velocity_law = -1
-  !atmos%v_char = 10*MAXVAL(atmos%Vmap)!0.5*(MAXVAL(atmos%Vmap)+MINVAL(atmos%Vmap))
   RETURN
   END SUBROUTINE spherically_symmetric_model
  

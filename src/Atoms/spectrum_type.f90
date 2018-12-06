@@ -57,13 +57,13 @@ MODULE spectrum_type
 
   type (Spectrum) :: NLTEspec
 
-CONTAINS
+  CONTAINS
 
   SUBROUTINE initSpectrum(NPROC, lam0, vacuum_to_air, write_wavelength)
    integer, intent(in) :: NPROC
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air, write_wavelength
-   
+      
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%NPROC = NPROC
    
@@ -76,7 +76,7 @@ CONTAINS
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
-   CALL writeWavelength()  
+   CALL writeWavelength()
   
   RETURN
   END SUBROUTINE initSpectrum
@@ -219,7 +219,7 @@ CONTAINS
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter
+  integer :: group,fpixel,nelements, i, xcenter, la
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
@@ -229,8 +229,12 @@ CONTAINS
 npix_x = 101; npix_y = 101
   write(*,*) "Writing Flux-map"
   write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
-  if (l_sym_ima) write(*,*) " image is symmetric."
-
+  if (l_sym_ima) then 
+   write(*,*) " image is symmetric."
+  else
+   write(*,*) " image is not symmetric."
+  end if
+  
    !  Get an unused Logical Unit Number to use to open the FITS file.
    status=0
    CALL ftgiou (unit,status)
@@ -284,18 +288,19 @@ npix_x = 101; npix_y = 101
 !       ! on lambda and not vel ?
 !      else
       xcenter = npix_x/2 + modulo(npix_x,2)
-!       if (lkeplerian) then !line profile reversed
-!        do i=xcenter+1,npix_x
-!         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-!         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)       
-!        end do
-!       else ! infall
-!       write(*,*) xcenter, npix_x, shape(NLTEspec%Flux)
-       do i=xcenter+1,npix_x
-        NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-        NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-       end do
-!       end if !lkeplerian
+       if (lkeplerian) then !line profile reversed
+        do i=xcenter+1,npix_x
+!          do la=-NLTEspec%Nwaves, NLTEspec%Nwaves
+          NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+          NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+!          end do       
+        end do
+       else ! infall
+        do i=xcenter+1,npix_x
+         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+        end do
+       end if !lkeplerian
 !      endif !RT_line_method
   endif ! l_sym_image
 

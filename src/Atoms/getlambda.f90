@@ -1,16 +1,4 @@
 MODULE getlambda
-! Adapted from RH H. Uitenbroek
-
- ! --- Construct a wavelength grid that is approximately equidistant
- !in the core (q <= qcore) and equidistant in log(q) in the wings
- !(qcore < q <= qwing).
-
- !Look for a function of the form: q[n] = a*(n + (exp(b*n)-1));
- !n=0, N-1 satisfying the following conditions:
-
- ! -- q[0]   = 0          (this is true for all a and b)
- ! -- q[(N-1)/2] = qcore
- ! -- q[N-1] = qwing
 
   use atom_type, only : AtomicContinuum, AtomicLine, AtomType
   use atmos_type, only : atmos
@@ -30,7 +18,8 @@ MODULE getlambda
    double precision, intent(in) :: lambdamin
    integer :: la, Nlambda
    double precision :: dlambda
-
+   ! from lambdamin to lambdaEdge or lambda ionisation
+   ! or from maximum frequency to frequency threshold.
    Nlambda =  continuum%Nlambda
    dlambda = (continuum%lambda0 - lambdamin) / (Nlambda-1)
    continuum%lambda(1) = lambdamin
@@ -45,12 +34,12 @@ MODULE getlambda
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vWing
    double precision :: v_char
-   double precision, parameter :: resol = 1.78888d0, subresol = 0.05, vsub = 5d0 !km/s
+   double precision, parameter :: resol = 1.78888d0, subresol = 0.2, vsub = 4.6 !km/s
    integer :: la, Nlambda
-   integer, parameter :: NlambdaMax = 100000
+   integer, parameter :: NlambdaMax = 10000
    double precision :: lam_grid(NlambdaMax), dlambda, l0, l1
    
-   v_char = max(5*atmos%v_char, vWing)
+   v_char = max(atmos%v_char, vWing)
    
    Nlambda = 2
    dlambda = v_char/CLIGHT * line%lambda0 !v_char / CLIGHT * line%lambda0
@@ -84,6 +73,18 @@ MODULE getlambda
   END SUBROUTINE make_sub_wavelength_grid
 
   SUBROUTINE getLambdaLine(line)
+! Adapted from RH H. Uitenbroek
+
+ ! --- Construct a wavelength grid that is approximately equidistant
+ !in the core (q <= qcore) and equidistant in log(q) in the wings
+ !(qcore < q <= qwing).
+
+ !Look for a function of the form: q[n] = a*(n + (exp(b*n)-1));
+ !n=0, N-1 satisfying the following conditions:
+
+ ! -- q[0]   = 0          (this is true for all a and b)
+ ! -- q[(N-1)/2] = qcore
+ ! -- q[N-1] = qwing
    type (AtomicLine), intent(inout) :: line
    integer :: la, n, Nlambda, NB=0, Nmid
    real(8) :: beta, a, b, y, q_to_lambda, qB_char, qB_shift,dlambda
@@ -231,7 +232,7 @@ MODULE getlambda
   END SUBROUTINE getLambdaLine
 
   FUNCTION IntegrationWeightLine(line, la) result (wlam)
-   real(8) :: wlam, Dopplerwidth
+   double precision :: wlam, Dopplerwidth
    type (AtomicLine) :: line
    integer :: la
    !Return wavelength interval.
@@ -243,9 +244,9 @@ MODULE getlambda
 
    Dopplerwidth = CLIGHT/line%lambda0
    if (line%symmetric) Dopplerwidth = Dopplerwidth*2
-   if (la.eq.1) then
+   if (la == 1) then
     wlam = 0.5*(line%lambda(la+1)-line%lambda(la))
-   else if (la.eq.line%Nlambda) then
+   else if (la == line%Nlambda) then
     wlam = 0.5*(line%lambda(la)-line%lambda(la-1))
    else
     wlam = 0.5*(line%lambda(la+1)-line%lambda(la-1))
@@ -258,11 +259,11 @@ MODULE getlambda
   ! result in nm
    type (AtomicContinuum) :: cont
    integer :: la
-   real(8) :: wlam
+   double precision :: wlam
 
-   if (la.eq.1) then
+   if (la == 1) then
     wlam = 0.5*(cont%lambda(la+1)-cont%lambda(la))
-   else if (la.eq.cont%Nlambda-1) then
+   else if (la == cont%Nlambda-1) then
     wlam = 0.5*(cont%lambda(la)-cont%lambda(la-1))
    else
     wlam = 0.5*(cont%lambda(la+1)-cont%lambda(la-1))
