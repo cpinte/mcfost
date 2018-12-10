@@ -34,7 +34,7 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use readatmos, only				    : readatmos_1D, readPLUTO
- use simple_models, only 				: spherically_symmetric_model, &
+ use simple_models, only 				: spherically_symmetric_shells_model, &
  										  prop_law_model, uniform_law_model
  
  !$ use omp_lib
@@ -78,7 +78,7 @@ MODULE AtomicTransfer
   double precision, intent(in) :: x,y,z
   logical, intent(in) :: labs !used in NLTE but why?
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, Snu1, Snu1_c
+  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
   integer :: nbr_cell, icell, next_cell, previous_cell
   double precision :: facteur_tau !used only in molecular line to have emission for one
@@ -129,7 +129,7 @@ MODULE AtomicTransfer
     previous_cell = 0 ! unused, just for Voronoi
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-                                        
+                     
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
@@ -157,6 +157,8 @@ MODULE AtomicTransfer
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)
+     Snu = 1d0
+     Snu_c = 1d0
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
@@ -177,16 +179,6 @@ MODULE AtomicTransfer
       ! continuum source function
       Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
-            
-!      CALL initAtomOpac(id)       
-!      CALL Background(id, next_cell, x0, y0, z0, x1, y1, z1, u, v, w)
-!      Snu1 = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
-!                   NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
-!                  (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
-!      Snu1_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
-!             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
-!      NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray)*exp(-dtau) + 0.5*(Snu + Snu1) * dtau
-!      NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray)*exp(-dtau_c) + 0.5*(Snu_c + Snu1_c) * dtau_c 
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
@@ -201,6 +193,7 @@ MODULE AtomicTransfer
 !     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
  
     if (MINVAL(NLTEspec%I(id,:,iray))<0) then
+     write(*,*) "Negative Opac !"
      if (NLTEspec%AtomOpac%store_opac) then
       write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
        MINVAL(NLTEspec%AtomOpac%jc(icell,:))
@@ -222,8 +215,7 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
-     ! Define PSI Operators here
-
+     ! Define PSI Operators here  
     end if  ! lcellule_non_vide
   end do infinie
   ! -------------------------------------------------------------- !
@@ -561,7 +553,7 @@ npix_x = 101; npix_y = 101
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
   !CALL prop_law_model()
-  CALL spherically_symmetric_model()
+  CALL spherically_symmetric_shells_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -732,14 +724,14 @@ npix_x = 101; npix_y = 101
      if (lcylindrical_rotation) then ! Midplane Keplerian velocity
         do icell=1, n_cells
            vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-        enddo
+        end do
      else ! dependance en z
         do icell=1, n_cells
            vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
         end do
-     endif
-    endif
+     end if
+    end if
    else if (atmos%velocity_law == -1) then 
     linfall=.true.
     Vfield = atmos%Vmap
@@ -747,8 +739,8 @@ npix_x = 101; npix_y = 101
 !      stop
    end if
    if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
-   atmos%v_char = 5*MAXVAL(Vfield)
-   write(*,*), minval(Vfield), maxval(Vfield), atmos%v_char
+   atmos%v_char = 10*MAXVAL(abs(Vfield)) 
+   write(*,*), minval(abs(Vfield)), maxval(abs(Vfield)), atmos%v_char
   else
    deallocate(Vfield)						! allocated only if moving
   end if 

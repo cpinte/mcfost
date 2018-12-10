@@ -421,11 +421,10 @@ MODULE readatom
      !    " type = ", nuDepChar," lambda min = ",&
      !     lambdamin," nm"
 
-     allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
-     allocate(atom%continua(kr)%alpha(atom%continua(kr)%Nlambda))
-
-
      if (trim(nuDepChar).eq."EXPLICIT") then
+      ! Nlambda set in atomic file
+      allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
+      allocate(atom%continua(kr)%alpha(atom%continua(kr)%Nlambda))
       atom%continua(kr)%hydrogenic=.false.
       ! rearanging them in increasing order
       ! because in the atomic file they are
@@ -456,7 +455,12 @@ MODULE readatom
         stop
        end if
        !input and fill wavelength grid for HYRDROGENIC
-       CALL getLambdaCont(atom%continua(kr), lambdamin) !already allocated
+       ! Matters only when the complete wavelength dependence
+       ! is not read from file (HYDROGENIC).
+       ! %lambda allocated inside the routines.
+       ! %alpha not needed in this case.
+       CALL make_sub_wavelength_grid_cont(atom%continua(kr), lambdamin)
+       !CALL getLambdaCont(atom%continua(kr), lambdamin)
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
      else
@@ -487,11 +491,11 @@ MODULE readatom
     !now compute wavelengths grid for
     ! each line
     !Unlike RH, I do it even for passive atoms
-  do kr=1,atom%Nline
+  do kr=1,atom%Nline !line%lambda allocated inside
      !write(*,*) atom%lines(kr)%symmetric,&
      !           atom%lines(kr)%polarizable
-!     CALL getLambdaLine(atom%lines(kr)) !allocated inside
-     CALL make_sub_wavelength_grid(atom%lines(kr), 5*MAXVAL(atom%vbroad))
+!     CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
+     CALL make_sub_wavelength_grid(atom%lines(kr), 10*MAXVAL(atom%vbroad))
 !      if (kr==3) then
 !       write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
 !        atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda

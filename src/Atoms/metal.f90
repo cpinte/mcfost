@@ -201,7 +201,7 @@ MODULE metal
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 20
+  integer, parameter										:: NvspaceMax = 100000 !beware here grrr
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -221,27 +221,12 @@ MODULE metal
   ! v_proj in m/s at point icell
   omegav = 0d0
   Nvspace = 1
-
   if (atmos%moving) then
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
-   if (atmos%Voronoi) then 
-    omegav(Nvspace) = v0 !velocity constant in the cell
-   else
-    v1 = v_proj(icell,x1,y1,z1,u,v,w)
-    dv = dabs(v1-v0) 
-    Nvspace = NvspaceMax!min(max(2,nint(20*dv/atom%vbroad(icell))),NvspaceMax)
-    !velocity projected along a path between one border of the cell to the other
-    omegav(Nvspace) = v1
-    do nv=2,Nvspace-1
-    delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-    xphi=x+delta_vol_phi*u
-    yphi=y+delta_vol_phi*v
-    zphi=z+delta_vol_phi*w
-    omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-    end do 
-   end if
-  end if !atmos is moving
+   !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
+   if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
+  end if
 
   if (atmos%magnetized) then
   !change static to dynamic allocation for chi, eta because it is NrecStokes sized
@@ -252,6 +237,26 @@ MODULE metal
   do m=1,atmos%Npassiveatoms
    atom = atmos%PassiveAtoms(m)!atmos%Atoms(m)
    !if (atom%active) CYCLE ! go to next passive atom
+   
+    !velocity projected along a path between one border of the cell to the other
+    if (atmos%moving .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = dabs(v1-v0) 
+     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))!min(...,NvspaceMax)  
+     if (Nvspacemax < Nvspace) then
+      write(*,*) "Nvspace > Nvspacemax"
+      write(*,*) icell, atom%ID, Nvspace, Nvspacemax
+      stop
+     end if
+     omegav(Nvspace) = v1
+     do nv=2,Nvspace-1
+      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+      xphi=x+delta_vol_phi*u
+      yphi=y+delta_vol_phi*v
+      zphi=z+delta_vol_phi*w
+      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+     end do 
+    end if
 
     do kr=1,atom%Nline ! for this atom go over all transitions
                        ! bound-bound

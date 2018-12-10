@@ -73,6 +73,8 @@ MODULE spectrum_type
   
    ! Initialize the wavelength grid depending on the number of transitions PASSIVE/ACTIVE
    ! and allocate NLTEspec%lambda
+   ! Set also Nblue and Nred for each transitions: extension of the transtion
+   ! in absolute indexes on the whole grid.
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
@@ -285,24 +287,24 @@ npix_x = 101; npix_y = 101
   if (l_sym_ima) then 
 !      if (RT_line_method==1) then ! what should I do in my case ?
 !       ! I do not add the two halfs of the spectrum because I compute my spectrum
-!       ! on lambda and not vel ?
+!       ! on lambda and not vel for all lines at the same time?
 !      else
-      xcenter = npix_x/2 + modulo(npix_x,2)
-       if (lkeplerian) then !line profile reversed
-        do i=xcenter+1,npix_x
+    xcenter = npix_x/2 + modulo(npix_x,2)
+    if (lkeplerian) then !line profile reversed
+     do i=xcenter+1,npix_x
 !          do la=-NLTEspec%Nwaves, NLTEspec%Nwaves
-          NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-          NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+      NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
 !          end do       
-        end do
-       else ! infall
-        do i=xcenter+1,npix_x
-         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-         NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-        end do
-       end if !lkeplerian
+     end do
+    else ! infall or expansion
+     do i=xcenter+1,npix_x
+      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+      NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+     end do
+    end if !lkeplerian
 !      endif !RT_line_method
-  endif ! l_sym_image
+  end if ! l_sym_image
 
   !  Write the array to the FITS file.
 !   do a=1,NLTEspec%Nwaves
