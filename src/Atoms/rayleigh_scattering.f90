@@ -52,28 +52,6 @@ MODULE rayleigh_scattering
    res = .false.
    RETURN
   end if
-
-
-!   !find lambda_red, the longest wavelength covered by the
-!   !transition less than lambda for this atom.
-!   !Takes into account the extent of the line domain,
-!   !parametred by qwing and atmos%v_char
-!   if (atom%Nline .gt. 0) then
-!   if (atmos%v_char <= 0) then
-!   write(*,*) atmos%v_char should be different than 0
-!   stop
-!   end if
-!    do kr=1,atom%Nline
-!     if (atom%lines(kr)%i.eq.1) then
-!      lambda_red = atom%lines(kr)%lambda0*(1.+ &
-!          atom%lines(kr)%qwing*atmos%v_char/CLIGHT) !redest wavelength
-!      lambda_limit = MIN(lambda_limit, lambda_red)
-!     end if
-!    end do
-!   else !no lines
-!    res = .false.
-!    RETURN
-!   end if
   
  !   find lambda_red, the longest wavelength covered by the
  !   transition less than lambda for this atom.
@@ -89,20 +67,11 @@ MODULE rayleigh_scattering
   end if
   
   fomega = 0.0
-!   do kr=1,atom%Nline
-!    lambda_red = atom%lines(kr)%lambda0 * & 
-!         (1.+atom%lines(kr)%qwing * atmos%v_char/CLIGHT)
-!    if (atom%lines(kr)%i.eq.1) then
-!     where((NLTEspec%lambda.gt.lambda_limit).and.(NLTEspec%lambda.gt.lambda_red))
-!      lambda2 = 1./((NLTEspec%lambda/atom%lines(kr)%lambda0)**2 -1.)
-!      fomega = fomega + (lambda2)**2 *atom%lines(kr)%fosc
-!     end where
-!    end if 
-!   end do
+
   do kr=1,atom%Nline
    lambda_red = atom%lines(kr)%lambda(atom%lines(kr)%Nred)
    if (atom%lines(kr)%i.eq.1) then
-    where((NLTEspec%lambda > lambda_limit).and.(NLTEspec%lambda >lambda_red))
+    where((NLTEspec%lambda > lambda_limit).and.(NLTEspec%lambda > lambda_red))
      lambda2 = 1./((NLTEspec%lambda/atom%lines(kr)%lambda0)**2 -1.)
      fomega = fomega + (lambda2)**2 *atom%lines(kr)%fosc
     end where
