@@ -45,7 +45,7 @@ MODULE atmos_type
    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
-   double precision :: B_char = 0., v_char=1d3 !used to convert doppler units to wavelength
+   double precision :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    !write(*,*) "Use the proper v_char in case of large ", &
    !  "velocity gradient" ! it is use to sample the line domain
@@ -415,7 +415,6 @@ MODULE atmos_type
 !    if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(Nspace))
 !    atmos%Vmap = 0d0
 
-   atmos%velocity_law = 0
    ! %velocity_law=0 for v read from file
    !              =1 for CAK circumstellar envelope
    atmos%Natom = 0

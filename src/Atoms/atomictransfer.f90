@@ -157,8 +157,6 @@ MODULE AtomicTransfer
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)
-     Snu = 1d0
-     Snu_c = 1d0
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
@@ -552,8 +550,8 @@ npix_x = 101; npix_y = 101
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  !CALL prop_law_model()
-  CALL spherically_symmetric_shells_model()
+  CALL prop_law_model()
+  !CALL spherically_symmetric_shells_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -567,6 +565,10 @@ npix_x = 101; npix_y = 101
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
+  !we need atmos%v_char here for computing wavelength grid but it is known far after,
+  !except if we read velocity from a model. But we do not allow for a depth dependent
+  !frequency grid.
+  !If velocity is keplerian, vchar is the maximum value of Keplerian velocity
 
   ! if the electron density is not provided by the model or simply want to
   ! recompute it
@@ -739,10 +741,9 @@ npix_x = 101; npix_y = 101
 !      stop
    end if
    if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
-   atmos%v_char = 10*MAXVAL(abs(Vfield)) 
-   write(*,*), minval(abs(Vfield)), maxval(abs(Vfield)), atmos%v_char
   else
    deallocate(Vfield)						! allocated only if moving
+   !vchar cannot be defined here because wavelength grid is already set up..
   end if 
 
  RETURN

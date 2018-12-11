@@ -145,6 +145,8 @@ MODULE readatom
     !which is faster?
     atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
     atom%ntotal = atom%Abund * atmos%nHtot
+    write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
+                        " minVD(km/s)=", minval(atom%vbroad)/1d3
     !!!$omp parallel &
     !!!$omp default(none) &
     !!!$omp private(k) &
@@ -460,7 +462,7 @@ MODULE readatom
        ! %lambda allocated inside the routines.
        ! %alpha not needed in this case.
        CALL make_sub_wavelength_grid_cont(atom%continua(kr), lambdamin)
-       !CALL getLambdaCont(atom%continua(kr), lambdamin)
+       !!!CALL getLambdaCont(atom%continua(kr), lambdamin)
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
      else
@@ -494,8 +496,10 @@ MODULE readatom
   do kr=1,atom%Nline !line%lambda allocated inside
      !write(*,*) atom%lines(kr)%symmetric,&
      !           atom%lines(kr)%polarizable
-!     CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
-     CALL make_sub_wavelength_grid(atom%lines(kr), 10*MAXVAL(atom%vbroad))
+     !!!CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
+     CALL make_sub_wavelength_grid(atom%lines(kr), MAXVAL(atom%vbroad)) !Maximum Thermal width
+     																	!used to sample line profile
+     																	!in frequencies.
 !      if (kr==3) then
 !       write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
 !        atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda

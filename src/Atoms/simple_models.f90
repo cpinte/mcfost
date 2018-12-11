@@ -22,7 +22,7 @@ MODULE simple_models
    ! Namely the FAL C model.
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
-
+   double precision :: Vkepmax
    !idk = 10
    nHtot =  2.27414200581936d16
    T = 45420d0
@@ -52,6 +52,8 @@ MODULE simple_models
    !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
    atmos%velocity_law = 0 !keplerian = 0
+   Vkepmax = 0d0
+   atmos%v_char = atmos%v_char + Vkepmax
    if (atmos%moving.and.atmos%velocity_law == 0) then
      if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
      atmos%Vmap = 0d0
@@ -66,15 +68,19 @@ MODULE simple_models
    ! proportional to dust density and temperature.
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
-
-   nHtot = 1d15 * densite_gaz/MAXVAL(densite_gaz) + 1d12
+   double precision :: Vkepmax
+   nHtot = 1d12! * densite_gaz/MAXVAL(densite_gaz) + 1d12
    !nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
-   T = Tdust * 1d0 + 3000d0!10d0, depends on the stellar flux
-   ne = 1d-2 * maxval(nHtot) * nHtot/maxval(nHtot)!1d-2 * nHtot
+   T = 3000d0!+Tdust!10d0, depends on the stellar flux
+   ne = 1d-2 * maxval(nHtot)! * nHtot/maxval(nHtot)
    
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving=.true.
    atmos%velocity_law = 0 !keplerian
+   Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmax**2 / &
+                ((Rmax**2 + maxval(z_grid)**2)**1.5 * AU_to_m) )
+   write(*,*) "Vkepmax = ", Vkepmax
+   atmos%v_char = Vkepmax
    if (atmos%moving.and.atmos%velocity_law == 0) then
      if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
      atmos%Vmap = 0d0
@@ -107,10 +113,10 @@ MODULE simple_models
   end if
 
   ne0 = 1d-2 * 1d3/masseH * rho0
-  T0 = 2000d0
+  T0 = 3000d0
   vt = 0d0
-  v0 = 1000d0 !km/s
-  Vlimit = 3000d0 !km/s, stop the calculations at this limit
+  v0 = 100d0 !km/s
+  Vlimit = 300d0 !km/s, stop the calculations at this limit
   r0 = Rmin !AU
   alpha = 0.5d0
 
@@ -148,7 +154,7 @@ MODULE simple_models
         !nHtotr(icell) = 1d3/masseH * Mdot / (4*pi * (r*AU_to_m)**2 * Vr(icell)) !m^-3
         nHtotr(icell) = 1d3/masseH *rho0 * sqrt(r0/r)
         ner(icell) = ne0 * sqrt(r0/r)!nHtotr(icell) !m^-3
-        vturbr(icell) = vt
+        vturbr(icell) = vt*1d3 !m/s
         write(*,*) r/r0, Tr(icell), nHtotr(icell), ner(icell), Vr(icell)/1d3
         if (Vr(icell) >= 1d3 * Vlimit) exit main
        !!end if
@@ -160,11 +166,12 @@ MODULE simple_models
 
   CALL init_atomic_atmos(n_cells, Tr, ner, nHtotr)
   atmos%moving=.true.
-  atmos%vturb = 1d3*vt
+  atmos%vturb = vturbr
   if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
   atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
   				  ! otherwise vinfall/vkep = cte = expected.
   atmos%velocity_law = -1
+  atmos%v_char = atmos%v_char + maxval(abs(atmos%Vmap))
   RETURN
   END SUBROUTINE spherically_symmetric_shells_model
   

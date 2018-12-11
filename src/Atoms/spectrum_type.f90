@@ -221,7 +221,7 @@ MODULE spectrum_type
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter, la
+  integer :: group,fpixel,nelements, i, xcenter, la, Nl, kr, m
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
@@ -284,26 +284,34 @@ npix_x = 101; npix_y = 101
 
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
+
   if (l_sym_ima) then 
-!      if (RT_line_method==1) then ! what should I do in my case ?
+   if (RT_line_method==1) then ! what should I do in my case ?
+    write(*,*) 'RT_line_method == 1, not valid yet'
+    stop
 !       ! I do not add the two halfs of the spectrum because I compute my spectrum
 !       ! on lambda and not vel for all lines at the same time?
-!      else
+   else if (RT_line_method==2) then
     xcenter = npix_x/2 + modulo(npix_x,2)
     if (lkeplerian) then !line profile reversed
      do i=xcenter+1,npix_x
-!          do la=-NLTEspec%Nwaves, NLTEspec%Nwaves
-      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-      NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-!          end do       
-     end do
+      do m=1,NLTEspec%atmos%Natom
+       do kr=1,NLTEspec%atmos%Atoms(m)%Nline
+        Nl = NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda
+        NLTEspec%Flux(Nl/2+1:NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda,i,:,:,:) = &
+          NLTEspec%Flux(NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue:Nl/2,npix_x-i+1,:,:,:)
+       end do !enough to run only on b-b transitions
+      end do !atom    
+     end do !pix
     else ! infall or expansion
      do i=xcenter+1,npix_x
       NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-      NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
      end do
     end if !lkeplerian
-!      endif !RT_line_method
+   else
+    write(*,*) "RT_line_method", RT_line_method, " not valid"
+    stop
+   endif !RT_line_method
   end if ! l_sym_image
 
   !  Write the array to the FITS file.
@@ -342,6 +350,13 @@ npix_x = 101; npix_y = 101
   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+  
+  if (l_sym_ima.and.(RT_line_method==2)) then
+   xcenter = npix_x/2 + modulo(npix_x,2)
+   do i=xcenter+1,npix_x
+    NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+   end do
+  end if ! l_sym_image  
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
   
   

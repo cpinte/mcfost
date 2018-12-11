@@ -3,8 +3,7 @@ MODULE getlambda
   use atom_type, only : AtomicContinuum, AtomicLine, AtomType
   use atmos_type, only : atmos
   use constant
-  use math, only : SQ, CUBE, locate, sort
-
+  
   IMPLICIT NONE
 
   CONTAINS
@@ -19,40 +18,27 @@ MODULE getlambda
   ! ----------------------------------------------------------- !
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
-   double precision, parameter :: resol = 2d0 !here in nm
-   integer :: la, Nlambda
-   integer, parameter :: NlambdaMax = 100
-   double precision :: lam_grid(NlambdaMax), l0, l1
-   ! can do a better job. Here the number of wavelength is not specified
-   ! but instead the constant spacing in nm is fixed. 
-   ! Note that it is mandatory that lambda(Nlambda) = l1 and
-   ! lambda(1) = l0.
+   double precision :: resol
+   integer, parameter :: Nlambda = 25
+   integer :: la
+   double precision :: l0, l1
 
-   Nlambda = 2
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
    l0 = lambdamin
-   lam_grid(1) = l0
-    infinie : do !from l0 to l1
-    lam_grid(Nlambda) = lam_grid(Nlambda-1) + resol
-     if (lam_grid(Nlambda) >= l1) exit infinie
-     Nlambda = Nlambda + 1
-     if (Nlambda > NlambdaMax) exit infinie
-   end do infinie
-   lam_grid(Nlambda) = l1 !mandatory
-
    cont%Nlambda = Nlambda
    allocate(cont%lambda(cont%Nlambda))
-   cont%lambda(1:cont%Nlambda) = lam_grid(1:cont%Nlambda)
-   !allocate cross-section
-   !allocate(cont%alpha(cont%Nlambda)) !not used in this case
-!    do la=1,cont%Nlambda
-!    write(*,*) cont%Nlambda, la, cont%lambda(la), cont%lambda0, lambdamin
-!    end do
-!    stop
+   resol = (l1 - l0) / (Nlambda - 1)
+   cont%lambda(1) = l0
+   do la=2,cont%Nlambda
+    cont%lambda(la) = cont%lambda(la-1) + resol
+   end do
+   !do not allocate cross-section
+   !allocate(cont%alpha(cont%Nlambda)) -> not used in this case
+   ! necessary only if the explicit wavelength dependence is given
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
   
-  SUBROUTINE make_sub_wavelength_grid(line, vWing)
+  SUBROUTINE make_sub_wavelength_grid(line, vD)
   ! ------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicLine
    ! line with constant resolution in km/s. When dlambda 
@@ -60,21 +46,25 @@ MODULE getlambda
    ! Allocate line%lambda.
   ! ------------------------------------------------------- !
    type (AtomicLine), intent(inout) :: line
-   double precision, intent(in) :: vWing
+   double precision, intent(in) :: vD !maximum thermal width of the atom in m
    double precision :: v_char
-   double precision, parameter :: resol = 1.78888d0, subresol = 0.05, vsub = 4.6 !km/s
+   double precision :: subresol, vsub, resol!km/s
    integer :: la, Nlambda
-   integer, parameter :: NlambdaMax = 10000
-   double precision :: lam_grid(NlambdaMax), dlambda, l0, l1
-   
-   v_char = 1d1*max(atmos%v_char, vWing)
-   
-   Nlambda = 2
-   dlambda = v_char/CLIGHT * line%lambda0 !v_char / CLIGHT * line%lambda0
+   integer, parameter :: NlambdaMax = 30000
+   double precision :: lam_grid(NlambdaMax), dlambda, l0, l1 !nm
+   !the line domain falls in [l0*(1+resol), l1*(1+resol)] with, 
+   !l0 = (lambda0 - lambda0*v_char/c - vWing) and l1 = (lambda0 + lambda0*v_char/c + vWing).
+   v_char = 2d0 * atmos%v_char + max(2*vD, 70d3)
+   resol = 5 !km/s
+   dlambda = v_char /CLIGHT * line%lambda0
    l1 = (line%lambda0 + dlambda) * (1 + 1d3 * resol/CLIGHT)
    l0 = (line%lambda0 - dlambda) * (1 - 1d3 * resol/CLIGHT)
+   vsub = 0.5*v_char*1d-3 !km/s
+   subresol = 5d-2 * resol
+
    lam_grid(1) = l0
-    infinie : do !from l0 to l1
+   Nlambda = 2
+   infinie : do !from l0 to l1
     lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * resol / CLIGHT)
     ! increase resolution in the line core
     if (CLIGHT * dabs(lam_grid(Nlambda) - line%lambda0)/line%lambda0 <= 1d3 * vsub) then
@@ -82,21 +72,19 @@ MODULE getlambda
        lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * subresol/CLIGHT)
        if (CLIGHT * dabs(lam_grid(Nlambda) - line%lambda0)/line%lambda0 > 1d3 * vsub) & 
           exit sub_infinie
-       Nlambda = Nlambda + 1
        if (Nlambda > NlambdaMax) exit !infinie exit all
+       Nlambda = Nlambda + 1
       end do sub_infinie
     end if
      if (lam_grid(Nlambda) >= l1) exit infinie
-     Nlambda = Nlambda + 1
      if (Nlambda > NlambdaMax) exit infinie
+     Nlambda = Nlambda + 1
    end do infinie
 
    line%Nlambda = Nlambda
    allocate(line%lambda(line%Nlambda))
    line%lambda(1:line%Nlambda) = lam_grid(1:line%Nlambda) 
-!     do la=1,line%Nlambda
-!     write(*,*) la, line%lambda(la)
-!     end do
+   
   RETURN
   END SUBROUTINE make_sub_wavelength_grid
 
@@ -123,6 +111,7 @@ MODULE getlambda
   END SUBROUTINE getLambdaCont
   
   SUBROUTINE getLambdaLine(line)
+  use math, only : SQ, CUBE, locate, sort
   ! Adapted from RH H. Uitenbroek
   ! Nlambda, qcore and qwing read from file.
   ! --- Construct a wavelength grid that is approximately equidistant
@@ -152,6 +141,10 @@ MODULE getlambda
 
    !store in unit of lambda0 instead of adimensional values
    !deltaLambda / lambda0 = deltav/c
+   if (atmos%v_char <= 0.) then
+   write(*,*) "Error with getlambda, set v_char /= 0"
+   stop
+   end if
    q_to_lambda = line%lambda0 * (atmos%v_char/CLIGHT)
 
    g_lande_eff = line%g_lande_eff
@@ -326,6 +319,7 @@ MODULE getlambda
   END FUNCTION
 
   SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, wl_ref)
+  use math, only : locate, sort
   ! --------------------------------------------------------------------------- !
    ! construct and sort a wavelength grid for atomic line radiative transfer.
    ! Computes also the edge of a line profile: Nblue and Nred.
