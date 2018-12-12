@@ -221,11 +221,11 @@ MODULE spectrum_type
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter, la, Nl, kr, m
+  integer :: group,fpixel,nelements, i, xcenter
+  integer :: la, Nred, Nblue, Nl, kr, m, Nmid
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
-  !integer :: a,b,c,d=1,e=1, idL
   real :: pixel_scale_x, pixel_scale_y 
 
 npix_x = 101; npix_y = 101
@@ -289,17 +289,19 @@ npix_x = 101; npix_y = 101
    if (RT_line_method==1) then ! what should I do in my case ?
     write(*,*) 'RT_line_method == 1, not valid yet'
     stop
-!       ! I do not add the two halfs of the spectrum because I compute my spectrum
-!       ! on lambda and not vel for all lines at the same time?
-   else if (RT_line_method==2) then
+   else if (RT_line_method /= 1) then !==2 ?
     xcenter = npix_x/2 + modulo(npix_x,2)
     if (lkeplerian) then !line profile reversed
      do i=xcenter+1,npix_x
       do m=1,NLTEspec%atmos%Natom
        do kr=1,NLTEspec%atmos%Atoms(m)%Nline
-        Nl = NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda
-        NLTEspec%Flux(Nl/2+1:NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda,i,:,:,:) = &
-          NLTEspec%Flux(NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue:Nl/2,npix_x-i+1,:,:,:)
+        Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
+        Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
+        Nmid = (Nred+Nblue)/2
+        Nl = NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda !Nred-Nblue + 1
+!         do la=Nblue,Nmid
+        NLTEspec%Flux(Nred:Nblue,i,:,:,:) = NLTEspec%Flux(Nblue:Nred,npix_x-i+1,:,:,:)
+!         end do
        end do !enough to run only on b-b transitions
       end do !atom    
      end do !pix
@@ -315,22 +317,6 @@ npix_x = 101; npix_y = 101
   end if ! l_sym_image
 
   !  Write the array to the FITS file.
-!   do a=1,NLTEspec%Nwaves
-!   do b=1,npix_x
-!   do c=1,npix_y
-!      if (NLTEspec%Flux(a,b,c,d,e)-1 == NLTEspec%Flux(a,b,c,d,e)) then 
-!       write(*,*) "Infinite"
-!       exit
-!      end if
-!      if (NLTEspec%Flux(a,b,c,d,e) /= NLTEspec%Flux(a,b,c,d,e)) then 
-!       write(*,*) "Nan"
-!       exit
-!      end if
-!   end do
-!   end do
-!   end do
-  !idL = locate(NLTEspec%lambda,121.582d0)!121.568d0)
-  !write(*,*) idL, NLTEspec%lambda(idL)
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
   
   ! create new hdu for continuum
@@ -351,7 +337,7 @@ npix_x = 101; npix_y = 101
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
   
-  if (l_sym_ima.and.(RT_line_method==2)) then
+  if (l_sym_ima.and.(RT_line_method == 2)) then
    xcenter = npix_x/2 + modulo(npix_x,2)
    do i=xcenter+1,npix_x
     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
