@@ -358,7 +358,7 @@ MODULE readatom
        stop
      end if
 
-     if (trim(symmChar).eq."ASYMM") then
+     if (trim(symmChar).eq."ASYMM") then !futur deprecation, but atmosphere will always move
       !write(*,*) "Line has an asymmetric profile."
       atom%lines(kr)%symmetric = .false.
      else
@@ -497,7 +497,7 @@ MODULE readatom
      !write(*,*) atom%lines(kr)%symmetric,&
      !           atom%lines(kr)%polarizable
      !!!CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
-     CALL make_sub_wavelength_grid(atom%lines(kr), MAXVAL(atom%vbroad)) !Maximum Thermal width
+     CALL make_sub_wavelength_grid_line(atom%lines(kr), MAXVAL(atom%vbroad)) !Maximum Thermal width
      																	!used to sample line profile
      																	!in frequencies.
 !      if (kr==3) then

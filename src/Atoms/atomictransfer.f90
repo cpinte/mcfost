@@ -462,7 +462,7 @@ npix_x = 101; npix_y = 101
      !$omp default(none) &
      !$omp private(i,j,id) &
      !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
-     !$omp shared(n_iter_min,n_iter_max,ibin,iaz) 
+     !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
 
      ! loop on pixels
      id = 1 ! pour code sequentiel
@@ -540,6 +540,10 @@ npix_x = 101; npix_y = 101
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
 
+if (l_sym_ima) then
+   write(*,*) "Warning symmetry properties of the image not taken into account yet"
+   stop
+end if
 !! ---------------- ---------------------------------------- !!
   
   atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic

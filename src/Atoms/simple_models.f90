@@ -69,7 +69,7 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
    double precision :: Vkepmax
-   nHtot = 1d12! * densite_gaz/MAXVAL(densite_gaz) + 1d12
+   nHtot = 1d14! * densite_gaz/MAXVAL(densite_gaz) + 1d12
    !nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
    T = 3000d0!+Tdust!10d0, depends on the stellar flux
    ne = 1d-2 * maxval(nHtot)! * nHtot/maxval(nHtot)
@@ -115,8 +115,8 @@ MODULE simple_models
   ne0 = 1d-2 * 1d3/masseH * rho0
   T0 = 3000d0
   vt = 0d0
-  v0 = 100d0 !km/s
-  Vlimit = 300d0 !km/s, stop the calculations at this limit
+  v0 = 10d0 !km/s
+  Vlimit = 3000d0 !km/s, stop the calculation at this limit
   r0 = Rmin !AU
   alpha = 0.5d0
 
@@ -171,7 +171,7 @@ MODULE simple_models
   atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
   				  ! otherwise vinfall/vkep = cte = expected.
   atmos%velocity_law = -1
-  atmos%v_char = atmos%v_char + maxval(abs(atmos%Vmap))
+  atmos%v_char = maxval(abs(atmos%Vmap))
   RETURN
   END SUBROUTINE spherically_symmetric_shells_model
   
