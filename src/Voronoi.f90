@@ -463,6 +463,7 @@ module Voronoi_grid
     enddo
     n_cells = icell
 
+    alloc_status = 0
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
          delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
@@ -1427,6 +1428,8 @@ subroutine indice_cellule_Voronoi(xin,yin,zin, icell)
 subroutine deallocate_Voronoi()
 
   if (allocated(Voronoi)) deallocate(Voronoi)
+  if (allocated(Voronoi_xyz)) deallocate(Voronoi_xyz)
+  if (allocated(Voronoi_neighbour_xyz)) deallocate(Voronoi_neighbour_xyz)
   if (allocated(volume)) deallocate(volume)
   if (allocated(neighbours_list)) deallocate(neighbours_list)
   if (allocated(wall)) deallocate(wall)
