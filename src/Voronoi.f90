@@ -109,12 +109,12 @@ module Voronoi_grid
       if ((n_faces /= 12).and.(n_faces /= 20)) call error("Only dodecahedon and icosahedron are implemented so far")
 
       PS%n_faces = n_faces
-      PS%radius_o_h = radius_o_h ! We have the input value just in case
+      PS%radius_o_h = radius_o_h ! We save the input value just in case
       if (.not.allocated(PS%vectors)) allocate(PS%vectors(3,n_faces))
 
       if (n_faces == 12) then ! regular dodecahedron
          ! a is the edge length
-         radius = sqrt(3.0)/2. * Phi ! x a
+         radius = sqrt(3.0)/2. * Phi ! x a  radius of circumscribed sphere
          dist_to_face = Phi**3 / (2*sqrt(Phi**2+1)) ! x a
 
          volume = (15 + 7*sqrt(5.0))/4. ! x a**3 ! filling factor ~ 0.665
