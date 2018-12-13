@@ -9,13 +9,12 @@ MODULE getlambda
   CONTAINS
   
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
-  ! ----------------------------------------------------------- !
+  ! ------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum
    ! cont with constant resolution in nm.
-   ! lambda must be lower that lambda0 and 
-   ! lambda(Nlambda)=lambda0.
+   ! lambda must be lower that lambda0 and lambda(Nlambda)=lambda0.
    ! Allocate cont%lambda.
-  ! ----------------------------------------------------------- !
+  ! ------------------------------------------------------------- !
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
@@ -28,6 +27,9 @@ MODULE getlambda
    cont%Nlambda = Nlambda
    allocate(cont%lambda(cont%Nlambda))
    resol = (l1 - l0) / (Nlambda - 1)
+   write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
+              " Resolution (nm):", resol, " lambdamin =", lambdamin  
+   
    cont%lambda(1) = l0
    do la=2,cont%Nlambda
     cont%lambda(la) = cont%lambda(la-1) + resol
@@ -44,46 +46,72 @@ MODULE getlambda
    ! line. The wavelength grid is symmetric.
   ! ------------------------------------------------------- !
    type (AtomicLine), intent(inout) :: line
-   double precision, intent(in) :: vD !maximum thermal width of the atom in m
+   double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: core_to_wing=3d-1, L=3d0
-   integer, parameter :: Nc = 75, Nw = 25 !ntotal = 2*Nc + Nw
+   double precision, parameter :: core_to_wing=3d-1, L=2d0
+   integer, parameter :: Nc = 101, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
    double precision, dimension(5*(Nc+Nw)) :: vel
    
    v_char = L * (atmos%v_char + vD)
    v0 = -v_char
    v1 = +v_char
    vel = 0d0
-   vcore = core_to_wing * vD!v_char
+   vcore = core_to_wing * v_char /L !converge to core_to_wing*vD in case of static atm.
    
    !from -v_char to 0
    dvw = (v_char-vcore)/(Nw-1)
    dvc = vcore/(Nc-1)
+   write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
+              " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
    vel(1) = v0 !half wing
+   !write(*,*) 1, vel(1), v0, v_char/1d3
+   !wing loop
    do la=2, Nw
     vel(la) = vel(la-1) + dvw
+    !write(*,*) la, vel(la)
    end do
-   !vel(Nw) = -vcore!should be okey
-   do la=Nw+1, Nc+Nw !Half line core
+   !write(*,*) Nw, vel(Nw), vcore
+   !vel(Nw) = -vcore!should be okey at the numerical precision 
+   !la goes from 1 to Nw + Nc -1 total number of points.
+   !if Nc=101 and Nw =11, 111 velocity points,because the point vel(11) of the wing grid
+   !is shared with the point vel(1) of the core grid.
+   !However, the index of the core grid runs from 1 to Nc and the loop starts at 2
+   !just like for the wing loop.
+   do la=Nw+1, Nc+Nw-1 !Half line core
     vel(la) = vel(la-1) + dvc
+    !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
+    							   ! is the first point.
    end do
+   if (dabs(vel(Nw+Nc-1)) <= 1d-10) vel(Nw+Nc-1) = 0d0
+   if (vel(Nw+Nc-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
 
-   Nlambda = 2 * Nc + 2 * Nw
+  !number of points from -vchar to 0 is Nw+Nc-1, -1 because otherwise we count
+  ! 2 times vcore which is shared by the wing (upper boundary) and core (lower boundary) grid.
+  ! Total number of points is 2*(Nw+Nc-1) but here we count 2 times lambda0., therefore
+  ! we remove 1 point.
+   Nlambda = 2 * (Nw + Nc - 1) - 1 
    line%Nlambda = Nlambda
-   Nmid = Nlambda/2 !=Nc + Nw -> vel(Nc+Nw) = 0 by construction
-   allocate(line%lambda(line%Nlambda))   
-   do la=1, Nmid
-    line%lambda(la) = line%lambda0 * (1d0 + vel(la)/CLIGHT)
-    line%lambda(Nlambda - la + 1) = line%lambda0 * (1d0 - vel(la)/CLIGHT)
-   end do
+   Nmid = Nlambda/2 + 1 !As Nlambda is odd '1--2--3', Nmid = N/2 + 1 = 2, because 3/2 = 1
+   						!because the division of too integers is the real part. 
+   allocate(line%lambda(line%Nlambda))
+
+   line%lambda(1:Nmid) = line%lambda0*(1d0 + vel(1:Nmid)/CLIGHT)
+   line%lambda(Nmid+1:Nlambda) = line%lambda0*(1d0 -vel(Nmid-1:1:-1)/CLIGHT)
+
+   if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2) should be lambda0'
    
+!    write(*,*) 1, line%lambda(1)
+!    do la=2,Nlambda
+!     write(*,*) la, line%lambda(la), line%lambda0
+!    end do
+!    stop
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line
   
   !building
-  SUBROUTINE make_sub_wavelength_grid(line, vD)
+  SUBROUTINE make_sub_wavelength_grid_asymm(line, vD)
   ! ------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicLine
    ! line with constant resolution in km/s. When dlambda 
@@ -96,7 +124,7 @@ MODULE getlambda
    double precision :: subresol, vsub, resol!km/s
    integer :: la, Nlambda, Nmid
    integer, parameter :: NlambdaMax = 30000
-   double precision, parameter :: L = 3d0, core_to_wing = 0.3d0, R = 4.6
+   double precision, parameter :: L = 2d0, core_to_wing = 0.3d0, R = 4.6
    double precision :: lam_grid(NlambdaMax), dlambda, l0, l1 !nm
    !the line domain falls in [l0*(1+resol), l1*(1+resol)] with, 
    !l0 = (lambda0 - lambda0*v_char/c - vWing) and l1 = (lambda0 + lambda0*v_char/c + vWing).
@@ -148,58 +176,7 @@ MODULE getlambda
    stop
    
   RETURN
-  END SUBROUTINE make_sub_wavelength_grid
-
-!   SUBROUTINE make_sub_wavelength_grid(line, vD)
-!   ! ------------------------------------------------------- !
-!    ! Make an individual wavelength grid for the AtomicLine
-!    ! line with constant resolution in km/s. When dlambda 
-!    ! is lower than vsub, the resolution is increased.
-!    ! Allocate line%lambda.
-!   ! ------------------------------------------------------- !
-!    type (AtomicLine), intent(inout) :: line
-!    double precision, intent(in) :: vD !maximum thermal width of the atom in m
-!    double precision :: v_char
-!    double precision :: subresol, vsub, resol!km/s
-!    integer :: la, Nlambda, s
-!    integer, parameter :: NlambdaMax = 30000
-!    double precision :: lam_grid(NlambdaMax), dlambda, l0, l1 !nm
-!    !the line domain falls in [l0*(1+resol), l1*(1+resol)] with, 
-!    !l0 = (lambda0 - lambda0*v_char/c - vWing) and l1 = (lambda0 + lambda0*v_char/c + vWing).
-!    v_char = 2d0 * atmos%v_char + max(2*vD, 70d3)
-!    resol = 10 !km/s
-!    dlambda = v_char /CLIGHT * line%lambda0
-!    l1 = (line%lambda0 + dlambda) * (1 + 1d3 * resol/CLIGHT)
-!    l0 = (line%lambda0 - dlambda) * (1 - 1d3 * resol/CLIGHT)
-!    vsub = 0.5*v_char*1d-3 !km/s
-!    subresol = 5d-2 * resol
-! 
-!    lam_grid(1) = l0
-!    Nlambda = 3
-!    infinie : do !from l0 to l1
-!     lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * resol / CLIGHT)
-!     ! increase resolution in the line core
-!     if (CLIGHT * dabs(lam_grid(Nlambda) - line%lambda0)/line%lambda0 <= 1d3 * vsub) &
-!        lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * subresol/CLIGHT)
-! 
-!      if ((lam_grid(Nlambda) >= l1).or.(Nlambda > NlambdaMax)) exit infinie
-!      Nlambda = Nlambda + 1
-!    end do infinie
-!    
-!    if (MOD(Nlambda, 2) > 0) then 
-!     Nlambda = Nlambda + 1
-!     s = 1
-!    else
-!     s = 2
-!    end if
-!    lam_grid(Nlambda/2) = line%lambda0
-! 
-!    line%Nlambda = Nlambda
-!    allocate(line%lambda(line%Nlambda))
-!    line%lambda(1:line%Nlambda) = lam_grid(s:line%Nlambda)
-!    
-!   RETURN
-!   END SUBROUTINE make_sub_wavelength_grid
+  END SUBROUTINE make_sub_wavelength_grid_asymm
 
   SUBROUTINE getLambdaCont(continuum, lambdamin)
    type (AtomicContinuum), intent(inout) :: continuum

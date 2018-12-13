@@ -540,10 +540,6 @@ npix_x = 101; npix_y = 101
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
 
-if (l_sym_ima) then
-   write(*,*) "Warning symmetry properties of the image not taken into account yet"
-   stop
-end if
 !! ---------------- ---------------------------------------- !!
   
   atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic

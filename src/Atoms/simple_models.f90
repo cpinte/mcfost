@@ -69,23 +69,23 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
    double precision :: Vkepmax
-   nHtot = 1d14! * densite_gaz/MAXVAL(densite_gaz) + 1d12
+   nHtot = 1d14 * densite_gaz/MAXVAL(densite_gaz) + 1d12
    !nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
-   T = 3000d0!+Tdust!10d0, depends on the stellar flux
-   ne = 1d-2 * maxval(nHtot)! * nHtot/maxval(nHtot)
+   T = 3000d0+Tdust!10d0, depends on the stellar flux
+   ne = 1d-2 * maxval(nHtot) * nHtot/maxval(nHtot)
    
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving=.true.
    atmos%velocity_law = 0 !keplerian
-   Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmax**2 / &
-                ((Rmax**2 + maxval(z_grid)**2)**1.5 * AU_to_m) )
+   Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
+                ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
    write(*,*) "Vkepmax = ", Vkepmax
    atmos%v_char = Vkepmax
    if (atmos%moving.and.atmos%velocity_law == 0) then
      if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
      atmos%Vmap = 0d0
    end if
-   
+
   RETURN
   END SUBROUTINE prop_law_model
   

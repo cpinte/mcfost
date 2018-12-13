@@ -222,7 +222,7 @@ MODULE spectrum_type
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
-  integer :: la, Nred, Nblue, Nl, kr, m, Nmid
+  integer :: la, Nred, Nblue, kr, m, Nmid
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
@@ -291,25 +291,28 @@ npix_x = 101; npix_y = 101
     stop
    else if (RT_line_method /= 1) then !==2 ?
     xcenter = npix_x/2 + modulo(npix_x,2)
-    if (lkeplerian) then !line profile reversed
-     do i=xcenter+1,npix_x
-      do m=1,NLTEspec%atmos%Natom
-       do kr=1,NLTEspec%atmos%Atoms(m)%Nline
-        Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
-        Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-        Nmid = (Nred+Nblue)/2
-        Nl = NLTEspec%atmos%Atoms(m)%lines(kr)%Nlambda !Nred-Nblue + 1
-!         do la=Nblue,Nmid
-        NLTEspec%Flux(Nred:Nblue,i,:,:,:) = NLTEspec%Flux(Nblue:Nred,npix_x-i+1,:,:,:)
-!         end do
-       end do !enough to run only on b-b transitions
-      end do !atom    
-     end do !pix
-    else ! infall or expansion
-     do i=xcenter+1,npix_x
-      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-     end do
-    end if !lkeplerian
+    if (NLTEspec%atmos%moving) then
+     if (lkeplerian) then !line profile reversed
+      do i=xcenter+1,npix_x
+       do m=1,NLTEspec%atmos%Natom
+        do kr=1,NLTEspec%atmos%Atoms(m)%Nline
+         Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
+         Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
+         Nmid = (Nred+Nblue)/2
+         NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
+        end do !enough to run only on b-b transitions
+       end do !atom    
+      end do !pix
+     else ! infall or expansion
+      do i=xcenter+1,npix_x
+       NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+      end do
+     end if !lkeplerian
+    else !static
+      do i=xcenter+1,npix_x
+       NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+      end do    
+    end if !if moving
    else
     write(*,*) "RT_line_method", RT_line_method, " not valid"
     stop
@@ -337,7 +340,7 @@ npix_x = 101; npix_y = 101
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
   
-  if (l_sym_ima.and.(RT_line_method == 2)) then
+  if (l_sym_ima.and.(RT_line_method /= 0)) then
    xcenter = npix_x/2 + modulo(npix_x,2)
    do i=xcenter+1,npix_x
     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)

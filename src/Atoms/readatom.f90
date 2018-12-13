@@ -494,20 +494,13 @@ MODULE readatom
     ! each line
     !Unlike RH, I do it even for passive atoms
   do kr=1,atom%Nline !line%lambda allocated inside
-     !write(*,*) atom%lines(kr)%symmetric,&
-     !           atom%lines(kr)%polarizable
      !!!CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
+     !-> Actually with this grid, all lines of an atom have the same grid
+     !because it depends only on vD and v_char which depends on the atom and the model.
+     !This is because the Number of core/wing points are fixed.
      CALL make_sub_wavelength_grid_line(atom%lines(kr), MAXVAL(atom%vbroad)) !Maximum Thermal width
      																	!used to sample line profile
      																	!in frequencies.
-!      if (kr==3) then
-!       write(*,*) "lammin = ", atom%lines(kr)%lambda(1)," lammax = ", &
-!        atom%lines(kr)%lambda(atom%lines(kr)%Nlambda), atom%lines(kr)%Nlambda
-!       do la=1,atom%lines(kr)%Nlambda
-!        write(*,*) la, atom%lines(kr)%lambda(la)
-!       end do
-!       stop
-!      end if
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
