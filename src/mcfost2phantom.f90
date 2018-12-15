@@ -4,7 +4,7 @@ module mcfost2phantom
 
 contains
 
-  subroutine init_mcfost_phantom(mcfost_para_filename, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
+  subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
        keep_particles, fix_star)
 
     use parametres
@@ -19,6 +19,7 @@ contains
     use messages, only : error
 
     character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
+    integer, intent(in) :: ndusttypes
     logical, intent(in) :: use_SPH_limits_file
     real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
@@ -62,6 +63,7 @@ contains
 
     ! parameter file
     call read_para(mcfost_para_filename)
+    lvariable_dust = (ndusttypes > 0)
 
     if (lnRE) then
        call error("Non-equilibrium grains are not yet implemented in libmcfost",ierr=ierr)
