@@ -167,15 +167,9 @@ mcfost :  $(OBJECTS) voro++_wrapper.o mcfost.o
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
 	mkdir -p libtmp
-	cp $(LIBS)/libcfitsio.a libtmp
-	cp $(LIBS)/libsprng.a libtmp
-	cp $(LIBS)/libvoro++.a libtmp
-	cd libtmp; \
-	ar x libcfitsio.a; \
-	ar x libsprng.a; \
-	ar x libvoro++.a
-	rm -f mcfost.o io_phantom_utils.o io_phantom_infiles.o libtmp/pmlcg.o \
-		libmcfost.a
+	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a libtmp
+	cd libtmp; ar x libcfitsio.a; ar x libsprng.a; ar x libvoro++.a
+	rm -f mcfost.o libtmp/pmlcg.o libmcfost.a
 	ar vr libmcfost.a *.o libtmp/*.o
 	ranlib libmcfost.a
 
