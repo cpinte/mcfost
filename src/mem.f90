@@ -72,7 +72,7 @@ subroutine alloc_dust_prop()
   if (alloc_status > 0) call error('Allocation error tab_g')
   tab_g = 0
 
-    ! **************************************************
+  ! **************************************************
   ! tableaux relatifs aux prop optiques des grains
   ! **************************************************
   allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)

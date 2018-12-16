@@ -4,7 +4,7 @@ module mcfost2phantom
 
 contains
 
-  subroutine init_mcfost_phantom(mcfost_para_filename, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
+  subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
        keep_particles, fix_star)
 
     use parametres
@@ -19,6 +19,7 @@ contains
     use messages, only : error
 
     character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
+    integer, intent(in) :: ndusttypes
     logical, intent(in) :: use_SPH_limits_file
     real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
@@ -63,17 +64,20 @@ contains
     ! parameter file
     call read_para(mcfost_para_filename)
 
+    ! Setting option for the mcfost2phantom interface
+    ltemp = .true. ; lsed = .false. ; lsed_complete = .false.
+    lVoronoi = .true. ; l3D = .true.
+    lsepar_pola = .false.
+    lvariable_dust = (ndusttypes > 0)
+
+    ! We do not use a file with limits yet
+    llimits_file = .false.
+
+    ! A few modes are not available via the interface
     if (lnRE) then
        call error("Non-equilibrium grains are not yet implemented in libmcfost",ierr=ierr)
        if (ierr /= 0) return
     endif
-
-    ! Setting option for the mcfost2phantom interface
-    ltemp = .true. ; lsed = .false. ; lsed_complete = .false.
-    lVoronoi = .true. ; l3D = .true.
-
-    ! We do not use a file with limits yet
-    llimits_file = .false.
 
     if (n_zones > 1) then
        call error("mcfost2phantom only works with a 1zone parameter file",ierr=ierr)
@@ -227,7 +231,7 @@ contains
     Frad = 0.
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,iphase,grainsize,dustfrac,massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
+         vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)

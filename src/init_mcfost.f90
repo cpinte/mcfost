@@ -129,6 +129,7 @@ subroutine set_default_variables()
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_units = .false.
+  lignore_dust = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -990,6 +991,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) scale_units_factor
         i_arg = i_arg + 1
+     case("-ignore_dust")
+        i_arg = i_arg + 1
+        lignore_dust=.true.
      case default
         call display_help()
      end select
@@ -1320,9 +1324,14 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
-  write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
+  write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"
   write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
   write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
+  write(*,*) "        : -ignore_dust : ignore the dust fraction in a phantom dump"
+  write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
+  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
+  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
+
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1388,14 +1397,11 @@ subroutine display_help()
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
-  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
-  write(*,*) "        : -age <age>"
-  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
@@ -1432,7 +1438,6 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
   write(*,*) "        : R.A.S yet"
-
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
