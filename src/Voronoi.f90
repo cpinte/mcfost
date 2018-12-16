@@ -63,14 +63,14 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
           n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
-       real(c_double), intent(in), value :: threshold, cutting_distance ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
+       real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
        ! normal vectors to the cutting plane (need to be normalized)
        real(c_double), dimension(3,n_vectors), intent(in) :: cutting_vectors  ! access order is wrong, but only way to pass a 2d array to C with an unfixed dim
 
@@ -214,8 +214,6 @@ module Voronoi_grid
     integer :: icell_start, icell_end, id, row, l
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
-    real(kind=dp) :: cutting_distance
-
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
