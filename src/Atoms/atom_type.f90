@@ -19,7 +19,7 @@ MODULE atom_type
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE"
    ! i, j start at 1 (not 0 like in C)
-   integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0
+   integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing
    real(8), dimension(4) :: cvdWaals
@@ -32,7 +32,7 @@ MODULE atom_type
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
    logical :: hydrogenic
-   integer :: i, j, Nlambda, Nblue = 0, Nred = 0
+   integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(8) :: lambda0, isotope_Frac, alpha0
    real(8), allocatable, dimension(:)  :: lambda, alpha, Rji, Rij
    !type (AtomType), pointer :: atom

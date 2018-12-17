@@ -349,12 +349,14 @@ MODULE AtomicTransfer
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36
-  integer, parameter :: n_ray_star = 1000
+  integer, parameter :: n_ray_star = 100 !1000
   double precision, dimension(n_rad_RT) :: tab_r
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
   logical :: lresolved
-logical :: lbottom_irradiated = .false. !to switch off the star in the map creation
+  
+  integer :: kc, kr, nat, Nred, Nblue, la
+  logical :: lbottom_irradiated = .false. !to switch off the star in the map creation
   
 npix_x = 101; npix_y = 101
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
@@ -487,19 +489,51 @@ npix_x = 101; npix_y = 101
  ! adding the stellar flux
  if (lbottom_irradiated) then
   write(*,*) " --> adding stellar flux map..."  
-  do lambda = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+  if (etoile(1)%lb_body) then !all stars are Blackbodies ?
+   !assumes a constant stellar flux across a transition.
+   !computes flux star only at lambda0 and set Flux(Nred:Nblue) = Flux(lambda0)
+   do nat=1,atmos%Natom
+    do kc=1,atmos%Atoms(nat)%Ncont
+     lambda = atmos%Atoms(nat)%continua(kc)%Nmid
+     Nred = atmos%Atoms(nat)%continua(kc)%Nred
+     Nblue = atmos%Atoms(nat)%continua(kc)%Nblue
+     nu = c_light / NLTEspec%lambda(lambda) * 1d9 
+     CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+      do la=Nblue,Nred
+      NLTEspec%Flux(la,:,:,ibin,iaz) = NLTEspec%Flux(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+      NLTEspec%Fluxc(la,:,:,ibin,iaz) = NLTEspec%Fluxc(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+      end do
+    end do
+    do kr=1,atmos%Atoms(nat)%Nline
+     lambda = atmos%Atoms(nat)%lines(kr)%Nmid
+     Nred = atmos%Atoms(nat)%lines(kr)%Nred
+     Nblue = atmos%Atoms(nat)%lines(kr)%Nblue
+     nu = c_light / NLTEspec%lambda(lambda) * 1d9 
+     CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+     !array = array + scalar
+      do la=Nblue,Nred
+      NLTEspec%Flux(la,:,:,ibin,iaz) = NLTEspec%Flux(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+      NLTEspec%Fluxc(la,:,:,ibin,iaz) = NLTEspec%Fluxc(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
+      end do
+    end do
+   end do !over atoms
+  else !a star is not a BB, computes for all wavelength
+   do lambda = 1, NLTEspec%Nwaves
+    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
                                              !else it means that in FLUX_PIXEL_LINE, nu
                                              !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!     write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(lambda), & 
-!         MAXVAL(NLTEspec%Flux(lambda,:,:,ibin,iaz))/MAXVAL(stars_map(:,:,1)), & 
-!         MINVAL(NLTEspec%Flux(lambda,:,:,ibin,iaz)),MINVAL(stars_map(:,:,1))
-    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!      write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(lambda), &
+!       stars_map(npix_x/2+1,npix_y/2+1,1)/nu, maxval(NLTEspec%Flux(lambda,:,:,ibin,iaz)), &
+!       maxval(stars_map(:,:,1))/nu
+
+     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
                                          stars_map(:,:,1) / nu
-    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
                                          stars_map(:,:,1) / nu
-  end do
+
+   end do  
+  end if  
  end if
 
  RETURN
@@ -509,7 +543,7 @@ npix_x = 101; npix_y = 101
  !       n_cells >> n_lambda, in "real" cases.
  ! npix_x, xpix_y, RT_line_method
  ! some of shared quantities by the code that i don't know were they are !!
- ! lkeplerian, linfall, lvoro wjere to declare them, lcylindrical ects
+ ! lkeplerian, linfall, lvoro where to declare them, lcylindrical ects
  
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
@@ -550,8 +584,8 @@ npix_x = 101; npix_y = 101
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  CALL prop_law_model()
-  !CALL spherically_symmetric_shells_model()
+  !CALL prop_law_model()
+  CALL spherically_symmetric_shells_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
