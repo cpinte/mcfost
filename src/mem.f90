@@ -412,7 +412,7 @@ subroutine clean_mem_dust_mol()
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
-  deallocate(kappa_abs_LTE)
+  !deallocate(kappa_abs_LTE)
   deallocate(tab_albedo_pos)
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
 
@@ -701,7 +701,7 @@ subroutine dealloc_emission_mol()
 
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
-  deallocate(kappa,emissivite_dust)
+  deallocate(kappa,kappa_abs_LTE,emissivite_dust)
 
   call deallocate_stellar_spectra()
 
