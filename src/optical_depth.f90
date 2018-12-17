@@ -478,16 +478,16 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
 
            ! Epaisseur optique
            dtau(:) =  l_contrib * opacite(:)
-           dtau_c = l_contrib * kappa(icell,iTrans)
+           dtau_c = l_contrib * kappa_abs_LTE(icell,iTrans)
 
            ! Fonction source
            Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
-           Snu_c = emissivite_dust(icell,iTrans) / (kappa(icell,iTrans) + 1.0e-300_dp)
+           Snu_c = emissivite_dust(icell,iTrans) / (kappa_abs_LTE(icell,iTrans) + 1.0e-300_dp)
 
            ! Warning I0, I0c (and origine_mol) are smaller arrays (dimension nTrans)
            I0(:,i,iray,id) = I0(:,i,iray,id) + &
@@ -515,7 +515,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            do i=1,nTrans
               iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-              opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa(icell,iTrans)
+              opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
               dtau(:) =  l_contrib * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
@@ -756,11 +756,11 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa(icell,iTrans)
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
 
            ! Epaisseur optique
            dtau_mol(:) =  l_contrib * opacite(:)
-           dtau_c = l_contrib * kappa(icell,iTrans)
+           dtau_c = l_contrib * kappa_abs_LTE(icell,iTrans)
 
            ! Mise a jour profondeur optique pour cellule suivante
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
