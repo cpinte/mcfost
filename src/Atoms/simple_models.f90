@@ -18,8 +18,8 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    ! Implements a simple model with density and electron density
    ! constant on the grid
-   ! Values are from a Solar model atmosphere by Fontenla et al.
-   ! Namely the FAL C model.
+   ! Values width idk are from a Solar model atmosphere by 
+   ! Fontenla et al. namely the FAL C model.
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
    double precision :: Vkepmax
@@ -33,12 +33,12 @@ MODULE simple_models
 !    ne = 4.446967d20
 !    nHtot = 1.259814d23
 
-!    !idk = 81   
+    !idk = 81   
 !     T=9400d0
 !     ne = 3.831726d21
 !     nHtot = 1.326625d23
 
-!    !idk = 0 
+    !idk = 0 
 !     T = 100000d0
 !     ne = 1.251891d16
 !     nHtot = 1.045714d16
@@ -46,14 +46,15 @@ MODULE simple_models
    !!more or less the same role as init_molecular_disk
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving = .false.
-   atmos%vturb = 0d0
-   !atmos%vturb = 9.506225d3 !m/s !idk=10
+   !atmos%vturb = 0d0
+   atmos%vturb = 9.506225d3 !m/s !idk=10
    !atmos%vturb = 1.696164d3 !idk = 75
    !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
    atmos%velocity_law = 0 !keplerian = 0
    Vkepmax = 0d0
-   atmos%v_char = atmos%v_char + Vkepmax
+   atmos%v_char = atmos%v_char + Vkepmax + maxval(atmos%vturb)
+   write(*,*) "Macroscopic motions typical velocity (km/s):", atmos%v_char/1d3
    if (atmos%moving.and.atmos%velocity_law == 0) then
      if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
      atmos%Vmap = 0d0
@@ -69,21 +70,24 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    double precision, dimension(n_cells) :: nHtot, T, ne
    double precision :: Vkepmax
-   nHtot = 1d14 * densite_gaz/MAXVAL(densite_gaz) + 1d12
-   !nHtot =  1d0 *  1d3 * densite_gaz * masse_mol_gaz / m3_to_cm3 / masseH + 1d12
-   T = 3000d0+Tdust!10d0, depends on the stellar flux
-   ne = 1d-2 * maxval(nHtot) * nHtot/maxval(nHtot)
+   
+   nHtot = 1d14! * densite_gaz/MAXVAL(densite_gaz) + 1d12
+   T = 3000d0!+Tdust
+   ne = 1d-2 * maxval(nHtot)! * nHtot/maxval(nHtot)
    
    CALL init_atomic_atmos(n_cells, T, ne, nHtot)
    atmos%moving=.true.
    atmos%velocity_law = 0 !keplerian
-   Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
+   if (atmos%moving) then
+    Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
-   write(*,*) "Vkepmax = ", Vkepmax
-   atmos%v_char = Vkepmax
-   if (atmos%moving.and.atmos%velocity_law == 0) then
-     if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
-     atmos%Vmap = 0d0
+
+    atmos%v_char = Vkepmax + maxval(atmos%vturb)
+    write(*,*) " >-< Macroscopic motions typical velocity (km/s):", atmos%v_char/1d3
+    if (atmos%velocity_law == 0) then
+      if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+      atmos%Vmap = 0d0
+    end if
    end if
 
   RETURN
@@ -93,37 +97,26 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    ! Implements a simple spherically symmetric model of shells
    ! in expansion or in contraction.
-   ! the gradient of velocity: dlog(Vr)/dlog(r) = alpha, drives
-   ! the shape of the emerging flux.
-   ! 
-   ! alpha > 1: 
-   ! See: Bertout & Magnan 1997
   ! ----------------------------------------------------------- !
   integer :: izone, i, j, k, icell, n_zones=1 !Only one component firstly
   double precision, dimension(n_cells) :: Vr, Tr,vturbr, nHtotr, ner
   type(disk_zone_type) :: dz ! to define the properties of the model
-  double precision :: r, ne0, T0, vt, rcyl, z, v0, vph, rho0, Mdot, r0
-  double precision :: alpha, yr_to_sec = 3.154d7, nH0, Vlimit !s/yr
+  double precision :: r, ne0, T0, vt, rcyl, z, v0, rho0, Mdot, r0, beta = 5d-1
+  double precision :: alpha, yr_to_sec = 3.154d7, nH0, r1, Rlimit, Vlimit !s/yr
   
-  nH0 = 1d12 !m^-3 !0d0
-  if (nH0 > 0d0) then
-   rho0 = nH0 * masseH / 1d3
-  else
-    rho0 = 7.107d-6!kg/m3
-  end if
-
-  ne0 = 1d-2 * 1d3/masseH * rho0
-  T0 = 3000d0
-  vt = 0d0
-  v0 = 10d0 !km/s
-  Vlimit = 3000d0 !km/s, stop the calculation at this limit
-  r0 = Rmin !AU
-  alpha = 0.5d0
 
   Mdot = 1d-4 * Msun_to_kg / yr_to_sec ! Msun/yr -> kg/s
-  vph = Mdot / (4*PI * (r0*AU_to_m)**2 * rho0) !m/s ! at the top of the stellar photosphere
-  write(*,*) " ------ Initial parameters --------"
-  write(*,*) Mdot*yr_to_sec / Msun_to_kg, v0/1d3, rho0 * 1d3/masseH, T0, ne0, alpha
+  nH0 = 1d15 !m^-3 !the inner radius should be opaque.
+  alpha = 0.5d0
+  rho0 = nH0 * masseH * 1d-3
+  ne0 = 1d-2 * nH0
+  T0 = 7d3
+  vt = 0d0
+  v0 = 100d0 !km/s
+  r0 = 1.5*Rmin!AU
+  !Vlimit = 1d9 !km/s, stop the calculation at this limit
+  !Rlimit = r0 * (Vlimit/v0) ** (1./alpha) !depending on the velocity law
+  Rlimit = Rmax
   
   Tr = 0d0
   nHtotr = 0d0
@@ -131,9 +124,8 @@ MODULE simple_models
   vturbr = 0d0
   ner = 0d0
   
-  write(*,*) " ------ parameters --------"
   main : do izone=1, n_zones
-   !dz = disk_zone(izon) ! for now the parameters are hardcoded
+   !dz = disk_zone(izone) ! for now the parameters are hardcoded
     do i=1, n_rad
      do j=j_start,nz
       do k=1, n_az
@@ -146,39 +138,49 @@ MODULE simple_models
         rcyl = r_grid(icell)
         z = z_grid(icell)/z_scaling_env
        end if
+       !Rin = Rmin if edge = 0
        r = sqrt(rcyl**2 + z**2)
-       !!if ((r <= 300.).and.(r>=r0)) then
-        Tr(icell) = T0 * sqrt(r0/r)
-        !Vr(icell) = 1d3 * (vph + (v0-vph) * (1.-r0/r)**alpha) !m/s
+       if (r>= Rmin .and. r<=Rlimit) then
+ 
+        Tr(icell) = T0 * dsqrt(Rmin/r)
+        nHtotr(icell) = nH0 * dsqrt(Rmin/r)
+        !! if ner = 0d0, it is computed in solvene.f90
+        !!ner(icell) = 1d-2 * nHtotr(icell)!ne0 * dsqrt(Rmin/r)
         Vr(icell) = 1d3 * v0 * (r/r0)**alpha !m/s
-        !nHtotr(icell) = 1d3/masseH * Mdot / (4*pi * (r*AU_to_m)**2 * Vr(icell)) !m^-3
-        nHtotr(icell) = 1d3/masseH *rho0 * sqrt(r0/r)
-        ner(icell) = ne0 * sqrt(r0/r)!nHtotr(icell) !m^-3
-        vturbr(icell) = vt*1d3 !m/s
-        write(*,*) r/r0, Tr(icell), nHtotr(icell), ner(icell), Vr(icell)/1d3
-        if (Vr(icell) >= 1d3 * Vlimit) exit main
-       !!end if
+
+        
+        !Tr(icell) = T0 * sqrt(Rmin/r)
+        !Vr(icell) = 1d3 * v0 * (1d0-Rmin/r)**beta !m/s
+        !nHtotr(icell) = 1d-3/masseH * Mdot / (4*pi * (r*AU_to_m)**2 * Vr(icell)) !m^-3
+        
+        
+        vturbr(icell) = vt*1d3 !m/s   
+        !define an opaque core
+        if (r <= r0) then
+         Tr(icell) = 1d4
+         nHtotr(icell) = 1d23
+         Vr(icell) = 0d0
+        end if   
+!         write(*,*) icell, nHtotr(icell), ner(icell), Tr(icell), Vr(icell)
+       end if
       end do !k
      end do !j
     end do !i
   end do main !over n_zones
-  write(*,*) " ------ ------- --------"
-
+  
+    
   CALL init_atomic_atmos(n_cells, Tr, ner, nHtotr)
   atmos%moving=.true.
   atmos%vturb = vturbr
-  if (atmos%moving .and. .not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
-  atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
+  if (atmos%moving) then
+   if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(n_cells))
+   atmos%Vmap = Vr !and set keyword lkeplerian=.false. and linfall=.true.
   				  ! otherwise vinfall/vkep = cte = expected.
-  atmos%velocity_law = -1
-  atmos%v_char = maxval(abs(atmos%Vmap))
+   atmos%velocity_law = -1
+   atmos%v_char = maxval(abs(atmos%Vmap)) + maxval(atmos%vturb)
+   write(*,*) "Macroscopic motions typical velocity (km/s):", atmos%v_char/1d3
+  end if
   RETURN
   END SUBROUTINE spherically_symmetric_shells_model
-  
-  SUBROUTINE writeRadialModel
-   ! Write a model a long a specific radius in MULTI format
-  
-  RETURN
-  END SUBROUTINE writeRadialModel
 
  END MODULE simple_models
