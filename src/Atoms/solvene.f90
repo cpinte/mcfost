@@ -229,7 +229,7 @@ END FUNCTION getPartitionFunctionk
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
-write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
+   !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."NPROTON") then
     ne_old = np(k)
    else if (initial.eq."NEMODEL") then
