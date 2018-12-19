@@ -9,12 +9,13 @@ MODULE getlambda
   CONTAINS
   
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
-  ! ------------------------------------------------------------- !
-   ! Make an individual wavelength grid for the AtomicContinuum
-   ! cont with constant resolution in nm.
+  ! ----------------------------------------------------------------- !
+   ! Make an individual wavelength grid for the AtomicContinuum cont.
+   ! The resolution is constant in nm.
    ! lambda must be lower that lambda0 and lambda(Nlambda)=lambda0.
    ! Allocate cont%lambda.
-  ! ------------------------------------------------------------- !
+   ! cont%alpha (cross-section of photoionisation) is not used.
+  ! ----------------------------------------------------------------- !
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
@@ -41,16 +42,16 @@ MODULE getlambda
   END SUBROUTINE make_sub_wavelength_grid_cont
   
   SUBROUTINE make_sub_wavelength_grid_line(line, vD)
-  ! ------------------------------------------------------- !
-   ! Make an individual wavelength grid for the AtomicLine
-   ! line. The wavelength grid is symmetric.
-  ! ------------------------------------------------------- !
+  ! ------------------------------------------------------------ !
+   ! Make an individual wavelength grid for the AtomicLine line.
+   ! The wavelength grid is symmetric wrt lambda0.
+  ! ------------------------------------------------------------ !
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: core_to_wing=3d-1, L=2d0
+   double precision, parameter :: core_to_wing=5d-1, L=7d0
    integer, parameter :: Nc = 101, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
    double precision, dimension(5*(Nc+Nw)) :: vel
    
@@ -58,7 +59,7 @@ MODULE getlambda
    v0 = -v_char
    v1 = +v_char
    vel = 0d0
-   vcore = core_to_wing * v_char /L !converge to core_to_wing*vD in case of static atm.
+   vcore = 2d0 * core_to_wing * v_char /L !converge to 2/L*core_to_wing*vD in case of static atm.
    
    !from -v_char to 0
    dvw = (v_char-vcore)/(Nw-1)
@@ -66,27 +67,25 @@ MODULE getlambda
    write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
               " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
    vel(1) = v0 !half wing
-   !write(*,*) 1, vel(1), v0, v_char/1d3
+!   write(*,*) 1, vel(1), v0, v_char/1d3
    !wing loop
    do la=2, Nw
     vel(la) = vel(la-1) + dvw
-    !write(*,*) la, vel(la)
+!    write(*,*) la, vel(la)
    end do
-   !write(*,*) Nw, vel(Nw), vcore
+!   write(*,*) Nw, vel(Nw), vcore
    !vel(Nw) = -vcore!should be okey at the numerical precision 
    !la goes from 1 to Nw + Nc -1 total number of points.
    !if Nc=101 and Nw =11, 111 velocity points,because the point vel(11) of the wing grid
    !is shared with the point vel(1) of the core grid.
-   !However, the index of the core grid runs from 1 to Nc and the loop starts at 2
-   !just like for the wing loop.
    do la=Nw+1, Nc+Nw-1 !Half line core
     vel(la) = vel(la-1) + dvc
-    !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
+!    write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
    end do
-   if (dabs(vel(Nw+Nc-1)) <= 1d-10) vel(Nw+Nc-1) = 0d0
+   if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
    if (vel(Nw+Nc-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
-
+!stop
   !number of points from -vchar to 0 is Nw+Nc-1, -1 because otherwise we count
   ! 2 times vcore which is shared by the wing (upper boundary) and core (lower boundary) grid.
   ! Total number of points is 2*(Nw+Nc-1) but here we count 2 times lambda0., therefore
@@ -100,7 +99,7 @@ MODULE getlambda
    line%lambda(1:Nmid) = line%lambda0*(1d0 + vel(1:Nmid)/CLIGHT)
    line%lambda(Nmid+1:Nlambda) = line%lambda0*(1d0 -vel(Nmid-1:1:-1)/CLIGHT)
 
-   if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2) should be lambda0'
+   if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
    
 !    write(*,*) 1, line%lambda(1)
 !    do la=2,Nlambda
@@ -408,7 +407,7 @@ MODULE getlambda
   RETURN
   END FUNCTION
 
-  SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, wl_ref)
+  SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, Ntrans, wl_ref)
   use math, only : locate, sort
   ! --------------------------------------------------------------------------- !
    ! construct and sort a wavelength grid for atomic line radiative transfer.
@@ -422,6 +421,7 @@ MODULE getlambda
    type (AtomType), intent(inout), dimension(Natom) :: Atoms
    integer, intent(in) :: Natom
    double precision, intent(in) :: wl_ref
+   integer, intent(out) :: Ntrans !Total number of transitions (cont + line)
    ! output grid. May contain values that are added to the final list before
    ! deallocating the array. It is reallocated when the final list is known.
    double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
@@ -479,7 +479,8 @@ MODULE getlambda
    allocate(tempgrid(Nspect))
   end if
 
-  write(*,*) "Adding ", Nspect," lines and continua, for a total of", Nlinetot+Nctot,&
+  Ntrans = Nlinetot + Nctot
+  write(*,*) "Adding ", Nspect," lines and continua, for a total of", Ntrans, &
              " transitions."
 
   ! add wavelength from mcfost inoutgrid if any
@@ -573,6 +574,7 @@ MODULE getlambda
 !     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
 !       " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
 !       " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
+    Atoms(n)%continua(kc)%Nmid = locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
    end do
    !then bound-bound transitions
    do kr=1,Atoms(n)%Nline
@@ -590,7 +592,8 @@ MODULE getlambda
 !     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%lines(kr)%Nred, & 
 !       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, & 
 !       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
-    end do
+    Atoms(n)%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%lines(kr)%lambda0)
+   end do
 !     write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
 

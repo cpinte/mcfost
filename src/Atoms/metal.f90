@@ -201,7 +201,7 @@ MODULE metal
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 100000 !beware here grrr
+  integer, parameter										:: NvspaceMax = 100!50000
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -242,12 +242,13 @@ MODULE metal
     if (atmos%moving .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
-     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))!min(...,NvspaceMax)  
-     if (Nvspacemax < Nvspace) then
-      write(*,*) "Nvspace > Nvspacemax"
-      write(*,*) icell, atom%ID, Nvspace, Nvspacemax
-      stop
-     end if
+     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     !Nvspace = max(2, nint())
+!      if (Nvspace > NvspaceMax) then
+!       write(*,*) "Warning: Nvspace greater than NvspaceMax", Nvspace, NvspaceMax
+!       write(*,*) icell, NvspaceMax, Nvspace, atom%ID, atom%vbroad(icell)
+!      end if
+     Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
      omegav(Nvspace) = v1
      do nv=2,Nvspace-1
       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l

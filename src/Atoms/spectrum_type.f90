@@ -42,7 +42,7 @@ MODULE spectrum_type
   TYPE Spectrum
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, NPROC
+   integer :: Nwaves, Nact, NPROC, Ntrans
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
    !nproc, nlambda, ncells
@@ -63,6 +63,7 @@ MODULE spectrum_type
    integer, intent(in) :: NPROC
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air, write_wavelength
+   integer :: kc, kr, n
       
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%NPROC = NPROC
@@ -76,9 +77,13 @@ MODULE spectrum_type
    ! Set also Nblue and Nred for each transitions: extension of the transtion
    ! in absolute indexes on the whole grid.
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
-                        NLTEspec%lambda, NLTEspec%wavelength_ref)
+                        NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    CALL writeWavelength()
+   
+!    !!store lambda0 of each transitions and indexes.
+!    allocate(NLTEspec%RedWing(NLTEspec%Ntrans), NLTEspec%BlueWing(NLTEspec%Ntrans))
+!    allocate(NLTEspec%TransLambda0(NLTEspec%Ntrans))
   
   RETURN
   END SUBROUTINE initSpectrum
@@ -222,7 +227,7 @@ MODULE spectrum_type
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
-  integer :: la, Nred, Nblue, kr, m, Nmid
+  integer :: la, Nred, Nblue, kr, kc, m, Nmid
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
@@ -298,9 +303,14 @@ npix_x = 101; npix_y = 101
         do kr=1,NLTEspec%atmos%Atoms(m)%Nline
          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-         Nmid = (Nred+Nblue)/2
+         Nmid = NLTEspec%atmos%Atoms(m)%lines(kr)%Nmid
          NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
-        end do !enough to run only on b-b transitions
+        end do
+        do kc=1,NLTEspec%atmos%Atoms(m)%Ncont
+         Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
+         Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
+         NLTEspec%Flux(Nblue:Nred,i,:,:,:) = NLTEspec%Flux(Nblue:Nred,npix_x-i+1,:,:,:)
+        end do 
        end do !atom    
       end do !pix
      else ! infall or expansion

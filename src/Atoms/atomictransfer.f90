@@ -562,7 +562,7 @@ npix_x = 101; npix_y = 101
   integer :: IterLimit
   logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
                                      ! is .false.
-  character(len=7) :: NE0 = "HIONIS"
+  character(len=7) :: NE0 = "HIONIS" !set this parameter according to the temperature.
   logical :: lstore_opac = .true.
   logical :: lstatic !to change the default of atmos%moving (.true.) in .false.
   					 ! should be considered only for testing purposes
