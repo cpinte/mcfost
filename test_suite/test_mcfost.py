@@ -46,9 +46,7 @@ def test_mcfost_bin():
     try:
         subprocess.call(_mcfost_bin)
     except OSError as e:
-        if e.errno == os.errno.ENOENT:
-            assert False
-    assert True
+        assert not e.errno == os.errno.ENOENT
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_Temperature(model_name):
