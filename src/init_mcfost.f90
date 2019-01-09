@@ -61,7 +61,6 @@ subroutine set_default_variables()
   lemission_atom = .false.
   lstore_opac = .false.
   lsolve_for_ne = .false.
-  cne_start_sol = "H_IONISATION"
   lstatic = .false.
   lvacuum_to_air = .false.
   ! AL-RT
