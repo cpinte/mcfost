@@ -361,7 +361,6 @@ MODULE AtomicTransfer
   integer :: kc, kr, nat, Nred, Nblue, la
   logical :: lbottom_irradiated = .false. !to switch off the star in the map creation
   
-npix_x = 101; npix_y = 101
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
@@ -544,7 +543,6 @@ npix_x = 101; npix_y = 101
  
  ! NOTE: should inverse the order of frequencies and depth because in general
  !       n_cells >> n_lambda, in "real" cases.
- ! npix_x, xpix_y, RT_line_method
  ! some of shared quantities by the code that i don't know were they are !!
  ! lkeplerian, linfall, lvoro where to declare them, lcylindrical ects
  
@@ -556,31 +554,26 @@ npix_x = 101; npix_y = 101
 
 #include "sprng_f.h"
 
-  integer :: atomunit = 1, nact,npass,  nat, la !atoms and wavelength
+  integer :: atomunit = 1, nact, npass,  nat, la !atoms and wavelength
   integer :: icell !spatial variables
-  integer :: ibin, iaz!, RT_line_method
-  integer :: NiterMax = 20, Nrays = 1! Number of rays for angular integration and to compute Inu(mu)
-  integer :: IterLimit
-  character(len=7) :: NE0 = "HIONIS" !set this parameter according to the temperature.
+  integer :: ibin, iaz
+  character(len=20) :: ne_start_sol = "H_IONISATION"
   logical :: lwrite_waves = .true.
 
   optical_length_tot => atom_optical_length_tot
-  !because for now lemission_atom is not a case of readparameters
-  write(*,*) npix_x, npix_y
-if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
-npix_x = 101; npix_y = 101
-!! ---------------- ---------------------------------------- !!
   
-  atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic
-  if (atmos%Nrays == 0) then
-   write(*,*) "Nrays should at least be 1!"
-   stop
+  if (npix_x_save > 1) then
+   RT_line_method = 2 ! creation d'une carte avec pixels carres
+   npix_x = npix_x_save ; npix_y = npix_y_save
+  else 
+   RT_line_method = 1 !pixels circulaires
   end if
+
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  CALL prop_law_model()
-  !CALL spherically_symmetric_shells_model()
+  !CALL prop_law_model()
+  CALL spherically_symmetric_shells_model()
   !CALL spherically_symmetric_star_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
@@ -589,6 +582,7 @@ npix_x = 101; npix_y = 101
   
   write(*,*) "maxTgas = ", MAXVAL(atmos%T), " minTgas = ", MINVAL(atmos%T)
   write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)  
+  atmos%Nrays = 1 !remember, it is needed to allocate I, Ic
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
@@ -608,7 +602,17 @@ npix_x = 101; npix_y = 101
   !can be used for the electron density calculation.
   if (.not.atmos%calc_ne) atmos%calc_ne = lsolve_for_ne
   if (lsolve_for_ne) write(*,*) "(Force) Solving for electron density"
-  if (atmos%calc_ne) CALL SolveElectronDensity(atmos%ne,NE0)
+  if (atmos%calc_ne) then 
+   if (lsolve_for_ne) write(*,*) "(Force) Solving for electron density"
+   if (.not.lsolve_for_ne) write(*,*) "Solving for electron density"
+   write(*,*) " Starting solution : ", ne_start_sol
+   if ((ne_start_sol == "NE_MODEL") .and. (atmos%calc_ne)) then
+    write(*,*) "WARNING, ne from model is presumably 0 (or not given)."
+    write(*,*) "Changing ne starting solution NE_MODEL in H_IONISATION"
+    ne_start_sol = "H_IONISATION"
+   end if 
+   CALL SolveElectronDensity(atmos%ne,ne_start_sol)
+  end if
   CALL writeElectron() !will be moved elsewhere
   ! do it in the reading process
   CALL writeHydrogenDensity()  
@@ -619,7 +623,7 @@ npix_x = 101; npix_y = 101
   write(*,*) "maxnHmin = ", MAXVAL(atmos%nHmin), " minnHmin = ", MINVAL(atmos%nHmin)
 
 !! --------------------------------------------------------- !!
-  NLTEspec%atmos => atmos !this one is important because atmos_Type : atmos is not used.
+  NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
   CALL initSpectrum(nb_proc, 500d0,lvacuum_to_air,lwrite_waves)  !optional vacuum2air and writewavelength
   NLTEspec%AtomOpac%store_opac = lstore_opac
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)

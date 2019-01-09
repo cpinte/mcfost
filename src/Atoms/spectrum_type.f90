@@ -232,8 +232,7 @@ MODULE spectrum_type
   character(len=6) :: comment="VACUUM"
   double precision :: lambda_vac(NLTEspec%Nwaves)
   real :: pixel_scale_x, pixel_scale_y 
-
-npix_x = 101; npix_y = 101
+  
   write(*,*) "Writing Flux-map"
   write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
   if (l_sym_ima) then 
@@ -394,6 +393,8 @@ npix_x = 101; npix_y = 101
    
    if (.not.allocated(NLTEspec%lambda).or.&
        .not.NLTEspec%write_wavelength_grid) RETURN !
+   write(*,*) " -> Writing wavelengths to ", WAVES_FILE       
+   
    CALL ftgiou(unit,EOF)
    blocksize=1
    CALL ftinit(unit,trim(WAVES_FILE),blocksize,EOF)
