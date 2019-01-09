@@ -35,7 +35,8 @@ MODULE AtomicTransfer
  use writeatom
  use readatmos, only				    : readatmos_1D, readPLUTO
  use simple_models, only 				: spherically_symmetric_shells_model, &
- 										  prop_law_model, uniform_law_model
+ 										  prop_law_model, uniform_law_model, &
+ 										  spherically_symmetric_star_model
  
  !$ use omp_lib
  
@@ -129,7 +130,9 @@ MODULE AtomicTransfer
     previous_cell = 0 ! unused, just for Voronoi
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-                     
+
+    !l_contrib = l_contrib*atmos%Scale2disk(icell)/AU_to_m
+    
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
@@ -556,24 +559,16 @@ npix_x = 101; npix_y = 101
   integer :: atomunit = 1, nact,npass,  nat, la !atoms and wavelength
   integer :: icell !spatial variables
   integer :: ibin, iaz!, RT_line_method
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !! the following quantities are input parameters !!
   integer :: NiterMax = 20, Nrays = 1! Number of rays for angular integration and to compute Inu(mu)
   integer :: IterLimit
-  logical :: lsolve_for_ne = .false. !for calculation of electron density even if atmos%calc_ne
-                                     ! is .false.
   character(len=7) :: NE0 = "HIONIS" !set this parameter according to the temperature.
-  logical :: lstore_opac = .true.
-  logical :: lstatic !to change the default of atmos%moving (.true.) in .false.
-  					 ! should be considered only for testing purposes
-  					 !or special geometry with static atmospheres
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  logical :: lwrite_waves = .true.
+
   optical_length_tot => atom_optical_length_tot
   !because for now lemission_atom is not a case of readparameters
   write(*,*) npix_x, npix_y
 if ((npix_x /= 101).or.(npix_y /= 101)) write(*,*) 'BEWARE: npix_x read is different from what it should be..'
 npix_x = 101; npix_y = 101
-
 !! ---------------- ---------------------------------------- !!
   
   atmos%Nrays = Nrays !remember, it is needed to allocate I, Ic
@@ -584,8 +579,9 @@ npix_x = 101; npix_y = 101
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  !CALL prop_law_model()
-  CALL spherically_symmetric_shells_model()
+  CALL prop_law_model()
+  !CALL spherically_symmetric_shells_model()
+  !CALL spherically_symmetric_star_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
@@ -624,7 +620,7 @@ npix_x = 101; npix_y = 101
 
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_Type : atmos is not used.
-  CALL initSpectrum(nb_proc, 500d0)  !optional vacuum2air and writewavelength
+  CALL initSpectrum(nb_proc, 500d0,lvacuum_to_air,lwrite_waves)  !optional vacuum2air and writewavelength
   NLTEspec%AtomOpac%store_opac = lstore_opac
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
   if (NLTEspec%AtomOpac%store_opac) then !only Background lines and active transitions

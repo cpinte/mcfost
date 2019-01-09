@@ -59,6 +59,11 @@ subroutine set_default_variables()
   lemission_mol=.false.
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
+  lstore_opac = .false.
+  lsolve_for_ne = .false.
+  lstatic = .false.
+  lvacuum_to_air = .false.
+  ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
@@ -549,6 +554,18 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
+     case("-static_model")
+        i_arg = i_arg + 1
+        lstatic = .true.
+     case("-store_atom_opac")
+        i_arg = i_arg + 1
+        lstore_opac = .true.
+     case("-solve_ne")
+        i_arg = i_arg + 1
+        lsolve_for_ne = .true.
+     case("-vacuum_to_air")
+        i_arg = i_arg + 1
+        lvacuum_to_air = .true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -1437,7 +1454,10 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
-  write(*,*) "        : R.A.S yet"
+  write(*,*) "        : -static_model : force the model to be static, and neglect velocity field"
+  write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
+  write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

@@ -47,15 +47,11 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
-   !write(*,*) "Use the proper v_char in case of large ", &
-   !  "velocity gradient" ! it is use to sample the line domain
-   !v_char converts q, doppler units without dimension, to wavelength.
-   ! Note that if velocity field are important, this term
-   ! should be use as a typical width
-   logical :: Magnetized = .false., XRD=.false., moving=.true., calc_ne,&
+   logical :: Magnetized = .false., XRD=.false., moving=.true., calc_ne, &
      H_LTE=.false. ! force LTE populations of H for
                    ! background opacities
    logical, dimension(:), allocatable :: lcompute_atomRT !where line RT is taken into account on the grid
+   double precision, dimension(:), allocatable :: Scale2disk
   END TYPE GridType
 
 
@@ -469,13 +465,8 @@ MODULE atmos_type
 !    end do
   !!!!$omp end do
   !!!$omp  end parallel
-     
-!! Test of defining v_char automatically
-!   do n=1,atmos%Natom
-!    if (atmos%v_char<MAXVAL(atmos%Atoms(n)%vbroad)) &
-!            atmos%v_char = MAXVAL(atmos%Atoms(n)%vbroad) !m/s
-!   end do
-!   if (atmos%v_char /= 1d0) write(*,*) "v_char (km/s) =", atmos%v_char/1d3
+
+   allocate(atmos%Scale2disk(Nspace))
 
    RETURN
    END SUBROUTINE init_atomic_atmos
