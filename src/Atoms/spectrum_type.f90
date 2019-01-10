@@ -235,6 +235,8 @@ MODULE spectrum_type
   
   write(*,*) "Writing Flux-map"
   write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
+  write(*,*) "Wavelength points:", NLTEspec%Nwaves
+  
   if (l_sym_ima) then 
    write(*,*) " image is symmetric."
   else
@@ -288,41 +290,47 @@ MODULE spectrum_type
 
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
-
   if (l_sym_ima) then 
    if (RT_line_method==1) then ! what should I do in my case ?
     write(*,*) 'RT_line_method == 1, not valid yet'
+    write(*,*) 'Change symmetries'
     stop
-   else if (RT_line_method /= 1) then !==2 ?
-    xcenter = npix_x/2 + modulo(npix_x,2)
-    if (NLTEspec%atmos%moving) then
+   else if (RT_line_method == 2) then !/= 1, ??
+    xcenter = npix_x/2 + modulo(npix_x,2) 
+    if (.not.lstatic) then !due to velocity the lines could be asym even if the model is sym
+    					   ! for instance keplerian profile is not the same for the two parts
+    					   ! of the final image
      if (lkeplerian) then !line profile reversed
       do i=xcenter+1,npix_x
        do m=1,NLTEspec%atmos%Natom
+        !!lines are sensitive to symmetry
         do kr=1,NLTEspec%atmos%Atoms(m)%Nline
          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
          Nmid = NLTEspec%atmos%Atoms(m)%lines(kr)%Nmid
+         !Keplerian rotation inverses profile slope
          NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
-        end do
+        end do 
+        !!continua are not sensitive to symmetry right ?
         do kc=1,NLTEspec%atmos%Atoms(m)%Ncont
          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-         NLTEspec%Flux(Nblue:Nred,i,:,:,:) = NLTEspec%Flux(Nblue:Nred,npix_x-i+1,:,:,:)
-        end do 
+         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+        end do
        end do !atom    
       end do !pix
-     else ! infall or expansion
+     else ! not keplerian (infall or expansion)
       do i=xcenter+1,npix_x
        NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
       end do
-     end if !lkeplerian
-    else !static
-      do i=xcenter+1,npix_x
-       NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-      end do    
-    end if !if moving
-   else
+     end if !lkeplerian  
+    else !static, not moving but image still has symmetries
+     do i=xcenter+1,npix_x !case of symmetric lines or continua
+    					  !copy the left part of the image to the right
+      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+     end do 
+    end if !if not static or if moving
+   else !RT line method /= 0, 2
     write(*,*) "RT_line_method", RT_line_method, " not valid"
     stop
    endif !RT_line_method
@@ -349,7 +357,8 @@ MODULE spectrum_type
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
   
-  if (l_sym_ima.and.(RT_line_method /= 0)) then
+  !the continuum should not be affected by velocity shift
+  if (l_sym_ima.and.(RT_line_method == 2)) then
    xcenter = npix_x/2 + modulo(npix_x,2)
    do i=xcenter+1,npix_x
     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)

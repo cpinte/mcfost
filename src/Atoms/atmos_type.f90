@@ -433,8 +433,7 @@ MODULE atmos_type
    atmos%ne = ne !m-3
    atmos%vturb = 0d0 !m/s
    
-   if (MAXVAL(atmos%ne).eq.0.0) then 
-     write(*,*) "Solving for electron density"
+   if (MAXVAL(atmos%ne).eq.0.0) then
      atmos%calc_ne=.true.
    end if 
 
