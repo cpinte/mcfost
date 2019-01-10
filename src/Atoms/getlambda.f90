@@ -28,8 +28,8 @@ MODULE getlambda
    cont%Nlambda = Nlambda
    allocate(cont%lambda(cont%Nlambda))
    resol = (l1 - l0) / (Nlambda - 1)
-   write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
-              " Resolution (nm):", resol, " lambdamin =", lambdamin  
+!    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
+!               " Resolution (nm):", resol, " lambdamin =", lambdamin  
    
    cont%lambda(1) = l0
    do la=2,cont%Nlambda
@@ -51,8 +51,8 @@ MODULE getlambda
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: core_to_wing=5d-1, L=7d0
-   integer, parameter :: Nc = 101, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
+   double precision, parameter :: core_to_wing=7d0, L=100d0
+   integer, parameter :: Nc = 301, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
    double precision, dimension(5*(Nc+Nw)) :: vel
    
    v_char = L * (atmos%v_char + vD)
@@ -64,8 +64,8 @@ MODULE getlambda
    !from -v_char to 0
    dvw = (v_char-vcore)/(Nw-1)
    dvc = vcore/(Nc-1)
-   write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
-              " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
+!    write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
+!               " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
    vel(1) = v0 !half wing
 !   write(*,*) 1, vel(1), v0, v_char/1d3
    !wing loop
