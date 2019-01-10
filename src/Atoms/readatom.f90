@@ -145,8 +145,8 @@ MODULE readatom
     !which is faster?
     atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
     atom%ntotal = atom%Abund * atmos%nHtot
-    write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
-                        " minVD(km/s)=", minval(atom%vbroad)/1d3
+!     write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
+!                         " minVD(km/s)=", minval(atom%vbroad)/1d3
     !!!$omp parallel &
     !!!$omp default(none) &
     !!!$omp private(k) &

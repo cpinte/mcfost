@@ -189,8 +189,8 @@ END FUNCTION getPartitionFunctionk
  ! ----------------------------------------------------------------------!
 
   double precision, dimension(atmos%Nspace), intent(inout) :: ne
-  character(len=7), optional :: ne_initial_solution
-  character(len=7) :: initial
+  character(len=20), optional :: ne_initial_solution
+  character(len=20) :: initial
   double precision :: error, ne_old, akj, sum, Uk, dne, Ukp1
   double precision :: ne_oldM, UkM, PhiHmin
   double precision, dimension(atmos%Nspace) :: np
@@ -198,9 +198,13 @@ END FUNCTION getPartitionFunctionk
   integer :: Nmaxstage=0, n, k, niter, j
 
   if (.not. present(ne_initial_solution)) then
-      initial="HIONISA"!use HIONISAtion
+      initial="H_IONISATION"!use HIONISAtion
   else
     initial=ne_initial_solution
+!     if ((initial .neq. "N_PROTON") .neq. (initial /= "NE_MODEL")) then
+!      write(*,*) 'NE initial solution unkown, set to H_IONISATION'
+!      initial = "H_IONISATION"
+!     end if
   end if
 
   do n=1,Nelem
@@ -217,7 +221,7 @@ END FUNCTION getPartitionFunctionk
   ! 1) NLTE populations from previous run are read
   ! 2) The routine is called in the NLTE loop meaning that all H levels are known
 
-  if (initial.eq."NPROTON") &
+  if (initial.eq."N_PROTON") &
      np=Hydrogen%n(Hydrogen%Nlevel,:)
 
   !$omp parallel &
@@ -230,11 +234,12 @@ END FUNCTION getPartitionFunctionk
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
-   if (initial.eq."NPROTON") then
+   if (initial.eq."N_PROTON") then
     ne_old = np(k)
-   else if (initial.eq."NEMODEL") then
+   else if (initial.eq."NE_MODEL") then
     ne_old = atmos%ne(k)
-   else
+   else !"H_IONISATION" or unkown
+   
     !Initial solution ionisation of H
     Uk = getPartitionFunctionk(atmos%Elements(1), 1, k)
     Ukp1 = 1d0 !getPartitionFunctionk(atmos%Elements(1), 2, k)
@@ -295,8 +300,6 @@ END FUNCTION getPartitionFunctionk
   !$omp end do
   !$omp end parallel
 
-  write(*,*) "maxium electron density (m^-3) =", MAXVAL(atmos%ne), &
-            " minimum electron density (m^-3) =", MINVAL(atmos%ne)
   deallocate(fjk, dfjk)
  RETURN
  END SUBROUTINE SolveElectronDensity

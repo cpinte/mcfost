@@ -361,7 +361,7 @@ end subroutine dust_and_mol_optical_length_tot
      !
      if ((icell0<=n_cells).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-      if (NLTEspec%AtomOpac%store_opac) then !ETL continua are kept on memory
+      if (NLTEspec%AtomOpac%store_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
        CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &

@@ -46,7 +46,7 @@ MODULE AtomicTransfer
  use grid
  use optical_depth
  use dust_prop
- use dust_transfer, only 				: compute_stars_map
+ use dust_transfer, only 				: compute_stars_map, find_pixel
  use dust_ray_tracing, only 			: init_directions_ray_tracing ,            & 
                               			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
                               			  tab_RT_incl, stars_map, kappa
@@ -113,7 +113,7 @@ MODULE AtomicTransfer
     icell = next_cell
     x0=x1 ; y0=y1 ; z0=z1
 
-    if (icell <= n_cells) then ! .and. atmos%lcompute_atomRT(icell)
+    if (icell <= n_cells) then
      lcellule_non_vide=.true.
     else
      lcellule_non_vide=.false.
@@ -357,15 +357,12 @@ MODULE AtomicTransfer
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
   logical :: lresolved
-  
-  integer :: kc, kr, nat, Nred, Nblue, la
-  logical :: lbottom_irradiated = .false. !to switch off the star in the map creation
-  
-  write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
+ 
+  !write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
-  write(*,*) "u=", u, "v=",v, "w=",w
+  !write(*,*) "u=", u, "v=",v, "w=",w
 
   ! Definition des vecteurs de base du plan image dans le repere universel
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
@@ -489,54 +486,22 @@ MODULE AtomicTransfer
      
   end if
  ! adding the stellar flux
- if (lbottom_irradiated) then
-  write(*,*) " --> adding stellar flux map..."  
-  if (etoile(1)%lb_body) then !all stars are Blackbodies ?
-   !assumes a constant stellar flux across a transition.
-   !computes flux star only at lambda0 and set Flux(Nred:Nblue) = Flux(lambda0)
-   do nat=1,atmos%Natom
-    do kc=1,atmos%Atoms(nat)%Ncont
-     lambda = atmos%Atoms(nat)%continua(kc)%Nmid
-     Nred = atmos%Atoms(nat)%continua(kc)%Nred
-     Nblue = atmos%Atoms(nat)%continua(kc)%Nblue
-     nu = c_light / NLTEspec%lambda(lambda) * 1d9 
-     CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-      do la=Nblue,Nred
-      NLTEspec%Flux(la,:,:,ibin,iaz) = NLTEspec%Flux(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-      NLTEspec%Fluxc(la,:,:,ibin,iaz) = NLTEspec%Fluxc(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-      end do
-    end do
-    do kr=1,atmos%Atoms(nat)%Nline
-     lambda = atmos%Atoms(nat)%lines(kr)%Nmid
-     Nred = atmos%Atoms(nat)%lines(kr)%Nred
-     Nblue = atmos%Atoms(nat)%lines(kr)%Nblue
-     nu = c_light / NLTEspec%lambda(lambda) * 1d9 
-     CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-     !array = array + scalar
-      do la=Nblue,Nred
-      NLTEspec%Flux(la,:,:,ibin,iaz) = NLTEspec%Flux(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-      NLTEspec%Fluxc(la,:,:,ibin,iaz) = NLTEspec%Fluxc(la,:,:,ibin,iaz) + stars_map(:,:,1) / nu
-      end do
-    end do
-   end do !over atoms
-  else !a star is not a BB, computes for all wavelength
-   do lambda = 1, NLTEspec%Nwaves
-    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+  !write(*,*) " --> adding stellar flux map..."  
+  do lambda = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
                                              !else it means that in FLUX_PIXEL_LINE, nu
                                              !is 1d0 (to have flux in W/m2/Hz)
-    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
 !      write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(lambda), &
 !       stars_map(npix_x/2+1,npix_y/2+1,1)/nu, maxval(NLTEspec%Flux(lambda,:,:,ibin,iaz)), &
 !       maxval(stars_map(:,:,1))/nu
 
-     NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
                                          stars_map(:,:,1) / nu
-     NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
                                          stars_map(:,:,1) / nu
+  end do  
 
-   end do  
-  end if  
- end if
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -558,7 +523,7 @@ MODULE AtomicTransfer
   integer :: icell !spatial variables
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "H_IONISATION"
-  logical :: lwrite_waves = .true.
+  logical :: lwrite_waves = .false.
 
   optical_length_tot => atom_optical_length_tot
   
@@ -572,16 +537,16 @@ MODULE AtomicTransfer
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  !CALL prop_law_model()
-  CALL spherically_symmetric_shells_model()
+  CALL prop_law_model()
+  !CALL spherically_symmetric_shells_model()
   !CALL spherically_symmetric_star_model()
 
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
   !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
   
-  write(*,*) "maxTgas = ", MAXVAL(atmos%T), " minTgas = ", MINVAL(atmos%T)
-  write(*,*) "maxnH = ", MAXVAL(atmos%nHtot), " minnH = ", MINVAL(atmos%nHtot)  
+  write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), " min(T) (K) = ", MINVAL(atmos%T)
+  write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), " min(nH) (m^-3) = ", MINVAL(atmos%nHtot)  
   atmos%Nrays = 1 !remember, it is needed to allocate I, Ic
 !! --------------------------------------------------------- !!
 
@@ -619,8 +584,8 @@ MODULE AtomicTransfer
 
   Call setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
-  write(*,*) "maxNE = ", MAXVAL(atmos%ne), " minNE = ", MINVAL(atmos%ne)
-  write(*,*) "maxnHmin = ", MAXVAL(atmos%nHmin), " minnHmin = ", MINVAL(atmos%nHmin)
+  write(*,*) "max(ne) (m^-3) = ", MAXVAL(atmos%ne), " min(ne) (m^-3) = ", MINVAL(atmos%ne)
+  write(*,*) "max(nH-) (m^-3) = ", MAXVAL(atmos%nHmin), " min(nH-) (m^-3) = ", MINVAL(atmos%nHmin)
 
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
