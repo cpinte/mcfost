@@ -42,13 +42,11 @@ def MC_similar(x,y,threshold=0.01,mask_threshold=1e-20):
 
 def test_mcfost_bin():
     # We first test if the mcfost binary actually exists and runs
-    #assert os.path.isfile(_mcfost_bin)
+    assert os.path.isfile(_mcfost_bin)
     try:
         subprocess.call(_mcfost_bin)
     except OSError as e:
-        if e.errno == os.errno.ENOENT:
-            assert False
-    assert True
+        assert not e.errno == os.errno.ENOENT
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_Temperature(model_name):

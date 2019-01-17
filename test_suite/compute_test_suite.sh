@@ -1,5 +1,6 @@
 #!/bin/bash
-export mcfost=$HOME"/mcfost/src/mcfost"
+#export mcfost=$MCFOST_INSTALL/../src/mcfost
+export mcfost=$(pwd)/../src/mcfost
 
 for dir in test_data/*; do
     param=`basename "$dir".para`
