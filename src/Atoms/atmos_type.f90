@@ -51,7 +51,6 @@ MODULE atmos_type
      H_LTE=.false. ! force LTE populations of H for
                    ! background opacities
    logical, dimension(:), allocatable :: lcompute_atomRT !where line RT is taken into account on the grid
-   double precision, dimension(:), allocatable :: Scale2disk
   END TYPE GridType
 
 
@@ -429,7 +428,7 @@ MODULE atmos_type
    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(Nspace))
 
    atmos%T = T ! K 
-   atmos%nHtot = nHtot !m-3 !cm^-3 to m^-3 = 1d6
+   atmos%nHtot = nHtot
    atmos%ne = ne !m-3
    atmos%vturb = 0d0 !m/s
    
@@ -438,6 +437,7 @@ MODULE atmos_type
    end if 
 
    CALL fillElements()
+   !atmos%nHtot = atmos%nHtot / atmos%avgWeight
    
    allocate(atmos%lcompute_atomRT(Nspace))
    if (tiny_T <= 0) then
@@ -464,8 +464,6 @@ MODULE atmos_type
 !    end do
   !!!!$omp end do
   !!!$omp  end parallel
-
-   allocate(atmos%Scale2disk(Nspace))
 
    RETURN
    END SUBROUTINE init_atomic_atmos

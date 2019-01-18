@@ -34,9 +34,8 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use readatmos, only				    : readatmos_1D, readPLUTO
- use simple_models, only 				: spherically_symmetric_shells_model, &
- 										  prop_law_model, uniform_law_model, &
- 										  spherically_symmetric_star_model
+ use simple_models, only 				: prop_law_model, uniform_law_model, &
+ 										  magneto_accretion_model
  
  !$ use omp_lib
  
@@ -130,8 +129,6 @@ MODULE AtomicTransfer
     previous_cell = 0 ! unused, just for Voronoi
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-
-    !l_contrib = l_contrib*atmos%Scale2disk(icell)/AU_to_m
     
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
@@ -537,10 +534,10 @@ MODULE AtomicTransfer
 
 !! ----------------------- Read Model ---------------------- !!
   !CALL uniform_law_model()
-  CALL prop_law_model()
-  !CALL spherically_symmetric_shells_model()
-  !CALL spherically_symmetric_star_model()
-
+  !CALL prop_law_model()
+  CALL magneto_accretion_model()   
+CALL writeHydrogenDensity()
+stop
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
   !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")

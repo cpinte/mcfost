@@ -76,11 +76,11 @@ MODULE READATMOS
   CALL ftgpvd(unit,1,1,Ndep,-999,Vzmod,anynull,EOF) !km/s
   Vzmod = Vzmod * 1000d0 !m/s
 
-!   write(*,*) Rstar, logg, Ndep
-!   write(*,*) "R:", maxval(rmod), minval(rmod)
-!   write(*,*) "T:", maxval(Tmod), minval(Tmod)
-!   write(*,*) "nH:", maxval(nHmod), minval(nHmod)
-!   write(*,*) "Vz:", maxval(Vzmod), minval(Vzmod)
+  write(*,*) Rstar, logg, Ndep
+  write(*,*) "R:", maxval(rmod), minval(rmod)
+  write(*,*) "T:", maxval(Tmod), minval(Tmod)
+  write(*,*) "nH:", maxval(nHmod), minval(nHmod)
+  write(*,*) "Vz:", maxval(Vzmod), minval(Vzmod)
 
   CALL ftclos(unit, EOF)
   CALL ftfiou(unit, EOF)
@@ -88,25 +88,7 @@ MODULE READATMOS
   !map the 1D atmos to the mcfost's grid
   rmax = maxval(rmod) * Rstar * Rsun !m
   rmin = minval(rmod) * Rstar * Rsun
-  do i=1, n_rad
-   do j=j_start,nz
-    do k=1, n_az
-     if (j==0) then !pourquoi ici
-      icell = cell_map(i,1,k)
-      rcyl = r_grid(icell) * AU_TO_RSUN * Rsun
-      z = 0d0
-     else
-      icell = cell_map(i,j,k)
-      rcyl = r_grid(icell) * AU_TO_RSUN * Rsun
-      z = z_grid(icell) * AU_TO_RSUN * Rsun
-     endif
-     r = sqrt(rcyl**2 + z**2) !m
-     if ((r <= rmax).and.(r>=rmin).and.(j/=0)) then
 
-     end if
-    end do !k
-   end do !j
-  end do !i
   !CALL init_atomic_atmos(n_cells, Tmap, NHtotmap, nemap)
   !atmos%Vmap = 0d0
 
