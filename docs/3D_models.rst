@@ -77,16 +77,19 @@ grains in each grain size bin : dn(a)/da
           each size.
 
 The gas density can be passed by setting the keyword ``read_gas_density``
-to 1. In that case, an extra keyword gas_to_dust must also be passed
+to 1. In that case, an extra keyword ``gas_to_dust`` must also be passed
 to give the integrated gas to dust mass ratio.
 An extra HDU must also be passed, giving the gas density with 3
 dimensions: ``gas_density(1:n_rad, 1:nz, 1:n_az)``.
 As for the dust density array, the array has 3 dimensions also in 2D,
 but with n_az=1. The total gas mass is set by the mcfost parameter
-file in any case. If the keyword read_gas_density is set to 0 or
+file in any case. If the keyword ``read_gas_density`` is set to 0 or
 absent, mcfost will assume that the gas has the same spatial
 distribution as the smallest grains in the FITS file, and will use the
 gas-to-dust mass ratio provided in the parameter file.
+
+.. note:: some parameters, such as ``read_gas_density`` are longer than 8 characters, which is the fits standard. They are however handled correctly by mcfost. In general, you can put a `HIERARCH` card in front of this parameter so that it respect fits standard. See for example `Astopy's documentation <http://docs.astropy.org/en/stable/io/fits/usage/headers.html#hierarch-cards>`_.
+
 
 The gas velocity field can also be passed by setting ``read_gas_velocity`` to 1. The fits file must have an extra HDU with 4
 dimensions: ``gas_velocity(1:n_rad, 1:nz, 1:n_az, 3)``. The last index correspond to ``v_x``, ``v_y``, ``v_z`` and the velocity is
