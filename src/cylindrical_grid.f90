@@ -468,6 +468,8 @@ subroutine define_cylindrical_grid()
            V(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
         endif
      enddo
+         
+     delta_z = maxval(z_grid_tmp) / real(nz)
 
   endif ! cylindrique ou spherique
 
