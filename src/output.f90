@@ -2033,7 +2033,7 @@ subroutine write_disk_struct(lparticle_density)
               icell = cell_map(i,j,k)
               grid(i,j,k,1) = r_grid(icell)
               grid(i,j,k,1) = z_grid(icell)
-              if (l3D) grid(i,j,k,3) = z_grid(icell)
+              if (l3D) grid(i,j,k,3) = phi_grid(icell)
            enddo
         enddo
      enddo
