@@ -1286,8 +1286,11 @@ subroutine read_density_file()
   if (lread_gas_density) then
      call ftgkye(unit,"gas_dust_ratio",gas2dust,comment,status)
 
-     write(*,*) "Updating gas-to-dust ratio to", gas2dust
-     dz%gas_to_dust = gas2dust
+     if (status == 0) then
+        write(*,*) "Updating gas-to-dust ratio to", gas2dust
+        dz%gas_to_dust = gas2dust
+     endif
+     status = 0
 
      if (l3D_file) then
         allocate(sph_gas_dens(n_rad,2*nz,n_az))
@@ -1300,12 +1303,11 @@ subroutine read_density_file()
      call ftmrhd(unit,1,hdutype,status)
 
      nfound = 0 ; naxes = 0 ;
-
      !  determine the size of density file
      call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
      if (nfound /= 3) then
         write(*,*) 'Gas density:'
-        write(*,*) "I found", nfound, "axis instead of 3"
+        write(*,*) "I found", nfound, "axis instead of 3, status=", status
         call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
      endif
 
