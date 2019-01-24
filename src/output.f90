@@ -2296,7 +2296,7 @@ subroutine ecriture_UV_field()
   if (l3D) then
      naxis=3
      naxes(1)=n_rad
-     naxes(2)=2*nz+1
+     naxes(2)=2*nz
      naxes(3)=n_az
      nelements=naxes(1)*naxes(2)*naxes(3)
   else
@@ -2543,7 +2543,7 @@ subroutine ecriture_temperature(iTemperature)
            naxis=4
            naxes(1)=n_grains_nRE
            naxes(2)=n_rad
-           naxes(3)=2*nz+1
+           naxes(3)=2*nz
            naxes(4)=n_az
            nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
