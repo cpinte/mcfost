@@ -181,6 +181,9 @@ subroutine lect_Temperature()
   integer, dimension(5) :: naxes
   logical :: anynull
 
+  !B. Tessore.
+  if (lemission_atom .and.(.not.lsed).and.(.not.ltemp)) RETURN
+
   if (lRE_LTE) then
      status=0
      !  Get an unused Logical Unit Number to use to open the FITS file.
