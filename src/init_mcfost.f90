@@ -1182,7 +1182,7 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lstop_after_init)) then
+  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lemission_atom).and.(.not.lstop_after_init)) then
      write(*,*) "ERROR: Nothing to calculate!"
      write(*,*) "You can: "
      write(*,*) "- use the [-img wavelength] option to calculate an image"
