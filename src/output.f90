@@ -1525,7 +1525,7 @@ subroutine write_disk_struct(lparticle_density)
 
   logical, intent(in) :: lparticle_density
 
-  integer :: i, j, k, icell
+  integer :: i, j, k, icell, jj
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -2027,13 +2027,15 @@ subroutine write_disk_struct(lparticle_density)
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
      do i=1, n_rad
+        jj=0
         do j=j_start,nz
            if (j==0) cycle
+           jj=jj+1
            do k=1, n_az
               icell = cell_map(i,j,k)
-              grid(i,j,k,1) = r_grid(icell)
-              grid(i,j,k,1) = z_grid(icell)
-              if (l3D) grid(i,j,k,3) = phi_grid(icell)
+              grid(i,jj,k,1) = r_grid(icell)
+              grid(i,jj,k,1) = z_grid(icell)
+              if (l3D) grid(i,jj,k,3) = phi_grid(icell)
            enddo
         enddo
      enddo
