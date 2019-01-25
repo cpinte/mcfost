@@ -2052,10 +2052,10 @@ subroutine write_disk_struct(lparticle_density)
      call ftpkys(unit,'UNIT',"AU",' ',status)
      call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
      call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
-     if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
 
      ! le d signifie real*8
      if (l3D) then
+      call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
       call ftpprd(unit,group,fpixel,nelements,grid3D,status)
      else
       call ftpprd(unit,group,fpixel,nelements,grid,status)
