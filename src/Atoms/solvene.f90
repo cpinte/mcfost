@@ -301,6 +301,10 @@ END FUNCTION getPartitionFunctionk
   !$omp end parallel
 
   deallocate(fjk, dfjk)
+  
+
+  write(*,*) "max(ne) (m^-3) = ", MAXVAL(atmos%ne), &
+  			 " min(ne) (m^-3) = ", MINVAL(atmos%ne,mask=atmos%ne>0)
  RETURN
  END SUBROUTINE SolveElectronDensity
 

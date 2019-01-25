@@ -536,15 +536,17 @@ MODULE AtomicTransfer
   !CALL uniform_law_model()
   !CALL prop_law_model()
   CALL magneto_accretion_model()   
-CALL writeHydrogenDensity()
-stop
+
   ! OR READ FROM MODEL (to move elsewhere) 
   !suppose the model is in utils/Atmos/
   !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
   
-  write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), " min(T) (K) = ", MINVAL(atmos%T)
-  write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), " min(nH) (m^-3) = ", MINVAL(atmos%nHtot)  
+  write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
+             " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
+  write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
+             " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
   atmos%Nrays = 1 !remember, it is needed to allocate I, Ic
+
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
@@ -578,11 +580,8 @@ stop
   CALL writeElectron() !will be moved elsewhere
   ! do it in the reading process
   CALL writeHydrogenDensity()  
-
   Call setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
-
-  write(*,*) "max(ne) (m^-3) = ", MAXVAL(atmos%ne), " min(ne) (m^-3) = ", MINVAL(atmos%ne)
-  write(*,*) "max(nH-) (m^-3) = ", MAXVAL(atmos%nHmin), " min(nH-) (m^-3) = ", MINVAL(atmos%nHmin)
+stop
 
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
@@ -711,12 +710,11 @@ stop
   CALL repartition_energie_etoiles()
   ! Velocity field in  m.s-1
   if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
-  lkeplerian = .false.
-  linfall = .false.
-  Vfield=0d0! by default or something if velocity_law != 0
+  !lkeplerian = .false.
+  !linfall = .false.
+  Vfield=0d0!
   if (atmos%moving) then
-   if (atmos%velocity_law == 0) then !default is 0 for keplerian vel
-    lkeplerian = .true.
+   if (lkeplerian) then
     ! Warning : assume all stars are at the center of the disk
     if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
      if (lcylindrical_rotation) then ! Midplane Keplerian velocity
@@ -730,8 +728,7 @@ stop
         end do
      end if
     end if
-   else if (atmos%velocity_law == -1) then 
-    linfall=.true.
+   else !linfall=.true.
     Vfield = atmos%Vmap
 !      write(*,*) linfall, atmos%velocity_law, MAXVAL(Vfield)
 !      stop
@@ -739,7 +736,6 @@ stop
    if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
   else
    deallocate(Vfield)						! allocated only if moving
-   !vchar cannot be defined here because wavelength grid is already set up..
   end if 
 
  RETURN

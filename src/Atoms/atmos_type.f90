@@ -35,10 +35,7 @@ MODULE atmos_type
    ! Each component of the velocity is a function of x, y, z so
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
-   integer :: velocity_law = 0 !use this integer to specify different velocity than
-    !infall or keplerian ?, or remove it
-   ! 0: Keplerian; -1: radial (type CAK); 1: frome file (used with Voronoi)
-   double precision, allocatable, dimension(:) :: Vmap !used if velocity fields
+   double precision, allocatable, dimension(:) :: Vmap,vx,vy,vz !used if velocity fields
    ! is not Keplerian nor read from file. Then Vmap is computed, and Vfield = Vmap.
    type (Element), dimension(:), allocatable :: Elements
    type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms 
@@ -410,8 +407,6 @@ MODULE atmos_type
 !    if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(Nspace))
 !    atmos%Vmap = 0d0
 
-   ! %velocity_law=0 for v read from file
-   !              =1 for CAK circumstellar envelope
    atmos%Natom = 0
    atmos%Nactiveatoms = 0
    atmos%totalAbund=0
@@ -421,6 +416,7 @@ MODULE atmos_type
    atmos%Npf = 0
    atmos%Nspace = Nspace
    atmos%calc_ne = .false.
+
 
    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(Nspace))
    if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(Nspace))

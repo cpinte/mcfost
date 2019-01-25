@@ -52,7 +52,7 @@ MODULE getlambda
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision, parameter :: core_to_wing=7d0, L=100d0
-   integer, parameter :: Nc = 301, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
+   integer, parameter :: Nc = 101, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
    double precision, dimension(5*(Nc+Nw)) :: vel
    
    v_char = L * (atmos%v_char + vD)
