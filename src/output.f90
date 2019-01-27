@@ -1525,7 +1525,7 @@ subroutine write_disk_struct(lparticle_density)
 
   logical, intent(in) :: lparticle_density
 
-  integer :: i, j, k, icell
+  integer :: i, j, k, icell, jj
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1537,7 +1537,6 @@ subroutine write_disk_struct(lparticle_density)
   real, dimension(:), allocatable :: dens, vol
   real(kind=dp), dimension(:,:), allocatable :: dust_dens
   real(kind=dp), dimension(:,:,:,:), allocatable :: grid
-  real(kind=dp), dimension(:,:), allocatable :: grid3D
 
   write(*,*) "Writing disk structure files in data_disk ..."
   allocate(dens(n_cells), vol(n_cells), dust_dens(n_cells,n_grains_tot), stat = alloc_status)
@@ -2017,9 +2016,7 @@ subroutine write_disk_struct(lparticle_density)
         naxes(2)=2*nz
         naxes(3)=n_az
         naxes(4)=3
-        !allocate(grid(n_rad,2*nz,n_az,3))
-        allocate(grid3D(n_rad*2*nz*n_az,3))
-        grid3D = 0d0
+        allocate(grid(n_rad,2*nz,n_az,3))
      else
         naxes(2)=nz
         naxes(3)=1
@@ -2030,17 +2027,15 @@ subroutine write_disk_struct(lparticle_density)
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
      do i=1, n_rad
+        jj=0
         do j=j_start,nz
            if (j==0) cycle
+           jj=jj+1
            do k=1, n_az
               icell = cell_map(i,j,k)
-              if (l3D) then
-               grid3D(icell,1) = r_grid(icell); grid3D(icell,2) = z_grid(icell)
-               grid3D(icell,3) = phi_grid(icell)
-              else
-               grid(i,j,k,1) = r_grid(icell)
-               grid(i,j,k,2) = z_grid(icell)         
-              end if
+              grid(i,jj,k,1) = r_grid(icell)
+              grid(i,jj,k,2) = z_grid(icell)
+              if (l3D) grid(i,jj,k,3) = phi_grid(icell)
            enddo
         enddo
      enddo
@@ -2052,14 +2047,10 @@ subroutine write_disk_struct(lparticle_density)
      call ftpkys(unit,'UNIT',"AU",' ',status)
      call ftpkys(unit,'DIM_1',"cylindrical radius",' ',status)
      call ftpkys(unit,'DIM_2',"elevation above midplane",' ',status)
+     if (l3D) call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
 
      ! le d signifie real*8
-     if (l3D) then
-      call ftpkys(unit,'DIM_3',"azimuth [rad]",' ',status)
-      call ftpprd(unit,group,fpixel,nelements,grid3D,status)
-     else
-      call ftpprd(unit,group,fpixel,nelements,grid,status)
-     end if
+     call ftpprd(unit,group,fpixel,nelements,grid,status)
   endif ! lVoronoi
 
   !  Close the file and free the unit number.
@@ -2307,7 +2298,7 @@ subroutine ecriture_UV_field()
   if (l3D) then
      naxis=3
      naxes(1)=n_rad
-     naxes(2)=2*nz+1
+     naxes(2)=2*nz
      naxes(3)=n_az
      nelements=naxes(1)*naxes(2)*naxes(3)
   else
@@ -2554,7 +2545,7 @@ subroutine ecriture_temperature(iTemperature)
            naxis=4
            naxes(1)=n_grains_nRE
            naxes(2)=n_rad
-           naxes(3)=2*nz+1
+           naxes(3)=2*nz
            naxes(4)=n_az
            nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else
