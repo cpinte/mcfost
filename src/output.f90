@@ -2034,7 +2034,7 @@ subroutine write_disk_struct(lparticle_density)
            do k=1, n_az
               icell = cell_map(i,j,k)
               grid(i,jj,k,1) = r_grid(icell)
-              grid(i,jj,k,1) = z_grid(icell)
+              grid(i,jj,k,2) = z_grid(icell)
               if (l3D) grid(i,jj,k,3) = phi_grid(icell)
            enddo
         enddo
