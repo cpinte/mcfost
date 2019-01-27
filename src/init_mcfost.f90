@@ -1127,10 +1127,12 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
      endif
   else ! SED : we do not need pixels
+     basename_data_dir = "data_th"
      npix_x_save = npix_x ; npix_y_save = npix_y
      npix_x = 1 ; npix_y = 1
      lmono0 = .false.
   endif
+  data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   lmono = lmono0
 
   ! Discrimination type de run (image vs SED/Temp)
@@ -1147,7 +1149,6 @@ subroutine initialisation_mcfost()
         call error("thermal equilibrium cannot be calculated with only 1 wavelength!", &
              msg2="Set n_lambda to a value higher than 1 in parameter file")
      endif
-     if ((.not.lstop_after_init)) basename_data_dir = "data_th"
   endif
 
   if ((lTemp).and.(.not.(lstop_after_init))) then
@@ -1236,13 +1237,12 @@ subroutine initialisation_mcfost()
   cmd = 'date'
   call appel_syst(cmd, syst_status)
 
-
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
 
-  call save_data(para,base_para)
+  if (.not.lstop_after_init) call save_data(para,base_para)
 
   if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
