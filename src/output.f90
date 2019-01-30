@@ -1476,7 +1476,7 @@ subroutine write_disk_struct(lparticle_density)
 
   logical, intent(in) :: lparticle_density
 
-  integer :: i, j, icell
+  integer :: i, j, k, icell, jj
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
@@ -1963,38 +1963,33 @@ subroutine write_disk_struct(lparticle_density)
   else
      naxis=4
      naxes(1)=n_rad
-     naxes(2)=nz
-     naxes(3)=1
-     naxes(4)=2
-
      if (l3D) then
-        naxes(2)=2*nz+1
+        naxes(2)=2*nz
         naxes(3)=n_az
         naxes(4)=3
-
-        allocate(grid(n_rad,2*nz+1,n_az,3)) ; grid = 0.0
-        do i=1, n_rad
-           grid(i,:,:,1) = sqrt(r_lim(i) * r_lim(i-1))
-           do j=1,nz
-              grid(i,nz+1+j,:,2) = (real(j)-0.5)*delta_z(i)
-              grid(i,nz+1-j,:,2) = -(real(j)-0.5)*delta_z(i)
-           enddo
-        enddo
-
-        do i=1, n_az
-           grid(:,:,i,3) = (i-0.5)/n_az * deux_pi
-        enddo
+        allocate(grid(n_rad,2*nz,n_az,3))
      else
+        naxes(2)=nz
+        naxes(3)=1
+        naxes(4)=2
         allocate(grid(n_rad,nz,1,2))
+     endif
+     grid = 0.0
+     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-        do i=1, n_rad
-           grid(i,:,1,1) = sqrt(r_lim(i) * r_lim(i-1))
-           do j=1,nz
-              grid(i,j,1,2) = (real(j)-0.5)*delta_z(i)
+     do i=1, n_rad
+        jj=0
+        do j=j_start,nz
+           if (j==0) cycle
+           jj=jj+1
+           do k=1, n_az
+              icell = cell_map(i,j,k)
+              grid(i,jj,k,1) = r_grid(icell)
+              grid(i,jj,k,2) = z_grid(icell)
+              if (l3D) grid(i,jj,k,3) = phi_grid(icell)
            enddo
         enddo
-     endif
-     nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     enddo
 
      !  Write the required header keywords.
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -2254,7 +2249,7 @@ subroutine ecriture_UV_field()
   if (l3D) then
      naxis=3
      naxes(1)=n_rad
-     naxes(2)=2*nz+1
+     naxes(2)=2*nz
      naxes(3)=n_az
      nelements=naxes(1)*naxes(2)*naxes(3)
   else
@@ -2501,7 +2496,7 @@ subroutine ecriture_temperature(iTemperature)
            naxis=4
            naxes(1)=n_grains_nRE
            naxes(2)=n_rad
-           naxes(3)=2*nz+1
+           naxes(3)=2*nz
            naxes(4)=n_az
            nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
         else

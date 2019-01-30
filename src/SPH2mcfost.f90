@@ -69,6 +69,11 @@ contains
     endif
     write(*,*) "Done"
 
+    if (lignore_dust) then
+       ndusttypes = 0
+       if (allocated(rhodust)) deallocate(rhodust,massdust)
+    endif
+
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
     if (lscale_SPH) then
@@ -86,9 +91,7 @@ contains
     call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
     deallocate(massgas,rho)
-    if (ndusttypes > 0) then
-       deallocate(rhodust,massdust)
-    endif
+    if (allocated(rhodust)) deallocate(rhodust,massdust)
 
     return
 

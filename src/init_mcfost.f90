@@ -128,6 +128,7 @@ subroutine set_default_variables()
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_units = .false.
+  lignore_dust = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -989,6 +990,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) scale_units_factor
         i_arg = i_arg + 1
+     case("-ignore_dust")
+        i_arg = i_arg + 1
+        lignore_dust=.true.
      case default
         call display_help()
      end select
@@ -1068,14 +1072,14 @@ subroutine initialisation_mcfost()
 
      basename_data_dir = "data_dust"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data_prop(base_para)
+     call save_data_prop(para,base_para)
   endif
 
   if (ldisk_struct) then
      write(*,*) "Computation of disk structure"
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
-     call save_data_prop(base_para)
+     call save_data_prop(para,base_para)
   endif
 
   if (ln_zone) then
@@ -1128,10 +1132,12 @@ subroutine initialisation_mcfost()
         write(*,*) "It is therefore discarded here"
      endif
   else ! SED : we do not need pixels
+     basename_data_dir = "data_th"
      npix_x_save = npix_x ; npix_y_save = npix_y
      npix_x = 1 ; npix_y = 1
      lmono0 = .false.
   endif
+  data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   lmono = lmono0
 
   if (lProDiMo .and. (mcfost2ProDiMo_version == 1)) then
@@ -1167,7 +1173,6 @@ subroutine initialisation_mcfost()
         call error("thermal equilibrium cannot be calculated with only 1 wavelength!", &
              msg2="Set n_lambda to a value higher than 1 in parameter file")
      endif
-     if ((.not.lstop_after_init)) basename_data_dir = "data_th"
   endif
 
   if ((lTemp).and.(.not.(lstop_after_init))) then
@@ -1244,13 +1249,12 @@ subroutine initialisation_mcfost()
   cmd = 'date'
   call appel_syst(cmd, syst_status)
 
-
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   do imol=1, n_molecules
      data_dir2(imol) = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir2(imol))
   enddo
 
-  call save_data(base_para)
+  if (.not.lstop_after_init) call save_data(para,base_para)
 
   if ((l3D).and.(n_az==1).and.(.not.lVoronoi)) then
      write(*,*) "WARNING: using 3D version of MCFOST with a 2D grid"
@@ -1329,9 +1333,14 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
-  write(*,*) "        : -limits <limit-file> : x,y,z values used for the Voronoi tesselation"
+  write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"
   write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
   write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
+  write(*,*) "        : -ignore_dust : ignore the dust fraction in a phantom dump"
+  write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
+  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
+  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
+
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1397,14 +1406,11 @@ subroutine display_help()
   write(*,*) "        : -n_rad : overwrite value in parameter file"
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
-  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
-  write(*,*) "        : -age <age>"
-  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
@@ -1438,7 +1444,6 @@ subroutine display_help()
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
-
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
@@ -1504,9 +1509,9 @@ end subroutine display_disclaimer
 
 !********************************************************************
 
-subroutine save_data_prop(para)
+subroutine save_data_prop(para, base_para)
 
-  character(len=*), intent(in) :: para
+  character(len=*), intent(in) :: para, base_para
 
   character(len=1024) :: cmd
   integer ::  syst_status
@@ -1523,14 +1528,14 @@ subroutine save_data_prop(para)
        ! copie le fichier de parametres
        'cp '//trim(para)//' '//trim(data_dir)//" ; "// &
        ! options de la ligne de commande
-       'echo " " >>  '//trim(data_dir)//'/'//trim(para)//" ; "// &
-       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       'echo " " >>  '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
+       'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
        ! date du calcul
-       'date >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       'date >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
        ! machine de calcul
-       'uname -a >> '//trim(data_dir)//'/'//trim(para)//" ; "// &
+       'uname -a >> '//trim(data_dir)//'/'//trim(base_para)//" ; "// &
        ! id SHA
-       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(para)
+       'echo sha = '//sha_id//' >> '//trim(data_dir)//'/'//trim(base_para)
   call appel_syst(cmd,syst_status)
 
   return
@@ -1539,14 +1544,14 @@ end subroutine save_data_prop
 
 !********************************************************************
 
-subroutine save_data(para)
+subroutine save_data(para,base_para)
   !*************************************************
   ! Si le dossier data existe on le sauve
   !*************************************************
 
   implicit none
 
-  character(len=*), intent(in) :: para
+  character(len=*), intent(in) :: para, base_para
 
   integer :: syst_status
   character(len=1024) :: cmd
@@ -1619,14 +1624,14 @@ subroutine save_data(para)
              ! copie le fichier de parametres
              'cp '//trim(para)//' '//trim(local_data_dir)//" ; "// &
              ! options de la ligne de commande
-             'echo " " >>  '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
-             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             'echo " " >>  '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
+             'echo "Executed command line : '//trim(cmd_opt)//'" >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
              ! date du calcul
-             'date >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             'date >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
              ! machine de calcul
-             'uname -a >> '//trim(local_data_dir)//'/'//trim(para)//" ; "// &
+             'uname -a >> '//trim(local_data_dir)//'/'//trim(base_para)//" ; "// &
              ! id SHA
-             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(para)
+             'echo sha = '//sha_id//' >> '//trim(local_data_dir)//'/'//trim(base_para)
         ! Copie du fichier lambda si besoin
         if (lsed.and.(.not.lsed_complete).and.(.not.lmono0).and.(etape==1)) then
            cmd = trim(cmd)//' ; cp '//trim(lambda_filename)//' '//trim(local_data_dir)

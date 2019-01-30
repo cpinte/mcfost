@@ -8,6 +8,15 @@ do
     if [ $? != 0 ] ; then echo "error: $comm command not found"; exit 1; fi
 done
 
+
+du *tar.gz | while read line
+do
+   typeset -i size=$(echo $line | awk '{print $1}')
+   if (($size<1000)); then
+       git lfs pull
+   fi
+done
+
 if [ ! $# = 0 ]; then SYSTEM=$1 ; fi
 
 set +u # personalized error messages
