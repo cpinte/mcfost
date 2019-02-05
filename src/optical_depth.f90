@@ -301,7 +301,8 @@ end subroutine dust_and_mol_optical_length_tot
   !special for atomic line RT.
  ! ------------------------------------------------------------------ !
   
-  use metal, only                         : Background, BackgroundLines
+  use metal, only                         : Background, BackgroundLines,&
+  										    BackgroundLines_lambda, Backgroundcontinua
   use spectrum_type, only                 : NLTEspec, initAtomOpac
   
   integer, intent(in)                    :: id, lambda, icell
@@ -344,34 +345,32 @@ end subroutine dust_and_mol_optical_length_tot
         lmax=ltot
         return
      end if
-     
+
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, & 
                      next_cell, l, l_contrib, l_void_before)
-     
-     
-     ! Background() returns the opacity at all wavelength. But here we need
-     ! the opacity at lambda only. Is it slow to use the full wavelength
-     ! calculations and then take the opac at lambda when using the vectorized
-     ! capabilities of fortran ?
-     !
-     ! but kappa is allocated and initialised to 0 in atomic_transfer().
-     ! To do: add a case in Background to compute opac at lambda
-     ! instead of at all lambda
-     !
+
      if ((icell0<=n_cells).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-      if (NLTEspec%AtomOpac%store_opac) then !LTE continua are kept in memory
+      if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
-       CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+      !CALL BackgroundLines(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+      !CALL NLTEOPAC_lambda()
+       CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda) + &
                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
                   
       else !on the fly calculations, slow but cheap in memory
-       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+       CALL BackgroundContinua(icell) !for all wavelength 
+       !CALL NLTEOPAC()
+       !for that wavelength
+       CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+       !CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
+       !opacite = opacite + NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
       end if
      else
       opacite = 0d0 !cell is empty
@@ -390,7 +389,6 @@ end subroutine dust_and_mol_optical_length_tot
   
  RETURN
  END SUBROUTINE atom_optical_length_tot
-
 !***********************************************************
 
 subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_speed, nTrans, tab_Trans)
