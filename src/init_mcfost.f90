@@ -63,6 +63,7 @@ subroutine set_default_variables()
   lsolve_for_ne = .false.
   lstatic = .false.
   lvacuum_to_air = .false.
+  lcontrib_function = .false.
   ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -560,6 +561,9 @@ subroutine initialisation_mcfost()
      case("-store_atom_opac")
         i_arg = i_arg + 1
         lstore_opac = .true.
+     case("-contrib_function")
+        i_arg = i_arg + 1
+        lcontrib_function = .true.
      case("-solve_ne")
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
@@ -1458,6 +1462,8 @@ subroutine display_help()
   write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
+  write(*,*) "        : -contrib_function : Computes and stores the contribution function "
+  write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

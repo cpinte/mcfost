@@ -57,7 +57,8 @@ module parametres
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
   
   ! Atomic line radiative transfer
-  logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic
+  logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
+  			 lcontrib_function
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
