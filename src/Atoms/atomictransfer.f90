@@ -34,8 +34,7 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use readatmos, only				    : readatmos_1D, readPLUTO
- use simple_models, only 				: prop_law_model, uniform_law_model, &
- 										  magneto_accretion_model
+ use simple_models, only 				: magneto_accretion_model
  
  !$ use omp_lib
  
@@ -119,7 +118,7 @@ MODULE AtomicTransfer
     endif
        
     ! Test sortie ! "The ray has reach the end of the grid"
-    if (test_exit_grid(icell, x0, y0, z0)) then 
+    if (test_exit_grid(icell, x0, y0, z0)) then
      RETURN
     end if
     
@@ -127,27 +126,29 @@ MODULE AtomicTransfer
 
     ! Calcul longeur de vol et profondeur optique dans la cellule
     previous_cell = 0 ! unused, just for Voronoi
+
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-    
+
     if (.not.atmos%lcompute_atomRT(icell)) & 
          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
 
     if (lcellule_non_vide) then !count opacity only if the cell is filled, else go to next cell
-     lsubtract_avg = ((nbr_cell == 1).and.labs)
+     lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
+     
+     !write(*,*) icell, l_contrib * m_to_AU, l_contrib/Rsun
 
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     if (NLTEspec%AtomOpac%store_opac) then
+     if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
-
 
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
@@ -161,6 +162,7 @@ MODULE AtomicTransfer
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
+
       ! Epaisseur optique
       ! chi_p contains both thermal and continuum scattering extinction
       dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
@@ -174,6 +176,8 @@ MODULE AtomicTransfer
       Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
                   NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
                  (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
+                 
+                 
       ! continuum source function
       Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
@@ -192,7 +196,7 @@ MODULE AtomicTransfer
  
     if (MINVAL(NLTEspec%I(id,:,iray))<0) then
      write(*,*) "Negative Opac !"
-     if (NLTEspec%AtomOpac%store_opac) then
+     if (lstore_opac) then
       write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
        MINVAL(NLTEspec%AtomOpac%jc(icell,:))
       stop
@@ -278,9 +282,10 @@ MODULE AtomicTransfer
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
            z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
            ! On se met au bord de la grille : propagation a l'envers
+           !write(*,*) x0, y0, z0
            CALL move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
-!            write(*,*) i, j, lintersect, labs, icell, x0, y0, z0, u0, v0, w0
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+           !write(*,*) i, j, lintersect, labs, n_cells, icell
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(id,:,iray)
              I0c = I0c + NLTEspec%Ic(id,:,iray)
@@ -339,7 +344,7 @@ MODULE AtomicTransfer
   ! if only one pixel it gives the total Flux.
   ! See: emission_line_map in mol_transfer.f90
  ! -------------------------------------------------------------- !
- 
+  use getlambda, only : Nred_array, Nmid_array, Nblue_array
   integer, intent(in) :: ibin, iaz !define the direction in which the map is computed
   double precision :: x0,y0,z0,l,u,v,w
 
@@ -349,17 +354,18 @@ MODULE AtomicTransfer
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
   integer, parameter :: n_rad_RT = 100, n_phi_RT = 36
-  integer, parameter :: n_ray_star = 100 !1000
+  integer, parameter :: n_ray_star = 1000
   double precision, dimension(n_rad_RT) :: tab_r
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
-  integer :: ri_RT, phi_RT, lambda
+  integer :: ri_RT, phi_RT, lambda, lM, lR, lB, ll
   logical :: lresolved
  
-  !write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
+  write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
-  !write(*,*) "u=", u, "v=",v, "w=",w
+  !write(*,*) "u=", u*rad_to_deg, "v=",v*rad_to_deg, "w=",w*rad_to_deg, &
+  ! npix_x, npix_y, RT_line_method
 
   ! Definition des vecteurs de base du plan image dans le repere universel
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
@@ -387,7 +393,6 @@ MODULE AtomicTransfer
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
   if (RT_line_method==1) then !log pixels
-    write(*,*) " WARNING: RT_line_method==1 not working correctly with AL-RT"
     n_iter_min = 1
     n_iter_max = 1
     
@@ -444,8 +449,6 @@ MODULE AtomicTransfer
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      lresolved = .true.
-     
-     !write(*,*) taille_pix, map_size, zoom, npix_x, npix_y, RT_n_incl, RT_n_az
 
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
@@ -482,22 +485,38 @@ MODULE AtomicTransfer
      !$omp end parallel
      
   end if
- ! adding the stellar flux
-  !write(*,*) " --> adding stellar flux map..."  
-  do lambda = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-                                             !else it means that in FLUX_PIXEL_LINE, nu
-                                             !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!      write(*,*) "Stellar flux at lambda = ", NLTEspec%lambda(lambda), &
-!       stars_map(npix_x/2+1,npix_y/2+1,1)/nu, maxval(NLTEspec%Flux(lambda,:,:,ibin,iaz)), &
-!       maxval(stars_map(:,:,1))/nu
 
-   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
-                                         stars_map(:,:,1) / nu
-   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-                                         stars_map(:,:,1) / nu
+ ! We loop over transitions and add a constant stellar flux for the whole transtion.
+ !   It is faster and not so bad if the stellar spectrum if flat. So true only if it is
+ !   a black boddy or a pure continuum spectrum.
+  write(*,*) " -> Adding stellar flux"
+  do lambda = 1, NLTEspec%Ntrans
+   lM = Nmid_array(lambda)
+   lR = Nred_array(lambda)
+   lB = Nblue_array(lambda)
+   nu = c_light / NLTEspec%lambda(lM) * 1d9
+   CALL compute_stars_map(lM, u, v, w, taille_pix, dx, dy, lresolved) !W/m2
+   do ll=lB,LR
+    !nu = c_light / NLTEspec%lambda(ll) * 1d9
+    NLTEspec%Flux(ll,:,:,ibin,iaz) = NLTEspec%Flux(ll,:,:,ibin,iaz) +  & 
+                                stars_map(:,:,1) / nu !W/m2/Hz
+    NLTEspec%Fluxc(ll,:,:,ibin,iaz) = NLTEspec%Fluxc(ll,:,:,ibin,iaz) + &
+                                stars_map(:,:,1) / nu
+   end do
   end do  
+  ! Here, if the stellar flux is not flat across a transition, we have to loop over
+  ! all frequency points
+!   do lambda = 1, NLTEspec%Nwaves
+!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+!                                              !else it means that in FLUX_PIXEL_LINE, nu
+!                                              !is 1d0 (to have flux in W/m2/Hz)
+!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+! 
+!    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+!                                          stars_map(:,:,1) / nu
+!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+!                                          stars_map(:,:,1) / nu
+!   end do  
 
 
  RETURN
@@ -517,7 +536,7 @@ MODULE AtomicTransfer
 #include "sprng_f.h"
 
   integer :: atomunit = 1, nact, npass,  nat, la !atoms and wavelength
-  integer :: icell !spatial variables
+  integer :: icell, NRT_CELLS=0 !spatial variables
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "H_IONISATION"
   logical :: lwrite_waves = .false.
@@ -533,19 +552,12 @@ MODULE AtomicTransfer
 
 
 !! ----------------------- Read Model ---------------------- !!
-  !CALL uniform_law_model()
-  !CALL prop_law_model()
   CALL magneto_accretion_model()   
-
-  ! OR READ FROM MODEL (to move elsewhere) 
-  !suppose the model is in utils/Atmos/
-  !CALL readatmos_1D("Atmos/FALC_mcfost.fits.gz")
   
   write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
              " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
   write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
              " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
-  atmos%Nrays = 1 !remember, it is needed to allocate I, Ic
 
 !! --------------------------------------------------------- !!
 
@@ -553,11 +565,6 @@ MODULE AtomicTransfer
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
-  !we need atmos%v_char here for computing wavelength grid but it is known far after,
-  !except if we read velocity from a model. But we do not allow for a depth dependent
-  !frequency grid.
-  !If velocity is keplerian, vchar is the maximum value of Keplerian velocity
-
   ! if the electron density is not provided by the model or simply want to
   ! recompute it
   ! if atmos%ne given, but one want to recompute ne
@@ -576,21 +583,25 @@ MODULE AtomicTransfer
     ne_start_sol = "H_IONISATION"
    end if 
    CALL SolveElectronDensity(atmos%ne,ne_start_sol)
+   CALL writeElectron()
   end if
-  CALL writeElectron() !will be moved elsewhere
-  ! do it in the reading process
   CALL writeHydrogenDensity()  
-  Call setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
-stop
+  CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
-  CALL initSpectrum(nb_proc, 500d0,lvacuum_to_air,lwrite_waves)  !optional vacuum2air and writewavelength
-  NLTEspec%AtomOpac%store_opac = lstore_opac
+  CALL initSpectrum(nb_proc, 500d0,lvacuum_to_air,lwrite_waves)
   CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
-  if (NLTEspec%AtomOpac%store_opac) then !only Background lines and active transitions
+  if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.
                                          ! Background continua (=ETL) are kept in memory.
+   if (real(3*n_cells*NLTEspec%Nwaves)/(1024**3) < 1.) then
+    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**2), " MB of memory", &
+   	 " for Background continuum opacities."   
+   else
+    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**3), " GB of memory", &
+   	 " for Background continuum opacities."
+   end if
    !$omp parallel &
    !$omp default(none) &
    !$omp private(icell) &
@@ -605,9 +616,10 @@ stop
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
   CALL adjusting_mcfost()
-  ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ----!
-!! --------------------- NLTE--------------------------------- !!
-!! For NLTE do not forget ->
+
+  ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
+  !! --------------------- NLTE--------------------------------- !!
+  !! For NLTE do not forget ->
   !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
   ! CALL initialSol()
   ! for now initialSol() is replaced by this if loop on active atoms
@@ -639,32 +651,22 @@ stop
 ! 
 !! -------------------------------------------------------- !!
 
-
-  write(*,*) "Voronoi?",lVoronoi, " keplerian?",lkeplerian, &
-    " cylindrical?", lcylindrical_rotation, " moving?", atmos%moving
-
   write(*,*) "Computing emission flux map..."
+  !Use converged NLTEOpac
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
        CALL EMISSION_LINE_MAP(ibin,iaz)
      end do
   end do
   CALL WRITE_FLUX()
-  
-!   open(10*atomunit, file="Snu_0.dat",action="write",status="unknown")
-!   CALL initAtomOpac(1)
-!   CALL Background(1, 1, 0d0,0d0, 0d0, 0d0, 0d0,0d0, 0d0,0d0,0d0)
-!   do la=1,NLTEspec%Nwaves
-!    ! write(*,*) NLTEspec%lambda(la), (NLTEspec%AtomOpac%eta_p(1,la)) / (NLTEspec%AtomOpac%chi_p(1,la)) 
-!    write(10*atomunit,*) NLTEspec%lambda(la), (NLTEspec%AtomOpac%eta_p(1,la)) / & 
-!     (NLTEspec%AtomOpac%chi_p(1,la)) 
-!   end do
-!   close(10*atomunit)
+
 
  ! Transfer ends, save data, free some space and leave
+ !should be closed after reading ? no if we do not save the C matrix in each cells
  do nact=1,atmos%Nactiveatoms
   CALL closeCollisionFile(atmos%ActiveAtoms(nact)) !if opened
  end do
+ !CALL WRITEATOM()
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()  
  deallocate(ds)
@@ -676,7 +678,7 @@ stop
  SUBROUTINE adjusting_mcfost()
   !--> should move them to init_atomic_atmos ? or elsewhere
   !need to be deallocated at the end of molecule RT or its okey ?`
-  integer :: icell, la
+  integer :: la
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
@@ -702,41 +704,18 @@ stop
   ! computes stellar flux at the new wavelength points
   CALL deallocate_stellar_spectra()
   if (allocated(kappa)) deallocate(kappa) !do not use it anymore
-!   allocate(kappa(n_cells,n_lambda))
-!   kappa = 0.0 !Important to init !!
-!   !kappa will be computed on the fly in  optical_length_tot()
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
   ! Velocity field in  m.s-1
-  if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
-  !lkeplerian = .false.
-  !linfall = .false.
-  Vfield=0d0!
-  if (atmos%moving) then
-   if (lkeplerian) then
-    ! Warning : assume all stars are at the center of the disk
-    if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
-     if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-        do icell=1, n_cells
-           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-        end do
-     else ! dependance en z
-        do icell=1, n_cells
-           vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-        end do
-     end if
-    end if
-   else !linfall=.true.
-    Vfield = atmos%Vmap
-!      write(*,*) linfall, atmos%velocity_law, MAXVAL(Vfield)
-!      stop
-   end if
-   if (allocated(atmos%Vmap)) deallocate(atmos%Vmap)   !free Vmap here because we do not use it	
-  else
-   deallocate(Vfield)						! allocated only if moving
-  end if 
+  if (allocated(Vfield)) write(*,*) "Vfield already exists"
+  if (allocated(Vfield)) deallocate(Vfield) !for security ?
+  !but if lstatic we do not allocate it.
+  if (.not.allocated(Vfield).and..not.lstatic) allocate(Vfield(n_cells))
+  if (.not.lstatic) then
+   Vfield=atmos%V!
+   deallocate(atmos%V)
+  end if
 
  RETURN
  END SUBROUTINE adjusting_mcfost

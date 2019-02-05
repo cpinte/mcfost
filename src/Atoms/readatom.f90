@@ -142,28 +142,12 @@ MODULE readatom
     allocate(atom%ntotal(atmos%Nspace))
     allocate(atom%vbroad(atmos%Nspace))
     vtherm = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
-    !which is faster?
+
     atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
     atom%ntotal = atom%Abund * atmos%nHtot
 !     write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
-!                         " minVD(km/s)=", minval(atom%vbroad)/1d3
-    !!!$omp parallel &
-    !!!$omp default(none) &
-    !!!$omp private(k) &
-    !!!$omp shared(atmos,atom,vtherm)
-    !!!$omp do
-!     do k=1,atmos%Nspace
-!      atom%ntotal(k) = atom%Abund * atmos%nHtot(k)
-!      !write (*,*) "Total populations for atom ",atom%ID,":",atom%ntotal(k)
-!      atom%vbroad(k) = dsqrt(vtherm*atmos%T(k) + atmos%vturb(k)**2) !vturb in m/s
-!      !write(*,*) atom%ID, atom%vbroad(k), vtherm, atmos%T(k), atmos%vturb(k)
-!     !however, in 3D we do not use micro turbulence
-!     ! all the essence of turbulence is in the MHD
-!     ! velocity
-!     end do
-   !!!$omp end do
-   !!!$omp  end parallel
-  
+!                          " minVD(km/s)=", minval(atom%vbroad,mask=atom%vbroad>0)/1d3
+!   
     !! DO NOT USE i as a loop index here !!
 
     !Now read all bound-bound transitions
@@ -462,7 +446,6 @@ MODULE readatom
        ! %lambda allocated inside the routines.
        ! %alpha not needed in this case.
        CALL make_sub_wavelength_grid_cont(atom%continua(kr), lambdamin)
-       !!!CALL getLambdaCont(atom%continua(kr), lambdamin)
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
      else
@@ -494,13 +477,11 @@ MODULE readatom
     ! each line
     !Unlike RH, I do it even for passive atoms
   do kr=1,atom%Nline !line%lambda allocated inside
-     !!!CALL getLambdaLine(atom%lines(kr)) !Nlambda from file
      !-> Actually with this grid, all lines of an atom have the same grid
-     !because it depends only on vD and v_char which depends on the atom and the model.
+     !because it depends only on vD and v_char which depends on the atom and on the model.
      !This is because the Number of core/wing points are fixed.
-     CALL make_sub_wavelength_grid_line(atom%lines(kr), MAXVAL(atom%vbroad)) !Maximum Thermal width
-     																	!used to sample line profile
-     																	!in frequencies.
+     CALL make_sub_wavelength_grid_line(atom%lines(kr), &
+                                        minval(atom%vbroad,mask=atom%vbroad>0)) !MAXVAL(atom%vbroad)
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.

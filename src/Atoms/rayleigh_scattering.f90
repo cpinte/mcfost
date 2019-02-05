@@ -4,14 +4,44 @@ MODULE rayleigh_scattering
  use atmos_type, only      : atmos
  use spectrum_type, only   : NLTEspec
  use constant
- use math, only            : dpow, SQ
 
  IMPLICIT NONE
 
  double precision, parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
 
  CONTAINS
+ 
+ SUBROUTINE HRayleigh(icell, atom, scatt)
+ ! ------------------------------------------------------------- !
+  ! Rayleigh scattering on neutral Hydrogen.
+  ! Baschek & Scholz 1982
 
+ ! ------------------------------------------------------------- !
+  type (AtomType), intent(in)                               :: atom
+  integer, intent(in)                                       :: icell
+  double precision, dimension(NLTEspec%Nwaves), intent(out) :: scatt
+  double precision, dimension(NLTEspec%Nwaves)              :: lambda
+  double precision 											:: lambda_limit, sigma_e
+  
+  scatt = 0d0
+  if (atom%ID /= "H") RETURN
+  
+  lambda_limit = 121.6d0
+  
+  sigma_e = 8.0*PI/3.0 * &
+         (Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
+         (dsqrt(M_ELECTRON)*CLIGHT)))**4.d0
+         
+  lambda = NLTEspec%lambda
+  where(NLTEspec%lambda >= lambda_limit)
+   scatt = (1d0 + (1566d0/lambda)**2.d0 + (1484.d0/lambda)**4d0)*(966.d0/lambda)**4d0
+  end where
+
+  scatt = scatt * sigma_e * atom%n(icell,1) !m^-1
+   
+ RETURN
+ END SUBROUTINE HRayleigh
+ 
  FUNCTION Rayleigh(icell, atom, scatt) result(res)
  ! ------------------------------------------------------------- !
   ! Rayleigh scattering by transitions from the ground state of
@@ -28,11 +58,12 @@ MODULE rayleigh_scattering
   !
   ! Return scattering cross-section for all wavelengths
  ! ------------------------------------------------------------- !
+  use math, only            								 : dpow
   type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell
   logical                                                   :: res
   double precision, dimension(NLTEspec%Nwaves), intent(out) :: scatt
-  integer                                                   :: kr, k
+  integer                                                   :: kr, k, la
   double precision                                          :: lambda_red, lambda_limit, &
    															   sigma_e
   double precision, dimension(NLTEspec%Nwaves) 				:: fomega, lambda2
@@ -48,35 +79,37 @@ MODULE rayleigh_scattering
 
   if (atom%stage(1) /= 0) then
    write(*,*) "Lowest level of atom is not a neutral stage"
-   write(*,*) "Not computing rayleigh for this atom"
+   write(*,*) "Not computing rayleigh for this atom", atom%ID
    res = .false.
    RETURN
   end if
   
  !   find lambda_red, the longest wavelength covered by the
  !   transition less than lambda for this atom.
-  if (atom%Nline > 0) then
    do kr=1,atom%Nline
-    lambda_red = atom%lines(kr)%lambda(atom%lines(kr)%Nred) !reddest wavelength including
+    ! BEWARE: a line expands from Nblue to Nred but the reddest wavelength
+    ! is line%lambda(Nlambda) = NLTEspec%lambda(Nred) by construction.
+    !In getlambda.f90, a new grid is constructed and lambda(Nlambda) might not
+    !exist anymore..
+    if (atom%lines(kr)%i == 1) then
+     lambda_red = NLTEspec%lambda(atom%lines(kr)%Nred) !reddest wavelength including
     														!velocity shifts.
-    lambda_limit = min(lambda_limit, lambda_red)
+     lambda_limit = min(lambda_limit, lambda_red)
+    end if
    end do
-  else
-   res = .false.
-   RETURN
-  end if
-  
   fomega = 0.0
+  lambda2 = 0d0
 
-  do kr=1,atom%Nline
-   lambda_red = atom%lines(kr)%lambda(atom%lines(kr)%Nred)
-   if (atom%lines(kr)%i.eq.1) then
+ do kr=1,atom%Nline
+  lambda_red =  NLTEspec%lambda(atom%lines(kr)%Nred)
+   if (atom%lines(kr)%i == 1) then
     where((NLTEspec%lambda > lambda_limit).and.(NLTEspec%lambda > lambda_red))
      lambda2 = 1./((NLTEspec%lambda/atom%lines(kr)%lambda0)**2 -1.)
      fomega = fomega + (lambda2)**2 *atom%lines(kr)%fosc
     end where
    end if 
-  end do
+ end do
+
   scatt = sigma_e * fomega * atom%n(1,icell) !m^-1 = m^2 * m^-3
   
   if ((MAXVAL(scatt).gt.0)) then

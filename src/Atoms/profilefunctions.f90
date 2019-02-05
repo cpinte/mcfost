@@ -7,6 +7,8 @@ MODULE ProfileFunctions
  use zeeman, only : ZeemanMultiplet
  use constant
 
+ use parametres
+  
  IMPLICIT NONE
 
  ! temporaire, la grille de vitesse de MCFOST
@@ -51,7 +53,7 @@ MODULE ProfileFunctions
   end do
   end if
 
-  if (.not.atmos%moving .or. .not.atmos%magnetized) angle_dep=.false.
+  if (lstatic .or. .not.atmos%magnetized) angle_dep=.false.
   ! even in the (rare) case of angle independent (angle_dep=.false.)
   ! their will be no big differences in the line profile, mainly because
   ! short char and MC methods do not act in the same way.

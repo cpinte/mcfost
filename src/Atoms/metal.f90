@@ -26,6 +26,7 @@ MODULE metal
  ! MCFOST's original
  use mcfost_env, only : dp
  use molecular_emission, only		 : v_proj
+ use parametres
 
  IMPLICIT NONE
 
@@ -43,7 +44,6 @@ MODULE metal
   integer, intent(in)							            :: icell
   logical 										            :: obtained_n
   integer                                                   :: m, kr, i, j, Z, nc
-! integer, dimension(:), allocatable                        :: iLam
   type (AtomType)                                           :: metal
   type (AtomicContinuum)                                    :: continuum
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: eta, chi
@@ -53,7 +53,6 @@ MODULE metal
   double precision, dimension(1) 							:: gbf_0, uu0
   double precision, dimension(NLTEspec%Nwaves)              :: twohnu3_c2, gijk, hc_kla,&
                                                                expla, alpha_la
-
    obtained_n = .false. !true if the routine to read principal quantum number is fine
 
    twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
@@ -77,19 +76,11 @@ MODULE metal
   ! wavelength min (frequency max). See Hydrogen b-f for more
   ! informations, and Hubeny & Mihalas chap. 7
 
-  ! m=2 because we avoid Hydrogen =)
-  !do m=2,atmos%Natom
+
   do m=1,atmos%Npassiveatoms
   ! run over all passive atoms
    metal = atmos%PassiveAtoms(m)!atmos%Atoms(m)
    if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
-   !if (metal%active) CYCLE ! go to next passive metal
-   !if loc(%n)=loc(%nstar) pure ETL, or if associated(%n,%nstar)
-   !else NLTEpops read from previous run for actual passive metal
-   ! I use atom%n(level,icell) !if NLTE pops exist for this atom, atom%n != atom%nstar
-   ! else atom%n = atom%nstar.
-   !write(*,*) loc(metal%n), loc(metal%nstar), &
-   !                  associated(metal%n,metal%nstar)
 
     do kr=1,metal%Ncont
      continuum = metal%continua(kr)
@@ -109,9 +100,6 @@ MODULE metal
        CYCLE
     end if
 
-!      allocate(iLam(continuum%Nlambda))
-!      iLam = (/ (nc, nc=continuum%Nblue, continuum%Nblue+continuum%Nlambda-1) /) !from Nblue to Nblue + Nlambda
-
      Z = metal%stage(i) + 1
      !! Only for Hydrogen n_eff = dsqrt(metal%g(i)/2.)
      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
@@ -124,8 +112,7 @@ MODULE metal
      uu = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * NLTEspec%lambda)
      uu0 = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * lambdaEdge)
      if (.not.continuum%Hydrogenic) then
-!        CALL bezier3_interp(continuum%Nlambda,continuum%lambda,continuum%alpha, &
-!              continuum%Nlambda,  NLTEspec%lambda(ilam), alpha_la(ilam)
+
        CALL bezier3_interp(continuum%Nlambda,&
                            continuum%lambda, &
                            continuum%alpha,  & !Now the interpolation grid
@@ -142,14 +129,6 @@ MODULE metal
          ! therefore we scale wrt the lambdaEdge
          ! alpha_la(lambda=lambdaEdge)=alpha0 (containing
          ! already the gaunt factor !! and factor 1/Z^2)
-
-!         uu(iLam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(iLam)) /(Z*Z * E_RYDBERG)
-!         gbf(iLam) = Gaunt_bf(continuum%Nlambda, uu, n_eff)
-!         alpha_la(iLam) = gbf(iLam) * &
-!                 continuum%alpha0*((NLTEspec%lambda(iLam)/lambdaEdge)**3)*n_eff/gbf_0(1)
-!         uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) = &
-!          uu(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1) / &
-!           NLTEspec%lambda(continuum%Nblue:continuum%Nblue+continuum%Nlambda-1)
            
         gbf(continuum%Nblue:continuum%Nred) = Gaunt_bf(continuum%Nlambda, &
           uu(continuum%Nblue:continuum%Nred), n_eff)
@@ -159,9 +138,7 @@ MODULE metal
            n_eff/gbf_0(1)
 
      end if !continuum type
-!      gijk(iLam) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(iLam)
-!      chi(iLam) = chi(iLam) + alpha_la(iLam) * (1.-expla(iLam))*metal%n(i,icell)
-!      eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * alpha_la(iLam)*metal%n(j,icell)
+     
      gijk(continuum%Nblue:continuum%Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * &
        expla(continuum%Nblue:continuum%Nred)
      chi(continuum%Nblue:continuum%Nred) = chi(continuum%Nblue:continuum%Nred) + &
@@ -171,7 +148,7 @@ MODULE metal
      eta(continuum%Nblue:continuum%Nred) = eta(continuum%Nblue:continuum%Nred) + &
        twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
          alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
-!     deallocate(iLam)
+
     end do ! loop over Ncont
   end do !loop over metals
 
@@ -195,13 +172,12 @@ MODULE metal
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
-!  integer, dimension(:), allocatable 			            :: iLam
   double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phiPol, phip, &
  															   Vij, vv
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 100
+  integer, parameter										:: NvspaceMax = 80
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -221,7 +197,7 @@ MODULE metal
   ! v_proj in m/s at point icell
   omegav = 0d0
   Nvspace = 1
-  if (atmos%moving) then
+  if (.not.lstatic) then
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
@@ -233,20 +209,14 @@ MODULE metal
    !! Magneto-optical elements (f, and r, LL04)
   end if
 
-  !do m=1,atmos%Natom ! go over all atoms
   do m=1,atmos%Npassiveatoms
-   atom = atmos%PassiveAtoms(m)!atmos%Atoms(m)
-   !if (atom%active) CYCLE ! go to next passive atom
+   atom = atmos%PassiveAtoms(m)
    
     !velocity projected along a path between one border of the cell to the other
-    if (atmos%moving .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
+    if (.not.lstatic .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
-!      if (Nvspace > NvspaceMax) then
-!       write(*,*) "Warning: Nvspace greater than NvspaceMax", Nvspace, NvspaceMax
-!       write(*,*) icell, NvspaceMax, Nvspace, atom%ID, atom%vbroad(icell)
-!      end if
      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
      omegav(Nvspace) = v1
      do nv=2,Nvspace-1
@@ -275,12 +245,6 @@ MODULE metal
 !       CYCLE
 !     end if
 
-     ! using directly line%Nblue:line%Nblue+line%Nlambda-1 instead of iLam
-     ! could save time, because for each line we allocate/deallocate iLam.
-     ! just for a more readable code, which is not negligible at all.
-!      allocate(iLam(line%Nlambda))
-!      iLam = (/ (nc, nc=line%Nblue, line%Nblue+line%Nlambda-1) /)
-
      phi = 0d0
      phip = 0d0
      phiPol = 0d0
@@ -295,18 +259,13 @@ MODULE metal
       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
       CALL Damping(icell, atom, kr, line%adamp)
        ! init for this line of this atom accounting for Velocity fields
-       do nv=1, Nvspace !one iteration if 1) No velocity fields or .not.atmos%moving
+       do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used
         vvoigt(line%Nblue:line%Nred) = vv(line%Nblue:line%Nred) - &
                                        omegav(nv) / atom%vbroad(icell)
-!        phi(iLam) = phi(ilam) + & 
-!                    Voigt(line%Nlambda, line%adamp, vvoigt(iLam), phip, VoigtMethod) / Nvspace
         phi(line%Nblue:line%Nred) = phi(line%Nblue:line%Nred) + &
             Voigt(line%Nlambda, line%adamp,vvoigt(line%Nblue:line%Nred), &
                   phip, VoigtMethod) / Nvspace !1 if no vel or Voronoi
-                !phip is on the whole grid, you take indexes after. Otherwise the function
-                !Voigt will return an error
-!       phiPol(iLam) = phiPol(ilam) + phip(iLam) / Nvspace
 !       phiPol(line%Nblue:line%Nred) = phiPol(line%Nblue:line%Nred) + &
 !              phip(line%Nblue:line%Nred) + Nvspace
       end do
@@ -344,6 +303,119 @@ MODULE metal
 
  RETURN
  END SUBROUTINE Metal_bb
+
+ SUBROUTINE Metal_bb_lambda (la, icell,x,y,z,x1,y1,z1,u,v,w,l,chi, eta, chip)
+  integer 													:: kr, m, i, j, NrecStokes
+  integer, intent(in) 							            :: icell, la
+  double precision, intent(in) 					            :: x,y,z,u,v,w,& 
+                                				               x1,y1,z1,l
+  character(len=20)							                :: VoigtMethod = "HUMLICEK"
+  double precision, dimension(1)                            :: phi, vvoigt, phiPol, phip, &
+ 															   Vij, vv
+  double precision, intent(out), dimension(1)               :: chi, eta, chip
+  double precision 											:: twohnu3_c2, hc, fourPI, &
+      														   hc_4PI, gij
+  integer, parameter										:: NvspaceMax = 80
+  double precision, dimension(NvspaceMax)					:: omegav
+  integer													:: Nvspace, nv
+  double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
+  															   v0, v1, dv
+  type (AtomicLine)										    :: line
+  type (AtomType)											:: atom
+
+  hc = HPLANCK * CLIGHT
+  fourPI = 4.*PI
+  hc_4PI = hc/fourPI
+
+  !NrecStokes = 1 in unpolarised transfer and 4 in Stokes tranfer (I,Q,U,V)
+  chi = 0d0  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
+  eta = 0d0  !NrecStokes per cell at each wavelength: Nspec sized in unpolarised
+  chip = 0d0 !NrecStokes-1 per cell at each wavelength = Nsize=(NrecStokes-1)*Nwavelength
+
+  ! v_proj in m/s at point icell
+  omegav = 0d0
+  Nvspace = 1
+  if (.not.lstatic) then
+   v0 = v_proj(icell,x,y,z,u,v,w)
+   omegav(1) = v0
+   !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
+   if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
+  end if
+
+  if (atmos%magnetized) then
+  !change static to dynamic allocation for chi, eta because it is NrecStokes sized
+   !! Magneto-optical elements (f, and r, LL04)
+  end if
+
+  !do m=1,atmos%Natom ! go over all atoms
+  do m=1,atmos%Npassiveatoms
+   atom = atmos%PassiveAtoms(m)!atmos%Atoms(m)
+   !if (atom%active) CYCLE ! go to next passive atom
+   
+    !velocity projected along a path between one border of the cell to the other
+    if (.not.lstatic .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = dabs(v1-v0) 
+     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
+     omegav(Nvspace) = v1
+     do nv=2,Nvspace-1
+      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+      xphi=x+delta_vol_phi*u
+      yphi=y+delta_vol_phi*v
+      zphi=z+delta_vol_phi*w
+      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+     end do 
+    end if
+
+    do kr=1,atom%Nline ! for this atom go over all transitions
+                       ! bound-bound
+     line = atom%lines(kr)
+     i = line%i
+     j = line%j
+
+     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
+
+     phi = 0d0
+     phip = 0d0
+     phiPol = 0d0
+     ! line dependent only
+     vv(1) = (NLTEspec%lambda(la)-line%lambda0) * &
+           CLIGHT / (line%lambda0 * atom%vbroad(icell))
+
+     gij = line%Bji / line%Bij
+     twohnu3_c2 = line%Aji / line%Bji
+     
+     if (abs(vv(1)) > 5000d3) CYCLE
+     !if we are very far from the line, here 5000d3 m/s
+     !we do not need to cound the opacity of this line.
+     
+     if (line%voigt) then
+      !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
+      CALL Damping(icell, atom, kr, line%adamp)
+       ! init for this line of this atom accounting for Velocity fields
+       do nv=1, Nvspace 
+        vvoigt(1) = vv(1) -  omegav(nv) / atom%vbroad(icell)
+
+        phi = phi + Voigt(1, line%adamp,vvoigt,phip, VoigtMethod) / Nvspace 
+      end do
+     else !Gaussian
+      do nv=1, Nvspace
+        vvoigt(1) = vv(1) - omegav(nv) / atom%vbroad(icell)
+       phi(1) = phi(1) + dexp(-(vvoigt(1))**2) / Nvspace
+      end do
+     end if !line%voigt
+    
+     
+     Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * atom%vbroad(icell))
+     chi(1) = chi(1) + Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
+     eta(1) = eta(1) + twohnu3_c2 * gij * Vij(1) * atom%n(j,icell)
+
+    end do !end loop on lines for this atom
+  end do !end loop over Natom
+
+ RETURN
+ END SUBROUTINE Metal_bb_lambda
  
  SUBROUTINE BackgroundContinua (icell)
   integer, intent(in) :: icell
@@ -414,6 +486,26 @@ MODULE metal
 
  RETURN
  END SUBROUTINE BackgroundLines
+ 
+ SUBROUTINE BackgroundLines_lambda(la, id,icell,x,y,z,x1,y1,z1,u,v,w,l)
+  integer, intent(in) :: icell, id, la
+  double precision, intent(in) :: x, y, z, u, v, w, &
+                                  x1, y1, z1, l
+  double precision, dimension(1) :: chi, eta, sca, chip
+
+  if (.not.atmos%lcompute_atomRT(icell)) RETURN 
+
+   chi = 0d0
+   eta = 0d0
+   sca = 0d0
+   chip = 0d0
+
+   if (atmos%Npassiveatoms == 0) RETURN
+   CALL Metal_bb_lambda(la, icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
+   NLTEspec%AtomOpac%chi_p(id,la) = chi(1)
+   NLTEspec%AtomOpac%eta_p(id,la) = eta(1)
+ RETURN
+ END SUBROUTINE BackgroundLines_lambda
 
  SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer, intent(in) :: icell, id

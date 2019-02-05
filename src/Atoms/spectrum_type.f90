@@ -2,11 +2,12 @@ MODULE spectrum_type
 
   use atom_type
   use atmos_type, only : GridType
-  use getlambda, only : make_wavelength_grid
+  use getlambda, only : make_wavelength_grid, Nred_array, Nmid_array, Nblue_array
   
   !MCFOST's original modules
   use fits_utils, only : print_error
   use utils, only : spanl, span
+  use parametres
 
   IMPLICIT NONE
 
@@ -29,7 +30,6 @@ MODULE spectrum_type
 !   END TYPE ActiveSetType
   
   TYPE AtomicOpacity
-   logical :: store_opac=.false.
    !active opacities
    double precision, allocatable, dimension(:,:) :: chi, eta, rho
    !passive opacities
@@ -45,11 +45,14 @@ MODULE spectrum_type
    integer :: Nwaves, Nact, NPROC, Ntrans
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
-   !nproc, nlambda, ncells
+   !nproc, nlambda, nrays
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nproc, nlambda
    double precision, allocatable, dimension(:,:) :: J, J20, Jc
+   !Nlambda, xpix, ypix, Nincl, Naz
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
+   !Contribution function
+   double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -80,10 +83,6 @@ MODULE spectrum_type
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    CALL writeWavelength()
-   
-!    !!store lambda0 of each transitions and indexes.
-!    allocate(NLTEspec%RedWing(NLTEspec%Ntrans), NLTEspec%BlueWing(NLTEspec%Ntrans))
-!    allocate(NLTEspec%TransLambda0(NLTEspec%Ntrans))
   
   RETURN
   END SUBROUTINE initSpectrum
@@ -129,7 +128,7 @@ MODULE spectrum_type
    NLTEspec%Fluxc = 0.0
    
    !Now opacities
-   if (NLTEspec%AtomOpac%store_opac) then !keep continuum LTE opacities in memory
+   if (lstore_opac) then !keep continuum LTE opacities in memory
      !sca_c = Kc(:,:,2), chi_c = Kc(:,:,1), eta_c = jc
      allocate(NLTEspec%AtomOpac%Kc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,2), &
        NLTEspec%AtomOpac%jc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves))
@@ -157,11 +156,17 @@ MODULE spectrum_type
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
+   
+   !Contribution function
+   if (lcontrib_function) then
+    allocate(NLTEspec%Ksi(NLTEspec%Ntrans, NLTEspec%atmos%Nspace, NLTEspec%Nwaves))
+    NLTEspec%Ksi = 0d0
+   end if
 
   RETURN
   END SUBROUTINE allocSpectrum
 
-  SUBROUTINE freeSpectrum()
+  SUBROUTINE freeSpectrum()   
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
@@ -176,7 +181,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%eta_p) !contains only passive lines if store_opac
    deallocate(NLTEspec%AtomOpac%chi_p)
    !deallocate(NLTEspec%AtomOpac%rho_p)
-   if (NLTEspec%AtomOpac%store_opac) then !keep continuum LTE opacities in memory
+   if (lstore_opac) then !keep continuum LTE opacities in memory
      deallocate(NLTEspec%AtomOpac%Kc,  NLTEspec%AtomOpac%jc)
    else !they are not allocated if we store background continua on ram
     deallocate(NLTEspec%AtomOpac%eta_c)
@@ -184,6 +189,8 @@ MODULE spectrum_type
     deallocate(NLTEspec%AtomOpac%sca_c)
    end if
    NULLIFY(NLTEspec%atmos)
+   
+   deallocate(Nblue_array, Nmid_array, Nred_array)
   RETURN
   END SUBROUTINE freeSpectrum
 
@@ -198,7 +205,7 @@ MODULE spectrum_type
 
     NLTEspec%AtomOpac%chi(id,:) = 0d0
     NLTEspec%AtomOpac%eta(id,:) = 0d0
-    if (.not.NLTEspec%AtomOpac%store_opac) then
+    if (.not.lstore_opac) then
       NLTEspec%AtomOpac%chi_c(id,:) = 0d0
       NLTEspec%AtomOpac%eta_c(id,:) = 0d0
       NLTEspec%AtomOpac%sca_c(id,:) = 0d0
@@ -291,10 +298,10 @@ MODULE spectrum_type
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
   if (l_sym_ima) then 
+   write(*,*) "Check symmetries with RT methods"
    if (RT_line_method==1) then ! what should I do in my case ?
-    write(*,*) 'RT_line_method == 1, not valid yet'
-    write(*,*) 'Change symmetries'
-    stop
+    write(*,*) 'RT1 symmetry?'
+    
    else if (RT_line_method == 2) then !/= 1, ??
     xcenter = npix_x/2 + modulo(npix_x,2) 
     if (.not.lstatic) then !due to velocity the lines could be asym even if the model is sym
@@ -302,22 +309,29 @@ MODULE spectrum_type
     					   ! of the final image
      if (lkeplerian) then !line profile reversed
       do i=xcenter+1,npix_x
-       do m=1,NLTEspec%atmos%Natom
-        !!lines are sensitive to symmetry
-        do kr=1,NLTEspec%atmos%Atoms(m)%Nline
-         Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
-         Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-         Nmid = NLTEspec%atmos%Atoms(m)%lines(kr)%Nmid
-         !Keplerian rotation inverses profile slope
-         NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
-        end do 
-        !!continua are not sensitive to symmetry right ?
-        do kc=1,NLTEspec%atmos%Atoms(m)%Ncont
-         Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
-         Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-         NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-        end do
-       end do !atom    
+!        do m=1,NLTEspec%atmos%Natom
+!         !!lines are sensitive to symmetry
+!         do kr=1,NLTEspec%atmos%Atoms(m)%Nline
+!          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
+!          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
+!          Nmid = NLTEspec%atmos%Atoms(m)%lines(kr)%Nmid
+!          !Keplerian rotation inverses profile slope
+!          NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
+!         end do 
+!         !!continua are not sensitive to symmetry right ?
+!         do kc=1,NLTEspec%atmos%Atoms(m)%Ncont
+!          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
+!          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
+!          NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+!         end do
+!        end do !atom  
+       write(*,*) "RT2 symmetry ? "
+       do m=1,NLTEspec%Ntrans
+        Nred = Nred_array(m)
+        Nblue = Nblue_array(m)
+        Nmid = Nmid_array(m)
+        NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
+       end do  
       end do !pix
      else ! not keplerian (infall or expansion)
       do i=xcenter+1,npix_x

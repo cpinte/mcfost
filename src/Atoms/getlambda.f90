@@ -4,7 +4,11 @@ MODULE getlambda
   use atmos_type, only : atmos
   use constant
   
+  use parametres
+  
   IMPLICIT NONE
+  
+  double precision, dimension(:), allocatable :: Nred_array, Nblue_array, Nmid_array
 
   CONTAINS
   
@@ -19,7 +23,7 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 25
+   integer, parameter :: Nlambda = 31
    integer :: la
    double precision :: l0, l1
 
@@ -51,16 +55,19 @@ MODULE getlambda
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: core_to_wing=7d0, L=100d0
-   integer, parameter :: Nc = 101, Nw = 11 !ntotal = 2*(Nc + Nw - 1)
+   double precision, parameter :: L=50d0, core_to_wing = 0.51
+   integer, parameter :: Nc = 31, Nw = 5 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(5*(Nc+Nw)) :: vel
    
-   v_char = L * (atmos%v_char + vD)
+   v_char = L * (atmos%v_char + vD) !=maximum extension of a line
+   !atmos%v_char is minimum of atmos%V and vD is minimum of atom%vbroad presently
    v0 = -v_char
    v1 = +v_char
    vel = 0d0
-   vcore = 2d0 * core_to_wing * v_char /L !converge to 2/L*core_to_wing*vD in case of static atm.
-   
+   !transition between wing and core in velocity
+   vcore = v_char * core_to_wing ! == fraction of line extent
+   !if (lstatic) vcore = (vD + atmos%v_char) * 10.
+
    !from -v_char to 0
    dvw = (v_char-vcore)/(Nw-1)
    dvc = vcore/(Nc-1)
@@ -85,7 +92,7 @@ MODULE getlambda
    end do
    if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
    if (vel(Nw+Nc-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
-!stop
+
   !number of points from -vchar to 0 is Nw+Nc-1, -1 because otherwise we count
   ! 2 times vcore which is shared by the wing (upper boundary) and core (lower boundary) grid.
   ! Total number of points is 2*(Nw+Nc-1) but here we count 2 times lambda0., therefore
@@ -101,11 +108,10 @@ MODULE getlambda
 
    if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
    
-!    write(*,*) 1, line%lambda(1)
-!    do la=2,Nlambda
+!    do la=1,Nlambda
 !     write(*,*) la, line%lambda(la), line%lambda0
 !    end do
-!    stop
+
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line
   
@@ -177,191 +183,6 @@ MODULE getlambda
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_asymm
 
-  SUBROUTINE getLambdaCont(continuum, lambdamin)
-   type (AtomicContinuum), intent(inout) :: continuum
-   double precision, intent(in) :: lambdamin
-   integer :: la, Nlambda
-   double precision :: dlambda
-   ! from lambdamin to lambdaEdge or lambda ionisation
-   ! or from maximum frequency to frequency threshold.
-
-   ! Nlambda set in the atomic file
-   allocate(continuum%lambda(continuum%Nlambda))
-   !allocate(continuum%alpha(continuum%Nlambda))   !not used in this case
-   
-   Nlambda =  continuum%Nlambda
-   dlambda = (continuum%lambda0 - lambdamin) / (Nlambda-1)
-   continuum%lambda(1) = lambdamin
-   do la=2,Nlambda
-    continuum%lambda(la) = continuum%lambda(la-1) + dlambda
-   end do
-
-  RETURN
-  END SUBROUTINE getLambdaCont
-  
-  SUBROUTINE getLambdaLine(line)
-  use math, only : SQ, CUBE, locate, sort
-  ! Adapted from RH H. Uitenbroek
-  ! Nlambda, qcore and qwing read from file.
-  ! --- Construct a wavelength grid that is approximately equidistant
-  !in the core (q <= qcore) and equidistant in log(q) in the wings
-  !(qcore < q <= qwing).
-  !
-  !Look for a function of the form: q[n] = a*(n + (exp(b*n)-1));
-  !n=0, N-1 satisfying the following conditions:
-  !
-  ! -- q[0]   = 0          (this is true for all a and b)
-  ! -- q[(N-1)/2] = qcore
-  ! -- q[N-1] = qwing
-   type (AtomicLine), intent(inout) :: line
-   integer :: la, n, Nlambda, NB=0, Nmid
-   real(8) :: beta, a, b, y, q_to_lambda, qB_char, qB_shift,dlambda
-   real(8), dimension(:), allocatable :: q
-   real(8) :: g_lande_eff, lambda0
-
-   if ((line%qcore.le.0.).or.(line%qwing.le.0.)) then
-    write(*,*) "Either qcore or qwing <= 0, for line ", &
-        line%j,"->",line%i
-    write(*,*) "exiting..."
-    stop
-   end if
-   
-   !write(*,*) line%j, "->", line%i, line%qcore, line%qwing
-
-   !store in unit of lambda0 instead of adimensional values
-   !deltaLambda / lambda0 = deltav/c
-   if (atmos%v_char <= 0.) then
-   write(*,*) "Error with getlambda, set v_char /= 0"
-   stop
-   end if
-   q_to_lambda = line%lambda0 * (atmos%v_char/CLIGHT)
-
-   g_lande_eff = line%g_lande_eff
-
-   !--- Create full (instead of half) line profiles in case of:
-
-  !1) a set keyword ASYMM in this_atom.atom for this line
-  !2) a moving grid wich is the case for accretion disk
-  !3) a magnetic field is present and the g_Lande is
-  !greater than -99 for this line
-  !4) the line has more than one components
-
-  ! Because atmos will be often moving, line
-  ! will be always asymmetric
-  if ((atmos%Magnetized .and. line%polarizable) .or. &
-     atmos%moving) then
-     line%symmetric=.false.
-  end if
-
-  ! Make sure the half-line profile always has an odd number of
-  ! grid points
-
-  if (line%symmetric) then
-   if (MOD(line%Nlambda,2) >= 1.) then
-     Nlambda=line%Nlambda !odd
-   else
-     Nlambda = line%Nlambda+1 !result of MOD is 0, even
-   end if
-  else
-   if (MOD(line%Nlambda,2) >= 1.) then
-     Nlambda = line%Nlambda/2 !odd
-   else
-     Nlambda = (line%Nlambda+1)/2 !result of MOD is 0, even
-   end if
-  end if
-  !write(*,*) "Nlambda, line%Nlambda = ",Nlambda, line%Nlambda
-
-  if (line%qwing <= 2.*line%qcore) then
-   !linear scale out to qwing
-   write(*,*) "Ratio of qwing/qcore < 1 for line ", &
-          line%j,"->",line%i
-   beta = 1
-  else
-   beta = line%qwing/(2.*line%qcore)
-  end if
-  y = beta+sqrt(SQ(beta) + (beta-1)*Nlambda + 2.-3.*beta)
-  b = 2.*log(y) / (Nlambda-1)
-  a = line%qwing / (Nlambda-2. + SQ(y))
-
-  allocate(q(Nlambda))
-  do la=1,Nlambda
-    q(la) = a*((la-1)+(exp(b*(la-1))-1))
-    !write(*,*) q(la)*q_to_lambda, " nm"
-  end do
-  if (line%polarizable) then
-      write(*,*) "line is polarizable and B is present"
-      !characteristic Zeeman splitting
-      qB_char = g_lande_eff * (Q_ELECTRON/(4*PI*M_ELECTRON))*&
-           (line%lambda0*NM_TO_M) * atmos%B_char / &
-            atmos%v_char
-
-    if (qB_char/2. >= line%qcore) then
-      write(*,*) "Characteristic Zeeman Splitting >= qcore ",&
-      "for line ", line%j,"->",line%i
-    end if
-     NB = locate(q, qB_char/2.)
-     qB_shift = 2.*q(NB)
-     !!CALL realloc(q, Nlambda+2*NB)
-     deallocate(q)
-     allocate(q(Nlambda+2*NB))
-
-     do la=NB+1,2*NB+1
-       q(la) = qB_shift - a*(2*NB-la-1 + (exp(b*(2*NB-la-1)) &
-           - 1.))
-     end do
-
-     do la=2*NB+1,Nlambda+2*NB
-       q(la) = qB_shift + a*(la-1 -2*NB+(exp(b*(-2*NB+la-1)) &
-           - 1.))
-     end do
-
-     Nlambda = Nlambda+2*NB
-
-   end if !over polarized line
-
-   !beware because the grid is most of the time moving
-   !accretion disk, stellar hydro models etc..
-   !we rarely inter in the case line%symmetric
-   !even if the line is defined symmetric in the model atom.
-   if (line%symmetric) then
-    line%Nlambda = Nlambda
-    allocate(line%lambda(Nlambda))
-    do la=1,Nlambda
-     line%lambda(la) = line%lambda0+q_to_lambda*q(la)
-    end do
-   else !not symmetric
-    !write(*,*) "Setting up grid for asymmetric line"
-    ! minus - 1 to force it to be odd
-    line%Nlambda = (2*Nlambda-1)! * line%Ncomponent
-    !!write(*,*) Nlambda, 2*Nlambda-1, line%Nlambda
-    allocate(line%lambda(line%Nlambda))
-    !do n=1,line%Ncomponent
-    n = 1
-     !in c, n=0,Ncompo - 1
-     Nmid = (n-1)*(2*Nlambda-1) + Nlambda -1
-     lambda0 = line%lambda0! + line%c_shift(n)
-     line%lambda(Nmid) = lambda0
-      do la=1,Nlambda !la=Nlambda->
-        ! Nlambda-1 +Nlambda = 2*Nlambda-1, last point
-        dlambda = q_to_lambda*q(la)
-        line%lambda(Nmid-la) = lambda0-dlambda
-        line%lambda(Nmid+la) = lambda0+dlambda
-      end do
-      !do la=1,line%Nlambda
-      ! write(*,*) line%lambda(la)
-      !end do
-    !end do
-
-!     if (line%Ncomponent.gt.1) then
-!      CALL sort(line%lambda, line%Nlambda)
-!      !!CALL hpsort(line%Nlambda, line%lambda) ! NumRec
-!     end if
-
-   end if
-
-  deallocate(q)
-  RETURN
-  END SUBROUTINE getLambdaLine
 
   FUNCTION IntegrationWeightLine(line, la) result (wlam)
   ! ------------------------------------------------------- !
@@ -480,8 +301,11 @@ MODULE getlambda
   end if
 
   Ntrans = Nlinetot + Nctot
-  write(*,*) "Adding ", Nspect," lines and continua, for a total of", Ntrans, &
+  write(*,*) "Adding ", Nspect," wavelengths for a total of", Ntrans, &
              " transitions."
+  if (allocated(inoutgrid)) write(*,*) "  ->", size(inoutgrid)," input wavelengths"
+
+  allocate(Nred_array(Ntrans), Nblue_array(Ntrans), Nmid_array(Ntrans))
 
   ! add wavelength from mcfost inoutgrid if any
   ! and convert it to nm, then deallocate
@@ -514,7 +338,7 @@ MODULE getlambda
    end do
   end do
   write(*,*) "  ->", nnn," line wavelengths"
-  
+  if (wl_ref > 0)   write(*,*) "  ->", 1," reference wavelength at", wl_ref, 'nm'
   ! sort wavelength
   CALL sort(tempgrid, Nspect)
 
@@ -535,7 +359,7 @@ MODULE getlambda
   					! is implied by the above algorithm...)
   					! or if 2 wavelengths, Nwaves = 2 = 3 - 1 (not 3 again etc)
   					! and so on, actually I have 1 wavelength more than I should have.
-  write(*,*) Nwaves, " unique wavelengths, ", Nspect-Nwaves,&
+  write(*,*) Nwaves, " unique wavelengths: ", Nspect-Nwaves,&
    " eliminated lines"
 
   ! allocate and store the final grid
@@ -553,17 +377,17 @@ MODULE getlambda
 
   ! Now replace the line%Nlambda and continuum%Nlambda by the new values.
   ! we do that even for PASSIVE atoms
-  !deallocate line%lambda and continuum%lambda because they do not correspond to the new
+  ! deallocate line%lambda and continuum%lambda because they do not correspond to the new
   ! Nblue and Nlambda anymore.
+  nn = 1
   do n=1,Natom
-   Nred = 0
    !first continuum transitions
 !   write(*,*) " ------------------------------------------------------------------ "
    do kc=1,Atoms(n)%Ncont
     Nlambda_original = Atoms(n)%continua(kc)%Nlambda
     l0 = Atoms(n)%continua(kc)%lambda(1)
     l1 = Atoms(n)%continua(kc)%lambda(Nlambda_original)
-    Nred = locate(inoutgrid,l1)
+!    Nred = locate(inoutgrid,l1)
 !     Nblue = locate(inoutgrid,l0)
 !     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
     Atoms(n)%continua(kc)%Nblue = locate(inoutgrid,l0)
@@ -574,14 +398,25 @@ MODULE getlambda
 !     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
 !       " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
 !       " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
-    Atoms(n)%continua(kc)%Nmid = locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
+!! For continuum transitions, lambda0 is at Nred, check definition of the wavelength grid
+!! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
+!! and l1, lam(Nlambda) = lambda0
+    Atoms(n)%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
+    !deallocate(Atoms(n)%continua(kc)%lambda)
+    !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
+    !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
+    ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
+    Nred_array(nn) = Atoms(n)%continua(kc)%Nred
+    Nmid_array(nn) = Atoms(n)%continua(kc)%Nmid
+    Nblue_array(nn) = Atoms(n)%continua(kc)%Nblue
+    nn= nn + 1
    end do
    !then bound-bound transitions
    do kr=1,Atoms(n)%Nline
     Nlambda_original = Atoms(n)%lines(kr)%Nlambda
     l0 = Atoms(n)%lines(kr)%lambda(1)
     l1 = Atoms(n)%lines(kr)%lambda(Nlambda_original)
-    Nred = locate(inoutgrid,l1)
+!    Nred = locate(inoutgrid,l1)
 !    Nblue = locate(inoutgrid,l0)
 !     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
     Atoms(n)%lines(kr)%Nblue = locate(inoutgrid,l0)!Nblue
@@ -593,6 +428,14 @@ MODULE getlambda
 !       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, & 
 !       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
     Atoms(n)%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%lines(kr)%lambda0)
+    !deallocate(Atoms(n)%lines(kr)%lambda)
+    !allocate(Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nlambda))
+    !Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred) &
+    ! = inoutgrid(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred)
+    Nred_array(nn) = Atoms(n)%lines(kr)%Nred
+    Nmid_array(nn) = Atoms(n)%lines(kr)%Nmid
+    Nblue_array(nn) = Atoms(n)%lines(kr)%Nblue
+    nn = nn + 1
    end do
 !     write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
