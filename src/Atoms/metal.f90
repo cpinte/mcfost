@@ -437,6 +437,8 @@ MODULE metal
     if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = &
           NLTEspec%AtomOpac%Kc(icell,:,1) + sca
    end if
+   !CALL HRayleigh(icell,Hydrogen, sca)
+   !NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + sca
 
    NLTEspec%AtomOpac%Kc(icell,:,2) = NLTEspec%AtomOpac%Kc(icell,:,1)
 
@@ -539,6 +541,8 @@ MODULE metal
     if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%sca_c(id,:) = &
           NLTEspec%AtomOpac%sca_c(id,:) + sca
    end if
+   !CALL HRayleigh(icell,Hydrogen, sca)
+   !NLTEspec%AtomOpac%sca_c(id,:) = NLTEspec%AtomOpac%sca_c(id,:) + sca
 
    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%sca_c(id,:)
 
