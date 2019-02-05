@@ -462,8 +462,6 @@ subroutine define_cylindrical_grid()
            z_grid_tmp(i,j)=rsph * w
         enddo
 
-        delta_z(i) = maxval(z_grid_tmp(i,:)) / real(nz)
-
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
            V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
         else
