@@ -55,7 +55,7 @@ MODULE getlambda
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: L=50d0, core_to_wing = 0.51
+   double precision, parameter :: L=50d0, core_to_wing = 0.3
    integer, parameter :: Nc = 31, Nw = 5 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(5*(Nc+Nw)) :: vel
    

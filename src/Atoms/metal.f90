@@ -390,7 +390,7 @@ MODULE metal
      
      if (abs(vv(1)) > 5000d3) CYCLE
      !if we are very far from the line, here 5000d3 m/s
-     !we do not need to cound the opacity of this line.
+     !we do not need to count the opacity of this line.
      
      if (line%voigt) then
       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.

@@ -27,18 +27,19 @@ MODULE simple_models
    use math, only : interp1D
    use utils, only : interp_dp
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Tmax = 8d3, Omegas = 0d0 !Stellar angular velocity
+   double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, cosTheta, rcyl, z, r, phi, Mdot, sinTheta, Rm, theta, L
-   double precision :: NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
+   double precision :: Omega, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
    data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 / !log10? 
    
    !if (.not.allocated(Vfiedl)) allocate(Vfield(n_cells))
+   Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
 
    CALL init_atomic_atmos(n_cells)
    atmos%vturb = 5d3 !m/s
@@ -91,7 +92,6 @@ MODULE simple_models
         z = z_grid(icell)/z_scaling_env
        end if
        phi = phi_grid(icell)
-
        r = sqrt(z**2 + rcyl**2)
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
@@ -116,12 +116,13 @@ MODULE simple_models
           if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
            vp = 0d0
-           if (.not.lstatic) then !add keplerian rotation?
-            atmos%Vxyz(icell,:) = 0d0
-           end if
+           !atmos%Vxyz is initialized to 0 everywhere
+            if (.not.lstatic) then !add keplerian rotation?
+             atmos%Vxyz(icell,3) = 0d0!Omega *  (r*AU_to_m) !m/s
+            end if
            !Density midplane of the disk
            !using power law of the dust-gas disk (defined in another zone?)
-           atmos%nHtot(icell) = 1e20!
+           atmos%nHtot(icell) = 5e18!
            !Temperature still given by the same law as in accretion funnels yet.
            !But probably different at this interface funnels/disk
           else !accretion funnels
@@ -134,7 +135,7 @@ MODULE simple_models
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
             atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rcyl
-            atmos%Vxyz(icell,3) = 0.0 !stellar rotation velocity !phi
+            atmos%Vxyz(icell,3) = 0d0 !Omega *  (r*AU_to_m)
             atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !z
             if (z < 0) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
            end if

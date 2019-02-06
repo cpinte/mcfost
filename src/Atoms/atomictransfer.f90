@@ -364,8 +364,7 @@ MODULE AtomicTransfer
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
-  !write(*,*) "u=", u*rad_to_deg, "v=",v*rad_to_deg, "w=",w*rad_to_deg, &
-  ! npix_x, npix_y, RT_line_method
+  write(*,*) "u=", u*rad_to_deg, "v=",v*rad_to_deg, "w=",w*rad_to_deg
 
   ! Definition des vecteurs de base du plan image dans le repere universel
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
@@ -496,7 +495,6 @@ MODULE AtomicTransfer
    lB = Nblue_array(lambda)
    nu = c_light / NLTEspec%lambda(lM) * 1d9
    CALL compute_stars_map(lM, u, v, w, taille_pix, dx, dy, lresolved) !W/m2
-   write(*,*) "ok2"
    do ll=lB,LR
     !nu = c_light / NLTEspec%lambda(ll) * 1d9
     NLTEspec%Flux(ll,:,:,ibin,iaz) = NLTEspec%Flux(ll,:,:,ibin,iaz) +  & 
