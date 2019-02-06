@@ -282,8 +282,16 @@ contains
 
        write(*,*) "Found the following grain sizes in SPH calculation:"
        do l=1, ndusttypes
-          a_SPH(l+1) = SPH_grainsizes(l)
-          write(*,*) real(SPH_grainsizes(l)), "microns"
+          if (dust_pop(1)%porosity > tiny_real) then
+             if (l==1) call warning("grain sizes are ajusted for porosity")
+             ! Stokes number is reduced by porosity
+             ! We shift the mcfost grain sizes relative to phantom grain sizes
+             a_SPH(l+1) = SPH_grainsizes(l) / (1.-dust_pop(1)%porosity)
+             write(*,*) real(SPH_grainsizes(l)), "microns   --->  ",  real(a_SPH(l+1)), "microns"
+          else
+             a_SPH(l+1) = SPH_grainsizes(l)
+             write(*,*) real(SPH_grainsizes(l)), "microns"
+          endif
        enddo
 
        ! Adding smallest grain size following the gas
