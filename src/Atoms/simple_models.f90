@@ -30,14 +30,15 @@ MODULE simple_models
    double precision, parameter :: Tmax = 8d3, Omegas = 0d0 !Stellar angular velocity
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
-   double precision, dimension(1) :: vx, vy, vz
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, cosTheta, rcyl, z, r, phi, Mdot, sinTheta, Rm, theta, L
-   double precision :: TL(8), Lambda(8) !K and erg/cm3/s
+   double precision :: NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
    data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 / !log10? 
+   
+   !if (.not.allocated(Vfiedl)) allocate(Vfield(n_cells))
 
    CALL init_atomic_atmos(n_cells)
    atmos%vturb = 5d3 !m/s
@@ -115,9 +116,9 @@ MODULE simple_models
           if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
            vp = 0d0
-           vx(1) = 0d0
-           vy(1) = 0d0!dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (rcyl * AU_to_m) )
-           vz(1) = 0d0
+           if (.not.lstatic) then !add keplerian rotation?
+            atmos%Vxyz(icell,:) = 0d0
+           end if
            !Density midplane of the disk
            !using power law of the dust-gas disk (defined in another zone?)
            atmos%nHtot(icell) = 1e20!
@@ -131,16 +132,13 @@ MODULE simple_models
                        1d3/masseH /atmos%avgWeight  !kg/m3 ->/m3
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
-           vx(1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y)
-           vy(1) = 0.0 !stellar rotation velocity
-           vz(1) = vp * (2d0 - 3d0 * y)
-           if (z < 0) vz(1) = -vz(1) !check that if we use vx,vy,vz
+           if (.not.lstatic) then
+            atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rcyl
+            atmos%Vxyz(icell,3) = 0.0 !stellar rotation velocity !phi
+            atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !z
+            if (z < 0) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
+           end if
           end if
-          if (.not.lstatic) then 
-            atmos%V(icell) = dsqrt(vx(1)**2 + vy(1)**2 + vz(1)**2)
-          end if
-          if ((atmos%V(icell)/=atmos%V(icell)).or.(atmos%V(icell)==atmos%V(icell)+1)) &
-             write(*,*) etoile(1)%r/r, 1/Rm
 
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
@@ -160,14 +158,16 @@ MODULE simple_models
 !		minval(atmos%nHtot,mask=rho>0))/ (maxval(atmos%nHtot) - minval(atmos%nHtot,mask=rho>0)))
 !     end do
    
+   !cannot use both simultaneously
    lkeplerian = .false.
-   linfall = .true.
+   linfall = .false.
    if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
-    atmos%v_char = atmos%v_char + minval(abs(atmos%V),mask=abs(atmos%V)>0)
+    NormV = dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2)
+    atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
    end if
-   write(*,*) "maxVfield (km/s)", maxval(atmos%V)/1d3, &
-              " minVfield", minval(atmos%V,mask=atmos%V>0)/1d3
+   write(*,*) "maxVfield (km/s)", maxval(NormV)/1d3, &
+              " minVfield", minval(NormV,mask=normV>0)/1d3
    write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
    CALL define_atomRT_domain()
 
@@ -236,19 +236,19 @@ MODULE simple_models
    if (.not.lstatic) then
 !     Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
 !                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
-
-    if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-      do icell=1, n_cells
-        atmos%V(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-      end do
-    else ! dependance en z
-       do icell=1, n_cells
-         atmos%V(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-       end do
-    end if
-    Vkepmin = minval(atmos%V, mask=atmos%V>0)
-    atmos%v_char = atmos%v_char + Vkepmin
+    write(*,*) "Implement Vfield here"
+!     if (lcylindrical_rotation) then ! Midplane Keplerian velocity
+!       do icell=1, n_cells
+!         Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+!       end do
+!     else ! dependance en z
+!        do icell=1, n_cells
+!          Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+!                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
+!        end do
+!     end if
+    !Vkepmin = minval(Vfield, mask=atmos%V>0)
+    atmos%v_char = atmos%v_char! + Vkepmin
    end if
    CALL define_atomRT_domain() !deallocate atmos%V if static
 

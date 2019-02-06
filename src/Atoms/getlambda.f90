@@ -60,7 +60,7 @@ MODULE getlambda
    double precision, dimension(5*(Nc+Nw)) :: vel
    
    v_char = L * (atmos%v_char + vD) !=maximum extension of a line
-   !atmos%v_char is minimum of atmos%V and vD is minimum of atom%vbroad presently
+   !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char
    v1 = +v_char
    vel = 0d0

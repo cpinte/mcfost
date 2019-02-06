@@ -496,6 +496,7 @@ MODULE AtomicTransfer
    lB = Nblue_array(lambda)
    nu = c_light / NLTEspec%lambda(lM) * 1d9
    CALL compute_stars_map(lM, u, v, w, taille_pix, dx, dy, lresolved) !W/m2
+   write(*,*) "ok2"
    do ll=lB,LR
     !nu = c_light / NLTEspec%lambda(ll) * 1d9
     NLTEspec%Flux(ll,:,:,ibin,iaz) = NLTEspec%Flux(ll,:,:,ibin,iaz) +  & 
@@ -707,15 +708,16 @@ MODULE AtomicTransfer
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
-  ! Velocity field in  m.s-1
-  if (allocated(Vfield)) write(*,*) "Vfield already exists"
-  if (allocated(Vfield)) deallocate(Vfield) !for security ?
-  !but if lstatic we do not allocate it.
-  if (.not.allocated(Vfield).and..not.lstatic) allocate(Vfield(n_cells))
-  if (.not.lstatic) then
-   Vfield=atmos%V!
-   deallocate(atmos%V)
-  end if
+  if (allocated(Vfield)) deallocate(Vfield) !do not need it anymore. Using Vxyz(:,3) now
+!   Velocity field in  m.s-1
+!   if (allocated(Vfield)) write(*,*) "Vfield already exists"
+!   if (allocated(Vfield)) deallocate(Vfield) !for security ?
+!   but if lstatic we do not allocate it.
+!   if (.not.allocated(Vfield).and..not.lstatic) allocate(Vfield(n_cells))
+!   if (.not.lstatic) then
+!    Vfield=atmos%V!
+!    deallocate(atmos%V)
+!   end if
 
  RETURN
  END SUBROUTINE adjusting_mcfost

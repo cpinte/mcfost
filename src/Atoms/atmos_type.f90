@@ -36,7 +36,7 @@ MODULE atmos_type
    ! Each component of the velocity is a function of x, y, z so
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
-   double precision, allocatable, dimension(:) :: V,vx,vy,vz !used if velocity fields
+   double precision, allocatable, dimension(:,:) :: Vxyz !used if velocity fields
    ! is not Keplerian nor read from file. Then Vmap is computed, and Vfield = Vmap.
    type (Element), dimension(:), allocatable :: Elements
    type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms 
@@ -396,10 +396,10 @@ MODULE atmos_type
    if (.not.allocated(atmos%T)) allocate(atmos%T(Nspace))
    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
    
-   !replace atmos%V by Vfield directly?
    if (.not.lstatic) then 
-    allocate(atmos%V(Nspace))
-    atmos%V = 0d0
+    !Nrad, Nz, Naz
+    allocate(atmos%Vxyz(Nspace,3))
+    atmos%Vxyz = 0d0
    end if
 
    atmos%Natom = 0
@@ -459,84 +459,6 @@ MODULE atmos_type
     end do  
    RETURN
    END SUBROUTINE define_atomRT_domain
-!   SUBROUTINE init_atomic_atmos(Nspace, T, ne, nHtot)
-!   ! as arguments are passed only necessary quantities
-!   ! Modify optional values only after init_atomic_atmos has been called.
-!   ! otherwise could lead to some memory allocation erros.
-!    integer, intent(in) :: Nspace
-!    double precision, intent(in), dimension(Nspace) :: T, ne, nHtot
-!    double precision :: maxNe = 0
-!    integer :: k
-!    double precision :: tiny_nH = 1d2, tiny_T = 1d1
-!    
-!    if (allocated(atmos%T).or.(allocated(atmos%nHtot)) & 
-!        .or.(allocated(atmos%ne))) then
-!     write(*,*) "A atomic atmosphere is already allocated, exiting..."
-!     stop
-!    end if
-!    
-!    if (.not.allocated(atmos%T)) allocate(atmos%T(Nspace))
-!    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
-!    !allocated elsewhere
-! !    if (.not.allocated(atmos%Vmap)) allocate(atmos%Vmap(Nspace))
-! !    atmos%Vmap = 0d0
-! 
-!    atmos%Natom = 0
-!    atmos%Nactiveatoms = 0
-!    atmos%totalAbund=0
-!    atmos%avgWeight=0
-!    atmos%wght_per_H=0
-!    atmos%metallicity = 0. !not used yet
-!    atmos%Npf = 0
-!    atmos%Nspace = Nspace
-!    atmos%calc_ne = .false.
-! 
-! 
-!    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(Nspace))
-!    if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(Nspace))
-!    if (.not.allocated(atmos%ne)) allocate(atmos%ne(Nspace))
-!    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(Nspace))
-! 
-!    atmos%T = T ! K 
-!    atmos%nHtot = nHtot
-!    atmos%ne = ne !m-3
-!    atmos%vturb = 0d0 !m/s
-!    
-!    if (MAXVAL(atmos%ne).eq.0.0) then
-!      atmos%calc_ne=.true.
-!    end if 
-! 
-!    CALL fillElements()
-!    !atmos%nHtot = atmos%nHtot / atmos%avgWeight
-!    
-!    allocate(atmos%lcompute_atomRT(Nspace))
-!    if (tiny_T <= 0) then
-!     write(*,*) "changing the value of tiny_T = ", tiny_T," to", 10d0
-!     tiny_T = 10d0
-!    end if
-!    if (tiny_nH <= 0) then
-!     write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
-!     tiny_nH = 1d0
-!    end if
-!    
-!    !check where to solve for the line radiative transfer equation.
-!    atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) !??? not working
-!    !!!$omp parallel &
-!    !!!$omp default(none) &
-!    !!!$omp private(k) &
-!    !!!$omp shared(atmos,tiny_nH, tiny_T,Nspace)
-!    !!!$omp do
-! !    do k=1,Nspace
-! !     atmos%lcompute_atomRT(k) = (atmos%nHtot(k) > tiny_nH) .and. (atmos%T(k) > tiny_T)
-! !     !knowing that we will have populations and ne only if nHtot and T are different from 0.
-! !     !Still, some levels of an atom can have 0 pops depending on the Temperature threashold
-! !     !and some others can have non zero pops for the same T.
-! !    end do
-!   !!!!$omp end do
-!   !!!$omp  end parallel
-! 
-!    RETURN
-!    END SUBROUTINE init_atomic_atmos
 
    FUNCTION atomZnumber(atomID) result(Z)
    ! --------------------------------------
