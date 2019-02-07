@@ -14,6 +14,21 @@ MODULE simple_models
 
  CONTAINS
  
+  SUBROUTINE rotateZ(Vx, Vy, Vz, angle)
+   double precision, intent(inout) :: Vx, Vy, Vz
+   double precision, intent(in)    :: angle
+   double precision				   :: x, y, z
+   
+   x = Vx
+   y = Vy
+   z = Vz
+   Vz = z
+   Vx = cos(angle) * x + sin(angle) * y
+   Vy = -sin(angle) * x + cos(angle) * y
+  
+  RETURN
+  END SUBROUTINE rotateZ
+ 
   SUBROUTINE magneto_accretion_model()
   ! ----------------------------------------------------------- !
    ! Magnetospheric accretion model
@@ -117,9 +132,10 @@ MODULE simple_models
            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
            vp = 0d0
            !atmos%Vxyz is initialized to 0 everywhere
-            if (.not.lstatic) then !add keplerian rotation?
-             atmos%Vxyz(icell,3) = 0d0!Omega *  (r*AU_to_m) !m/s
-            end if
+           if (.not.lstatic) then !add keplerian rotation?
+            atmos%Vxyz(icell,1) = Omega *  (r*AU_to_m) * cos(phi)
+            atmos%Vxyz(icell,2) = Omega * (r*AU_to_m) * sin(phi)
+           end if
            !Density midplane of the disk
            !using power law of the dust-gas disk (defined in another zone?)
            atmos%nHtot(icell) = 5e18!
@@ -134,10 +150,12 @@ MODULE simple_models
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
-            atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rcyl
-            atmos%Vxyz(icell,3) = 0d0 !Omega *  (r*AU_to_m)
-            atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !z
-            if (z < 0) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
+             atmos%Vxyz(icell,1) = cos(phi) * vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rcyl
+             atmos%Vxyz(icell,2) = sin(phi) * vp * 3d0 * dsqrt(y) * dsqrt(1.-y)
+             atmos%Vxyz(icell,3) = vp * (2d0 - 3d0 * y) !z
+             if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
+             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1)+Omega *  (r*AU_to_m) * cos(phi)
+             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2)+Omega * (r*AU_to_m) * sin(phi)
            end if
           end if
 
