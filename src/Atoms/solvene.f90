@@ -193,7 +193,7 @@ END FUNCTION getPartitionFunctionk
   character(len=20) :: initial
   double precision :: error, ne_old, akj, sum, Uk, dne, Ukp1
   double precision :: ne_oldM, UkM, PhiHmin
-  double precision, dimension(atmos%Nspace) :: np
+!   double precision, dimension(atmos%Nspace) :: np
   double precision, dimension(:), allocatable :: fjk, dfjk
   integer :: Nmaxstage=0, n, k, niter, j
 
@@ -221,21 +221,21 @@ END FUNCTION getPartitionFunctionk
   ! 1) NLTE populations from previous run are read
   ! 2) The routine is called in the NLTE loop meaning that all H levels are known
 
-  if (initial.eq."N_PROTON") &
-     np=Hydrogen%n(Hydrogen%Nlevel,:)
+!   if (initial.eq."N_PROTON") &
+!      np=Hydrogen%n(Hydrogen%Nlevel,:)
 
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj) &
-  !$omp shared(atmos, ne,initial,np)
+  !$omp shared(atmos, ne,initial,Hydrogen)
   !$omp do
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."N_PROTON") then
-    ne_old = np(k)
+    ne_old = Hydrogen%n(Hydrogen%Nlevel,k)!np(k)
    else if (initial.eq."NE_MODEL") then
     ne_old = atmos%ne(k)
    else !"H_IONISATION" or unkown
