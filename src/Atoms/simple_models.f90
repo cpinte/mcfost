@@ -15,6 +15,7 @@ MODULE simple_models
  CONTAINS
  
   SUBROUTINE rotateZ(Vx, Vy, Vz, angle)
+   !rotation around z-axis = rotation_3d((/0,0,1/), -angle, (/Vx, Vy, Vz/))
    double precision, intent(inout) :: Vx, Vy, Vz
    double precision, intent(in)    :: angle
    double precision				   :: x, y, z
@@ -46,8 +47,8 @@ MODULE simple_models
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
-   double precision :: vp, y, cosTheta, rcyl, z, r, phi, Mdot, sinTheta, Rm, theta, L
-   double precision :: Omega, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
+   double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L, proj_phix, proj_phiy
+   double precision :: Omega, Vphi, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
@@ -107,12 +108,14 @@ MODULE simple_models
         z = z_grid(icell)/z_scaling_env
        end if
        phi = phi_grid(icell)
-       r = sqrt(z**2 + rcyl**2)
+       r = dsqrt(z**2 + rcyl**2)
+       Vphi = Omega * (r*AU_to_m) !m/s
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
-       cosTheta = z/r
-       theta = asin(sinTheta)
+       ! and cosTheta = z/r = sqrt(1.-y) = sqrt(1.-sinTheta**2)
+       proj_phix = -sin(phi) !cos(phi)*sinTheta
+       proj_phiy =  cos(phi) !sin(phi)*sinTheta
        !from definition of y
        y = sinTheta**2!min(real(sinTheta**2), 0.9999)
        !here the trick is to handle y = 1 at z=0 because rcyl=r and 1/(1-y) = inf.
@@ -132,9 +135,13 @@ MODULE simple_models
            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
            vp = 0d0
            !atmos%Vxyz is initialized to 0 everywhere
-           if (.not.lstatic) then !add keplerian rotation?
-            atmos%Vxyz(icell,1) = Omega *  (r*AU_to_m) * cos(phi)
-            atmos%Vxyz(icell,2) = Omega * (r*AU_to_m) * sin(phi)
+           if (.not.lstatic) then
+            !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
+            !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
+            !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
+            atmos%Vxyz(icell,1) = Vphi * proj_phix
+            atmos%Vxyz(icell,2) = Vphi * proj_phiy
+            !here it is better to have keplerian rotation than stellar rotation?
            end if
            !Density midplane of the disk
            !using power law of the dust-gas disk (defined in another zone?)
@@ -150,15 +157,15 @@ MODULE simple_models
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
-             atmos%Vxyz(icell,1) = cos(phi) * vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rcyl
-             atmos%Vxyz(icell,2) = sin(phi) * vp * 3d0 * dsqrt(y) * dsqrt(1.-y)
+             atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) !Vx = VR * projx
+             atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) !Vy = VR * projy
              atmos%Vxyz(icell,3) = vp * (2d0 - 3d0 * y) !z
+             ! or theta > PI/2d0
              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
-             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1)+Omega *  (r*AU_to_m) * cos(phi)
-             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2)+Omega * (r*AU_to_m) * sin(phi)
+             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * proj_phix
+             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi * proj_phiy
            end if
           end if
-
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
@@ -170,12 +177,6 @@ MODULE simple_models
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
-
-!     do icell=1,n_cells
-!      if (atmos%nHtot(icell) > 0) &
-!       atmos%T(icell) = max(5000.d0,Tmax-2500.*(atmos%nHtot(icell) - &
-!		minval(atmos%nHtot,mask=rho>0))/ (maxval(atmos%nHtot) - minval(atmos%nHtot,mask=rho>0)))
-!     end do
    
    !cannot use both simultaneously
    lkeplerian = .false.
