@@ -581,7 +581,7 @@ MODULE AtomicTransfer
     write(*,*) "Changing ne starting solution NE_MODEL in H_IONISATION"
     ne_start_sol = "H_IONISATION"
    end if 
-   CALL SolveElectronDensity(atmos%ne,ne_start_sol)
+   CALL SolveElectronDensity(ne_start_sol)
    CALL writeElectron()
   end if
   CALL writeHydrogenDensity()  
