@@ -255,87 +255,85 @@ MODULE lte
  RETURN
  END SUBROUTINE LTEpops
 
- !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>!
- !--> The following routine is here for learning purpose
- SUBROUTINE LTEpops_element(elem)
-  ! -------------------------------------------------------------- !
-   ! Obtains the TOTAL LTE populations of each stage (NI)
-   ! for an element. These populations are used
-   ! to compute the population of each level (ni)
-   ! using Boltzmann's equation, gi, gj and Ei, Ej.
-   ! this version is for testing,
-   ! electron density calculations
-   ! and LTE background 2-levels atoms
+!  SUBROUTINE LTEpops_element(elem)
+!   -------------------------------------------------------------- !
+!    Obtains the TOTAL LTE populations of each stage (NI)
+!    for type(Element) elem. These populations are used
+!    to compute the population of each level (ni)
+!    using Boltzmann's equation, gi, gj and Ei, Ej.
+!    this version is for testing,
+!    electron density calculations
+!    and LTE background 2-levels atoms
+! 
+!    At this step, we do not know which two levels atom
+!    transititions are used, so only total populations
+!    of each ion is computed. These populations
+!    can esealy give the population of each level with
+!    Botlzmann's equation
+!   -------------------------------------------------------------- !
+! 
+!   type (Element), intent(inout) :: elem
+!   integer :: j, k
+!   double precision, dimension(atmos%Nspace) :: Uk, Ukp1, sum
+!   double precision, dimension(atmos%Npf) :: pfel
+!   double precision :: phik
+! 
+!   pfel = elem%pf(1,:)
+! 
+!   parition functions in logarithm
+!   CALL bezier3_interp(atmos%Npf, atmos%Tpf, pfel, &
+!                      atmos%Nspace, atmos%T, Uk)
+! 
+!   init
+!   nj(1,:) is set to 1 -> nj(j>1,:) normalised to nj(1,:)
+!   do k=1,atmos%Nspace
+!    if (.not.atmos%lcompute_atomRT(k)) CYCLE
+!    sum(k) = 1.
+!    elem%n(1,k) = 1.
+!   end do
+!   if (MAXVAL(elem%n(1,:)) == 0d0) RETURN !no element elem here.
+! 
+!   do j=2,elem%Nstage !next ion stage
+!    pfel = elem%pf(j,:)
+!    CALL  bezier3_interp(atmos%Npf, atmos%Tpf, pfel, &
+!        atmos%Nspace, atmos%T, Ukp1)
+!    do k=1,atmos%Nspace
+! 
+!     phik = phi_jl(k, 10**(Uk(k)), 10**(Ukp1(k)),&
+!                   elem%ionpot(j-1))
+!     Saha equation here elem%n(j,k)=&
+!     Sahaeq(k,elem%n(j-1,k),Ukp1,Uk,elem%ionpot(j-1),atmos%ne(k))
+!     elem%n(j,k) = elem%n(j-1,k) / (phik*atmos%ne(k))
+!     sum(k) = sum(k) + elem%n(j,k)
+!     1.+n2/n1 + n3/n1 +...+nj/n1+...+nNstage/n1
+!     Need new equations for the first stage!:
+!     1 + n2/n1 + nj/n1 = sum (eq. 1)
+!     n2 + n1 + nj = nElemTot = A * nHtot (eq. 2)
+!     (eq. 2)/(eq. 1) ->
+!     (n1 + n2 +.. +nj)/(1 + n2/n1 + ..+nj/n1) =
+!     = nElemTot/sum -> remebering, 1=n1/n1!
+!     -> n1 (n2 + n1 ...) / (n1 + n2 ...) = nElemTot/sum
+!     n1 = nElemTot/sum = A * nHtot / sum
+! 
+!     set Uk=Ukp1 for next ion stage by swapping values
+!     Uk(k)=Ukp1(k)
+!    end do
+!   end do
+! 
+!   because of the CYCLE statement, here sum(k) is at least 1
+!   do k=1,atmos%Nspace
+!    elem%n(1,k) = elem%abund*atmos%nHtot(k)/sum(k)
+!   end do
+!   do j=2,elem%Nstage
+!    do k=1,atmos%Nspace
+!     elem%n(j,k) = elem%n(j,k)*elem%n(1,k)
+!    denormalise to n1
+!    end do
+!   end do
+! 
+!   RETURN
+!  END SUBROUTINE LTEpops_element
 
-   ! At this step, we do not know which two levels atom
-   ! transititions are used, so only total populations
-   ! of each ion is computed. These populations
-   ! can esealy give the population of each level with
-   ! Botlzmann's equation
-  ! -------------------------------------------------------------- !
-
-  type (Element), intent(inout) :: elem
-  integer :: j, k
-  double precision, dimension(atmos%Nspace) :: Uk, Ukp1, sum
-  double precision, dimension(atmos%Npf) :: pfel
-  double precision :: phik
-
-  pfel = elem%pf(1,:)
-
-  !parition functions in logarithm
-  CALL bezier3_interp(atmos%Npf, atmos%Tpf, pfel, &
-                     atmos%Nspace, atmos%T, Uk)
-
-  !init
-  !nj(1,:) is set to 1 -> nj(j>1,:) normalised to nj(1,:)
-  do k=1,atmos%Nspace
-   if (.not.atmos%lcompute_atomRT(k)) CYCLE
-   sum(k) = 1.
-   elem%n(1,k) = 1.
-  end do
-  if (MAXVAL(elem%n(1,:)) == 0d0) RETURN !no element elem here.
-
-  do j=2,elem%Nstage !next ion stage
-   pfel = elem%pf(j,:)
-   CALL  bezier3_interp(atmos%Npf, atmos%Tpf, pfel, &
-       atmos%Nspace, atmos%T, Ukp1)
-   do k=1,atmos%Nspace
-
-    phik = phi_jl(k, 10**(Uk(k)), 10**(Ukp1(k)),&
-                  elem%ionpot(j-1))
-    ! Saha equation here elem%n(j,k)=&
-    !Sahaeq(k,elem%n(j-1,k),Ukp1,Uk,elem%ionpot(j-1),atmos%ne(k))
-    elem%n(j,k) = elem%n(j-1,k) / (phik*atmos%ne(k))
-    sum(k) = sum(k) + elem%n(j,k)
-    !1.+n2/n1 + n3/n1 +...+nj/n1+...+nNstage/n1
-    !Need new equations for the first stage!:
-    !1 + n2/n1 + nj/n1 = sum (eq. 1)
-    !n2 + n1 + nj = nElemTot = A * nHtot (eq. 2)
-    !(eq. 2)/(eq. 1) ->
-    !(n1 + n2 +.. +nj)/(1 + n2/n1 + ..+nj/n1) =
-    ! = nElemTot/sum -> remebering, 1=n1/n1!
-    ! -> n1 (n2 + n1 ...) / (n1 + n2 ...) = nElemTot/sum
-    ! n1 = nElemTot/sum = A * nHtot / sum
-
-    !set Uk=Ukp1 for next ion stage by swapping values
-    Uk(k)=Ukp1(k)
-   end do
-  end do
-
-  !because of the CYCLE statement, here sum(k) is at least 1
-  do k=1,atmos%Nspace
-   elem%n(1,k) = elem%abund*atmos%nHtot(k)/sum(k)
-  end do
-  do j=2,elem%Nstage
-   do k=1,atmos%Nspace
-    elem%n(j,k) = elem%n(j,k)*elem%n(1,k)
-   !denormalise to n1
-   end do
-  end do
-
-  RETURN
- END SUBROUTINE LTEpops_element
- !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<!
 
  SUBROUTINE setLTEcoefficients ()
   ! -------------------------------------------------------------- !

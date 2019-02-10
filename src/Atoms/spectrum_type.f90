@@ -31,11 +31,12 @@ MODULE spectrum_type
   
   TYPE AtomicOpacity
    !active opacities
-   double precision, allocatable, dimension(:,:) :: chi, eta, rho
+   double precision, allocatable, dimension(:,:)   :: chi, eta, rho
    !passive opacities
-   double precision, allocatable, dimension(:,:) :: rho_p, eta_p, chi_p
-   double precision, allocatable, dimension(:,:) :: eta_c, chi_c, sca_c
-   double precision, allocatable                 :: Kc(:,:,:), jc(:,:)
+   double precision, allocatable, dimension(:,:)   :: rho_p, eta_p, chi_p
+   double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
+   double precision, allocatable, dimension(:,:)   :: jc
+   double precision, allocatable, dimension(:,:,:) :: Kc
    !type (ActiveSetType) :: ActiveSet
   END TYPE AtomicOpacity
 

@@ -48,7 +48,7 @@ MODULE atmos_type
    logical :: Magnetized = .false., XRD=.false., calc_ne, &
      H_LTE=.false. ! force LTE populations of H for
                    ! background opacities
-   logical, dimension(:), allocatable :: lcompute_atomRT !where line RT is taken into account on the grid
+   logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
   END TYPE GridType
 
 
@@ -449,14 +449,14 @@ MODULE atmos_type
      tiny_nH = 1d0
     end if
     
-    !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) !??? not working 
-    do icell=1,atmos%Nspace
-     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) then
-      atmos%lcompute_atomRT(icell) = .true.
-     else
-      atmos%lcompute_atomRT(icell) = .false.
-     end if
-    end do  
+    atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) 
+!     do icell=1,atmos%Nspace
+!      if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) then
+!       atmos%lcompute_atomRT(icell) = .true.
+!      else
+!       atmos%lcompute_atomRT(icell) = .false.
+!      end if
+!     end do  
    RETURN
    END SUBROUTINE define_atomRT_domain
 

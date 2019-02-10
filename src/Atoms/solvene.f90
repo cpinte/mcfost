@@ -169,7 +169,7 @@ END FUNCTION getPartitionFunctionk
  RETURN
  END SUBROUTINE getfjk
 
- SUBROUTINE SolveElectronDensity(ne, ne_initial_solution)
+ SUBROUTINE SolveElectronDensity(ne_initial_solution)
  ! ----------------------------------------------------------------------!
   ! Solve for electron density for a set of elements
   ! stored in atmos%Elements. Elements up to N_MAX_ELEMENT are
@@ -184,11 +184,7 @@ END FUNCTION getPartitionFunctionk
   ! that NLTE populations are present for hydrogen, since
   ! nprot = hydrogen%n(Nlevel,:).
   ! If keyword is not set, HIONISATION is used.
-  !
-  ! TO DO: vectorize it
  ! ----------------------------------------------------------------------!
-
-  double precision, dimension(atmos%Nspace), intent(inout) :: ne
   character(len=20), optional :: ne_initial_solution
   character(len=20) :: initial
   double precision :: error, ne_old, akj, sum, Uk, dne, Ukp1
@@ -228,7 +224,7 @@ END FUNCTION getPartitionFunctionk
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj) &
-  !$omp shared(atmos, ne,initial,Hydrogen)
+  !$omp shared(atmos, initial,Hydrogen)
   !$omp do
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
@@ -256,7 +252,7 @@ END FUNCTION getPartitionFunctionk
    !write(*,*) "k=",k," ne_old=",ne_old, &
    !       " ne_mod=",atmos%ne(k)
 
-   ne(k) = ne_old
+   atmos%ne(k) = ne_old
    niter=0
    do while (niter.lt.N_MAX_ELECTRON_ITERATIONS)
     error = ne_old/atmos%nHtot(k)
@@ -281,18 +277,18 @@ END FUNCTION getPartitionFunctionk
       !write(*,*) n-1, j-1, akj, error, sum
      end do
     end do !loop over elem
-    ne(k) = ne_old - atmos%nHtot(k)*error /&
+    atmos%ne(k) = ne_old - atmos%nHtot(k)*error /&
           (1.-atmos%nHtot(k)*sum)
-    dne = dabs((ne(k)-ne_old)/ne_old)
-    ne_old = ne(k)
+    dne = dabs((atmos%ne(k)-ne_old)/ne_old)
+    ne_old = atmos%ne(k)
 
 
     if (dne.le.MAX_ELECTRON_ERROR) then
-      !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",ne(k)
+      !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k)
      exit
     !else
       !write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
-      !         "dne = ",dne, " ne=",ne(k)
+      !         "dne = ",dne, " ne=",atmos%ne(k)
     end if
     niter = niter + 1
    end do !while loop

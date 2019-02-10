@@ -257,8 +257,7 @@ MODULE getlambda
    double precision :: l0, l1 !ref wavelength of each transitions
 
    nn = 0
-   !!-> why it is not working if I want to remove the dynamic allocation? ...
-   allocate(alllines(MAX_TRANSITIONS), allcont(MAX_TRANSITIONS))
+   allocate(alllines(MAX_TRANSITIONS), allcont(MAX_TRANSITIONS))!stored on heap
    ! if allocated inoutgrid then add to the number of
    ! wavelength points to the points of the inoutgrid.
    Nspect = 0
