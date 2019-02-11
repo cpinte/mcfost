@@ -1,6 +1,7 @@
 MODULE Planck
 
  use constant
+ use spectrum_type, only : NLTEspec
 
  IMPLICIT NONE
 
@@ -8,22 +9,20 @@ MODULE Planck
 
  CONTAINS
 
- SUBROUTINE Bplanck (T, Nlam, lambda, Bnu)
+ SUBROUTINE Bplanck (T, Bnu)
  ! -----------------------------------------------------
  ! Return an array of planck functions at all wavelengths
  ! for the cell temperature.
  ! Bnu in J/s/m2/Hz/sr
  ! lambda in nm
  ! -----------------------------------------------------
-  integer, intent(in) :: Nlam
   double precision, intent(in) :: T
-  double precision, dimension(Nlam), intent(out) :: Bnu
-  double precision, intent(in), dimension(Nlam) :: lambda
-  double precision, dimension(Nlam) :: hnu_kT, twohnu3_c2
+  double precision, dimension(NLTEspec%Nwaves), intent(out) :: Bnu
+  double precision, dimension(NLTEspec%Nwaves) :: hnu_kT, twohnu3_c2
 
-   twohnu3_c2 = 2.*HPLANCK*CLIGHT / (NM_TO_M * lambda)**3
+   twohnu3_c2 = 2.*HPLANCK*CLIGHT / (NM_TO_M * NLTEspec%lambda)**3
 
-   hnu_kT = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*lambda*T)
+   hnu_kT = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*NLTEspec%lambda*T)
    where(hnu_kT.lt.MAX_EXPONENT)
      Bnu = twohnu3_c2 / (dexp(hnu_kT)-1.)
    else where
