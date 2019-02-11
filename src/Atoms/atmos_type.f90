@@ -449,14 +449,11 @@ MODULE atmos_type
      tiny_nH = 1d0
     end if
     
-    atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) 
-!     do icell=1,atmos%Nspace
-!      if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) then
-!       atmos%lcompute_atomRT(icell) = .true.
-!      else
-!       atmos%lcompute_atomRT(icell) = .false.
-!      end if
-!     end do  
+    !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) 
+    do icell=1,atmos%Nspace
+     atmos%lcompute_atomRT(icell) = &
+       (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+    end do  
    RETURN
    END SUBROUTINE define_atomRT_domain
 
