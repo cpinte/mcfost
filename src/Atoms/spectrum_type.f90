@@ -91,7 +91,7 @@ MODULE spectrum_type
   SUBROUTINE allocSpectrum(NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
-   integer :: Nsize
+   integer :: Nsize, maxNlambda=0, Nadmp = 50, iv, ia, n, kr
    double precision, allocatable, dimension(:) :: F
    
    Nsize = NLTEspec%Nwaves

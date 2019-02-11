@@ -130,16 +130,17 @@ MODULE AtomicTransfer
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
 
-    if (.not.atmos%lcompute_atomRT(icell)) & 
-         lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent                     
-
-    if (lcellule_non_vide) then !count opacity only if the cell is filled, else go to next cell
+!     if (.not.atmos%lcompute_atomRT(icell)) & 
+!          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
+!	   this makes the code to break down    
+               
+    !count opacity only if the cell is filled, else go to next cell
+    if (lcellule_non_vide.and..not.atmos%lcompute_atomRT(icell)) then
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
-     
-     !write(*,*) icell, l_contrib * m_to_AU, l_contrib/Rsun
+
 
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
@@ -153,11 +154,12 @@ MODULE AtomicTransfer
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
                   NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / & 
-                 (NLTEspec%AtomOpac%Kc(icell,:,1) + &
+                 (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300 + &
                  NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
-            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%Kc(icell,:,1)
+            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / &
+            (1d-300 + NLTEspec%AtomOpac%Kc(icell,:,1))
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
@@ -175,12 +177,13 @@ MODULE AtomicTransfer
       ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
       Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
                   NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
-                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
+                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
                  
                  
       ! continuum source function
       Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
-            NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / NLTEspec%AtomOpac%chi_c(id,:)
+            NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / &
+            (1d-300 + NLTEspec%AtomOpac%chi_c(id,:))
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
