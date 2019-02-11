@@ -137,7 +137,6 @@ MODULE metal
      gijk(continuum%Nblue:continuum%Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * &
        expla(continuum%Nblue:continuum%Nred)
      if (lstore_opac) then !we don't care about proc id id
-     write(*,*) "ok_metal_bf"
       NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) = &
                     NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) + &
        				alpha_la(continuum%Nblue:continuum%Nred) * &
@@ -148,7 +147,6 @@ MODULE metal
        				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
          			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
      else !proc id is important
-          write(*,*) "ok2:metal_bf"
       NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) = &
       				NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) + &
        				alpha_la(continuum%Nblue:continuum%Nred) * &
