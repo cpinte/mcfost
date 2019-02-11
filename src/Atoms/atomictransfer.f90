@@ -135,7 +135,7 @@ MODULE AtomicTransfer
 !	   this makes the code to break down    
                
     !count opacity only if the cell is filled, else go to next cell
-    if (lcellule_non_vide.and..not.atmos%lcompute_atomRT(icell)) then
+    if (lcellule_non_vide.and.atmos%lcompute_atomRT(icell)) then
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
@@ -154,12 +154,12 @@ MODULE AtomicTransfer
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
                   NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / & 
-                 (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300 + &
-                 NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:))
+                 (NLTEspec%AtomOpac%Kc(icell,:,1) + &
+                 NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / &
-            (1d-300 + NLTEspec%AtomOpac%Kc(icell,:,1))
+            (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300)
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
                                 !define the projection of the vector field (velocity, B...)
@@ -183,7 +183,7 @@ MODULE AtomicTransfer
       ! continuum source function
       Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / &
-            (1d-300 + NLTEspec%AtomOpac%chi_c(id,:))
+            (NLTEspec%AtomOpac%chi_c(id,:) + 1d-300)
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
