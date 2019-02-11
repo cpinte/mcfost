@@ -109,7 +109,7 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       Vphi = Omega * (r*AU_to_m) !m/s
+       Vphi = 235d0! Omega * (r*AU_to_m) !m/s
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
@@ -157,9 +157,9 @@ MODULE simple_models
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
-             atmos%Vxyz(icell,1) = 0*vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) !Vx = VR * projx
-             atmos%Vxyz(icell,2) = 0*vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) !Vy = VR * projy
-             atmos%Vxyz(icell,3) = 0*vp * (2d0 - 3d0 * y) !z
+             atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi)
+             atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi)
+             atmos%Vxyz(icell,3) = vp * (2d0 - 3d0 * y) !z
              ! or theta > PI/2d0
              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
              atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * proj_phix

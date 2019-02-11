@@ -33,7 +33,7 @@ MODULE metal
 
  CONTAINS
 
- SUBROUTINE Metal_bf(icell, chi, eta)
+ SUBROUTINE Metal_bf(id, icell)
  !cross-section in cm2 per particle is given by Kramers’ formula
   !with n the principal quantum number of the level i from
  !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
@@ -41,25 +41,20 @@ MODULE metal
  !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
  !being zero below it because the threshold energy is the required minimum. Think the
   ! inverse in terms of wavelengths
-  integer, intent(in)							            :: icell
+  integer, intent(in)							            :: icell, id
   logical 										            :: obtained_n
   integer                                                   :: m, kr, i, j, Z, nc
   type (AtomType)                                           :: metal
   type (AtomicContinuum)                                    :: continuum
-  double precision, intent(out), dimension(NLTEspec%Nwaves) :: eta, chi
   double precision                                          :: lambdaEdge, twohc, hc_k, &
        														   n_eff
-  double precision, dimension(NLTEspec%Nwaves)              :: uu, gbf
   double precision, dimension(1) 							:: gbf_0, uu0
   double precision, dimension(NLTEspec%Nwaves)              :: twohnu3_c2, gijk, hc_kla,&
-                                                               expla, alpha_la
+                                                               expla, alpha_la, uu, gbf
    obtained_n = .false. !true if the routine to read principal quantum number is fine
 
    twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
    hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
-
-   chi = 0d0
-   eta = 0d0
    
    if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ID == "H ") RETURN
    ! else if H is not passive (active) it will not be the first.
@@ -141,13 +136,29 @@ MODULE metal
      
      gijk(continuum%Nblue:continuum%Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * &
        expla(continuum%Nblue:continuum%Nred)
-     chi(continuum%Nblue:continuum%Nred) = chi(continuum%Nblue:continuum%Nred) + &
-       alpha_la(continuum%Nblue:continuum%Nred) * &
-       (1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
+     if (lstore_opac) then !we don't care about proc id id
+     write(*,*) "ok_metal_bf"
+      NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) = &
+                    NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) + &
+       				alpha_la(continuum%Nblue:continuum%Nred) * &
+       				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
 
-     eta(continuum%Nblue:continuum%Nred) = eta(continuum%Nblue:continuum%Nred) + &
-       twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
-         alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
+      NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) = &
+     				NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) + &
+       				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
+         			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
+     else !proc id is important
+          write(*,*) "ok2:metal_bf"
+      NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) = &
+      				NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) + &
+       				alpha_la(continuum%Nblue:continuum%Nred) * &
+       				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
+
+      NLTEspec%AtomOpac%eta_p(id,continuum%Nblue:continuum%Nred) = &
+      				NLTEspec%AtomOpac%eta_p(id,continuum%Nblue:continuum%Nred) + &
+      				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
+         			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)     
+     end if
 
     end do ! loop over Ncont
   end do !loop over metals
@@ -156,7 +167,7 @@ MODULE metal
  END SUBROUTINE Metal_bf
 
 
- SUBROUTINE Metal_bb (icell,x,y,z,x1,y1,z1,u,v,w,l,chi, eta, chip)
+ SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
   ! not treated in NLTE.
@@ -167,14 +178,13 @@ MODULE metal
   ! cell point we are computing the opacities.
   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
   integer 													:: kr, m, i, j, NrecStokes
-  integer, intent(in) 							            :: icell
+  integer, intent(in) 							            :: icell, id
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phiPol, phip, &
  															   Vij, vv
-  double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
   integer, parameter										:: NvspaceMax = 1
@@ -188,11 +198,6 @@ MODULE metal
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
-
-  !NrecStokes = 1 in unpolarised transfer and 4 in Stokes tranfer (I,Q,U,V)
-  chi = 0d0  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
-  eta = 0d0  !NrecStokes per cell at each wavelength: Nspec sized in unpolarised
-  chip = 0d0 !NrecStokes-1 per cell at each wavelength = Nsize=(NrecStokes-1)*Nwavelength
 
   ! v_proj in m/s at point icell
   omegav = 0d0
@@ -286,11 +291,13 @@ MODULE metal
      Vij(line%Nblue:line%Nred) = &
       hc_4PI * line%Bij * phi(line%Nblue:line%Nred) / (SQRTPI * atom%vbroad(icell))
 !      chi(iLam) = chi(iLam) + Vij(iLam) * (atom%n(i,icell)-gij*atom%n(j,icell))
-     chi(line%Nblue:line%Nred) = chi(line%Nblue:line%Nred) + &
-       Vij(line%Nblue:line%Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
+     NLTEspec%AtomOpac%chi_p(id,line%Nblue:line%Nred) = &
+     		NLTEspec%AtomOpac%chi_p(id,line%Nblue:line%Nred) + &
+       		Vij(line%Nblue:line%Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
 !      eta(iLam) = eta(iLam) + twohnu3_c2 * gij * Vij(iLam) * atom%n(j,icell)
-     eta(line%Nblue:line%Nred) = eta(line%Nblue:line%Nred) + &
-       twohnu3_c2 * gij * Vij(line%Nblue:line%Nred) * atom%n(j,icell)
+     NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) = &
+     		NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) + &
+       		twohnu3_c2 * gij * Vij(line%Nblue:line%Nred) * atom%n(j,icell)
        
 !      write(*,*) atom%ID, line%j,"->",line%i, NLTEspec%lambda(line%NBlue+(line%Nlambda-1)/2) - line%lambda0, &
 !       " nspect=", line%NBlue+(line%Nlambda-1)/2 - 1
@@ -305,15 +312,14 @@ MODULE metal
  RETURN
  END SUBROUTINE Metal_bb
 
- SUBROUTINE Metal_bb_lambda (la, icell,x,y,z,x1,y1,z1,u,v,w,l,chi, eta, chip)
+ SUBROUTINE Metal_bb_lambda (id, la, icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer 													:: kr, m, i, j, NrecStokes
-  integer, intent(in) 							            :: icell, la
+  integer, intent(in) 							            :: icell, la, id
   double precision, intent(in) 					            :: x,y,z,u,v,w,& 
                                 				               x1,y1,z1,l
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   double precision, dimension(1)                            :: phi, vvoigt, phiPol, phip, &
  															   Vij, vv
-  double precision, intent(out), dimension(1)               :: chi, eta, chip
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
   integer, parameter										:: NvspaceMax = 1
@@ -328,10 +334,7 @@ MODULE metal
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
 
-  !NrecStokes = 1 in unpolarised transfer and 4 in Stokes tranfer (I,Q,U,V)
-  chi = 0d0  !NrecStokes per cell at eachwavelength = Nsize=NrecStokes*Nwavelength
-  eta = 0d0  !NrecStokes per cell at each wavelength: Nspec sized in unpolarised
-  chip = 0d0 !NrecStokes-1 per cell at each wavelength = Nsize=(NrecStokes-1)*Nwavelength
+  !check that NLTEspec%AtomOpac%eta_p(id,:) = 0d0 here
 
   ! v_proj in m/s at point icell
   omegav = 0d0
@@ -410,8 +413,10 @@ MODULE metal
     
      
      Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * atom%vbroad(icell))
-     chi(1) = chi(1) + Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
-     eta(1) = eta(1) + twohnu3_c2 * gij * Vij(1) * atom%n(j,icell)
+     NLTEspec%AtomOpac%chi_p(id,la) = NLTEspec%AtomOpac%chi_p(id,la) +&
+     								  Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
+     NLTEspec%AtomOpac%eta_p(id,la) = NLTEspec%AtomOpac%eta_p(id,la) +&
+     								  twohnu3_c2 * gij * Vij(1) * atom%n(j,icell)
 
     end do !end loop on lines for this atom
   end do !end loop over Natom
@@ -425,7 +430,7 @@ MODULE metal
 
   if (.not.atmos%lcompute_atomRT(icell)) RETURN
   
-   CALL Bplanck(atmos%T(icell), NLTEspec%Nwaves, NLTEspec%lambda, Bpnu)
+   CALL Bplanck(atmos%T(icell), Bpnu)
 
    chi = 0d0
    eta = 0d0
@@ -433,12 +438,14 @@ MODULE metal
 
    NLTEspec%AtomOpac%Kc(icell,:,1) = Thomson(icell)
 
-   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = & 
-     NLTEspec%AtomOpac%Kc(icell,:,1) + sca
-   if (associated(Helium)) then
-    if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = &
-          NLTEspec%AtomOpac%Kc(icell,:,1) + sca
-   end if
+!    if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = & 
+!      NLTEspec%AtomOpac%Kc(icell,:,1) + sca
+!    if (associated(Helium)) then
+!     if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = &
+!           NLTEspec%AtomOpac%Kc(icell,:,1) + sca
+!    end if
+   CALL Rayleigh(1, icell, Hydrogen) !don't care about id here
+   if (associated(Helium)) CALL Rayleigh(1, icell, Helium)
    !CALL HRayleigh(icell,Hydrogen, sca)
    !NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + sca
 
@@ -463,9 +470,7 @@ MODULE metal
    end if
 
    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
-   CALL Metal_bf(icell, chi, eta)
-   NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
-   NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
+   CALL Metal_bf(1, icell) !here we do not need id, because lstore_atom_opac=.true.
 
  RETURN
  END SUBROUTINE BackgroundContinua
@@ -474,40 +479,26 @@ MODULE metal
   integer, intent(in) :: icell, id
   double precision, intent(in) :: x, y, z, u, v, w, &
                                   x1, y1, z1, l
-  double precision, dimension(NLTEspec%Nwaves) :: chi, eta, sca, chip
 
   if (.not.atmos%lcompute_atomRT(icell)) RETURN 
 
-   chi = 0d0
-   eta = 0d0
-   sca = 0d0
-   chip = 0d0
-
    if (atmos%Npassiveatoms == 0) RETURN
-   CALL Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
-   NLTEspec%AtomOpac%chi_p(id,:) =  chi !+NLTEspec%AtomOpac%chi_p(id,:)
-   NLTEspec%AtomOpac%eta_p(id,:) = eta !+NLTEspec%AtomOpac%eta_p(id,:) !because it is already 0
+   CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
 
  RETURN
  END SUBROUTINE BackgroundLines
  
- SUBROUTINE BackgroundLines_lambda(la, id,icell,x,y,z,x1,y1,z1,u,v,w,l)
+ SUBROUTINE BackgroundLines_lambda(la,id,icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer, intent(in) :: icell, id, la
   double precision, intent(in) :: x, y, z, u, v, w, &
                                   x1, y1, z1, l
-  double precision, dimension(1) :: chi, eta, sca, chip
 
   if (.not.atmos%lcompute_atomRT(icell)) RETURN 
 
-   chi = 0d0
-   eta = 0d0
-   sca = 0d0
-   chip = 0d0
 
    if (atmos%Npassiveatoms == 0) RETURN
-   CALL Metal_bb_lambda(la, icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
-   NLTEspec%AtomOpac%chi_p(id,la) = chi(1)
-   NLTEspec%AtomOpac%eta_p(id,la) = eta(1)
+   CALL Metal_bb_lambda(id, la, icell, x, y, z, x1, y1, z1, u, v, w, l)
+
  RETURN
  END SUBROUTINE BackgroundLines_lambda
 
@@ -529,7 +520,7 @@ MODULE metal
   !The compute_atomRT ensures that at least one level has non-zero populations,
   !to avoid division by zero.
 
-   CALL Bplanck(atmos%T(icell), NLTEspec%Nwaves, NLTEspec%lambda, Bpnu)
+   CALL Bplanck(atmos%T(icell), Bpnu)
 
    chi = 0d0
    eta = 0d0
@@ -537,14 +528,15 @@ MODULE metal
    chip = 0d0
 
 
-   if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%sca_c(id,:) = sca
-   NLTEspec%AtomOpac%sca_c(id,:) =  NLTEspec%AtomOpac%sca_c(id,:) + Thomson(icell)
-   if (associated(Helium)) then
-    if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%sca_c(id,:) = &
-          NLTEspec%AtomOpac%sca_c(id,:) + sca
-   end if
-   !CALL HRayleigh(icell,Hydrogen, sca)
-   !NLTEspec%AtomOpac%sca_c(id,:) = NLTEspec%AtomOpac%sca_c(id,:) + sca
+!    if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%sca_c(id,:) = sca
+!    NLTEspec%AtomOpac%sca_c(id,:) =  NLTEspec%AtomOpac%sca_c(id,:) + Thomson(icell)
+!    if (associated(Helium)) then
+!     if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%sca_c(id,:) = &
+!           NLTEspec%AtomOpac%sca_c(id,:) + sca
+!    end if
+   CALL Rayleigh(id, icell, Hydrogen)
+   if (associated(Helium)) CALL Rayleigh(id, icell, Helium)
+   !CALL HRayleigh(icell,Hydrogen)
 
    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%sca_c(id,:)
 
@@ -568,10 +560,10 @@ MODULE metal
    
    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
    ! we avoid H passive in metal_bf if H is passive
-   
-    CALL Metal_bf(icell, chi, eta) !Return if Npassive=1 and PassiveAtoms(1)==" H"
-    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-    NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+   						!, chi, eta)
+    CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
+!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
 
    !keep pure continuum opacities now
    if (MINVAL(NLTEspec%AtomOpac%eta_p(id,:))<0 .or. &
@@ -583,9 +575,7 @@ MODULE metal
    NLTEspec%AtomOpac%chi_c(id,:) = NLTEspec%AtomOpac%chi_p(id,:)
 
    ! we already RETURNs if no passive transitions (H included)
-   CALL Metal_bb(icell, x, y, z, x1, y1, z1, u, v, w, l, chi, eta, chip)
-   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-   NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+   CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
 
  RETURN
  END SUBROUTINE Background
