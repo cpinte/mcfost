@@ -44,7 +44,7 @@ MODULE AtomicTransfer
  use grid
  use optical_depth
  use dust_prop
- use dust_transfer, only 				: compute_stars_map, find_pixel
+ use dust_transfer, only 				: compute_stars_map
  use dust_ray_tracing, only 			: init_directions_ray_tracing ,            & 
                               			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
                               			  tab_RT_incl, stars_map, kappa
