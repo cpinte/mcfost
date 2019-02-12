@@ -384,8 +384,10 @@ MODULE atmos_type
   RETURN
   END SUBROUTINE fillElements
 
-  SUBROUTINE init_atomic_atmos(Nspace)
-   integer, intent(in) :: Nspace
+  SUBROUTINE init_atomic_atmos()!(Nspace)
+   use input, only : Vfield, linfall, lkeplerian
+   !integer, intent(in) :: Nspace
+   atmos%Nspace = n_cells
    
    if (allocated(atmos%T).or.(allocated(atmos%nHtot)) & 
        .or.(allocated(atmos%ne))) then
@@ -393,13 +395,17 @@ MODULE atmos_type
     stop
    end if
    
-   if (.not.allocated(atmos%T)) allocate(atmos%T(Nspace))
+   if (.not.allocated(atmos%T)) allocate(atmos%T(atmos%Nspace))
    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
    
    if (.not.lstatic) then 
     !Nrad, Nz, Naz
-    allocate(atmos%Vxyz(Nspace,3))
+    allocate(atmos%Vxyz(atmos%Nspace,3))
     atmos%Vxyz = 0d0
+   end if
+   if (allocated(Vfield).and.lkeplerian.or.linfall) then
+    write(*,*) "Vfield already filled", maxval(Vfield), minval(Vfield)
+    deallocate(Vfield) !reallocate it later if needed
    end if
 
    atmos%Natom = 0
@@ -409,15 +415,14 @@ MODULE atmos_type
    atmos%wght_per_H=0
    atmos%metallicity = 0. !not used yet
    atmos%Npf = 0
-   atmos%Nspace = Nspace
    atmos%calc_ne = .false.
    atmos%T = 0d0
 
 
-   if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(Nspace))
-   if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(Nspace))
-   if (.not.allocated(atmos%ne)) allocate(atmos%ne(Nspace))
-   if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(Nspace))
+   if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
+   if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
+   if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
+   if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
    
    atmos%ne = 0d0
    atmos%nHmin = 0d0
@@ -426,7 +431,7 @@ MODULE atmos_type
 
    CALL fillElements()
    
-   allocate(atmos%lcompute_atomRT(Nspace))
+   allocate(atmos%lcompute_atomRT(atmos%Nspace))
 
    RETURN
    END SUBROUTINE init_atomic_atmos

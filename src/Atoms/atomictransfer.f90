@@ -592,8 +592,8 @@ MODULE AtomicTransfer
 
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
-  CALL initSpectrum(nb_proc, 500d0,lvacuum_to_air,lwrite_waves)
-  CALL allocSpectrum(npix_x, npix_y, RT_n_incl, RT_n_az)
+  CALL initSpectrum(500d0,lvacuum_to_air,lwrite_waves)
+  CALL allocSpectrum()
   if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.
                                          ! Background continua (=ETL) are kept in memory.
@@ -709,16 +709,6 @@ MODULE AtomicTransfer
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
-  if (allocated(Vfield)) deallocate(Vfield) !do not need it anymore. Using Vxyz(:,3) now
-!   Velocity field in  m.s-1
-!   if (allocated(Vfield)) write(*,*) "Vfield already exists"
-!   if (allocated(Vfield)) deallocate(Vfield) !for security ?
-!   but if lstatic we do not allocate it.
-!   if (.not.allocated(Vfield).and..not.lstatic) allocate(Vfield(n_cells))
-!   if (.not.lstatic) then
-!    Vfield=atmos%V!
-!    deallocate(atmos%V)
-!   end if
 
  RETURN
  END SUBROUTINE adjusting_mcfost

@@ -8,6 +8,7 @@ MODULE spectrum_type
   use fits_utils, only : print_error
   use utils, only : spanl, span
   use parametres
+  use input
 
   IMPLICIT NONE
 
@@ -20,6 +21,7 @@ MODULE spectrum_type
    character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
    ! I(x,y,0,lambda,imu), not used yet
    !character(len=*), parameter :: SPEC_FILE="spectrum.fits.gz"
+   character(len=*), parameter :: OPAC_CONTRIB_FILE="opacities.fits.gz"
 
   !Like RH, should vanish in the futur
 !   TYPE ActiveSetType
@@ -43,7 +45,7 @@ MODULE spectrum_type
   TYPE Spectrum
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, NPROC, Ntrans
+   integer :: Nwaves, Nact, Ntrans, NPROC=1
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
    !nproc, nlambda, nrays
@@ -63,14 +65,14 @@ MODULE spectrum_type
 
   CONTAINS
 
-  SUBROUTINE initSpectrum(NPROC, lam0, vacuum_to_air, write_wavelength)
-   integer, intent(in) :: NPROC
+  SUBROUTINE initSpectrum(lam0, vacuum_to_air, write_wavelength)
+   !integer, intent(in) :: NPROC
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air, write_wavelength
    integer :: kc, kr, n
       
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
-   NLTEspec%NPROC = NPROC
+   NLTEspec%NPROC = nb_proc!NPROC
    
    if (present(lam0)) NLTEspec%wavelength_ref = lam0
    if (present(write_wavelength)) NLTEspec%write_wavelength_grid = write_wavelength
@@ -88,8 +90,8 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initSpectrum
 
-  SUBROUTINE allocSpectrum(NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
-   integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
+  SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
+   !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
    integer :: Nsize, maxNlambda=0, Nadmp = 50, iv, ia, n, kr
    double precision, allocatable, dimension(:) :: F
@@ -121,8 +123,8 @@ MODULE spectrum_type
    NLTEspec%J = 0.0
    NLTEspec%Jc = 0.0
       
-   allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
-   allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X, NPIX_Y,N_INCL,N_AZIMUTH))
+   allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
+   allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
    !create pol flux map or add to Flux
    
    NLTEspec%Flux = 0.0
@@ -226,12 +228,6 @@ MODULE spectrum_type
   ! FLUX map:
   ! NLTEspec%Flux total and NLTEspec%Flux continuum
  ! --------------------------------------------------- !
-   
-  use input
-  use parametres
- 
-  character(len=512) :: filename !in case
-
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
@@ -409,7 +405,9 @@ MODULE spectrum_type
  END SUBROUTINE WRITE_FLUX
   
   SUBROUTINE writeWavelength()
+  ! --------------------------------------------------------------- !
    ! Write wavelength grid build with each transition of each atom
+  ! --------------------------------------------------------------- !
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
    logical :: extend, simple
    character(len=6) :: comment="VACUUM"
@@ -486,6 +484,43 @@ MODULE spectrum_type
 
   RETURN
   END FUNCTION air2vacuum
+  
+  SUBROUTINE writeContrib()
+  ! --------------------------------------------------------------- !
+   ! Write the different contributions to opacities to fits file
+  ! --------------------------------------------------------------- !
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements, i, xcenter
+  integer :: la, Nred, Nblue, kr, kc, m
+  logical :: simple, extend
+  character(len=6) :: comment=""
+  
+  write(*,*) "Writing opacities"
+  
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+   status=0
+   CALL ftgiou (unit,status)
+
+   !  Create the new empty FITS file.
+   blocksize=1
+   CALL ftinit(unit,trim(OPAC_CONTRIB_FILE),blocksize,status)
+
+   simple=.true.
+   extend=.true.
+   group=1
+   fpixel=1
+
+   bitpix=-64
+   naxis=4
+   naxes(1)=NLTEspec%Nwaves
+   naxes(2)=NLTEspec%atmos%Nspace
+   naxes(3)=RT_n_incl
+   naxes(4)=RT_n_az
+   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+  
+  RETURN
+  END SUBROUTINE
 
 END MODULE spectrum_type
 

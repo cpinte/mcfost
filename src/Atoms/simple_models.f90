@@ -54,10 +54,9 @@ MODULE simple_models
    !Lambda = Q/nH**2
    data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 / !log10? 
    
-   !if (.not.allocated(Vfiedl)) allocate(Vfield(n_cells))
    Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
 
-   CALL init_atomic_atmos(n_cells)
+   CALL init_atomic_atmos()!(n_cells)
    atmos%vturb = 5d3 !m/s
    !vx = 0d0; vy=0d0; vz=0d0
 
@@ -109,7 +108,7 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       Vphi = 235d0! Omega * (r*AU_to_m) !m/s
+       Vphi = Omega * (r*AU_to_m) !m/s
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
@@ -202,7 +201,7 @@ MODULE simple_models
    ! Fontenla et al. namely the FAL C model.
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
   ! ----------------------------------------------------------- !
-   CALL init_atomic_atmos(n_cells)
+   CALL init_atomic_atmos()!(n_cells)
 
    !idk = 10
 !    atmos%nHtot =  2.27414200581936d16
@@ -244,7 +243,7 @@ MODULE simple_models
    double precision :: Vkepmax, Vkepmin
    integer :: icell
    
-   CALL init_atomic_atmos(n_cells)
+   CALL init_atomic_atmos()!(n_cells)
 
    atmos%nHtot = 1d14 * densite_gaz/MAXVAL(densite_gaz) + 1d12
    atmos%T = 3000d0+Tdust
@@ -254,6 +253,9 @@ MODULE simple_models
    atmos%vturb = 1d-5
    atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
+   !we need vfield: (deallocated in init_atomic_atmos now if already allocated)
+!  allocate(Vfield(n_cells))
+!  deallocate(atmos%Vxyz) !supposing lkep or linf, Vfield is used and veloc is varying across cells
 !     Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
 !                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
     write(*,*) "Implement Vfield here"
@@ -270,7 +272,7 @@ MODULE simple_models
     !Vkepmin = minval(Vfield, mask=atmos%V>0)
     atmos%v_char = atmos%v_char! + Vkepmin
    end if
-   CALL define_atomRT_domain() !deallocate atmos%V if static
+   CALL define_atomRT_domain()
 
   RETURN
   END SUBROUTINE prop_law_model

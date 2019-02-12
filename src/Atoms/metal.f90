@@ -217,7 +217,7 @@ MODULE metal
    atom = atmos%PassiveAtoms(m)
    
     !velocity projected along a path between one border of the cell to the other
-!     if (.not.lstatic .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
+!     if (.not.lstatic .and. .not.atmos%Voronoi .and.allocated(Vfield)) then ! velocity is varying across the cell
 !      v1 = v_proj(icell,x1,y1,z1,u,v,w)
 !      dv = dabs(v1-v0) 
 !      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
@@ -356,7 +356,7 @@ MODULE metal
    !if (atom%active) CYCLE ! go to next passive atom
    
     !velocity projected along a path between one border of the cell to the other
-!     if (.not.lstatic .and. .not.atmos%Voronoi) then ! velocity is varying across the cell
+!     if (.not.lstatic .and. .not.atmos%Voronoi .and.allocated(Vfield)) then ! velocity is varying across the cell
 !      v1 = v_proj(icell,x1,y1,z1,u,v,w)
 !      dv = dabs(v1-v0) 
 !      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
