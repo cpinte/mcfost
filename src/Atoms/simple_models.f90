@@ -57,7 +57,7 @@ MODULE simple_models
    Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
 
    CALL init_atomic_atmos()!(n_cells)
-   atmos%vturb = 5d3 !m/s
+   atmos%vturb = 0d3 !m/s
    !vx = 0d0; vy=0d0; vz=0d0
 
    !Define some useful quantities
@@ -108,7 +108,7 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       Vphi = Omega * (r*AU_to_m) !m/s
+       Vphi = 400d3!Omega * (r*AU_to_m) !m/s
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
@@ -180,7 +180,8 @@ MODULE simple_models
    !cannot use both simultaneously
    lkeplerian = .false.
    linfall = .false.
-   if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
+   !! inclued in atom%vbroad so we do not count it here
+   !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
     NormV = dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2)
     atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
@@ -230,7 +231,7 @@ MODULE simple_models
    !atmos%vturb = 1.696164d3 !idk = 75
    atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
-   atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
+   atmos%v_char = 0d0!would be only atom%vbroad which contains vturb already
 
   RETURN
   END SUBROUTINE uniform_law_model
@@ -250,8 +251,7 @@ MODULE simple_models
    atmos%ne = 0d0
 
    lkeplerian = .true.
-   atmos%vturb = 1d-5
-   atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
+   atmos%vturb = 1d0
    if (.not.lstatic) then
    !we need vfield: (deallocated in init_atomic_atmos now if already allocated)
 !  allocate(Vfield(n_cells))
