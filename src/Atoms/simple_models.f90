@@ -47,7 +47,7 @@ MODULE simple_models
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
-   double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L, proj_phix, proj_phiy
+   double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -108,13 +108,11 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       Vphi = 400d3!Omega * (r*AU_to_m) !m/s
+       Vphi = Omega * (r*AU_to_m) !m/s
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
        ! and cosTheta = z/r = sqrt(1.-y) = sqrt(1.-sinTheta**2)
-       proj_phix = -sin(phi) !cos(phi)*sinTheta
-       proj_phiy =  cos(phi) !sin(phi)*sinTheta
        !from definition of y
        y = sinTheta**2!min(real(sinTheta**2), 0.9999)
        !here the trick is to handle y = 1 at z=0 because rcyl=r and 1/(1-y) = inf.
@@ -123,7 +121,7 @@ MODULE simple_models
        !if r**3/rcyl**2 or Rm=r/sint**2 is between rmi and rmo it means that the
        !cell icell (r, theta) belongs to a field line.
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
-       if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r
+       if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r  
           nH0 = 1d3/masseH/atmos%avgWeight * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
@@ -138,8 +136,8 @@ MODULE simple_models
             !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
-            atmos%Vxyz(icell,1) = Vphi * proj_phix
-            atmos%Vxyz(icell,2) = Vphi * proj_phiy
+            atmos%Vxyz(icell,1) = Vphi * -sin(phi)
+            atmos%Vxyz(icell,2) = Vphi * cos(phi)
             !here it is better to have keplerian rotation than stellar rotation?
            end if
            !Density midplane of the disk
@@ -161,8 +159,8 @@ MODULE simple_models
              atmos%Vxyz(icell,3) = vp * (2d0 - 3d0 * y) !z
              ! or theta > PI/2d0
              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
-             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * proj_phix
-             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi * proj_phiy
+             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * -sin(phi)
+             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi * cos(phi)
            end if
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s

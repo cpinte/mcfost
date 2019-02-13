@@ -526,8 +526,6 @@ MODULE AtomicTransfer
  
  ! NOTE: should inverse the order of frequencies and depth because in general
  !       n_cells >> n_lambda, in "real" cases.
- ! some of shared quantities by the code that i don't know were they are !!
- ! lkeplerian, linfall, lvoro where to declare them, lcylindrical ects
  
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
@@ -604,6 +602,7 @@ MODULE AtomicTransfer
     write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**3), " GB of memory", &
    	 " for Background continuum opacities."
    end if
+   !!To DO: keep line LTE opacities if lstatic
    !$omp parallel &
    !$omp default(none) &
    !$omp private(icell) &
