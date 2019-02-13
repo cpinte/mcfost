@@ -389,7 +389,7 @@ MODULE metal
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
      
-     if (abs(vv(1)) > 5000d3) CYCLE
+     if (abs(vv(1)) > 20d0*atmos%v_char / atom%vbroad(icell)) CYCLE
      !if we are very far from the line, here 5000d3 m/s
      !we do not need to count the opacity of this line.
      
