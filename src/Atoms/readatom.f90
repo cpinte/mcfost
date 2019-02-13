@@ -47,7 +47,7 @@ MODULE readatom
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
     real(8) :: C1, vtherm, f, lambdaji
-    real(8) :: lambdamin, geff !, c_sum
+    real(8) :: lambdamin, geff, vDamp_char !, c_sum
     EOF = 0
     !write(*,*) "Atom is part of the active atoms ?", atom%active
 
@@ -147,7 +147,10 @@ MODULE readatom
     atom%ntotal = atom%Abund * atmos%nHtot
 !     write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
 !                          " minVD(km/s)=", minval(atom%vbroad,mask=atom%vbroad>0)/1d3
-!   
+!   do k=1, atmos%Nspace
+!    CALL Damping(icell, line) TO DO
+!    vDamp_char = max(line%adamp, vDamp_char)
+!   end do
     !! DO NOT USE i as a loop index here !!
 
     !Now read all bound-bound transitions

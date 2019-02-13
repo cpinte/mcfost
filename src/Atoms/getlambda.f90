@@ -52,29 +52,33 @@ MODULE getlambda
   ! ------------------------------------------------------------ !
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
-   double precision :: v_char, dvc, dvw
+   double precision :: v_char, dvc, dvw, L=50d0
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: L=50d0, core_to_wing = 0.3
+   double precision, parameter :: core_to_wing = 0.3
    integer, parameter :: Nc = 71, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(5*(Nc+Nw)) :: vel
    
-   v_char = L * (atmos%v_char + vD) !=maximum extension of a line
+   v_char = (atmos%v_char + vD) !=maximum extension of a line
+!    if (L*v_char >= 1d6) then 
+!     L = 1d0
+!     v_char = 1d6
+!    end if
+   !v_char = L * (atmos%v_char + vD) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
-   v0 = -v_char
-   v1 = +v_char
+   v0 = -v_char * L
+   v1 = +v_char * L
    vel = 0d0
    !transition between wing and core in velocity
-   vcore = v_char * core_to_wing ! == fraction of line extent
-   !if (lstatic) vcore = (vD + atmos%v_char) * 10.
+   vcore = L * v_char * core_to_wing ! == fraction of line extent
 
    !from -v_char to 0
-   dvw = (v_char-vcore)/(Nw-1)
+   dvw = (L * v_char-vcore)/(Nw-1)
    dvc = vcore/(Nc-1)
 !    write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
 !               " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
    vel(1) = v0 !half wing
-!   write(*,*) 1, vel(1), v0, v_char/1d3
+!   write(*,*) 1, vel(1), v0, L*v_char/1d3
    !wing loop
    do la=2, Nw
     vel(la) = vel(la-1) + dvw
