@@ -45,7 +45,7 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
-   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.1!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
@@ -137,12 +137,15 @@ MODULE simple_models
             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
             atmos%Vxyz(icell,1) = Vphi * -sin(phi)
-            atmos%Vxyz(icell,2) = Vphi * cos(phi)
+            atmos%Vxyz(icell,2) = Vphi *  cos(phi)
+!             atmos%Vxyz(icell,1) = Vphi * sinTheta * cos(phi)
+!             atmos%Vxyz(icell,2) = Vphi*sinTheta *sin(phi)
+!             atmos%Vxyz(icell,3) = Vphi*dsqrt(1.-y)
             !here it is better to have keplerian rotation than stellar rotation?
            end if
            !Density midplane of the disk
            !using power law of the dust-gas disk (defined in another zone?)
-           atmos%nHtot(icell) = 5e18!
+           atmos%nHtot(icell) = 1d19!
            !Temperature still given by the same law as in accretion funnels yet.
            !But probably different at this interface funnels/disk
           else !accretion funnels
@@ -160,7 +163,10 @@ MODULE simple_models
              ! or theta > PI/2d0
              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
              atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * -sin(phi)
-             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi * cos(phi)
+             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi *  cos(phi)
+!             atmos%Vxyz(icell,1) = Vphi * sinTheta * cos(phi)
+!             atmos%Vxyz(icell,2) = Vphi*sinTheta *sin(phi)
+!             atmos%Vxyz(icell,3) = Vphi*dsqrt(1.-y)
            end if
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s

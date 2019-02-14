@@ -63,7 +63,6 @@ MODULE getlambda
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    
-   !add damping if line is Voigt
    v_char = (atmos%v_char + vD) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char * L
