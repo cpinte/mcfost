@@ -6,7 +6,6 @@ MODULE spectrum_type
   
   !MCFOST's original modules
   use fits_utils, only : print_error
-  use utils, only : spanl, span
   use parametres
   use input
 
