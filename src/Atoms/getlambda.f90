@@ -5,6 +5,7 @@ MODULE getlambda
   use constant
   
   use parametres
+  use utils, only : span, spanl
   
   IMPLICIT NONE
   
@@ -31,7 +32,7 @@ MODULE getlambda
    l0 = lambdamin
    cont%Nlambda = Nlambda
    allocate(cont%lambda(cont%Nlambda))
-   resol = (l1 - l0) / (Nlambda - 1)
+   resol = (l1 - l0) / real(Nlambda - 1, kind=dp)
 !    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
 !               " Resolution (nm):", resol, " lambdamin =", lambdamin  
    
@@ -49,15 +50,18 @@ MODULE getlambda
   ! ------------------------------------------------------------ !
    ! Make an individual wavelength grid for the AtomicLine line.
    ! The wavelength grid is symmetric wrt lambda0.
+   ! It is by default, logarithmic in the wing and linear in the
+   ! core.
   ! ------------------------------------------------------------ !
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision, parameter :: core_to_wing = 0.3, L = 10d0!50d0
+   double precision, parameter :: wing_to_core = 0.3, L = 10d0!50d0
    integer, parameter :: Nc = 71, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
-   double precision, dimension(5*(Nc+Nw)) :: vel
+   double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
+   													 !if error try, 2*(Nc+Nw)
    
    !add damping if line is Voigt
    v_char = (atmos%v_char + vD) !=maximum extension of a line
@@ -66,21 +70,27 @@ MODULE getlambda
    v1 = +v_char * L
    vel = 0d0
    !transition between wing and core in velocity
-   !vcore = L * v_char * core_to_wing ! == fraction of line extent
-   vcore = v_char * 2d0 ! == multiple of v_char
+   !vcore = L * v_char * wing_to_core ! == fraction of line extent
+   vcore = v_char * 1.5d0
 
    !from -v_char to 0
-   dvw = (L * v_char-vcore)/(Nw-1)
-   dvc = vcore/(Nc-1)
+   dvw = (L * v_char-vcore)/real(Nw-1,kind=dp)
+   dvc = vcore/real(Nc-1,kind=dp)
 !    write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
 !               " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
-   vel(1) = v0 !half wing
-!   write(*,*) 1, vel(1), v0, L*v_char/1d3
+!! Linear wing
+   !vel(1:Nw) = -real(span(real(v1), real(vcore), Nw),kind=dp)
+   !vel(1) = v0 !half wing
+   !!write(*,*) 1, vel(1), v0, L*v_char/1d3
    !wing loop
-   do la=2, Nw
-    vel(la) = vel(la-1) + dvw
-!    write(*,*) la, vel(la)
-   end do
+!    do la=2, Nw
+!     vel(la) = vel(la-1) + dvw
+!    !!write(*,*) la, vel(la)
+!    end do
+!! Log wing
+   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
+!! end scale of wing points
+!   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp) 
 !   write(*,*) Nw, vel(Nw), vcore
    !vel(Nw) = -vcore!should be okey at the numerical precision 
    !la goes from 1 to Nw + Nc -1 total number of points.
@@ -91,7 +101,11 @@ MODULE getlambda
 !    write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
    end do
-   if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
+
+   !! Just a check here, maybe forcing the mid point to be zero is brutal
+   !! but by construction it should be zero !
+   !if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
+   if (dabs(vel(Nw+Nc-1)) /= 0d0) vel(Nw+Nc-1) = 0d0
    if (vel(Nw+Nc-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
 
   !number of points from -vchar to 0 is Nw+Nc-1, -1 because otherwise we count
