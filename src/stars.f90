@@ -764,4 +764,57 @@ subroutine stars_cell_indices()
 
 end subroutine stars_cell_indices
 
+!***********************************************************
+
+integer function intersect_stars(x,y,z, u,v,w)
+  ! return 0 if the packet/ray does not intersect a star, returns the star is if it does
+
+  real(kind=dp), intent(in) :: x,y,z, u,v,w
+
+  real(kind=dp), dimension(3) :: r, k, delta_r
+  real(kind=dp) :: b,c, delta, rac, s1, s2, d_to_star
+  integer :: i_star
+
+
+  r(1) = x ; r(2) = y ; r(3) = z
+  k(1) = u ; k(2) = v ; k(3) = w
+
+  d_to_star = huge(1.0_dp)
+
+  intersect_stars = 0
+
+  star_loop : do i_star = 1, n_etoiles
+     delta_r(:)  = r(:) - (/etoile(i_star)%x, etoile(i_star)%y, etoile(i_star)%z/)
+     b = dot_product(delta_r,k)
+     c = dot_product(delta_r,delta_r) - (etoile(i_star)%r)**2
+
+     delta = b*b - c
+
+     if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
+        rac = sqrt(delta)
+        s1 = -b - rac
+
+        if (s1 < 0) then ! we already entered the star
+           ! We can probably skip that test, s1 must be positive as we must be outside the star
+           s2 = -b + rac
+           if (s2 < 0) then ! we already exited the star
+              cycle star_loop
+           else ! We are still in the sphere and will exit it
+              d_to_star = min(d_to_star, s2)
+              call error("Packet is inside the star")
+           endif
+        else ! We will enter in the star
+           if (s1 < d_to_star) then
+              d_to_star = s1
+              intersect_stars = i_star
+           endif
+        endif ! s1 < 0
+
+     endif ! delta < 0
+
+  enddo star_loop
+
+end function intersect_stars
+
+
 end module stars
