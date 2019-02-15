@@ -766,14 +766,19 @@ end subroutine stars_cell_indices
 
 !***********************************************************
 
-integer function intersect_stars(x,y,z, u,v,w)
-  ! return 0 if the packet/ray does not intersect a star, returns the star is if it does
+subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+
+  ! lintersect_star is true is the ray/packet will intersect a star
+  ! i_star returns the id of the star intersected
+  ! icell_star returns the id of the cell where the star is
 
   real(kind=dp), intent(in) :: x,y,z, u,v,w
+  logical, intent(out) :: lintersect_stars
+  integer, intent(out) :: i_star, icell_star
 
   real(kind=dp), dimension(3) :: r, k, delta_r
   real(kind=dp) :: b,c, delta, rac, s1, s2, d_to_star
-  integer :: i_star
+  integer :: i
 
 
   r(1) = x ; r(2) = y ; r(3) = z
@@ -781,13 +786,11 @@ integer function intersect_stars(x,y,z, u,v,w)
 
   d_to_star = huge(1.0_dp)
 
-  intersect_stars = 0
-
-  star_loop : do i_star = 1, n_etoiles
-     delta_r(:)  = r(:) - (/etoile(i_star)%x, etoile(i_star)%y, etoile(i_star)%z/)
+  i_star = 0
+  star_loop : do i = 1, n_etoiles
+     delta_r(:)  = r(:) - (/etoile(i)%x, etoile(i)%y, etoile(i)%z/)
      b = dot_product(delta_r,k)
-     c = dot_product(delta_r,delta_r) - (etoile(i_star)%r)**2
-
+     c = dot_product(delta_r,delta_r) - (etoile(i)%r)**2
      delta = b*b - c
 
      if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
@@ -806,7 +809,7 @@ integer function intersect_stars(x,y,z, u,v,w)
         else ! We will enter in the star
            if (s1 < d_to_star) then
               d_to_star = s1
-              intersect_stars = i_star
+              i_star = i
            endif
         endif ! s1 < 0
 
@@ -814,7 +817,16 @@ integer function intersect_stars(x,y,z, u,v,w)
 
   enddo star_loop
 
-end function intersect_stars
+  lintersect_stars = (i_star > 0)
+  if (lintersect_stars) then
+     icell_star = etoile(i_star)%icell
+  else
+     icell_star = 0
+  end if
+
+  return
+
+end subroutine intersect_stars
 
 
 end module stars

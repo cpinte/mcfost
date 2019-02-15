@@ -713,9 +713,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   integ_ray_dust(:) = 0.0_dp
 
   ! Will the ray intersect a star
-  i_star = intersect_stars(x,y,z, u,v,w)
-  lintersect_stars = (i_star > 0)
-  if (lintersect_stars) icell_star = etoile(i_star)%icell
+  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
   ! propagation dans la grille
   ! Boucle infinie sur les cellules
