@@ -10,6 +10,7 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
+  use stars, only : intersect_stars
 
   implicit none
 
@@ -417,11 +418,11 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=dp), dimension(nTrans) :: tau_c
   real(kind=dp) :: dtau_c, Snu_c
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
+  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
 
   real :: facteur_tau
 
-  logical :: lcellule_non_vide, lsubtract_avg
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -434,8 +435,10 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   tau_c(:) = 0.0_dp
   I0c(:,iray,id) = 0.0_dp
 
-  !*** propagation dans la grille
+  ! Will the ray intersect a star
+  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
+  ! propagation dans la grille
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
      ! Indice de la cellule
@@ -451,6 +454,9 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
      ! Test sortie
      if (test_exit_grid(icell, x0, y0, z0)) then
         return
+     endif
+     if (lintersect_stars) then
+        if (icell == icell_star) return
      endif
 
      nbr_cell = nbr_cell + 1
@@ -793,11 +799,11 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   real(kind=dp), dimension(N_type_flux) :: integ_ray_dust
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l, l_contrib, l_void_before
-  integer :: icell, previous_cell, next_cell
+  integer :: icell, previous_cell, next_cell, icell_star, i_star
 
   real(kind=dp) :: tau, dtau
 
-  logical :: lcellule_non_vide
+  logical :: lcellule_non_vide, lintersect_stars
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z

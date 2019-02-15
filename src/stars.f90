@@ -12,7 +12,8 @@ module stars
   public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
-       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
+       intersect_stars
 
   private
 
@@ -782,7 +783,7 @@ subroutine stars_cell_indices()
      y = etoile(i_star)%y
      z = etoile(i_star)%z
 
-     ! todo : l'etoile peut occuper plusieurs cellules
+     ! todo : l'etoile peut occuper plusieurs cellules : Non,
      call indice_cellule(x,y,z, icell)
      etoile(i_star)%icell = icell
 
@@ -800,6 +801,8 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
   ! lintersect_star is true is the ray/packet will intersect a star
   ! i_star returns the id of the star intersected
   ! icell_star returns the id of the cell where the star is
+
+  ! This routine implies that a star is in a unique cell
 
   real(kind=dp), intent(in) :: x,y,z, u,v,w
   logical, intent(out) :: lintersect_stars
