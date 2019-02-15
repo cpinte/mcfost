@@ -35,9 +35,9 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
-  integer :: icell_in, icell0, icell_old, next_cell, previous_cell
+  integer :: icell_in, icell0, icell_old, next_cell, previous_cell, icell_star, i_star
 
-  logical :: lcellule_non_vide, lstop
+  logical :: lcellule_non_vide, lstop, lintersect_stars
 
   lstop = .false.
   flag_sortie = .false.
@@ -56,6 +56,9 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   ! Calcule les angles de diffusion pour la direction de propagation donnee
   if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
 
+  ! Will the packet intersect a star
+  call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
+
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
      ! Indice de la cellule
@@ -70,6 +73,9 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      if (test_exit_grid(icell0, x0, y0, z0)) then
         flag_sortie = .true.
         return
+     endif
+     if (lintersect_stars) then
+        if (icell0 == icell_star) return
      endif
 
      ! Pour cas avec approximation de diffusion
