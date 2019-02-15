@@ -103,7 +103,7 @@ MODULE AtomicTransfer
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
   ! -------------------------------------------------------------- !
-
+!icell = intersect_stars(x0,y0,z0, u,v,w)
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -116,7 +116,7 @@ MODULE AtomicTransfer
     else
      lcellule_non_vide=.false.
     endif
-       
+
     ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) then
      RETURN
@@ -616,7 +616,7 @@ MODULE AtomicTransfer
   end if
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
-  CALL adjusting_mcfost()
+  CALL reallocate_mcfost_vars()
 
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
   !! --------------------- NLTE--------------------------------- !!
@@ -676,7 +676,7 @@ MODULE AtomicTransfer
  RETURN
  END SUBROUTINE
  
- SUBROUTINE adjusting_mcfost()
+ SUBROUTINE reallocate_mcfost_vars()
   !--> should move them to init_atomic_atmos ? or elsewhere
   !need to be deallocated at the end of molecule RT or its okey ?`
   integer :: la
@@ -710,6 +710,6 @@ MODULE AtomicTransfer
   CALL repartition_energie_etoiles()
 
  RETURN
- END SUBROUTINE adjusting_mcfost
+ END SUBROUTINE reallocate_mcfost_vars
 
 END MODULE AtomicTransfer
