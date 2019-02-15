@@ -800,6 +800,8 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   tau = 0.0_dp
   integ_ray_dust(:) = 0.0_dp
 
+  ! Will the ray intersect a star
+  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
   !*** propagation dans la grille
 
