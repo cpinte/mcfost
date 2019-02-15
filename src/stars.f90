@@ -12,7 +12,7 @@ module stars
   public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
-       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, intersect_stars
 
   private
 

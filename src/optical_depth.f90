@@ -10,6 +10,7 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
+  use stars, only : intersect_stars
 
   implicit none
 
@@ -698,11 +699,11 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   real(kind=dp), dimension(N_type_flux) :: integ_ray_dust
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l, l_contrib, l_void_before
-  integer :: icell, previous_cell, next_cell
+  integer :: icell, previous_cell, next_cell, icell_star, i_star
 
   real(kind=dp) :: tau, dtau
 
-  logical :: lcellule_non_vide
+  logical :: lcellule_non_vide, lintersect_stars
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -711,9 +712,12 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   tau = 0.0_dp
   integ_ray_dust(:) = 0.0_dp
 
+  ! Will the ray intersect a star
+  i_star = intersect_stars(x,y,z, u,v,w)
+  lintersect_stars = (i_star > 0)
+  if (lintersect_stars) icell_star = etoile(i_star)%icell
 
-  !*** propagation dans la grille
-
+  ! propagation dans la grille
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
      ! Indice de la cellule
@@ -727,8 +731,9 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
      endif
 
      ! Test sortie
-     if (test_exit_grid(icell, x0, y0, z0)) then
-        return
+     if (test_exit_grid(icell, x0, y0, z0)) return
+     if (lintersect_stars) then
+        if (icell == icell_star) return
      endif
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
