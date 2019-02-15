@@ -16,7 +16,7 @@ module optical_depth
 
   contains
 
-subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie,lpacket_alive)
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
@@ -32,7 +32,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   real, intent(in) :: extrin
   real(kind=dp), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie
+  logical, intent(out) :: flag_sortie, lpacket_alive
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
@@ -42,6 +42,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   lstop = .false.
   flag_sortie = .false.
+  lpacket_alive = .true.
 
   x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
@@ -76,7 +77,10 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         return
      endif
      if (lintersect_stars) then
-        if (icell0 == icell_star) return
+        if (icell0 == icell_star) then
+           lpacket_alive = .false.
+           return
+        endif
      endif
 
      ! Pour cas avec approximation de diffusion
@@ -798,7 +802,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 
   logical :: flag_direct_star = .false.
   logical :: flag_star = .false.
-  logical :: flag_sortie
+  logical :: flag_sortie, lpacket_alive
 
   real(kind=dp), dimension(4) :: Stokes
 
@@ -879,7 +883,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
               w0=sin(angle)
               Stokes(:) = 0.0_dp ; !Stokes(1) = 1.0_dp ; ! Pourquoi c'etait a 1 ?? ca fausse les chmps de radiation !!!
               call physical_length(id,lambda,p_lambda,Stokes,icell, x0,y0,z0,u0,v0,w0, &
-                   flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
+                   flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
               if (.not.flag_sortie) then ! le photon ne sort pas
                  ! la cellule et celles en dessous sont dans la zone noire
                  do jj=1,j
@@ -912,7 +916,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  w0=sin(angle)
                  Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
-                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     do jj=1,j
@@ -942,7 +946,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
                  w0=sin(angle)
                  Stokes(:) = 0.0_dp ; Stokes(1) = 1.0_dp ;
                  call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
-                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie)
+                      flag_star,flag_direct_star,tau_max,dvol1,flag_sortie,lpacket_alive)
                  if (.not.flag_sortie) then ! le photon ne sort pas
                     ! la cellule et celles en dessous sont dans la zone noire
                     do jj=1,-1
