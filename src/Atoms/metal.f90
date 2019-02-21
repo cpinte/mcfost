@@ -272,6 +272,7 @@ MODULE metal
                         !                 2) Voronoi grid is used
         vvoigt(line%Nblue:line%Nred) = vv(line%Nblue:line%Nred) - &
                                        omegav(nv) / atom%vbroad(icell)
+
         phi(line%Nblue:line%Nred) = phi(line%Nblue:line%Nred) + &
             Voigt(line%Nlambda, line%adamp,vvoigt(line%Nblue:line%Nred), &
                   phip, VoigtMethod) / Nvspace !1 if no vel or Voronoi
@@ -287,8 +288,7 @@ MODULE metal
        !phiPol = phiPol + dphi/dv etc
       end do
      end if !line%voigt
-    
-     
+
      !Sum up all contributions for this line with the other
 !      Vij(iLam) = hc_4PI * line%Bij * phi(iLam) / (SQRTPI * atom%vbroad(icell))
      Vij(line%Nblue:line%Nred) = &
@@ -301,11 +301,7 @@ MODULE metal
      NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) = &
      		NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) + &
        		twohnu3_c2 * gij * Vij(line%Nblue:line%Nred) * atom%n(j,icell)
-       
-!      write(*,*) atom%ID, line%j,"->",line%i, NLTEspec%lambda(line%NBlue+(line%Nlambda-1)/2) - line%lambda0, &
-!       " nspect=", line%NBlue+(line%Nlambda-1)/2 - 1
-!      write(*,*) Vij(line%NBlue+(line%Nlambda-1)/2), &
-!         phi(line%Nblue+(line%Nlambda-1)/2), gij, line%adamp
+
        
      !dealloc indexes for next line
 !     deallocate(iLam)
@@ -439,18 +435,9 @@ MODULE metal
 
    chi = 0d0
    eta = 0d0
-!   sca = 0d0
 
    NLTEspec%AtomOpac%Kc(icell,:,1) = Thomson(icell)
 
-!    if (Rayleigh(icell, Hydrogen, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = & 
-!      NLTEspec%AtomOpac%Kc(icell,:,1) + sca
-!    if (associated(Helium)) then
-!     if (Rayleigh(icell, Helium, sca)) NLTEspec%AtomOpac%Kc(icell,:,1) = &
-!           NLTEspec%AtomOpac%Kc(icell,:,1) + sca
-!    end if
-   !CALL HRayleigh(icell,Hydrogen, sca)
-   !NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + sca
    CALL Rayleigh(1, icell, Hydrogen)
    if (associated(Helium)) CALL Rayleigh(1, icell, Helium)
 
@@ -459,11 +446,11 @@ MODULE metal
    CALL Hydrogen_ff(icell, chi)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
-
+   
    CALL Hminus_bf(icell, chi,eta)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
-
+   
    CALL Hminus_ff(icell, chi)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
@@ -476,6 +463,7 @@ MODULE metal
 
    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
    CALL Metal_bf(1, icell) !here we do not need id, because lstore_atom_opac=.true.
+
 
  RETURN
  END SUBROUTINE BackgroundContinua
