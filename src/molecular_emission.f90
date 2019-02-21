@@ -662,9 +662,15 @@ end subroutine J_mol_loc
 !***********************************************************
 
 function v_proj(icell,x,y,z,u,v,w) !
+  use atmos_type, only : atmos
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
+  ! Added projection for magnetospheric accretion, i.e., velocity is
+  ! a combination of Vpoloidal (VRcyl, Vz) and rotational (0,0,Vphi) +
+  ! eventually keplerian (0, 0, Vphi). Using atmos%Vxyz defined in 
+  ! Atoms/atmos_type.f90
+  ! 21/02/19; B. Tessore
 
   implicit none
 
@@ -685,7 +691,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         v_proj = vx * u + vy * v + vz * w
      else ! Using Analytical velocity field
-        vitesse = vfield(icell)
+        if (.not.lmagnetoaccr) vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -718,6 +724,21 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0.0_dp
            endif
+        else if (lmagnetoaccr) then
+           r = dsqrt(x*x+y*y)
+           vx = 0d0; vy = 0d0; vz = 0d0
+           if (r > tiny_dp) then !rotational (and Keplerian) velocity + v poloidal
+              norme = 1.0_dp/r
+              vx = -y * norme * atmos%Vxyz(icell,3) !Vphi proj_x
+              vy = x * norme * atmos%Vxyz(icell,3) !Vphi projy
+              vx = vx + x*norme*atmos%Vxyz(icell, 1) !Vr proj_x
+              vy = vy + y*norme*atmos%Vxyz(icell, 1) !Vr proj_y
+              vz = atmos%Vxyz(icell, 2) !Vz
+              if (z < 0) vz = -vz
+              v_proj = vx*u + vy*v + vz*w
+           else
+            v_proj = 0d0
+           endif     
         else
            call error("velocity field not defined")
         endif
