@@ -188,7 +188,6 @@ MODULE simple_models
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
-   
 
    !! inclued in atom%vbroad so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)

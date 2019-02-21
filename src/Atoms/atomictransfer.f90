@@ -119,13 +119,11 @@ MODULE AtomicTransfer
     endif
 
     ! Test sortie ! "The ray has reach the end of the grid"
-    if (test_exit_grid(icell, x0, y0, z0)) then
-     RETURN
-    end if
+    if (test_exit_grid(icell, x0, y0, z0)) RETURN
     if (lintersect_stars) then
-      if (icell==icell_star) write(*,*) "touch the star, end of ray", icell, icell_star
       if (icell == icell_star) RETURN
     endif
+    !if (lintersect_stars .and. (icell == icell_star)) RETURN
     
     nbr_cell = nbr_cell + 1
 
