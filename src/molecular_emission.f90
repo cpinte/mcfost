@@ -684,7 +684,7 @@ function v_proj(icell,x,y,z,u,v,w) !
      if (ldensity_file) then
         vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         v_proj = vx * u + vy * v + vz * w
-     else ! Using Analytical velocity field
+     else ! Using analytical velocity field
         vitesse = vfield(icell)
 
         if (lkeplerian) then
