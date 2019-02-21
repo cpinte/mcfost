@@ -8,9 +8,6 @@ module density
   use utils
   use messages
 
-  ! B. Tessore's modules
-  ! use atmos_type, only : initGrid
-
   implicit none
   save
 
