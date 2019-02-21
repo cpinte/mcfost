@@ -58,7 +58,7 @@ module parametres
   
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
-  			 lcontrib_function
+  			 lcontrib_function, lmagnetoaccr
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet

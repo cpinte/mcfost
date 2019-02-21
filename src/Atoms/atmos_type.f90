@@ -36,8 +36,7 @@ MODULE atmos_type
    ! Each component of the velocity is a function of x, y, z so
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
-   double precision, allocatable, dimension(:,:) :: Vxyz !used if velocity fields
-   ! is not Keplerian nor read from file. Then Vmap is computed, and Vfield = Vmap.
+   double precision, allocatable, dimension(:,:) :: Vxyz
    type (Element), dimension(:), allocatable :: Elements
    type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms 
    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
@@ -385,7 +384,6 @@ MODULE atmos_type
   END SUBROUTINE fillElements
 
   SUBROUTINE init_atomic_atmos()!(Nspace)
-   use input, only : Vfield, linfall, lkeplerian
    !integer, intent(in) :: Nspace
    atmos%Nspace = n_cells
    
@@ -399,13 +397,16 @@ MODULE atmos_type
    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
    
    if (.not.lstatic) then 
-    !Nrad, Nz, Naz
+    !Nrad, Nz, Naz-> Velocity vector cartesian components
     allocate(atmos%Vxyz(atmos%Nspace,3))
     atmos%Vxyz = 0d0
-   end if
-   if (allocated(Vfield).and.lkeplerian.or.linfall) then
-    write(*,*) "Vfield already filled", maxval(Vfield), minval(Vfield)
-    deallocate(Vfield) !reallocate it later if needed
+    !if lmagnetoaccr then atmos%Vxyz = (VRcyl, Vz, Vphi)
+    !it is then projected like it is done in v_proj for keplerian rot
+    !meaning that the vlocity field has infinite resolution. Otherwise,
+    !Vxyz=(Vx,Vy,Vz) and the velocity is constant in the cell just like in the
+    !Vornoi case.
+    !Vfield or atmos%Vxyz deallocated in atomictransfer.f90/&
+    !           reallocate_mcfost_vars() depending on lkep, linf and lmagnetoaccr
    end if
 
    atmos%Natom = 0

@@ -64,6 +64,7 @@ subroutine set_default_variables()
   lstatic = .false.
   lvacuum_to_air = .false.
   lcontrib_function = .false.
+  lmagnetoaccr = .false.
   ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.

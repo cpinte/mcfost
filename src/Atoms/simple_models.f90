@@ -38,7 +38,6 @@ MODULE simple_models
    ! sintheta = R/sqrt(z**2+R**2) and r/sin2(theta) = cte along
    ! a line.
    !
-   ! No rotation of the star yet
   ! ----------------------------------------------------------- !
    use math, only : interp1D
    use utils, only : interp_dp
@@ -56,9 +55,11 @@ MODULE simple_models
    
    Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
 
-   CALL init_atomic_atmos()!(n_cells)
+   linfall = .false.
+   lkeplerian = .false.
+   lmagnetoaccr = .true.
+   CALL init_atomic_atmos()
    atmos%vturb = 0d3 !m/s
-   !vx = 0d0; vy=0d0; vz=0d0
 
    !Define some useful quantities
    !write(*,*) "Mstar ", etoile(1)%M, " Rstar ", etoile(1)%r*AU_to_Rsun
@@ -109,6 +110,7 @@ MODULE simple_models
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
        Vphi = Omega * (r*AU_to_m) !m/s
+       if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat
        !from trigonometric relations we get y using rcyln 
        !and the radius at r(rcyln, zn)
        sinTheta = rcyl/r
@@ -132,15 +134,14 @@ MODULE simple_models
            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
            vp = 0d0
            !atmos%Vxyz is initialized to 0 everywhere
-           if (.not.lstatic) then
+           if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
+           													!using analytical velocity law
+           													!hence if atmos%magnetoaccr = .false.
             !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
-            atmos%Vxyz(icell,1) = Vphi * -sin(phi)
-            atmos%Vxyz(icell,2) = Vphi *  cos(phi)
-!             atmos%Vxyz(icell,1) = Vphi * sinTheta * cos(phi)
-!             atmos%Vxyz(icell,2) = Vphi*sinTheta *sin(phi)
-!             atmos%Vxyz(icell,3) = Vphi*dsqrt(1.-y)
+            atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
+            atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
             !here it is better to have keplerian rotation than stellar rotation?
            end if
            !Density midplane of the disk
@@ -157,16 +158,23 @@ MODULE simple_models
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
-             atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi)
-             atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi)
-             atmos%Vxyz(icell,3) = vp * (2d0 - 3d0 * y) !z
-             ! or theta > PI/2d0
+             atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rhat
+             atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !zhat
+             atmos%Vxyz(icell,3) = Vphi !phihat
+             if (.not.lmagnetoaccr) then !projection
+              atmos%Vxyz(icell,3) = atmos%Vxyz(icell,2) !zhat         
+              atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) &
+              						-Vphi*sin(phi)!xhat
+              atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) &
+              						+Vphi*cos(phi)!yhat
              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
-             atmos%Vxyz(icell,1) = atmos%Vxyz(icell,1) + Vphi * -sin(phi)
-             atmos%Vxyz(icell,2) = atmos%Vxyz(icell,2) + Vphi *  cos(phi)
-!             atmos%Vxyz(icell,1) = Vphi * sinTheta * cos(phi)
-!             atmos%Vxyz(icell,2) = Vphi*sinTheta *sin(phi)
-!             atmos%Vxyz(icell,3) = Vphi*dsqrt(1.-y)
+             end if
+             ! or theta > PI/2d0
+             !Because z, is the second axis if Vxyz=(Vr, Vz, Vphi) and the third if the
+             !velocity is projected on the cartesian coordinates
+             !!the minus sign in case of lmagnetoaccr is now taken in v_proj
+             !!if (z<0 .and.lmagnetoaccr) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
+
            end if
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
@@ -181,9 +189,7 @@ MODULE simple_models
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
    
-   !cannot use both simultaneously
-   lkeplerian = .false.
-   linfall = .false.
+
    !! inclued in atom%vbroad so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
@@ -256,25 +262,25 @@ MODULE simple_models
 
    lkeplerian = .true.
    atmos%vturb = 1d0
+
    if (.not.lstatic) then
-   !we need vfield: (deallocated in init_atomic_atmos now if already allocated)
-!  allocate(Vfield(n_cells))
-!  deallocate(atmos%Vxyz) !supposing lkep or linf, Vfield is used and veloc is varying across cells
-!     Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
-!                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
-    write(*,*) "Implement Vfield here"
-!     if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-!       do icell=1, n_cells
-!         Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-!       end do
-!     else ! dependance en z
-!        do icell=1, n_cells
-!          Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-!                 ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-!        end do
-!     end if
-    !Vkepmin = minval(Vfield, mask=atmos%V>0)
-    atmos%v_char = atmos%v_char! + Vkepmin
+   !we need vfield
+    if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
+    deallocate(atmos%Vxyz) !supposing lkep or linf, Vfield is used and veloc is varying across cells
+    Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
+                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
+    if (lcylindrical_rotation) then ! Midplane Keplerian velocity
+      do icell=1, n_cells
+        Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+      end do
+    else ! dependance en z
+       do icell=1, n_cells
+         Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
+       end do
+    end if
+    Vkepmin = minval(Vfield, mask=Vfield>0)
+    atmos%v_char = atmos%v_char + Vkepmin
    end if
    CALL define_atomRT_domain()
 

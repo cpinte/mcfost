@@ -185,7 +185,7 @@ MODULE metal
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 1
+  integer, parameter										:: NvspaceMax = 300
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -201,15 +201,17 @@ MODULE metal
   omegav = 0d0
   Nvspace = 1
   if (.not.lstatic) then
-   v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
-   !v0 = v_proj(icell,x,y,z,u,v,w)
+   if (lmagnetoaccr) then
+    v0 = v_proj(icell,x,y,z,u,v,w)
+   else !not infinite resol
+    v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
+   end if
    omegav(1) = v0
    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
    if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
   end if
 
   if (atmos%magnetized) then
-  !change static to dynamic allocation for chi, eta because it is NrecStokes sized
    !! Magneto-optical elements (f, and r, LL04)
   end if
 
@@ -217,20 +219,23 @@ MODULE metal
    atom = atmos%PassiveAtoms(m)
    
     !velocity projected along a path between one border of the cell to the other
-!     if (.not.lstatic .and. .not.atmos%Voronoi .and.allocated(Vfield)) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0) 
-!      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
-!      omegav(Nvspace) = v1
-!      do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!      end do 
-!     end if
+    if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = dabs(v1-v0) 
+     !write(*,*) v0/1000, v1/1000, dv/1000
+     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
+     omegav(Nvspace) = v1
+     !write(*,*) Nvspace, Nvspacemax
+     do nv=2,Nvspace-1
+      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+      xphi=x+delta_vol_phi*u
+      yphi=y+delta_vol_phi*v
+      zphi=z+delta_vol_phi*w
+      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+      !write(*,*) icell, omegav(nv)/1d3
+     end do 
+    end if
 
     do kr=1,atom%Nline ! for this atom go over all transitions
                        ! bound-bound
@@ -320,7 +325,7 @@ MODULE metal
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 1
+  integer, parameter										:: NvspaceMax = 300
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -338,15 +343,17 @@ MODULE metal
   omegav = 0d0
   Nvspace = 1
   if (.not.lstatic) then
-  ! v0 = v_proj(icell,x,y,z,u,v,w)
-   v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
+   if (lmagnetoaccr) then
+    v0 = v_proj(icell,x,y,z,u,v,w)
+   else !not infinite resol
+    v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
+   end if
    omegav(1) = v0
    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
    if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
   end if
 
   if (atmos%magnetized) then
-  !change static to dynamic allocation for chi, eta because it is NrecStokes sized
    !! Magneto-optical elements (f, and r, LL04)
   end if
 
@@ -356,20 +363,20 @@ MODULE metal
    !if (atom%active) CYCLE ! go to next passive atom
    
     !velocity projected along a path between one border of the cell to the other
-!     if (.not.lstatic .and. .not.atmos%Voronoi .and.allocated(Vfield)) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0) 
-!      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
-!      omegav(Nvspace) = v1
-!      do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!      end do 
-!     end if
+    if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = dabs(v1-v0) 
+     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
+     omegav(Nvspace) = v1
+     do nv=2,Nvspace-1
+      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+      xphi=x+delta_vol_phi*u
+      yphi=y+delta_vol_phi*v
+      zphi=z+delta_vol_phi*w
+      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+     end do 
+    end if
 
     do kr=1,atom%Nline ! for this atom go over all transitions
                        ! bound-bound

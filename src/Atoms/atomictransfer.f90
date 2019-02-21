@@ -79,11 +79,11 @@ MODULE AtomicTransfer
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
-  integer :: nbr_cell, icell, next_cell, previous_cell
+  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau !used only in molecular line to have emission for one
                                   !  half of the disk only. Note used in AL-RT.
                                   !  this is passed through the lonly_top or lonly_bottom.
-  logical :: lcellule_non_vide, lsubtract_avg
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -103,7 +103,8 @@ MODULE AtomicTransfer
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
   ! -------------------------------------------------------------- !
-!icell = intersect_stars(x0,y0,z0, u,v,w)
+  ! Will the ray intersect a star
+  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -111,7 +112,7 @@ MODULE AtomicTransfer
     icell = next_cell
     x0=x1 ; y0=y1 ; z0=z1
 
-    if (icell <= n_cells) then
+    if (icell <= n_cells) then !.and.atmos%lcompute_atomRT(icell)
      lcellule_non_vide=.true.
     else
      lcellule_non_vide=.false.
@@ -121,6 +122,10 @@ MODULE AtomicTransfer
     if (test_exit_grid(icell, x0, y0, z0)) then
      RETURN
     end if
+    if (lintersect_stars) then
+      if (icell==icell_star) write(*,*) "touch the star, end of ray", icell, icell_star
+      if (icell == icell_star) RETURN
+    endif
     
     nbr_cell = nbr_cell + 1
 
@@ -708,6 +713,16 @@ MODULE AtomicTransfer
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)
   CALL repartition_energie_etoiles()
+  !If Vfield is used in atomic line transfer, with lkep or linfall
+  !atmos%Vxyz is not used and lmagnetoaccr is supposed to be zero
+  !and Vfield allocated and filled in the model definition if not previously allocated
+  !nor filled.
+  if (allocated(Vfield).and.lkeplerian.or.linfall) then
+    write(*,*) "Vfield already filled", maxval(Vfield), minval(Vfield)
+  else if (allocated(Vfield).and.lmagnetoaccr) then
+   write(*,*) "deallocating Vfield for atomic line when lmagnetoaccr = .true."
+   deallocate(Vfield)
+  end if
 
  RETURN
  END SUBROUTINE reallocate_mcfost_vars
