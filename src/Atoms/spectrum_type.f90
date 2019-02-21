@@ -2,7 +2,8 @@ MODULE spectrum_type
 
   use atom_type
   use atmos_type, only : GridType
-  use getlambda, only : make_wavelength_grid, Nred_array, Nmid_array, Nblue_array
+  use getlambda, only  : make_wavelength_grid, Nred_array, Nmid_array, Nblue_array, &
+  					    adjust_wavelength_grid
   
   !MCFOST's original modules
   use fits_utils, only : print_error
@@ -44,7 +45,7 @@ MODULE spectrum_type
   TYPE Spectrum
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, Ntrans, NPROC=1
+   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
    !nproc, nlambda, nrays
@@ -65,12 +66,18 @@ MODULE spectrum_type
   CONTAINS
 
   SUBROUTINE initSpectrum(lam0, vacuum_to_air, write_wavelength)
+   ! ------------------------------------------- !
+    ! Allocate and store the wavelength grid for
+    ! NLTE atomic line transfer.
+   ! ------------------------------------------- !
+
    !integer, intent(in) :: NPROC
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air, write_wavelength
-   integer :: kc, kr, n
       
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
+   NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
+
    NLTEspec%NPROC = nb_proc!NPROC
    
    if (present(lam0)) NLTEspec%wavelength_ref = lam0
@@ -88,12 +95,32 @@ MODULE spectrum_type
   
   RETURN
   END SUBROUTINE initSpectrum
+  
+  SUBROUTINE initSpectrumImage(lam0, dL, resol)
+  ! -------------------------------------------------------------------- !
+   ! Allocate a special wavelength grid for emission_line map.
+   !This allows to solve for the RT equation only for a specific line.
+   ! a LINEAR wavelength grid spanning from lam0-dL to lam0+dL with a
+   ! constant resolution in km/s given by resol is built.
+  ! -------------------------------------------------------------------- !
+   double precision, intent(in) :: lam0, resol, dL
+      
+   NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
+   NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
+   NLTEspec%NPROC = nb_proc
+   
+   !reallocate wavelength arrays and indexes
+   CALL adjust_wavelength_grid()
+   
+   NLTEspec%Nwaves = size(NLTEspec%lambda)
+  
+  RETURN
+  END SUBROUTINE initSpectrumImage
 
   SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
-   integer :: Nsize, maxNlambda=0, Nadmp = 50, iv, ia, n, kr
-   double precision, allocatable, dimension(:) :: F
+   integer :: Nsize
    
    Nsize = NLTEspec%Nwaves
    ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi

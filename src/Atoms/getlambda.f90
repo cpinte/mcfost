@@ -387,4 +387,14 @@ MODULE getlambda
   RETURN
   END SUBROUTINE make_wavelength_grid
 
+  SUBROUTINE adjust_wavelength_grid()
+   ! ------------------------------------------ !
+    ! Reallocate wavelengths and indexes arrays
+    ! to compute images on a user defined grid
+   ! ------------------------------------------ !
+
+  
+  RETURN
+  END SUBROUTINE adjust_wavelength_grid
+
   END MODULE getlambda
