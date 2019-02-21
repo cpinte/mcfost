@@ -61,9 +61,11 @@ contains
   ! Peut etre un bug en 0, 0 due a la correction sur grid_rmin dans define_grid3
   if (r2 < r_lim_2(0)) then
      ri_out=0
+     thetaj_out=1
      phik_out=1
   else if (r2 > Rmax2) then
      ri_out=n_rad+1
+     thetaj_out=1
      phik_out=1
   else
      ri_min=0
@@ -79,42 +81,42 @@ contains
         ri=(ri_min+ri_max)/2
      enddo
      ri_out=ri+1
-  endif
 
-  ! thetaj_out
-  if (r02 > tiny_dp) then
-     tan_theta = abs(zin) / sqrt(r02)
-  else
-     tan_theta = 1.0e30
-  endif
-
-  thetaj_min = 0
-  thetaj_max = nz
-  thetaj=(thetaj_min+thetaj_max)/2
-
-  do while((thetaj_max-thetaj_min) > 1)
-     if(tan_theta > tan_theta_lim(thetaj)) then
-        thetaj_min=thetaj
+     ! thetaj_out
+     if (r02 > tiny_dp) then
+        tan_theta = abs(zin) / sqrt(r02)
      else
-        thetaj_max=thetaj
+        tan_theta = 1.0e30
      endif
+
+     thetaj_min = 0
+     thetaj_max = nz
      thetaj=(thetaj_min+thetaj_max)/2
-  enddo
-  thetaj_out=thetaj+1
 
-  if (l3D) then
-     if (zin < 0.) thetaj_out = -thetaj_out
+     do while((thetaj_max-thetaj_min) > 1)
+        if(tan_theta > tan_theta_lim(thetaj)) then
+           thetaj_min=thetaj
+        else
+           thetaj_max=thetaj
+        endif
+        thetaj=(thetaj_min+thetaj_max)/2
+     enddo
+     thetaj_out=thetaj+1
 
-     if (zin /= 0.0) then
-        phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
-        phik_out=floor(phi/(2*pi)*real(N_az))+1
-        if (phik_out==n_az+1) phik_out=n_az
-     else
-        phik_out=1
+     if (l3D) then
+        if (zin < 0.) thetaj_out = -thetaj_out
+
+        if (zin /= 0.0) then
+           phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
+           phik_out=floor(phi/(2*pi)*real(N_az))+1
+           if (phik_out==n_az+1) phik_out=n_az
+        else
+           phik_out=1
+        endif
+     else ! 2D
+        phik_out = 1
      endif
-  else ! 2D
-     phik_out = 1
-  endif
+  endif ! r < rmin or r > rmax
 
   icell = cell_map(ri_out,thetaj_out,phik_out)
 
@@ -124,14 +126,14 @@ end subroutine indice_cellule_sph
 
 !******************************************************************************
 
-subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out)
+subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out,phik_out)
 
   implicit none
 
   real(kind=dp), intent(in) :: xin,yin,zin
-  integer, intent(out) :: thetaj_out
+  integer, intent(out) :: thetaj_out, phik_out
 
-  real(kind=dp) :: r02, tan_theta
+  real(kind=dp) :: r02, tan_theta, phi
   integer :: thetaj, thetaj_min, thetaj_max
 
   r02 = xin*xin+yin*yin
@@ -159,6 +161,16 @@ subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out)
 
   if (l3D) then
      if (zin < 0) thetaj_out = - thetaj_out
+
+     if (zin /= 0.0) then
+        phi=modulo(atan2(yin,xin),2*real(pi,kind=dp))
+        phik_out=floor(phi/(2*pi)*real(N_az))+1
+        if (phik_out==n_az+1) phik_out=n_az
+     else
+        phik_out=1
+     endif
+  else ! 2D
+     phik_out=1
   endif
 
   return
@@ -222,7 +234,7 @@ end subroutine indice_cellule_sph_theta
     else
        ! 1) position interface radiale
        ! on avance ou recule en r ? -> produit scalaire
-       dotprod= b
+       dotprod = b
        if (dotprod < 0.0_dp) then
           ! on recule : on cherche rayon inférieur
           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
@@ -380,12 +392,20 @@ end subroutine indice_cellule_sph_theta
        z1=z0+delta_vol*w
        ri1=ri0+delta_rad
        thetaj1 = thetaj0
-       phik1=phik0
+       phik1 = phik0
 
        ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
-       if (ri0==0) then
-          call indice_cellule_sph_theta(x1,y1,z1,thetaj1)
+       ! Todo : calcul indice phi aussi ???
+       if (ri0 == 0) then
+          call indice_cellule_sph_theta(x1,y1,z1,thetaj1,phik1)
        endif
+
+       ! Forcing indices to be 1 if ri1==0, as this defines the cell where the star is
+       if (ri1 == 0) then
+          thetaj1 = 1
+          phik1 = 1
+       endif
+
     else if (t < t_phi) then ! theta
        l=t
        delta_vol=t
@@ -417,7 +437,7 @@ end subroutine indice_cellule_sph_theta
     if (z1 == 0.0_dp) z1 = prec_grille
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
-    next_cell =  cell_map(ri1,thetaj1,phik1)
+    next_cell = cell_map(ri1,thetaj1,phik1)
 
     l_contrib = l
     l_void_before = 0.0_dp
