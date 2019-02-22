@@ -379,6 +379,10 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i
      j = line%j
+     
+     !wavelength does not fall inside line domaine? OK cylcle
+     if ((NLTEspec%lambda(la) < NLTEspec%lambda(line%Nblue)).or.&
+       (NLTEspec%lambda(la) > NLTEspec%lambda(line%Nred))) CYCLE
 
      if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
 
@@ -391,10 +395,6 @@ MODULE metal
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
-     
-!      if (abs(vv(1)) > 20*atmos%v_char / atom%vbroad(icell)) CYCLE
-!      !if we are very far from the line, 
-!      !we do not need to count the opacity of this line.
      
      if (line%voigt) then
       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
