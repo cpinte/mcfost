@@ -164,7 +164,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 opera
 	$(Atom_dir)/planck.f90 \
 	$(Atom_dir)/metal.f90  optical_depth.f90 dust_transfer.f90 mol_transfer.f90 \
 	$(Atom_dir)/accelerate.f90 $(Atom_dir)/writeatom.f90 \
-	$(Atom_dir)/readatmos.f90 $(Atom_dir)/simple_models.f90 \
+	$(Atom_dir)/simple_models.f90 \
 	$(Atom_dir)/atomictransfer.f90 
 
 OBJECTS= $(SOURCES:.f90=.o)
