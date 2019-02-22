@@ -199,7 +199,7 @@ MODULE simple_models
               " minVfield", minval(NormV,mask=normV>0)/1d3
    write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
    CALL define_atomRT_domain()
-
+   !CALL writeATMOS_ascii()
   RETURN
   END SUBROUTINE magneto_accretion_model
   
