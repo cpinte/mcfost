@@ -2,8 +2,8 @@ MODULE spectrum_type
 
   use atom_type
   use atmos_type, only : GridType
-  use getlambda, only  : make_wavelength_grid, Nred_array, Nmid_array, Nblue_array, &
-  					    adjust_wavelength_grid
+  use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid!,&
+  ! 						Nred_array, Nmid_array, Nblue_array
   
   !MCFOST's original modules
   use fits_utils, only : print_error
@@ -219,7 +219,7 @@ MODULE spectrum_type
    end if
    NULLIFY(NLTEspec%atmos)
    
-   deallocate(Nblue_array, Nmid_array, Nred_array)
+!    deallocate(Nblue_array, Nmid_array, Nred_array)
   RETURN
   END SUBROUTINE freeSpectrum
 
@@ -266,12 +266,6 @@ MODULE spectrum_type
   write(*,*) "Writing Flux-map"
   write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
   write(*,*) "Wavelength points:", NLTEspec%Nwaves
-  
-  if (l_sym_ima) then 
-   write(*,*) " image is symmetric."
-  else
-   write(*,*) " image is not symmetric."
-  end if
   
    !  Get an unused Logical Unit Number to use to open the FITS file.
    status=0
@@ -320,57 +314,15 @@ MODULE spectrum_type
 
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
-  if (l_sym_ima) then 
-   write(*,*) "Check symmetries with RT methods"
-   if (RT_line_method==1) then ! what should I do in my case ?
-    write(*,*) 'RT1 symmetry?'
-    
-   else if (RT_line_method == 2) then !/= 1, ??
-    xcenter = npix_x/2 + modulo(npix_x,2) 
-    if (.not.lstatic) then !due to velocity the lines could be asym even if the model is sym
-    					   ! for instance keplerian profile is not the same for the two parts
-    					   ! of the final image
-     if (lkeplerian) then !line profile reversed
-      do i=xcenter+1,npix_x
-!        do m=1,NLTEspec%atmos%Natom
-!         !!lines are sensitive to symmetry
-!         do kr=1,NLTEspec%atmos%Atoms(m)%Nline
-!          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
-!          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-!          Nmid = NLTEspec%atmos%Atoms(m)%lines(kr)%Nmid
-!          !Keplerian rotation inverses profile slope
-!          NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
-!         end do 
-!         !!continua are not sensitive to symmetry right ?
-!         do kc=1,NLTEspec%atmos%Atoms(m)%Ncont
-!          Nred = NLTEspec%atmos%Atoms(m)%lines(kr)%Nred
-!          Nblue = NLTEspec%atmos%Atoms(m)%lines(kr)%Nblue
-!          NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-!         end do
-!        end do !atom  
-       write(*,*) "RT2 symmetry ? "
-       do m=1,NLTEspec%Ntrans
-        Nred = Nred_array(m)
-        Nblue = Nblue_array(m)
-        Nmid = Nmid_array(m)
-        NLTEspec%Flux(Nblue:Nmid-1,i,:,:,:) = NLTEspec%Flux(Nmid+1:Nred,npix_x-i+1,:,:,:)
-       end do  
-      end do !pix
-     else ! not keplerian (infall or expansion)
-      do i=xcenter+1,npix_x
-       NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-      end do
-     end if !lkeplerian  
-    else !static, not moving but image still has symmetries
-     do i=xcenter+1,npix_x !case of symmetric lines or continua
-    					  !copy the left part of the image to the right
-      NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
-     end do 
-    end if !if not static or if moving
-   else !RT line method /= 0, 2
-    write(*,*) "RT_line_method", RT_line_method, " not valid"
-    stop
-   endif !RT_line_method
+  !Method1 not sure of what it does
+  !error if Keplerian or infall or any ?
+  if ((lkeplerian .or. linfall .or. lmagnetoaccr).and.(l_sym_ima)) &
+  	write(*,*) "Warning, image symmetry might be wrong."
+  if (l_sym_ima.and.RT_line_method == 2) then 
+   xcenter = npix_x/2 + modulo(npix_x,2)
+   do i=xcenter+1,npix_x
+     NLTEspec%Flux(:,i,:,:,:) = NLTEspec%Flux(:,npix_x-i+1,:,:,:)
+   end do
   end if ! l_sym_image
 
   !  Write the array to the FITS file.
@@ -394,7 +346,6 @@ MODULE spectrum_type
   CALL ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
   
-  !the continuum should not be affected by velocity shift
   if (l_sym_ima.and.(RT_line_method == 2)) then
    xcenter = npix_x/2 + modulo(npix_x,2)
    do i=xcenter+1,npix_x

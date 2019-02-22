@@ -351,7 +351,6 @@ MODULE AtomicTransfer
   ! if only one pixel it gives the total Flux.
   ! See: emission_line_map in mol_transfer.f90
  ! -------------------------------------------------------------- !
-  use getlambda, only : Nred_array, Nmid_array, Nblue_array
   integer, intent(in) :: ibin, iaz !define the direction in which the map is computed
   double precision :: x0,y0,z0,l,u,v,w
 
@@ -492,37 +491,19 @@ MODULE AtomicTransfer
      
   end if
 
- ! We loop over transitions and add a constant stellar flux for the whole transtion.
- !   It is faster and not so bad if the stellar spectrum if flat. So true only if it is
- !   a black boddy or a pure continuum spectrum.
+
   write(*,*) " -> Adding stellar flux"
-  do lambda = 1, NLTEspec%Ntrans
-   lM = Nmid_array(lambda)
-   lR = Nred_array(lambda)
-   lB = Nblue_array(lambda)
-   nu = c_light / NLTEspec%lambda(lM) * 1d9
-   CALL compute_stars_map(lM, u, v, w, taille_pix, dx, dy, lresolved) !W/m2
-   do ll=lB,LR
-    !nu = c_light / NLTEspec%lambda(ll) * 1d9
-    NLTEspec%Flux(ll,:,:,ibin,iaz) = NLTEspec%Flux(ll,:,:,ibin,iaz) +  & 
-                                stars_map(:,:,1) / nu !W/m2/Hz
-    NLTEspec%Fluxc(ll,:,:,ibin,iaz) = NLTEspec%Fluxc(ll,:,:,ibin,iaz) + &
-                                stars_map(:,:,1) / nu
-   end do
+  do lambda = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+                                             !else it means that in FLUX_PIXEL_LINE, nu
+                                             !is 1d0 (to have flux in W/m2/Hz)
+   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+
+   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+                                         stars_map(:,:,1) / nu
+   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+                                         stars_map(:,:,1) / nu
   end do  
-  ! Here, if the stellar flux is not flat across a transition, we have to loop over
-  ! all frequency points
-!   do lambda = 1, NLTEspec%Nwaves
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-!                                              !else it means that in FLUX_PIXEL_LINE, nu
-!                                              !is 1d0 (to have flux in W/m2/Hz)
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-! 
-!    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
-!                                          stars_map(:,:,1) / nu
-!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-!                                          stars_map(:,:,1) / nu
-!   end do  
 
 
  RETURN

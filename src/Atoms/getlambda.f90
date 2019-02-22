@@ -9,7 +9,7 @@ MODULE getlambda
   
   IMPLICIT NONE
   
-  double precision, dimension(:), allocatable :: Nred_array, Nblue_array, Nmid_array
+!   double precision, dimension(:), allocatable :: Nred_array, Nblue_array, Nmid_array
 
   CONTAINS
   
@@ -249,7 +249,7 @@ MODULE getlambda
              " transitions."
   if (allocated(inoutgrid)) write(*,*) "  ->", size(inoutgrid)," input wavelengths"
 
-  allocate(Nred_array(Ntrans), Nblue_array(Ntrans), Nmid_array(Ntrans))
+!   allocate(Nred_array(Ntrans), Nblue_array(Ntrans), Nmid_array(Ntrans))
 
   ! add wavelength from mcfost inoutgrid if any
   ! and convert it to nm, then deallocate
@@ -319,11 +319,11 @@ MODULE getlambda
   !free some space
   deallocate(tempgrid, alllines, allcont)
 
-  ! Now replace the line%Nlambda and continuum%Nlambda by the new values.
-  ! we do that even for PASSIVE atoms
-  ! deallocate line%lambda and continuum%lambda because they do not correspond to the new
-  ! Nblue and Nlambda anymore.
-  nn = 1
+!   Now replace the line%Nlambda and continuum%Nlambda by the new values.
+!   we do that even for PASSIVE atoms
+!   deallocate line%lambda and continuum%lambda because they do not correspond to the new
+!   Nblue and Nlambda anymore.
+!   nn = 1
   do n=1,Natom
    !first continuum transitions
 !   write(*,*) " ------------------------------------------------------------------ "
@@ -350,10 +350,10 @@ MODULE getlambda
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
-    Nred_array(nn) = Atoms(n)%continua(kc)%Nred
-    Nmid_array(nn) = Atoms(n)%continua(kc)%Nmid
-    Nblue_array(nn) = Atoms(n)%continua(kc)%Nblue
-    nn= nn + 1
+!     Nred_array(nn) = Atoms(n)%continua(kc)%Nred
+!     Nmid_array(nn) = Atoms(n)%continua(kc)%Nmid
+!     Nblue_array(nn) = Atoms(n)%continua(kc)%Nblue
+!     nn= nn + 1
    end do
    !then bound-bound transitions
    do kr=1,Atoms(n)%Nline
@@ -376,10 +376,10 @@ MODULE getlambda
     !allocate(Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nlambda))
     !Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred) &
     ! = inoutgrid(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred)
-    Nred_array(nn) = Atoms(n)%lines(kr)%Nred
-    Nmid_array(nn) = Atoms(n)%lines(kr)%Nmid
-    Nblue_array(nn) = Atoms(n)%lines(kr)%Nblue
-    nn = nn + 1
+!     Nred_array(nn) = Atoms(n)%lines(kr)%Nred
+!     Nmid_array(nn) = Atoms(n)%lines(kr)%Nmid
+!     Nblue_array(nn) = Atoms(n)%lines(kr)%Nblue
+!     nn = nn + 1
    end do
 !     write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
