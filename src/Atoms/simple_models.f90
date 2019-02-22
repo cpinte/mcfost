@@ -44,7 +44,7 @@ MODULE simple_models
    use utils, only : interp_dp
    integer :: n_zones = 1, izone, i, j, k, icell
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d0, Macc = 1d-7
+   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=7d3, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.1!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
@@ -300,11 +300,37 @@ MODULE simple_models
    ! TO DO: Numerically solve for the temperature, iterating
    ! between NLTE solution (Cooling rates) and Temperature->ne->npops
   ! ------------------------------------------------------------------ !
+   use Voronoi_grid, only : Voronoi
+   use utils, only : interp_dp
+   integer 	:: icell, icell0
+   double precision, parameter :: T0 = 7d3 !Defined the Temperature, must be consitant
+   									!with the one in magneto_accretion_model() if used
+   double precision :: Q0, nH0, L, TL(8), Lambda(8) !K and erg/cm3/s
+   double precision :: r0 = 1d0, r
+   
+   !T = K
+   data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 /
+   !Lambda = Q/nH**2, Q in J/m9/s
+   data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 /
 
    if (.not.lVoronoi) then
     write(*,*) "Only defined for external model read"
     stop
    end if
+
+
+
+
+   icell0 = etoile(1)%icell - 1
+   !We need to define a Q0... but we do not know the position along a field line
+   !and cell, contruary to the case where the model is defined
+   do icell=1, atmos%Nspace
+    r = dsqrt(Voronoi(icell)%xyz(1)**2 +Voronoi(icell)%xyz(2)**2+Voronoi(icell)%xyz(3)**2 )
+    Q0 = atmos%nHtot(icell0)**2 * 10**(interp_dp(Lambda, TL, log10(T0)))*0.1
+    L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
+    atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
+    write(*,*) icell0, Q0, L, atmos%T(icell)
+   end do
 
   RETURN
   END SUBROUTINE TTauri_Temperature
