@@ -374,14 +374,10 @@ end subroutine dust_and_mol_optical_length_tot
                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
                   
       else !on the fly calculations, slow but cheap in memory
-       CALL BackgroundContinua(icell) !for all wavelength 
        !CALL NLTEOPAC()
-       !for that wavelength
-       CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-       !CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
-       !opacite = opacite + NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
       end if
      else
       opacite = 0d0 !cell is empty
