@@ -255,6 +255,7 @@ MODULE atmos_type
   if (allocated(atmos%vturb)) deallocate(atmos%vturb)
   if (allocated(atmos%nHmin)) deallocate(atmos%nHmin)
   if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
+  if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
 
   !write(*,*) "Free Atoms"
   ! start freeing Atoms if previously allocated

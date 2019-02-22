@@ -1,6 +1,7 @@
 MODULE simple_models
 
- use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain
+ use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain, &
+ 						free_atomic_atmos
  
  ! MCFOST's modules
  use input
@@ -57,7 +58,7 @@ MODULE simple_models
 
    linfall = .false.
    lkeplerian = .false.
-   lmagnetoaccr = .true.
+   lmagnetoaccr = .false. !set to false if Voronoi
    CALL init_atomic_atmos()
    atmos%vturb = 0d3 !m/s
 
@@ -199,7 +200,11 @@ MODULE simple_models
               " minVfield", minval(NormV,mask=normV>0)/1d3
    write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
    CALL define_atomRT_domain()
-   !CALL writeATMOS_ascii()
+   if (.not.lmagnetoaccr) CALL writeATMOS_ascii()
+   CALL free_atomic_atmos()
+   CALL readATMOS_ascii("model.s")
+   stop
+   
   RETURN
   END SUBROUTINE magneto_accretion_model
   
@@ -285,5 +290,112 @@ MODULE simple_models
 
   RETURN
   END SUBROUTINE prop_law_model
+  
+  SUBROUTINE TTauri_Temperature()
+  ! ---------------------------------------------------------------- !
+   ! Computes temperature of accretion columns of T Tauri stars
+   ! given the density, using the prescription of Hartmann 94
+   ! and the cooling rates for Hartmann 82
+   !
+   ! TO DO: Numerically solve for the temperature, iterating
+   ! between NLTE solution (Cooling rates) and Temperature->ne->npops
+  ! ------------------------------------------------------------------ !
+
+   if (.not.lVoronoi) then
+    write(*,*) "Only defined for external model read"
+    stop
+   end if
+
+  RETURN
+  END SUBROUTINE TTauri_Temperature
+  
+  SUBROUTINE writeAtmos_ascii()
+  ! ------------------------------------- !
+   ! Write GridType atmos to ascii file.
+   ! ultimately this model will be mapped
+   ! onto a Voronoi mesh.
+  ! ------------------------------------- !
+   character(len=10)	:: filename="model.s"
+   integer :: icell, i, j, k
+   double precision, dimension(n_cells) :: XX, YY, ZZ
+   double precision :: r, rcyl, phi, z, sinTheta
+   
+   if (n_az <= 1) then
+    write(*,*) "Error, in this case, lmagnetoaccr is false, and", &
+    	' n_az > 1'
+    stop
+   end if
+   do i=1, n_rad
+    do j=j_start,nz
+     do k=1, n_az
+      if (j==0) then !midplane
+        icell = cell_map(i,1,k)
+        rcyl = r_grid(icell) !AU
+        z = 0.0_dp
+      else
+       icell = cell_map(i,j,k)
+       rcyl = r_grid(icell)
+       z = z_grid(icell)/z_scaling_env
+      end if
+      phi = phi_grid(icell)
+      r = dsqrt(z**2 + rcyl**2)
+      sinTheta = dsqrt(1.-(z/r)**2)
+
+          XX(icell) = r*cos(phi)*sinTheta * AU_to_m
+          YY(icell) = r*sin(phi)*sinTheta * AU_to_m
+   
+      ZZ(icell) = z
+     end do
+    end do
+   end do
+   
+   open(unit=1,file=trim(filename),status="replace")
+ 
+   do icell=1, atmos%Nspace
+    write(1,"(7E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
+    	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3)
+   end do
+   
+   close(unit=1)
+
+  RETURN
+  END SUBROUTINE writeAtmos_ascii
+  
+  SUBROUTINE readAtmos_ascii(filename)
+  ! ------------------------------------------ !
+   ! read atmos ascii file in GridType atmos.
+   ! ultimately this model will be mapped
+   ! onto a Voronoi mesh.
+   ! Note: The temperature is not written !
+  ! ------------------------------------------ !
+   use getline
+   character(len=*), intent(in)	:: filename
+   integer :: icell, Nread, syst_status
+   character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
+   
+   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
+   
+   
+   cmd = "wc -l "//trim(filename)//" > ntest.txt"
+   call appel_syst(cmd,syst_status)
+   open(unit=1,file="ntest.txt",status="old")
+   read(1,*) n_cells
+   close(unit=1)
+   write(*,*) "Found ", n_cells, "voronoi points"
+   
+   CALL init_atomic_atmos()
+   
+   open(unit=1,file=trim(filename))
+   do icell=1, atmos%Nspace
+    CALL getnextline(1, "#", FormatLine, inputline, Nread)
+    READ(inputLine(1:Nread), *) atmos%nHtot(icell), &
+    	atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3)
+
+   end do
+   
+   close(unit=1)
+
+  RETURN
+  END SUBROUTINE readAtmos_ascii
 
  END MODULE simple_models

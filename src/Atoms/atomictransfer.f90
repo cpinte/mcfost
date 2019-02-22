@@ -33,8 +33,9 @@ MODULE AtomicTransfer
  use collision
  use solvene
  use writeatom
- use readatmos, only				    : readatmos_1D, readPLUTO
- use simple_models, only 				: magneto_accretion_model
+ use simple_models, only 				: magneto_accretion_model, &
+ 										  uniform_law_model
+ 										  
  
  !$ use omp_lib
  
@@ -120,10 +121,10 @@ MODULE AtomicTransfer
 
     ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
-    if (lintersect_stars) then
-      if (icell == icell_star) RETURN
-    endif
-    !if (lintersect_stars .and. (icell == icell_star)) RETURN
+!     if (lintersect_stars) then
+!       if (icell == icell_star) RETURN
+!     endif
+    if (lintersect_stars .and. (icell == icell_star)) RETURN
     
     nbr_cell = nbr_cell + 1
 
@@ -150,7 +151,7 @@ MODULE AtomicTransfer
      !! at all wavelength points including vector fields in the bound-bound transitions
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-      dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
+      dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
 
@@ -170,7 +171,7 @@ MODULE AtomicTransfer
 
       ! Epaisseur optique
       ! chi_p contains both thermal and continuum scattering extinction
-      dtau(:) =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
+      dtau(:)   =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
 
       ! Source function
@@ -200,19 +201,19 @@ MODULE AtomicTransfer
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
  
-    if (MINVAL(NLTEspec%I(id,:,iray))<0) then
-     write(*,*) "Negative Opac !"
-     if (lstore_opac) then
-      write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
-       MINVAL(NLTEspec%AtomOpac%jc(icell,:))
-      stop
-     else
-      write(*,*) id, icell, MINVAL(Snu),&
-      MINVAL(NLTEspec%AtomOpac%eta_p(id,:)),MINVAL(NLTEspec%AtomOpac%chi_p(id,:)),&
-      MINVAL(NLTEspec%AtomOpac%sca_c(id,:)), MINVAL(NLTEspec%AtomOpac%eta_c(id,:)), MINVAL(NLTEspec%AtomOpac%chi_c(id,:))
-      stop
-     end if
-    end if
+!     if (MINVAL(NLTEspec%I(id,:,iray))<0) then
+!      write(*,*) "Negative Opac !"
+!      if (lstore_opac) then
+!       write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
+!        MINVAL(NLTEspec%AtomOpac%jc(icell,:))
+!       stop
+!      else
+!       write(*,*) id, icell, MINVAL(Snu),&
+!       MINVAL(NLTEspec%AtomOpac%eta_p(id,:)),MINVAL(NLTEspec%AtomOpac%chi_p(id,:)),&
+!       MINVAL(NLTEspec%AtomOpac%sca_c(id,:)), MINVAL(NLTEspec%AtomOpac%eta_c(id,:)), MINVAL(NLTEspec%AtomOpac%chi_c(id,:))
+!       stop
+!      end if
+!     end if
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
 !      if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
@@ -555,7 +556,8 @@ MODULE AtomicTransfer
 
 
 !! ----------------------- Read Model ---------------------- !!
-  CALL magneto_accretion_model()   
+  CALL magneto_accretion_model()  
+  !CALL uniform_law_model() 
   
   write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
              " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)

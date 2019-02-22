@@ -203,7 +203,7 @@ MODULE metal
   if (.not.lstatic) then
    if (lmagnetoaccr) then
     v0 = v_proj(icell,x,y,z,u,v,w)
-   else !not infinite resol
+   else !not infinite resol, replaced by lVoronoi case in a near futur =)
     v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
    end if
    omegav(1) = v0
