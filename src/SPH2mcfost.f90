@@ -303,13 +303,12 @@ contains
           a_SPH(1) = 1. ;
        endif
 
-
        ! temporary for old phantom dumps were grain sizes were not defined
        if (SPH_grainsizes(1) < tiny_real) then
-          a_SPH(2) = 1. ;
+          a_SPH(1) = 1. ;
           a_SPH(2) = 1000. ;
           write(*,*) "WARNING: SPH dust grain size  not found"
-          write(*,*) "forcing small & big grains to be 1mum & 1mm"
+          write(*,*) "Forcing small & big grains to be ", a_SPH(1), "and", a_SPH(2), "mum"
        endif
 
        log_a_SPH(:) = 0.
