@@ -110,7 +110,7 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lpluto_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()

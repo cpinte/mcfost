@@ -439,6 +439,7 @@ MODULE simple_models
    integer :: icell, i, j, k
    double precision, dimension(n_cells) :: XX, YY, ZZ
    double precision :: r, rcyl, phi, z, sinTheta, rho_to_nH, fact
+   double precision :: dx, dy, dz, smooth_scale
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight
    
@@ -471,16 +472,28 @@ MODULE simple_models
         !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
         XX(icell) = r*cos(phi)*sinTheta * AU_to_m
         YY(icell) = r*sin(phi)*sinTheta * AU_to_m   
-        ZZ(icell) = z
+        ZZ(icell) = z*AU_to_m
      end do
     end do
    end do
    
    open(unit=1,file=trim(filename),status="replace")
-   atmos%nHtot = atmos%nHtot / rho_to_nH !using total density isntead of nHtot for writing
-   do icell=1, atmos%Nspace
-    write(1,"(7E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
-    	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3)
+   atmos%nHtot = atmos%nHtot / rho_to_nH !using total density instead of nHtot for writing
+   !write Masses per cell instead of densities. Voronoi cells Volume is different than
+   !grid cell right ? 
+   atmos%nHtot = atmos%nHtot * volume * AU3_to_m3  * kg_to_Msun!Msun
+   !length_scale = 1d0
+   do icell=1, atmos%Nspace !error here, the grid should not be < rstar
+     dx = XX(icell) - etoile(1)%x*AU_to_m
+     dy = YY(icell) - etoile(1)%y*AU_to_m
+     dz = ZZ(icell) - etoile(1)%z*AU_to_m
+     !smooth_scale = real((volume(icell)*AU3_to_m3)**(1./3.))
+     smooth_scale = 5. * Rmax * AU_to_m
+     if (min(dx,dy,dz) < 2*etoile(1)%r*AU_to_m) then
+      if ((dx**2+dy**2+dz**2) >= (2*etoile(1)%r*AU_to_m)**2) &
+        write(1,"(8E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
+    	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), smooth_scale
+     end if
    end do
    
    close(unit=1)

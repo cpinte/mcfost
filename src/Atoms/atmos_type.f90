@@ -29,7 +29,6 @@ MODULE atmos_type
    ! for each cell starting from 1 to n_cells
    integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays = 1
    double precision :: metallicity, totalAbund, avgWeight, wght_per_H
-   logical :: Voronoi = .false.
    ! an arrray containing the project local velocity
    ! in the cell, to be used to compute the local profile
    ! T is a function of x,y,z or T is a function of the cell point (T(Nspace))
@@ -397,10 +396,11 @@ MODULE atmos_type
    if (.not.allocated(atmos%T)) allocate(atmos%T(atmos%Nspace))
    if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
    
-   if (.not.lstatic) then 
+   if (.not.lstatic.and..not.lvoronoi) then 
     !Nrad, Nz, Naz-> Velocity vector cartesian components
     allocate(atmos%Vxyz(atmos%Nspace,3))
     atmos%Vxyz = 0d0
+    write(*,*) "Allocating velocity array for lmagnetoaccr."
     !if lmagnetoaccr then atmos%Vxyz = (VRcyl, Vz, Vphi)
     !it is then projected like it is done in v_proj for keplerian rot
     !meaning that the vlocity field has infinite resolution. Otherwise,

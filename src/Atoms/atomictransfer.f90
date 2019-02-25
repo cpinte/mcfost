@@ -535,17 +535,18 @@ MODULE AtomicTransfer
    RT_line_method = 1 !pixels circulaires
   end if
 
-
+  !read in dust_transfer.f90 in case of -pluto.
+  !mainly because, RT atomic line and dust RT are not decoupled
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()  
   !CALL uniform_law_model() 
   !CALL spherical_shells_model()
-stop  
+write(*,*) lVoronoi 
   write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
              " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
   write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
              " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
-stop
+
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji

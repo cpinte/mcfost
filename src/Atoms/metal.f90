@@ -197,7 +197,7 @@ MODULE metal
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
   hc_4PI = hc/fourPI
-
+write(*,*) "in metal_bb"
   ! v_proj in m/s at point icell
   omegav = 0d0
   Nvspace = 1
@@ -209,7 +209,7 @@ MODULE metal
    end if
    omegav(1) = v0
    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
-   if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
+   if (lVoronoi) omegav(Nvspace) = v0 !velocity constant in the cell
   end if
 
   if (atmos%magnetized) then
@@ -220,7 +220,7 @@ MODULE metal
    atom = atmos%PassiveAtoms(m)
    
     !velocity projected along a path between one border of the cell to the other
-    if (.not.lstatic .and. .not.atmos%Voronoi .and.&
+    if (.not.lstatic .and. .not.lVoronoi .and.&
     	(lmagnetoaccr.or.linfall.or.lkeplerian)) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
@@ -349,7 +349,7 @@ MODULE metal
    end if
    omegav(1) = v0
    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
-   if (atmos%Voronoi) omegav(Nvspace) = v0 !velocity constant in the cell
+   if (lVoronoi) omegav(Nvspace) = v0 !velocity constant in the cell
   end if
 
   if (atmos%magnetized) then
@@ -363,7 +363,7 @@ MODULE metal
    
     !velocity projected along a path between one border of the cell to the other
     !if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
-    if (.not.lstatic .and. .not.atmos%Voronoi .and.&
+    if (.not.lstatic .and. .not.lVoronoi .and.&
     	(lmagnetoaccr.or.linfall.or.lkeplerian)) then
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
