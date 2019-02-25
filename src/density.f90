@@ -1062,7 +1062,7 @@ subroutine read_density_file()
 
   ! Do we read the gas velocity ?
   status = 0
-  call ftgkyj(unit,"read_gas_velocity",read_gas_density,comment,status)
+  call ftgkyj(unit,"read_gas_velocity",read_gas_velocity,comment,status)
   if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
   lread_gas_velocity = (read_gas_velocity == 1)
