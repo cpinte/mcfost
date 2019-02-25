@@ -1340,15 +1340,16 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp), dimension(3) :: dx_screen, dy_screen
-  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg, delta, frac_x, frac_y
+  real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec
+  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
+  real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy
   real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
 
-  integer, parameter :: nx_screen = 10 ! nx_screen needs to be even
-  real(kind=dp), dimension(nx_screen,nx_screen) :: tau_screen
+  integer, parameter :: nx_screen = 10
+  real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
   ! allacatable array as it can be big and not fit in stack memory
@@ -1395,16 +1396,20 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
      if (etoile(istar)%icell == 0) cycle ! star is not in the grid
 
      ! Compute optical depth screen in front of the star at limited resolution, e.g. 10x10
-     delta = 2 * etoile(i)%r / nx_screen
+     delta = etoile(istar)%r / nx_screen
+     norm_screen2 = 1./delta**2
+
      dx_screen(:) = delta * dx_map(:)/norm2(dx_map(:))
      dy_screen(:) = delta * dy_map(:)/norm2(dy_map(:))
-     do i=1, nx_screen
-        do j=1, nx_screen
-           x = etoile(istar)%x + dx_screen(1) * (2*i - nx_screen) +  dy_screen(1) * (2*j - nx_screen)
-           y = etoile(istar)%y + dx_screen(2) * (2*i - nx_screen) +  dy_screen(2) * (2*j - nx_screen)
-           z = etoile(istar)%z + dx_screen(3) * (2*i - nx_screen) +  dy_screen(3) * (2*j - nx_screen)
+     ! Todo : this could be made parallel, but it is very fast so far
+     do j=-nx_screen, nx_screen
+        do i=-nx_screen, nx_screen
+           x = etoile(istar)%x + dx_screen(1) * i +  dy_screen(1) * j
+           y = etoile(istar)%y + dx_screen(2) * i +  dy_screen(2) * j
+           z = etoile(istar)%z + dx_screen(3) * i +  dy_screen(3) * j
 
            icell = etoile(istar)%icell
+           call indice_cellule_cyl(x,y,z, icell)
 
            Stokes = 0.0_dp
            call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
@@ -1412,7 +1417,6 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
            tau_screen(i,j) = tau
         enddo ! j
      enddo ! i
-
 
      map_1star(:,:,:) = 0.0
      if (lpola) then
@@ -1436,7 +1440,8 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola,lmono0) &
      !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
-     !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes) &
+     !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &
+     !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes,fx,fy,offset_x,offset_y,vec) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme,tau_avg)
      in_map = .true. ! for SED
@@ -1468,14 +1473,24 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         endif
 
         ! Position de depart aleatoire sur une sphere de rayon r_etoile
-        x = etoile(istar)%x + x * etoile(istar)%r
-        y = etoile(istar)%y + y * etoile(istar)%r
-        z = etoile(istar)%z + z * etoile(istar)%r
+        vec = (/x,y,z/) * etoile(istar)%r ! offset vector from center of star
+        x = etoile(istar)%x + vec(1)
+        y = etoile(istar)%y + vec(2)
+        z = etoile(istar)%z + vec(3)
 
-        icell = etoile(istar)%icell
+        ! Compute exact optical depth for each point
+        !icell = etoile(istar)%icell
+        !Stokes = 0.0_dp
+        !call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
-        Stokes = 0.0_dp
-        call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
+        ! Interpolation of optical depth : bilinear interpolation on the precomputed screen
+        ! offset in in # of screen pixels (dx_screen is propto delta, so there is a delta**2 normlization)
+        offset_x = dot_product(vec,dx_screen) * norm_screen2 ; i = floor(offset_x) ; fx = offset_x - i
+        offset_y = dot_product(vec,dy_screen) * norm_screen2 ; j = floor(offset_y) ; fy = offset_y - j
+        tau =  tau_screen(i,j)     * (1-fx) * (1-fy) &
+             + tau_screen(i+1,j)   * fx * (1-fy) &
+             + tau_screen(i,j+1)   * (1-fx) * fy &
+             + tau_screen(i+1,j+1) * fx * fy
 
         ! Average optical depth to the star
         if (lmono0) tau_avg = tau_avg + tau
