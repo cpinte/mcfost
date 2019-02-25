@@ -149,7 +149,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 opera
 	$(Atom_dir)/getline.f90 $(Atom_dir)/constant.f90 \
 	$(Atom_dir)/uplow.f90 density.f90 read_opacity.f90 \
 	scattering.f90  coated_sphere.f90 dust_prop.f90 $(Atom_dir)/atmos_type.f90\
-	molecular_emission.f90 PAH.f90 \
+	molecular_emission.f90 PAH.f90 $(Atom_dir)/read_pluto.f90 \
 	input.f90 $(Atom_dir)/getlambda.f90 benchmarks.f90 \
 	read_param.f90 dust_ray_tracing.f90 radiation_field.f90 \
 	thermal_emission.f90 diffusion.f90 io_prodimo.f90 disk_physics.f90 output.f90 mem.f90 \

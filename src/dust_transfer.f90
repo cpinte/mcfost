@@ -99,6 +99,9 @@ subroutine transfert_poussiere()
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
+  else if (lpluto_file) then
+     CALL setup_pluto_to_mcfost("model.s")
+     CALL setup_grid()
   else
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost

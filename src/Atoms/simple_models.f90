@@ -49,6 +49,7 @@ MODULE simple_models
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
+   double precision :: rho_to_nH
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
@@ -58,9 +59,13 @@ MODULE simple_models
 
    linfall = .false.
    lkeplerian = .false.
-   lmagnetoaccr = .false. !set to false if Voronoi
+   lmagnetoaccr = .false.
    CALL init_atomic_atmos()
    atmos%vturb = 0d3 !m/s
+   !lvoronoi = .true.!has to be done after init with lvoronoi=.false.
+   !otherwise atmos%Vxyz is not allocated
+   
+   rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
    !Define some useful quantities
    !write(*,*) "Mstar ", etoile(1)%M, " Rstar ", etoile(1)%r*AU_to_Rsun
@@ -125,7 +130,7 @@ MODULE simple_models
        !cell icell (r, theta) belongs to a field line.
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
        if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r  
-          nH0 = 1d3/masseH/atmos%avgWeight * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
+          nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
           Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
@@ -155,7 +160,7 @@ MODULE simple_models
            atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*y) / dsqrt(1d0-y) * &
-                       1d3/masseH /atmos%avgWeight  !kg/m3 ->/m3
+                       rho_to_nH  !kg/m3 ->/m3
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
@@ -200,10 +205,17 @@ MODULE simple_models
               " minVfield", minval(NormV,mask=normV>0)/1d3
    write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
    CALL define_atomRT_domain()
-   if (.not.lmagnetoaccr) CALL writeATMOS_ascii()
-   CALL free_atomic_atmos()
-   CALL readATMOS_ascii("model.s")
-   stop
+   
+   if (.not.lmagnetoaccr) then !for now
+    CALL writeAtmos_ascii()
+    !leave here, we enter here only to write the model for Voronoi tesselation
+    CALL free_atomic_atmos()
+    !densities will be fill again during the Voronoi tesselation
+    !leave here with an empty atomic atmos that will be filled during the tesselation
+    !using this model
+    write(*,*) "Stop after writing for the moment"
+    stop
+   end if
    
   RETURN
   END SUBROUTINE magneto_accretion_model
@@ -249,6 +261,90 @@ MODULE simple_models
 
   RETURN
   END SUBROUTINE uniform_law_model
+  
+  SUBROUTINE spherical_shells_model()
+  ! ----------------------------------------------------------- !
+   ! Implements a simple model with moving spherical shells
+  ! ----------------------------------------------------------- !
+   integer :: n_zones = 1, izone, i, j, k, icell
+   double precision, parameter :: Tmax = 3d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: Macc = 1d-7, Vexp = 200d3
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
+   double precision :: Rstar, Mstar, normV(n_Cells), Omega
+   double precision :: rcyl, z, r, phi, Mdot
+   
+
+
+   linfall = .true.
+   lkeplerian = .false.
+   lmagnetoaccr = .false.
+   CALL init_atomic_atmos()
+   atmos%vturb = 0d3 !m/s
+   
+   if (linfall.or.lkeplerian) then 
+   	if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
+   	deallocate(atmos%Vxyz)
+   end if
+
+   Rstar = etoile(1)%r * AU_to_m !AU_to_Rsun * Rsun !m
+   Mstar = etoile(1)%M * Msun_to_kg !kg
+   Mdot = Macc * Msun_to_kg / year_to_sec !kg/s
+   
+   Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
+   
+   atmos%nHtot = 1d14
+   atmos%T = Tmax
+
+    do i=1, n_rad
+     do j=j_start,nz !j_start = -nz in 3D
+      do k=1, n_az
+       if (j==0) then !midplane
+        icell = cell_map(i,1,k)
+        rcyl = r_grid(icell) !AU
+        z = 0.0_dp
+       else
+        icell = cell_map(i,j,k)
+        rcyl = r_grid(icell)
+        z = z_grid(icell)/z_scaling_env
+       end if
+       phi = phi_grid(icell)
+       r = dsqrt(z**2 + rcyl**2)
+       
+       if (.not.lstatic) then
+       !!->expansion
+        if (.not.linfall.and..not.lmagnetoaccr) then !expansion not analytic
+         atmos%Vxyz(icell,1) = Vexp * z/r * cos(phi)
+         atmos%Vxyz(icell, 2) = Vexp * z/r * sin(phi)
+         atmos%Vxyz(icell,3) = Vexp * rcyl/r
+        else if (linfall.and..not.lmagnetoaccr) then !expansion analytic
+         Vfield(icell) = Vexp
+        else if (.not.linfall.and.lmagnetoaccr) then !rotation analytic
+         atmos%Vxyz(icell,1) = 0d0
+         atmos%Vxyz(icell,2) = 0d0 
+         atmos%Vxyz(icell,3) = Omega * (r*AU_to_m)
+        else if (lkeplerian) then !rotation analytic also
+         Vfield(icell) = Omega * (r*AU_to_m)
+        end if
+       end if !static
+      end do
+     end do
+    end do
+
+   if (.not.lstatic) then
+    if (linfall.or.lkeplerian) then
+     NormV = Vfield
+    else
+     NormV = dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2)
+    end if
+    atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
+   end if
+   write(*,*) "maxVfield (km/s)", maxval(NormV)/1d3, &
+              " minVfield", minval(NormV,mask=normV>0)/1d3
+   write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
+   CALL define_atomRT_domain()
+
+  RETURN
+  END SUBROUTINE spherical_shells_model
   
   SUBROUTINE prop_law_model()
   ! ----------------------------------------------------------- !
@@ -319,8 +415,6 @@ MODULE simple_models
    end if
 
 
-
-
    icell0 = etoile(1)%icell - 1
    !We need to define a Q0... but we do not know the position along a field line
    !and cell, contruary to the case where the model is defined
@@ -344,13 +438,16 @@ MODULE simple_models
    character(len=10)	:: filename="model.s"
    integer :: icell, i, j, k
    double precision, dimension(n_cells) :: XX, YY, ZZ
-   double precision :: r, rcyl, phi, z, sinTheta
+   double precision :: r, rcyl, phi, z, sinTheta, rho_to_nH, fact
+   
+   rho_to_nH = 1d3/masseH /atmos%avgWeight
    
    if (n_az <= 1) then
     write(*,*) "Error, in this case, lmagnetoaccr is false, and", &
     	' n_az > 1'
     stop
    end if
+   !X, Y, Z cartesian coordinates
    do i=1, n_rad
     do j=j_start,nz
      do k=1, n_az
@@ -365,18 +462,22 @@ MODULE simple_models
       end if
       phi = phi_grid(icell)
       r = dsqrt(z**2 + rcyl**2)
-      sinTheta = dsqrt(1.-(z/r)**2)
+      fact = 1d0
+      if (z<0) fact = -1
+      sinTheta = fact*dsqrt(1.-(z/r)**2)
 
-          XX(icell) = r*cos(phi)*sinTheta * AU_to_m
-          YY(icell) = r*sin(phi)*sinTheta * AU_to_m
    
-      ZZ(icell) = z
+        !XX(icell) = rcyl*cos(phi)*AU_to_m!r*cos(phi)*sinTheta * AU_to_m
+        !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
+        XX(icell) = r*cos(phi)*sinTheta * AU_to_m
+        YY(icell) = r*sin(phi)*sinTheta * AU_to_m   
+        ZZ(icell) = z
      end do
     end do
    end do
    
    open(unit=1,file=trim(filename),status="replace")
- 
+   atmos%nHtot = atmos%nHtot / rho_to_nH !using total density isntead of nHtot for writing
    do icell=1, atmos%Nspace
     write(1,"(7E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
     	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3)
@@ -386,42 +487,5 @@ MODULE simple_models
 
   RETURN
   END SUBROUTINE writeAtmos_ascii
-  
-  SUBROUTINE readAtmos_ascii(filename)
-  ! ------------------------------------------ !
-   ! read atmos ascii file in GridType atmos.
-   ! ultimately this model will be mapped
-   ! onto a Voronoi mesh.
-   ! Note: The temperature is not written !
-  ! ------------------------------------------ !
-   use getline
-   character(len=*), intent(in)	:: filename
-   integer :: icell, Nread, syst_status
-   character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
-   
-   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-   
-   
-   cmd = "wc -l "//trim(filename)//" > ntest.txt"
-   call appel_syst(cmd,syst_status)
-   open(unit=1,file="ntest.txt",status="old")
-   read(1,*) n_cells
-   close(unit=1)
-   write(*,*) "Found ", n_cells, "voronoi points"
-   
-   CALL init_atomic_atmos()
-   
-   open(unit=1,file=trim(filename))
-   do icell=1, atmos%Nspace
-    CALL getnextline(1, "#", FormatLine, inputline, Nread)
-    READ(inputLine(1:Nread), *) atmos%nHtot(icell), &
-    	atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3)
-
-   end do
-   
-   close(unit=1)
-
-  RETURN
-  END SUBROUTINE readAtmos_ascii
 
  END MODULE simple_models
