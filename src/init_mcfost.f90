@@ -65,6 +65,7 @@ subroutine set_default_variables()
   lvacuum_to_air = .false.
   lcontrib_function = .false.
   lmagnetoaccr = .false.
+  lpluto_file = .false.
   ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -655,6 +656,18 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-pluto")
+        i_arg = i_arg + 1
+        lpluto_file=.true.
+        lVoronoi = .true.
+        l3D = .true.
+        !NOW read input files here, later, hardcoded name assumed for development
+        !call get_command_argument(i_arg,s)
+        !n_phantom_files = 1
+        !allocate(density_files(n_phantom_files))
+        !density_files(1) = s
+        !i_arg = i_arg + 1
+        !!DOing nothing special now
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1353,6 +1366,8 @@ subroutine display_help()
   write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
   write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
+  write(*,*) "        : -pluto : reads a pluto file (implementing)"
+
 
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
