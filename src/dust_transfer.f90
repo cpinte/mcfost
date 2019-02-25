@@ -1341,7 +1341,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
 
   real(kind=dp), dimension(4) :: Stokes
   real(kind=dp), dimension(3) :: dx_screen, dy_screen
-  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg, delta
+  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg, delta, frac_x, frac_y
   real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
@@ -1541,13 +1541,15 @@ subroutine find_pixel(x,y,z,taille_pix, dx_map,dy_map, i, j, in_map)
   logical, intent(out) :: in_map
 
   real(kind=dp), dimension(3) :: xyz
-  real(kind=dp) :: x_map, y_map
+  real(kind=dp) :: x_map, y_map, factor
 
   xyz(1) = x ; xyz(2) = y ; xyz(3) = z
 
+  factor = 1.0 / taille_pix**2
+
   ! Offset from map center in units of pixel size
-  x_map = dot_product(xyz, dx_map) / taille_pix**2
-  y_map = dot_product(xyz, dy_map) / taille_pix**2
+  x_map = dot_product(xyz, dx_map) * factor !/ taille_pix**2
+  y_map = dot_product(xyz, dy_map) * factor !/ taille_pix**2
 
   if (modulo(npix_x,2) == 1) then
      i = nint(x_map) + npix_x/2 + 1
