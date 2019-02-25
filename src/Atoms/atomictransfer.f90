@@ -34,7 +34,7 @@ MODULE AtomicTransfer
  use solvene
  use writeatom
  use simple_models, only 				: magneto_accretion_model, &
- 										  uniform_law_model
+ 										  uniform_law_model, spherical_shells_model
  										  
  
  !$ use omp_lib
@@ -537,14 +537,15 @@ MODULE AtomicTransfer
 
 
 !! ----------------------- Read Model ---------------------- !!
-  CALL magneto_accretion_model()  
+  if (.not.lpluto_file) CALL magneto_accretion_model()  
   !CALL uniform_law_model() 
-  
+  !CALL spherical_shells_model()
+stop  
   write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
              " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
   write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
              " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
-
+stop
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
@@ -599,6 +600,10 @@ MODULE AtomicTransfer
    end do
    !$omp end do
    !$omp end parallel
+   !!!TO DO:
+   ! At the end of NLTE transfer keep active continua in memory for images
+   !just like background conitua, avoiding te recompute them as they do not change
+   !! TDO DO2: try to keep lines opac also.
   end if
 
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
@@ -699,9 +704,9 @@ MODULE AtomicTransfer
   !and Vfield allocated and filled in the model definition if not previously allocated
   !nor filled.
   if (allocated(Vfield).and.lkeplerian.or.linfall) then
-    write(*,*) "Vfield already filled", maxval(Vfield), minval(Vfield)
+    write(*,*) "Vfield max/min", maxval(Vfield), minval(Vfield)
   else if (allocated(Vfield).and.lmagnetoaccr) then
-   write(*,*) "deallocating Vfield for atomic line when lmagnetoaccr = .true."
+   write(*,*) "deallocating Vfield for atomic lines when lmagnetoaccr = .true."
    deallocate(Vfield)
   end if
 
