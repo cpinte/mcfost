@@ -150,20 +150,20 @@ MODULE hydrogen_opacities
     n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
     np = Hydrogen%n(Hydrogen%Nlevel,icell)
 
-    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) CYCLE
+!    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) CYCLE
     ! -> prevents dividing by zero
-!     if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) then
-! !       write(*,*) "(Hydrogen_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!        if (npstar <= 0) then
-! !          write(*,*) "np density <= 0"
-! !          write(*,*) "skipping this level"
-!          CYCLE
-!        else
-! !          write(*,*) "Hydrogen%n(i) density <= 0 for i=", i
-! !          write(*,*) "skipping this level"
-!          CYCLE
-!        end if
-!      end if
+    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) then
+       write(*,*) "(Hydrogen_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+       if (npstar <= 0) then
+          write(*,*) "np density <= 0"
+          write(*,*) "skipping this level"
+         CYCLE
+       else
+          write(*,*) "Hydrogen%n(i) density <= 0 for i=", i
+          write(*,*) "skipping this level"
+         CYCLE
+       end if
+     end if
 
 
 !     allocate(iLam(continuum%Nlambda)) !not used yet

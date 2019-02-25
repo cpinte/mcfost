@@ -27,6 +27,7 @@ MODULE metal
  use mcfost_env, only : dp
  use molecular_emission, only		 : v_proj
  use parametres
+ use input
 
  IMPLICIT NONE
 
@@ -89,9 +90,9 @@ MODULE metal
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
     if (metal%nstar(j,icell) <=0) then
-!        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!        write(*,*) metal%ID,"%n(j) density <= 0 for j=", j
-!        write(*,*) "skipping this level"
+       write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+       write(*,*) metal%ID,"%n(j) density <= 0 for j=", j, metal%n(j,icell)
+       write(*,*) "skipping this level"
        CYCLE
     end if
 
@@ -185,7 +186,7 @@ MODULE metal
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 300
+  integer, parameter										:: NvspaceMax = 101
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -201,7 +202,7 @@ MODULE metal
   omegav = 0d0
   Nvspace = 1
   if (.not.lstatic) then
-   if (lmagnetoaccr) then
+   if (lmagnetoaccr.or.linfall.or.lkeplerian) then
     v0 = v_proj(icell,x,y,z,u,v,w)
    else !not infinite resol, replaced by lVoronoi case in a near futur =)
     v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
@@ -219,7 +220,8 @@ MODULE metal
    atom = atmos%PassiveAtoms(m)
    
     !velocity projected along a path between one border of the cell to the other
-    if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+    if (.not.lstatic .and. .not.atmos%Voronoi .and.&
+    	(lmagnetoaccr.or.linfall.or.lkeplerian)) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
      !write(*,*) v0/1000, v1/1000, dv/1000
@@ -243,16 +245,16 @@ MODULE metal
      i = line%i
      j = line%j
 
-     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
+!     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a transition
      ! between the levels i and j, but not for the others.
-!    if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) then !no transition
-!        write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!        write(*,*) atom%ID," density <= 0 ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
-!        write(*,*) "skipping this level"
-!       CYCLE
-!     end if
+   if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) then !no transition
+       write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
+       write(*,*) atom%ID," density <= 0 ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+       write(*,*) "skipping this level"
+      CYCLE
+    end if
 
      phi = 0d0
      phip = 0d0
@@ -321,7 +323,7 @@ MODULE metal
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 300
+  integer, parameter										:: NvspaceMax = 101
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
@@ -339,7 +341,8 @@ MODULE metal
   omegav = 0d0
   Nvspace = 1
   if (.not.lstatic) then
-   if (lmagnetoaccr) then
+   !if (lmagnetoaccr) then
+   if (lmagnetoaccr.or.linfall.or.lkeplerian) then
     v0 = v_proj(icell,x,y,z,u,v,w)
    else !not infinite resol
     v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
@@ -359,7 +362,9 @@ MODULE metal
    !if (atom%active) CYCLE ! go to next passive atom
    
     !velocity projected along a path between one border of the cell to the other
-    if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+    !if (.not.lstatic .and. .not.atmos%Voronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+    if (.not.lstatic .and. .not.atmos%Voronoi .and.&
+    	(lmagnetoaccr.or.linfall.or.lkeplerian)) then
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
      Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
@@ -382,9 +387,20 @@ MODULE metal
      
      !wavelength does not fall inside line domaine? OK cylcle
      if ((NLTEspec%lambda(la) < NLTEspec%lambda(line%Nblue)).or.&
-       (NLTEspec%lambda(la) > NLTEspec%lambda(line%Nred))) CYCLE
+        (NLTEspec%lambda(la) > NLTEspec%lambda(line%Nred))) then
+!        write(*,*) NLTEspec%lambda(la), " beyond line edge:", j, i
+!        write(*,*) NLTEspec%lambda(line%Nblue), NLTEspec%lambda(line%Nred)
+!        write(*,*) "Skipping"
+       CYCLE
+     end if
 
-     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
+!     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
+   if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) then !no transition
+       write(*,*) "(Metal_bb_lambda) Warning at icell=", icell," T(K)=", atmos%T(icell)
+       write(*,*) atom%ID," density <= 0 ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+       write(*,*) "skipping this level"
+      CYCLE
+    end if
 
      phi = 0d0
      phip = 0d0
