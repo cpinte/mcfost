@@ -1340,11 +1340,15 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
+  real(kind=dp), dimension(3) :: dx_screen, dy_screen
+  real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg, delta
   real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
+
+  integer, parameter :: nx_screen = 10 ! nx_screen needs to be even
+  real(kind=dp), dimension(nx_screen,nx_screen) :: tau_screen
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
   ! allacatable array as it can be big and not fit in stack memory
@@ -1389,6 +1393,26 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
 
   do istar=1, n_etoiles
      if (etoile(istar)%icell == 0) cycle ! star is not in the grid
+
+     ! Compute optical depth screen in front of the star at limited resolution, e.g. 10x10
+     delta = 2 * etoile(i)%r / nx_screen
+     dx_screen(:) = delta * dx_map(:)/norm2(dx_map(:))
+     dy_screen(:) = delta * dy_map(:)/norm2(dy_map(:))
+     do i=1, nx_screen
+        do j=1, nx_screen
+           x = etoile(istar)%x + dx_screen(1) * (2*i - nx_screen) +  dy_screen(1) * (2*j - nx_screen)
+           y = etoile(istar)%y + dx_screen(2) * (2*i - nx_screen) +  dy_screen(2) * (2*j - nx_screen)
+           z = etoile(istar)%z + dx_screen(3) * (2*i - nx_screen) +  dy_screen(3) * (2*j - nx_screen)
+
+           icell = etoile(istar)%icell
+
+           Stokes = 0.0_dp
+           call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
+
+           tau_screen(i,j) = tau
+        enddo ! j
+     enddo ! i
+
 
      map_1star(:,:,:) = 0.0
      if (lpola) then
