@@ -89,6 +89,8 @@ subroutine set_default_variables()
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
+  lSPH_amin = .false.
+  lSPH_amax = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -705,6 +707,18 @@ subroutine initialisation_mcfost()
         density_file = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-SPH_amin")
+        lSPH_amin = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) SPH_amin
+        i_arg = i_arg + 1
+     case("-SPH_amax")
+        lSPH_amax = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) SPH_amax
+        i_arg = i_arg + 1
      case("-gadget","-gadget2")
         i_arg = i_arg + 1
         lgadget2_file=.true.
