@@ -667,7 +667,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   ! C. Pinte
   ! 13/07/07
   ! Added projection for magnetospheric accretion, i.e., velocity is
-  ! a combination of Vpoloidal (VRcyl, Vz) and rotational (0,0,Vphi) +
+  ! a combination of Vpoloidal (VRcyl, Vz, 0) and rotational (0,0,Vphi) +
   ! eventually keplerian (0, 0, Vphi). Using atmos%Vxyz defined in
   ! Atoms/atmos_type.f90
   ! 21/02/19; B. Tessore
