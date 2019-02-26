@@ -636,8 +636,8 @@ contains
     endif
     
     !Temperature
-   atmos%T = 8000d0 !K
-   CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
+   atmos%T = 6d3 !K
+   !CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
 
    !Temperature and electron densities could be moved here, or later
    !After nHtot (m^-3) and T are known

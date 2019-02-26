@@ -71,15 +71,14 @@ MODULE TTauri_module
    do icell=1, atmos%Nspace
     r = dsqrt(Voronoi(icell)%xyz(1)**2 + &
     	Voronoi(icell)%xyz(2)**2+Voronoi(icell)%xyz(3)**2 )
-    if (atmos%nHtot(icell)>0) then !Iam assuming that it is .true. only
+    if ((atmos%nHtot(icell)>0).and.(r/etoile(1)%r>=r0)) then !Iam assuming that it is .true. only
     									 !along field lines
      L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
      atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-     write(*,*) icell, L, atmos%T(icell), atmos%nHtot(icell)
+     write(*,*) icell, L, atmos%T(icell), atmos%nHtot(icell), nH0, r
     end if
-    write(*,*) icell0, Q0, L, atmos%T(icell)
    end do
-
+stop
   RETURN
   END SUBROUTINE TTauri_Temperature
   

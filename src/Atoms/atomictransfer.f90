@@ -496,7 +496,7 @@ MODULE AtomicTransfer
 !                                              !else it means that in FLUX_PIXEL_LINE, nu
 !                                              !is 1d0 (to have flux in W/m2/Hz)
 !    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!
+! 
 !    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
 !                                          stars_map(:,:,1) / nu
 !    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &

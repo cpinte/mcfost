@@ -184,6 +184,7 @@ MODULE simple_models
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
           !write(*,*) log10(L), Rm, rcyl/etoile(1)%r, atmos%T(icell), nH0, Q0
+          atmos%T(icell) = 6d3
        end if
       end do
      end do
@@ -459,7 +460,8 @@ MODULE simple_models
      smooth_scale = 5. * Rmax * AU_to_m
      if (min(dx,dy,dz) < 2*etoile(1)%r*AU_to_m) then
       if ((dx**2+dy**2+dz**2) < (2*etoile(1)%r*AU_to_m)**2) then
-         smooth_scale = etoile(1)%r*AU_to_m!2*etoile(1)%r/3. * AU_to_m!m
+         smooth_scale = dsqrt(dx**2+dy**2+dz**2)/3. * AU_to_m
+         !=etoile(1)%r*AU_to_m!etoile(1)%r/3. * AU_to_m!m
       end if
      end if
         write(1,"(8E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
