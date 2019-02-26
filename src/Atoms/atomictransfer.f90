@@ -130,17 +130,10 @@ MODULE AtomicTransfer
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
 
-<<<<<<< Updated upstream
 
-!     if (.not.atmos%lcompute_atomRT(icell)) &
-!           lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent
-
-
-=======
 !     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
 !	   this makes the code to break down    ?
-               
->>>>>>> Stashed changes
+
     !count opacity only if the cell is filled, else go to next cell
     if (lcellule_non_vide.and.atmos%lcompute_atomRT(icell)) then
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
