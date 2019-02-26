@@ -132,8 +132,7 @@ MODULE AtomicTransfer
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
 
-!     if (.not.atmos%lcompute_atomRT(icell)) & 
-!           lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
+!     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
 !	   this makes the code to break down    ?
                
     !count opacity only if the cell is filled, else go to next cell
@@ -533,25 +532,9 @@ MODULE AtomicTransfer
 
   !read in dust_transfer.f90 in case of -pluto.
   !mainly because, RT atomic line and dust RT are not decoupled
+  !move elsewhere, in the model reading/definition?
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()  
-  
-   write(*,*) "Maximum/minimum velocities in the model (km/s):"
-   if (.not.lVoronoi) then
-    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
-     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
-     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
-   else
-!     write(*,*) maxval(dsqrt(sum(Voronoi(:)%Vxyz(:)**2,dim=2)), dim=1)*1d-3,  &
-!      		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
-!      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3   
-   end if
-
-   write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%T > 0)
-   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
-
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
@@ -580,10 +563,9 @@ MODULE AtomicTransfer
   end if
   CALL writeHydrogenDensity()  
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
-
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
-  CALL initSpectrum(500d0,lvacuum_to_air,lwrite_waves)
+  CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
   if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.

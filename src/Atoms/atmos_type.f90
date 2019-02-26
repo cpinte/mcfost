@@ -400,14 +400,18 @@ MODULE atmos_type
     !Nrad, Nz, Naz-> Velocity vector cartesian components
     allocate(atmos%Vxyz(atmos%Nspace,3))
     atmos%Vxyz = 0d0
-    write(*,*) "Allocating velocity array for lmagnetoaccr."
+    write(*,*) "Allocating atmos%Vxyz array for lmagnetoaccr case."
     !if lmagnetoaccr then atmos%Vxyz = (VRcyl, Vz, Vphi)
     !it is then projected like it is done in v_proj for keplerian rot
-    !meaning that the vlocity field has infinite resolution. Otherwise,
+    !meaning that the velocity field has infinite resolution. 
+    !Otherwise,
     !Vxyz=(Vx,Vy,Vz) and the velocity is constant in the cell just like in the
-    !Vornoi case.
-    !Vfield or atmos%Vxyz deallocated in atomictransfer.f90/&
-    !           reallocate_mcfost_vars() depending on lkep, linf and lmagnetoaccr
+    !Vornoi case. Note that this second case of (Vx,Vy,Vz) is just a test case
+    !For generating a model for Voronoi Tesselation.
+    !The normal case is atmos%Vxyz beeing (VRcyl, Vz, Vphi) for
+    !lmagnetoaccr case only, where both cylindrical and spherical velocities vectors
+    !overlap (different than lkeplerian with only Vphi and linfall with only Vrsph.
+    !If Lvoronoi, it is not allated since velocity is in Voronoi(:)%vxyz
    end if
 
    atmos%Natom = 0
@@ -438,15 +442,28 @@ MODULE atmos_type
    RETURN
    END SUBROUTINE init_atomic_atmos
 
-   SUBROUTINE define_atomRT_domain()
+   SUBROUTINE define_atomRT_domain(itiny_T, itiny_nH)
    ! Set where to solve for the RT equation: where a cell is not 
    ! transparent = where there is a significant density and temperature.
    ! Determines also if we have to force electron density calculation
     integer :: icell
-    double precision :: tiny_nH = 1d2, tiny_T = 1d1
+    double precision, optional :: itiny_nH, itiny_T
+    double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=5d2
+    !with Very low value of densities or temperature it is possible to have
+    !nan or infinity in the populations calculations because of numerical precisions
+    
+    if (present(itiny_T)) then
+     write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
+     tiny_T = itiny_T !K
+    end if
+
+    if (present(itiny_nH)) then
+     write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
+     tiny_nH = itiny_nH !m^-3
+    end if
     
     if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
-    
+
     if (tiny_T <= 0) then
      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 10d0
      tiny_T = 10d0
@@ -460,7 +477,8 @@ MODULE atmos_type
     do icell=1,atmos%Nspace
      atmos%lcompute_atomRT(icell) = &
        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
-    end do  
+    end do
+
    RETURN
    END SUBROUTINE define_atomRT_domain
 
