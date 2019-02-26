@@ -389,8 +389,8 @@ MODULE lte
   !$omp end do
   !$omp  end parallel
   ! end if !if chemical equilibrium
-  write(*,*) "max(nH-) (m^-3) = ", MAXVAL(atmos%nHmin), &
-  			 " min(nH-) (m^-3) = ", MINVAL(atmos%nHmin,mask=atmos%nHmin>0)
+   write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%nHmin>0)
 
  RETURN
  END SUBROUTINE setLTEcoefficients

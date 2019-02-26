@@ -298,9 +298,8 @@ END FUNCTION getPartitionFunctionk
 
   deallocate(fjk, dfjk)
   
-
-  write(*,*) "max(ne) (m^-3) = ", MAXVAL(atmos%ne), &
-  			 " min(ne) (m^-3) = ", MINVAL(atmos%ne,mask=atmos%ne>0)
+  write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
+  write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%ne>0)
  RETURN
  END SUBROUTINE SolveElectronDensity
 

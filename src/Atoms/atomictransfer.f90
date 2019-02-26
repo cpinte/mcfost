@@ -33,10 +33,7 @@ MODULE AtomicTransfer
  use collision
  use solvene
  use writeatom
- use simple_models, only 				: magneto_accretion_model, &
- 										  uniform_law_model, spherical_shells_model
-
-
+ use simple_models, only 				: magneto_accretion_model
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -121,10 +118,9 @@ MODULE AtomicTransfer
 
     ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
-!     if (lintersect_stars) then
-!       if (icell == icell_star) RETURN
-!     endif
-    if (lintersect_stars .and. (icell == icell_star)) RETURN
+    if (lintersect_stars) then
+      if (icell == icell_star) RETURN
+    endif
 
     nbr_cell = nbr_cell + 1
 
@@ -135,8 +131,8 @@ MODULE AtomicTransfer
                      l, l_contrib, l_void_before)
 
 !     if (.not.atmos%lcompute_atomRT(icell)) &
-!          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent
-!	   this makes the code to break down
+!           lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent
+!	   this makes the code to break down    ?
 
     !count opacity only if the cell is filled, else go to next cell
     if (lcellule_non_vide.and.atmos%lcompute_atomRT(icell)) then
@@ -494,20 +490,18 @@ MODULE AtomicTransfer
 
   end if
 
-
-  write(*,*) " -> Adding stellar flux"
-  do lambda = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-                                             !else it means that in FLUX_PIXEL_LINE, nu
-                                             !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-
-   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
-                                         stars_map(:,:,1) / nu
-   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-                                         stars_map(:,:,1) / nu
-  end do
-
+!   write(*,*) " -> Adding stellar flux"
+!   do lambda = 1, NLTEspec%Nwaves
+!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+!                                              !else it means that in FLUX_PIXEL_LINE, nu
+!                                              !is 1d0 (to have flux in W/m2/Hz)
+!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!
+!    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
+!                                          stars_map(:,:,1) / nu
+!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+!                                          stars_map(:,:,1) / nu
+!   end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -524,7 +518,7 @@ MODULE AtomicTransfer
 #include "sprng_f.h"
 
   integer :: atomunit = 1, nact, npass,  nat, la !atoms and wavelength
-  integer :: icell, NRT_CELLS=0 !spatial variables
+  integer :: icell
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "H_IONISATION"
   logical :: lwrite_waves = .false.
@@ -542,13 +536,22 @@ MODULE AtomicTransfer
   !mainly because, RT atomic line and dust RT are not decoupled
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()
-  !CALL uniform_law_model()
-  !CALL spherical_shells_model()
-write(*,*) lVoronoi
-  write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
-             " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
-  write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
-             " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)
+
+   write(*,*) "Maximum/minimum velocities in the model (km/s):"
+   if (.not.lVoronoi) then
+    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+   else
+!     write(*,*) maxval(dsqrt(sum(Voronoi(:)%Vxyz(:)**2,dim=2)), dim=1)*1d-3,  &
+!      		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+!      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+   end if
+
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%T > 0)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%nHtot>0)
 
 !! --------------------------------------------------------- !!
 
