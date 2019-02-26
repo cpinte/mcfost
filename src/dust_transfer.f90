@@ -1223,8 +1223,11 @@ subroutine dust_map(lambda,ibin,iaz)
      n_iter_min = 1
      n_iter_max = 1
 
-     dx(:) = 0.0_dp
-     dy(:) = 0.0_dp
+     ! dx and dy are only required for stellar map here
+     taille_pix = (map_size/zoom)  ! en AU
+     dx(:) = x_plan_image * taille_pix
+     dy(:) = y_plan_image * taille_pix
+
      i = 1
      j = 1
      lresolved = .false.
