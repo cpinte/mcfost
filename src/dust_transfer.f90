@@ -1419,7 +1419,7 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
            z = etoile(istar)%z + dx_screen(3) * i +  dy_screen(3) * j
 
            icell = etoile(istar)%icell
-           call indice_cellule_cyl(x,y,z, icell)
+           call indice_cellule(x,y,z, icell)
 
            Stokes = 0.0_dp
            call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
