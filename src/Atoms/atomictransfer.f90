@@ -1,6 +1,6 @@
 ! ----------------------------------------------------------------------------------- !
 ! ----------------------------------------------------------------------------------- !
-! This module solves for the radiative transfer equation by ray-tracing for 
+! This module solves for the radiative transfer equation by ray-tracing for
 ! multi-level atoms, using the MALI scheme.
 !
 ! Outputs:
@@ -35,10 +35,10 @@ MODULE AtomicTransfer
  use writeatom
  use simple_models, only 				: magneto_accretion_model, &
  										  uniform_law_model, spherical_shells_model
- 										  
- 
+
+
  !$ use omp_lib
- 
+
  !MCFOST's original modules
  use input
  use parametres
@@ -46,18 +46,18 @@ MODULE AtomicTransfer
  use optical_depth
  use dust_prop
  use dust_transfer, only 				: compute_stars_map
- use dust_ray_tracing, only 			: init_directions_ray_tracing ,            & 
+ use dust_ray_tracing, only 			: init_directions_ray_tracing ,            &
                               			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
                               			  tab_RT_incl, stars_map, kappa
  use stars
  use wavelengths
  use density
- 
+
  IMPLICIT NONE
 
  CONTAINS
 
- 
+
  SUBROUTINE INTEG_RAY_LINE(id,icell_in,x,y,z,u,v,w,iray,labs)
  ! ------------------------------------------------------------------------------- !
   ! This routine performs integration of the transfer equation along a ray
@@ -125,7 +125,7 @@ MODULE AtomicTransfer
 !       if (icell == icell_star) RETURN
 !     endif
     if (lintersect_stars .and. (icell == icell_star)) RETURN
-    
+
     nbr_cell = nbr_cell + 1
 
     ! Calcul longeur de vol et profondeur optique dans la cellule
@@ -134,10 +134,10 @@ MODULE AtomicTransfer
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
 
-!     if (.not.atmos%lcompute_atomRT(icell)) & 
-!          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
-!	   this makes the code to break down    
-               
+!     if (.not.atmos%lcompute_atomRT(icell)) &
+!          lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent
+!	   this makes the code to break down
+
     !count opacity only if the cell is filled, else go to next cell
     if (lcellule_non_vide.and.atmos%lcompute_atomRT(icell)) then
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
@@ -157,15 +157,15 @@ MODULE AtomicTransfer
 
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / & 
+                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / &
                  (NLTEspec%AtomOpac%Kc(icell,:,1) + &
                  NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
 
-      Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + & 
+      Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / &
             (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300)
      else
-      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1 
+      CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1
                                 !define the projection of the vector field (velocity, B...)
                                 !at each spatial location.
 
@@ -180,12 +180,12 @@ MODULE AtomicTransfer
       ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
       ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
       Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
-                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / & 
+                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / &
                  (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
-                 
-                 
+
+
       ! continuum source function
-      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + & 
+      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + &
             NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / &
             (NLTEspec%AtomOpac%chi_c(id,:) + 1d-300)
     end if
@@ -194,13 +194,13 @@ MODULE AtomicTransfer
     !intgreation of the RTE from the observer to the source result in having the
     ! inward flux and intensity. Integration from the source to the observer is done
     ! when computing the mean intensity: Sum_ray I*exp(-dtau)+S*(1-exp(-dtau))
-    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + & 
+    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + &
                              exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + &
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
- 
+
 !     if (MINVAL(NLTEspec%I(id,:,iray))<0) then
 !      write(*,*) "Negative Opac !"
 !      if (lstore_opac) then
@@ -224,16 +224,16 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
-     ! Define PSI Operators here  
+     ! Define PSI Operators here
     end if  ! lcellule_non_vide
   end do infinie
   ! -------------------------------------------------------------- !
   ! -------------------------------------------------------------- !
 
-  
+
   RETURN
   END SUBROUTINE INTEG_RAY_LINE
- 
+
   SUBROUTINE FLUX_PIXEL_LINE(&
          id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
   ! -------------------------------------------------------------- !
@@ -324,26 +324,26 @@ MODULE AtomicTransfer
      end if ! iter
      iter = iter + 1
    end do infinie
-   
+
   !Prise en compte de la surface du pixel (en sr)
 
   nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !to get W/m2 instead of W/m2/Hz !in Hz
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
-  
+
   ! adding to the total flux map.
   if (RT_line_method==1) then
     NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0
     NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c
   else
     NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
-    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c  
+    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
   end if
 
   RETURN
   END SUBROUTINE FLUX_PIXEL_LINE
-  
+
  SUBROUTINE EMISSION_LINE_MAP(ibin,iaz)
  ! -------------------------------------------------------------- !
   ! Line emission map in a given direction n(ibin,iaz),
@@ -365,7 +365,7 @@ MODULE AtomicTransfer
   double precision:: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda, lM, lR, lB, ll
   logical :: lresolved
- 
+
   write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
@@ -400,9 +400,12 @@ MODULE AtomicTransfer
   if (RT_line_method==1) then !log pixels
     n_iter_min = 1
     n_iter_max = 1
-    
-    dx(:) = 0.0_dp
-    dy(:) = 0.0_dp
+
+    ! dx and dy are only required for stellar map here
+    taille_pix = (map_size/zoom)  ! en AU
+    dx(:) = x_plan_image * taille_pix
+    dy(:) = y_plan_image * taille_pix
+
     i = 1
     j = 1
     lresolved = .false.
@@ -449,8 +452,8 @@ MODULE AtomicTransfer
         end do !j
      end do !i
      !$omp end do
-     !$omp end parallel  
-  else !method 2  
+     !$omp end parallel
+  else !method 2
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      lresolved = .true.
@@ -474,7 +477,7 @@ MODULE AtomicTransfer
      id = 1 ! pour code sequentiel
      n_iter_min = 1 ! 3
      n_iter_max = 1 ! 6
-     
+
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
@@ -488,7 +491,7 @@ MODULE AtomicTransfer
      enddo !i
      !$omp end do
      !$omp end parallel
-     
+
   end if
 
 
@@ -499,19 +502,19 @@ MODULE AtomicTransfer
                                              !is 1d0 (to have flux in W/m2/Hz)
    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
 
-   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  & 
+   NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
                                          stars_map(:,:,1) / nu
    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
                                          stars_map(:,:,1) / nu
-  end do  
+  end do
 
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
- 
+
  ! NOTE: should inverse the order of frequencies and depth because in general
  !       n_cells >> n_lambda, in "real" cases.
- 
+
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
   ! This routine initialises the necessary quantities for atomic line transfer
@@ -527,25 +530,25 @@ MODULE AtomicTransfer
   logical :: lwrite_waves = .false.
 
   optical_length_tot => atom_optical_length_tot
-  
+
   if (npix_x_save > 1) then
    RT_line_method = 2 ! creation d'une carte avec pixels carres
    npix_x = npix_x_save ; npix_y = npix_y_save
-  else 
+  else
    RT_line_method = 1 !pixels circulaires
   end if
 
   !read in dust_transfer.f90 in case of -pluto.
   !mainly because, RT atomic line and dust RT are not decoupled
 !! ----------------------- Read Model ---------------------- !!
-  if (.not.lpluto_file) CALL magneto_accretion_model()  
-  !CALL uniform_law_model() 
+  if (.not.lpluto_file) CALL magneto_accretion_model()
+  !CALL uniform_law_model()
   !CALL spherical_shells_model()
-write(*,*) lVoronoi 
+write(*,*) lVoronoi
   write(*,*) "max(T) (K) = ", MAXVAL(atmos%T), &
              " min(T) (K) = ", MINVAL(atmos%T,mask=atmos%T > 0)
   write(*,*) "max(nH) (m^-3) = ", MAXVAL(atmos%nHtot), &
-             " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)  
+             " min(nH) (m^-3) = ", MINVAL(atmos%nHtot,mask=atmos%nHtot>0)
 
 !! --------------------------------------------------------- !!
 
@@ -561,7 +564,7 @@ write(*,*) lVoronoi
   !can be used for the electron density calculation.
   if (.not.atmos%calc_ne) atmos%calc_ne = lsolve_for_ne
   if (lsolve_for_ne) write(*,*) "(Force) Solving for electron density"
-  if (atmos%calc_ne) then 
+  if (atmos%calc_ne) then
    if (lsolve_for_ne) write(*,*) "(Force) Solving for electron density"
    if (.not.lsolve_for_ne) write(*,*) "Solving for electron density"
    write(*,*) " Starting solution : ", ne_start_sol
@@ -569,11 +572,11 @@ write(*,*) lVoronoi
     write(*,*) "WARNING, ne from model is presumably 0 (or not given)."
     write(*,*) "Changing ne starting solution NE_MODEL in H_IONISATION"
     ne_start_sol = "H_IONISATION"
-   end if 
+   end if
    CALL SolveElectronDensity(ne_start_sol)
    CALL writeElectron()
   end if
-  CALL writeHydrogenDensity()  
+  CALL writeHydrogenDensity()
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
 !! --------------------------------------------------------- !!
@@ -585,7 +588,7 @@ write(*,*) lVoronoi
                                          ! Background continua (=ETL) are kept in memory.
    if (real(3*n_cells*NLTEspec%Nwaves)/(1024**3) < 1.) then
     write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**2), " MB of memory", &
-   	 " for Background continuum opacities."   
+   	 " for Background continuum opacities."
    else
     write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**3), " GB of memory", &
    	 " for Background continuum opacities."
@@ -594,7 +597,7 @@ write(*,*) lVoronoi
    !$omp parallel &
    !$omp default(none) &
    !$omp private(icell) &
-   !$omp shared(atmos) 
+   !$omp shared(atmos)
    !$omp do
    do icell=1,atmos%Nspace
     CALL BackgroundContinua(icell)
@@ -626,11 +629,11 @@ write(*,*) lVoronoi
   end if !end replacing initSol()
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
-!   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open 
+!   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open
 !   ! before the transfer starts and closed at the end.
-!   do nact=1,atmos%Nactiveatoms 
+!   do nact=1,atmos%Nactiveatoms
 !     if (atmos%ActiveAtoms(nact)%active) then
-!      CALL CollisionRate(icell, atmos%ActiveAtoms(nact)) 
+!      CALL CollisionRate(icell, atmos%ActiveAtoms(nact))
 !      CALL initGamma(icell, atmos%ActiveAtoms(nact)) !set Gamma to C for each active atom
 !       !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
 !       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
@@ -641,7 +644,7 @@ write(*,*) lVoronoi
 !   else
 !    write(*,*) "Solving for", atmos%Nrays,' directions.'
 !   end if
-! 
+!
 !! -------------------------------------------------------- !!
 
   write(*,*) "Computing emission flux map..."
@@ -661,13 +664,13 @@ write(*,*) lVoronoi
  end do
  !CALL WRITEATOM()
  CALL freeSpectrum() !deallocate spectral variables
- CALL free_atomic_atmos()  
+ CALL free_atomic_atmos()
  deallocate(ds)
  NULLIFY(optical_length_tot)
 
  RETURN
  END SUBROUTINE
- 
+
  SUBROUTINE reallocate_mcfost_vars()
   !--> should move them to init_atomic_atmos ? or elsewhere
   !need to be deallocated at the end of molecule RT or its okey ?`
@@ -686,7 +689,7 @@ write(*,*) lVoronoi
   tab_lambda = NLTEspec%lambda / MICRON_TO_NM
   tab_delta_lambda(1) = 0d0
   do la=2,NLTEspec%Nwaves
-   tab_delta_lambda(la) = tab_delta_lambda(la) - tab_delta_lambda(la-1) 
+   tab_delta_lambda(la) = tab_delta_lambda(la) - tab_delta_lambda(la-1)
   end do
   if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
   allocate(tab_lambda_inf(n_lambda))
