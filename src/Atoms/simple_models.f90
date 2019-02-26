@@ -48,8 +48,8 @@ MODULE simple_models
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.1!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
-   double precision :: Omega, Vphi, NormV(n_cells), TL(8), Lambda(8) !K and erg/cm3/s
-   double precision :: rho_to_nH
+   double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
+   logical :: lwrite_model_ascii = .true.
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
@@ -59,11 +59,8 @@ MODULE simple_models
 
    linfall = .false.
    lkeplerian = .false.
-   lmagnetoaccr = .false.
+   lmagnetoaccr = .not.(lwrite_model_ascii)
    CALL init_atomic_atmos()
-   atmos%vturb = 0d3 !m/s
-   !lvoronoi = .true.!has to be done after init with lvoronoi=.false.
-   !otherwise atmos%Vxyz is not allocated
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
@@ -198,24 +195,37 @@ MODULE simple_models
    !! inclued in atom%vbroad so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
-    NormV = dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2)
-    atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
+    atmos%v_char = atmos%v_char + &
+    minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
-   write(*,*) "maxVfield (km/s)", maxval(NormV)/1d3, &
-              " minVfield", minval(NormV,mask=normV>0)/1d3
-   write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
+
    CALL define_atomRT_domain()
    
-   if (.not.lmagnetoaccr) then !for now
+   if (lwrite_model_ascii.and..not.lmagnetoaccr) then !for now
     CALL writeAtmos_ascii()
     !leave here, we enter here only to write the model for Voronoi tesselation
     CALL free_atomic_atmos()
     !densities will be fill again during the Voronoi tesselation
     !leave here with an empty atomic atmos that will be filled during the tesselation
     !using this model
-    write(*,*) "Stop after writing for the moment"
-    stop
+     write(*,*) "Stop after writing for the moment"
+     stop
    end if
+   
+   if (.not.lstatic) then
+    write(*,*) "Maximum/minimum velocities in the model (km/s):"
+    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+   end if
+   write(*,*) "Typical velocity in the model (km/s):"
+   write(*,*) atmos%v_char/1d3
+
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)  
    
   RETURN
   END SUBROUTINE magneto_accretion_model
@@ -250,14 +260,13 @@ MODULE simple_models
 !     atmos%ne = 1.251891d16
 !     atmos%nHtot = 1.045714d16
 
-   CALL define_atomRT_domain()
-
    lstatic = .true. !force to be static for this case
    !tmos%vturb = 9.506225d3 !m/s !idk=10
    !atmos%vturb = 1.696164d3 !idk = 75
    atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
-   atmos%v_char = 0d0!would be only atom%vbroad which contains vturb already
+   atmos%v_char = maxval(atmos%vturb)
+   CALL define_atomRT_domain()
 
   RETURN
   END SUBROUTINE uniform_law_model
@@ -338,9 +347,7 @@ MODULE simple_models
     end if
     atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
    end if
-   write(*,*) "maxVfield (km/s)", maxval(NormV)/1d3, &
-              " minVfield", minval(NormV,mask=normV>0)/1d3
-   write(*,*) "atmos%v_char (km/s) =", atmos%v_char/1d3
+
    CALL define_atomRT_domain()
 
   RETURN
@@ -387,48 +394,6 @@ MODULE simple_models
   RETURN
   END SUBROUTINE prop_law_model
   
-  SUBROUTINE TTauri_Temperature()
-  ! ---------------------------------------------------------------- !
-   ! Computes temperature of accretion columns of T Tauri stars
-   ! given the density, using the prescription of Hartmann 94
-   ! and the cooling rates for Hartmann 82
-   !
-   ! TO DO: Numerically solve for the temperature, iterating
-   ! between NLTE solution (Cooling rates) and Temperature->ne->npops
-  ! ------------------------------------------------------------------ !
-   use Voronoi_grid, only : Voronoi
-   use utils, only : interp_dp
-   integer 	:: icell, icell0
-   double precision, parameter :: T0 = 7d3 !Defined the Temperature, must be consitant
-   									!with the one in magneto_accretion_model() if used
-   double precision :: Q0, nH0, L, TL(8), Lambda(8) !K and erg/cm3/s
-   double precision :: r0 = 1d0, r
-   
-   !T = K
-   data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 /
-   !Lambda = Q/nH**2, Q in J/m9/s
-   data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 /
-
-   if (.not.lVoronoi) then
-    write(*,*) "Only defined for external model read"
-    stop
-   end if
-
-
-   icell0 = etoile(1)%icell - 1
-   !We need to define a Q0... but we do not know the position along a field line
-   !and cell, contruary to the case where the model is defined
-   do icell=1, atmos%Nspace
-    r = dsqrt(Voronoi(icell)%xyz(1)**2 +Voronoi(icell)%xyz(2)**2+Voronoi(icell)%xyz(3)**2 )
-    Q0 = atmos%nHtot(icell0)**2 * 10**(interp_dp(Lambda, TL, log10(T0)))*0.1
-    L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
-    atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-    write(*,*) icell0, Q0, L, atmos%T(icell)
-   end do
-
-  RETURN
-  END SUBROUTINE TTauri_Temperature
-  
   SUBROUTINE writeAtmos_ascii()
   ! ------------------------------------- !
    ! Write GridType atmos to ascii file.
@@ -466,36 +431,49 @@ MODULE simple_models
       fact = 1d0
       if (z<0) fact = -1
       sinTheta = fact*dsqrt(1.-(z/r)**2)
-
-   
-        !XX(icell) = rcyl*cos(phi)*AU_to_m!r*cos(phi)*sinTheta * AU_to_m
-        !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
-        XX(icell) = r*cos(phi)*sinTheta * AU_to_m
-        YY(icell) = r*sin(phi)*sinTheta * AU_to_m   
-        ZZ(icell) = z*AU_to_m
+      !XX(icell) = rcyl*cos(phi)*AU_to_m!r*cos(phi)*sinTheta * AU_to_m
+      !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
+       XX(icell) = r*cos(phi)*sinTheta * AU_to_m
+       YY(icell) = r*sin(phi)*sinTheta * AU_to_m   
+       ZZ(icell) = z*AU_to_m
      end do
     end do
    end do
+   
+   if (lstatic) then 
+    allocate(atmos%Vxyz(n_cells,3))
+    atmos%Vxyz = 0d0
+   end if
    
    open(unit=1,file=trim(filename),status="replace")
    atmos%nHtot = atmos%nHtot / rho_to_nH !using total density instead of nHtot for writing
    !write Masses per cell instead of densities. Voronoi cells Volume is different than
    !grid cell right ? 
+   write(*,*) "Maximum/minimum density in the model (kg/m^3):"
+   write(*,*) maxval(atmos%nHtot), minval(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)
    atmos%nHtot = atmos%nHtot * volume * AU3_to_m3  * kg_to_Msun!Msun
-   !length_scale = 1d0
-   do icell=1, atmos%Nspace !error here, the grid should not be < rstar
+   do icell=1, atmos%Nspace
      dx = XX(icell) - etoile(1)%x*AU_to_m
      dy = YY(icell) - etoile(1)%y*AU_to_m
      dz = ZZ(icell) - etoile(1)%z*AU_to_m
-     !smooth_scale = real((volume(icell)*AU3_to_m3)**(1./3.))
      smooth_scale = 5. * Rmax * AU_to_m
      if (min(dx,dy,dz) < 2*etoile(1)%r*AU_to_m) then
-      if ((dx**2+dy**2+dz**2) >= (2*etoile(1)%r*AU_to_m)**2) &
+      if ((dx**2+dy**2+dz**2) < (2*etoile(1)%r*AU_to_m)**2) then
+         smooth_scale = etoile(1)%r*AU_to_m!2*etoile(1)%r/3. * AU_to_m!m
+      end if
+     end if
         write(1,"(8E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
     	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), smooth_scale
-     end if
    end do
-   
+   write(*,*) "Maximum/minimum mass in the model (Msun):"
+   write(*,*) maxval(atmos%nHtot), minval(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) "Maximum/minimum mass in the model (Kg):"
+   write(*,*) maxval(atmos%nHtot)*Msun_to_kg, &
+   				minval(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)*Msun_to_kg
+   write(*,*) "Maximum/minimum velocities in the model (km/s):"
+   write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
    close(unit=1)
 
   RETURN

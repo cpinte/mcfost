@@ -492,8 +492,11 @@ contains
 
     ! Voronoi tesselation
     CALL pluto_to_Voronoi(Nmod, x,y,z,h,rho,vx,vy,vz,.false.)
+    !check_previous_tesselation = .true. does not work yet because, the routine
+    !which reads the previous tesselation uses density_files(...) so far, which is not
+    !yet implemented.
 
-    !deallocate(vx,vy,vz,rho,h,x,y,z) !right?
+    deallocate(vx,vy,vz,rho,h,x,y,z) !right?
    
    RETURN
 
@@ -508,6 +511,7 @@ contains
     use Voronoi_grid
     use mem
     use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain
+    use ttauri_module, only : TTauri_Temperature
 
     integer, intent(in) :: Nmod
     real(dp), dimension(Nmod), intent(in) :: x,y,z, h
@@ -515,10 +519,12 @@ contains
     logical, intent(in) :: check_previous_tesselation
     real(dp), dimension(6) :: limits
     real :: f, density_factor
-    integer :: icell, l, k, i, id_n, voroindex, n_force_empty
+    integer :: icell, k, i, id_n, voroindex, n_force_empty
+    real(dp) :: Vchar, Vcharb
 
-    density_factor = 1e-12
-    icell_ref = 1
+    density_factor = 1e-30
+    Vchar = 1d99 !default = minimum
+    Vcharb = 0d0 !default = maximum, inverse case of Vchar
 
     write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)
@@ -556,7 +562,8 @@ contains
      write(*,*) "Error in array size"
      stop
     end if
-
+    atmos%vturb = 0d0
+    
     !*************************
     ! Densities
     !*************************
@@ -564,6 +571,10 @@ contains
     !allocated to avoid errors    
     CALL allocate_densities(n_cells_max=Nmod+n_etoiles)
     ! I need to work with masses, as Voronoi and Pluto volume could be different
+    !Note that a very low density, due to high volume for instance, might create some
+    !erros in LTE.f90 and solvene.f90 due to numerical precisions.
+    !This can be overcome by setting a different threshold in define_rt_domain
+    !or by setting the density of these cells to 0
     do icell=1,n_cells
        voroindex = Voronoi(icell)%id
        if (voroindex > 0) then
@@ -587,8 +598,12 @@ contains
              Voronoi(icell)%vxyz(1) = vx(voroindex)
              Voronoi(icell)%vxyz(2) = vy(voroindex)
              Voronoi(icell)%vxyz(3) = vz(voroindex)
+             if ((vx(voroindex)**2+vx(voroindex)**2+vx(voroindex)**2) > 0d0) &
+              Vchar = min(dsqrt(vx(voroindex)**2+vy(voroindex)**2+vz(voroindex)**2), Vchar)
+             Vcharb = max(Vcharb, dsqrt(sum(Voronoi(icell)%vxyz**2)))
           endif
-       enddo
+       end do
+       atmos%v_char = atmos%v_char + Vchar
     endif
 
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
@@ -622,12 +637,23 @@ contains
     
     !Temperature
    atmos%T = 8000d0 !K
+   CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
 
    !Temperature and electron densities could be moved here, or later
-  !After nHtot (m^-3) and T are known
-  CALL define_atomRT_domain()
+   !After nHtot (m^-3) and T are known
+   !allocate lcompute_atomRT
+   CALL define_atomRT_domain(itiny_nH=1d3)
+  
+   write(*,*) "Maximum/minimum velocities in the model (km/s):"
+   write(*,*) Vcharb/1d3, Vchar/1d3
+   write(*,*) "Typical velocity in the model (km/s):"
+   write(*,*) atmos%v_char/1d3
 
-
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.) 
+ 
   RETURN
 
   END SUBROUTINE pluto_to_Voronoi 

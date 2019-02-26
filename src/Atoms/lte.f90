@@ -234,7 +234,8 @@ MODULE lte
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
     if (MAXVAL(atom%nstar(:,k)) <= 0d0) then !at the cell
-     write(*,*) "cell=",k, atom%ID, atom%nstar(:,k)
+     write(*,*) "cell=",k, atom%ID, atmos%lcompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
+     write(*,*) atom%nstar(:,k)
      write(*,*) "Error, zero or negative populations for this atom at this cell point"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
@@ -245,7 +246,7 @@ MODULE lte
 !    write(*,*) "-------------------"
 
    if (MAXVAL(atom%nstar) <= 0d0) then !Total
-     write(*,*) "cell=",k, atom%ID
+     write(*,*) "cell=",k, atom%ID,atmos%lcompute_atomRT(k)
      write(*,*) "Error, zero or negative populations for this atom on the grid!"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
@@ -390,7 +391,7 @@ MODULE lte
   !$omp  end parallel
   ! end if !if chemical equilibrium
    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%nHmin>0)
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%lcompute_atomRT==.true.)
 
  RETURN
  END SUBROUTINE setLTEcoefficients

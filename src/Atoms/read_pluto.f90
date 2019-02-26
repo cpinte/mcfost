@@ -36,7 +36,7 @@ module READ_PLUTO
   SUBROUTINE pluto_to_mcfost(x,y,z,h)
    double precision, intent(inout), allocatable, dimension(:) :: x,y,z,h
 
-  ! Convert phantom quantities & units to mcfost quantities & units
+  ! Convert PLUTO quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! densities assumed in kg/m3 here and velocities in m/s
 

@@ -153,7 +153,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 opera
 	input.f90 $(Atom_dir)/getlambda.f90 benchmarks.f90 \
 	read_param.f90 dust_ray_tracing.f90 radiation_field.f90 \
 	thermal_emission.f90 diffusion.f90 io_prodimo.f90 disk_physics.f90 output.f90 mem.f90 \
-	init_mcfost.f90 \
+	init_mcfost.f90 $(Atom_dir)/ttauri_module.f90\
 	io_phantom_infiles.f90 io_phantom_utils.f90 read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90 \
 	$(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90 $(Atom_dir)/readatom.f90 \
 	$(Atom_dir)/collision.f90 $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
