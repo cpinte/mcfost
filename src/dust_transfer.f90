@@ -1391,11 +1391,12 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   ! Test si etoile est resolue
   n_ray_star(:) = max(n_ray_star_SED / n_etoiles,1)
 
-  if (lmono0) then
+  if (lresolved) then
      pix_size = map_size/zoom / max(npix_x,npix_y)
      do istar=1, n_etoiles
         if (2*etoile(istar)%r > pix_size) then
-           n_ray_star(istar) = max(n_ray_star_SED / n_etoiles,1) * 8 * int(max(etoile(istar)%r/pix_size**2,1.))
+           ! on average 100 rays per pixels
+           n_ray_star(istar) = max(100 * int(4*pi*(etoile(istar)%r/pix_size)**2), n_ray_star_SED)
            if (istar==1) write(*,*) ""
            write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
         endif
