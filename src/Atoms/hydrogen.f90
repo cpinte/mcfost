@@ -32,6 +32,8 @@ MODULE hydrogen_opacities
  use constant
  use spectrum_type, only : NLTEspec
  use math, only : bezier3_interp, interp2Darr
+ 
+ use constantes, only : tiny_dp
 
  IMPLICIT NONE
 
@@ -152,7 +154,7 @@ MODULE hydrogen_opacities
 
 !    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) CYCLE
     ! -> prevents dividing by zero
-    if ((Hydrogen%n(i,icell) <= 0.).or.(npstar <= 0.)) then
+    if ((Hydrogen%n(i,icell) <= tiny_dp).or.(npstar <= tiny_dp)) then
        write(*,*) "(Hydrogen_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
        if (npstar <= 0) then
           write(*,*) "np density <= 0"
