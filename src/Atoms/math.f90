@@ -133,8 +133,9 @@ MODULE math
  ! POINTS OUTSIDE THE DOMAIN ARE ATTRIBUTED TO THE OUTER INTIAL VALUES
  Implicit None
  Integer :: n, np, k
- Real(8), dimension(n) :: x, y
- Real(8), dimension(np) :: xp, yp
+ Real(8), dimension(n), intent(in) :: x, y
+ Real(8), dimension(np), intent(in) :: xp
+ Real(8), dimension(np), intent(out) :: yp
  Real(8) :: cntrl, dx, yprime(n), lambda, u(np)
 
 
@@ -173,8 +174,9 @@ MODULE math
 
  SUBROUTINE bezier3_interp(n, x, y, np, xp, yp)
   Integer :: n, np, k
-  Real(8), dimension(n) :: x, y
-  Real(8), dimension(np) :: xp, yp
+  Real(8), dimension(n), intent(in) :: x, y
+  Real(8), dimension(np), intent(in) :: xp
+  Real(8), dimension(np), intent(out) :: yp
   Real(8) :: c1, c2, yprime(n), dx, u(np), mmi, mma
 
 
@@ -220,11 +222,10 @@ MODULE math
   !One point Bezier interpolation, wrapper around BezierN_interp
   ! return scallar
   FUNCTION interp1D(x1a,ya,x1) result(y)
-   REAL(8), dimension(:) :: x1a
-   REAL(8), DIMENSION(:) :: ya
-   REAL(8) :: x1
+   REAL(8), dimension(:), intent(in) :: x1a, ya
+   REAL(8), intent(in) :: x1
    REAL(8) :: y
-   real(8), dimension(1) :: tmp1, tmp2, tmp3
+   real(8), dimension(1) :: tmp1, tmp3
 
    tmp1(1) = x1
    call bezier3_interp(size(x1a),x1a,ya,1, tmp1,tmp3)
@@ -236,9 +237,7 @@ MODULE math
   END FUNCTION
 
   FUNCTION interp1Darr(x1a,ya,x1) result(y)
-   REAL(8), dimension(:) :: x1a
-   REAL(8), DIMENSION(:) :: ya
-   REAL(8), dimension(:) :: x1
+   REAL(8), dimension(:), intent(in) :: x1a, ya, x1
    REAL(8), dimension(size(x1)) :: y
 
    call bezier3_interp(size(x1a),x1a,ya,size(x1), x1,y)
@@ -253,25 +252,25 @@ MODULE math
    ! special case for Barklem data.
    ! Using 2 x 1D Bezier cubic splines (in the x and y direction)
    ! return scalar
-   REAL(8), dimension(:) :: x1a, x2a
-   REAL(8), DIMENSION(:,:) :: ya
-   REAL(8) :: x1,x2
+   REAL(8), dimension(:), intent(in) :: x1a, x2a
+   REAL(8), DIMENSION(:,:), intent(in) :: ya
+   REAL(8), intent(in) :: x1,x2
    REAL(8) :: y
    real(8), dimension(1) :: tmp1, tmp2, tmp3
 
    INTEGER :: j
    REAL(8), DIMENSION(size(x1a)) :: ymtmp
+   real(8), dimension(size(x2a)) :: yb
 
    tmp1(1) = x1
    tmp2(1) = x2
 
    do j=1,size(x1a) !y-axis interpolation
-    call bezier3_interp(size(x2a),&
-           x2a,ya(j,:),1, tmp2, tmp3)
+    yb = ya(j,:)
+    call bezier3_interp(size(x2a),x2a,yb,1, tmp2, tmp3)
     ymtmp(j) = tmp3(1) !tmp3 needed to extract the scalar value
    end do
-  call bezier3_interp(size(x1a), &
-           x1a, ymtmp, 1, tmp1, tmp3)
+   call bezier3_interp(size(x1a), x1a, ymtmp, 1, tmp1, tmp3)
 
    y = tmp3(1)
 
@@ -279,29 +278,40 @@ MODULE math
   END FUNCTION interp2D
 
   FUNCTION interp2Darr(N1a, x1a, N2a, x2a,ya,N1, x1, N2, x2) result(y)
-   ! interpolate at vectorised points x1 and x2
-   ! inside the grid vectors x1a and x2a.
-   ! return vector
-   integer :: N1a, N2a, N1, N2
-   REAL(8) :: x1a(N1a), x2a(N2a)
-   REAL(8), DIMENSION(N1a,N2a) :: ya
-   REAL(8) :: x1(N1),x2(N2)
-   REAL(8), dimension(N1,N2) :: y
-
-   INTEGER :: m, n
-   REAL(8), DIMENSION(N1a, N2) :: ymtmp
-
-
-   do n=1,N1a ! y axis interpolation
-    call bezier3_interp(N2a,&
-           x2a,ya(n,:),N2, x2, ymtmp(n,:))
+   integer, intent(in) :: N1a, N2a, N1, N2
+   double precision, intent(in) :: x1a(N1a), x2a(N2a)
+   double precision, intent(in) :: x1(N1), x2(N2)
+   double precision, DIMENSION(N1a,N2a), intent(in) :: ya
+   double precision  :: y(N1,N2)
+   integer :: i, j
+!    integer, intent(in) :: N1a, N2a, N1, N2
+!    REAL(8), intent(in) :: x1a(N1a), x2a(N2a)
+!    REAL(8), DIMENSION(N1a,N2a), intent(in) :: ya
+!    REAL(8), intent(in) :: x1(N1),x2(N2)
+!    REAL(8), dimension(N1,N2) :: y
+! 
+!    INTEGER :: m, n
+!    REAL(8), DIMENSION(N1a, N2) :: ymtmp
+!    real(8) :: yb(N2a), ym2(N2), yc(N1a), ym3(N1)
+   
+   do i=1,N1
+    do j=1,N2
+     y(i,j) = Interp2D(x1a, x2a, ya,x1(i),x2(j))
+    end do
    end do
-   do m =1,N2 ! interpolate on the x direction
-   call bezier3_interp(N1a, &
-           x1a, ymtmp(:,m), N1,x1, y(:,m))
-   end do
 
-  RETURN
+
+!    do n=1,N1a ! y axis interpolation
+!     call bezier3_interp(N2a,&
+!            x2a,ya(n,:),N2, x2, ymtmp(n,:))
+!    end do
+!    do m =1,N2 ! interpolate on the x direction
+!    !y(:,m) = ymtmp(:,m)
+!    call bezier3_interp(N1a, &
+!            x1a, ymtmp(:,m), N1,x1, y(:,m))
+!    end do
+   
+   RETURN
   END FUNCTION interp2Darr
 
   FUNCTION gammln(xx)
