@@ -92,9 +92,10 @@ MODULE solvene
 
   type(Element) :: elem
   integer, intent(in) :: stage, k
-  double precision :: Uk
-
-  Uk = Interp1D(atmos%Tpf,elem%pf(stage,:),atmos%T(k))
+  double precision :: Uk, part_func(atmos%Npf)
+  
+  part_func = elem%pf(stage,:)
+  Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
        !do not forget that Uk is base 10 logarithm !!
        ! note that in RH, natural (base e) logarithm
        ! is used instead

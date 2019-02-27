@@ -13,6 +13,8 @@ MODULE lte
  use math
  use collision, only : CollisionRate, openCollisionFile
  
+ use constantes, only : tiny_dp, huge_dp
+ 
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -36,11 +38,14 @@ MODULE lte
   ! -------------------------------------------------------------- !
   integer :: k
   double precision :: ionpot, C1, phi
-  double precision :: Ujl, Uj1l
+  double precision :: Ujl, Uj1l, arg_exp
   C1 = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
   !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
-  phi = C1 * (Ujl / Uj1l) * dexp(ionpot/(KBOLTZMANN*atmos%T(k))) / &
-           (atmos%T(k)**1.5)
+  !! -> avoiding dividing by big numbers causing overflow.
+  !!maximum argument is 600, exp(600) = 3.77e260
+  arg_exp = min(600d0,ionpot/(KBOLTZMANN*atmos%T(k)))
+  phi = C1 * (Ujl / Uj1l) * dexp(arg_exp) / (atmos%T(k)**1.5)
+  
   RETURN
   END FUNCTION phi_jl
 
@@ -233,10 +238,10 @@ MODULE lte
     !faster ? 
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 
-    if (MAXVAL(atom%nstar(:,k)) <= 0d0) then !at the cell
+    if (MAXVAL(atom%nstar(:,k)) <= tiny_dp) then !at the cell
      write(*,*) "cell=",k, atom%ID, atmos%lcompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
      write(*,*) atom%nstar(:,k)
-     write(*,*) "Error, zero or negative populations for this atom at this cell point"
+     write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
     end if
@@ -245,9 +250,9 @@ MODULE lte
    !$omp  end parallel
 !    write(*,*) "-------------------"
 
-   if (MAXVAL(atom%nstar) <= 0d0) then !Total
+   if (MAXVAL(atom%nstar) <= tiny_dp) then !Total
      write(*,*) "cell=",k, atom%ID,atmos%lcompute_atomRT(k)
-     write(*,*) "Error, zero or negative populations for this atom on the grid!"
+     write(*,*) "Error, populations negative or lower than tiny dp for this atom on the grid!"
      write(*,*) "Exciting..."
      stop !beware if low T, np -> 0, check to not divide by 0 density
    end if

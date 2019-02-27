@@ -28,6 +28,7 @@ MODULE metal
  use molecular_emission, only		 : v_proj
  use parametres
  use input
+ use constantes, only				 : tiny_dp, huge_dp
 
  IMPLICIT NONE
 
@@ -89,9 +90,9 @@ MODULE metal
     ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
-    if (metal%nstar(j,icell) <=0) then
+    if (metal%nstar(j,icell) <= tiny_dp) then
        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-       write(*,*) metal%ID,"%n(j) density <= 0 for j=", j, metal%n(j,icell)
+       write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
        write(*,*) "skipping this level"
        CYCLE
     end if
@@ -205,18 +206,7 @@ MODULE metal
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
-!   omegav = 0d0
-!   Nvspace = 1
-!   if (.not.lstatic) then
-!    if (lmagnetoaccr.or.linfall.or.lkeplerian) then
-!     v0 = v_proj(icell,x,y,z,u,v,w)
-!    else !not infinite resol, replaced by lVoronoi case in a near futur =)
-!     v0 = atmos%Vxyz(icell,1)*u + atmos%Vxyz(icell,2)*v + atmos%Vxyz(icell,3)*w
-!    end if
-!    omegav(1) = v0
-!    !the following line is not mandatory, anyway.. Nvspace=1 at the init phase
-!    if (lVoronoi) omegav(Nvspace) = v0 !velocity constant in the cell
-!   end if
+  
   if (atmos%magnetized) then
    !! Magneto-optical elements (f, and r, LL04)
   end if
@@ -253,9 +243,9 @@ MODULE metal
      ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a transition
      ! between the levels i and j, but not for the others.
-     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) then !no transition
+     if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
        write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-       write(*,*) atom%ID," density <= 0 ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+       write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
        write(*,*) "skipping this level"
       CYCLE
      end if
@@ -391,9 +381,9 @@ MODULE metal
      end if
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
-   if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) then !no transition
+   if ((atom%n(j,icell) <= tiny_dp).or.(atom%n(i,icell) <= tiny_dp)) then !no transition
        write(*,*) "(Metal_bb_lambda) Warning at icell=", icell," T(K)=", atmos%T(icell)
-       write(*,*) atom%ID," density <= 0 ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+       write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
        write(*,*) "skipping this level"
       CYCLE
     end if
@@ -424,7 +414,7 @@ MODULE metal
       end do
      end if !line%voigt
     
-     
+
      Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * atom%vbroad(icell))
      NLTEspec%AtomOpac%chi_p(id,la) = NLTEspec%AtomOpac%chi_p(id,la) +&
      								  Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))

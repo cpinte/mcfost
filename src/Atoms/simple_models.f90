@@ -49,7 +49,7 @@ MODULE simple_models
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
-   logical :: lwrite_model_ascii = .true.
+   logical :: lwrite_model_ascii = .false.
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
@@ -184,7 +184,6 @@ MODULE simple_models
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
           !write(*,*) log10(L), Rm, rcyl/etoile(1)%r, atmos%T(icell), nH0, Q0
-          atmos%T(icell) = 6d3
        end if
       end do
      end do

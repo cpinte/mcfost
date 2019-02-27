@@ -144,7 +144,7 @@ MODULE atmos_type
    ! there is an HDU for each element (+one for T grid already read)
    integer :: unit, EOF, blocksize, i, j
    integer, intent(in) :: code
-   integer :: NAXISPF(2), naxis_found, hdutype, Z
+   integer :: NAXISPF(2), naxis_found, hdutype, Z, shape_pf(2)
    character(len=256) :: some_comments
    integer,  intent(inout) :: Nstage
    integer,  intent(in) :: Npf
@@ -193,8 +193,9 @@ MODULE atmos_type
     ! remember: pf(:,1) =  ion potentials
     !           pf(:,2:) = partition functions for all ion pots.
     !e = real*4
-    !d = real*8
-    CALL FTG2Dd(unit,1,-999,shape(data_krz),Npf+1,Nstage,data_krz,anynull,EOF)
+    !d = real*8            !shape(data_krz)
+    shape_pf(1) = Npf+1; shape_pf(2) = Nstage
+    CALL FTG2Dd(unit,1,-999,shape_pf,Npf+1,Nstage,data_krz,anynull,EOF)
     !do i=1,Nstage
     ! write(*,*) "potential in cm-1 for elem ", elemental_ID(code),":", &
     !            data_krz(1,i)

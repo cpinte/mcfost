@@ -1397,8 +1397,10 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         if (2*etoile(istar)%r > pix_size) then
            ! on average 100 rays per pixels
            n_ray_star(istar) = max(100 * int(4*pi*(etoile(istar)%r/pix_size)**2), n_ray_star_SED)
-           if (istar==1) write(*,*) ""
-           write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
+           if (lsed .or. lemission_mol) then
+            if (istar==1) write(*,*) ""
+            write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
+           endif
         endif
      enddo
   endif

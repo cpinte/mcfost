@@ -6,10 +6,12 @@ MODULE TTauri_module
   use utils, only : interp_dp
   use math, only : locate
   use constantes
+  use stars
 
   IMPLICIT NONE
 
   CONTAINS  
+  
   SUBROUTINE TTauri_Temperature(rmi, rmo, Macc)
   ! ---------------------------------------------------------------- !
    ! Computes temperature of accretion columns of T Tauri stars
@@ -81,5 +83,68 @@ MODULE TTauri_module
 stop
   RETURN
   END SUBROUTINE TTauri_Temperature
+  
+  SUBROUTINE Star_Addspot(istar, Ns, phi0a, dphia, theta0a, dthetaa, Tsa, Sa)
+   ! ----------------------------------------------------- !
+    ! Given coordinates, add bright or dark spots
+    ! at a stellar surface.
+    ! It changes the flux of the star at the spot location.
+    !
+    ! angle in degrees, surface in % and T in K
+   ! ----------------------------------------------------- !
+   integer, intent(in)			:: Ns, istar
+   double precision, dimension(Ns), intent(in) :: phi0a, dphia ,&
+   												  theta0a, dthetaa, Tsa, Sa
+   type (star_type) :: star
+   integer :: k
+   
+   star = etoile(istar)
+   
+   !for this star allocate StarSpots array
+   allocate(star%StarSpots(Ns))
+   !Fill each StarSpots with data
+   do k = 1, Ns
+    star%StarSpots(k)%phi0 = phi0a(k) * deg_to_rad
+    star%StarSpots(k)%dphi = dphia(k) * deg_to_rad
+    star%StarSpots(k)%theta0 = theta0a(k) * deg_to_rad
+    star%StarSpots(k)%dtheta = dthetaa(k) * deg_to_rad
+    star%StarSpots(k)%Ts = Tsa(k)
+    star%StarSpots(k)%S = Sa(k) * 1d-2   
+   end do
+   
+
+  RETURN
+  END SUBROUTINE Star_Addspot
+  
+  SUBROUTINE TTauri_Accretion_schocks(rmi, rmo, Macc)
+   ! ----------------------------------------------------- !
+    ! Add an accretion ring on the T Tauri surface.
+    ! Assumes only 1 star.
+    ! Dark spots can be added too.
+   ! ----------------------------------------------------- ! 
+   double precision, intent(in) :: rmi, rmo, Macc
+   double precision :: r, Rstar, Mstar, Mdot, Lr, thetai, thetao, Tring, Sr
+   double precision, parameter ::  year_to_sec = 3.154d7
+   integer :: istar
+   
+   istar = 1
+   etoile(istar)%Nspot = 2! 2 Rings in that case
+   
+   Rstar = etoile(istar)%r * AU_to_m !AU_to_Rsun * Rsun !m
+   Mstar = etoile(istar)%M * Msun_to_kg !kg
+   Mdot = Macc * Msun_to_kg / year_to_sec !kg/s
+   Lr = Ggrav * Mstar * Mdot / Rstar * (1. - 2./(rmi + rmo))
+
+   thetai = asin(dsqrt(1d0/rmi))
+   thetao = asin(dsqrt(1d0/rmo))
+
+   Tring = Lr / (4d0 * PI * Rstar**2 * sigma * abs(cos(thetai)-cos(thetao)))
+   Tring = Tring**0.25
+   Sr = abs(cos(thetai)-cos(thetao)) !4pi*Rstar**2 * abs(c1-c2) / 4pi Rstar**2   
+    
+   allocate(etoile(istar)%StarSpots(etoile(istar)%Nspot))
+  
+  RETURN
+  END SUBROUTINE TTauri_Accretion_schocks
   
 END MODULE TTauri_module

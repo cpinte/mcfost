@@ -361,25 +361,28 @@ end subroutine dust_and_mol_optical_length_tot
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, & 
                      next_cell, l, l_contrib, l_void_before)
 
-     if ((icell0<=n_cells).and.(NLTEspec%Atmos%lcompute_atomRT(icell0))) then
-      CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-      if (lstore_opac) then !LTE continua are kept in memory
+     if (icell0<=n_cells) then
+      if (NLTEspec%Atmos%lcompute_atomRT(icell0)) then 
+       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
+       if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
-      !CALL NLTEOPAC_lambda()
-      CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+       !CALL NLTEOPAC_lambda()
+       CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda) + &
                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
-                  
-      else !on the fly calculations, slow but cheap in memory
-       !CALL NLTEOPAC()
-       CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
-       opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+       else !on the fly calculations, slow but cheap in memory
+        !CALL NLTEOPAC()
+        CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
+        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
-      end if
+       end if
+      else
+       opacite = 0d0
+      end if !lcompute_atomRT
      else
       opacite = 0d0 !cell is empty
-     end if
+     end if ! 
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
 

@@ -178,13 +178,25 @@ module parametres
   character(len=512), dimension(:), allocatable :: density_files
   integer :: n_phantom_files
 
+  TYPE spot_type
+   real(kind=dp) :: xs, ys, zs
+   real(kind=dp) :: theta0, dtheta, phi0, dphi
+   integer 		 :: shape
+   ! shape       0 : circular spot
+   ! 			 1 : ring
+   !			 2 : etc ...
+   real(kind=dp) :: S, Ts !should be position dependent 
+  END TYPE spot_type
   ! Stars
+  !27/02/2019, adding spots coordinates
   type star_type
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
      real(kind=dp) :: x,y,z
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
+     integer :: Nspot
+     type (spot_type), dimension(:), allocatable :: StarSpots
   end type star_type
 
   integer :: n_etoiles

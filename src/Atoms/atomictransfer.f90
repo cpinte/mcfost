@@ -40,7 +40,7 @@ MODULE AtomicTransfer
  use input
  use parametres
  use grid
- use optical_depth
+ use optical_depth, only				: atom_optical_length_tot, optical_length_tot
  use dust_prop
  use dust_transfer, only 				: compute_stars_map
  use dust_ray_tracing, only 			: init_directions_ray_tracing ,            &
@@ -110,8 +110,9 @@ MODULE AtomicTransfer
     icell = next_cell
     x0=x1 ; y0=y1 ; z0=z1
 
-    if (icell <= n_cells) then !.and.atmos%lcompute_atomRT(icell)
-     lcellule_non_vide=.true.
+    if (icell <= n_cells) then
+     !lcellule_non_vide=.true.
+     lcellule_non_vide = atmos%lcompute_atomRT(icell)
     else
      lcellule_non_vide=.false.
     endif
@@ -132,10 +133,12 @@ MODULE AtomicTransfer
 
 
 !     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
-!	   this makes the code to break down    ?
+!	   this makes the code to break down  --> the atomRT is defined on n_cells
+!		but the infinite loop runs over "virtual" cells, which can be be 
+!		out of atomRT boundary
 
     !count opacity only if the cell is filled, else go to next cell
-    if (lcellule_non_vide.and.atmos%lcompute_atomRT(icell)) then
+    if (lcellule_non_vide) then
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
@@ -490,18 +493,17 @@ MODULE AtomicTransfer
 
   end if
 
-!   write(*,*) " -> Adding stellar flux"
-!   do lambda = 1, NLTEspec%Nwaves
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-!                                              !else it means that in FLUX_PIXEL_LINE, nu
-!                                              !is 1d0 (to have flux in W/m2/Hz)
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-! 
-!    NLTEspec%Flux(lambda,:,:,ibin,iaz) = NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
-!                                          stars_map(:,:,1) / nu
-!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-!                                          stars_map(:,:,1) / nu
-!   end do
+  write(*,*) " -> Adding stellar flux"
+  do lambda = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+                                             !else it means that in FLUX_PIXEL_LINE, nu
+                                             !is 1d0 (to have flux in W/m2/Hz)
+   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+   NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
+                                         stars_map(:,:,1) / nu
+   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+                                         stars_map(:,:,1) / nu
+  end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -524,6 +526,10 @@ MODULE AtomicTransfer
   logical :: lwrite_waves = .false.
 
   optical_length_tot => atom_optical_length_tot
+  if (.not.associated(optical_length_tot)) then
+   write(*,*) "pointer optical_length_tot not associated"
+   stop
+  end if
 
   if (npix_x_save > 1) then
    RT_line_method = 2 ! creation d'une carte avec pixels carres
@@ -675,7 +681,7 @@ MODULE AtomicTransfer
   tab_lambda = NLTEspec%lambda / MICRON_TO_NM
   tab_delta_lambda(1) = 0d0
   do la=2,NLTEspec%Nwaves
-   tab_delta_lambda(la) = tab_delta_lambda(la) - tab_delta_lambda(la-1)
+   tab_delta_lambda(la) = tab_lambda(la) - tab_lambda(la-1)
   end do
   if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
   allocate(tab_lambda_inf(n_lambda))
