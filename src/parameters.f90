@@ -55,7 +55,7 @@ module parametres
 
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
-  
+
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
   			 lcontrib_function, lmagnetoaccr
@@ -178,18 +178,16 @@ module parametres
   character(len=512), dimension(:), allocatable :: density_files
   integer :: n_phantom_files
 
-  TYPE spot_type
-   real(kind=dp) :: xs, ys, zs
-   real(kind=dp) :: dOmega
-   real(kind=dp) :: theta0, dtheta, phi0, dphi
-   integer 		 :: shape
-   ! shape       0 : circular spot
-   ! 			 1 : ring
-   !			 2 : etc ...
-   real(kind=dp) :: S, Ts !Ts should be position dependent 
-  END TYPE spot_type
+  type spot_type
+     real(kind=dp) :: xs, ys, zs
+     real(kind=dp) :: dOmega
+     real(kind=dp) :: theta0, dtheta, phi0, dphi
+     real(kind=dp) :: S, Ts !Ts should be position dependent
+     integer       :: shape ! 0 : circular spot, 1 : ring
+  end type spot_type
+
   ! Stars
-  !27/02/2019, adding spots coordinates
+  ! 27/02/2019, adding spots coordinates
   type star_type
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
      real(kind=dp) :: x,y,z
@@ -197,7 +195,7 @@ module parametres
      character(len=512) :: spectre
      integer :: icell
      integer :: Nspot = 0
-     type (spot_type), dimension(:), allocatable :: StarSpots
+     type(spot_type), dimension(:), allocatable :: StarSpots
   end type star_type
 
   integer :: n_etoiles

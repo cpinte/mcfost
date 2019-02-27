@@ -288,7 +288,7 @@ subroutine dust_and_mol_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w
      else
         opacite = 0.0_dp
      endif
-     
+
      ! Calcul longeur de vol et profondeur optique dans la cellule
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -306,16 +306,16 @@ subroutine dust_and_mol_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w
 
 end subroutine dust_and_mol_optical_length_tot
 
- SUBROUTINE atom_optical_length_tot(&
-             id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
- ! ------------------------------------------------------------------ !
-  !special for atomic line RT.
- ! ------------------------------------------------------------------ !
-  
-  use metal, only                         : Background, BackgroundLines,&
-  										    BackgroundLines_lambda, Backgroundcontinua
+!***********************************************************
+
+subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+  ! ------------------------------------------------------------------ !
+  ! special for atomic line RT.
+  ! ------------------------------------------------------------------ !
+
+  use metal, only                         : Background, BackgroundLines, BackgroundLines_lambda, Backgroundcontinua
   use spectrum_type, only                 : NLTEspec, initAtomOpac
-  
+
   integer, intent(in)                    :: id, lambda, icell
   real(kind=dp),dimension(4), intent(in) :: Stokes
   real(kind=dp), intent(in)              :: u,v,w
@@ -358,31 +358,31 @@ end subroutine dust_and_mol_optical_length_tot
      end if
 
      ! Calcul longeur de vol et profondeur optique dans la cellule
-     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, & 
-                     next_cell, l, l_contrib, l_void_before)
+     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, &
+          next_cell, l, l_contrib, l_void_before)
 
      if (icell0<=n_cells) then
-      if (NLTEspec%Atmos%lcompute_atomRT(icell0)) then 
-       CALL initAtomOpac(id) !set opac to zero for this cell and thread.
-       if (lstore_opac) then !LTE continua are kept in memory
+        if (NLTEspec%Atmos%lcompute_atomRT(icell0)) then
+           call initAtomOpac(id) !set opac to zero for this cell and thread.
+           if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
-       !CALL NLTEOPAC_lambda()
-       CALL BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
-                  NLTEspec%AtomOpac%chi_p(id,lambda) + &
-                  NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
-       else !on the fly calculations, slow but cheap in memory
-        !CALL NLTEOPAC()
-        CALL Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
-        opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
-                  NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
-       end if
-      else
-       opacite = 0d0
-      end if !lcompute_atomRT
+              !call NLTEOPAC_lambda()
+              call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+              opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+                   NLTEspec%AtomOpac%chi_p(id,lambda) + &
+                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
+           else !on the fly calculations, slow but cheap in memory
+              !call NLTEOPAC()
+              call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
+              opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
+                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
+           end if
+        else
+           opacite = 0d0
+        end if !lcompute_atomRT
      else
-      opacite = 0d0 !cell is empty
-     end if ! 
+        opacite = 0d0 !cell is empty
+     end if !
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
 
@@ -394,9 +394,11 @@ end subroutine dust_and_mol_optical_length_tot
   end do ! boucle infinie
 
   write(*,*) "BUG"
-  
- RETURN
- END SUBROUTINE atom_optical_length_tot
+
+  return
+
+end subroutine atom_optical_length_tot
+
 !***********************************************************
 
 subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_speed, nTrans, tab_Trans)
