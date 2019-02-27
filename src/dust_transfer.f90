@@ -1412,7 +1412,9 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
 
      dx_screen(:) = delta * dx_map(:)/norm2(dx_map(:))
      dy_screen(:) = delta * dy_map(:)/norm2(dy_map(:))
+
      ! Todo : this could be made parallel, but it is very fast so far
+     id = 1
      do j=-nx_screen, nx_screen
         do i=-nx_screen, nx_screen
            x = etoile(istar)%x + dx_screen(1) * i +  dy_screen(1) * j
