@@ -125,7 +125,7 @@ stop
    double precision, intent(in) :: rmi, rmo, Macc
    double precision :: r, Rstar, Mstar, Mdot, Lr, thetai, thetao, Tring, Sr
    double precision, parameter ::  year_to_sec = 3.154d7
-   integer :: istar
+   integer :: istar, k
    
    istar = 1
    etoile(istar)%Nspot = 2! 2 Rings in that case
@@ -143,6 +143,20 @@ stop
    Sr = abs(cos(thetai)-cos(thetao)) !4pi*Rstar**2 * abs(c1-c2) / 4pi Rstar**2   
     
    allocate(etoile(istar)%StarSpots(etoile(istar)%Nspot))
+   do k=1, etoile(istar)%Nspot
+    etoile(istar)%StarSpots(k)%shape = 1
+    etoile(istar)%StarSpots(k)%theta0 = 0.5*(thetao + thetai)
+    etoile(istar)%StarSpots(k)%dtheta = abs(thetai - thetao)
+    etoile(istar)%StarSpots(k)%phi0 = -1d0
+    etoile(istar)%StarSpots(k)%dphi = -1d0
+    !phi is only important if shape /= 1 ie if it is not a ring
+    etoile(istar)%StarSpots(k)%S = Sr
+    etoile(istar)%StarSpots(k)%Ts = Tring
+    !etoile(istar)%StarSpots(k)%zs = cos(0.5*(thetao + thetai))
+    !etoile(istar)%StarSpots(k)%ys = sin(0.5*(thetao + thetai)) * sin(phi_spot/180.*pi)
+    !etoile(istar)%StarSpots(k)%xs = sin(0.5*(thetao + thetai)) * cos(phi_spot/180.*pi)
+    etoile(istar)%StarSpots(k)%dOmega = cos(0.5*(thetao + thetai))*dsqrt(1d0 - Sr)
+   end do
   
   RETURN
   END SUBROUTINE TTauri_Accretion_schocks

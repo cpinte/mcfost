@@ -180,12 +180,13 @@ module parametres
 
   TYPE spot_type
    real(kind=dp) :: xs, ys, zs
+   real(kind=dp) :: dOmega
    real(kind=dp) :: theta0, dtheta, phi0, dphi
    integer 		 :: shape
    ! shape       0 : circular spot
    ! 			 1 : ring
    !			 2 : etc ...
-   real(kind=dp) :: S, Ts !should be position dependent 
+   real(kind=dp) :: S, Ts !Ts should be position dependent 
   END TYPE spot_type
   ! Stars
   !27/02/2019, adding spots coordinates
@@ -195,7 +196,7 @@ module parametres
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
-     integer :: Nspot
+     integer :: Nspot = 0
      type (spot_type), dimension(:), allocatable :: StarSpots
   end type star_type
 
