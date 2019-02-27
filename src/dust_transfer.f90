@@ -1492,7 +1492,24 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         ! Interpolation of optical depth : bilinear interpolation on the precomputed screen
         ! offset in in # of screen pixels (dx_screen is propto delta, so there is a delta**2 normlization)
         offset_x = dot_product(vec,dx_screen) * norm_screen2 ; i = floor(offset_x) ; fx = offset_x - i
+        if (i < -nx_screen) then
+           i = -nx_screen
+           fx = 0._dp
+        else if (i >= nx_screen) then
+           i = nx_screen -1
+           fx = 1._dp
+        endif
+
         offset_y = dot_product(vec,dy_screen) * norm_screen2 ; j = floor(offset_y) ; fy = offset_y - j
+        if (j < -nx_screen) then
+           j = -nx_screen
+           fy = 0._dp
+        else if (j >= nx_screen) then
+           j = nx_screen -1
+           fy = 1._dp
+        endif
+
+
         tau =  tau_screen(i,j)     * (1-fx) * (1-fy) &
              + tau_screen(i+1,j)   * fx * (1-fy) &
              + tau_screen(i,j+1)   * (1-fx) * fy &
