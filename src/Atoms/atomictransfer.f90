@@ -673,7 +673,6 @@ MODULE AtomicTransfer
   CALL init_directions_ray_tracing()
   if (.not.allocated(stars_map)) allocate(stars_map(npix_x,npix_y,3))
   if (.not.allocated(stars_map_cont)) allocate(stars_map_cont(npix_x,npix_y,3))
-  stars_map = 0
   n_lambda = NLTEspec%Nwaves
   if (allocated(tab_lambda)) deallocate(tab_lambda)
   allocate(tab_lambda(n_lambda))

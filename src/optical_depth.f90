@@ -326,7 +326,8 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
   real(kind=dp)                          :: x0, y0, z0, x1, y1, z1, l,   &
                                             ltot, tau, opacite, tau_tot, &
                                             correct_plus, correct_moins, &
-                                            l_contrib, l_void_before, kappa_c
+                                            l_contrib, l_void_before, kappa_c, &
+                                            tau_tot_cont
 
   integer                                :: icell0, previous_cell, next_cell
 
@@ -336,7 +337,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
   x1=xi;y1=yi;z1=zi
 
   tau_tot=0.0_dp
-  NLTEspec%atmos%tau = 0d0
+  tau_tot_cont=0.0_dp
 
   lmin=0.0_dp
   ltot=0.0_dp
@@ -355,6 +356,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
      if (test_exit_grid(icell0, x0, y0, z0)) then
         tau_tot_out=tau_tot
         lmax=ltot
+        NLTEspec%atmos%tau = tau_tot_cont
         return
      end if
 
@@ -390,7 +392,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
      end if !
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
-     NLTEspec%atmos%tau = NLTEspec%atmos%tau + l_contrib*kappa_c
+     tau_tot_cont = tau_tot_cont + l_contrib*kappa_c
 
      tau_tot = tau_tot + tau
      ltot= ltot + l
