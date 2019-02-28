@@ -184,6 +184,7 @@ module parametres
      real(kind=dp) :: theta0, dtheta, phi0, dphi
      real(kind=dp) :: S, Ts !Ts should be position dependent
      integer       :: shape ! 0 : circular spot, 1 : ring
+     real(kind=dp) :: gamma !constrast: array or not?
   end type spot_type
 
   ! Stars

@@ -55,7 +55,8 @@ module dust_ray_tracing
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
-  real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
+  real, dimension(:,:,:), allocatable :: stars_map, stars_map_cont ! nx, ny, 4
+  !stellar continuum map only for lemission_atom
 
 
   contains

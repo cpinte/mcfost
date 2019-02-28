@@ -29,6 +29,7 @@ MODULE atmos_type
    ! for each cell starting from 1 to n_cells
    integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays = 1
    double precision :: metallicity, totalAbund, avgWeight, wght_per_H
+   double precision :: tau !a variable used to sum up contribution of opacities along a ray
    ! an arrray containing the project local velocity
    ! in the cell, to be used to compute the local profile
    ! T is a function of x,y,z or T is a function of the cell point (T(Nspace))

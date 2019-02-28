@@ -326,7 +326,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
   real(kind=dp)                          :: x0, y0, z0, x1, y1, z1, l,   &
                                             ltot, tau, opacite, tau_tot, &
                                             correct_plus, correct_moins, &
-                                            l_contrib, l_void_before
+                                            l_contrib, l_void_before, kappa_c
 
   integer                                :: icell0, previous_cell, next_cell
 
@@ -336,6 +336,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
   x1=xi;y1=yi;z1=zi
 
   tau_tot=0.0_dp
+  NLTEspec%atmos%tau = 0d0
 
   lmin=0.0_dp
   ltot=0.0_dp
@@ -371,20 +372,25 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
               opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                    NLTEspec%AtomOpac%chi_p(id,lambda) + &
                    NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
+              kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
            else !on the fly calculations, slow but cheap in memory
               !call NLTEOPAC()
               call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
               opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
                    NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
+              kappa_c = NLTEspec%AtomOpac%chi_c(id, lambda) * AU_to_m
            end if
         else
            opacite = 0d0
+           kappa_c = 0d0
         end if !lcompute_atomRT
      else
         opacite = 0d0 !cell is empty
+        kappa_c = 0d0
      end if !
 
      tau=l_contrib*opacite ! opacite constante dans la cellule
+     NLTEspec%atmos%tau = NLTEspec%atmos%tau + l_contrib*kappa_c
 
      tau_tot = tau_tot + tau
      ltot= ltot + l

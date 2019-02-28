@@ -45,7 +45,7 @@ MODULE AtomicTransfer
  use dust_transfer, only 				: compute_stars_map
  use dust_ray_tracing, only 			: init_directions_ray_tracing ,            &
                               			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
-                              			  tab_RT_incl, stars_map, kappa
+                              			  tab_RT_incl, stars_map, kappa, stars_map_cont
  use stars
  use wavelengths
  use density
@@ -502,7 +502,7 @@ MODULE AtomicTransfer
    NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
                                          stars_map(:,:,1) / nu
    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-                                         stars_map(:,:,1) / nu
+                                         stars_map_cont(:,:,1) / nu
   end do
 
  RETURN
@@ -672,6 +672,7 @@ MODULE AtomicTransfer
   ds = 0d0 !meters
   CALL init_directions_ray_tracing()
   if (.not.allocated(stars_map)) allocate(stars_map(npix_x,npix_y,3))
+  if (.not.allocated(stars_map_cont)) allocate(stars_map_cont(npix_x,npix_y,3))
   stars_map = 0
   n_lambda = NLTEspec%Nwaves
   if (allocated(tab_lambda)) deallocate(tab_lambda)
