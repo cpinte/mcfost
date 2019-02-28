@@ -58,7 +58,7 @@ module parametres
 
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
-  			 lcontrib_function, lmagnetoaccr
+       lcontrib_function, lmagnetoaccr
   ! PLUTO MHD
   logical :: lpluto_file
 
