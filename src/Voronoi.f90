@@ -250,8 +250,7 @@ module Voronoi_grid
                    dy = y(i) - etoile(istar)%y
                    dz = z(i) - etoile(istar)%z
 
-                   !if (min(dx,dy,dz) < 2*etoile(istar)%r) then
-                   if ((min(dx,dy,dz) < 2*etoile(istar)%r).and.(h(i)<etoile(istar)%r)) then
+                   if (min(dx,dy,dz) < 2*etoile(istar)%r) then
                       dist2 = dx**2 + dy**2 + dz**2
                       if (dist2 < deuxr2_star(istar)) then
                          is_outside_stars = .false.
