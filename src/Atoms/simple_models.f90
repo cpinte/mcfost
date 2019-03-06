@@ -42,6 +42,7 @@ MODULE simple_models
   ! ----------------------------------------------------------- !
    use math, only : interp1D
    use utils, only : interp_dp
+   use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=7d3, Macc = 1d-7
@@ -200,6 +201,8 @@ MODULE simple_models
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
 
+   atmos%T = 0d0
+   CALL TTauri_Temperature(rmi, rmo, Macc)
    CALL define_atomRT_domain()
    
    if (lwrite_model_ascii.and..not.lmagnetoaccr) then !for now

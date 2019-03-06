@@ -7,6 +7,7 @@ MODULE TTauri_module
   use math, only : locate
   use constantes
   use stars
+  use grid, only : r_grid, z_grid
 
   IMPLICIT NONE
 
@@ -25,20 +26,22 @@ MODULE TTauri_module
    double precision, intent(in) :: rmi, rmo, Macc
    									!with the one in magneto_accretion_model() if used
    double precision :: Q0, nH0, L, TL(8), Lambda(8) !K and erg/cm3/s
-   double precision :: r, Rstar, Mstar, Mdot, Lr, thetai, thetao, Tring, rho_to_nH, Sr
+   double precision :: Rstar, Mstar, Mdot, Lr, thetai, thetao, Tring, rho_to_nH, Sr
    double precision, parameter ::  year_to_sec = 3.154d7, r0=1d0
+   double precision, allocatable, dimension(:) :: r
    
    !T = K
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 /
    !Lambda = Q/nH**2, Q in J/m9/s
    data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 /
 
-   if (.not.lVoronoi) then
-    write(*,*) "Only defined for external model read"
-    stop
+   allocate(r(atmos%Nspace))
+   if (lVoronoi) then
+    r(:) = dsqrt(Voronoi(:)%xyz(1)**2 + &
+    	Voronoi(:)%xyz(2)**2+Voronoi(:)%xyz(3)**2 )
+   else
+    r = dsqrt(r_grid**2 + z_grid**2)
    end if
-
- 
 
    Rstar = etoile(1)%r * AU_to_m !AU_to_Rsun * Rsun !m
    Mstar = etoile(1)%M * Msun_to_kg !kg
@@ -71,16 +74,16 @@ MODULE TTauri_module
    atmos%T = 0d0
 
    do icell=1, atmos%Nspace
-    r = dsqrt(Voronoi(icell)%xyz(1)**2 + &
-    	Voronoi(icell)%xyz(2)**2+Voronoi(icell)%xyz(3)**2 )
-    if ((atmos%nHtot(icell)>0).and.(r/etoile(1)%r>=r0)) then !Iam assuming that it is .true. only
+    if ((atmos%nHtot(icell)>0).and.(r(icell)/etoile(1)%r>=r0)) then !Iam assuming that it is .true. only
     									 !along field lines
-     L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
+     L = 10 * Q0*(r0*etoile(1)%r/r(icell))**3 / atmos%nHtot(icell)**2!erg/cm3/s
      atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-     write(*,*) icell, L, atmos%T(icell), atmos%nHtot(icell), nH0, r
+     !write(*,*) icell, L, atmos%T(icell), atmos%nHtot(icell), nH0, r
     end if
    end do
-stop
+   
+   deallocate(r)
+!stop
   RETURN
   END SUBROUTINE TTauri_Temperature
   
