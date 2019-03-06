@@ -43,14 +43,15 @@ MODULE spectrum_type
   END TYPE AtomicOpacity
 
   TYPE Spectrum
+   !n_proc should be the last index
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
    integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
-   !nproc, nlambda, nrays
+   !nlambda, nrays, nproc
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
-   !nproc, nlambda
+   !nlambda, nproc
    double precision, allocatable, dimension(:,:) :: J, J20, Jc
    !Nlambda, xpix, ypix, Nincl, Naz
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
@@ -130,22 +131,22 @@ MODULE spectrum_type
     stop
    end if
    
-   allocate(NLTEspec%I(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
-   allocate(NLTEspec%Ic(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+   allocate(NLTEspec%I(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
+   allocate(NLTEspec%Ic(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
    NLTEspec%I = 0d0
    NLTEspec%Ic = 0d0
 
    if (NLTEspec%atmos%Magnetized) then
-    allocate(NLTEspec%StokesQ(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), & 
-             NLTEspec%StokesU(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS), &
-             NLTEspec%StokesV(NLTEspec%NPROC, NLTEspec%NWAVES, NLTEspec%atmos%NRAYS))
+    allocate(NLTEspec%StokesQ(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), & 
+             NLTEspec%StokesU(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), &
+             NLTEspec%StokesV(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
     NLTEspec%StokesQ=0d0
     NLTEspec%StokesU=0d0
     NLTEspec%StokesV=0d0
    end if
-   allocate(NLTEspec%J(NLTEspec%NPROC, NLTEspec%Nwaves))
-   allocate(NLTEspec%Jc(NLTEspec%NPROC, NLTEspec%Nwaves))
-   !! allocate(NLTEspec%J20(NLTEspec%NPROC, NLTEspec%Nwaves))
+   allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
+   allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
+   !! allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC))
    NLTEspec%J = 0.0
    NLTEspec%Jc = 0.0
       
@@ -164,22 +165,22 @@ MODULE spectrum_type
      NLTEspec%AtomOpac%Kc = 0d0
      NLTEspec%AtomOpac%jc = 0d0
    else
-    allocate(NLTEspec%AtomOpac%eta_c(NLTEspec%NPROC,Nsize))
-    allocate(NLTEspec%AtomOpac%chi_c(NLTEspec%NPROC,Nsize))
-    allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%NPROC,NLTEspec%Nwaves))
+    allocate(NLTEspec%AtomOpac%eta_c(Nsize,NLTEspec%NPROC))
+    allocate(NLTEspec%AtomOpac%chi_c(Nsize,NLTEspec%NPROC))
+    allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%Nwaves,NLTEspec%NPROC))
     NLTEspec%AtomOpac%chi_c = 0.
     NLTEspec%AtomOpac%eta_c = 0.
     NLTEspec%AtomOpac%sca_c = 0.
    end if
    
-   allocate(NLTEspec%AtomOpac%chi(NLTEspec%NPROC,Nsize))
-   allocate(NLTEspec%AtomOpac%eta(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%chi(Nsize,NLTEspec%NPROC))
+   allocate(NLTEspec%AtomOpac%eta(Nsize,NLTEspec%NPROC))
    ! if pol allocate AtomOpac%rho
    NLTEspec%AtomOpac%chi = 0.
    NLTEspec%AtomOpac%eta = 0.
 
-   allocate(NLTEspec%AtomOpac%eta_p(NLTEspec%NPROC,Nsize))
-   allocate(NLTEspec%AtomOpac%chi_p(NLTEspec%NPROC,Nsize))
+   allocate(NLTEspec%AtomOpac%eta_p(Nsize,NLTEspec%NPROC))
+   allocate(NLTEspec%AtomOpac%chi_p(Nsize,NLTEspec%NPROC))
    !allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%NPROC,Nsize))
    ! if pol same as atice opac case
 
@@ -232,17 +233,17 @@ MODULE spectrum_type
      stop
     end if
 
-    NLTEspec%AtomOpac%chi(id,:) = 0d0
-    NLTEspec%AtomOpac%eta(id,:) = 0d0
+    NLTEspec%AtomOpac%chi(:,id) = 0d0
+    NLTEspec%AtomOpac%eta(:,id) = 0d0
     if (.not.lstore_opac) then
-      NLTEspec%AtomOpac%chi_c(id,:) = 0d0
-      NLTEspec%AtomOpac%eta_c(id,:) = 0d0
-      NLTEspec%AtomOpac%sca_c(id,:) = 0d0
+      NLTEspec%AtomOpac%chi_c(:,id) = 0d0
+      NLTEspec%AtomOpac%eta_c(:,id) = 0d0
+      NLTEspec%AtomOpac%sca_c(:,id) = 0d0
     end if !else thay are not allocated
-    NLTEspec%AtomOpac%chi_p(id,:) = 0d0
-    NLTEspec%AtomOpac%eta_p(id,:) = 0d0
-    NLTEspec%J(id,:) = 0d0
-    NLTEspec%Jc(id,:) = 0d0
+    NLTEspec%AtomOpac%chi_p(:,id) = 0d0
+    NLTEspec%AtomOpac%eta_p(:,id) = 0d0
+    NLTEspec%J(:,id) = 0d0
+    NLTEspec%Jc(:,id) = 0d0
   
   RETURN
   END SUBROUTINE initAtomOpac
