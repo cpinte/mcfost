@@ -174,7 +174,7 @@ MODULE getlambda
   END FUNCTION
 
   SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, Ntrans, wl_ref)
-  use math, only : locate, sort
+  use math, only : locate
   ! --------------------------------------------------------------------------- !
    ! construct and sort a wavelength grid for atomic line radiative transfer.
    ! Computes also the edge of a line profile: Nblue and Nred.
