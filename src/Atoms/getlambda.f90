@@ -5,7 +5,7 @@ MODULE getlambda
   use constant
   
   use parametres
-  use utils, only : span, spanl
+  use utils, only : span, spanl, bubble_sort
   
   IMPLICIT NONE
   
@@ -59,7 +59,7 @@ MODULE getlambda
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision, parameter :: wing_to_core = 0.3, L = 10d0!50d0
-   integer, parameter :: Nc = 71, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    
@@ -198,7 +198,7 @@ MODULE getlambda
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot
    integer :: la, nn, nnn !counters: wavelength, number of wavelengths, line wavelength
    integer :: Nred, Nblue, Nlambda_original!read from model
-   double precision, allocatable, dimension(:) :: tempgrid
+   double precision, allocatable, dimension(:) :: tempgrid, sorted_indexes
    double precision :: l0, l1 !ref wavelength of each transitions
 
    nn = 0
@@ -284,7 +284,11 @@ MODULE getlambda
   write(*,*) "  ->", nnn," line wavelengths"
   if (wl_ref > 0)   write(*,*) "  ->", 1," reference wavelength at", wl_ref, 'nm'
   ! sort wavelength
-  CALL sort(tempgrid, Nspect)
+  !!CALL sort(tempgrid, Nspect)
+  !this should work ?
+  allocate(sorted_indexes(Nspect))
+  sorted_indexes = bubble_sort(tempgrid)
+  tempgrid(:) = tempgrid(sorted_indexes)
 
   !check for dupplicates
   !tempgrid(1) already set
@@ -313,11 +317,11 @@ MODULE getlambda
    ! write(*,*) "lam(la) =", inoutgrid(la)
   end do
 
-  !should not dot that but error somewhere if many atoms
-  !CALL sort(inoutgrid, Nwaves)
+  !!should not dot that but error somewhere if many atoms
+  !!CALL sort(inoutgrid, Nwaves)
 
   !free some space
-  deallocate(tempgrid, alllines, allcont)
+  deallocate(tempgrid, alllines, allcont, sorted_indexes)
 
 !   Now replace the line%Nlambda and continuum%Nlambda by the new values.
 !   we do that even for PASSIVE atoms
