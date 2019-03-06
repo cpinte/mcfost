@@ -149,13 +149,13 @@ MODULE metal
        				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
          			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
      else !proc id is important
-      NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) = &
-      				NLTEspec%AtomOpac%chi_p(id,continuum%Nblue:continuum%Nred) + &
+      NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) = &
+      				NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) + &
        				alpha_la(continuum%Nblue:continuum%Nred) * &
        				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
 
-      NLTEspec%AtomOpac%eta_p(id,continuum%Nblue:continuum%Nred) = &
-      				NLTEspec%AtomOpac%eta_p(id,continuum%Nblue:continuum%Nred) + &
+      NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) = &
+      				NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) + &
       				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
          			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)     
      end if
@@ -290,12 +290,12 @@ MODULE metal
      Vij(line%Nblue:line%Nred) = &
       hc_4PI * line%Bij * phi(line%Nblue:line%Nred) / (SQRTPI * atom%vbroad(icell))
 !      chi(iLam) = chi(iLam) + Vij(iLam) * (atom%n(i,icell)-gij*atom%n(j,icell))
-     NLTEspec%AtomOpac%chi_p(id,line%Nblue:line%Nred) = &
-     		NLTEspec%AtomOpac%chi_p(id,line%Nblue:line%Nred) + &
+     NLTEspec%AtomOpac%chi_p(line%Nblue:line%Nred,id) = &
+     		NLTEspec%AtomOpac%chi_p(line%Nblue:line%Nred,id) + &
        		Vij(line%Nblue:line%Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
 !      eta(iLam) = eta(iLam) + twohnu3_c2 * gij * Vij(iLam) * atom%n(j,icell)
-     NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) = &
-     		NLTEspec%AtomOpac%eta_p(id,line%Nblue:line%Nred) + &
+     NLTEspec%AtomOpac%eta_p(line%Nblue:line%Nred,id) = &
+     		NLTEspec%AtomOpac%eta_p(line%Nblue:line%Nred,id) + &
        		twohnu3_c2 * gij * Vij(line%Nblue:line%Nred) * atom%n(j,icell)
 
        
@@ -416,9 +416,9 @@ MODULE metal
     
 
      Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * atom%vbroad(icell))
-     NLTEspec%AtomOpac%chi_p(id,la) = NLTEspec%AtomOpac%chi_p(id,la) +&
+     NLTEspec%AtomOpac%chi_p(la,id) = NLTEspec%AtomOpac%chi_p(la,id) +&
      								  Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
-     NLTEspec%AtomOpac%eta_p(id,la) = NLTEspec%AtomOpac%eta_p(id,la) +&
+     NLTEspec%AtomOpac%eta_p(la,id) = NLTEspec%AtomOpac%eta_p(la,id) +&
      								  twohnu3_c2 * gij * Vij(1) * atom%n(j,icell)
 
     end do !end loop on lines for this atom
@@ -531,29 +531,29 @@ MODULE metal
 !    end if
    !CALL HRayleigh(icell,Hydrogen, sca)
    !NLTEspec%AtomOpac%sca_c(id,:) = NLTEspec%AtomOpac%sca_c(id,:) + sca
-   NLTEspec%AtomOpac%sca_c(id,:) = Thomson(icell) !init then update
+   NLTEspec%AtomOpac%sca_c(:,id) = Thomson(icell) !init then update
    CALL Rayleigh(id, icell, Hydrogen)
    if (associated(Helium)) CALL Rayleigh(id, icell, Helium)
 
 
-   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%sca_c(id,:)
+   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%sca_c(:,id)
 
    CALL Hydrogen_ff(icell, chi)
-   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-   NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + chi * Bpnu
+   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
 
    CALL Hminus_bf(icell, chi, eta)
-   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-   NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
 
    CALL Hminus_ff(icell, chi)
-   NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-   NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + chi * Bpnu
+   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
 
    if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
     CALL Hydrogen_bf(icell, chi, eta)
-    NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-    NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
    end if
    
    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
@@ -564,13 +564,13 @@ MODULE metal
 !     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
 
    !keep pure continuum opacities now
-   if (MINVAL(NLTEspec%AtomOpac%eta_p(id,:))<0 .or. &
-    MINVAL(NLTEspec%AtomOpac%chi_p(id,:)) < 0) then
+   if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &
+    MINVAL(NLTEspec%AtomOpac%chi_p(:,id)) < 0) then
     write(*,*) "err, negative opac"
     stop
    end if
-   NLTEspec%AtomOpac%eta_c(id,:) = NLTEspec%AtomOpac%eta_p(id,:)
-   NLTEspec%AtomOpac%chi_c(id,:) = NLTEspec%AtomOpac%chi_p(id,:)
+   NLTEspec%AtomOpac%eta_c(:,id) = NLTEspec%AtomOpac%eta_p(:,id)
+   NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
 
    ! we already RETURNs if no passive transitions (H included)
    CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)

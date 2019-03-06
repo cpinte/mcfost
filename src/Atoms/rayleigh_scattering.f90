@@ -41,7 +41,7 @@ MODULE rayleigh_scattering
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + &
    									 scatt * sigma_e * atom%n(icell,1) !m^-1
   else
-   NLTEspec%AtomOpac%sca_c(id,:) = NLTEspec%AtomOpac%sca_c(id,:) + &
+   NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
    									 scatt * sigma_e * atom%n(icell,1)
   end if
    
@@ -122,7 +122,7 @@ MODULE rayleigh_scattering
   if (res .and. lstore_opac) then
      NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + scatt
   else if (res .and. .not.lstore_opac) then
-     NLTEspec%AtomOpac%sca_c(id,:) = NLTEspec%AtomOpac%sca_c(id,:) + scatt
+     NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + scatt
   end if
 
  RETURN

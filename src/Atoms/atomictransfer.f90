@@ -95,8 +95,8 @@ MODULE AtomicTransfer
   ! with emission_line_map, we only use one ray, iray=1
   ! and the same space is used for emergent I.
   ! Therefore it is needed to reset it.
-  NLTEspec%I(id,:,iray) = 0d0
-  NLTEspec%Ic(id,:,iray) = 0d0
+  NLTEspec%I(:,iray,id) = 0d0
+  NLTEspec%Ic(:,iray,id) = 0d0
 
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
@@ -150,18 +150,18 @@ MODULE AtomicTransfer
      !! at all wavelength points including vector fields in the bound-bound transitions
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-      dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:)+&
+      dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
 
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
-               NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(id,:)) / &
+               NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
+                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / &
                  (NLTEspec%AtomOpac%Kc(icell,:,1) + &
-                 NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
+                 NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%chi(:,id) + 1d-300)
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
-            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(id,:)) / &
+            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)) / &
             (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300)
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1
@@ -170,49 +170,36 @@ MODULE AtomicTransfer
 
       ! Epaisseur optique
       ! chi_p contains both thermal and continuum scattering extinction
-      dtau(:)   =  l_contrib * (NLTEspec%AtomOpac%chi_p(id,:)+NLTEspec%AtomOpac%chi(id,:))
-      dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(id,:)
+      dtau(:)   =  l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id))
+      dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(:,id)
 
       ! Source function
       ! No dust yet
       ! J and Jc are the mean radiation field for total and continuum intensities
       ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
       ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
-      Snu = (NLTEspec%AtomOpac%eta_p(id,:) + NLTEspec%AtomOpac%eta(id,:) + &
-                  NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%J(id,:)) / &
-                 (NLTEspec%AtomOpac%chi_p(id,:) + NLTEspec%AtomOpac%chi(id,:) + 1d-300)
+      Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
+                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / &
+                 (NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%chi(:,id) + 1d-300)
 
 
       ! continuum source function
-      Snu_c = (NLTEspec%AtomOpac%eta_c(id,:) + &
-            NLTEspec%AtomOpac%sca_c(id,:) * NLTEspec%Jc(id,:)) / &
-            (NLTEspec%AtomOpac%chi_c(id,:) + 1d-300)
+      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + &
+            NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)) / &
+            (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
     !intgreation of the RTE from the observer to the source result in having the
     ! inward flux and intensity. Integration from the source to the observer is done
     ! when computing the mean intensity: Sum_ray I*exp(-dtau)+S*(1-exp(-dtau))
-    NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + &
+    NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + &
                              exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-    NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + &
+    NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + &
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-!     NLTEspec%I(id,:,iray) = NLTEspec%I(id,:,iray) + dtau*Snu*dexp(-tau)
-!     NLTEspec%Ic(id,:,iray) = NLTEspec%Ic(id,:,iray) + dtau_c*Snu_c*dexp(-tau_c)
+!     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dtau*Snu*dexp(-tau)
+!     NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dtau_c*Snu_c*dexp(-tau_c)
 
-!     if (MINVAL(NLTEspec%I(id,:,iray))<0) then
-!      write(*,*) "Negative Opac !"
-!      if (lstore_opac) then
-!       write(*,*) id, icell, MINVAL(Snu), MINVAL(NLTEspec%AtomOpac%Kc(icell,:,1)) , MINVAL(NLTEspec%AtomOpac%Kc(icell,:,2)) , &
-!        MINVAL(NLTEspec%AtomOpac%jc(icell,:))
-!       stop
-!      else
-!       write(*,*) id, icell, MINVAL(Snu),&
-!       MINVAL(NLTEspec%AtomOpac%eta_p(id,:)),MINVAL(NLTEspec%AtomOpac%chi_p(id,:)),&
-!       MINVAL(NLTEspec%AtomOpac%sca_c(id,:)), MINVAL(NLTEspec%AtomOpac%eta_c(id,:)), MINVAL(NLTEspec%AtomOpac%chi_c(id,:))
-!       stop
-!      end if
-!     end if
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
 !      if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
@@ -293,8 +280,8 @@ MODULE AtomicTransfer
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            !write(*,*) i, j, lintersect, labs, n_cells, icell
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
-             I0 = I0 + NLTEspec%I(id,:,iray)
-             I0c = I0c + NLTEspec%Ic(id,:,iray)
+             I0 = I0 + NLTEspec%I(:,iray,id)
+             I0c = I0c + NLTEspec%Ic(:,iray,id)
            !else !Outside the grid, no radiation flux
            endif
         end do !j

@@ -371,16 +371,16 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
                                              !Fast but memory expensive
               !call NLTEOPAC_lambda()
               call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-              opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
-                   NLTEspec%AtomOpac%chi_p(id,lambda) + &
+              opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
+                   NLTEspec%AtomOpac%chi_p(lambda,id) + &
                    NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
               kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
            else !on the fly calculations, slow but cheap in memory
               !call NLTEOPAC()
               call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
-              opacite = (NLTEspec%AtomOpac%chi(id,lambda) + &
-                   NLTEspec%AtomOpac%chi_p(id,lambda)) * AU_to_m
-              kappa_c = NLTEspec%AtomOpac%chi_c(id, lambda) * AU_to_m
+              opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
+                   NLTEspec%AtomOpac%chi_p(lambda,id)) * AU_to_m
+              kappa_c = NLTEspec%AtomOpac%chi_c(lambda,id) * AU_to_m
            end if
         else
            opacite = 0d0
