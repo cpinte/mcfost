@@ -114,8 +114,11 @@ MODULE atmos_type
       if (allocated(line%psi_U)) deallocate(line%psi_U)
       if (allocated(line%psi_V)) deallocate(line%psi_V)
       if (allocated(line%lambda)) deallocate(line%lambda)
-      if (allocated(line%Rij)) deallocate(line%Rij)
-      if (allocated(line%Rji)) deallocate(line%Rji)
+      !The net cooling rates is stored instead of the radiative rates
+      !which are now scalar.
+      if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
+!       if (allocated(line%Rij)) deallocate(line%Rij)
+!       if (allocated(line%Rji)) deallocate(line%Rji)
       if (allocated(line%wphi)) deallocate(line%wphi)
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
@@ -131,8 +134,8 @@ MODULE atmos_type
       cont = atom%continua(c)
       if (allocated(cont%lambda)) deallocate(cont%lambda)
       if (allocated(cont%alpha)) deallocate(cont%alpha)
-      if (allocated(cont%Rij)) deallocate(cont%Rij)
-      if (allocated(cont%Rji)) deallocate(cont%Rji)
+      if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
+
      end do
       deallocate(atom%continua)
      end if

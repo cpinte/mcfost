@@ -350,10 +350,7 @@ MODULE readatom
      end if
      atom%lines(kr)%polarizable = .false.
 
-     if (atom%active) then
-      allocate(atom%lines(kr)%Rij(atmos%Nspace))
-      allocate(atom%lines(kr)%Rji(atmos%Nspace))
-
+     if (atom%active) then !Should do it for passive atoms too
      if (atmos%Magnetized) then !.or.line%scattpol ...
       if (atom%lines(kr)%g_Lande_eff.gt.-99 .or. &
           determined(atom%lines(kr)%i) .and. &
@@ -452,11 +449,6 @@ MODULE readatom
          "dependence."
       write(*,*) "exiting..."
       stop
-     end if
-
-     if (atom%active) then
-      allocate(atom%continua(kr)%Rij(atmos%Nspace))
-      allocate(atom%continua(kr)%Rji(atmos%Nspace))
      end if
     end do !end loop over bound-free transitions
 

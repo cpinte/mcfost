@@ -24,8 +24,8 @@ MODULE atom_type
    real(8) :: qcore, qwing
    real(8), dimension(4) :: cvdWaals
    real(8), allocatable, dimension(:,:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
-   double precision, allocatable, dimension(:)  :: lambda, Rij, Rji, wphi!, c_shift, c_fraction
-   double precision :: Qelast, adamp
+   double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij, wphi!, c_shift, c_fraction
+   double precision :: Qelast, adamp, Rij, Rji
    real(8), allocatable, dimension(:,:) :: rho_pfr
    !type (AtomType), pointer :: atom
   END TYPE AtomicLine
@@ -34,7 +34,8 @@ MODULE atom_type
    logical :: hydrogenic
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(8) :: lambda0, isotope_Frac, alpha0
-   real(8), allocatable, dimension(:)  :: lambda, alpha, Rji, Rij
+   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij
+   double precision :: Rji, Rij
    !type (AtomType), pointer :: atom
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum

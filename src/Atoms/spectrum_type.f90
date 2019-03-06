@@ -186,7 +186,7 @@ MODULE spectrum_type
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
-   
+
    !Contribution function
    if (lcontrib_function) then
     allocate(NLTEspec%Ksi(NLTEspec%Ntrans, NLTEspec%atmos%Nspace, NLTEspec%Nwaves))
@@ -196,7 +196,7 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE allocSpectrum
 
-  SUBROUTINE freeSpectrum()   
+  SUBROUTINE freeSpectrum() 
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
@@ -219,7 +219,6 @@ MODULE spectrum_type
     deallocate(NLTEspec%AtomOpac%sca_c)
    end if
    NULLIFY(NLTEspec%atmos)
-   
 !    deallocate(Nblue_array, Nmid_array, Nred_array)
   RETURN
   END SUBROUTINE freeSpectrum

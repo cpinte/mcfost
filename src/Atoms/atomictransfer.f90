@@ -32,6 +32,7 @@ MODULE AtomicTransfer
  use constant, only 					: MICRON_TO_NM
  use collision
  use solvene
+ use statequil_atoms
  use writeatom
  use simple_models, only 				: magneto_accretion_model
  !$ use omp_lib
@@ -506,7 +507,7 @@ MODULE AtomicTransfer
 
 #include "sprng_f.h"
 
-  integer :: atomunit = 1, nact, npass,  nat, la !atoms and wavelength
+  integer :: atomunit = 1, nact
   integer :: icell
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "H_IONISATION"
@@ -598,12 +599,13 @@ MODULE AtomicTransfer
   !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
   ! CALL initialSol()
   ! for now initialSol() is replaced by this if loop on active atoms
-  if (atmos%Nactiveatoms.gt.0) then
+  if (atmos%Nactiveatoms > 0) then
     write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
     do nact=1,atmos%Nactiveatoms
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ID, &
       atmos%ActiveAtoms(nact)%active
      atmos%ActiveAtoms(nact)%n = 1d0 * atmos%ActiveAtoms(nact)%nstar
+     CALL allocNetCoolingRates(atmos%ActiveAtoms(nact))
     end do
   end if !end replacing initSol()
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
