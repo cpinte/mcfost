@@ -55,12 +55,12 @@ MODULE statequil_atoms
  
  
  SUBROUTINE addtoRadiativeRates()
- ! ---------------------------------------- !
+ ! -------------------------------------------- !
   ! For each atoms and each transitions
   ! compute the radiative rates
+  ! It is a integral over frequency and angles
   !
-  !
- ! ---------------------------------------- !
+ ! -------------------------------------------- !
  
  
  RETURN

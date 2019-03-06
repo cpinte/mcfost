@@ -39,15 +39,7 @@ MODULE atom_type
    !type (AtomType), pointer :: atom
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !TYPE FixedTransition
-  ! fixed transitions are usefull to describe NLTE problem
-  ! in the solar chromosphere in 2D,3D without not so much
-  ! computational cost.
-  ! They are not implemented because only relevent for solar
-  ! application
-  !END TYPE FixedTransition
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
   TYPE AtomType
    character(len=ATOM_ID_WIDTH) :: ID
    character (len=15)             :: dataFile!popsinFile, popsoutFile
