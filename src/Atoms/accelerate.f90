@@ -4,13 +4,14 @@ MODULE accelerate
   ! Implements Ng structure similar to RH for convergence
   ! acceleration
   !
+  ! Do not work because are depth dependent and not parralel
   
-  !use some_modules, only : linear_eq_solver ??
+  use utils, only :  GaussSlv
 
   IMPLICIT NONE
   
   
- logical, parameter :: improve_sol = .true.
+  logical, parameter :: improve_sol = .true.
 
 
   TYPE Ng
@@ -34,7 +35,7 @@ MODULE accelerate
    Ngs%Nperiod = Nperiod
    Ngs%Ndelay = MAX(Ndelay, Norder+2)
 
-   if (Norder.lt.0) then
+   if (Norder.gt.0) then
     allocate(Ngs%A(Norder,Norder))
     allocate(Ngs%b(Norder))
    end if
@@ -105,7 +106,8 @@ MODULE accelerate
        end do
      end do
    
-     !CALL some_linear_solver(Ngs%Norder,Ngs%A,Ngs%b, improve_sol)
+     !bourrin
+     CALL  GaussSlv(Ngs%A, Ngs%b, Ngs%Norder)
 
      i0 = MOD(Ngs%count -1, Ngs%Norder+2)
      do i=1,Ngs%Norder
