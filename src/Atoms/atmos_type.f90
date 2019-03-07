@@ -94,13 +94,13 @@ MODULE atmos_type
       NULLIFY(atom%n)
       deallocate(atom%nstar)
     end if
-    if (allocated(atom%gij)) deallocate(atom%gij)
-    if (allocated(atom%Vij)) deallocate(atom%Vij)
-    if (allocated(atom%wla)) deallocate(atom%wla)
+    !if (allocated(atom%gij)) deallocate(atom%gij)
+    !if (allocated(atom%Vij)) deallocate(atom%Vij)
+    !if (allocated(atom%wla)) deallocate(atom%wla)
     if (allocated(atom%chi_up)) deallocate(atom%chi_up)
     if (allocated(atom%chi_down)) deallocate(atom%chi_down)
     if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
-    if (allocated(atom%eta)) deallocate(atom%eta)
+    !if (allocated(atom%eta)) deallocate(atom%eta)
 
 !!!     for this atom, free lines if allocated
      if (allocated(atom%lines)) then
@@ -119,7 +119,7 @@ MODULE atmos_type
       if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
 !       if (allocated(line%Rij)) deallocate(line%Rij)
 !       if (allocated(line%Rji)) deallocate(line%Rji)
-      if (allocated(line%wphi)) deallocate(line%wphi)
+      if (allocated(line%wlam)) deallocate(line%wlam)
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
       !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
@@ -135,6 +135,7 @@ MODULE atmos_type
       if (allocated(cont%lambda)) deallocate(cont%lambda)
       if (allocated(cont%alpha)) deallocate(cont%alpha)
       if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
+      if (allocated(cont%wlam)) deallocate(cont%wlam)
 
      end do
       deallocate(atom%continua)
