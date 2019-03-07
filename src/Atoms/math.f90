@@ -124,6 +124,34 @@ MODULE math
  RETURN
  END FUNCTION Gaunt_bf
 
+ FUNCTION Gaunt_ff(N, lambda, charge, T) result(GIII)
+  use constant, only : HPLANCK, CLIGHT, NM_TO_M, KBOLTZMANN, E_RYDBERG
+ ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
+ !
+ ! Note: There is a problem with this expansion at higher temperatures
+ ! (T > 3.0E4 and longer wavelengths (lambda > 2000 nm). Set to
+ ! 1.0 when the value goes below 1.0
+  integer, intent(in) :: N
+  double precision, intent(in) :: lambda(N)
+  double precision, dimension(N) :: x, x3, y, GIII
+  double precision :: charge, T
+
+  x = ((HPLANCK * CLIGHT)/(lambda * NM_TO_M)) / &
+       (E_RYDBERG * (charge)**(2d0))
+  x3 = (x**(3.3333333d-1))
+  y  = (2.0 * lambda * NM_TO_M * KBOLTZMANN*T) / &
+       (HPLANCK*CLIGHT)
+
+  gIII = 1.0 + 0.1728*x3 * (1.0 + y) - &
+        0.0496*(x3*x3) * (1.0 + (1.0 + y)*0.33333333*y)
+
+  where (GIII <= 1d0) gIII = 1.
+
+  if (MAXVAL(GIII) > 2d0) write(*,*) "free-free Gaunt factor gIII = ", &
+      MAXVAL(gIII)
+
+ RETURN
+ END FUNCTION Gaunt_ff
 
   SUBROUTINE cent_deriv(n,x,y,yp)
   integer :: n, k
