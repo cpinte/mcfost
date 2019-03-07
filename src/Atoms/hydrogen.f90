@@ -31,7 +31,7 @@ MODULE hydrogen_opacities
  use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use spectrum_type, only : NLTEspec
- use math, only : bezier3_interp, interp2Darr
+ use math, only : bezier3_interp, interp2Darr, gaunt_bf
  
  use constantes, only : tiny_dp
 
@@ -41,31 +41,31 @@ MODULE hydrogen_opacities
 
  CONTAINS
 
- FUNCTION Gaunt_bf(Nl,u, n_eff) result(GII)
-  ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
-  ! See also Menzel & Pekeris 1935
-  integer :: Nl
-  double precision :: n_eff, GII(Nl)
-  double precision :: u(Nl), n23
-
-  n23 = n_eff**(-6.6666666666667d-1) !n^-2/3
-
-  GII = 1.+0.1728 * n23 * (u+1)**(-6.6666666666667d-1) * &
-      (u-1) - 0.0496*n23*n23 * (u+1)**(-4d0/3d0) * (u*u + 4./3. * u + 1) !+...
-
-  if (MINVAL(GII) < 0d0) then
-   !write(*,*) "Warning, Gaunt factor is less than 0"
-   !write(*,*) Nl, minval(u), maxval(u), n_eff, minval(GII)
-   GII = dabs(GII)
-  end if
-
-  if (MAXVAL(GII) > 2d0) then
-    write(*,*) "Bound-free Gaunt factor gII = ", MAXVAL(GII)
-  end if
-
- RETURN
- END FUNCTION Gaunt_bf
-
+!  FUNCTION Gaunt_bf(Nl,u, n_eff) result(GII)
+!   ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
+!   ! See also Menzel & Pekeris 1935
+!   integer :: Nl
+!   double precision :: n_eff, GII(Nl)
+!   double precision :: u(Nl), n23
+! 
+!   n23 = n_eff**(-6.6666666666667d-1) !n^-2/3
+! 
+!   GII = 1.+0.1728 * n23 * (u+1)**(-6.6666666666667d-1) * &
+!       (u-1) - 0.0496*n23*n23 * (u+1)**(-4d0/3d0) * (u*u + 4./3. * u + 1) !+...
+! 
+!   if (MINVAL(GII) < 0d0) then
+!    !write(*,*) "Warning, Gaunt factor is less than 0"
+!    !write(*,*) Nl, minval(u), maxval(u), n_eff, minval(GII)
+!    GII = dabs(GII)
+!   end if
+! 
+!   if (MAXVAL(GII) > 2d0) then
+!     write(*,*) "Bound-free Gaunt factor gII = ", MAXVAL(GII)
+!   end if
+! 
+!  RETURN
+!  END FUNCTION Gaunt_bf
+! 
  FUNCTION Gaunt_ff(lambda, charge, T) result(GIII)
  ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
  !

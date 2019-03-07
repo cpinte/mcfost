@@ -396,9 +396,8 @@ MODULE getlambda
   END SUBROUTINE make_wavelength_grid
   
   SUBROUTINE fillPhotoionisationCrossSection(atom, kc, Nwaves, waves)
-   use hydrogen_opacities, only : Gaunt_bf
    use atmos_type, only : Hydrogen
-   use math, only : bezier3_interp
+   use math, only : bezier3_interp, gaunt_bf
     type(AtomType), intent(inout) :: atom
     integer, intent(in) :: kc, Nwaves
     double precision, dimension(Nwaves) :: waves
