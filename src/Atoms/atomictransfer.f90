@@ -651,6 +651,13 @@ MODULE AtomicTransfer
 
  RETURN
  END SUBROUTINE
+ 
+ SUBROUTINE NLTEloop(Niter, IterLim)
+  integer, intent(in) :: Niter
+  double precision, intent(in) :: IterLim
+ 
+ RETURN
+ END SUBROUTINE NLTEloop
 
  SUBROUTINE reallocate_mcfost_vars()
   !--> should move them to init_atomic_atmos ? or elsewhere

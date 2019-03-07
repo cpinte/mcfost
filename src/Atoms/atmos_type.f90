@@ -405,7 +405,6 @@ MODULE atmos_type
     !Nrad, Nz, Naz-> Velocity vector cartesian components
     allocate(atmos%Vxyz(atmos%Nspace,3))
     atmos%Vxyz = 0d0
-    write(*,*) "Allocating atmos%Vxyz array for lmagnetoaccr case."
     !if lmagnetoaccr then atmos%Vxyz = (VRcyl, Vz, Vphi)
     !it is then projected like it is done in v_proj for keplerian rot
     !meaning that the velocity field has infinite resolution. 

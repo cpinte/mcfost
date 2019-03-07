@@ -405,8 +405,9 @@ MODULE readatom
 
      if (trim(nuDepChar).eq."EXPLICIT") then
       ! Nlambda set in atomic file
-      allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
       allocate(atom%continua(kr)%alpha(atom%continua(kr)%Nlambda))
+      !->alpha allocated latter in case of Hydrogenic continua
+      allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
       atom%continua(kr)%hydrogenic=.false.
       ! rearanging them in increasing order
       ! because in the atomic file they are
@@ -440,7 +441,6 @@ MODULE readatom
        ! Matters only when the complete wavelength dependence
        ! is not read from file (HYDROGENIC).
        ! %lambda allocated inside the routines.
-       ! %alpha not needed in this case.
        CALL make_sub_wavelength_grid_cont(atom%continua(kr), lambdamin)
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)

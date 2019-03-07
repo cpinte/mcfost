@@ -48,12 +48,12 @@ MODULE metal
   integer                                                   :: m, kr, i, j, Z, nc
   type (AtomType)                                           :: metal
   type (AtomicContinuum)                                    :: continuum
-  double precision                                          :: lambdaEdge, twohc, hc_k, &
-       														   n_eff
-  double precision, dimension(1) 							:: gbf_0, uu0
+  double precision                                          :: lambdaEdge, twohc, hc_k!, &
+       														   !n_eff
+  !double precision, dimension(1) 							:: gbf_0, uu0
   double precision, dimension(NLTEspec%Nwaves)              :: twohnu3_c2, gijk, hc_kla,&
-                                                               expla, alpha_la, uu, gbf
-   obtained_n = .false. !true if the routine to read principal quantum number is fine
+                                                               expla!, alpha_la, uu, gbf
+   !obtained_n = .false. !true if the routine to read principal quantum number is fine
 
    twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
    hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
@@ -97,67 +97,67 @@ MODULE metal
        CYCLE
     end if
 
-     Z = metal%stage(i) + 1
-     !! Only for Hydrogen n_eff = dsqrt(metal%g(i)/2.)
-     !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
-
-     if (.not.obtained_n) &
-        n_eff = Z*dsqrt(E_RYDBERG / (metal%E(continuum%j) - metal%E(continuum%i)))
-
-     ! for this continuum of this line
-     alpha_la = 0d0
-     uu = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * NLTEspec%lambda)
-     uu0 = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * lambdaEdge)
-     if (.not.continuum%Hydrogenic) then
-
-       CALL bezier3_interp(continuum%Nlambda,&
-                           continuum%lambda, &
-                           continuum%alpha,  & !Now the interpolation grid
-             continuum%Nlambda, &
-             NLTEspec%lambda(continuum%Nblue:continuum%Nred), &
-             alpha_la(continuum%Nblue:continuum%Nred)) !end
-
-     else
-     
-        gbf_0 = Gaunt_bf(1, uu0, n_eff)
-         !continuum%alpha0 is the result of the photoionisation
-         !cross-section at lambdaEdge=continuum%lambda0
-         ! = HPLANCK*CLIGHT/(Ej - Ei)
-         ! therefore we scale wrt the lambdaEdge
-         ! alpha_la(lambda=lambdaEdge)=alpha0 (containing
-         ! already the gaunt factor !! and factor 1/Z^2)
-           
-        gbf(continuum%Nblue:continuum%Nred) = Gaunt_bf(continuum%Nlambda, &
-          uu(continuum%Nblue:continuum%Nred), n_eff)
-
-        alpha_la(continuum%Nblue:continuum%Nred) = gbf(continuum%Nblue:continuum%Nred) * &
-           continuum%alpha0*((NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3)*&
-           n_eff/gbf_0(1)
-
-     end if !continuum type
+!      Z = metal%stage(i) + 1
+!      !! Only for Hydrogen n_eff = dsqrt(metal%g(i)/2.)
+!      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
+! 
+!      if (.not.obtained_n) &
+!         n_eff = Z*dsqrt(E_RYDBERG / (metal%E(continuum%j) - metal%E(continuum%i)))
+! 
+!      ! for this continuum of this line
+!      alpha_la = 0d0
+!      uu = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * NLTEspec%lambda)
+!      uu0 = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*Z*Z * E_RYDBERG * lambdaEdge)
+!      if (.not.continuum%Hydrogenic) then
+! 
+!        CALL bezier3_interp(continuum%Nlambda,&
+!                            continuum%lambda, &
+!                            continuum%alpha,  & !Now the interpolation grid
+!              continuum%Nlambda, &
+!              NLTEspec%lambda(continuum%Nblue:continuum%Nred), &
+!              alpha_la(continuum%Nblue:continuum%Nred)) !end
+! 
+!      else
+!      
+!         gbf_0 = Gaunt_bf(1, uu0, n_eff)
+!          !continuum%alpha0 is the result of the photoionisation
+!          !cross-section at lambdaEdge=continuum%lambda0
+!          ! = HPLANCK*CLIGHT/(Ej - Ei)
+!          ! therefore we scale wrt the lambdaEdge
+!          ! alpha_la(lambda=lambdaEdge)=alpha0 (containing
+!          ! already the gaunt factor !! and factor 1/Z^2)
+!            
+!         gbf(continuum%Nblue:continuum%Nred) = Gaunt_bf(continuum%Nlambda, &
+!           uu(continuum%Nblue:continuum%Nred), n_eff)
+! 
+!         alpha_la(continuum%Nblue:continuum%Nred) = gbf(continuum%Nblue:continuum%Nred) * &
+!            continuum%alpha0*((NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3)*&
+!            n_eff/gbf_0(1)
+! 
+!      end if !continuum type
      
      gijk(continuum%Nblue:continuum%Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * &
        expla(continuum%Nblue:continuum%Nred)
      if (lstore_opac) then !we don't care about proc id id
       NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) = &
                     NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) + &
-       				alpha_la(continuum%Nblue:continuum%Nred) * &
+       				continuum%alpha(continuum%Nblue:continuum%Nred) * &
        				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
 
       NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) = &
      				NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) + &
        				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
-         			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
+         			continuum%alpha(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
      else !proc id is important
       NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) = &
       				NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) + &
-       				alpha_la(continuum%Nblue:continuum%Nred) * &
+       				continuum%alpha(continuum%Nblue:continuum%Nred) * &
        				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
 
       NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) = &
       				NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) + &
       				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
-         			alpha_la(continuum%Nblue:continuum%Nred)*metal%n(j,icell)     
+         			continuum%alpha(continuum%Nblue:continuum%Nred)*metal%n(j,icell)     
      end if
 
     end do ! loop over Ncont

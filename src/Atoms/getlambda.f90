@@ -325,8 +325,10 @@ MODULE getlambda
 
 !   Now replace the line%Nlambda and continuum%Nlambda by the new values.
 !   we do that even for PASSIVE atoms
-!   deallocate line%lambda and continuum%lambda because they do not correspond to the new
+!   deallocate line%lambda because it does not correspond to the new
 !   Nblue and Nlambda anymore.
+! However, cont%lambda is need for interpolation of cont%alpha on the new grid if
+! cont is not hydrogenic
 !   nn = 1
   do n=1,Natom
    !first continuum transitions
@@ -350,14 +352,16 @@ MODULE getlambda
 !! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
 !! and l1, lam(Nlambda) = lambda0
     Atoms(n)%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
-    deallocate(Atoms(n)%continua(kc)%lambda)
+    if (Atoms(n)%continua(kc)%hydrogenic) deallocate(Atoms(n)%continua(kc)%lambda)
+    !cont%lambda is deallocated in fillPhotoionisationRates is case of cont is not hydrogenic
+    CALL fillPhotoionisationCrossSection(Atoms(n), kc, Nwaves, inoutgrid)
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
-!     Nred_array(nn) = Atoms(n)%continua(kc)%Nred
-!     Nmid_array(nn) = Atoms(n)%continua(kc)%Nmid
-!     Nblue_array(nn) = Atoms(n)%continua(kc)%Nblue
-!     nn= nn + 1
+!!!     Nred_array(nn) = Atoms(n)%continua(kc)%Nred
+!!!     Nmid_array(nn) = Atoms(n)%continua(kc)%Nmid
+!!!     Nblue_array(nn) = Atoms(n)%continua(kc)%Nblue
+!!!     nn= nn + 1
    end do
    !then bound-bound transitions
    do kr=1,Atoms(n)%Nline
@@ -380,16 +384,81 @@ MODULE getlambda
     !allocate(Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nlambda))
     !Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred) &
     ! = inoutgrid(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred)
-!     Nred_array(nn) = Atoms(n)%lines(kr)%Nred
-!     Nmid_array(nn) = Atoms(n)%lines(kr)%Nmid
-!     Nblue_array(nn) = Atoms(n)%lines(kr)%Nblue
-!     nn = nn + 1
+!!!     Nred_array(nn) = Atoms(n)%lines(kr)%Nred
+!!!     Nmid_array(nn) = Atoms(n)%lines(kr)%Nmid
+!!!     Nblue_array(nn) = Atoms(n)%lines(kr)%Nblue
+!!!     nn = nn + 1
    end do
 !     write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
-
+  
   RETURN
   END SUBROUTINE make_wavelength_grid
+  
+  SUBROUTINE fillPhotoionisationCrossSection(atom, kc, Nwaves, waves)
+   use hydrogen_opacities, only : Gaunt_bf
+   use atmos_type, only : Hydrogen
+   use math, only : bezier3_interp
+    type(AtomType), intent(inout) :: atom
+    integer, intent(in) :: kc, Nwaves
+    double precision, dimension(Nwaves) :: waves
+    type(AtomicContinuum) :: cont
+    integer :: i, j
+    double precision, dimension(Nwaves) :: uu, g_bf
+    double precision, dimension(:), allocatable :: old_alpha
+    double precision :: n_eff, Z, gbf_0(1), uu0(1), lambdaEdge, sigma0
+    
+    !pour H only?
+    sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
+          (HPLANCK**(3d0)) / (CLIGHT * &
+          (M_ELECTRON*Q_ELECTRON)**(2d0))
+
+    cont = atom%continua(kc)
+    
+    i = cont%i; j = cont%j; Z = real(atom%stage(i)+1); lambdaEdge = cont%lambda0
+
+    if (cont%hydrogenic) then
+     
+     if (atom%ID == "H ") then
+      n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
+     else
+     !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
+     !if (.not.obtained_n) &
+        n_eff = Z*dsqrt(E_RYDBERG / (atom%E(cont%j) - atom%E(cont%i)))
+     end if
+
+     allocate(cont%alpha(Nwaves)) !it is allocated in readatom only for non
+     									   ! hydrogenic continua
+     cont%alpha = 0d0
+     g_bf = 0d0
+
+    uu(cont%Nblue:cont%Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
+        (NM_TO_M*waves(cont%Nblue:cont%Nred)) / (Z*Z) / E_RYDBERG - 1.
+    uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
+       
+    gbf_0 = Gaunt_bf(1, uu0, n_eff)
+    
+    g_bf(cont%Nblue:cont%Nred) = &
+      Gaunt_bf(cont%Nlambda, uu(cont%Nblue:cont%Nred), n_eff)
+      
+    cont%alpha(cont%Nblue:cont%Nred) = &
+     cont%alpha0 * g_bf(cont%Nblue:cont%Nred) * &
+       (waves(cont%Nblue:cont%Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
+
+    else !cont%alpha is allocated and filled with read values
+     allocate(old_alpha(size(cont%alpha)))
+     old_alpha(:) = cont%alpha(:)
+     deallocate(cont%alpha)
+     allocate(cont%alpha(Nwaves))
+     cont%alpha = 0d0
+     CALL bezier3_interp(size(old_alpha),cont%lambda, old_alpha, & !Now the interpolation grid
+             cont%Nlambda,  waves(cont%Nblue:cont%Nred), &
+             cont%alpha(cont%Nblue:cont%Nred)) !end
+     deallocate(old_alpha, cont%lambda)
+    end if
+    atom%continua(kc)%alpha = cont%alpha
+  RETURN
+  END SUBROUTINE fillPhotoionisationCrossSection
 
   SUBROUTINE adjust_wavelength_grid()
    ! ------------------------------------------ !

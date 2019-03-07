@@ -69,17 +69,6 @@ MODULE atom_type
    real, allocatable, dimension(:)  :: gij, Vij, wla, chi_up, chi_down, Uji_down, eta
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !building
-  TYPE AtomicTransition
-   ! a type storing all transitions from atom
-   !independently of their type
-   character(len=20) :: trtype !transition type
-   !UNION transitions
-    !type (AtomicContinuum) :: line
-    !type (AtomicLine) :: continuum
-   !END UNION transitions
-  END TYPE AtomicTransition
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE Element
    !Element is a structure similar to atom but for all the Nelem
    ! of the periodic table. Even if no atomic model (store in AtomType)

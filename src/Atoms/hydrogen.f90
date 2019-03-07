@@ -50,8 +50,8 @@ MODULE hydrogen_opacities
 
   n23 = n_eff**(-6.6666666666667d-1) !n^-2/3
 
-  GII = 1.+0.1728 * n23 * ((u+1)**(-6.6666666666667d-1)) * &
-      (u-1) - 0.0496*n23*n23 * (u*u + 4./3. * u + 1) !+...
+  GII = 1.+0.1728 * n23 * (u+1)**(-6.6666666666667d-1) * &
+      (u-1) - 0.0496*n23*n23 * (u+1)**(-4d0/3d0) * (u*u + 4./3. * u + 1) !+...
 
   if (MINVAL(GII) < 0d0) then
    !write(*,*) "Warning, Gaunt factor is less than 0"
@@ -114,7 +114,6 @@ MODULE hydrogen_opacities
    eta = 0.
    uu = 0d0
    g_bf = 0d0
-   sigma = 0d0
 
   twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
@@ -140,6 +139,7 @@ MODULE hydrogen_opacities
   ! LTE number of protons (H+)
   npstar = Hydrogen%nstar(Hydrogen%Nlevel,icell)
   do kr=1,Hydrogen%Ncont
+   sigma = 0d0
    continuum = Hydrogen%continua(kr)
    lambdaEdge = continuum%lambda0 !ionisation frequency (min)
    i = continuum%i
@@ -183,24 +183,25 @@ MODULE hydrogen_opacities
    ! cross-section alpha falls off in lambda^3 (or nu^-3).
 
 
-    ! u = n**2 * h * nu / (Z**2 * R) - 1
+!     u = n**2 * h * nu / (Z**2 * R) - 1
 !     uu(ilam) = n_eff*n_eff*HPLANCK*CLIGHT/(NM_TO_M*NLTEspec%lambda(ilam)) / &
 !       ((Hydrogen%stage(i)+1)* (Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
-    uu(continuum%Nblue:continuum%Nred) = &
-      n_eff*n_eff*HPLANCK*CLIGHT/ & 
-       (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nred)) / &
-      ((Hydrogen%stage(i)+1)*(Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
+!     uu(continuum%Nblue:continuum%Nred) = &
+!       n_eff*n_eff*HPLANCK*CLIGHT/ & 
+!        (NM_TO_M*NLTEspec%lambda(continuum%Nblue:continuum%Nred)) / &
+!       ((Hydrogen%stage(i)+1)*(Hydrogen%stage(i)+1)) / E_RYDBERG - 1.
 !    g_bf(ilam) = Gaunt_bf(continuum%Nlambda, uu(ilam), n_eff)
-    g_bf(continuum%Nblue:continuum%Nred) = &
-     Gaunt_bf(continuum%Nlambda, uu(continuum%Nblue:continuum%Nred), n_eff)
-    ! Z scaled law
+!     g_bf(continuum%Nblue:continuum%Nred) = &
+!      Gaunt_bf(continuum%Nlambda, uu(continuum%Nblue:continuum%Nred), n_eff)
+!     Z scaled law
 !     sigma(ilam) = &
 !      sigma0 * g_bf(ilam) * (NLTEspec%lambda(ilam)/lambdaEdge)**3 * n_eff / (Hydrogen%stage(i)+1)**2 !m^2
-    sigma(continuum%Nblue:continuum%Nred) = &
-     sigma0 * g_bf(continuum%Nblue:continuum%Nred) * &
-       (NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3 * &
-       n_eff / (Hydrogen%stage(i)+1)**2 !m^2
+!     sigma(continuum%Nblue:continuum%Nred) = &
+!      sigma0 * g_bf(continuum%Nblue:continuum%Nred) * &
+!        (NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3 * &
+!        n_eff / (Hydrogen%stage(i)+1)**2 !m^2
 
+    sigma(continuum%Nblue:continuum%Nred) = continuum%alpha(continuum%Nblue:continuum%Nred)
 
     !! or use this (with sigma02)
     !sigma2 = &
