@@ -35,9 +35,9 @@ MODULE readatom
    !!!
     integer, intent(in) :: atomunit
     integer :: kr, k, la, ftell !ftell here for ifort ??
-    type (AtomType), intent(inout) :: atom
-    type (AtomicLine) :: line, line1
-    type (AtomicContinuum) :: AtomicContinuum
+    type (AtomType), intent(inout), target :: atom
+    type (AtomicLine) :: line
+    type (AtomicContinuum) :: cont
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
     integer :: Nread, i,j, EOF, nll, nc
@@ -153,7 +153,8 @@ MODULE readatom
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
-     !atom%lines(kr)%atom => atom !hmm work this?
+     line = atom%lines(kr)
+     line%atom => atom !hmm work this?
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
      !atom%lines(kr)%trtype="ATOMIC_LINE"
@@ -381,7 +382,8 @@ MODULE readatom
     allocate(atom%continua(atom%Ncont))
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
-     !atom%continua(kr)%trtype="ATOMIC_CONTINUUM"
+     cont = atom%continua(kr)
+     cont%atom => atom
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
