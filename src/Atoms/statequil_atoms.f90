@@ -20,11 +20,12 @@ MODULE statequil_atoms
  ! ----------------------------------------------- !
   integer :: kc, kr
   type (AtomType), intent(inout) :: atom
-  
-   do kc=1,atom%Ncont
-    allocate(atom%continua(kc)%CoolRates_ij(atmos%Nspace))
-    atom%continua(kc)%CoolRates_ij(:) = 0d0
-   end do
+   write(*,*) "Allocating net cooling rates..."
+   write(*,*) "  -> continuum cooling rates not implemented yet"
+!    do kc=1,atom%Ncont
+!     allocate(atom%continua(kc)%CoolRates_ij(atmos%Nspace))
+!     atom%continua(kc)%CoolRates_ij(:) = 0d0
+!    end do
    do kr=1,atom%Nline
     allocate(atom%lines(kr)%CoolRates_ij(atmos%Nspace))
     atom%lines(kr)%CoolRates_ij(:) = 0d0

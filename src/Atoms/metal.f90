@@ -84,8 +84,6 @@ MODULE metal
      i = continuum%i
      j = continuum%j !+1 wrt C indexing
      Nblue = continuum%Nblue; Nred = continuum%Nred
-     ! write(*,*) maxval(atmos%Atoms(2)%n), maxval(atmos%Atoms(2)%nstar),&
-!      maxval(atmos%PassiveAtoms(2)%n), maxval(atmos%PassiveAtoms(2)%nstar), maxval(metal%n), maxval(metal%nstar)
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
                ! to unbound an electron
