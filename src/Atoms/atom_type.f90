@@ -26,7 +26,7 @@ MODULE atom_type
    double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij, wlam!, c_shift, c_fraction
    double precision :: Qelast, adamp, Rij, Rji
    real(8), allocatable, dimension(:,:) :: rho_pfr
-   integer :: atom_id
+   character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    type (AtomType), pointer :: atom => NULL()
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -36,7 +36,7 @@ MODULE atom_type
    real(8) :: lambda0, isotope_Frac, alpha0
    real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, wlam
    double precision :: Rji, Rij
-   integer :: atom_id
+   character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
