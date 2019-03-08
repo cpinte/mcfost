@@ -1,7 +1,7 @@
 MODULE getlambda
 
   use atom_type, only : AtomicContinuum, AtomicLine, AtomType
-  use atmos_type, only : atmos
+  use atmos_type, only : atmos, atomPointerArray
   use constant
   
   use parametres
@@ -27,6 +27,9 @@ MODULE getlambda
    integer, parameter :: Nlambda = 41
    integer :: la
    double precision :: l0, l1
+   
+   write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
+
 
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
    l0 = lambdamin
@@ -53,6 +56,7 @@ MODULE getlambda
    ! It is by default, logarithmic in the wing and linear in the
    ! core.
   ! ------------------------------------------------------------ !
+  use broad, only : Damping
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
@@ -62,6 +66,8 @@ MODULE getlambda
    integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
+   													 
+write(*,*) "Atom for which the line belongs to:", line%atom%ID
    
    v_char = (atmos%v_char + vD) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
@@ -184,7 +190,7 @@ MODULE getlambda
    ! line%lambda and continuum%lambda are useless now. Except that 
    ! continuu%lambda is still used in .not.continuum%Hydrogenic !!
   ! --------------------------------------------------------------------------- !
-   type (AtomType), intent(inout), dimension(Natom) :: Atoms
+   type (atomPointerArray), intent(inout), dimension(Natom) :: Atoms
    integer, intent(in) :: Natom
    double precision, intent(in) :: wl_ref
    integer, intent(out) :: Ntrans !Total number of transitions (cont + line)
@@ -213,23 +219,23 @@ MODULE getlambda
    do n=1,Natom
    !unlike RH, even passive atoms have dedicated wavelength grids
    ! Count number of total wavelengths
-   do kr=1,Atoms(n)%Nline
-    Nspect = Nspect + Atoms(n)%lines(kr)%Nlambda
+   do kr=1,Atoms(n)%ptr_atom%Nline
+    Nspect = Nspect + Atoms(n)%ptr_atom%lines(kr)%Nlambda
     Nlinetot = Nlinetot + 1
     if (Nlinetot > MAX_TRANSITIONS) then
      write(*,*) "too many transitions"
      stop
     end if
-    alllines(Nlinetot) = Atoms(n)%lines(kr)
+    alllines(Nlinetot) = Atoms(n)%ptr_atom%lines(kr)
    end do
-   do kc=1,Atoms(n)%Ncont
-    Nspect = Nspect + Atoms(n)%continua(kc)%Nlambda
+   do kc=1,Atoms(n)%ptr_atom%Ncont
+    Nspect = Nspect + Atoms(n)%ptr_atom%continua(kc)%Nlambda
     Nctot = Nctot + 1
     if (Nctot > MAX_TRANSITIONS) then
      write(*,*) "too many transitions"
      stop
     end if
-    allcont(Nctot) = Atoms(n)%continua(kc)
+    allcont(Nctot) = Atoms(n)%ptr_atom%continua(kc)
    end do
   end do ! end loop over atoms
 
@@ -333,28 +339,28 @@ MODULE getlambda
   do n=1,Natom
    !first continuum transitions
 !   write(*,*) " ------------------------------------------------------------------ "
-   do kc=1,Atoms(n)%Ncont
-    Nlambda_original = Atoms(n)%continua(kc)%Nlambda
-    l0 = Atoms(n)%continua(kc)%lambda(1)
-    l1 = Atoms(n)%continua(kc)%lambda(Nlambda_original)
+   do kc=1,Atoms(n)%ptr_atom%Ncont
+    Nlambda_original = Atoms(n)%ptr_atom%continua(kc)%Nlambda
+    l0 = Atoms(n)%ptr_atom%continua(kc)%lambda(1)
+    l1 = Atoms(n)%ptr_atom%continua(kc)%lambda(Nlambda_original)
 !    Nred = locate(inoutgrid,l1)
 !     Nblue = locate(inoutgrid,l0)
-!     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
-    Atoms(n)%continua(kc)%Nblue = locate(inoutgrid,l0)
-    Atoms(n)%continua(kc)%Nred = locate(inoutgrid,l1)
-    Atoms(n)%continua(kc)%Nlambda = Atoms(n)%continua(kc)%Nred - &
-                                    Atoms(n)%continua(kc)%Nblue + 1
-!     write(*,*) Atoms(n)%ID, " continuum:",kr, " Nlam_ori:", Nlambda_original, &
-!     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
-!       " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
-!       " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
+!      write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
+    Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(inoutgrid,l0)
+    Atoms(n)%ptr_atom%continua(kc)%Nred = locate(inoutgrid,l1)
+    Atoms(n)%ptr_atom%continua(kc)%Nlambda = Atoms(n)%ptr_atom%continua(kc)%Nred - &
+                                    Atoms(n)%ptr_atom%continua(kc)%Nblue + 1
+!      write(*,*) Atoms(n)%ID, " continuum:",kr, " Nlam_ori:", Nlambda_original, &
+!      " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
+!        " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
+!        " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
 !! For continuum transitions, lambda0 is at Nred, check definition of the wavelength grid
 !! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
 !! and l1, lam(Nlambda) = lambda0
-    Atoms(n)%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
-    if (Atoms(n)%continua(kc)%hydrogenic) deallocate(Atoms(n)%continua(kc)%lambda)
+    Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
+    if (Atoms(n)%ptr_atom%continua(kc)%hydrogenic) deallocate(Atoms(n)%ptr_atom%continua(kc)%lambda)
     !cont%lambda is deallocated in fillPhotoionisationRates is case of cont is not hydrogenic
-    CALL fillPhotoionisationCrossSection(Atoms(n), kc, Nwaves, inoutgrid)
+    CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
@@ -364,23 +370,23 @@ MODULE getlambda
 !!!     nn= nn + 1
    end do
    !then bound-bound transitions
-   do kr=1,Atoms(n)%Nline
-    Nlambda_original = Atoms(n)%lines(kr)%Nlambda
-    l0 = Atoms(n)%lines(kr)%lambda(1)
-    l1 = Atoms(n)%lines(kr)%lambda(Nlambda_original)
+   do kr=1,Atoms(n)%ptr_atom%Nline
+    Nlambda_original = Atoms(n)%ptr_atom%lines(kr)%Nlambda
+    l0 = Atoms(n)%ptr_atom%lines(kr)%lambda(1)
+    l1 = Atoms(n)%ptr_atom%lines(kr)%lambda(Nlambda_original)
 !    Nred = locate(inoutgrid,l1)
 !    Nblue = locate(inoutgrid,l0)
 !     write(*,*) locate(inoutgrid,l0), locate(inoutgrid,l1), l0, l1!, Nblue, Nred
-    Atoms(n)%lines(kr)%Nblue = locate(inoutgrid,l0)!Nblue
-    Atoms(n)%lines(kr)%Nred = locate(inoutgrid,l1)
-    Atoms(n)%lines(kr)%Nlambda = Atoms(n)%lines(kr)%Nred - &
-                                 Atoms(n)%lines(kr)%Nblue + 1
+    Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(inoutgrid,l0)!Nblue
+    Atoms(n)%ptr_atom%lines(kr)%Nred = locate(inoutgrid,l1)
+    Atoms(n)%ptr_atom%lines(kr)%Nlambda = Atoms(n)%ptr_atom%lines(kr)%Nred - &
+                                 Atoms(n)%ptr_atom%lines(kr)%Nblue + 1
 !     write(*,*) Atoms(n)%ID, " line:",kr, " Nlam_ori:", Nlambda_original, &
 !     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%lines(kr)%Nred, & 
 !       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, & 
 !       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
-    Atoms(n)%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%lines(kr)%lambda0)
-    deallocate(Atoms(n)%lines(kr)%lambda) !does not correpond to the new grid, indexes might be wrong
+    Atoms(n)%ptr_atom%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%ptr_atom%lines(kr)%lambda0)
+    deallocate(Atoms(n)%ptr_atom%lines(kr)%lambda) !does not correpond to the new grid, indexes might be wrong
     !allocate(Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nlambda))
     !Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred) &
     ! = inoutgrid(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred)
@@ -445,6 +451,7 @@ MODULE getlambda
        (waves(cont%Nblue:cont%Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
 
     else !cont%alpha is allocated and filled with read values
+     write(*,*) "Interpolating photoionisation cross-section for atom", cont%atom%ID, atom%ID
      allocate(old_alpha(size(cont%alpha)))
      old_alpha(:) = cont%alpha(:)
      deallocate(cont%alpha)

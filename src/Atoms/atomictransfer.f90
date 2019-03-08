@@ -602,10 +602,10 @@ MODULE AtomicTransfer
   if (atmos%Nactiveatoms > 0) then
     write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
     do nact=1,atmos%Nactiveatoms
-     write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ID, &
-      atmos%ActiveAtoms(nact)%active
-     atmos%ActiveAtoms(nact)%n = 1d0 * atmos%ActiveAtoms(nact)%nstar
-     CALL allocNetCoolingRates(atmos%ActiveAtoms(nact))
+     write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
+      atmos%ActiveAtoms(nact)%ptr_atom%active
+     atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
+     CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
     end do
   end if !end replacing initSol()
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
@@ -641,7 +641,7 @@ MODULE AtomicTransfer
  ! Transfer ends, save data, free some space and leave
  !should be closed after reading ? no if we do not save the C matrix in each cells
  do nact=1,atmos%Nactiveatoms
-  CALL closeCollisionFile(atmos%ActiveAtoms(nact)) !if opened
+  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
  end do
  !CALL WRITEATOM()
  CALL freeSpectrum() !deallocate spectral variables

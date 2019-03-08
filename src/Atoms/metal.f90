@@ -45,7 +45,7 @@ MODULE metal
   ! inverse in terms of wavelengths
   integer, intent(in)							            :: icell, id
   logical 										            :: obtained_n
-  integer                                                   :: m, kr, i, j, Z, nc
+  integer                                                   :: m, kr, i, j, Z, nc, Nblue, Nred
   type (AtomType)                                           :: metal
   type (AtomicContinuum)                                    :: continuum
   double precision                                          :: lambdaEdge, twohc, hc_k!, &
@@ -58,7 +58,7 @@ MODULE metal
    twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
    hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
    
-   if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ID == "H ") RETURN
+   if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
    ! else if H is not passive (active) it will not be the first.
    ! If H is passive it is always the first one (And if active the first one).
 
@@ -76,13 +76,16 @@ MODULE metal
 
   do m=1,atmos%Npassiveatoms
   ! run over all passive atoms
-   metal = atmos%PassiveAtoms(m)!atmos%Atoms(m)
+   metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
    if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
 
     do kr=1,metal%Ncont
      continuum = metal%continua(kr)
      i = continuum%i
      j = continuum%j !+1 wrt C indexing
+     Nblue = continuum%Nblue; Nred = continuum%Nred
+     ! write(*,*) maxval(atmos%Atoms(2)%n), maxval(atmos%Atoms(2)%nstar),&
+!      maxval(atmos%PassiveAtoms(2)%n), maxval(atmos%PassiveAtoms(2)%nstar), maxval(metal%n), maxval(metal%nstar)
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
                ! to unbound an electron
@@ -136,28 +139,23 @@ MODULE metal
 ! 
 !      end if !continuum type
      
-     gijk(continuum%Nblue:continuum%Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * &
-       expla(continuum%Nblue:continuum%Nred)
+     gijk(Nblue:Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(Nblue:Nred)
      if (lstore_opac) then !we don't care about proc id id
-      NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) = &
-                    NLTEspec%AtomOpac%Kc(icell,continuum%Nblue:continuum%Nred,1) + &
-       				continuum%alpha(continuum%Nblue:continuum%Nred) * &
-       				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
+      NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
+       				continuum%alpha(Nblue:Nred) * &
+       				(1.-expla(Nblue:Nred))*metal%n(i,icell)
 
-      NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) = &
-     				NLTEspec%AtomOpac%jc(icell,continuum%Nblue:continuum%Nred) + &
-       				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
-         			continuum%alpha(continuum%Nblue:continuum%Nred)*metal%n(j,icell)
+      NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
+       				twohnu3_c2(Nblue:Nred) * gijk(Nblue:Nred) * &
+         			continuum%alpha(Nblue:Nred)*metal%n(j,icell)
      else !proc id is important
-      NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) = &
-      				NLTEspec%AtomOpac%chi_p(continuum%Nblue:continuum%Nred,id) + &
-       				continuum%alpha(continuum%Nblue:continuum%Nred) * &
-       				(1.-expla(continuum%Nblue:continuum%Nred))*metal%n(i,icell)
+      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+       				continuum%alpha(Nblue:Nred) * &
+       				(1.-expla(Nblue:Nred))*metal%n(i,icell)
 
-      NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) = &
-      				NLTEspec%AtomOpac%eta_p(continuum%Nblue:continuum%Nred,id) + &
-      				twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
-         			continuum%alpha(continuum%Nblue:continuum%Nred)*metal%n(j,icell)     
+      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+      				twohnu3_c2(Nblue:Nred) * gijk(Nblue:Nred) * &
+         			continuum%alpha(Nblue:Nred)*metal%n(j,icell)     
      end if
 
     end do ! loop over Ncont
@@ -212,7 +210,7 @@ MODULE metal
   end if
 
   do m=1,atmos%Npassiveatoms
-   atom = atmos%PassiveAtoms(m)
+   atom = atmos%PassiveAtoms(m)%ptr_atom
    
     !velocity projected along a path between one border of the cell to the other
     if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
@@ -345,7 +343,7 @@ MODULE metal
 
   !do m=1,atmos%Natom ! go over all atoms
   do m=1,atmos%Npassiveatoms
-   atom = atmos%PassiveAtoms(m)!atmos%Atoms(m)
+   atom = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
    !if (atom%active) CYCLE ! go to next passive atom
    
     !velocity projected along a path between one border of the cell to the other

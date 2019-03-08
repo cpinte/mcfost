@@ -22,6 +22,9 @@ MODULE atmos_type
   character(len=50), parameter :: ABUNDANCE_FILE="/Atoms/abundance.input"
   character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
 
+  TYPE atomPointerArray
+   type(AtomType), pointer :: ptr_atom => NULL()
+  END TYPE atomPointerArray
 
   ! Initialized only once at the begening of the main iteration loop !
   TYPE GridType
@@ -38,8 +41,10 @@ MODULE atmos_type
    ! Don't know yet if it is useful here
    double precision, allocatable, dimension(:,:) :: Vxyz
    type (Element), dimension(:), allocatable :: Elements
-   type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms 
-   type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
+   !!type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms
+   !type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
+   type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
+   !type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
@@ -52,8 +57,7 @@ MODULE atmos_type
 
 
   TYPE (GridType), target :: atmos
-  !alias to atmos%Atoms(1)
-  TYPE (AtomType), pointer :: Hydrogen, Helium
+  TYPE (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
   CONTAINS
@@ -68,7 +72,7 @@ MODULE atmos_type
    type (AtomicContinuum) :: cont
    
     !why error with deallocate(lines)
-
+    atom%ID="" !just for checking
 
     if (allocated(atom%label)) deallocate(atom%label)
     if (allocated(atom%stage)) deallocate(atom%stage)
@@ -88,11 +92,11 @@ MODULE atmos_type
     !! %n needs to be nullified, not deallocated as
     !! it is already delinked from %nstar
     if ((atom%active).or.(atom%NLTEpops)) then
-     deallocate(atom%n)
-     deallocate(atom%nstar)
+     if (associated(atom%n)) deallocate(atom%n)
+     if (associated(atom%nstar)) deallocate(atom%nstar)
     else !passive 
       NULLIFY(atom%n)
-      deallocate(atom%nstar)
+      if (associated(atom%nstar)) deallocate(atom%nstar)
     end if
     !if (allocated(atom%gij)) deallocate(atom%gij)
     !if (allocated(atom%Vij)) deallocate(atom%Vij)
@@ -126,7 +130,7 @@ MODULE atmos_type
       !if (allocated(line%adamp)) deallocate(line%adamp)
       if (allocated(line%rho_pfr)) deallocate(line%rho_pfr)
      end do
-!      deallocate(atom%lines)
+      deallocate(atom%lines)
      end if
 !!!     now free continua if allocated
      if (allocated(atom%continua)) then
@@ -265,19 +269,23 @@ MODULE atmos_type
   !write(*,*) "Free Atoms"
   ! start freeing Atoms if previously allocated
   ! in readAtom()
-   if (associated(atmos%Atoms)) then !now c'est un pointeur array
+   !if (allocated(atmos%Atoms)) then
+  do n=1,atmos%Natom
+   if (associated(atmos%Atoms(n)%ptr_atom)) then !now c'est un pointeur array
 !    ! H is alway presents as it is required !
 !    ! but He exists only if a model atom is given and so
 !    ! Helium is allocated only if He exists i.e., if
 !    ! atmos%Atoms(n)%periodic_tabel.eq.2 with n a number.
-    NULLIFY(Hydrogen) ! Hydrogen is always associated
+    if (associated(Hydrogen)) NULLIFY(Hydrogen) ! Hydrogen is always associated
     if (associated(Helium)) NULLIFY(Helium)
-    do n=1,atmos%Natom
-     CALL freeAtom(atmos%Atoms(n))
-    end do
+!    do n=1,atmos%Natom
+     CALL freeAtom(atmos%Atoms(n)%ptr_atom)
+!    end do
 !    if (associated(atmos%ActiveAtoms)) deallocate(atmos%ActiveAtoms)
-!    deallocate(atmos%Atoms)
+!   deallocate(atmos%Atoms)
+    NULLIFY(atmos%Atoms(n)%ptr_atom)
    end if
+end do
   !write(*,*) "After free atoms"
   RETURN
   END SUBROUTINE free_atomic_atmos

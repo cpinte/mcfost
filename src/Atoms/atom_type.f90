@@ -12,7 +12,6 @@ MODULE atom_type
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicLine
-   !type (AtomType), pointer   :: atom
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
@@ -38,7 +37,7 @@ MODULE atom_type
    real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, wlam
    double precision :: Rji, Rij
    integer :: atom_id
-   type (AtomType), pointer :: atom
+   type (AtomType), pointer :: atom => NULL()
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 

@@ -1,7 +1,7 @@
 MODULE readatom
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate
-  use atmos_type, only : atmos, Nelem, Hydrogen, Helium
+  use atmos_type, only : atmos, Nelem, Hydrogen, Helium, freeAtom
   use zeeman, only : Lande_eff
   use getlambda
   use constant
@@ -36,8 +36,6 @@ MODULE readatom
     integer, intent(in) :: atomunit
     integer :: kr, k, la, ftell !ftell here for ifort ??
     type (AtomType), intent(inout), target :: atom
-    type (AtomicLine) :: line
-    type (AtomicContinuum) :: cont
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
     integer :: Nread, i,j, EOF, nll, nc
@@ -64,7 +62,7 @@ MODULE readatom
 
     IDread(2:2) = to_lower(IDread(2:2))
     atom%ID = IDread
-    !write(*,*) "AtomID = ", atom%ID
+    write(*,*) "AtomID = ", atom%ID
 
     match = .false.
     do nll=1,Nelem
@@ -106,6 +104,7 @@ MODULE readatom
     allocate(determined(atom%Nlevel))
     allocate(parse_label(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,atmos%Nspace))
+
     atom%nstar = 0d0
 
     do i=1,atom%Nlevel
@@ -153,8 +152,7 @@ MODULE readatom
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
-     line = atom%lines(kr)
-     line%atom => atom !hmm work this?
+     atom%lines(kr)%atom => atom
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
      !atom%lines(kr)%trtype="ATOMIC_LINE"
@@ -304,7 +302,7 @@ MODULE readatom
 !         end if
 
      else !default is Voigt ! line%voigt is default .true.
-      line%Voigt = .true.
+      atom%lines(kr)%Voigt = .true.
         !write(*,*) "Using Voigt profile for that line"
         !allocate(atom%lines(kr)%c_shift(1))
         !allocate(atom%lines(kr)%c_fraction(1))
@@ -382,8 +380,7 @@ MODULE readatom
     allocate(atom%continua(atom%Ncont))
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
-     cont = atom%continua(kr)
-     cont%atom => atom
+     atom%continua(kr)%atom => atom
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
@@ -551,7 +548,7 @@ MODULE readatom
   character(len=MAX_LENGTH) :: popsfile, filename
   character(len=MAX_KEYWORD_SIZE) :: actionKey, popsKey
   character(len=2) :: IDread
-  type (AtomType) :: atom
+!   type (AtomType), target :: atom
 
   !create formatline
   !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
@@ -574,39 +571,39 @@ MODULE readatom
   do nmet = 1, atmos%Natom
    CALL getnextline(unit, COMMENT_CHAR, FormatLine, &
      inputline, Nread)
-   !write(*,*) "nmet=",nmet, inputline
+     
+   allocate(atmos%Atoms(nmet)%ptr_atom)
+  
    read(inputline,'(1A28, 1A7, 1A22, 1A20)') &
         filename, actionKey, popsKey, popsFile
    !write(*,*) ".",trim(filename),"."
    !write(*,*) ".",adjustl(actionKey),"."
    !write(*,*) ".",adjustl(popsKey),"."
    !write(*,*) ".",trim(popsFile),"."
-   atmos%Atoms(nmet)%initial_solution=adjustl(popsKey)
-   atmos%Atoms(nmet)%inputFile=trim(filename)
+   atmos%Atoms(nmet)%ptr_atom%initial_solution=adjustl(popsKey)
+   atmos%Atoms(nmet)%ptr_atom%inputFile=trim(filename)
 
 
    ! would be pssoible in the future to read all J value also
-   if (atmos%Atoms(nmet)%initial_solution.ne."OLD_POPULATIONS" &
-      .and.atmos%Atoms(nmet)%initial_solution.ne."LTE_POPULATIONS"&
-      .and.atmos%Atoms(nmet)%initial_solution.ne."ZERO_RADIATION"&
-       .and.atmos%Atoms(nmet)%initial_solution.ne."SOBOLEV") then
-     write(*,*) "Initial solution ", atmos%Atoms(nmet)%initial_solution,&
+   if (atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."OLD_POPULATIONS" &
+      .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."LTE_POPULATIONS"&
+      .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."ZERO_RADIATION"&
+       .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."SOBOLEV") then
+     write(*,*) "Initial solution ", atmos%Atoms(nmet)%ptr_atom%initial_solution,&
       " unkown!"
      write(*,*) "Exiting..."
      stop
    end if
-!   atmos%Atoms(nmet)%popsinFile = trim(popsFile)
-   atmos%Atoms(nmet)%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
+   atmos%Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
                                                ! all informations including populations.
-
 
    !Active atoms are treated in NLTE
    if (adjustl(actionKey).eq."ACTIVE") then
-     atmos%atoms(nmet)%active=.true.
+     atmos%Atoms(nmet)%ptr_atom%active=.true.
      !write(*,*) "atom is active"
      atmos%Nactiveatoms = atmos%Nactiveatoms+1
    else
-     atmos%atoms(nmet)%active=.false.
+     atmos%Atoms(nmet)%ptr_atom%active=.false.
      atmos%NpassiveAtoms = atmos%NpassiveAtoms+1
      !write(*,*) "atom is passive"
    end if
@@ -624,7 +621,8 @@ MODULE readatom
    ! check duplicates
    IDread(2:2) = to_lower(IDread(2:2))
    do mmet = 1,nmet-1 !compare the actual (IDread) with previous
-    if (atmos%atoms(mmet-1)%ID.eq.IDread) then
+    write(*,*) mmet, nmet
+    if (atmos%Atoms(nmet)%ptr_atom%ID.eq.IDread) then
      write(*,*) "Already read a model for this atom ", IDread
      write(*,*) "exiting..."
      stop
@@ -633,22 +631,26 @@ MODULE readatom
 
    ! read and fill atomic structures saved in atmos%atoms
    ! create an alias for Hydrogen
-   CALL readModelAtom(unit+nmet, atmos%Atoms(nmet), &
+   CALL readModelAtom(unit+nmet, atmos%Atoms(nmet)%ptr_atom, &
         trim(mcfost_utils)//TRIM(path_to_atoms)//trim(filename))
    !write(*,*) "IS ACTIVE = ", atmos%Atoms(nmet)%active
+   !atmos%Atoms(nmet)%ptr_atom = atom
+   !CALL freeAtom(atom)
+   write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID
+   if (nmet>1) write(*,*) nmet-1, atmos%Atoms(nmet-1)%ptr_atom%ID
   end do
   close(unit)
+
   ! Alias to the most importent one
-  Hydrogen=>atmos%Atoms(1)
+  Hydrogen=>atmos%Atoms(1)%ptr_atom
 
   ! Aliases to active atoms
+  nact = 0; npass = 0
   if (atmos%Nactiveatoms.gt.0) then
-     nact = 1
     allocate(atmos%ActiveAtoms(atmos%Nactiveatoms))
   end if
   if (atmos%Natom - atmos%Nactiveatoms == atmos%Npassiveatoms) then
    allocate(atmos%PassiveAtoms(atmos%Npassiveatoms))
-   npass = 1
   else
    write(*,*) "Error, number of passive atoms is not N-Nactive"
    stop
@@ -657,29 +659,39 @@ MODULE readatom
   ! keep a duplicate in Elements
   write(*,*) "order#     ID   periodic-table#    ACTIVE    #lines   #continua"
   do nmet=1,atmos%Natom
-   write(*,*) nmet, atmos%Atoms(nmet)%ID, &
-    atmos%Atoms(nmet)%periodic_table, atmos%Atoms(nmet)%active, &
-    atmos%Atoms(nmet)%Nline, atmos%Atoms(nmet)%Ncont
+   write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID, &
+    atmos%Atoms(nmet)%ptr_atom%periodic_table, atmos%Atoms(nmet)%ptr_atom%active, &
+    atmos%Atoms(nmet)%ptr_atom%Nline, atmos%Atoms(nmet)%ptr_atom%Ncont
    ! create alias in atmos%Elements for elements that have
    ! a model atom.
-   atmos%Elements(atmos%Atoms(nmet)%periodic_table)%model &
-         => atmos%Atoms(nmet)
-   if (atmos%atoms(nmet)%periodic_table.eq.2)  &
-           Helium => atmos%Atoms(nmet)
-   if (associated(atmos%ActiveAtoms)) then
-     if (atmos%Atoms(nmet)%active) then 
-      atmos%ActiveAtoms(nact:nact) => atmos%Atoms(nmet:nmet)
+   !atom => atmos%Atoms(nmet)
+   atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%model &
+         => atmos%Atoms(nmet)%ptr_atom
+   if (atmos%Atoms(nmet)%ptr_atom%periodic_table.eq.2)  &
+           Helium => atmos%Atoms(nmet)%ptr_atom
+   if (allocated(atmos%ActiveAtoms)) then
+     if (atmos%Atoms(nmet)%ptr_atom%active) then 
       nact = nact + 1 !got the next index of active atoms
+      atmos%ActiveAtoms(nact)%ptr_atom => atmos%Atoms(nmet)%ptr_atom
+!       atom2 => atmos%ActiveAtoms(nact)
+!       atom2 = atom
      end if
    end if
-   if (associated(atmos%PassiveAtoms)) then
-     if (.not.atmos%Atoms(nmet)%active) then
-      atmos%PassiveAtoms(npass:npass) => atmos%Atoms(nmet:nmet)
-      npass = npass + 1
+   if (allocated(atmos%PassiveAtoms)) then
+     if (.not.atmos%Atoms(nmet)%ptr_atom%active) then
+      npass = npass+1
+!       atom2 => atmos%PassiveAtoms(npass)
+!       atom2 = atom
+      atmos%PassiveAtoms(npass)%ptr_atom => atmos%Atoms(nmet)%ptr_atom
      end if
    end if
   end do
+    
+!  NULLIFY(atom, atom2)
 
+!   do nmet=1, atmos%Npassiveatoms
+!    write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID, atmos%PassiveAtoms(nmet)%ptr_atom%ID
+!   end do
 
   RETURN
   END SUBROUTINE readAtomicModels

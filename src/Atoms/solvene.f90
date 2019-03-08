@@ -125,10 +125,10 @@ END FUNCTION getPartitionFunctionk
 
   ! check if the element as an atomic model and it is active
   do nll=1,atmos%Nactiveatoms
-   if (Elem%ID.eq.atmos%Atoms(nll)%ID .and. &
-       atmos%Atoms(nll)%active) then
+   if (Elem%ID.eq.atmos%Atoms(nll)%ptr_atom%ID .and. &
+       atmos%Atoms(nll)%ptr_atom%active) then
      is_active=.true.
-     write(*,*) "Atom ",Elem%ID,atmos%Atoms(nll)%ID," is active"
+     write(*,*) "Atom ",Elem%ID,atmos%Atoms(nll)%ptr_atom%ID," is active"
      exit
    end if
   end do

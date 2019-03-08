@@ -354,11 +354,11 @@ MODULE lte
   do n=1,atmos%Natom
 
    ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%atoms(n),debeye) !it is parralel 
-     if (atmos%Atoms(n)%active) then
-       allocate(atmos%Atoms(n)%C(atmos%atoms(n)%Nlevel*atmos%atoms(n)%Nlevel))
+   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+     if (atmos%Atoms(n)%ptr_atom%active) then
+       allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
        !open collision file
-       CALL openCollisionFile(atmos%Atoms(n))
+       CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
      end if
   end do
 
@@ -389,15 +389,16 @@ MODULE lte
    !! il n y pas besoin de preciser if %NLTEpops
    !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
    !!   ", nHmin(k), np(k)"
-   !!write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%n(1,k), &
-   !! atmos%Atoms(1)%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k)
+!    write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%ptr_atom%n(1,k), &
+!    atmos%Atoms(1)%ptr_atom%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k),&
+!    atmos%PAssiveAtoms(1)%ptr_atom%n(1,k)
   end do !over depth points
   !$omp end do
   !$omp  end parallel
   ! end if !if chemical equilibrium
    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%lcompute_atomRT==.true.)
-
+! stop
  RETURN
  END SUBROUTINE setLTEcoefficients
 
