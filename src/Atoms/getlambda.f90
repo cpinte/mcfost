@@ -28,8 +28,7 @@ MODULE getlambda
    integer :: la
    double precision :: l0, l1
    
-   write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
-
+   !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
    l0 = lambdamin
@@ -56,20 +55,23 @@ MODULE getlambda
    ! It is by default, logarithmic in the wing and linear in the
    ! core.
   ! ------------------------------------------------------------ !
-  use broad, only : Damping
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
+   double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.3, L = 10d0!50d0
    integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
-   													 
-write(*,*) "Atom for which the line belongs to:", line%atom%ID
-   
-   v_char = (atmos%v_char + vD) !=maximum extension of a line
+   !If it is needed we can develop an empirical recipe for the line and the element
+   !or used typical values, without knowing atom%n, which is not known
+   !because this routine is called in readatom, before lte populations are knonw
+   !even if used after in init_spectrum().
+   !one solution would be to compute and store the LTE pops in Elements(:)%n								 
+   if (line%atom%ID=="Na") adamp_char = 1.2 !adamp/vbroad
+   v_char = (atmos%v_char + vD*(1. + adamp_char)) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char * L
    v1 = +v_char * L
