@@ -39,7 +39,7 @@ MODULE atmos_type
    ! Each component of the velocity is a function of x, y, z so
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
-   double precision, allocatable, dimension(:,:) :: Vxyz
+   double precision, allocatable, dimension(:,:) :: Vxyz, Bxyz
    type (Element), dimension(:), allocatable :: Elements
    !!type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms
    !type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
@@ -270,6 +270,14 @@ MODULE atmos_type
   ! start freeing Atoms if previously allocated
   ! in readAtom()
    !if (allocated(atmos%Atoms)) then
+  do n=1,atmos%Npassiveatoms
+   if (associated(atmos%PassiveAtoms(n)%ptr_atom)) NULLIFY(atmos%PassiveAtoms(n)%ptr_atom)
+  end do
+  if (allocated(atmos%PassiveAtoms)) deallocate(atmos%PassiveAtoms)
+  do n=1,atmos%Nactiveatoms
+   if (associated(atmos%ActiveAtoms(n)%ptr_atom)) NULLIFY(atmos%ActiveAtoms(n)%ptr_atom)
+  end do
+  if (allocated(atmos%ActiveAtoms)) deallocate(atmos%ActiveAtoms)
   do n=1,atmos%Natom
    if (associated(atmos%Atoms(n)%ptr_atom)) then !now c'est un pointeur array
 !    ! H is alway presents as it is required !
@@ -285,8 +293,8 @@ MODULE atmos_type
 !   deallocate(atmos%Atoms)
     NULLIFY(atmos%Atoms(n)%ptr_atom)
    end if
-end do
-  !write(*,*) "After free atoms"
+  end do
+  deallocate(atmos%Atoms)
   RETURN
   END SUBROUTINE free_atomic_atmos
 
@@ -372,13 +380,13 @@ end do
     ! write(*,*) "Inpot for stage ", i, &
     !            atmos%Elements(n)%ionpot(i)*JOULE_TO_EV, " eV"
     !end do
-    ! allocate space for futur populations of each stage
-    allocate(atmos%Elements(n)%n(atmos%Elements(n)%Nstage, atmos%Nspace))
+    !! allocate space for futur populations of each stage
+    !!allocate(atmos%Elements(n)%n(atmos%Elements(n)%Nstage, atmos%Nspace))
     !write(*,*) "Elem pop" !BEWARE of n index and Elements(n)%n
     ! there is a conflict
-    do ni=1,Nelem
-     atmos%Elements(n)%n(:,:)=0.
-    end do
+!     do ni=1,Nelem
+!      atmos%Elements(n)%n(:,:)=0d0
+!     end do
 
     !write(*,*) "************************************"
     n = n + 1 !go to next element

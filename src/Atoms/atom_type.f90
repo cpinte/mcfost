@@ -78,11 +78,11 @@ MODULE atom_type
    ! if desired.
    character(len=ATOM_ID_WIDTH) :: ID
    logical :: abundance_set
-   integer :: Nstage, Nmolecule
-   integer, allocatable, dimension(:)  :: mol_index
+   integer :: Nstage, Nmolecule ! umber of Molecules having an element
+   integer, allocatable, dimension(:)  :: mol_index !track molecules in which Element is present
    real(8) :: weight, abund
    real(8), allocatable, dimension(:)  :: ionpot
-   real(8), allocatable, dimension(:,:)  :: pf, n
+   real(8), allocatable, dimension(:,:)  :: pf, n !LTE populations, not used nor allocated anymore
    !n is the population for each stage at a given grid point
    type (AtomType), pointer :: model => NULL()
  END TYPE Element
