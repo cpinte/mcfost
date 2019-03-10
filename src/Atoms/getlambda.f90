@@ -42,9 +42,7 @@ MODULE getlambda
    do la=2,cont%Nlambda
     cont%lambda(la) = cont%lambda(la-1) + resol
    end do
-   !do not allocate cross-section
-   !allocate(cont%alpha(cont%Nlambda)) -> not used in this case
-   ! necessary only if the explicit wavelength dependence is given
+   !does not allocate cross-section, here
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
   
@@ -69,8 +67,13 @@ MODULE getlambda
    !or used typical values, without knowing atom%n, which is not known
    !because this routine is called in readatom, before lte populations are knonw
    !even if used after in init_spectrum().
-   !one solution would be to compute and store the LTE pops in Elements(:)%n								 
-   if (line%atom%ID=="Na") adamp_char = 1.2 !adamp/vbroad
+   !one solution would be to compute and store the LTE pops in Elements(:)%n
+   !before the call of this function in readatom, so well well before LTE().
+   !if (line%name == "Halpha") then ..
+   !if (line%name == "Mgh" .or. line%name == "Mgk") then ...	
+   !if (line%name == "Na D1" .or. line%name == "Na D2") then ...							 
+   if (line%atom%ID=="Na") adamp_char = 50 !adamp/vbroad
+   if (line%atom%ID=="Mg") adamp_char = 150
    v_char = (atmos%v_char + vD*(1. + adamp_char)) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char * L
@@ -135,7 +138,7 @@ MODULE getlambda
 !    end do
 
   RETURN
-  END SUBROUTINE make_sub_wavelength_grid_line
+  END SUBROUTINE make_sub_wavelength_grid_line  
   
   FUNCTION IntegrationWeightLine(line, la) result (wlam)
   ! ------------------------------------------------------- !
@@ -264,7 +267,7 @@ MODULE getlambda
   if (allocated(inoutgrid)) then
    do la=1, size(inoutgrid)
     nn = nn + 1
-    tempgrid(nn) = inoutgrid(la) * 1d3 !micron to nm
+    tempgrid(nn) = inoutgrid(la) !nm or convert to nm here
    end do
    deallocate(inoutgrid)
   end if
@@ -389,7 +392,7 @@ MODULE getlambda
 !       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
     Atoms(n)%ptr_atom%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%ptr_atom%lines(kr)%lambda0)
     deallocate(Atoms(n)%ptr_atom%lines(kr)%lambda) !does not correpond to the new grid, indexes might be wrong
-    !allocate(Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nlambda))
+    !allocate(Atoms(n)%ptr_atom%lines(kr)%lambda(Atoms(n)%ptr_atom%lines(kr)%Nlambda))
     !Atoms(n)%lines(kr)%lambda(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred) &
     ! = inoutgrid(Atoms(n)%lines(kr)%Nblue:Atoms(n)%lines(kr)%Nred)
 !!!     Nred_array(nn) = Atoms(n)%lines(kr)%Nred
@@ -405,7 +408,7 @@ MODULE getlambda
   
   SUBROUTINE fillPhotoionisationCrossSection(atom, kc, Nwaves, waves)
    use atmos_type, only : Hydrogen
-   use math, only : bezier3_interp, gaunt_bf
+   use math, only : bezier3_interp, Gaunt_bf
     type(AtomType), intent(inout) :: atom
     integer, intent(in) :: kc, Nwaves
     double precision, dimension(Nwaves) :: waves

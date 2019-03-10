@@ -65,8 +65,8 @@ MODULE atom_type
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
-   double precision, allocatable, dimension(:)  :: chi_up, chi_down, Uji_down
-   !real, allocatable, dimension(:)  :: gij, Vij, wla, chi_up, chi_down, Uji_down, eta
+   double precision, allocatable, dimension(:,:)  :: chi_up, chi_down, Uji_down, chi, eta!,&
+        !gij, Vij
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE Element

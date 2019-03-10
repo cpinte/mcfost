@@ -561,6 +561,11 @@ MODULE AtomicTransfer
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
+!   allocate(NLTEspec%lambda(1000))
+!   NLTEspec%lambda(1) = 50d0
+!   do icell=2, 1000
+!    NLTEspec%lambda(icell) = NLTEspec%lambda(icell-1) + (800d0 - 50d0)/(1000d0-1d0)
+!   end do
   CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
   if (lstore_opac) then !o nly Background lines and active transitions

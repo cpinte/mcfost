@@ -6,6 +6,12 @@ MODULE Opacity
 
  IMPLICIT NONE
 
+ !store the pure continuum NLTE opacities to be added to the total
+ !continuum opacity after NLTEloop ends
+ double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
+ !cross-coupling opacities
+ double precision, dimension(:,:), allocatable :: chi_xc, eta_xc
+
  CONTAINS
 
  SUBROUTINE NLTEOpacity(id, icell, x, y, z, x1, y1, z1, u, v, w, l)

@@ -247,6 +247,45 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
+  SUBROUTINE compute_wlambda()
+  ! ---------------------------------------------- !
+   !
+  ! ---------------------------------------------- !
+   use atmos_type, only : atmos
+   integer :: kr, kc, nact, Nred, Nblue, Nlambda, la
+   
+   do nact=1,atmos%Nactiveatoms
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+      Nred = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nred
+      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nblue
+      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda
+      ! actually to prevents to use to much memory
+      					! we could actually only store a Nlambda version of weights
+      					!instead of a Nwaves array
+      !allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(NLTEspec%Nwaves))
+      allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(Nlambda))
+      atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(:) = 0d0
+      do la=1,Nlambda!la=Nblue, Nred 
+       atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(la) = & 
+        NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
+      end do
+    end do
+    do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
+      Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
+      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nblue
+      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nlambda
+      !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(NLTEspec%Nwaves))
+      allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
+      atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
+      do la=1,Nlambda!=Nblue, Nred
+       atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
+        NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
+      end do
+    end do  
+   end do
+ 
+  RETURN
+  END SUBROUTINE compute_wlambda
 
  SUBROUTINE WRITE_FLUX()
  ! -------------------------------------------------- !
