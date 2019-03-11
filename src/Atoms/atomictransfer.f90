@@ -507,12 +507,6 @@ MODULE AtomicTransfer
 
 #include "sprng_f.h"
 
-  integer :: atomunit = 1, nact
-  integer :: icell
-  integer :: ibin, iaz
-  character(len=20) :: ne_start_sol = "H_IONISATION"
-  logical :: lwrite_waves = .false.
-
   optical_length_tot => atom_optical_length_tot
   if (.not.associated(optical_length_tot)) then
    write(*,*) "pointer optical_length_tot not associated"
@@ -533,10 +527,50 @@ MODULE AtomicTransfer
   if (.not.lpluto_file) CALL magneto_accretion_model()  
 !! --------------------------------------------------------- !!
 
+  !start transfer
+  CALL NLTEloop(0, 1d-4)
+
+ ! Transfer ends, save data, free some space and leave
+ !should be closed after reading ? no if we do not save the C matrix in each cells
+ !CALL WRITEATOM()
+ CALL freeSpectrum() !deallocate spectral variables
+ CALL free_atomic_atmos()
+ deallocate(ds)
+ NULLIFY(optical_length_tot)
+
+ RETURN
+ END SUBROUTINE
+ 
+ SUBROUTINE NLTEloop(Niter, IterLim)
+  integer, intent(in) :: Niter
+  double precision, intent(in) :: IterLim
+  integer :: atomunit = 1, nact
+  integer :: icell
+  integer :: ibin, iaz
+  character(len=20) :: ne_start_sol = "H_IONISATION"
+  logical :: lwrite_waves = .false.
+  
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
+
+  if (atmos%Nactiveatoms>0) then
+  write(*,*) "Beware, pops in background Hydrogen opacities uses n instead of nstar"
+  write(*,*) "There will be a bug if H is active, as n is not an alias to nstar in this case"
+  write(*,*) "also in solve NE."
+  !if I set atom%n to atom%nstar before starting the NLTE loop
+  !independently of the starting solution, solvene and background H should work
+  !properly. And then I set atom%n to the initial guess and starts the NLTEloop, with
+  !eventually iteration of the electron density
+  stop
+  !or at the forst iteration set atmos%Atoms(nll)%ptr_atom%NLTEpops = .false. (normally true
+  !if the atom is active (or is passive but pops read from file,s that %n and %nstar are different).
+  !If we do that for the first iteration, ne is computed using kurucz pf. 
+  !then we can set atmos%Atoms(nll)%ptr_atom%NLTEpops = true again and NLTE pops will be used.
+  atmos%Atoms(nact)%ptr_atom%NLTEpops = .false.
+  
+  end if
   ! if the electron density is not provided by the model or simply want to
   ! recompute it
   ! if atmos%ne given, but one want to recompute ne
@@ -559,6 +593,7 @@ MODULE AtomicTransfer
   end if
   CALL writeHydrogenDensity()
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
+  !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
 !! --------------------------------------------------------- !!
   NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
 !   allocate(NLTEspec%lambda(1000))
@@ -607,6 +642,7 @@ MODULE AtomicTransfer
   if (atmos%Nactiveatoms > 0) then
     write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
     do nact=1,atmos%Nactiveatoms
+     atmos%Atoms(nact)%ptr_atom%NLTEpops = .true. !again
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
      atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
@@ -633,6 +669,10 @@ MODULE AtomicTransfer
 !
 !! -------------------------------------------------------- !!
 
+ do nact=1,atmos%Nactiveatoms
+  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
+ end do
+
   write(*,*) "Computing emission flux map..."
   !Use converged NLTEOpac
   do ibin=1,RT_n_incl
@@ -642,24 +682,6 @@ MODULE AtomicTransfer
   end do
   CALL WRITE_FLUX()
 
-
- ! Transfer ends, save data, free some space and leave
- !should be closed after reading ? no if we do not save the C matrix in each cells
- do nact=1,atmos%Nactiveatoms
-  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
- end do
- !CALL WRITEATOM()
- CALL freeSpectrum() !deallocate spectral variables
- CALL free_atomic_atmos()
- deallocate(ds)
- NULLIFY(optical_length_tot)
-
- RETURN
- END SUBROUTINE
- 
- SUBROUTINE NLTEloop(Niter, IterLim)
-  integer, intent(in) :: Niter
-  double precision, intent(in) :: IterLim
  
  RETURN
  END SUBROUTINE NLTEloop

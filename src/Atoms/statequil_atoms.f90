@@ -8,6 +8,34 @@ MODULE statequil_atoms
 
  CONTAINS
  
+ SUBROUTINE initGamma()
+ ! ------------------------------------------------------ !
+  !for each active atom, allocate and init Gamma matrix
+  !deallocated in freeAtom()
+  ! Collision matrix has to be allocated
+  ! if already allocated, simply set Gamma to its new icell
+  ! value.
+ ! ------------------------------------------------------ !
+  integer :: nact, Nlevel, i, j, ij
+  type (AtomType), pointer :: atom
+  
+  do nact = 1, atmos%Nactiveatoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+   Nlevel = atom%Nlevel
+   ij = 0
+   if (.not.allocated(atom%Gamma)) allocate(atom%Gamma(Nlevel, Nlevel))
+   do i=1, Nlevel
+    do j=1,Nlevel
+      ij = ij + 1
+      atom%Gamma(i,j) = atom%C(ij) 
+    end do
+   end do
+   NULLIFY(atom)
+  end do
+ 
+ RETURN
+ END SUBROUTINE initGamma
+ 
 
  SUBROUTINE allocNetCoolingRates(atom)
  ! ----------------------------------------------- !
@@ -54,6 +82,10 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE initRadiativeRates
  
+ SUBROUTINE fillCrossCoupling_terms()
+ 
+ RETURN
+ END SUBROUTINE fillCrossCoupling_terms
  
  SUBROUTINE addtoRadiativeRates()
  ! -------------------------------------------- !

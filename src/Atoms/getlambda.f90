@@ -139,50 +139,6 @@ MODULE getlambda
 
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line  
-  
-  FUNCTION IntegrationWeightLine(line, la) result (wlam)
-  ! ------------------------------------------------------- !
-   ! result in m/s
-   ! A 1/vbroad term is missing.
-  ! ------------------------------------------------------- !
-   double precision :: wlam, Dopplerwidth
-   type (AtomicLine) :: line
-   integer :: la
-   
-   Dopplerwidth = CLIGHT/line%lambda0
-   if (line%symmetric) Dopplerwidth = Dopplerwidth*2
-   
-   if (la == 1) then
-    wlam = 0.5*(line%lambda(la+1)-line%lambda(la))
-   else if (la == line%Nlambda) then
-    wlam = 0.5*(line%lambda(la)-line%lambda(la-1))
-   else
-    wlam = 0.5*(line%lambda(la+1)-line%lambda(la-1))
-   end if
-   
-   wlam = wlam * DopplerWidth
-
-  RETURN
-  END FUNCTION IntegrationWeightLine
-
-  FUNCTION IntegrationWeightCont(cont, la) result(wlam)
-  ! ------------------------------------------------------- !
-   ! result in nm
-  ! ------------------------------------------------------- !
-   type (AtomicContinuum) :: cont
-   integer :: la
-   double precision :: wlam
-
-   if (la == 1) then
-    wlam = 0.5*(cont%lambda(la+1)-cont%lambda(la))
-   else if (la == cont%Nlambda-1) then
-    wlam = 0.5*(cont%lambda(la)-cont%lambda(la-1))
-   else
-    wlam = 0.5*(cont%lambda(la+1)-cont%lambda(la-1))
-   end if
-
-  RETURN
-  END FUNCTION
 
   SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, Ntrans, wl_ref)
   use math, only : locate

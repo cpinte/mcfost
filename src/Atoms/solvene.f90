@@ -133,7 +133,7 @@ END FUNCTION getPartitionFunctionk
    end if
   end do
 
-  if (is_active) then
+  if (is_active .and. atmos%Atoms(nll)%ptr_atom%NLTEpops) then!if (is_active) then
    atom = Elem%model
    fjk = 0d0
    dfjk = 0d0
@@ -143,7 +143,8 @@ END FUNCTION getPartitionFunctionk
    !For Nstage
    fjk(:) = fjk(:)/atom%ntotal(k)
 
-  else !not active, whateveeer, use LTE
+  else !not active or active but first iteration of the NLTEloop so that
+  	!NLTEpos has been set to .false., whateveeer, use LTE
    fjk(1)=1.
    dfjk(1)=0.
    sum1 = 1.

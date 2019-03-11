@@ -22,14 +22,6 @@ MODULE spectrum_type
    ! I(x,y,0,lambda,imu), not used yet
    !character(len=*), parameter :: SPEC_FILE="spectrum.fits.gz"
    character(len=*), parameter :: OPAC_CONTRIB_FILE="opacities.fits.gz"
-
-  !Like RH, should vanish in the futur
-!   TYPE ActiveSetType
-!    integer, allocatable, dimension(:,:) :: lower_levels, upper_levels
-!    type (AtomicLine), allocatable, dimension(:,:) :: art
-!    type (AtomicContinuum), allocatable, dimension(:,:) :: crt
-!    double precision, allocatable, dimension(:,:) :: Psi !proc and wavelength
-!   END TYPE ActiveSetType
   
   TYPE AtomicOpacity
    !active opacities
@@ -39,7 +31,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
    double precision, allocatable, dimension(:,:)   :: jc
    double precision, allocatable, dimension(:,:,:) :: Kc
-   !type (ActiveSetType) :: ActiveSet
+   logical, dimension(:), allocatable :: cont_initialized
   END TYPE AtomicOpacity
 
   TYPE Spectrum
@@ -58,6 +50,8 @@ MODULE spectrum_type
    !Contribution function
    double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
+   double precision, allocatable, dimension(:,:,:) :: Psi
+   !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
   END TYPE Spectrum
@@ -121,7 +115,7 @@ MODULE spectrum_type
   SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
-   integer :: Nsize
+   integer :: Nsize, nat
    
    Nsize = NLTEspec%Nwaves
    ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
@@ -186,6 +180,26 @@ MODULE spectrum_type
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
+   
+   if (NLTEspec%Nact > 0) then !NLTE loop activated
+    allocate(NLTEspec%AtomOpac%cont_initialized(NLTEspec%NPROC))
+    NLTEspec%AtomOpac%cont_initialized(:) = .false.
+    allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+    do nat=1,NLTEspec%atmos%Nactiveatoms
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Vij&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%gij&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+    end do
+   end if
 
    !Contribution function
    if (lcontrib_function) then
@@ -206,6 +220,9 @@ MODULE spectrum_type
    !active
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
+   if (NLTEspec%Nact > 0) then
+    deallocate(NLTEspec%Psi, NLTEspec%AtomOpac%cont_initialized)
+   end if
 
    !passive
    deallocate(NLTEspec%AtomOpac%eta_p) !contains only passive lines if store_opac
@@ -243,13 +260,14 @@ MODULE spectrum_type
     NLTEspec%AtomOpac%eta_p(:,id) = 0d0
     NLTEspec%J(:,id) = 0d0
     NLTEspec%Jc(:,id) = 0d0
-  
+    
   RETURN
   END SUBROUTINE initAtomOpac
   
   SUBROUTINE compute_wlambda()
   ! ---------------------------------------------- !
-   !
+   ! Allocates and computes wavelength integration
+   ! weights.
   ! ---------------------------------------------- !
    use atmos_type, only : atmos
    integer :: kr, kc, nact, Nred, Nblue, Nlambda, la

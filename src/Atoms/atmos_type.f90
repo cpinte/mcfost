@@ -98,13 +98,12 @@ MODULE atmos_type
       NULLIFY(atom%n)
       if (associated(atom%nstar)) deallocate(atom%nstar)
     end if
-    !if (allocated(atom%gij)) deallocate(atom%gij)
-    !if (allocated(atom%Vij)) deallocate(atom%Vij)
-    !if (allocated(atom%wla)) deallocate(atom%wla)
+    if (allocated(atom%gij)) deallocate(atom%gij)
+    if (allocated(atom%Vij)) deallocate(atom%Vij)
     if (allocated(atom%chi_up)) deallocate(atom%chi_up)
     if (allocated(atom%chi_down)) deallocate(atom%chi_down)
     if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
-    !if (allocated(atom%eta)) deallocate(atom%eta)
+    if (allocated(atom%eta)) deallocate(atom%eta)
 
 !!!     for this atom, free lines if allocated
      if (allocated(atom%lines)) then
@@ -237,12 +236,6 @@ MODULE atmos_type
 
   SUBROUTINE free_atomic_atmos()
   integer :: n
-
-  !Some error of deallocate, how it works with derived types with allocatable,
-  ! derived types as attributes and pointers and pointers in derived types attributes...
-  ! should not deallocate(atmos%Atoms) working if at least all pointers have been deallocated
-  ! first ?
-  write(*,*) "Warning: check deallocation of pointers and derived types in derived types.."
 
   if (allocated(atmos%Elements)) then
     do n=1,Nelem
