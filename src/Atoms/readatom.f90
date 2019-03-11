@@ -673,6 +673,7 @@ MODULE readatom
      if (atmos%Atoms(nmet)%ptr_atom%active) then 
       nact = nact + 1 !got the next index of active atoms
       atmos%ActiveAtoms(nact)%ptr_atom => atmos%Atoms(nmet)%ptr_atom
+      atmos%Atoms(nmet)%ptr_atom%activeindex = nact
 !       atom2 => atmos%ActiveAtoms(nact)
 !       atom2 = atom
      end if

@@ -186,8 +186,7 @@ MODULE spectrum_type
     NLTEspec%AtomOpac%cont_initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     do nat=1,NLTEspec%atmos%Nactiveatoms
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(Nsize,NLTEspec%NPROC))
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Vij&
        (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%gij&
