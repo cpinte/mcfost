@@ -41,7 +41,7 @@ MODULE Opacity
   integer :: nact, Nred, Nblue, kc, kr, i, j
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
-  type(AtomType) :: aatom
+  type(AtomType), pointer :: aatom
   double precision, parameter :: twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2, &
@@ -65,7 +65,8 @@ MODULE Opacity
   end if
   
   do nact = 1, atmos%Nactiveatoms
-   aatom = atmos%ActiveAtoms(nact)%ptr_atom
+   aatom => atmos%ActiveAtoms(nact)%ptr_atom
+   aatom%eta(:,id) = 0d0
 
    if (.not.NLTEspec%AtomOpac%cont_initialized(id)) then
    !Update continuum opacties only once for each angle and each thread.
@@ -90,6 +91,7 @@ MODULE Opacity
     	NLTEspec%AtomOpac%cont_initialized(id) = .true.
     	if (NLTEspec%AtomOpac%cont_initialized(id)) write(*,*) &
     	"do not forget to reset the flag between itertation"
+    	aatom%eta(:,id) = aatom%eta(:,id) + gij * Vij * aatom%n(j,icell) * twohnu3_c2
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged
    	end do
@@ -157,6 +159,9 @@ MODULE Opacity
      NLTEspec%AtomOpac%eta(Nblue:Nred,id)= &
      		NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
        		twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
+    aatom%eta(:,id) = aatom%eta(:,id) + &
+    	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
+
    end do
   
   end do !over activeatoms

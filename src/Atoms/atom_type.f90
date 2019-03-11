@@ -69,8 +69,11 @@ MODULE atom_type
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
+   !one emissivity per atom, used in the construction of the gamma matrix
+   !where I have to distinguish between atom own opac and overlapping transitions
+   double precision, allocatable, dimension(:,:) :: eta
    !!Nlevel, wavelength and proc
-   double precision, allocatable, dimension(:,:,:)  :: chi_up, chi_down, Uji_down, eta,&
+   double precision, allocatable, dimension(:,:,:)  :: chi_up, chi_down, Uji_down, &
      gij, Vij
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
