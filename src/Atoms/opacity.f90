@@ -20,6 +20,22 @@ MODULE Opacity
 
 
  CONTAINS
+ 
+ SUBROUTINE initCrossCoupling(id)
+  integer, intent(in) :: id
+  integer :: nact
+  
+  do nact=1,atmos%Nactiveatoms
+   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
+   
+   !init eta at the same time
+   atmos%ActiveAtoms(nact)%ptr_atom%eta(:,id) = 0d0
+  end do
+ 
+ RETURN
+ END SUBROUTINE initCrossCoupling
 
  SUBROUTINE NLTEOpacity(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
   !
@@ -81,6 +97,9 @@ MODULE Opacity
      	CYCLE
     	end if
     	gij = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda
+    	aatom%continua(kc)%gij(:,id) = gij
+    	aatom%continua(kc)%Vij(:,id) = Vij
+
     
     !store total emissivities and opacities
     	NLTEspec%AtomOpac%chi(:,id) = NLTEspec%AtomOpac%chi(:,id) + &
@@ -150,6 +169,10 @@ MODULE Opacity
 
      Vij(Nblue:Nred) = &
       hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * aatom%vbroad(icell))
+ 
+     aatom%lines(kr)%gij(:,id) = gij
+     aatom%lines(kr)%Vij(:,id) = Vij     
+      
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
        		Vij(Nblue:Nred) * (aatom%n(i,icell)-gij(Nblue:Nred)*aatom%n(j,icell))

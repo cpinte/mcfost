@@ -118,7 +118,7 @@ MODULE spectrum_type
   SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
-   integer :: Nsize, nat
+   integer :: Nsize, nat, k
    
    Nsize = NLTEspec%Nwaves
    ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
@@ -189,17 +189,18 @@ MODULE spectrum_type
     NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     do nat=1,NLTEspec%atmos%Nactiveatoms
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(Nsize,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Vij&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%gij&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nsize,NLTEspec%NPROC))
+     do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(Nsize,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(Nsize,NLTEspec%NPROC))
+     end do
+     do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(Nsize,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(Nsize,NLTEspec%NPROC))
+     end do
     end do
    end if
 
@@ -250,6 +251,8 @@ MODULE spectrum_type
      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
      stop
     end if
+    
+    NLTEspec%Psi(:,:,id) = 0d0
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
