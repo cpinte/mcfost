@@ -31,7 +31,10 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
    double precision, allocatable, dimension(:,:)   :: jc
    double precision, allocatable, dimension(:,:,:) :: Kc
-   logical, dimension(:), allocatable :: cont_initialized
+   logical, dimension(:), allocatable :: initialized
+   									     !set to .true. for each cell, when iray=1.
+   									     !.false. otherwise.
+   									     !%initialized(id) = (iray == 1)
   END TYPE AtomicOpacity
 
   TYPE Spectrum
@@ -182,8 +185,8 @@ MODULE spectrum_type
    NLTEspec%AtomOpac%eta_p = 0.
    
    if (NLTEspec%Nact > 0) then !NLTE loop activated
-    allocate(NLTEspec%AtomOpac%cont_initialized(NLTEspec%NPROC))
-    NLTEspec%AtomOpac%cont_initialized(:) = .false.
+    allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
+    NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(Nsize,NLTEspec%NPROC))
@@ -220,7 +223,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
    if (NLTEspec%Nact > 0) then
-    deallocate(NLTEspec%Psi, NLTEspec%AtomOpac%cont_initialized)
+    deallocate(NLTEspec%Psi, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -263,10 +266,11 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
-  SUBROUTINE compute_wlambda()
+  SUBROUTINE alloc_wlambda()
   ! ---------------------------------------------- !
-   ! Allocates and computes wavelength integration
+   ! Allocates wavelength integration
    ! weights.
+   ! only from Nblue to Nred !
   ! ---------------------------------------------- !
    use atmos_type, only : atmos
    integer :: kr, kc, nact, Nred, Nblue, Nlambda, la
@@ -282,10 +286,10 @@ MODULE spectrum_type
       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(NLTEspec%Nwaves))
       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(Nlambda))
       atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(:) = 0d0
-      do la=1,Nlambda!la=Nblue, Nred 
-       atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(la) = & 
-        NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-      end do
+!       do la=1,Nlambda!la=Nblue, Nred 
+!        atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(la) = & 
+!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
+!       end do
     end do
     do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
       Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
@@ -294,15 +298,15 @@ MODULE spectrum_type
       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(NLTEspec%Nwaves))
       allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
       atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
-      do la=1,Nlambda!=Nblue, Nred
-       atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
-        NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-      end do
+!       do la=1,Nlambda!=Nblue, Nred
+!        atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
+!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
+!       end do
     end do  
    end do
  
   RETURN
-  END SUBROUTINE compute_wlambda
+  END SUBROUTINE alloc_wlambda
 
  SUBROUTINE WRITE_FLUX()
  ! -------------------------------------------------- !

@@ -368,7 +368,7 @@ MODULE getlambda
     type(AtomType), intent(inout) :: atom
     integer, intent(in) :: kc, Nwaves
     double precision, dimension(Nwaves) :: waves
-    type(AtomicContinuum) :: cont
+    type(AtomicContinuum), pointer :: cont
     integer :: i, j
     double precision, dimension(Nwaves) :: uu, g_bf
     double precision, dimension(:), allocatable :: old_alpha

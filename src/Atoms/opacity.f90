@@ -16,9 +16,8 @@ MODULE Opacity
 
  !store the pure continuum NLTE opacities to be added to the total
  !continuum opacity after NLTEloop ends
- double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
- !cross-coupling opacities
- double precision, dimension(:,:), allocatable :: chi_xc, eta_xc
+ !double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
+
 
  CONTAINS
 
@@ -68,7 +67,7 @@ MODULE Opacity
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
    aatom%eta(:,id) = 0d0
 
-   if (.not.NLTEspec%AtomOpac%cont_initialized(id)) then
+   if (NLTEspec%AtomOpac%initialized(id)) then
    !Update continuum opacties only once for each angle and each thread.
    !Separated loop on b-f and b-b- transitions
    	do kc = 1, aatom%Ncont
@@ -88,10 +87,9 @@ MODULE Opacity
     									Vij * (aatom%n(i, icell) - gij * aatom%n(j,icell))
 		NLTEspec%AtomOpac%eta(:,id) = NLTEspec%AtomOpac%eta(:,id) + &
     	gij * Vij * aatom%n(j,icell) * twohnu3_c2
-    	NLTEspec%AtomOpac%cont_initialized(id) = .true.
-    	if (NLTEspec%AtomOpac%cont_initialized(id)) write(*,*) &
-    	"do not forget to reset the flag between itertation"
+    	
     	aatom%eta(:,id) = aatom%eta(:,id) + gij * Vij * aatom%n(j,icell) * twohnu3_c2
+        aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged
    	end do
@@ -161,6 +159,8 @@ MODULE Opacity
        		twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
     aatom%eta(:,id) = aatom%eta(:,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
+    	
+    aatom%lines(kr)%wlam(Nblue:Nred) = hc_4PI*phi(Nblue:Nred) / (SQRTPI * aatom%vbroad(icell))
 
    end do
   

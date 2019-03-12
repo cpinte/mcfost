@@ -22,7 +22,8 @@ MODULE atom_type
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing
    real(8), dimension(4) :: cvdWaals
-   real(8), allocatable, dimension(:,:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
+   real(8), allocatable, dimension(:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
+   !wlam is the integration wavelenght weigh = phi
    double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij, wlam!, c_shift, c_fraction
    !double precision, allocatable, dimension(:)  :: Jbar! (n_cells)
    double precision :: Qelast, adamp, Rij, Rji

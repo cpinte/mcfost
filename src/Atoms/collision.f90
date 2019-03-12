@@ -382,7 +382,6 @@ MODULE collision
  
  SUBROUTINE closeCollisionFile(atom)
   type (AtomType), intent(in) :: atom
-  
   write(*,*) "Closing collision file for atom ", atom%ID, atom%colunit
   close(atom%colunit)
   return
