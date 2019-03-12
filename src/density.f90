@@ -1073,6 +1073,7 @@ subroutine read_density_file()
   nullval=-999
 
   !  determine the size of density file
+  write(*,*) "Reading dust density ..."
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if ((nfound /= 3) .and. (nfound /= 4)) then
      write(*,*) "I found", nfound, "axis instead of 3 or 4"
@@ -1151,7 +1152,7 @@ subroutine read_density_file()
   sph_dens = max(sph_dens,1e10*tiny_real)
 
   if (n_a > 1) then
-
+     write(*,*) "Reading grain sizes ..."
      read_n_a = 0
      call ftgkyj(unit,"read_n_a",read_n_a,comment,status)
      write(*,*) "read_n_a", read_n_a
@@ -1205,7 +1206,7 @@ subroutine read_density_file()
 
      ! On lit au besoin la distribution en taille (dn(a) / da)
      if (read_n_a==1) then
-        write(*,*) "Reading grain size distribution from fits file"
+        write(*,*) "Reading grain size distribution ..."
 
         !---------------------------------------------------------
         ! HDU 3 : nombre de grains
@@ -1284,6 +1285,7 @@ subroutine read_density_file()
   ! Gas density
   !-----------------------------
   if (lread_gas_density) then
+     write(*,*) "Reading gas density ..."
      call ftgkye(unit,"gas_dust_ratio",gas2dust,comment,status)
 
      if (status == 0) then
@@ -1351,6 +1353,7 @@ subroutine read_density_file()
   ! Velocity field
   !------------------------
   if (lread_gas_velocity) then
+     write(*,*) "Reading gas velocity ..."
      lvelocity_file = .true.
 
      if (l3D_file) then
