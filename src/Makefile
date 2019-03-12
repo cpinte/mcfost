@@ -158,7 +158,6 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 opera
 	$(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90 $(Atom_dir)/readatom.f90 \
 	$(Atom_dir)/collision.f90 $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
 	$(Atom_dir)/voigtfunctions.f90 \
-	$(Atom_dir)/profilefunctions.f90\
 	$(Atom_dir)/rayleigh_scattering.f90 $(Atom_dir)/thomson_scattering.f90 \
 	$(Atom_dir)/hydrogen.f90 $(Atom_dir)/opacity.f90 $(Atom_dir)/statequil_atoms.f90 \
 	$(Atom_dir)/planck.f90 \
