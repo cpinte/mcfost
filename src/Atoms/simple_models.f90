@@ -201,8 +201,8 @@ MODULE simple_models
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
 
-   atmos%T = 0d0
-   CALL TTauri_Temperature(rmi, rmo, Macc)
+!    atmos%T = 0d0
+!    CALL TTauri_Temperature(rmi, rmo, Macc)
    CALL define_atomRT_domain()
    
    if (lwrite_model_ascii.and..not.lmagnetoaccr) then !for now
