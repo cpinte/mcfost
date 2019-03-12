@@ -9,7 +9,6 @@ MODULE atom_type
    integer, parameter :: ATOM_ID_WIDTH=2
 
 
-
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicLine
    logical           :: symmetric, polarizable
@@ -28,6 +27,11 @@ MODULE atom_type
    !double precision, allocatable, dimension(:)  :: Jbar! (n_cells)
    double precision :: Qelast, adamp, Rij, Rji
    real(8), allocatable, dimension(:,:) :: rho_pfr
+   !!Nlevel, wavelength and proc
+   !!Stores the information for that atom only, necessary to  construct the Gamma matrix
+   !!and to compute the cross-coupling terms. We need to know for each wavelength and each
+   !!proc what are the active transitions involved in the Gamma matrix.
+   double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    type (AtomType), pointer :: atom => NULL()
   END TYPE AtomicLine
@@ -41,6 +45,7 @@ MODULE atom_type
    double precision :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
+   double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -73,9 +78,7 @@ MODULE atom_type
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
    double precision, allocatable, dimension(:,:) :: eta
-   !!Nlevel, wavelength and proc
-   double precision, allocatable, dimension(:,:,:)  :: chi_up, chi_down, Uji_down, &
-     gij, Vij
+   double precision, allocatable, dimension(:,:,:) :: chi_up, chi_down, Uji_down
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE Element
