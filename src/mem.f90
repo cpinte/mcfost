@@ -380,6 +380,12 @@ subroutine realloc_dust_mol()
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc)')
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
+  if (lRE_nLTE) then
+     allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc)')
+     kappa_abs_nLTE = 0.0
+  endif
+
   ! todo : could be p_n_cells
   allocate(tab_albedo_pos(n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_albedo_pos (realloc)')
