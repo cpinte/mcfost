@@ -686,11 +686,11 @@ subroutine Temp_LTE(icell, Ti, Temp)
 
   real :: Qheat, log_Qheat, frac
 
-  Qheat=sum(xKJ_abs(icell,:))
-  if (Qheat < 0.) then
+  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th
+  if (Qheat < tiny_real) then
      Temp = T_min ; Ti = 2
   else
-     log_Qheat = log(Qheat*L_packet_th)
+     log_Qheat = log(Qheat)
 
      if (log_Qheat <  log_Qcool_minus_extra_heating(1,icell)) then
         Temp = T_min ; Ti = 2

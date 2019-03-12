@@ -148,12 +148,6 @@ subroutine alloc_dynamique(n_cells_max)
   if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
   n_phot_envoyes = 0.0
 
-  if (lSigma_file) then
-     allocate(Surface_density(n_rad), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error Sigma')
-     Surface_density = 0.0_dp
-  endif
-
   allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error l_dark_zone')
@@ -385,6 +379,12 @@ subroutine realloc_dust_mol()
        emissivite_dust(n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc)')
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
+
+  if (lRE_nLTE) then
+     allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc)')
+     kappa_abs_nLTE = 0.0
+  endif
 
   ! todo : could be p_n_cells
   allocate(tab_albedo_pos(n_cells,n_lambda),stat=alloc_status)
