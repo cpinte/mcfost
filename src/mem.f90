@@ -148,12 +148,6 @@ subroutine alloc_dynamique(n_cells_max)
   if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
   n_phot_envoyes = 0.0
 
-  if (lSigma_file) then
-     allocate(Surface_density(n_rad), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error Sigma')
-     Surface_density = 0.0_dp
-  endif
-
   allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
           zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error l_dark_zone')

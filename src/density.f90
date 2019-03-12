@@ -1634,7 +1634,7 @@ subroutine read_Sigma_file()
   ! 22/01/15
 
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels, bitpix
-  integer :: nullval
+  integer :: nullval, alloc_status
   integer, dimension(2) :: naxes
   logical :: anynull
   character(len=80) :: comment
@@ -1687,6 +1687,10 @@ subroutine read_Sigma_file()
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
 
   ! read_image
+  allocate(Surface_density(n_rad), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error Sigma')
+  Surface_density = 0.0_dp
+
   if (bitpix==-32) then
      allocate(sigma_sp(n_rad))
      sigma_sp = 0.0_dp
