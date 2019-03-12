@@ -646,7 +646,7 @@ MODULE readatom
 
   ! Aliases to active atoms
   nact = 0; npass = 0
-  if (atmos%Nactiveatoms.gt.0) then
+  if (atmos%Nactiveatoms > 0) then
     allocate(atmos%ActiveAtoms(atmos%Nactiveatoms))
   end if
   if (atmos%Natom - atmos%Nactiveatoms == atmos%Npassiveatoms) then
