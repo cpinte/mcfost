@@ -10,16 +10,22 @@ MODULE atom_type
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ TYPE ZeemanType
+  integer :: Ncomponent
+  integer, allocatable, dimension(:)  :: q
+  double precision, allocatable, dimension(:)  :: shift, strength
+ END TYPE ZeemanType
+ 
   TYPE AtomicLine
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
-   character(len=20) :: trtype="ATOMIC_LINE"
+   character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
    integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
-   real(8) :: qcore, qwing
+   real(8) :: qcore, qwing, glande_i, glande_j
    real(8), dimension(4) :: cvdWaals
    real(8), allocatable, dimension(:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
    !wlam is the integration wavelenght weigh = phi
@@ -34,6 +40,7 @@ MODULE atom_type
    double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    type (AtomType), pointer :: atom => NULL()
+   type (ZeemanType), pointer :: zm
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
@@ -100,11 +107,6 @@ MODULE atom_type
  END TYPE Element
 
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- TYPE ZeemanType
-  integer :: Ncomponent
-  integer, allocatable, dimension(:)  :: q
-  double precision, allocatable, dimension(:)  :: shift, strength
- END TYPE ZeemanType
 
  CONTAINS
 

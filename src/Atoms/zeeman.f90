@@ -1,6 +1,8 @@
 MODULE zeeman
  ! see LL04
- use atom_type, only : AtomType, ZeemanType, determinate, getorbital
+ use atom_type, only : AtomType, ZeemanType, determinate, getorbital, AtomicLine
+ use atmos_type, only : atmos
+ use messages
 
  IMPLICIT NONE
  CONTAINS
@@ -39,22 +41,39 @@ MODULE zeeman
         atom%qJ(i)*(atom%qJ(i) + 1.0))
 
    atom%lines(kr)%g_lande_eff = g
+   atom%lines(kr)%glande_i = gi
+   atom%lines(kr)%glande_j = gj
 
  RETURN
  END SUBROUTINE Lande_eff
 
  SUBROUTINE ZeemanStrength()
 
+
  RETURN
  END SUBROUTINE ZeemanStrength
 
- SUBROUTINE ZeemanMultiplet(zm)
-  type(ZeemanType), intent(out) :: zm
+ SUBROUTINE ZeemanMultiplet(line) !Called only once per line
+  type(AtomicLine), intent(inout) :: line
+  type(ZeemanType), pointer :: zm
   
-  zm%Ncomponent = 0
-  zm%shift = 0d0
-  zm%strength = 0d0
-  zm%q = 0
+  !init the Zeeman component for this line at this position
+
+  if (atmos%B_SOLUTION == "WEAK_FIELD") then
+   if (line%g_Lande_eff <= -99) then
+    CALL Warning("Landé factor not parsed for this line")
+    RETURN
+   end if
+   allocate(line%zm%q(3), line%zm%strength(3), line%zm%shift(3))
+   zm => line%zm 
+   
+   zm%Ncomponent = 3
+   zm%q = (/-1, 0, 1/)
+   zm%strength = 1d0
+   zm%shift = zm%q * line%g_Lande_eff
+  else
+   CALL Error("Full Zeeman components not implemented yet!")   
+  end if
 
  RETURN
  END SUBROUTINE ZeemanMultiplet

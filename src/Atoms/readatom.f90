@@ -12,6 +12,7 @@ MODULE readatom
   !$ use omp_lib
 
   !MCFOST's originals
+  use messages
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
 
@@ -174,11 +175,11 @@ MODULE readatom
        atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
        atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
        atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
-       atom%lines(kr)%g_Lande_eff
+       atom%lines(kr)%g_Lande_eff, atom%lines(kr)%glande_j, atom%lines(kr)%glande_i 
+       !landé upper / lower levels in case the coupling scheme is not accurate
      else
-       write(*,*) "Error reading line"
-       write(*,*) "exiting.."
-       stop
+       write(*,*) inputline
+       CALL error("Unable to parse atomic file line")
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
@@ -240,6 +241,7 @@ MODULE readatom
        ! fill lande_g_factor if determined and not given
        ! for b-b transitions
        CALL Lande_eff(atom, kr)
+       !compute indiviual glande of levels also
        !!testing
        !!write(*,*) wKul(atom, kr, 0)**2
        !!write(*,*) wKul(atom, kr, 1)**2

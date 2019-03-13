@@ -52,6 +52,7 @@ MODULE atmos_type
    logical :: Magnetized = .false., XRD=.false., calc_ne, &
      H_LTE=.false. ! force LTE populations of H for
                    ! background opacities
+   character(len=20) :: B_SOLUTION
    logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
   END TYPE GridType
 
@@ -453,6 +454,7 @@ MODULE atmos_type
    if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
    if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
+
    
    atmos%ne = 0d0
    atmos%nHmin = 0d0
@@ -505,6 +507,20 @@ MODULE atmos_type
 
    RETURN
    END SUBROUTINE define_atomRT_domain
+   
+   SUBROUTINE init_magnetic_field()
+   ! ----------------------------------------- !
+   ! Allocate space for magnetic field
+   ! and solution for the Zeeman polarisation.
+   ! ----------------------------------------- !
+    if (.not.atmos%magnetized) RETURN
+    allocate(atmos%Bxyz(atmos%Nspace, 3))
+    atmos%Bxyz = 0.0
+    atmos%B_SOLUTION = "WEAK_FIELD"
+    !in the weak field regime
+    ! V = -delaLambda_B * geff * cos(incl_mag, normal) * dI/dlambda
+   RETURN
+   END SUBROUTINE init_magnetic_field
 
    FUNCTION atomZnumber(atomID) result(Z)
    ! --------------------------------------
