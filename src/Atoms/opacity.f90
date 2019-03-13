@@ -26,7 +26,7 @@ MODULE Opacity
   integer :: nact
   
   do nact=1,atmos%Nactiveatoms
-   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
    atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
    atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
    

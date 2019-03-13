@@ -77,13 +77,12 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillCrossCoupling_terms
  
- SUBROUTINE fillGamma()
+ SUBROUTINE fillGamma(id,icell)
  !---------------------------------- !
   ! for all atoms
-  ! also does summation over threads
-  ! or compute the populations thread
-  ! by threads hm?
+  !
  !---------------------------------- !
+  integer, intent(in) :: id, icell
   integer :: nact, nc, kr
   type (AtomType), pointer :: atom
 
