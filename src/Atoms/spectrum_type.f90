@@ -50,6 +50,8 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:) :: J, J20, Jc
    !Nlambda, xpix, ypix, Nincl, Naz
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
+   double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
+   double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
    double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
@@ -121,7 +123,7 @@ MODULE spectrum_type
    integer :: Nsize, nat, k
    
    Nsize = NLTEspec%Nwaves
-   ! if pol, Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
+   ! if (atmos%magnetized and atmos%B_solution /= "WEAK_FIELD"), Nsize = 3*Nsize for rho and 4*Nsize for eta, chi
    
    if (allocated(NLTEspec%I)) then
     write(*,*) "Error I already allocated"
@@ -136,10 +138,12 @@ MODULE spectrum_type
    if (NLTEspec%atmos%Magnetized) then
     allocate(NLTEspec%StokesQ(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), & 
              NLTEspec%StokesU(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), &
-             NLTEspec%StokesV(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
+             NLTEspec%StokesV(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), &
+             NLTEspec%S_QUV(3,NLTEspec%Nwaves))
     NLTEspec%StokesQ=0d0
     NLTEspec%StokesU=0d0
     NLTEspec%StokesV=0d0
+    !no continuum pol yet
    end if
    allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
    allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
@@ -149,7 +153,10 @@ MODULE spectrum_type
       
    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
-   !create pol flux map or add to Flux
+   if (NLTEspec%atmos%magnetized) then 
+    allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
+    NLTEspec%F_QUV = 0d0
+   end if
    
    NLTEspec%Flux = 0.0
    NLTEspec%Fluxc = 0.0
@@ -217,7 +224,10 @@ MODULE spectrum_type
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
-   if (NLTEspec%atmos%Magnetized) deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV)
+   if (NLTEspec%atmos%Magnetized) then 
+    deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV, NLTEspec%F_QUV)
+    deallocate(NLTEspec%S_QUV)
+   end if
    !! deallocate(NLTEspec%J20)
    
    !active
@@ -318,7 +328,7 @@ MODULE spectrum_type
   ! NLTEspec%Flux total and NLTEspec%Flux continuum
  ! --------------------------------------------------- !
   integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(5) :: naxes
+  integer, dimension(6) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
   integer :: la, Nred, Nblue, kr, kc, m, Nmid
   logical :: simple, extend
@@ -390,7 +400,7 @@ MODULE spectrum_type
 
   !  Write the array to the FITS file.
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
-  
+
   ! create new hdu for continuum
   CALL ftcrhd(unit, status)
 
@@ -417,6 +427,21 @@ MODULE spectrum_type
   end if ! l_sym_image  
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
   
+  ! write polarized flux
+  if (NLTEspec%atmos%magnetized .and. RT_line_method /= 1) then
+   CALL ftcrhd(unit, status)
+   naxis = 6
+   naxes(1) = 3 !Q, U, V
+   naxes(2)=NLTEspec%Nwaves
+   naxes(3)=npix_x
+   naxes(4)=npix_y
+   naxes(5)=RT_n_incl
+   naxes(6)=RT_n_az
+   nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5) * naxes(6)
+   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+   CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'Polarised Flux (Q, U, V)',status)
+   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%F_QUV,status)
+  end if
   
   ! create new hdu for wavelength grid
   CALL ftcrhd(unit, status)

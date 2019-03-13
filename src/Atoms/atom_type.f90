@@ -40,7 +40,7 @@ MODULE atom_type
    double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    type (AtomType), pointer :: atom => NULL()
-   type (ZeemanType), pointer :: zm
+   type (ZeemanType) :: zm
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum

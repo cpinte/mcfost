@@ -54,23 +54,36 @@ MODULE zeeman
  END SUBROUTINE ZeemanStrength
 
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
-  type(AtomicLine), intent(inout) :: line
-  type(ZeemanType), pointer :: zm
-  
-  !init the Zeeman component for this line at this position
+  type(AtomicLine), intent(inout) :: line  
 
   if (atmos%B_SOLUTION == "WEAK_FIELD") then
    if (line%g_Lande_eff <= -99) then
-    CALL Warning("Landé factor not parsed for this line")
+    !CALL Warning("  -> Landé factor not parsed for this line")
+    !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
     RETURN
    end if
-   allocate(line%zm%q(3), line%zm%strength(3), line%zm%shift(3))
-   zm => line%zm 
+   allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
    
-   zm%Ncomponent = 3
-   zm%q = (/-1, 0, 1/)
-   zm%strength = 1d0
-   zm%shift = zm%q * line%g_Lande_eff
+   line%zm%Ncomponent = 1
+   line%zm%q = 0
+   line%zm%strength(1) = line%g_Lande_eff
+   line%zm%shift = 1d0
+   
+   !The Stokes parameters are only prop to g_lande_eff * dI/dlambda
+
+  else if (atmos%B_SOLUTION == "EFFECTIVE_TRIPLET") then
+   if (line%g_Lande_eff <= -99) then
+    !CALL Warning("  -> Landé factor not parsed for this line")
+    !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
+    RETURN
+   end if
+   line%zm%Ncomponent = 3
+   line%zm%q = (/-1, 0, 1/)
+   line%zm%strength = 1d0
+   line%zm%shift = line%zm%q * line%g_Lande_eff
+   CALL Error("Effective Zeeman Triplet (EZT) not implemented yet!")   
+   write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
+   			  " Zeeman components, geff=", line%g_lande_eff
   else
    CALL Error("Full Zeeman components not implemented yet!")   
   end if

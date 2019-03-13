@@ -200,6 +200,8 @@ MODULE AtomicTransfer
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dtau_c*Snu_c*dexp(-tau_c)
+    NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
+                             exp(-tau) * (1.0_dp - exp(-dtau)) * NLTEspec%S_QUV(3,:)
 
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
@@ -234,6 +236,7 @@ MODULE AtomicTransfer
    integer, parameter :: maxSubPixels = 32
    double precision :: x0,y0,z0,u0,v0,w0
    double precision, dimension(NLTEspec%Nwaves) :: Iold, nu, I0, I0c
+   double precision, dimension(:,:), allocatable :: QUV
    double precision, dimension(3) :: sdx, sdy
    double precision:: npix2, diff
    double precision, parameter :: precision = 1.e-2
@@ -244,7 +247,11 @@ MODULE AtomicTransfer
    ! reset local Fluxes
    I0c = 0d0
    I0 = 0d0
-
+   if (atmos%magnetized) then 
+    if (.not.allocated(QUV)) allocate(QUV(3,NLTEspec%Nwaves)) 
+    !anyway set to 0 each time we enter the routine
+    QUV(:,:) = 0d0
+   end if
    ! Ray tracing : on se propage dans l'autre sens
    u0 = -u ; v0 = -v ; w0 = -w
 
@@ -283,6 +290,7 @@ MODULE AtomicTransfer
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
+             if (atmos%magnetized) QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id)
            !else !Outside the grid, no radiation flux
            endif
         end do !j
@@ -318,6 +326,11 @@ MODULE AtomicTransfer
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
+  if (atmos%magnetized) then 
+   QUV(1,:) = QUV(1,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
+   QUV(2,:) = QUV(2,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
+   QUV(3,:) = QUV(3,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
+  end if
 
   ! adding to the total flux map.
   if (RT_line_method==1) then
@@ -326,6 +339,7 @@ MODULE AtomicTransfer
   else
     NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
     NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
+    if (atmos%magnetized) NLTEspec%F_QUV(:,:,ipix,jpix,ibin,iaz) = QUV(:,:)
   end if
 
   RETURN

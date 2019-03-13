@@ -1,7 +1,7 @@
 MODULE simple_models
 
  use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain, &
- 						free_atomic_atmos
+ 						free_atomic_atmos, init_magnetic_field
  
  ! MCFOST's modules
  use input
@@ -50,6 +50,7 @@ MODULE simple_models
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
+   double precision :: Bp, BR, Bz
    logical :: lwrite_model_ascii = .false.
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -62,6 +63,11 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .not.(lwrite_model_ascii)
    CALL init_atomic_atmos()
+   atmos%magnetized = .true.
+   if (atmos%magnetized) then 
+    CALL init_magnetic_field()
+    atmos%B_char = 3d-2
+   end if
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
@@ -89,6 +95,11 @@ MODULE simple_models
    write(*,*) "Surface ", 100*Sr, "%"
    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
    write(*,*) "Mean molecular weight", atmos%avgWeight
+   !1G = 1e-4 T
+   Bp = 1d-4 * 4.2*1d2 * (rmi/2.2)*(2*Mstar*kg_to_Msun)**(0.25) * &
+   	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
+   write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
+  
    !now nH0 and Q0 are computed for each field lines assuming that Tring is the same
    !for all.
 !    nH0 = 1d3/masseH/atmos%avgWeight * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
@@ -180,6 +191,12 @@ MODULE simple_models
              !!if (z<0 .and.lmagnetoaccr) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
 
            end if
+           ! Now magnetic field
+             !if (.not.lmagnetoaccr) then ect..
+             atmos%Bxyz(icell,:) = 3d-2 !Tesla
+             BR = Bp * (etoile(1)%r / r)**(3.0) * 3*dsqrt(y)*dsqrt(1.-y**2)
+             Bz = Bp * (etoile(1)%r / r)**(3.0) * (3*(1.-y)-1)
+             if (z<0) Bz = -Bz
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))

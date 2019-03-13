@@ -1,8 +1,8 @@
 MODULE readatom
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate
-  use atmos_type, only : atmos, Nelem, Hydrogen, Helium, freeAtom
-  use zeeman, only : Lande_eff
+  use atmos_type, only : atmos, Nelem, Hydrogen, Helium
+  use zeeman, only : Lande_eff, ZeemanMultiplet
   use getlambda
   use constant
   use uplow
@@ -157,12 +157,15 @@ MODULE readatom
      atom%lines(kr)%atom => atom
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
+     atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
      !atom%lines(kr)%trtype="ATOMIC_LINE"
      CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
      Nread = len(trim(inputline)) ! because, if blanck
            ! beyond cStark it will be interpreted
            ! has "additional geff", but its not.
            !
+     !futur implement: line%name
+     write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
          symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
@@ -170,7 +173,7 @@ MODULE readatom
          atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
          atom%lines(kr)%Grad, atom%lines(kr)%cStark
      else if (Nread.gt.112) then
-       write(*,*) "Read aditional g_lande_eff for that line"
+       write(*,*) " ->Read aditional g_lande_eff for that line"
        read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
        symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
        atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
@@ -180,7 +183,7 @@ MODULE readatom
        !landé upper / lower levels in case the coupling scheme is not accurate
      else
        write(*,*) inputline
-       CALL error("Unable to parse atomic file line")
+       CALL error(" Unable to parse atomic file line")
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
@@ -235,7 +238,7 @@ MODULE readatom
 
       if (((determined(atom%lines(kr)%j)).and.&
           (determined(atom%lines(kr)%i))).and. &
-           atom%lines(kr)%g_Lande_eff.eq.-99) then
+           atom%lines(kr)%g_Lande_eff <= -99) then
        ! do not compute geff if term is not
        ! determined or if the geff is read from file
        ! ie if g_lande_eff > -99
@@ -250,6 +253,8 @@ MODULE readatom
        !!stop
        !write(*,*) "geff = ", atom%lines(kr)%g_lande_eff
       end if
+      !                  .and.atom%lines(kr)%g_lande_eff > -99
+      if (atmos%magnetized) CALL ZeemanMultiplet(atom%lines(kr))
       ! oscillator strength saved
       atom%lines(kr)%fosc = f
       lambdaji = (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i))

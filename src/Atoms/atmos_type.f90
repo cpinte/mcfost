@@ -62,7 +62,17 @@ MODULE atmos_type
 
 
   CONTAINS
+  
+  SUBROUTINE freeZeemanMultiplet(line)
+   type(AtomicLine), intent(inout) :: line
 
+   if (allocated(line%zm%strength)) deallocate(line%zm%strength)
+   if (allocated(line%zm%q)) deallocate(line%zm%q)
+   if (allocated(line%zm%shift)) deallocate(line%zm%shift)
+   
+  RETURN
+  END SUBROUTINE freeZeemanMultiplet
+ 
   SUBROUTINE freeAtom(atom)
   ! This subroutine free atmos%atoms properly including lines
   ! and continua.
@@ -134,6 +144,8 @@ MODULE atmos_type
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
 !       if (allocated(line%chi_down)) deallocate(line%chi_down)
 !       if (allocated(line%Uji_down)) deallocate(line%Uji_down)
+      if (associated(line%atom)) NULLIFY(line%atom)
+      CALL freeZeemanMultiplet(line)
      end do
       deallocate(atom%lines)
      end if
@@ -513,12 +525,10 @@ MODULE atmos_type
    ! Allocate space for magnetic field
    ! and solution for the Zeeman polarisation.
    ! ----------------------------------------- !
-    if (.not.atmos%magnetized) RETURN
+    !if (.not.atmos%magnetized) RETURN
     allocate(atmos%Bxyz(atmos%Nspace, 3))
     atmos%Bxyz = 0.0
     atmos%B_SOLUTION = "WEAK_FIELD"
-    !in the weak field regime
-    ! V = -delaLambda_B * geff * cos(incl_mag, normal) * dI/dlambda
    RETURN
    END SUBROUTINE init_magnetic_field
 
