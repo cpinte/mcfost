@@ -1,6 +1,7 @@
 MODULE getline
 
   !Routine to read formatted input files
+  use messages
 
   IMPLICIT NONE
   integer, parameter :: MAX_LENGTH=512 !maximum character read on a line
@@ -47,9 +48,8 @@ MODULE getline
   end do
 
   if (n.eq.0) then
-    write(*,*) "Error when reading line",line, count
-    write(*,*) "exiting..."
-    stop
+    write(*,*) "line=",line, count
+    CALL error("Unable to read next line from file!")
   end if
 
   RETURN
