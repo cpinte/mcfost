@@ -412,7 +412,8 @@ MODULE getlambda
        (waves(cont%Nblue:cont%Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
 
     else !cont%alpha is allocated and filled with read values
-     write(*,*) "Interpolating photoionisation cross-section for atom ", cont%atom%ID, " ", atom%ID
+     write(*,*) "Interpolating photoionisation cross-section for atom ", &
+      cont%j,'->',cont%i,cont%atom%ID, " ", atom%ID
      allocate(old_alpha(size(cont%alpha)))
      old_alpha(:) = cont%alpha(:)
      deallocate(cont%alpha)

@@ -63,7 +63,7 @@ MODULE readatom
 
     IDread(2:2) = to_lower(IDread(2:2))
     atom%ID = IDread
-    write(*,*) "AtomID = ", atom%ID
+    write(*,*) "Reading atomic model of atom ", atom%ID
 
     match = .false.
     do nll=1,Nelem
@@ -88,7 +88,8 @@ MODULE readatom
     CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
     read(inputline,*) atom%Nlevel, atom%Nline, atom%Ncont, atom%Nfixed
     write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
-              " Ncont=", atom%Ncont, " Nfixed=", atom%Nfixed
+              " Ncont=", atom%Ncont!, " Nfixed=", atom%Nfixed
+              !deprecated Nfixed will be removed
 
     !read for each level, Energie (%E), statistical weight (%g), label,
     ! stage and levelNo
@@ -623,7 +624,7 @@ MODULE readatom
    ! check duplicates
    IDread(2:2) = to_lower(IDread(2:2))
    do mmet = 1,nmet-1 !compare the actual (IDread) with previous
-    write(*,*) mmet, nmet
+    !write(*,*) mmet, nmet
     if (atmos%Atoms(nmet)%ptr_atom%ID.eq.IDread) then
      write(*,*) "Already read a model for this atom ", IDread
      write(*,*) "exiting..."
@@ -638,8 +639,8 @@ MODULE readatom
    !write(*,*) "IS ACTIVE = ", atmos%Atoms(nmet)%active
    !atmos%Atoms(nmet)%ptr_atom = atom
    !CALL freeAtom(atom)
-   write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID
-   if (nmet>1) write(*,*) nmet-1, atmos%Atoms(nmet-1)%ptr_atom%ID
+   !write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID
+   !if (nmet>1) write(*,*) nmet-1, atmos%Atoms(nmet-1)%ptr_atom%ID
   end do
   close(unit)
 
