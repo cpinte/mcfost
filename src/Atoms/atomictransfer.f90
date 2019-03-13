@@ -504,6 +504,11 @@ MODULE AtomicTransfer
   ! This routine initialises the necessary quantities for atomic line transfer
   ! and calls the appropriate routines for LTE or NLTE transfer.
  ! --------------------------------------------------------------------------- !
+  integer :: atomunit = 1, nact
+  integer :: icell
+  integer :: ibin, iaz
+  character(len=20) :: ne_start_sol = "H_IONISATION"
+  logical :: lwrite_waves = .false.
 
 #include "sprng_f.h"
 
@@ -526,30 +531,6 @@ MODULE AtomicTransfer
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()  
 !! --------------------------------------------------------- !!
-
-  !start transfer
-  CALL NLTEloop(0, 1d-4)
-
- ! Transfer ends, save data, free some space and leave
- !should be closed after reading ? no if we do not save the C matrix in each cells
- !CALL WRITEATOM()
- CALL freeSpectrum() !deallocate spectral variables
- CALL free_atomic_atmos()
- deallocate(ds)
- NULLIFY(optical_length_tot)
-
- RETURN
- END SUBROUTINE
- 
- SUBROUTINE NLTEloop(Niter, IterLim)
-  integer, intent(in) :: Niter
-  double precision, intent(in) :: IterLim
-  integer :: atomunit = 1, nact
-  integer :: icell
-  integer :: ibin, iaz
-  character(len=20) :: ne_start_sol = "H_IONISATION"
-  logical :: lwrite_waves = .false.
-  
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
@@ -634,6 +615,39 @@ MODULE AtomicTransfer
   CALL reallocate_mcfost_vars()
 
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
+  !start transfer
+  if (atmos%Nactiveatoms > 0) CALL NLTEloop(0, 1d-4)
+  
+  write(*,*) "Computing emission flux map..."
+  !Use converged NLTEOpac
+  do ibin=1,RT_n_incl
+     do iaz=1,RT_n_az
+       CALL EMISSION_LINE_MAP(ibin,iaz)
+     end do
+  end do
+  CALL WRITE_FLUX()
+
+ ! Transfer ends, save data, free some space and leave
+ !should be closed after reading ? no if we do not save the C matrix in each cells
+ !CALL WRITEATOM()
+ CALL freeSpectrum() !deallocate spectral variables
+ CALL free_atomic_atmos()
+ deallocate(ds)
+ NULLIFY(optical_length_tot)
+
+ RETURN
+ END SUBROUTINE
+ 
+ SUBROUTINE NLTEloop(Niter, IterLim)
+  integer, intent(in) :: Niter
+  double precision, intent(in) :: IterLim
+  integer :: atomunit = 1, nact
+  integer :: icell
+  integer :: ibin, iaz
+  character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+
+  
+
   !! --------------------- NLTE--------------------------------- !!
   !! For NLTE do not forget ->
   !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
@@ -672,15 +686,6 @@ MODULE AtomicTransfer
  do nact=1,atmos%Nactiveatoms
   CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
  end do
-
-  write(*,*) "Computing emission flux map..."
-  !Use converged NLTEOpac
-  do ibin=1,RT_n_incl
-     do iaz=1,RT_n_az
-       CALL EMISSION_LINE_MAP(ibin,iaz)
-     end do
-  end do
-  CALL WRITE_FLUX()
 
  
  RETURN
