@@ -24,8 +24,8 @@
 
 MODULE AtomicTransfer
 
- use metal, only                        : Background, BackgroundContinua, BackgroundLines,& 
- 										  Metal_bb, MetalZeeman_bb, LTE_bb_opac
+ use metal, only                        : Background, BackgroundContinua, BackgroundLines
+ use Profiles
  use spectrum_type
  use atmos_type
  use readatom
@@ -35,7 +35,7 @@ MODULE AtomicTransfer
  use solvene
  use statequil_atoms
  use writeatom
- use simple_models, only 				: magneto_accretion_model
+ use simple_models, only 				: magneto_accretion_model, uniform_law_model
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -504,7 +504,6 @@ MODULE AtomicTransfer
      enddo !i
      !$omp end do
      !$omp end parallel
-                write(*,*) id, i,j
   end if
 
   write(*,*) " -> Adding stellar flux"
@@ -538,7 +537,7 @@ MODULE AtomicTransfer
 
 #include "sprng_f.h"
 
-  LTE_bb_opac => metal_bb
+  Profile => IProfile
   optical_length_tot => atom_optical_length_tot
   if (.not.associated(optical_length_tot)) then
    write(*,*) "pointer optical_length_tot not associated"
@@ -557,6 +556,7 @@ MODULE AtomicTransfer
   !move elsewhere, in the model reading/definition?
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()  
+  !CALL uniform_law_model()
 !! --------------------------------------------------------- !!
 
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
@@ -674,6 +674,8 @@ MODULE AtomicTransfer
   integer :: icell
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+  character(len=20) :: Solution !iterate from the starting guess
+
 
   
 
@@ -737,21 +739,23 @@ MODULE AtomicTransfer
    character(len=*), intent(inout) :: Solution
    
 !     if (.not.atmos%magnetized) then
-!      LTE_bb_opac => Metal_bb
+!      Profile => IProfile
 !      RETURN
 !     end if
   
     if (SOLUTION=="FIELD_FREE") then
-      if (associated(LTE_bb_opac)) LTE_bb_opac => NULL()
-      LTE_bb_opac => Metal_bb
+      if (associated(Profile)) Profile => NULL()
+      Profile => Iprofile
       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
       if (allocated(NLTEspec%AtomOpac%epsilon_p)) deallocate(NLTEspec%AtomOpac%epsilon_p)
       if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
       if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
       												NLTEspec%StokesU)
-    else if (SOLUTION=="FULL_STOKES") then
-      if (associated(LTE_bb_opac)) LTE_bb_opac => NULL()
-      LTE_bb_opac => MetalZeeman_bb
+      												
+      SOLUTION = "FULL_STOKES" !For next call after NLTE loop
+    else if (SOLUTION=="FULL_STOKES") then !Solution unchanged here
+      if (associated(Profile)) Profile => NULL()
+      Profile => Zprofile
       !allocate space for Zeeman polarisation
       !only LTE for now
        if (.not.allocated(NLTEspec%StokesQ)) & !all allocated, but dangerous ?
