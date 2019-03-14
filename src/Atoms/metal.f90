@@ -18,6 +18,7 @@ MODULE metal
  use spectrum_type, only			 : NLTEspec, initAtomOpac
  use hydrogen_opacities
  use voigtfunctions, only 			 : Voigt
+ use Profiles, only					 : Profile, Profile_lambda
  use broad, only 					 : Damping
  use thomson_scattering
  use Rayleigh_scattering
@@ -31,8 +32,6 @@ MODULE metal
  use constantes, only				 : tiny_dp, huge_dp
 
  IMPLICIT NONE
-
- PROCEDURE(metal_bb), pointer :: LTE_bb_opac => null()
 
  CONTAINS
 
@@ -163,8 +162,82 @@ MODULE metal
  RETURN
  END SUBROUTINE Metal_bf
 
-
  SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
+  ! Computes the emissivity and extinction of passive lines.
+  ! i.e., Atoms with detailed atomic structures read but
+  ! not treated in NLTE.
+  ! Because damping is wavelength dependent and depend only on
+  ! the grid (cell) points, here, if line%damping_initialized
+  ! do not CALL Damping()
+  ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
+  ! cell point we are computing the opacities.
+  ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
+  integer 													:: kr, m, i, j
+  integer, intent(in) 							            :: icell, id
+  double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+                                				               x1,y1,z1, &      ! velocity field and magnetic field
+                                				               l !physical length of the cell
+  character(len=20)							                :: VoigtMethod = "HUMLICEK"
+  double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phip, &
+ 															   Vij, vv
+  double precision 											:: twohnu3_c2, hc, fourPI, &
+      														   hc_4PI, gij
+  integer													:: Nred, Nblue
+  type (AtomicLine)										    :: line
+  type (AtomType)											:: atom
+
+  hc = HPLANCK * CLIGHT
+  fourPI = 4.*PI
+  hc_4PI = hc/fourPI
+
+
+  do m=1,atmos%Npassiveatoms
+   atom = atmos%PassiveAtoms(m)%ptr_atom
+    do kr=1,atom%Nline ! for this atom go over all transitions
+                       ! bound-bound
+     line = atom%lines(kr)
+     i = line%i; j = line%j
+     Nred = line%Nred; Nblue = line%Nblue
+
+!     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
+     ! -> prevents dividing by zero
+     ! even if lcompute_atomRT(icell) it is still possible to not have a transition
+     ! between the levels i and j, but not for the others.
+     if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
+       write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
+       write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+       write(*,*) "skipping this level"
+      CYCLE
+     end if
+
+     phi = 0d0
+     phip = 0d0
+
+     gij = line%Bji / line%Bij
+     twohnu3_c2 = line%Aji / line%Bji
+     
+     if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
+     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phip)
+
+     !Sum up all contributions for this line with the other
+
+     Vij(Nblue:Nred) = &
+      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * atom%vbroad(icell))
+      
+     NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
+     		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+       		Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
+       		
+     NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
+     		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+       		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
+
+    end do !end loop on lines for this atom
+  end do !end loop over Natom
+
+ RETURN
+ END SUBROUTINE Metal_bb
+ SUBROUTINE Metal_bb_old (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
   ! not treated in NLTE.
@@ -251,6 +324,9 @@ MODULE metal
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
      
+     !if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
+     !CALL Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phip)
+     
      if (line%voigt) then
       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
       CALL Damping(icell, atom, kr, line%adamp)
@@ -292,7 +368,7 @@ MODULE metal
   end do !end loop over Natom
 
  RETURN
- END SUBROUTINE Metal_bb
+ END SUBROUTINE Metal_bb_old
  
  SUBROUTINE MetalZeeman_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer 													:: kr, m, i, j, NrecStokes
@@ -305,11 +381,13 @@ MODULE metal
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
-  integer, parameter										:: NvspaceMax = 101
-  double precision, dimension(NvspaceMax)					:: omegav, omegaB, gamma, chi
-  integer													:: Nvspace, nv, Nred, Nblue, nc, Nzc
+  integer, parameter										:: NvspaceMax = 101, NbspaceMax=15
+  double precision, dimension(NvspaceMax)					:: omegav
+  double precision, dimension(NbspaceMax)					:: omegaB, gamma, chi
+  integer													:: Nvspace, nv, Nred, Nblue, nc, &
+  															   Nbspace, nb, Nzc
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, dlamB, b0, b1,dB,Bmod
+  															   v0, v1, dv, dlamB, b0, b1,g1,c1,dB
   type (AtomicLine)										    :: line
   type (AtomType)											:: atom
 
@@ -328,9 +406,9 @@ MODULE metal
 
 
   NLTEspec%S_QUV = 0d0
-  b0 = B_project(icell,x,y,z,u,v,w)
-  omegaB(1) = 0
-
+  b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
+  omegaB(1) = b0
+  gamma(1) = g1; chi(1)=c1
 
   do m=1,atmos%Npassiveatoms
    atom = atmos%PassiveAtoms(m)%ptr_atom
@@ -347,22 +425,24 @@ MODULE metal
       yphi=y+delta_vol_phi*v
       zphi=z+delta_vol_phi*w
       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-      !write(*,*) icell, omegav(nv)/1d3
      end do 
     end if
     if (.not.lvoronoi) then
-     b1 = B_project(icell,x1,y1,z1,u,v,w)
-     if (lstatic) Nvspace = 10
-     omegaB(Nvspace) = b1 !use the same as velcocity
-     do nv=2,Nvspace-1
-      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-      xphi=x+delta_vol_phi*u
-      yphi=y+delta_vol_phi*v
-      zphi=z+delta_vol_phi*w
-      omegaB(nv) = B_project(icell,xphi,yphi,zphi,u,v,w)
-     end do      
+      b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
+      Nbspace = NbspaceMax
+!       Nbspace = max(2,nint(20*dB/line%atom%vbroad(icell)))
+!       Nbspace = min(Nbspace,NbspaceMax)
+      omegaB(Nbspace) = b1
+      gamma(Nbspace) = g1; chi(Nbspace)=c1
+      do nv=2,Nbspace-1
+       delta_vol_phi = (real(nv,kind=dp))/(real(Nbspace,kind=dp)) * l
+       xphi=x+delta_vol_phi*u
+       yphi=y+delta_vol_phi*v
+       zphi=z+delta_vol_phi*w
+       omegaB(nv) = B_project(icell,xphi,yphi,zphi,u,v,w,g1,c1)
+       gamma(nv) = g1; chi(nv)=c1
+      end do      
     end if
-
     do kr=1,atom%Nline ! for this atom go over all transitions
                        ! bound-bound
      line = atom%lines(kr)
@@ -381,6 +461,7 @@ MODULE metal
        write(*,*) "skipping this level"
       CYCLE
      end if
+
 
      phi = 0d0
      phip = 0d0
@@ -401,22 +482,23 @@ MODULE metal
                         
         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
                                        omegav(nv) / atom%vbroad(icell)
-
-        if (Nzc == 0) & !line not polarizable or weak field
+         do nb=1,Nbspace
+          if (Nzc == 0) & !line not polarizable or weak field
              phi(Nblue:Nred) = phi(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-                  			phip, VoigtMethod) / Nvspace !1 if no vel or Voronoi
-        do nc=1,Nzc
-             vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nv) / atom%vbroad(icell) * &
+                  			phip, VoigtMethod) / Nvspace / Nbspace
+          do nc=1,Nzc
+             vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / atom%vbroad(icell) * &
                                   LARMOR/CLIGHT * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
              phi(Nblue:Nred) = phi(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-                  			phip, VoigtMethod) / Nvspace !1 if no vel or Voronoi
-             phiPol(Nblue:Nred) = phiPol(Nblue:Nred) + phip(Nblue:Nred)/Nvspace
+                  			phip, VoigtMethod) / Nvspace / Nbspace!1 if no vel or Voronoi
+             phiPol(Nblue:Nred) = phiPol(Nblue:Nred) + phip(Nblue:Nred)/Nvspace/Nbspace
              !do something here
              CALL Error("Full profile not implemented")
-        end do       
-       end do
+          end do !components 
+        end do !magnetic field     
+       end do !velocity
 
      !Sum up all contributions for this line with the other
 
@@ -436,8 +518,7 @@ MODULE metal
        !gamma(1) = !Bl = B*cos(gamma)
        !chi(1) = 0d0
        !derivative after, because we want dI/dlambda, I = exp(-tau)*(1.-exp(-dtau))*S
-       dlamB = -line%zm%shift(1) * omegaB(1)*u * LARMOR * (line%lambda0)**2 * NM_TO_M / CLIGHT
-       dlamB = -line%zm%shift(1) * LARMOR * (line%lambda0)**2 * NM_TO_M / CLIGHT
+       dlamB = -line%zm%shift(1) * 1*LARMOR * (line%lambda0)**2 * NM_TO_M / CLIGHT
         NLTEspec%S_QUV(3,line%Nblue:line%Nred) = &
          NLTEspec%S_QUV(3,line%Nblue:line%Nred) + dlamB
       else
@@ -451,6 +532,8 @@ MODULE metal
  RETURN
  END SUBROUTINE MetalZeeman_bb
 
+ !--> I should include the zeeman lines in phi, because it plays a role in opacity
+ !and tau
  SUBROUTINE Metal_bb_lambda (id, la, icell,x,y,z,x1,y1,z1,u,v,w,l)
   integer 													:: kr, m, i, j, NrecStokes
   integer, intent(in) 							            :: icell, la, id
@@ -619,8 +702,7 @@ MODULE metal
   if (.not.atmos%lcompute_atomRT(icell)) RETURN 
 
    if (atmos%Npassiveatoms == 0) RETURN
-   !CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
-   CALL LTE_bb_opac(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
+   CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
 
 
  RETURN
@@ -717,8 +799,7 @@ MODULE metal
    NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
 
    ! we already RETURNs if no passive transitions (H included)
-   !CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
-   CALL LTE_bb_opac(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
+   CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
 
 
  RETURN
