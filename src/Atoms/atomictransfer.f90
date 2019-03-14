@@ -24,7 +24,8 @@
 
 MODULE AtomicTransfer
 
- use metal, only                        : Background, BackgroundContinua, BackgroundLines
+ use metal, only                        : Background, BackgroundContinua, BackgroundLines,& 
+ 										  Metal_bb, MetalZeeman_bb, LTE_bb_opac
  use spectrum_type
  use atmos_type
  use readatom
@@ -78,6 +79,7 @@ MODULE AtomicTransfer
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
+  double precision, dimension(3,NLTEspec%Nwaves) :: Ipol
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau !used only in molecular line to have emission for one
                                   !  half of the disk only. Note used in AL-RT.
@@ -98,7 +100,11 @@ MODULE AtomicTransfer
   ! Therefore it is needed to reset it.
   NLTEspec%I(:,iray,id) = 0d0
   NLTEspec%Ic(:,iray,id) = 0d0
-
+  if (atmos%magnetized .and. PRT_SOLUTION /= "FIELD_FREE") then
+    NLTEspec%StokesV(:,iray,id) = 0d0
+    NLTEspec%StokesQ(:,iray,id) = 0d0
+    NLTEspec%StokesU(:,iray,id) = 0d0
+  end if
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
   ! -------------------------------------------------------------- !
@@ -145,7 +151,6 @@ MODULE AtomicTransfer
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
-
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
@@ -154,7 +159,6 @@ MODULE AtomicTransfer
       dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
-
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
                   NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / &
@@ -200,8 +204,13 @@ MODULE AtomicTransfer
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dtau_c*Snu_c*dexp(-tau_c)
-    NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
-                             exp(-tau) * (1.0_dp - exp(-dtau)) * NLTEspec%S_QUV(3,:)
+      if (atmos%magnetized.and.PRT_SOLUTION /= "FIELD_FREE") then !force weak field, because it is a flag line dependent
+      							 !so don"t know here... Because it allows to have separate
+      							 !Solution, but maybe better to have the same for all...
+        CALL cent_deriv(NLTEspec%Nwaves,NLTEspec%lambda,&
+              NLTEspec%I(:,iray,id)*NLTEspec%S_QUV(3,:),Ipol(3,:)) 
+         NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) +  Ipol(3,:)
+      end if
 
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
@@ -236,7 +245,7 @@ MODULE AtomicTransfer
    integer, parameter :: maxSubPixels = 32
    double precision :: x0,y0,z0,u0,v0,w0
    double precision, dimension(NLTEspec%Nwaves) :: Iold, nu, I0, I0c
-   double precision, dimension(:,:), allocatable :: QUV
+   double precision, dimension(3,NLTEspec%Nwaves) :: QUV
    double precision, dimension(3) :: sdx, sdy
    double precision:: npix2, diff
    double precision, parameter :: precision = 1.e-2
@@ -247,11 +256,8 @@ MODULE AtomicTransfer
    ! reset local Fluxes
    I0c = 0d0
    I0 = 0d0
-   if (atmos%magnetized) then 
-    if (.not.allocated(QUV)) allocate(QUV(3,NLTEspec%Nwaves)) 
-    !anyway set to 0 each time we enter the routine
-    QUV(:,:) = 0d0
-   end if
+   if (atmos%magnetized .and. PRT_SOLUTION /= "FIELD_FREE") QUV(:,:) = 0d0
+
    ! Ray tracing : on se propage dans l'autre sens
    u0 = -u ; v0 = -v ; w0 = -w
 
@@ -264,6 +270,7 @@ MODULE AtomicTransfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
+     if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") QUV = 0d0
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -290,7 +297,8 @@ MODULE AtomicTransfer
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
-             if (atmos%magnetized) QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id)
+             if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") &
+             	QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id)
            !else !Outside the grid, no radiation flux
            endif
         end do !j
@@ -298,6 +306,7 @@ MODULE AtomicTransfer
 
      I0 = I0 / npix2
      I0c = I0c / npix2
+     if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") QUV = QUV / npix2
 
      if (iter < n_iter_min) then
         ! On itere par defaut
@@ -326,7 +335,7 @@ MODULE AtomicTransfer
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
-  if (atmos%magnetized) then 
+  if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") then 
    QUV(1,:) = QUV(1,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
    QUV(2,:) = QUV(2,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
    QUV(3,:) = QUV(3,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
@@ -339,7 +348,11 @@ MODULE AtomicTransfer
   else
     NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
     NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
-    if (atmos%magnetized) NLTEspec%F_QUV(:,:,ipix,jpix,ibin,iaz) = QUV(:,:)
+    if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") then 
+     NLTEspec%F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) !U
+     NLTEspec%F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) !Q
+     NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) !V
+    end if
   end if
 
   RETURN
@@ -483,7 +496,6 @@ MODULE AtomicTransfer
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
-           !write(*,*) i,j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
@@ -492,7 +504,7 @@ MODULE AtomicTransfer
      enddo !i
      !$omp end do
      !$omp end parallel
-
+                write(*,*) id, i,j
   end if
 
   write(*,*) " -> Adding stellar flux"
@@ -526,6 +538,7 @@ MODULE AtomicTransfer
 
 #include "sprng_f.h"
 
+  LTE_bb_opac => metal_bb
   optical_length_tot => atom_optical_length_tot
   if (.not.associated(optical_length_tot)) then
    write(*,*) "pointer optical_length_tot not associated"
@@ -545,6 +558,7 @@ MODULE AtomicTransfer
 !! ----------------------- Read Model ---------------------- !!
   if (.not.lpluto_file) CALL magneto_accretion_model()  
 !! --------------------------------------------------------- !!
+
   !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
   ! on the whole grid space.
   ! The following routines have to be invoked in the right order !
@@ -598,6 +612,7 @@ MODULE AtomicTransfer
 !   end do
   CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
+  if (atmos%magnetized) CALL adjustStokesMode(PRT_SOLUTION)
   if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.
                                          ! Background continua (=ETL) are kept in memory.
@@ -631,7 +646,7 @@ MODULE AtomicTransfer
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
   !start transfer
   if (atmos%Nactiveatoms > 0) CALL NLTEloop(0, 1d-4)
-  
+  !if (atmos%magnetized) CALL adjustStokesMode("FULL_STOKES")
   write(*,*) "Computing emission flux map..."
   !Use converged NLTEOpac
   do ibin=1,RT_n_incl
@@ -704,6 +719,62 @@ MODULE AtomicTransfer
  
  RETURN
  END SUBROUTINE NLTEloop
+ 
+ SUBROUTINE adjustStokesMode(Solution)
+ !
+ ! Depending of the Solution of the polarized transfer equation
+ ! Allocate Zeeman Opac and Stokes arrays. 
+ ! if Field_Free for instance, nothing is allocated
+ ! metal_bb, and in the futur NLTEOpac, point to the unmagnetic routine
+ ! if for the image Solution=FULL_STOKES, arrays are allocated and intiialized
+ ! to perform full polarised images.
+ ! If First solution=FULL_STOKES, and images = FULL_STOKES, the arrays
+ ! are just set to 0. They are deallocated if FIELD_FREE for image.
+ ! if two times FIELD_FREE, nothing change
+ ! SETTING field_free is equivalent to unpolarised transfer or not setting atmos%magnetized
+ ! However it allows to perform polarised tranfer at the end if desired, which is not
+ ! possible simply re seeting atmos%magnetized to true.
+   character(len=*), intent(inout) :: Solution
+   
+!     if (.not.atmos%magnetized) then
+!      LTE_bb_opac => Metal_bb
+!      RETURN
+!     end if
+  
+    if (SOLUTION=="FIELD_FREE") then
+      if (associated(LTE_bb_opac)) LTE_bb_opac => NULL()
+      LTE_bb_opac => Metal_bb
+      if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
+      if (allocated(NLTEspec%AtomOpac%epsilon_p)) deallocate(NLTEspec%AtomOpac%epsilon_p)
+      if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
+      if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
+      												NLTEspec%StokesU)
+    else if (SOLUTION=="FULL_STOKES") then
+      if (associated(LTE_bb_opac)) LTE_bb_opac => NULL()
+      LTE_bb_opac => MetalZeeman_bb
+      !allocate space for Zeeman polarisation
+      !only LTE for now
+       if (.not.allocated(NLTEspec%StokesQ)) & !all allocated, but dangerous ?
+            allocate(NLTEspec%StokesQ(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC), & 
+             NLTEspec%StokesU(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC), &
+             NLTEspec%StokesV(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC), &
+             NLTEspec%S_QUV(3,NLTEspec%Nwaves))
+      NLTEspec%StokesQ=0d0
+      NLTEspec%StokesU=0d0
+      NLTEspec%StokesV=0d0
+      if (.not.allocated(NLTEspec%F_QUV)) &
+      	allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
+      NLTEspec%F_QUV = 0d0
+      if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
+      	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%epsilon_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        !init in initatomopac()
+      end if
+    else
+     CALL ERROR("Error in adjust StokesMode")
+    end if
+ RETURN
+ END SUBROUTINE adjustStokesMode
 
  SUBROUTINE reallocate_mcfost_vars()
   !--> should move them to init_atomic_atmos ? or elsewhere
