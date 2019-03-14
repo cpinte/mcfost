@@ -531,20 +531,24 @@ MODULE atmos_type
    RETURN
    END SUBROUTINE init_magnetic_field
    
-   FUNCTION B_project(icell, x,y,z,u,v,w) result(bproj)
+   FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(bproj)
    ! ------------------------------------------- !
-   ! Projection of the magnetic field vector in
-   ! one point of the cell icell
+   ! Returned the module of the magnetic field at
+   ! one point of the cell icell and the angles
+   ! gamma and chi, the angle between B and the
+   ! line of sight and the azimuth respectively.
    ! ------------------------------------------- !
     integer :: icell
     double precision :: x, y, z, u, v, w, bproj
     double precision :: r, bx, by, bz
+    double precision, intent(inout) :: gamma, chi
     
-     bproj = 0d0
-    
+     bproj = 0d0 !Module of B.
+     gamma = 0d0; chi = 0d0
      if (lVoronoi) then !Bxyz in cartesian
-       bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
-     					   atmos%Bxyz(icell,3) * w
+       !bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
+       !					   atmos%Bxyz(icell,3) * w
+       bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
      else
       if (lmagnetoaccr) then
        r = dsqrt(x**2 + y**2)
@@ -556,9 +560,12 @@ MODULE atmos_type
        by = y/r * atmos%Bxyz(icell,1)
        bz = atmos%Bxyz(icell,2)
        if (z<0) bz = -bz
-       bproj = bx * u + by * v * bz * w
+       !module
+       bproj = dsqrt(bx**2 + by**2 +bz**2)!bx * u + by * v * bz * w
       else
-       CALL Error("Geometry for magnetic field projection unkown")  
+       !temporary
+        bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+       !CALL Error("Geometry for magnetic field projection unkown")  
       end if     
      end if
     
