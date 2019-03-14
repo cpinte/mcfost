@@ -64,9 +64,9 @@
 MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
- use atom_type, only : AtomType, ATOM_ID_WIDTH
+ use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol
  use readatom,only : path_to_atoms
- use atmos_type, only : atomZnumber, atmos, PTrowcol, Hydrogen, Helium
+ use atmos_type, only : atomZnumber, atmos, Hydrogen, Helium
  use getline
 
  IMPLICIT NONE

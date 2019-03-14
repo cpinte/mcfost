@@ -39,6 +39,7 @@ MODULE atom_type
    !!proc what are the active transitions involved in the Gamma matrix.
    double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
+   integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
    type (ZeemanType) :: zm
   END TYPE AtomicLine
@@ -264,8 +265,8 @@ MODULE atom_type
 
   S = (real(S,kind=8) - 1.)/2.
   L = getOrbital(orbit)
-  J = (g-1.)/2.
-  if (J.gt.(L+S)) then
+  J = L + S!(g-1.)/2.
+  if (J>(L+S)) then
    determined = .false.
   end if
 
@@ -296,5 +297,54 @@ MODULE atom_type
    !WK = wKul**2
   RETURN
   END FUNCTION wKul
+
+   SUBROUTINE PTrowcol(Z, row, col)
+   ! ---------------------------------------------------
+   ! Position in the periodic table of an atom according
+   ! to this Z number.
+   ! min row is 1, max row is 87 Francium
+   ! No special ceses yet for Lanthanides and Actinides
+   ! min col is 1, max col is 18
+   ! beware He, is on the 18 column, because they are 16
+   ! empty columns between H and He
+   ! ---------------------------------------------------
+
+   integer i
+   integer, intent(in) :: Z
+   integer, intent(out) :: row, col
+   integer :: istart(7)
+
+   row = 0
+   col = 0
+
+   istart = (/1, 3, 11, 19, 37, 55, 87/) !first Z of each rows
+
+   ! -- find row
+   do i=1,6
+    if ((Z .ge. istart(i)) .and. (Z .lt. istart(i + 1))) then
+     ! we are on the row istart(i)
+     row=i
+     exit
+    end if
+   end do
+   ! find column on the row
+   col = Z - istart(i) + 1
+
+   ! for relative position just comment out the following lines
+   ! or take col=col-10 (or-18 for He) for these cases.
+
+   ! special case of Z=2 for Helium because there are 16
+   ! empty columns between Hydrogen and Helium
+   if (Z.eq.2) then
+    col = col + 16
+   ! ten empty lines between Be and B
+   ! ten empty lines between Mg and Al
+   else if (((istart(i).eq.3).or.(istart(i)).eq.11).and.&
+      (Z.gt.istart(i)+1)) then
+    !row = istart(i)
+    col = col+10
+   end if
+  RETURN
+  END SUBROUTINE PTrowcol
 
 END MODULE atom_type
