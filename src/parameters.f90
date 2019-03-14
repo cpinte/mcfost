@@ -59,8 +59,10 @@ module parametres
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
        lcontrib_function, lmagnetoaccr
+  !Magnetic Polarized RT equation
+  character(len=20) :: prt_solution
   ! PLUTO MHD
-  logical :: lpluto_file
+  logical :: lpluto_file, lmagnetic_field
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet

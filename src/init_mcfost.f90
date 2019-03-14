@@ -57,6 +57,8 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  !Polarised RTE in presence of magnetic field
+  prt_solution = "FIELD_FREE"
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
   lstore_opac = .false.
@@ -66,6 +68,7 @@ subroutine set_default_variables()
   lcontrib_function = .false.
   lmagnetoaccr = .false.
   lpluto_file = .false.
+  lmagnetic_field = .true.
   ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -561,7 +564,12 @@ subroutine initialisation_mcfost()
         lemission_atom=.true.
      case("-static_model")
         i_arg = i_arg + 1
-        lstatic = .true.
+        lstatic = .true.!futur deprecation
+     case("-prt_solution")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        i_arg = i_arg + 1
+        read(s,*) prt_solution
      case("-store_atom_opac")
         i_arg = i_arg + 1
         lstore_opac = .true.
@@ -670,6 +678,9 @@ subroutine initialisation_mcfost()
         !density_files(1) = s
         !i_arg = i_arg + 1
         !!DOing nothing special now
+     case("-no_magnetic_field")
+        i_arg = i_arg + 1
+        lmagnetic_field=.false.
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1381,6 +1392,7 @@ subroutine display_help()
   write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) "        : -pluto : reads a pluto file (implementing)"
+  write(*,*) "        : -no_magnetic_field : Force magnetic field to be zero."
 
 
   write(*,*) " "
@@ -1494,6 +1506,8 @@ subroutine display_help()
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
+  write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
+  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE (DEFAULT)"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
