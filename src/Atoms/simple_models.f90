@@ -267,11 +267,19 @@ MODULE simple_models
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
   ! ----------------------------------------------------------- !
    CALL init_atomic_atmos()!(n_cells)
+   atmos%magnetized = lmagnetic_field
+   if (atmos%magnetized) then 
+    CALL init_magnetic_field()
+   end if
+   atmos%Bxyz(:,:) = 3d3 * 1d-4 !T
+   atmos%B_char = maxval(atmos%Bxyz)
+   atmos%nHtot = 1e18
+   atmos%T = 3000d0
 
    !idk = 10
-!    atmos%nHtot =  2.27414200581936d16
-!    atmos%T = 45420d0
-!    atmos%ne = 2.523785d16
+    !atmos%nHtot =  2.27414200581936d16
+    !atmos%T = 45420d0
+    !atmos%ne = 2.523785d16
 
    !idk = 75
 !   atmos%T=7590d0
@@ -279,9 +287,9 @@ MODULE simple_models
 !   atmos%nHtot = 1.259814d23
 
     !idk = 81   
-    atmos%T=9400d0
-    atmos%ne = 3.831726d21
-    atmos%nHtot = 1.326625d23
+    !atmos%T=9400d0
+    !atmos%ne = 3.831726d21
+    !atmos%nHtot = 1.326625d23
 
     !idk = 0 
 !     atmos%T = 100000d0
@@ -290,8 +298,8 @@ MODULE simple_models
 
    lstatic = .true. !force to be static for this case
    !tmos%vturb = 9.506225d3 !m/s !idk=10
-   !atmos%vturb = 1.696164d3 !idk = 75
-   atmos%vturb = 1.806787d3 !idk=81
+   atmos%vturb = 1.696164d3 !idk = 75
+   !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
    atmos%v_char = maxval(atmos%vturb)
    CALL define_atomRT_domain()
