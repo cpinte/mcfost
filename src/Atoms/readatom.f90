@@ -165,6 +165,7 @@ MODULE readatom
            ! has "additional geff", but its not.
            !
      !futur implement: line%name
+     atom%lines(kr)%ZeemanPattern = 0!futur implement!depends on the magnetic field
      write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
@@ -180,6 +181,8 @@ MODULE readatom
        atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
        atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
        atom%lines(kr)%g_Lande_eff, atom%lines(kr)%glande_j, atom%lines(kr)%glande_i 
+       !if glande_eff given, we need to read a value for gi and gj even if it is 0.
+       !if glane is <= -99, gi, and gj and geff are computed eventually.
        !landé upper / lower levels in case the coupling scheme is not accurate
      else
        write(*,*) inputline
@@ -213,6 +216,7 @@ MODULE readatom
        atom%Lorbit(atom%lines(kr)%i),&
        atom%qJ(atom%lines(kr)%i), &
        determined(atom%lines(kr)%i))
+       parse_label(atom%lines(kr)%i) = .true.
       end if
       if (.not.parse_label(atom%lines(kr)%j)) then
       CALL determinate(atom%label(atom%lines(kr)%j),&
@@ -221,6 +225,7 @@ MODULE readatom
        atom%Lorbit(atom%lines(kr)%j),&
        atom%qJ(atom%lines(kr)%j), &
        determined(atom%lines(kr)%j))
+       parse_label(atom%lines(kr)%i) = .true. !even if determined is false.
       end if
       ! not that if J > L+S determined is FALSE
       ! just like if the term could not be parsed
@@ -235,10 +240,12 @@ MODULE readatom
       !end if
       !write(*,'("S="(1F2.2)", L="(1I2)", J="(1F2.2))') &
       !  atom%qS(i), atom%Lorbit(i), atom%qJ(i)
-
-      if (((determined(atom%lines(kr)%j)).and.&
-          (determined(atom%lines(kr)%i))).and. &
-           atom%lines(kr)%g_Lande_eff <= -99) then
+      !!      			
+      !If Selection rule is OK and g_lande_eff not given from file and atomic label
+      !correctly determined
+      if ((abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.) .and. &
+           (atom%lines(kr)%g_Lande_eff <= -99) .and. &
+           (determined(atom%lines(kr)%j)) .and. (determined(atom%lines(kr)%i))) then !
        ! do not compute geff if term is not
        ! determined or if the geff is read from file
        ! ie if g_lande_eff > -99
@@ -253,8 +260,19 @@ MODULE readatom
        !!stop
        !write(*,*) "geff = ", atom%lines(kr)%g_lande_eff
       end if
-      !                  .and.atom%lines(kr)%g_lande_eff > -99
-      if (atmos%magnetized) CALL ZeemanMultiplet(atom%lines(kr))
+      !!atom%lines(kr)%has_alignement = .false. !different criterion than polarizable
+      atom%lines(kr)%polarizable = .false. !check also deltaJ
+      !write(*,*) "dJ=", abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j))
+      atom%lines(kr)%polarizable = (atmos%magnetized) .and. &
+      								(atom%lines(kr)%g_lande_eff > -99) .and. &
+      			(abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
+       !not need to be determined here. Because geff can be read from file and be > -99
+       !even if the levels are not determined. In this case deltaJ = 0 (-99+99).
+       !Exception if one of the level is determined but not the other, in this case
+       !line is assumed to be not polarizable and you have to chandle that in the atomic file.
+       ! Otherwise I assume you know what you do by providing a landé factor to a line.
+       if (atom%lines(kr)%polarizable) CALL ZeemanMultiplet(atom%lines(kr))
+
       ! oscillator strength saved
       atom%lines(kr)%fosc = f
       lambdaji = (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i))
@@ -355,31 +373,31 @@ MODULE readatom
       atom%lines(kr)%symmetric = .true.
       !write(*,*) "Symmetric line profile"
      end if
-     atom%lines(kr)%polarizable = .false.
 
-     if (atom%active) then !Should do it for passive atoms too
-     if (atmos%Magnetized) then !.or.line%scattpol ...
-      if (atom%lines(kr)%g_Lande_eff.gt.-99 .or. &
-          determined(atom%lines(kr)%i) .and. &
-          determined(atom%lines(kr)%j).and. &
-          abs(atom%qJ(atom%lines(kr)%i) - &
-           atom%qJ(atom%lines(kr)%j)).le.1.) then
 
-!        if (atom%lines(kr)%Ncomponent.gt.1) then
-!            !write(*,*) &
-!            !"Cannot treat composite line with polar"
-!            atom%lines(kr)%polarizable=.false.
-!        else
-         atom%lines(kr)%polarizable=.true.
-!        end if
-      end if
-     else
-      !write(*,*) "Treating line ",atom%lines(kr)%j,&
-      !    "->",atom%lines(kr)%i,&
-      !    " without polarization"
-      atom%lines(kr)%polarizable=.false.
-     end if !not mag
-    end if ! end loop over active b-b transitions of atom
+!      if (atom%active) then !Should do it for passive atoms too
+!      if (atmos%Magnetized) then !.or.line%scattpol ...
+!       if (atom%lines(kr)%g_Lande_eff.gt.-99 .or. &
+!           determined(atom%lines(kr)%i) .and. &
+!           determined(atom%lines(kr)%j).and. &
+!           abs(atom%qJ(atom%lines(kr)%i) - &
+!            atom%qJ(atom%lines(kr)%j)).le.1.) then
+! 
+! !        if (atom%lines(kr)%Ncomponent.gt.1) then
+! !            !write(*,*) &
+! !            !"Cannot treat composite line with polar"
+! !            atom%lines(kr)%polarizable=.false.
+! !        else
+!          atom%lines(kr)%polarizable=.true.
+! !        end if
+!       end if
+!      else
+!       !write(*,*) "Treating line ",atom%lines(kr)%j,&
+!       !    "->",atom%lines(kr)%i,&
+!       !    " without polarization"
+!       atom%lines(kr)%polarizable=.false.
+!      end if !not mag
+!     end if ! end loop over active b-b transitions of atom
    end do !end loop over bound-bound transitions
 
     ! ----------------------------------------- !

@@ -3,6 +3,7 @@ MODULE zeeman
  use atom_type, only : AtomType, ZeemanType, determinate, getorbital, AtomicLine
  use atmos_type, only : atmos
  use messages
+ use parametres
 
  IMPLICIT NONE
  CONTAINS
@@ -43,6 +44,8 @@ MODULE zeeman
    atom%lines(kr)%g_lande_eff = g
    atom%lines(kr)%glande_i = gi
    atom%lines(kr)%glande_j = gj
+   if (atmos%magnetized) & !otherwise we don't care seeing that
+   	write(*,*) " -> line gi = ", gi, " line gj = ", gj," line geff = ", g
 
  RETURN
  END SUBROUTINE Lande_eff
@@ -55,37 +58,39 @@ MODULE zeeman
 
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
   type(AtomicLine), intent(inout) :: line  
+  
+  
+!    if (line%g_Lande_eff <= -99) then
+!     write(*,*) "Should not happen anymore"
+!     CALL Warning("  -> Landé factor not parsed for this line")
+!     !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
+!     RETURN
+!    end if
 
-  if (atmos%B_SOLUTION == "WEAK_FIELD") then
-   if (line%g_Lande_eff <= -99) then
-    !CALL Warning("  -> Landé factor not parsed for this line")
-    !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
-    RETURN
-   end if
+  if (line%ZeemanPattern == 0) then !Weak Field
    allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
    
-   line%zm%Ncomponent = 1
-   line%zm%q = 0
-   line%zm%strength(1) = line%g_Lande_eff
-   line%zm%shift = 1d0
+   line%zm%Ncomponent = 0
+   line%zm%q = 1d0
+   line%zm%strength = 1d0 !not used in this case.
+   line%zm%shift = line%zm%q*line%g_lande_eff !unique shift = deltaLamB/B
    
    !The Stokes parameters are only prop to g_lande_eff * dI/dlambda
 
-  else if (atmos%B_SOLUTION == "EFFECTIVE_TRIPLET") then
-   if (line%g_Lande_eff <= -99) then
-    !CALL Warning("  -> Landé factor not parsed for this line")
-    !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
-    RETURN
-   end if
+  else if (line%ZeemanPattern == -1) then
    line%zm%Ncomponent = 3
    line%zm%q = (/-1, 0, 1/)
-   line%zm%strength = 1d0
-   line%zm%shift = line%zm%q * line%g_Lande_eff
+   line%zm%strength = 1d0 !Here all components have the same strength
+   line%zm%shift = line%zm%q * line%g_Lande_eff !same shift
    CALL Error("Effective Zeeman Triplet (EZT) not implemented yet!")   
    write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
    			  " Zeeman components, geff=", line%g_lande_eff
+   			  
+  else if (line%ZeemanPattern == 1) then
+    !Strength relative of all components
+   CALL Error("Full Zeeman components not implemented yet!")
   else
-   CALL Error("Full Zeeman components not implemented yet!")   
+    CALL Error("Zeeman components Recipe unknown!")
   end if
 
  RETURN
