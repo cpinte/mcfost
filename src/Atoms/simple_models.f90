@@ -63,7 +63,7 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .not.(lwrite_model_ascii)
    CALL init_atomic_atmos()
-   atmos%magnetized = .true.
+   atmos%magnetized = lmagnetic_field
    if (atmos%magnetized) then 
     CALL init_magnetic_field()
     atmos%B_char = 3d-2
@@ -192,11 +192,19 @@ MODULE simple_models
 
            end if
            ! Now magnetic field
-             !if (.not.lmagnetoaccr) then ect..
-             atmos%Bxyz(icell,:) = 3d-2 !Tesla
-             BR = Bp * (etoile(1)%r / r)**(3.0) * 3*dsqrt(y)*dsqrt(1.-y**2)
-             Bz = Bp * (etoile(1)%r / r)**(3.0) * (3*(1.-y)-1)
-             if (z<0) Bz = -Bz
+            BR = Bp * (etoile(1)%r / r)**(3.0) * 3*dsqrt(y)*dsqrt(1.-y**2)
+            Bz = Bp * (etoile(1)%r / r)**(3.0) * (3*(1.-y)-1)
+            if (atmos%magnetized) then
+             atmos%Bxyz(icell,1) = BR
+             atmos%Bxyz(icell,2) = Bz
+             atmos%Bxyz(icell,3) = 0d0
+              if (.not.lmagnetoaccr) then !projection on the cell
+               atmos%Bxyz(icell,1) = BR*cos(phi)
+               atmos%Bxyz(icell,2) = BR*sin(phi)
+               atmos%Bxyz(icell,3) = Bz
+               if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
+              end if
+            end if
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
