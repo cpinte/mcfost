@@ -165,7 +165,11 @@ MODULE readatom
            ! has "additional geff", but its not.
            !
      !futur implement: line%name
-     atom%lines(kr)%ZeemanPattern = 0!futur implement!depends on the magnetic field
+     atom%lines(kr)%ZeemanPattern = -1!futur implement!depends on the magnetic field
+     if ((PRT_SOLUTION == "WEAK_FIELD").or. (PRT_SOLUTION=="NO_STOKES").or. &
+       (.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
+     ! -1 = effective triplet, +1
+     
      write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
@@ -271,7 +275,10 @@ MODULE readatom
        !Exception if one of the level is determined but not the other, in this case
        !line is assumed to be not polarizable and you have to chandle that in the atomic file.
        ! Otherwise I assume you know what you do by providing a landé factor to a line.
-       if (atom%lines(kr)%polarizable) CALL ZeemanMultiplet(atom%lines(kr))
+       !In case of PRT but the line is not polarized, set a Zeeman structure with Nc=1,
+       !S=0, q=0, shift=0
+       ! line%ZP = 0 if WEAK_FIEKD solution; otherwise has to be -1, 1 or .not.polarizable
+       if (atom%lines(kr)%ZeemanPattern /= 0) CALL ZeemanMultiplet(atom%lines(kr))
 
       ! oscillator strength saved
       atom%lines(kr)%fosc = f
@@ -537,17 +544,17 @@ MODULE readatom
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
     atom%n = 0d0
-    atom%NLTEpops = .true.
+    atom%NLTEpops = .false. !Zero at first, and if .true. solvene will crash
    else !not active
     if (atom%dataFile.ne."" & !atom%popsinFile.ne.""
        .and. atom%initial_solution &
         .eq. "OLD_POPULATIONS") then
-       atom%NLTEpops = .true.
        write(*,*) "First define a function that writes"
        write(*,*) "populations as fits and read it"
        stop
        allocate(atom%n(atom%Nlevel,atmos%Nspace))
        !CALL readPopulations(atom)
+       atom%NLTEpops = .true.
     else
      atom%NLTEpops=.false.
      atom%n => atom%nstar !initialised to zero

@@ -58,7 +58,7 @@ subroutine set_default_variables()
   lHH30mol = .false.
   lemission_mol=.false.
   !Polarised RTE in presence of magnetic field
-  prt_solution = "FIELD_FREE"
+  prt_solution = "NO_STOKES"
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
   lstore_opac = .false.
@@ -1507,7 +1507,7 @@ subroutine display_help()
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
   write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
-  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE (DEFAULT)"
+  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, WEAK_FIELD, NO_STOKES (DEFAULT)"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
