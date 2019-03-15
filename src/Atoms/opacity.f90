@@ -60,8 +60,7 @@ MODULE Opacity
   type(AtomType), pointer :: aatom
   double precision, parameter :: twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
-  double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2, &
-  	phip, phi
+  double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2, phi
   integer, parameter :: NvspaceMax = 100
   character(len=20) :: VoigtMethod="HUMLICEK"
   integer :: Nvspace, nv
@@ -141,7 +140,6 @@ MODULE Opacity
      	CYCLE
     end if 
     phi = 0d0
-    phip = 0d0
     gij = 0d0
     Vij = 0d0
 !     vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
@@ -150,7 +148,7 @@ MODULE Opacity
     gij = line%Bji / line%Bij
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
-    CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phip)
+    CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi)
 !     if (line%voigt) then
 !       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
 !       CALL Damping(icell, aatom, kr, line%adamp)

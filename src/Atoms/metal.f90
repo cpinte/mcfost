@@ -178,8 +178,7 @@ MODULE metal
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
-  double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, phip, &
- 															   Vij, vv
+  double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
   integer													:: Nred, Nblue
@@ -211,13 +210,15 @@ MODULE metal
      end if
 
      phi = 0d0
-     phip = 0d0
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
      
      if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
-     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phip)
+     !Actually we do not need to know the dispersion profile.
+     !Elements of the Absorption-dispersion matrix and emissivity of Stokes QUV
+     !are stored in NLTEspec%AtomOpac
+     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi)
 
      !Sum up all contributions for this line with the other
 

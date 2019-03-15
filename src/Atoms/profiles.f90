@@ -22,7 +22,7 @@ MODULE PROFILES
  CONTAINS
 
 
- SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, F)
+ SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
@@ -37,7 +37,7 @@ MODULE PROFILES
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: P
-  double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
+  !double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
 
 
   ! v_proj in m/s at point icell
@@ -103,7 +103,7 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE IProfile
  
- SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, F)
+ SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
@@ -119,7 +119,8 @@ MODULE PROFILES
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: P
-  double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
+  !double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
+  double precision, dimension(NLTEspec%Nwaves) 			    :: F
 
 
   NLTEspec%S_QUV = 0d0
@@ -182,7 +183,7 @@ MODULE PROFILES
            CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
            
   Nzc = line%zm%Ncomponent
-  if (.not.line%voigt) then !unpolarised line assumed
+  if (.not.line%voigt) then !unpolarised line assumed even if line%polarizable
       do nv=1, Nvspace
       
          vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
@@ -267,7 +268,7 @@ MODULE PROFILES
 
  !--> I should include the zeeman lines in phi, because it plays a role in opacity
  !and tau, so in the map calculations it might matter. But perhaps negligible
- SUBROUTINE Iprofile_lambda (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, F)
+ SUBROUTINE Iprofile_lambda (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
@@ -276,7 +277,8 @@ MODULE PROFILES
   integer 													:: i, j
   type (AtomicLine), intent(in)								:: line
   double precision, intent(out), dimension(1) :: P
-  double precision, intent(out), dimension(1), optional :: F
+  !double precision, intent(out), dimension(1), optional :: F
+  !double precision, dimension(1) 			    :: F
 
   P(1) = 0d0
 
