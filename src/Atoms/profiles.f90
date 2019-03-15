@@ -117,7 +117,7 @@ MODULE PROFILES
   integer													:: Nvspace, nv, Nred, Nblue, nc, &
   															   Nbspace, nb, Nzc, i, j
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, dlamB, b0, b1,g1,c1,dB
+  															   v0, v1, dv, b0, b1,g1,c1,dB
   double precision, intent(out), dimension(NLTEspec%Nwaves) :: P
   double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
 
@@ -177,32 +177,31 @@ MODULE PROFILES
   Nred = line%Nred; Nblue = line%Nblue
   P = 0d0
   F = 0d0
-  Nzc = 0
 
   vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
            CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
            
-  if (line%polarizable) Nzc = line%zm%Ncomponent
-  if (.not.line%voigt) then !futur use weak field only when line%Gauss
+  Nzc = line%zm%Ncomponent
+  if (.not.line%voigt) then !unpolarised line assumed
       do nv=1, Nvspace
       
          vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
          P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
       !derivative of Gaussian:
-      ! F(Nblue:Nred) = F(Nblue:Nred) - &
-      !2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
-      ! NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
+!          F(Nblue:Nred) = F(Nblue:Nred) - &
+!            2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
+!            NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
 
       end do
       P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
-     ! F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
-      CALL Warning("Warning this line is not polarised because only Voigt profile for Zeeman calculation!")
+!       F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
       RETURN
   end if
      
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)
 
+  !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
@@ -210,13 +209,13 @@ MODULE PROFILES
         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
                                        omegav(nv) / line%atom%vbroad(icell)
          do nb=1,Nbspace
-           if (Nzc == 0) & !line not polarizable or weak field
-                   P(Nblue:Nred) = P(Nblue:Nred) + &
-          					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-                  			phip, VoigtMethod) / Nvspace / Nbspace
+         
           do nc=1,Nzc
+             ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
              vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / line%atom%vbroad(icell) * &
                                   LARMOR * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
+             !The normalisation by Nzc is done when compute the strength*profiles.
+             !In case of unpolarised line, Nzc = 1 and there is no need to normalised
              P(Nblue:Nred) = P(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
                   			phip, VoigtMethod) / Nvspace / Nbspace
@@ -229,27 +228,44 @@ MODULE PROFILES
         end do !magnetic field     
         
        end do !velocity
-     
-     if (line%polarizable) then
-      if (line%ZeemanPattern==0) then
-       !gamma(1) = !Bl = B*cos(gamma)
-       !chi(1) = 0d0
-       !derivative after, because we want dI/dlambda, I = exp(-tau)*(1.-exp(-dtau))*S
-       dlamB = -line%zm%shift(1) * 1*LARMOR * (line%lambda0)**2 * NM_TO_M !result in nm
-        NLTEspec%S_QUV(3,line%Nblue:line%Nred) = &
-         NLTEspec%S_QUV(3,line%Nblue:line%Nred) + dlamB
-      else
-        CALL ERROR("Zeeman Opac not implemented yet")
-      end if
-     end if
+       !check that if line is not polarised the Zeeman components are 0
+
   P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+  !F is 0 if unpolarised Voigt profile
   F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
 
  RETURN
  END SUBROUTINE ZProfile
 
+ 
+ SUBROUTINE WEAKFIELD_FLUX(ipix, jpix, ibin, iaz)
+  use math, only : cent_deriv
+  !Should be fine for non-overlapping lines
+  integer, intent(in) :: ipix, jpix, ibin, iaz
+  integer :: k, nat, Nred, Nblue
+  type (AtomicLine) :: line
+  type (AtomType), pointer :: atom
+  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves)
+  
+  do nat=1,atmos%Natom
+   atom => atmos%Atoms(nat)%ptr_atom
+   do k=1,atom%Nline
+     line = atom%lines(k)
+     Nred = line%Nred; Nblue=line%Nblue
+     if (.not.line%polarizable) CYCLE !Should be Bl at the "surface"
+     dlamB = -line%g_lande_eff * maxval(atmos%Bxyz) * LARMOR * (line%lambda0**2) * NM_TO_M!can be 0 anyway
+     CALL cent_deriv(line%Nlambda,NLTEspec%lambda(Nblue:Nred),&
+              NLTEspec%Flux(Nblue:Nred,ipix, jpix,ibin, iaz), Ipol(3,Nblue:Nred))
+     NLTEspec%F_QUV(Nblue:Nred,3,ipix,jpix,ibin,iaz) = NLTEspec%F_QUV(Nblue:Nred,3,ipix,jpix,ibin,iaz) + &
+                   Ipol(3,Nblue:Nred) * dlamB
+   end do
+   NULLIFY(atom)
+  end do
+ RETURN
+ END SUBROUTINE
+
  !--> I should include the zeeman lines in phi, because it plays a role in opacity
- !and tau
+ !and tau, so in the map calculations it might matter. But perhaps negligible
  SUBROUTINE Iprofile_lambda (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, F)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project

@@ -67,17 +67,9 @@ MODULE zeeman
 !     RETURN
 !    end if
 
-  if (line%ZeemanPattern == 0) then !Weak Field
-   allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
-   
-   line%zm%Ncomponent = 0
-   line%zm%q = 1d0
-   line%zm%strength = 1d0 !not used in this case.
-   line%zm%shift = line%zm%q*line%g_lande_eff !unique shift = deltaLamB/B
-   
-   !The Stokes parameters are only prop to g_lande_eff * dI/dlambda
+  ! IF PRT_SOLUTION IS WEAKFIELD WE NEVER ENTER HERE.
 
-  else if (line%ZeemanPattern == -1) then
+  if (line%ZeemanPattern == -1) then
    line%zm%Ncomponent = 3
    line%zm%q = (/-1, 0, 1/)
    line%zm%strength = 1d0 !Here all components have the same strength
@@ -89,6 +81,14 @@ MODULE zeeman
   else if (line%ZeemanPattern == 1) then
     !Strength relative of all components
    CALL Error("Full Zeeman components not implemented yet!")
+   
+  else if (.not.line%polarizable) then !unpolarized line
+   allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
+   line%zm%Ncomponent = 1
+   line%zm%q = 0d0
+   line%zm%strength = 0d0 !not used in this case.
+   line%zm%shift = 0d0
+   
   else
     CALL Error("Zeeman components Recipe unknown!")
   end if
