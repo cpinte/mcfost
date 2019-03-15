@@ -133,7 +133,8 @@ END FUNCTION getPartitionFunctionk
    end if
   end do
 
-  if (is_active .and. atmos%Atoms(nll)%ptr_atom%NLTEpops) then!if (is_active) then
+  !may be active without NLTEpops or passive with read NLTE pops
+  if (atmos%Atoms(nll)%ptr_atom%NLTEpops) then!if (is_active) then
    atom = Elem%model
    fjk = 0d0
    dfjk = 0d0
