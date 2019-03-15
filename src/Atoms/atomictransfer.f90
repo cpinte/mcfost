@@ -79,7 +79,6 @@ MODULE AtomicTransfer
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
-  double precision, dimension(3,NLTEspec%Nwaves) :: Ipol
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau !used only in molecular line to have emission for one
                                   !  half of the disk only. Note used in AL-RT.
@@ -100,7 +99,7 @@ MODULE AtomicTransfer
   ! Therefore it is needed to reset it.
   NLTEspec%I(:,iray,id) = 0d0
   NLTEspec%Ic(:,iray,id) = 0d0
-  if (atmos%magnetized .and. PRT_SOLUTION /= "FIELD_FREE") then
+  if (atmos%magnetized .and. PRT_SOLUTION == "FULL_STOKES") then
     NLTEspec%StokesV(:,iray,id) = 0d0
     NLTEspec%StokesQ(:,iray,id) = 0d0
     NLTEspec%StokesU(:,iray,id) = 0d0
@@ -204,13 +203,7 @@ MODULE AtomicTransfer
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
 !     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dtau*Snu*dexp(-tau)
 !     NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dtau_c*Snu_c*dexp(-tau_c)
-      if (atmos%magnetized.and.PRT_SOLUTION /= "FIELD_FREE") then !force weak field, because it is a flag line dependent
-      							 !so don"t know here... Because it allows to have separate
-      							 !Solution, but maybe better to have the same for all...
-        CALL cent_deriv(NLTEspec%Nwaves,NLTEspec%lambda,&
-              NLTEspec%I(:,iray,id)*NLTEspec%S_QUV(3,:),Ipol(3,:)) 
-         NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) +  Ipol(3,:)
-      end if
+    ! PUT ZEEMANHERE
 
 !      !!surface superieure ou inf, not used with AL-RT
      facteur_tau = 1.0
@@ -254,9 +247,9 @@ MODULE AtomicTransfer
 
    labs = .false.
    ! reset local Fluxes
-   I0c = 0d0
-   I0 = 0d0
-   if (atmos%magnetized .and. PRT_SOLUTION /= "FIELD_FREE") QUV(:,:) = 0d0
+   !I0c = 0d0
+   !I0 = 0d0
+   !if (atmos%magnetized .and. PRT_SOLUTION == "FULL_STOKES") QUV(:,:) = 0d0
 
    ! Ray tracing : on se propage dans l'autre sens
    u0 = -u ; v0 = -v ; w0 = -w
@@ -270,7 +263,7 @@ MODULE AtomicTransfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
-     if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") QUV = 0d0
+     if (atmos%magnetized.and. PRT_SOLUTION == "FULL_STOKES") QUV = 0d0
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -297,7 +290,7 @@ MODULE AtomicTransfer
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
-             if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") &
+             if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") &
              	QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id)
            !else !Outside the grid, no radiation flux
            endif
@@ -306,7 +299,7 @@ MODULE AtomicTransfer
 
      I0 = I0 / npix2
      I0c = I0c / npix2
-     if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") QUV = QUV / npix2
+     if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") QUV = QUV / npix2
 
      if (iter < n_iter_min) then
         ! On itere par defaut
@@ -335,7 +328,7 @@ MODULE AtomicTransfer
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
-  if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") then 
+  if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
    QUV(1,:) = QUV(1,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
    QUV(2,:) = QUV(2,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
    QUV(3,:) = QUV(3,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
@@ -348,10 +341,13 @@ MODULE AtomicTransfer
   else
     NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
     NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
-    if (atmos%magnetized.and. PRT_SOLUTION /= "FIELD_FREE") then 
+    if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
      NLTEspec%F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) !U
      NLTEspec%F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) !Q
      NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) !V
+    else if (atmos%magnetized.and.PRT_SOLUTION == "WEAK_FIELD") then
+     CALL WEAKFIELD_FLUX(ipix, jpix, ibin, iaz)
+    !else FIELD_FREE do nothing here or no mag field
     end if
   end if
 
@@ -506,7 +502,8 @@ MODULE AtomicTransfer
      !$omp end parallel
   end if
 
-  write(*,*) " -> Adding stellar flux"
+  !!write(*,*) " -> Adding stellar flux"
+  !! This is slow in my implementation actually
   do lambda = 1, NLTEspec%Nwaves
    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
                                              !else it means that in FLUX_PIXEL_LINE, nu
@@ -521,9 +518,6 @@ MODULE AtomicTransfer
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
 
- ! NOTE: should inverse the order of frequencies and depth because in general
- !       n_cells >> n_lambda, in "real" cases.
-
  SUBROUTINE Atomic_transfer()
  ! --------------------------------------------------------------------------- !
   ! This routine initialises the necessary quantities for atomic line transfer
@@ -531,12 +525,12 @@ MODULE AtomicTransfer
  ! --------------------------------------------------------------------------- !
   integer :: atomunit = 1, nact
   integer :: icell
-  integer :: ibin, iaz
+  integer :: ibin, iaz, Nrayone = 1
   character(len=20) :: ne_start_sol = "H_IONISATION"
   logical :: lwrite_waves = .false.
 
 #include "sprng_f.h"
-
+ ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   Profile => IProfile
   optical_length_tot => atom_optical_length_tot
   if (.not.associated(optical_length_tot)) then
@@ -550,36 +544,30 @@ MODULE AtomicTransfer
   else
    RT_line_method = 1 !pixels circulaires
   end if
+  
+  if (atmos%magnetized .and. PRT_SOLUTION /= "NO_STOKES") CALL adjustStokesMode(PRT_SOLUTION)
 
   !read in dust_transfer.f90 in case of -pluto.
   !mainly because, RT atomic line and dust RT are not decoupled
   !move elsewhere, in the model reading/definition?
+ ! ------------------------------------------------------------------------------------ !
+ ! ------------------------------------------------------------------------------------ !
 !! ----------------------- Read Model ---------------------- !!
+  ! -> only for not Voronoi
   if (.not.lpluto_file) CALL magneto_accretion_model()  
   !CALL uniform_law_model()
 !! --------------------------------------------------------- !!
+ ! ------------------------------------------------------------------------------------ !
+ ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
 
-  !Read atomic models and allocate space for n, nstar, vbroad, ntotal, Rij, Rji
+  !Read atomic models and allocate space for n, nstar, vbroad, ntotal
   ! on the whole grid space.
-  ! The following routines have to be invoked in the right order !
   CALL readAtomicModels(atomunit)
-
-  if (atmos%Nactiveatoms>0) then
-  write(*,*) "Beware, pops in background Hydrogen opacities uses n instead of nstar"
-  write(*,*) "There will be a bug if H is active, as n is not an alias to nstar in this case"
-  write(*,*) "also in solve NE."
-  !if I set atom%n to atom%nstar before starting the NLTE loop
-  !independently of the starting solution, solvene and background H should work
-  !properly. And then I set atom%n to the initial guess and starts the NLTEloop, with
-  !eventually iteration of the electron density
-  stop
-  !or at the forst iteration set atmos%Atoms(nll)%ptr_atom%NLTEpops = .false. (normally true
-  !if the atom is active (or is passive but pops read from file,s that %n and %nstar are different).
-  !If we do that for the first iteration, ne is computed using kurucz pf. 
-  !then we can set atmos%Atoms(nll)%ptr_atom%NLTEpops = true again and NLTE pops will be used.
-  atmos%Atoms(nact)%ptr_atom%NLTEpops = .false.
-  
+  if (atmos%NactiveAtoms > 0) then 
+   atmos%Nrays = 300
+   write(*,*) " Using", atmos%Nrays," for NLTE line transfer"
   end if
+
   ! if the electron density is not provided by the model or simply want to
   ! recompute it
   ! if atmos%ne given, but one want to recompute ne
@@ -603,16 +591,12 @@ MODULE AtomicTransfer
   CALL writeHydrogenDensity()
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
   !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
-!! --------------------------------------------------------- !!
-  NLTEspec%atmos => atmos !this one is important because atmos_type : atmos is not used.
-!   allocate(NLTEspec%lambda(1000))
-!   NLTEspec%lambda(1) = 50d0
-!   do icell=2, 1000
-!    NLTEspec%lambda(icell) = NLTEspec%lambda(icell-1) + (800d0 - 50d0)/(1000d0-1d0)
-!   end do
+ ! ------------------------------------------------------------------------------------ !
+ ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
+ ! ------------------------------------------------------------------------------------ !
+  NLTEspec%atmos => atmos
   CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
-  if (atmos%magnetized) CALL adjustStokesMode(PRT_SOLUTION)
   if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.
                                          ! Background continua (=ETL) are kept in memory.
@@ -639,14 +623,24 @@ MODULE AtomicTransfer
    !just like background conitua, avoiding te recompute them as they do not change
    !! TDO DO2: try to keep lines opac also.
   end if
-
+ ! ------------------------------------------------------------------------------------ !
+ ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
-  CALL reallocate_mcfost_vars()
-
+  CALL reallocate_mcfost_vars() !also allocates ds
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
-  !start transfer
+ ! ------------------------------------------------------------------------------------ !
+ ! ----------------------------------- NLTE LOOP -------------------------------------- !
+  !The BIG PART IS HERE
   if (atmos%Nactiveatoms > 0) CALL NLTEloop(0, 1d-4)
-  !if (atmos%magnetized) CALL adjustStokesMode("FULL_STOKES")
+ ! ------------------------------------------------------------------------------------ !
+ ! ------------------------------------------------------------------------------------ !
+ ! ----------------------------------- MAKE IMAGES ------------------------------------ !
+  if (atmos%Nrays /= Nrayone) CALL reallocate_rays_arrays(Nrayone)
+  !Except except ds(Nray,Nproc) and Polarized arrays which are: 1) deallocated if PRT_SOL
+  !is FIELD_FREE (or not allocated if no magnetic field), reallocated if FULL_STOKES.
+  !And, atmos%Nrays = Nrayone if they are different.
+  !This in order to reduce the memory of arrays in the map calculation
+  if (atmos%magnetized .and. PRT_SOLUTION /= "NO_STOKES") CALL adjustStokesMode(PRT_SOLUTION)
   write(*,*) "Computing emission flux map..."
   !Use converged NLTEOpac
   do ibin=1,RT_n_incl
@@ -655,72 +649,70 @@ MODULE AtomicTransfer
      end do
   end do
   CALL WRITE_FLUX()
-
- ! Transfer ends, save data, free some space and leave
- !should be closed after reading ? no if we do not save the C matrix in each cells
- !CALL WRITEATOM()
+ ! ------------------------------------------------------------------------------------ !
+ ! ------------------------------------------------------------------------------------ !
+ ! -------------------------------- CLEANING ------------------------------------------ !
+ !close file after NLTE loop
+ do nact=1,atmos%Nactiveatoms
+  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
+ end do
+ !CALL WRITEATOM() !keep C in memory for that ?
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()
  deallocate(ds)
- NULLIFY(optical_length_tot)
+ NULLIFY(optical_length_tot, Profile)
 
  RETURN
  END SUBROUTINE
- 
- SUBROUTINE NLTEloop(Niter, IterLim)
-  integer, intent(in) :: Niter
+ ! ------------------------------------------------------------------------------------ !
+
+ SUBROUTINE NLTEloop(Nmaxiter, IterLim)
+  integer, intent(in) :: Nmaxiter
   double precision, intent(in) :: IterLim
   integer :: atomunit = 1, nact
   integer :: icell
   integer :: ibin, iaz
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
-  character(len=20) :: Solution !iterate from the starting guess
 
-
-  
-
-  !! --------------------- NLTE--------------------------------- !!
-  !! For NLTE do not forget ->
-  !initiate NLTE popuplations for ACTIVE atoms, depending on the choice of the solution
+ ! ----------------------------  INITIAL POPS------------------------------------------ !
+  write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
   ! CALL initialSol()
   ! for now initialSol() is replaced by this if loop on active atoms
-  if (atmos%Nactiveatoms > 0) then
-    write(*,*) "solving for ", atmos%Nactiveatoms, " active atoms"
-    do nact=1,atmos%Nactiveatoms
-     atmos%Atoms(nact)%ptr_atom%NLTEpops = .true. !again
+  do nact=1,atmos%Nactiveatoms
+     !Now we can set it to .true. The new background pops or the new ne pops
+     !will used the H%n
+     atmos%Atoms(nact)%ptr_atom%NLTEpops = .true.
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
      atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
-     CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
-    end do
-  end if !end replacing initSol()
+     !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
+  end do
+
+  !end replacing initSol()
+  
+
+ ! ---------------------------------- CELLS LOOP -------------------------------------- !
+ ! Start loop here !
+ !make sure to properly RETURN if NmaxIter=0
+  do icell=1, n_cells
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
 !   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open
-!   ! before the transfer starts and closed at the end.
-!   do nact=1,atmos%Nactiveatoms
-!     if (atmos%ActiveAtoms(nact)%active) then
-!      CALL CollisionRate(icell, atmos%ActiveAtoms(nact))
-!      CALL initGamma(icell, atmos%ActiveAtoms(nact)) !set Gamma to C for each active atom
-!       !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
-!       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
-!      end if
-!   end do
-!   if (atmos%Nrays==1) then !placed before computing J etc
-!    write(*,*) "Solving for", atmos%Nrays,' direction.'
-!   else
-!    write(*,*) "Solving for", atmos%Nrays,' directions.'
-!   end if
-!
-!! -------------------------------------------------------- !!
-
- do nact=1,atmos%Nactiveatoms
-  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
- end do
-
- 
+!   ! before the transfer starts and closed at the end. This is because we compute C at each cell
+!   ! instead of the whole grid. So some extra IO overheads.
+!   !They can be removed by keeping C in memory for each atom: NactAtom * Nlevel**2 * n_cells
+!   ! Or keeping in memory the collision data. (TO DO)
+  	do nact=1,atmos%Nactiveatoms
+	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom)
+      !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
+      !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
+  	end do
+  	CALL initGamma() !set Gamma to C for each active atom
+  end do !cell loop
+ ! ------------------------------------------------------------------------------------ !
  RETURN
  END SUBROUTINE NLTEloop
+ ! ------------------------------------------------------------------------------------ !
  
  SUBROUTINE adjustStokesMode(Solution)
  !
@@ -742,8 +734,18 @@ MODULE AtomicTransfer
 !      Profile => IProfile
 !      RETURN
 !     end if
-  
-    if (SOLUTION=="FIELD_FREE") then
+
+    if (SOLUTION=="WEAK_FIELD") then 
+      if (associated(PRofile)) Profile => NULL()
+      Profile => Iprofile
+    !Also reallocate with the good NRAYS if atmos%NRays has changed
+      !NEVER ALLOCATE NOR ENTER ZPROFILE IF WEAKFIELD
+     if (.not.allocated(NLTEspec%F_QUV)) &
+      	allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
+      NLTEspec%F_QUV = 0d0
+    else if (SOLUTION=="FIELD_FREE") then
+      write(*,*) "SOL NOY IMPLEMENTED YEY"
+      stop
       if (associated(Profile)) Profile => NULL()
       Profile => Iprofile
       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
@@ -751,9 +753,12 @@ MODULE AtomicTransfer
       if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
       if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
       												NLTEspec%StokesU)
-      												
+      write(*,*) " Using FIELD_FREE solution for the PRT!"
+      CALL Warning("  Set PRT_SOLUTION to FULL_STOKES for images")							
       SOLUTION = "FULL_STOKES" !For next call after NLTE loop
     else if (SOLUTION=="FULL_STOKES") then !Solution unchanged here
+      write(*,*) "SOL NOY IMPLEMENTED YEY"
+      stop
       if (associated(Profile)) Profile => NULL()
       Profile => Zprofile
       !allocate space for Zeeman polarisation
@@ -772,13 +777,14 @@ MODULE AtomicTransfer
       if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
       	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
         allocate(NLTEspec%AtomOpac%epsilon_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-        !init in initatomopac()
+        write(*,*) " Using FULL_STOKES solution for the PRT!"
       end if
     else
      CALL ERROR("Error in adjust StokesMode")
     end if
  RETURN
  END SUBROUTINE adjustStokesMode
+ ! ------------------------------------------------------------------------------------ !
 
  SUBROUTINE reallocate_mcfost_vars()
   !--> should move them to init_atomic_atmos ? or elsewhere

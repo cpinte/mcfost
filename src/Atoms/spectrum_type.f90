@@ -119,6 +119,27 @@ MODULE spectrum_type
   
   RETURN
   END SUBROUTINE initSpectrumImage
+  
+  SUBROUTINE reallocate_rays_arrays(newNray)
+   integer, intent(in) :: newNray
+  
+   NLTEspec%atmos%Nrays = newNray
+   
+   if ((NLTEspec%atmos%Nrays) /= newNray .or. (newNray /=1 )) &
+   	 CALL Warning("  Beware, check the number of rays for the ray-traced map!")
+   
+   deallocate(NLTEspec%I, NLTEspec%Ic)
+   !except polarization which are (de)allocated in adjustStokesMode
+   if (NLTEspec%Nact > 0) deallocate(NLTEspec%Psi)
+   !Could be also LTE opac if line are kept in memory ?
+   allocate(NLTEspec%I(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+   allocate(NLTEspec%Ic(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+   NLTEspec%I = 0d0; NLTEspec%Ic = 0d0
+   if (NLTEspec%Nact) &
+   	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+  
+  RETURN
+  END SUBROUTINE
 
   SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
@@ -285,14 +306,14 @@ MODULE spectrum_type
     !Currently LTE or NLTE Zeeman opac are not stored on memory. They change with 
     !direction. BUT the star is assumed to not emit polarised photons (from ZeemanEffect)
     !So we do not take into account this opac in Metal_lambda and futur NLTEOpacity_lambda
-    if (NLTEspec%atmos%magnetized) then
-    !check allocation because even if magnetized, due to the FIELD_FREE solution
-    !they might be not allocated
-     if (allocated(NLTEspec%AtomOpac%rho_p)) NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
-     if (allocated(NLTEspec%AtomOpac%rho_p)) NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
+    if (NLTEspec%atmos%magnetized .and. PRT_SOLUTION == "FULL_STOKES") then
+    !check allocation because even if magnetized, due to the FIELD_FREE solution or WF
+    !they might be not allocated !if (allocated(NLTEspec%AtomOpac%rho_p)) 
+     NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
+     NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
      !NLTE
-     !if (allocated()) NLTEspec%AtomOpac%epsilon(:,:,id) = 0d0
-     !if (allocated()) NLTEspec%AtomOpac%rho(:,:,id) = 0d0
+     !NLTEspec%AtomOpac%epsilon(:,:,id) = 0d0
+     !NLTEspec%AtomOpac%rho(:,:,id) = 0d0
     end if
     
   RETURN
@@ -448,7 +469,7 @@ MODULE spectrum_type
   
   ! write polarized flux if any. Atmosphere magnetic does not necessarily
   								!means we compute polarization
-  if ((NLTEspec%atmos%magnetized) .and. (PRT_SOLUTION /= "FIELD_FREE") &
+  if ((NLTEspec%atmos%magnetized) .and. (PRT_SOLUTION /= "NO_STOKES") &
                .and. (RT_line_method /= 1)) then
    CALL ftcrhd(unit, status)
    naxis = 6
