@@ -156,7 +156,7 @@ MODULE PROFILES
   if (.not.lvoronoi) then
       b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
       Nbspace = NbspaceMax
-!       dB = dabs(b1-b0) * LARMOR / CLIGHT * (line%lambda0 * NM_TO_M) **2
+!       dB = dabs(b1-b0) * LARMOR * (line%lambda0 * NM_TO_M) **2
 !       Nbspace = max(2,nint(20*dB/atom%vbroad(icell)))
 !       Nbspace = min(Nbspace,NbspaceMax)
       omegaB(Nbspace) = b1
@@ -208,7 +208,7 @@ MODULE PROFILES
                   			phip, VoigtMethod) / Nvspace / Nbspace
           do nc=1,Nzc
              vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / line%atom%vbroad(icell) * &
-                                  LARMOR/CLIGHT * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
+                                  LARMOR * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
              P(Nblue:Nred) = P(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
                   			phip, VoigtMethod) / Nvspace / Nbspace
@@ -227,7 +227,7 @@ MODULE PROFILES
        !gamma(1) = !Bl = B*cos(gamma)
        !chi(1) = 0d0
        !derivative after, because we want dI/dlambda, I = exp(-tau)*(1.-exp(-dtau))*S
-       dlamB = -line%zm%shift(1) * 1*LARMOR * (line%lambda0)**2 * NM_TO_M / CLIGHT
+       dlamB = -line%zm%shift(1) * 1*LARMOR * (line%lambda0)**2 * NM_TO_M !result in nm
         NLTEspec%S_QUV(3,line%Nblue:line%Nred) = &
          NLTEspec%S_QUV(3,line%Nblue:line%Nred) + dlamB
       else
