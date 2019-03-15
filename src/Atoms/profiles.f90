@@ -245,7 +245,7 @@ MODULE PROFILES
   integer :: k, nat, Nred, Nblue
   type (AtomicLine) :: line
   type (AtomType), pointer :: atom
-  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves)
+  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves), dlamB21, dlamB22
   
   do nat=1,atmos%Natom
    atom => atmos%Atoms(nat)%ptr_atom
@@ -254,10 +254,11 @@ MODULE PROFILES
      Nred = line%Nred; Nblue=line%Nblue
      if (.not.line%polarizable) CYCLE !Should be Bl at the "surface"
      dlamB = -line%g_lande_eff * maxval(atmos%Bxyz) * LARMOR * (line%lambda0**2) * NM_TO_M!can be 0 anyway
+     Ipol = 0d0
      CALL cent_deriv(line%Nlambda,NLTEspec%lambda(Nblue:Nred),&
-              NLTEspec%Flux(Nblue:Nred,ipix, jpix,ibin, iaz), Ipol(3,Nblue:Nred))
-     NLTEspec%F_QUV(Nblue:Nred,3,ipix,jpix,ibin,iaz) = NLTEspec%F_QUV(Nblue:Nred,3,ipix,jpix,ibin,iaz) + &
-                   Ipol(3,Nblue:Nred) * dlamB
+              NLTEspec%Flux(Nblue:Nred,ipix, jpix,ibin, iaz)*dlamB, Ipol(3,Nblue:Nred))
+     NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) + &
+                   Ipol(3,:)
    end do
    NULLIFY(atom)
   end do
