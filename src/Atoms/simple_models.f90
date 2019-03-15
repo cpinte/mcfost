@@ -63,7 +63,8 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .not.(lwrite_model_ascii)
    CALL init_atomic_atmos()
-   atmos%magnetized = lmagnetic_field
+   !For now we do not necessarily need to compute B if no polarization at all
+   atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
    if (atmos%magnetized) then 
     CALL init_magnetic_field()
     atmos%B_char = 3d-2
