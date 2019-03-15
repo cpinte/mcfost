@@ -222,7 +222,7 @@ MODULE metal
      !Sum up all contributions for this line with the other
 
      Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * atom%vbroad(icell))
+      hc_4PI * line%Bij * phi(Nblue:Nred)!already normalized / (SQRTPI * atom%vbroad(icell))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &

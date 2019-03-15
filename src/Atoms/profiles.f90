@@ -19,11 +19,11 @@ MODULE PROFILES
  PROCEDURE(Iprofile), pointer :: Profile => null()
  PROCEDURE(Iprofile_lambda), pointer :: Profile_lambda => null()
 
-
  CONTAINS
 
 
  SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, F)
+ ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
@@ -90,14 +90,15 @@ MODULE PROFILES
                   phip, VoigtMethod) / Nvspace
 
       end do
- else !Gaussian !only for checking
+  else !Gaussian !only for checking
       do nv=1, Nvspace
       
          vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
-         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
+         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace 
          
       end do
  end if !line%voigt
+ P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
 
  RETURN
  END SUBROUTINE IProfile
@@ -177,20 +178,27 @@ MODULE PROFILES
   P = 0d0
   F = 0d0
   Nzc = 0
-  if (line%polarizable) Nzc = line%zm%Ncomponent
-  if (.not.line%voigt) then !futur use weak field only when line%Gauss
-      do nv=1, Nvspace
-         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
-         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
-
-      end do
-      F = 0d0
-      CALL Warning("Warning this line is not polarised because only Voigt profile for Zeeman calculation!")
-      RETURN
-  end if
 
   vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
            CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
+           
+  if (line%polarizable) Nzc = line%zm%Ncomponent
+  if (.not.line%voigt) then !futur use weak field only when line%Gauss
+      do nv=1, Nvspace
+      
+         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
+         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
+      !derivative of Gaussian:
+      ! F(Nblue:Nred) = F(Nblue:Nred) - &
+      !2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
+      ! NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
+
+      end do
+      P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+     ! F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+      CALL Warning("Warning this line is not polarised because only Voigt profile for Zeeman calculation!")
+      RETURN
+  end if
      
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)
@@ -234,6 +242,8 @@ MODULE PROFILES
         CALL ERROR("Zeeman Opac not implemented yet")
       end if
      end if
+  P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+  F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
 
  RETURN
  END SUBROUTINE ZProfile
