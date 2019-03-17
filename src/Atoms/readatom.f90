@@ -165,7 +165,7 @@ MODULE readatom
            ! has "additional geff", but its not.
            !
      !futur implement: line%name
-     atom%lines(kr)%ZeemanPattern = -1!futur implement!depends on the magnetic field
+     atom%lines(kr)%ZeemanPattern = 1
      if ((PRT_SOLUTION == "WEAK_FIELD").or. (PRT_SOLUTION=="NO_STOKES").or. &
        (.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
      ! -1 = effective triplet, +1
@@ -188,6 +188,12 @@ MODULE readatom
        !if glande_eff given, we need to read a value for gi and gj even if it is 0.
        !if glane is <= -99, gi, and gj and geff are computed eventually.
        !landé upper / lower levels in case the coupling scheme is not accurate
+       if (atom%lines(kr)%g_lande_eff > -99) atom%lines(kr)%ZeemanPattern = -1 !effective T assumed
+       if (atom%lines(kr)%g_lande_eff <= -99) atom%lines(kr)%ZeemanPattern = 1 !Full using gi and gj
+       if (atom%lines(kr)%glande_j <= -99 .or. atom%lines(kr)%glande_i<= -99) then
+        CALL Warning("Unable to use read lande factors, try to compute them..")
+        atom%lines(kr)%g_lande_eff = -99 !force calculation
+       end if
      else
        write(*,*) inputline
        CALL error(" Unable to parse atomic file line")
@@ -545,6 +551,8 @@ MODULE readatom
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
     atom%n = 0d0
     atom%NLTEpops = .false. !Zero at first, and if .true. solvene will crash
+    !HOWever, if init_sol is old pops and u can read them here, set NLTEpops=.true.
+    !It will be used also for background
    else !not active
     if (atom%dataFile.ne."" & !atom%popsinFile.ne.""
        .and. atom%initial_solution &
