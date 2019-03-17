@@ -323,7 +323,8 @@ MODULE getlambda
     Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
     if (Atoms(n)%ptr_atom%continua(kc)%hydrogenic) deallocate(Atoms(n)%ptr_atom%continua(kc)%lambda)
     !cont%lambda is deallocated in fillPhotoionisationRates is case of cont is not hydrogenic
-    CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
+    !!if (Atoms(n)%ptr_atom%active) &
+      CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
