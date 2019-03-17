@@ -60,13 +60,13 @@ MODULE Opacity
   type(AtomType), pointer :: aatom
   double precision, parameter :: twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
-  double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2, phi
+  double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2
+  double precision, allocatable :: phi(:), phiZ(:,:), psiZ(:,:)
   integer, parameter :: NvspaceMax = 100
   character(len=20) :: VoigtMethod="HUMLICEK"
-  integer :: Nvspace, nv
-  double precision :: omegav(NvspaceMax), v0, v1, delta_vol_phi, xphi, yphi, zphi, dv, &
-  	vv(NLTEspec%Nwaves), vvoigt(NLTEspec%Nwaves), hc_4PI
-  						  
+  integer :: Nvspace, nv, nk
+  double precision :: omegav(NvspaceMax), v0, v1, delta_vol_phi, xphi, yphi, zphi, dv, hc_4PI
+!vv(NLTEspec%Nwaves), vvoigt(NLTEspec%Nwaves),   						  
   exp_lambda = dexp(-hc_k / (NLTEspec%lambda * atmos%T(icell)))
   twohnu3_c2 = twohc / NLTEspec%lambda(:)**(3d0)
   hc_4PI = HPLANCK * CLIGHT / (4d0 * PI)
@@ -139,7 +139,6 @@ MODULE Opacity
      	CALL error("too small populations")
      	CYCLE
     end if 
-    phi = 0d0
     gij = 0d0
     Vij = 0d0
 !     vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
@@ -148,7 +147,10 @@ MODULE Opacity
     gij = line%Bji / line%Bij
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
-    CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi)
+    allocate(phi(line%Nlambda))
+    if (PRT_SOLUTION=="FULL_STOKES") &
+    	allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
+    CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
 !     if (line%voigt) then
 !       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
 !       CALL Damping(icell, aatom, kr, line%adamp)
@@ -167,7 +169,7 @@ MODULE Opacity
 !       end do
 !      end if !line%voigt
 
-     Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(Nblue:Nred) !normalized in Profile()
+     Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * aatom%vbroad(icell))
  
      aatom%lines(kr)%gij(:,id) = gij
@@ -184,7 +186,17 @@ MODULE Opacity
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
     	
     aatom%lines(kr)%wlam(Nblue:Nred) = hc_4PI*phi(Nblue:Nred)! / (SQRTPI * aatom%vbroad(icell))
-
+    
+!      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
+!        do nk = 1, 3
+!          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
+!            Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
+!          NLTEspec%AtomOpac%epsilon(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%epsilon(Nblue:Nred,nk,id) + &
+!           twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell) * phiZ(nk,:)
+!        end do 
+!      end if
+    deallocate(phi)
+    if (PRT_SOLUTION=="FULL_STOKES") deallocate(phiZ, psiZ)
    end do
   
   end do !over activeatoms

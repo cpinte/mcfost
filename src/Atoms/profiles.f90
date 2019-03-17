@@ -21,8 +21,7 @@ MODULE PROFILES
 
  CONTAINS
 
-
- SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
+ SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
@@ -30,14 +29,14 @@ MODULE PROFILES
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(NLTEspec%Nwaves)              :: vvoigt, phip, vv
+  double precision, dimension(line%Nlambda)					:: vvoigt, F, vv
   integer, parameter										:: NvspaceMax = 101
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv, Nred, Nblue, i, j
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv
-  double precision, intent(out), dimension(NLTEspec%Nwaves) :: P
-  !double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
+  double precision, intent(out), dimension(:)               :: P
+  double precision, intent(out), dimension(:,:), optional   :: phi, psi
 
 
   ! v_proj in m/s at point icell
@@ -68,10 +67,10 @@ MODULE PROFILES
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
 
-
   P = 0d0
+  !allocate(vv(line%Nlambda), F(line%Nlambda), vvoigt(line%Nlambda))
   vv = 0d0
-  vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
+  vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
            CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
 
 
@@ -82,35 +81,34 @@ MODULE PROFILES
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
                         
-          vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
-                                       omegav(nv) / line%atom%vbroad(icell)
+          vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
 
-          P(Nblue:Nred) = P(Nblue:Nred) + &
-            Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-                  phip, VoigtMethod) / Nvspace
+          P(:) = P(:) + &
+            Voigt(line%Nlambda, line%adamp,vvoigt(:), &
+                  F, VoigtMethod) / Nvspace
 
       end do
   else !Gaussian !only for checking
       do nv=1, Nvspace
       
-         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
-         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace 
+         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+         P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace 
          
       end do
  end if !line%voigt
- P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
-
+ P(:) = P(:) / (SQRTPI * line%atom%vbroad(icell))
+ !deallocate(vv, vvoigt, F)
  RETURN
  END SUBROUTINE IProfile
  
- SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
+ SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
   integer, intent(in) 							            :: icell
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(NLTEspec%Nwaves)              :: vvoigt, phip, vv
+  double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV
   integer, parameter										:: NvspaceMax = 101, NbspaceMax=15
   double precision, dimension(NvspaceMax)					:: omegav
   double precision, dimension(NbspaceMax)					:: omegaB, gamma, chi
@@ -118,12 +116,11 @@ MODULE PROFILES
   															   Nbspace, nb, Nzc, i, j
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB
-  double precision, intent(out), dimension(NLTEspec%Nwaves) :: P
-  !double precision, intent(out), dimension(NLTEspec%Nwaves), optional :: F
-  double precision, dimension(NLTEspec%Nwaves) 			    :: F
+  double precision, intent(out), dimension(:)               :: P
+  double precision, intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
+  double precision, dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
+  !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
 
-
-  NLTEspec%S_QUV = 0d0
   omegaB = 0d0
   ! v_proj in m/s at point icell
   omegav = 0d0
@@ -132,7 +129,6 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
-
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
   omegaB(1) = b0
@@ -177,64 +173,91 @@ MODULE PROFILES
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
   P = 0d0
-  F = 0d0
+  
+  !allocate(vv(line%Nlambda), vvoigt(line%Nlambda))
 
-  vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
+  vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
            CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
-           
+
   Nzc = line%zm%Ncomponent
   if (.not.line%voigt) then !unpolarised line assumed even if line%polarizable
       do nv=1, Nvspace
       
-         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / line%atom%vbroad(icell)
-         P(Nblue:Nred) = P(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
+         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+         P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace
       !derivative of Gaussian:
 !          F(Nblue:Nred) = F(Nblue:Nred) - &
 !            2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
 !            NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
 
       end do
-      P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+      P(:) = P(:) / (SQRTPI * line%atom%vbroad(icell))
 !       F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
+      !deallocate(vv, vvoigt)
       RETURN
   end if
      
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)
 
+  !allocate(LV(line%Nlambda), F(line%Nlambda), psi_zc(3,line%Nlambda),phi_zc(3,line%Nlambda))
+  LV = 0d0
+  F = 0d0
+  psi_zc = 0d0; phi_zc = 0d0
+  psi = 0d0; phi = 0d0
   !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
                         
-        vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
-                                       omegav(nv) / line%atom%vbroad(icell)
+        vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
          do nb=1,Nbspace
          
           do nc=1,Nzc
              ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
-             vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / line%atom%vbroad(icell) * &
-                                  LARMOR * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
+             !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
+             vvoigt(:) = vvoigt(:) + line%zm%shift(nc) * omegaB(nb) * &
+                                  LARMOR * (line%lambda0 * NM_TO_M)**2 / line%atom%vbroad(icell)
              !The normalisation by Nzc is done when compute the strength*profiles.
              !In case of unpolarised line, Nzc = 1 and there is no need to normalised
-             P(Nblue:Nred) = P(Nblue:Nred) + &
-          					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-                  			phip, VoigtMethod) / Nvspace / Nbspace
-             F(Nblue:Nred) = F(Nblue:Nred) + phip(Nblue:Nred)/Nvspace/Nbspace
-             phip = 0d0
-             !do something here
-             CALL Error("Full profile not implemented")
+             LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt(:),F, VoigtMethod) / Nvspace / Nbspace
+             F(:) = F(:)/Nvspace/Nbspace
+             !write(*,*) "S^MjMi_JjJi=", line%zm%strength(nc) 
+             if (abs(line%zm%q(nc)) > 1) CALL Error("BUG")
+              psi_zc(-line%zm%q(nc),:) = psi_zc(-line%zm%q(nc),:) + &
+              		line%zm%strength(nc) * F(:) / (SQRTPI * line%atom%vbroad(icell))
+              phi_zc(-line%zm%q(nc),:) = phi_zc(-line%zm%q(nc),:) + &
+              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell)) 
+             F = 0d0
+             LV = 0d0
           end do !components 
-          
+          !the output, for the other we store eta_pol/eta_I, rho_pol/chi_I etc
+          P(:) = P(:) + 0.5*(phi_zc(2,:) * sin(gamma(nb))**2 + \
+            0.5*(1+cos(gamma(nb))**2) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
+          !rhoQ/chiI
+          psi(1,:) = psi(1,:) + &
+          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
+          !rhoU/chiI
+          psi(2,:) = psi(2,:) + &
+          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
+          !rhoV/chiI
+          psi(3,:) = psi(3,:) + 0.5*(psi_zc(3,:)-psi_zc(1,:))*cos(gamma(nb))
+          !etaQ/chiI
+          phi(1,:) = phi(1,:) + &
+          		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
+          !etaU/chiI
+          phi(2,:) = phi(2,:) + &
+          		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
+          !etaV/chiI
+          phi(3,:) = phi(3,:) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
+          !write(*,*) line%i, line%j, nv, nb, maxval(phi), maxval(psi)
         end do !magnetic field     
         
        end do !velocity
        !check that if line is not polarised the Zeeman components are 0
-
-  P(Nblue:Nred) = P(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
-  !F is 0 if unpolarised Voigt profile
-  F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
-
+       !write(*,*) "tpt", allocated(psi_zc),allocated(phi_zc), allocated(LV), allocated(F), &
+       ! allocated(vv), allocated(vvoigt)
+  !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt) 
  RETURN
  END SUBROUTINE ZProfile
 
@@ -276,9 +299,7 @@ MODULE PROFILES
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   integer 													:: i, j
   type (AtomicLine), intent(in)								:: line
-  double precision, intent(out), dimension(1) :: P
-  !double precision, intent(out), dimension(1), optional :: F
-  !double precision, dimension(1) 			    :: F
+  double precision, intent(out), dimension(1) 				:: P
 
   P(1) = 0d0
 

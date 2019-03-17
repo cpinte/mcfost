@@ -172,18 +172,20 @@ MODULE metal
   ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
   ! cell point we are computing the opacities.
   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
-  integer 													:: kr, m, i, j
+  integer 													:: kr, m, i, j, nk
   integer, intent(in) 							            :: icell, id
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
-  double precision, dimension(NLTEspec%Nwaves)              :: phi, vvoigt, Vij, vv
+  double precision, dimension(:), allocatable   			:: Vij
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
   integer													:: Nred, Nblue
   type (AtomicLine)										    :: line
   type (AtomType)											:: atom
+  double precision, dimension(:,:), allocatable 			:: psiZ, phiZ
+  double precision, allocatable, dimension(:) 				:: phi(:)
 
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
@@ -197,6 +199,7 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i; j = line%j
      Nred = line%Nred; Nblue = line%Nblue
+     allocate(Vij(line%Nlambda)); Vij = 0d0
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
@@ -209,30 +212,37 @@ MODULE metal
       CYCLE
      end if
 
-     phi = 0d0
-
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
-     
+
+     allocate(phi(line%Nlambda))!; phi = 0d0
+     if (PRT_SOLUTION == "FULL_STOKES") allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
+     !write(*,*) allocated(phiZ), allocated(psiZ), line%polarizable, PRT_SOLUTION
      if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
-     !Actually we do not need to know the dispersion profile.
-     !Elements of the Absorption-dispersion matrix and emissivity of Stokes QUV
-     !are stored in NLTEspec%AtomOpac
-     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi)
+     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
 
      !Sum up all contributions for this line with the other
-
-     Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(Nblue:Nred)!already normalized / (SQRTPI * atom%vbroad(icell))
+     Vij(:) = &
+      hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * atom%vbroad(icell))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-       		Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
+       		Vij(:) * (atom%n(i,icell)-gij*atom%n(j,icell))
        		
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-       		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
+       		twohnu3_c2 * gij * Vij(:) * atom%n(j,icell)
 
+     if (PRT_SOLUTION == "FULL_STOKES") then
+       do nk = 1, 3
+         NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
+           hc_4PI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
+         NLTEspec%AtomOpac%epsilon_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%epsilon_p(Nblue:Nred,nk,id) + &
+          twohnu3_c2 * gij * hc_4PI * line%Bij * atom%n(j,icell) * phiZ(nk,:)
+       end do 
+     end if
+     deallocate(Vij,phi)
+     if (PRT_SOLUTION == "FULL_STOKES") deallocate(psiZ, phiZ)
     end do !end loop on lines for this atom
   end do !end loop over Natom
 
@@ -406,7 +416,6 @@ MODULE metal
   end if
 
 
-  NLTEspec%S_QUV = 0d0
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
   omegaB(1) = b0
   gamma(1) = g1; chi(1)=c1
@@ -514,18 +523,6 @@ MODULE metal
      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
        		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
      
-     if (line%polarizable) then
-      if (line%ZeemanPattern==0) then
-       !gamma(1) = !Bl = B*cos(gamma)
-       !chi(1) = 0d0
-       !derivative after, because we want dI/dlambda, I = exp(-tau)*(1.-exp(-dtau))*S
-       dlamB = -line%zm%shift(1) * 1*LARMOR * (line%lambda0)**2 * NM_TO_M / CLIGHT
-        NLTEspec%S_QUV(3,line%Nblue:line%Nred) = &
-         NLTEspec%S_QUV(3,line%Nblue:line%Nred) + dlamB
-      else
-        CALL ERROR("Zeeman Opac not implemented yet")
-      end if
-     end if
        
     end do !end loop on lines for this atom
   end do !end loop over Natom
