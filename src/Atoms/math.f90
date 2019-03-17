@@ -502,7 +502,7 @@ MODULE math
   FUNCTION w3js(j1,j2,j3,m1,m2,m3)
    integer :: m1, m2, m3, j1, j2, j3
    integer :: ia, ib, ic, id, ie, im, ig, ih, z, zmin, zmax, jsum
-   real(kind=8) :: w3js, cc, denom, cc1, cc2
+   double precision :: w3js, cc, denom, cc1, cc2
 
 
    w3js = 0.d0
