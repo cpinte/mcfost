@@ -12,7 +12,6 @@ MODULE spectrum_type
 
   IMPLICIT NONE
 
-
    real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
    real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
    character(len=*), parameter :: WAVES_FILE="wavelength_grid.fits.gz"
@@ -26,7 +25,7 @@ MODULE spectrum_type
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
-   double precision, allocatable, dimension(:,:,:)   :: rho!, epsilon!separated
+   double precision, allocatable, dimension(:,:,:)   :: epsilon!separated
    !passive opacities
    double precision, allocatable, dimension(:,:)   :: eta_p, chi_p
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
@@ -54,7 +53,7 @@ MODULE spectrum_type
    !Nlambda, xpix, ypix, Nincl, Naz
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
-   double precision, allocatable, dimension(:,:) :: S_QUV
+   !!double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
    double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
@@ -95,7 +94,6 @@ MODULE spectrum_type
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    CALL writeWavelength()
-  
   RETURN
   END SUBROUTINE initSpectrum
   
@@ -250,9 +248,10 @@ MODULE spectrum_type
     !check allocation due to field_free sol
     if (allocated(NLTEspec%StokesQ)) & !same for all dangerous
     	deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV, NLTEspec%F_QUV)
-    if (allocated(NLTEspec%S_QUV)) deallocate(NLTEspec%S_QUV)
+    !!if (allocated(NLTEspec%S_QUV)) deallocate(NLTEspec%S_QUV)
     if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
     if (allocated(NLTEspec%AtomOpac%epsilon_p)) deallocate(NLTEspec%AtomOpac%epsilon_p)
+    if (allocated(NLTEspec%AtomOpac%epsilon)) deallocate(NLTEspec%AtomOpac%epsilon)
    end if
    !! deallocate(NLTEspec%J20)
    
@@ -310,9 +309,9 @@ MODULE spectrum_type
     !check allocation because even if magnetized, due to the FIELD_FREE solution or WF
     !they might be not allocated !if (allocated(NLTEspec%AtomOpac%rho_p)) 
      NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
-     NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
+     NLTEspec%AtomOpac%epsilon_p(:,:,id) = 0d0
      !NLTE
-     !NLTEspec%AtomOpac%epsilon(:,:,id) = 0d0
+     if (NLTEspec%Nact > 0) NLTEspec%AtomOpac%epsilon(:,:,id) = 0d0
      !NLTEspec%AtomOpac%rho(:,:,id) = 0d0
     end if
     
@@ -466,11 +465,11 @@ MODULE spectrum_type
    end do
   end if ! l_sym_image  
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
-  
   ! write polarized flux if any. Atmosphere magnetic does not necessarily
   								!means we compute polarization
   if ((NLTEspec%atmos%magnetized) .and. (PRT_SOLUTION /= "NO_STOKES") &
                .and. (RT_line_method /= 1)) then
+   write(*,*) " -> Writing polarization"
    CALL ftcrhd(unit, status)
    naxis = 6
    naxes(1) = 3 !Q, U, V
