@@ -50,38 +50,90 @@ MODULE zeeman
  RETURN
  END SUBROUTINE Lande_eff
 
- SUBROUTINE ZeemanStrength()
-
-
+ FUNCTION ZeemanStrength(Ji, Mi, Jj, Mj)
+  use math, only : w3js
+  double precision :: ZeemanStrength
+  double precision, intent(in) :: Ji, Jj, Mi, Mj
+  integer :: dM, q
+  
+  !q = -1 = sB, 0 spi, +1 sr
+  !dM = 1 -> sr; dM = +1 sb
+  dM = int(Mj - Mi)
+  q = -dM
+  if (abs(dM) > 1) then
+    write(*,*) dM, " is not satisfying selection rules!"
+    ZeemanStrength = 0d0
+    RETURN !should not happen
+  end if
+  
+  !are they normed ? Should be
+  ZeemanStrength = 3d0 * w3js(int(2*Jj),int(2*Ji),2,&
+                              -int(2*Mj),int(2*Mi),-2*q)**2
  RETURN
- END SUBROUTINE ZeemanStrength
+ END FUNCTION ZeemanStrength
 
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
   type(AtomicLine), intent(inout) :: line  
-  
-  
-!    if (line%g_Lande_eff <= -99) then
-!     write(*,*) "Should not happen anymore"
-!     CALL Warning("  -> Landé factor not parsed for this line")
-!     !write(*,*) line%g_lande_eff, line%atom%qJ(line%i), line%atom%qJ(line%j)
-!     RETURN
-!    end if
+  integer :: nc, i1, i2
+  double precision :: Mi, Mj, norm(3) !sum of -1, 0 and +1 components
 
   ! IF PRT_SOLUTION IS WEAKFIELD WE NEVER ENTER HERE.
+  ! but now we need also to test if line%polarizable, meaning it has a geff > -99
+  ! and abs(dj) <= 1
 
-  if (line%ZeemanPattern == -1) then
+  if (line%ZeemanPattern == -1 .and. line%polarizable) then
    line%zm%Ncomponent = 3
+   allocate(line%zm%q(3), line%zm%strength(3), line%zm%shift(3))
    line%zm%q = (/-1, 0, 1/)
    line%zm%strength = 1d0 !Here all components have the same strength
    line%zm%shift = line%zm%q * line%g_Lande_eff !same shift
-   CALL Error("Effective Zeeman Triplet (EZT) not implemented yet!")   
    write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
    			  " Zeeman components, geff=", line%g_lande_eff
    			  
-  else if (line%ZeemanPattern == 1) then
+  else if (line%ZeemanPattern == 1 .and. line%polarizable) then
     !Strength relative of all components
-   CALL Error("Full Zeeman components not implemented yet!")
+   !First count number of components
+   line%zm%Ncomponent = 0
+   do i1=1,2*line%atom%qJ(line%j)+1
+    Mj = 2*line%atom%qJ(line%j) + 1 - i1
+    do i2=1,2*line%atom%qJ(line%i)+1
+     Mi = 2*line%atom%qJ(line%i) + 1 - i2
+!    do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
+!     do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
+     if (abs(Mi-Mj) <= 1) line%zm%Ncomponent = line%zm%Ncomponent + 1
+    end do
+   end do
    
+   allocate(line%zm%q(line%zm%Ncomponent), &
+            line%zm%strength(line%zm%Ncomponent), &
+            line%zm%shift(line%zm%Ncomponent))
+  
+   write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
+   			  " Zeeman components, geff=", line%g_lande_eff
+   write(*,*) "J' = ", line%atom%qJ(line%j), " J = ", line%atom%qJ(line%i)
+   nc = 0
+   norm = 0d0
+   do i1=1,2*line%atom%qJ(line%j)+1 !problem index non integer
+    Mj = line%atom%qJ(line%j) + 1 - i1
+     write(*,*) "Mj = ", Mj
+    do i2=1,2*line%atom%qJ(line%i)+1
+     Mi = line%atom%qJ(line%i) + 1 - i2
+     write(*,*) "Mi = ", Mi
+!    do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
+!     do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
+     if (abs(Mi-Mj) <= 1) then
+      nc = nc + 1
+      line%zm%q(nc) = -int(Mj - Mi)
+      line%zm%shift(nc) = line%glande_i * Mi - line%glande_j * Mj
+      line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,&
+      						                line%atom%qJ(line%j), Mj)
+      write(*,*) "Strength = ",line%zm%strength(nc) 
+      !norm(-q) = norm(1) if q=-1, norm(0) if q=0 and norm(3)=norm(-1) if q=1
+      norm(-line%zm%q(nc)) = norm(line%zm%q(nc)+2) + line%zm%strength(nc)
+     end if
+    end do
+   end do
+if (line%j==3 .and. line%i == 2) stop
   else if (.not.line%polarizable) then !unpolarized line
    allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
    line%zm%Ncomponent = 1
