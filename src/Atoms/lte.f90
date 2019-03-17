@@ -366,7 +366,8 @@ MODULE lte
   atmos%nHmin = 0d0 !init
   
   !!This is in case H is NLTE but has not converged pops yet, or not read from file
-  if (.not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar !for background Hydrogen and Hminus
+  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
+                                            !for background Hydrogen and Hminus
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k, PhiHmin,j) &
