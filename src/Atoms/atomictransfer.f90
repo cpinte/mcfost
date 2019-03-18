@@ -335,10 +335,10 @@ MODULE AtomicTransfer
 !                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
 ! 			NLTEspec%AtomOpac%etaQUV_p(:,2,id) /chiI
 !      ) !end Snu_U
-!      NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI
-!      ) !end Snu_V
+     NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
+                             exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI &
+     ) !end Snu_V
 
 
      facteur_tau = 1.0

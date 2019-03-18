@@ -52,14 +52,14 @@ MODULE zeeman
 
  FUNCTION ZeemanStrength(Ji, Mi, Jj, Mj)
   use math, only : w3js
-  double precision :: ZeemanStrength
+  double precision :: ZeemanStrength, dM
   double precision, intent(in) :: Ji, Jj, Mi, Mj
-  integer :: dM, q
+  integer :: q
   
   !q = -1 = sB, 0 spi, +1 sr
   !dM = 1 -> sr; dM = +1 sb
-  dM = int(Mj - Mi)
-  q = -dM
+  dM = Mj - Mi
+  q = -int(dM)
   if (abs(dM) > 1) then
     write(*,*) dM, " is not satisfying selection rules!"
     ZeemanStrength = 0d0
@@ -91,15 +91,15 @@ MODULE zeeman
    			  " Zeeman components, geff=", line%g_lande_eff
    			  
   else if (line%ZeemanPattern == 1 .and. line%polarizable) then
-    !Strength relative of all components
+   !Strength relative of all components
    !First count number of components
    line%zm%Ncomponent = 0
-   do i1=1,2*line%atom%qJ(line%j)+1
-    Mj = 2*line%atom%qJ(line%j) + 1 - i1
-    do i2=1,2*line%atom%qJ(line%i)+1
-     Mi = 2*line%atom%qJ(line%i) + 1 - i2
-!    do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
-!     do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
+!    do i1=1,2*line%atom%qJ(line%j)+1
+!     Mj = line%atom%qJ(line%j) + 1 - i1
+!     do i2=1,2*line%atom%qJ(line%i)+1
+!      Mi = line%atom%qJ(line%i) + 1 - i2
+   do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
+    do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
      if (abs(Mi-Mj) <= 1) line%zm%Ncomponent = line%zm%Ncomponent + 1
     end do
    end do
@@ -113,27 +113,27 @@ MODULE zeeman
    write(*,*) "J' = ", line%atom%qJ(line%j), " J = ", line%atom%qJ(line%i)
    nc = 0
    norm = 0d0
-   do i1=1,2*line%atom%qJ(line%j)+1 !problem index non integer
-    Mj = line%atom%qJ(line%j) + 1 - i1
-     write(*,*) "Mj = ", Mj
-    do i2=1,2*line%atom%qJ(line%i)+1
-     Mi = line%atom%qJ(line%i) + 1 - i2
-     write(*,*) "Mi = ", Mi
-!    do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
-!     do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
-     if (abs(Mi-Mj) <= 1) then
+!    do i1=1,2*line%atom%qJ(line%j)+1
+!      Mj = line%atom%qJ(line%j) + 1 - i1
+!      write(*,*) "Mj = ", Mj
+!     do i2=1,2*line%atom%qJ(line%i)+1
+!      Mi = line%atom%qJ(line%i) + 1 - i2
+!      write(*,*) "Mi = ", Mi
+   do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
+    do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
+     if (abs(Mj-Mi) <= 1) then
       nc = nc + 1
       line%zm%q(nc) = -int(Mj - Mi)
       line%zm%shift(nc) = line%glande_i * Mi - line%glande_j * Mj
       line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,&
       						                line%atom%qJ(line%j), Mj)
-      write(*,*) "Strength = ",line%zm%strength(nc) 
+      !write(*,*) "Strength = ",line%zm%strength(nc) 
       !norm(-q) = norm(1) if q=-1, norm(0) if q=0 and norm(3)=norm(-1) if q=1
       norm(-line%zm%q(nc)) = norm(line%zm%q(nc)+2) + line%zm%strength(nc)
      end if
     end do
    end do
-if (line%j==3 .and. line%i == 2) stop
+
   else if (.not.line%polarizable) then !unpolarized line
    allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
    line%zm%Ncomponent = 1
