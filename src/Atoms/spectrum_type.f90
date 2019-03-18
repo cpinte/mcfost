@@ -25,13 +25,15 @@ MODULE spectrum_type
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
-   double precision, allocatable, dimension(:,:,:)   :: epsilon!separated
+   double precision, allocatable, dimension(:,:,:)   :: etaQUV
+   ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
+   ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
+   ! emissivity.
    !passive opacities
    double precision, allocatable, dimension(:,:)   :: eta_p, chi_p
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
    !separate polarised opacities. Or regroud in one array with Nsize, or pointers ?
-   !!missing opac here
-   double precision, allocatable, dimension(:,:,:)   :: rho_p, epsilon_p !=etaQ,etaU,etaV
+   double precision, allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
    double precision, allocatable, dimension(:,:)   :: jc
    double precision, allocatable, dimension(:,:,:) :: Kc
    logical, dimension(:), allocatable :: initialized
@@ -155,16 +157,6 @@ MODULE spectrum_type
    NLTEspec%I = 0d0
    NLTEspec%Ic = 0d0
 
-!    if (NLTEspec%atmos%Magnetized) then
-!     allocate(NLTEspec%StokesQ(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), & 
-!              NLTEspec%StokesU(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), &
-!              NLTEspec%StokesV(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC), &
-!              NLTEspec%S_QUV(3,NLTEspec%Nwaves))
-!     NLTEspec%StokesQ=0d0
-!     NLTEspec%StokesU=0d0
-!     NLTEspec%StokesV=0d0
-!     !no continuum pol yet
-!    end if
    allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
    allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
    !! allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC))
@@ -173,11 +165,7 @@ MODULE spectrum_type
       
    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
-!    if (NLTEspec%atmos%magnetized) then 
-!     allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
-!     NLTEspec%F_QUV = 0d0
-!    end if
-   
+
    NLTEspec%Flux = 0.0
    NLTEspec%Fluxc = 0.0
    
@@ -249,10 +237,10 @@ MODULE spectrum_type
     !check allocation due to field_free sol
     if (allocated(NLTEspec%StokesQ)) & !same for all dangerous
     	deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV, NLTEspec%F_QUV)
-    !!if (allocated(NLTEspec%S_QUV)) deallocate(NLTEspec%S_QUV)
     if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
-    if (allocated(NLTEspec%AtomOpac%epsilon_p)) deallocate(NLTEspec%AtomOpac%epsilon_p)
-    if (allocated(NLTEspec%AtomOpac%epsilon)) deallocate(NLTEspec%AtomOpac%epsilon)
+    if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
+    if (allocated(NLTEspec%AtomOpac%etaQUV)) deallocate(NLTEspec%AtomOpac%etaQUV)
+    if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
    end if
    !! deallocate(NLTEspec%J20)
    
@@ -310,10 +298,10 @@ MODULE spectrum_type
     !check allocation because even if magnetized, due to the FIELD_FREE solution or WF
     !they might be not allocated !if (allocated(NLTEspec%AtomOpac%rho_p)) 
      NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
-     NLTEspec%AtomOpac%epsilon_p(:,:,id) = 0d0
+     NLTEspec%AtomOpac%etaQUV_p(:,:,id) = 0d0
+     NLTEspec%AtomOpac%chiQUV_p(:,:,id) = 0d0
      !NLTE
-     if (NLTEspec%Nact > 0) NLTEspec%AtomOpac%epsilon(:,:,id) = 0d0
-     !NLTEspec%AtomOpac%rho(:,:,id) = 0d0
+     NLTEspec%AtomOpac%etaQUV(:,:,id) = 0d0
     end if
     
   RETURN

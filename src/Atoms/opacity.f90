@@ -145,14 +145,19 @@ MODULE Opacity
     	
     aatom%lines(kr)%wlam(Nblue:Nred) = hc_4PI*phi(Nblue:Nred)! / (SQRTPI * aatom%vbroad(icell))
     
-!      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
-!        do nk = 1, 3
-!          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-!            Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
-!          NLTEspec%AtomOpac%epsilon(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%epsilon(Nblue:Nred,nk,id) + &
-!           twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell) * phiZ(nk,:)
-!        end do 
-!      end if
+     if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
+       do nk = 1, 3
+         !magneto-optical
+         NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
+           hc_4PI * line%Bij * (aatom%n(i,icell)-gij*aatom%n(j,icell)) * psiZ(nk,:)
+         !dichroism
+         NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
+           hc_4PI * line%Bij * (aatom%n(i,icell)-gij*aatom%n(j,icell)) * psiZ(nk,:)
+         !emissivity
+         NLTEspec%AtomOpac%etaQUV(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV(Nblue:Nred,nk,id) + &
+          twohnu3_c2 * gij * hc_4PI * line%Bij * aatom%n(j,icell) * phiZ(nk,:)
+       end do 
+     end if
     deallocate(phi)
     if (PRT_SOLUTION=="FULL_STOKES") deallocate(phiZ, psiZ)
    end do

@@ -235,9 +235,14 @@ MODULE metal
 
      if (PRT_SOLUTION == "FULL_STOKES") then
        do nk = 1, 3
+         !magneto-optical
          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
            hc_4PI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
-         NLTEspec%AtomOpac%epsilon_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%epsilon_p(Nblue:Nred,nk,id) + &
+         !dichroism
+         NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
+           hc_4PI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
+         !emissivity
+         NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
           twohnu3_c2 * gij * hc_4PI * line%Bij * atom%n(j,icell) * phiZ(nk,:)
        end do 
      end if

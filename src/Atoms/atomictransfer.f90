@@ -225,7 +225,6 @@ MODULE AtomicTransfer
   logical, intent(in) :: labs
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
-  double precision, dimension(3,NLTEspec%Nwaves) :: S_QUV
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chiI
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau
@@ -286,30 +285,30 @@ MODULE AtomicTransfer
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       chiI = (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
-                    NLTEspec%AtomOpac%Kc(icell,:,1))
+                    NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp)
       dtau(:)   = l_contrib * chiI
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / (chiI + 1d-300)
+                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / (chiI + tiny_dp)
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)) / &
-            (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300)
+            (NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp)
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-      chiI = (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id))
+      chiI = (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id) + tiny_dp)
       dtau(:)   =  l_contrib * chiI
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(:,id)
 
 
       Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / (chiI + 1d-300)
+                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / (chiI + tiny_dp)
 
 
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + &
             NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)) / &
-            (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
+            (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp)
     end if
     !continuum not affected by polarisation yet
      NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + &
@@ -317,21 +316,29 @@ MODULE AtomicTransfer
                              
     !Correct line source fonction from polarisation
     !explicit product of Seff = S - (K/chiI - 1) * I
+    !Is there a particular initialization to do for polarisation ?
+    !because it will be zero at the first place
      Snu(:) = Snu(:) + &
-     	-NLTEspec%AtomOpac%epsilon(:,1,id) / chiI *  NLTEspec%StokesQ(:,iray,id) +&
-     	-NLTEspec%AtomOpac%epsilon(:,2,id) / chiI *  NLTEspec%StokesU(:,iray,id) +&
-     	-NLTEspec%AtomOpac%epsilon(:,3,id) / chiI *  NLTEspec%StokesV(:,iray,id)
-     !S_QUV(1,:) = NLTEspec%AtomOpac%epsilon
+     	-NLTEspec%AtomOpac%chiQUV_p(:,1,id) / chiI *  NLTEspec%StokesQ(:,iray,id) +&
+     	-NLTEspec%AtomOpac%chiQUV_p(:,2,id) / chiI *  NLTEspec%StokesU(:,iray,id) +&
+     	-NLTEspec%AtomOpac%chiQUV_p(:,3,id) / chiI *  NLTEspec%StokesV(:,iray,id)
 
-     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + &
-                             exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+     NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+    
                              
-     NLTEspec%StokesQ(:,iray,id) = NLTEspec%StokesQ(:,iray,id) + &
-                             exp(-tau) * (1.0_dp - exp(-dtau)) * NLTEspec%AtomOpac%epsilon_p(:,1,id) /chiI 
-     NLTEspec%StokesU(:,iray,id) = NLTEspec%StokesU(:,iray,id) + &
-                             exp(-tau) * (1.0_dp - exp(-dtau)) * NLTEspec%AtomOpac%epsilon_p(:,2,id) /chiI
-     NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
-                             exp(-tau) * (1.0_dp - exp(-dtau)) * NLTEspec%AtomOpac%epsilon_p(:,3,id) /chiI
+!      NLTEspec%StokesQ(:,iray,id) = NLTEspec%StokesQ(:,iray,id) + &
+!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+! 			(NLTEspec%AtomOpac%etaQUV_p(:,1,id)+NLTEspec%AtomOpac%etaQUV(:,1,id)) /chiI + &
+! sum of other term
+!      ) !end Snu_Q
+!      NLTEspec%StokesU(:,iray,id) = NLTEspec%StokesU(:,iray,id) + &
+!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+! 			(NLTEspec%AtomOpac%etaQUV_p(:,2,id)+NLTEspec%AtomOpac%etaQUV(:,2,id)) /chiI
+!      ) !end Snu_U
+!      NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
+!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+! 			(NLTEspec%AtomOpac%etaQUV_p(:,3,id)+NLTEspec%AtomOpac%etaQUV(:,3,id)) /chiI
+!      ) !end Snu_V
 
 
      facteur_tau = 1.0
@@ -689,8 +696,13 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
 !! ----------------------- Read Model ---------------------- !!
   ! -> only for not Voronoi
-  if (.not.lpluto_file) CALL magneto_accretion_model()  
-  !CALL uniform_law_model()
+  !later use the same density and T as defined in dust_transfer.f90
+  !apply a correction for atomic line if needed.
+  !if not flag atom in parafile, never enter this subroutine
+  if (.not.lpluto_file) then 
+  ! CALL magneto_accretion_model()  
+  CALL uniform_law_model()
+  end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
@@ -946,6 +958,8 @@ MODULE AtomicTransfer
        w0 = -z0/norme
       end if
 
+      !Only compute continuum NLTE for iray==1, because indpendent of direction
+      NLTEspec%AtomOpac%initialized(id) = (iray==1)
       CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
 
      end do !ray
@@ -1018,8 +1032,9 @@ stop
       !if (associated(Profile)) Profile => NULL()
       !Profile => Iprofile !already init to that
       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
-      if (allocated(NLTEspec%AtomOpac%epsilon_p)) deallocate(NLTEspec%AtomOpac%epsilon_p)
-      if (allocated(NLTEspec%AtomOpac%epsilon)) deallocate(NLTEspec%AtomOpac%epsilon)
+      if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
+      if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
+      if (allocated(NLTEspec%AtomOpac%etaQUV)) deallocate(NLTEspec%AtomOpac%etaQUV)
       if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
       if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
       												NLTEspec%StokesU)
@@ -1046,9 +1061,9 @@ stop
       NLTEspec%F_QUV = 0d0
       if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
       	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-        allocate(NLTEspec%AtomOpac%epsilon_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-        if (atmos%NactiveAtoms > 0) &
-        	allocate(NLTEspec%AtomOpac%epsilon(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%etaQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%chiQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%etaQUV(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
 
         write(*,*) " Using FULL_STOKES solution for the SEE!"
       end if
