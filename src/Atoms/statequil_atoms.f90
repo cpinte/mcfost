@@ -9,7 +9,7 @@ MODULE statequil_atoms
 
  CONTAINS
  
- SUBROUTINE initGamma()
+ SUBROUTINE initGamma(icell) !icell temporary
  ! ------------------------------------------------------ !
   !for each active atom, allocate and init Gamma matrix
   !deallocated in freeAtom()
@@ -18,6 +18,7 @@ MODULE statequil_atoms
   ! value.
  ! ------------------------------------------------------ !
   integer :: nact, Nlevel, i, j, ij
+  integer, intent(in) :: icell
   type (AtomType), pointer :: atom
   
   do nact = 1, atmos%Nactiveatoms
@@ -28,7 +29,7 @@ MODULE statequil_atoms
    do i=1, Nlevel
     do j=1,Nlevel
       ij = ij + 1
-      atom%Gamma(i,j) = atom%C(ij) 
+      atom%Gamma(i,j) = atom%Ckij(icell,ij)!atom%C(ij) 
     end do
    end do
    NULLIFY(atom)
@@ -77,25 +78,33 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillCrossCoupling_terms
  
- SUBROUTINE fillGamma(id,icell)
- !---------------------------------- !
-  ! for all atoms
-  !
- !---------------------------------- !
-  integer, intent(in) :: id, icell
+ SUBROUTINE fillGamma(id,icell,iray,methode)
+ !------------------------------------------------- !
+  ! for all atoms, performs wavelength
+  ! and angle integration of rate matrix
+ !------------------------------------------------- !
+  integer, intent(in) :: id, icell, iray
+  character(len=*), intent(in) :: methode !ALI, MALI
   integer :: nact, nc, kr
   type (AtomType), pointer :: atom
-
+  double precision, dimension(:), allocatable :: Ieff
   
+  allocate(Ieff(NLTEspec%Nwaves)); Ieff=0d0
 
+  do nact=1,atmos%Nactiveatoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+   Ieff(:) = NLTEspec%I(:,iray,id) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)!at this iray, id
+   
+  end do
+  deallocate(Ieff)
   NULLIFY(atom)
  RETURN
  END SUBROUTINE fillGamma
  
- SUBROUTINE statequil()
+ SUBROUTINE SEE()
 
  RETURN
- END SUBROUTINE statequil
+ END SUBROUTINE SEE
  
  SUBROUTINE initRadiativeRates(atom)
  ! ---------------------------------------- !

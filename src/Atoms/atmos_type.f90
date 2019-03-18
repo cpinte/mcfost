@@ -51,9 +51,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
-   logical :: Magnetized = .false., XRD=.false., calc_ne, &
-     H_LTE=.false. ! force LTE populations of H for
-                   ! background opacities
+   logical :: Magnetized = .false., XRD=.false., calc_ne
    logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
   END TYPE GridType
 
@@ -534,7 +532,7 @@ MODULE atmos_type
    FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(bproj)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
-   ! one point of the cell icell and the angles
+   ! one point of the model icell and the angles
    ! gamma and chi, the angle between B and the
    ! line of sight and the azimuth respectively.
    ! ------------------------------------------- !

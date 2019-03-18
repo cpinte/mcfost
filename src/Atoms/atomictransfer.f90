@@ -6,17 +6,7 @@
 ! Outputs:
 ! - Flux (\lambda) [J.s^{-1}.m^{-2}.Hz^{-1}]
 ! - Irradiation map around a line [J.s^{-1}.m^{-2}.Hz^{-1}.pix^{-1}] !sr^{-1}
-!   --> not exactly, it is multiplied by the pixel solid angle seen from the Earth.
-! TBD - levels population n
-! TBD - Cooling rates PHIij = njRij - niRji
-! TBD - Contribution function around a line
-! - Electron density
-! TBD - Fixed radiative rates
-! TBD - Full NLTE line transfer
-! TBD - PFR on the "atoms'frame - observer's frame" approach
 !
-! It uses all the NLTE modules in NLTE/ and it is called in mcfost.f90 similar to
-! mol_transfer.f90
 !
 ! Note: SI units, velocity in m/s, density in kg/m3, radius in m
 ! ----------------------------------------------------------------------------------- !
@@ -25,7 +15,7 @@
 MODULE AtomicTransfer
 
  use metal, only                        : Background, BackgroundContinua, BackgroundLines
- use opacity, only  					: NLTEopacity
+ use opacity
  use Profiles
  use spectrum_type
  use atmos_type
@@ -151,10 +141,12 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
+     CALL initCrossCoupling(id) !does nothing if not active atoms
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-     if (lstore_opac) then
+     !never enter NLTEopacity if no activeatoms
+     if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
@@ -288,6 +280,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
+     CALL initCrossCoupling(id)
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
 
      if (lstore_opac) then
@@ -661,7 +654,6 @@ MODULE AtomicTransfer
   character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES"
   logical :: lwrite_waves = .false.
 
-#include "sprng_f.h"
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   Profile => IProfile
   INTEG_RAY_LINE => INTEG_RAY_LINE_I
@@ -774,7 +766,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
-  if (atmos%Nactiveatoms > 0) CALL NLTEloop(0, 1d-4)
+  if (atmos%Nactiveatoms > 0) CALL NLTEloop()
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
@@ -814,14 +806,45 @@ MODULE AtomicTransfer
  END SUBROUTINE
  ! ------------------------------------------------------------------------------------ !
 
- SUBROUTINE NLTEloop(Nmaxiter, IterLim)
-  integer, intent(in) :: Nmaxiter
-  double precision, intent(in) :: IterLim
-  integer :: atomunit = 1, nact, niter 
-  integer :: NIterMax = 1
+ SUBROUTINE NLTEloop() !for all active atoms
+ 
+#include "sprng_f.h"
+
+  integer, parameter :: n_rayons_start = 50 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start2 = 20
+  integer, parameter :: n_iter2_max = 10
+  integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
+  integer :: n_level_comp
+  real, parameter :: precision_sub = 1.0e-3
+  real, parameter :: precision = 1.0e-1
+  integer :: etape, etape_start, etape_end, iray, n_rayons
+  integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
+  integer, dimension(nb_proc) :: max_n_iter_loc
+
+  logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
+
+  real :: rand, rand2, rand3, fac_etape
+
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
+
+  logical :: labs
+  integer :: atomunit = 1, nact
   integer :: icell
-  integer :: ibin, iaz, Nlevel_total = 0
+  integer :: Nlevel_total = 0
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+  
+  n_rayons_max = atmos%Nrays
+  labs = .true.
+  id = 1
+  
+  !only etape1 for now
+  lfixed_rays = .true.
+  n_rayons = 2 ! one up one down
+  iray_start = 1
+  lprevious_converged = .false.
+  lnotfixed_rays = .not.lfixed_rays
+  lconverged = .false.
+  n_iter = 0
 
  ! ----------------------------  INITIAL POPS------------------------------------------ !
   write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
@@ -865,10 +888,31 @@ MODULE AtomicTransfer
  !make sure to properly RETURN if NmaxIter=0
  !could be error in H background if not lstore_opac, cause opacities will be updated
  !but we do not want that
- niter = 1
- if (nIterMax < nMaxIter) nIterMax = nMaxIter
- do while (niter <= nIterMax)
+ do while (.not.lconverged) 
+  n_iter = n_iter + 1
+  write(*,*) " -> Iteration #", n_iter
+  if (lfixed_rays) then
+    stream = 0.0
+    do i=1,nb_proc
+     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+    end do
+  end if
+  
+  !do icell=1, n_Cells
+  !	CALL initGamma(icell) !set Gamma to C for each active atom
+  !end do
+  
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+  !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell) &
+  !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
+  !$omp shared(atmos, n_cells) &
+  !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
+  !$omp do schedule(static,1)
   do icell=1, n_cells
+   CALL initGamma(icell)
+   !$ id = omp_get_thread_num() + 1
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
 !   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open
@@ -881,11 +925,51 @@ MODULE AtomicTransfer
 !       !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
 !       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
 !   	end do
-  	CALL initGamma(icell) !set Gamma to C for each active atom
+    !Formal solution for this cell, for all wavelength and angle
+   if (atmos%lcompute_atomRT(icell)) then
+     do iray=iray_start, iray_start-1+n_rayons
+      
+      !only etape1
+      x0 = r_grid(icell)
+      y0 = 0d0
+      z0 = z_grid(icell)
+      !Assume no keplerian
+      
+      norme = dsqrt(x0**2 + y0**2 + z0**2)
+      if (iray==1) then
+       u0 = x0/norme
+       v0 = y0/norme
+       w0 = z0/norme
+      else
+       u0 = -x0/norme
+       v0 = -y0/norme
+       w0 = -z0/norme
+      end if
+
+      CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
+
+     end do !ray
+     n_iter_loc = 0
+     lconverged_loc = .false.
+      
+     do while (.not.lconverged_loc)
+       n_iter_loc = n_iter_loc + 1
+       !do something
+       !return the criterion of local convergence
+       
+       if (diff < precision_sub) then
+        lconverged_loc = .true.
+       else
+        lconverged_loc = .false. !opacity recomputed in integ_ray_line
+       end if
+     end do
+      
+   end if
   end do !cell loop
-  niter = niter + 1
-  !exit if convergence reached
- end do !loop over iteration
+  !$omp end do
+  !$omp end parallel
+  if (n_iter >= 10) exit
+ end do !loop over iteration, convergence global
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
   do nact=1,atmos%Nactiveatoms
