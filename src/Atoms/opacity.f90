@@ -154,7 +154,7 @@ MODULE Opacity
          NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
            hc_4PI * line%Bij * (aatom%n(i,icell)-gij*aatom%n(j,icell)) * psiZ(nk,:)
          !emissivity
-         NLTEspec%AtomOpac%etaQUV(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV(Nblue:Nred,nk,id) + &
+         NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
           twohnu3_c2 * gij * hc_4PI * line%Bij * aatom%n(j,icell) * phiZ(nk,:)
        end do 
      end if

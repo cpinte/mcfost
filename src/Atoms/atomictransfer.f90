@@ -328,16 +328,16 @@ MODULE AtomicTransfer
                              
 !      NLTEspec%StokesQ(:,iray,id) = NLTEspec%StokesQ(:,iray,id) + &
 !                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			(NLTEspec%AtomOpac%etaQUV_p(:,1,id)+NLTEspec%AtomOpac%etaQUV(:,1,id)) /chiI + &
+! 			NLTEspec%AtomOpac%etaQUV_p(:,1,id) /chiI + &
 ! sum of other term
 !      ) !end Snu_Q
 !      NLTEspec%StokesU(:,iray,id) = NLTEspec%StokesU(:,iray,id) + &
 !                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			(NLTEspec%AtomOpac%etaQUV_p(:,2,id)+NLTEspec%AtomOpac%etaQUV(:,2,id)) /chiI
+! 			NLTEspec%AtomOpac%etaQUV_p(:,2,id) /chiI
 !      ) !end Snu_U
 !      NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
 !                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			(NLTEspec%AtomOpac%etaQUV_p(:,3,id)+NLTEspec%AtomOpac%etaQUV(:,3,id)) /chiI
+! 			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI
 !      ) !end Snu_V
 
 
@@ -683,6 +683,10 @@ MODULE AtomicTransfer
    RT_line_method = 1 !pixels circulaires
   end if
 
+  if (PRT_SOLUTION == "FULL_STOKES") then
+   CALL Warning(" Full Stokes solution not allowed. Stokes polarization not handled in SEE yet.")
+   PRT_SOLUTION = "FIELD_FREE"
+  end if
 
   if (atmos%magnetized .and. PRT_SOLUTION /= "NO_STOKES") then
    if (PRT_SOLUTION == "FIELD_FREE") newPRT_SOLUTION = "FULL_STOKES"
@@ -1034,7 +1038,6 @@ stop
       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
       if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
       if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
-      if (allocated(NLTEspec%AtomOpac%etaQUV)) deallocate(NLTEspec%AtomOpac%etaQUV)
       if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
       if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
       												NLTEspec%StokesU)
@@ -1063,7 +1066,6 @@ stop
       	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
         allocate(NLTEspec%AtomOpac%etaQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
         allocate(NLTEspec%AtomOpac%chiQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-        allocate(NLTEspec%AtomOpac%etaQUV(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
 
         write(*,*) " Using FULL_STOKES solution for the SEE!"
       end if

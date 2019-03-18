@@ -25,10 +25,10 @@ MODULE spectrum_type
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
-   double precision, allocatable, dimension(:,:,:)   :: etaQUV
    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
-   ! emissivity.
+   ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
+   ! and NLTE is the same variable
    !passive opacities
    double precision, allocatable, dimension(:,:)   :: eta_p, chi_p
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
@@ -239,7 +239,6 @@ MODULE spectrum_type
     	deallocate(NLTEspec%StokesQ, NLTEspec%StokesU, NLTEspec%StokesV, NLTEspec%F_QUV)
     if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
     if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
-    if (allocated(NLTEspec%AtomOpac%etaQUV)) deallocate(NLTEspec%AtomOpac%etaQUV)
     if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
    end if
    !! deallocate(NLTEspec%J20)
@@ -300,8 +299,10 @@ MODULE spectrum_type
      NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
      NLTEspec%AtomOpac%etaQUV_p(:,:,id) = 0d0
      NLTEspec%AtomOpac%chiQUV_p(:,:,id) = 0d0
-     !NLTE
-     NLTEspec%AtomOpac%etaQUV(:,:,id) = 0d0
+     !both NLTE and LTE actually.
+     !If one want to add them in SEE, it has to be atom (atom%eta) dependent for emissivity.
+     !adding the off diagonal elements in SEE results in solving for the whole
+     !density matrix, WEEEEEEELLLLL beyond our purpose.
     end if
     
   RETURN
