@@ -231,7 +231,7 @@ MODULE PROFILES
              F = 0d0
              LV = 0d0
           end do !components 
-          !the output, for the other we store eta_pol/eta_I, rho_pol/chi_I etc
+          !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
           P(:) = P(:) + 0.5*(phi_zc(2,:) * sin(gamma(nb))**2 + \
             0.5*(1+cos(gamma(nb))**2) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI

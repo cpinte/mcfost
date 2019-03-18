@@ -25,6 +25,7 @@
 MODULE AtomicTransfer
 
  use metal, only                        : Background, BackgroundContinua, BackgroundLines
+ use opacity, only  					: NLTEopacity
  use Profiles
  use spectrum_type
  use atmos_type
@@ -55,6 +56,9 @@ MODULE AtomicTransfer
  IMPLICIT NONE
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
+ 
+ !Try to give a good idea to the user on how much RAM memory will be used
+ integer :: Total_size_1 = 0, Total_size_2 = 0
 
  CONTAINS
  
@@ -149,6 +153,7 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
@@ -228,6 +233,7 @@ MODULE AtomicTransfer
   logical, intent(in) :: labs
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
+  double precision, dimension(3,NLTEspec%Nwaves) :: S_QUV
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chiI
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau
@@ -282,6 +288,8 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
+
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       chiI = (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
@@ -315,8 +323,13 @@ MODULE AtomicTransfer
                              exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
                              
     !Correct line source fonction from polarisation
-    !explicit product of Seff = 
-    !Snu(:) = 
+    !explicit product of Seff = S - (K/chiI - 1) * I
+     Snu(:) = Snu(:) + &
+     	-NLTEspec%AtomOpac%epsilon(:,1,id) / chiI *  NLTEspec%StokesQ(:,iray,id) +&
+     	-NLTEspec%AtomOpac%epsilon(:,2,id) / chiI *  NLTEspec%StokesU(:,iray,id) +&
+     	-NLTEspec%AtomOpac%epsilon(:,3,id) / chiI *  NLTEspec%StokesV(:,iray,id)
+     !S_QUV(1,:) = NLTEspec%AtomOpac%epsilon
+
      NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + &
                              exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
                              
@@ -695,7 +708,7 @@ MODULE AtomicTransfer
   CALL readAtomicModels(atomunit)
   if (atmos%NactiveAtoms > 0) then 
    atmos%Nrays = 300
-   write(*,*) " Using", atmos%Nrays," for NLTE line transfer"
+   write(*,*) " Using", atmos%Nrays," rays for NLTE line transfer"
   end if
 
   ! if the electron density is not provided by the model or simply want to
@@ -787,9 +800,10 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! -------------------------------- CLEANING ------------------------------------------ !
  !close file after NLTE loop
- do nact=1,atmos%Nactiveatoms
-  CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
- end do
+!Temporary: because we kept in memory, so file is closed earlier
+!  do nact=1,atmos%Nactiveatoms
+!   CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
+!  end do
  !CALL WRITEATOM() !keep C in memory for that ?
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()
@@ -803,9 +817,10 @@ MODULE AtomicTransfer
  SUBROUTINE NLTEloop(Nmaxiter, IterLim)
   integer, intent(in) :: Nmaxiter
   double precision, intent(in) :: IterLim
-  integer :: atomunit = 1, nact
+  integer :: atomunit = 1, nact, niter 
+  integer :: NIterMax = 1
   integer :: icell
-  integer :: ibin, iaz
+  integer :: ibin, iaz, Nlevel_total = 0
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
 
  ! ----------------------------  INITIAL POPS------------------------------------------ !
@@ -816,19 +831,43 @@ MODULE AtomicTransfer
   do nact=1,atmos%Nactiveatoms
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
-     atmos%Atoms(nact)%ptr_atom%NLTEpops = .true.
+     atmos%ActiveAtoms(nact)%ptr_atom%NLTEpops = .true.
+     Nlevel_total = Nlevel_total + atmos%ActiveAtoms(nact)%ptr_atom%Nlevel**2
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
      atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
   end do
+  
+  ! Temporary keep collision on RAM, BEWARE IT CAN BE LARGE, need a better collision routine
+  ! which stores the required data to compute on the fly the Cij, instead of reading it
+  ! each cell
+   if (real(Nlevel_total*n_cells)/(1024**3) < 1.) then
+    write(*,*) "Keeping", real(Nlevel_total*n_cells)/(1024**2), " MB of memory", &
+   	 " for Collisional matrix."
+   else
+    write(*,*) "Keeping", real(Nlevel_total*n_cells)/(1024**3), " GB of memory", &
+   	 " for Collisional matrix."
+   end if
 
+   do nact=1,atmos%Nactiveatoms
+     do icell=1,atmos%Nspace
+	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom) !open and allocated in LTE.f90
+      !try keeping in memory until better collision routine !
+  	end do
+  	CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
+  	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
+  end do
   !end replacing initSol()
   
-
  ! ---------------------------------- CELLS LOOP -------------------------------------- !
  ! Start loop here !
  !make sure to properly RETURN if NmaxIter=0
+ !could be error in H background if not lstore_opac, cause opacities will be updated
+ !but we do not want that
+ niter = 1
+ if (nIterMax < nMaxIter) nIterMax = nMaxIter
+ do while (niter <= nIterMax)
   do icell=1, n_cells
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
@@ -837,13 +876,24 @@ MODULE AtomicTransfer
 !   ! instead of the whole grid. So some extra IO overheads.
 !   !They can be removed by keeping C in memory for each atom: NactAtom * Nlevel**2 * n_cells
 !   ! Or keeping in memory the collision data. (TO DO)
-  	do nact=1,atmos%Nactiveatoms
-	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom)
-      !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
-      !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
-  	end do
-  	CALL initGamma() !set Gamma to C for each active atom
+!   	do nact=1,atmos%Nactiveatoms
+! 	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom)
+!       !note that when updating populations, if ne is kept fixed (and T and nHtot etc)
+!       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
+!   	end do
+  	CALL initGamma(icell) !set Gamma to C for each active atom
   end do !cell loop
+  niter = niter + 1
+  !exit if convergence reached
+ end do !loop over iteration
+ ! -------------------------------- CLEANING ------------------------------------------ !
+  ! Remove NLTE quantities not useful now
+  do nact=1,atmos%Nactiveatoms
+   if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
+     deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
+   deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
+  end do
+stop
  ! ------------------------------------------------------------------------------------ !
  RETURN
  END SUBROUTINE NLTEloop

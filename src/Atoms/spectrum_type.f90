@@ -30,6 +30,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:)   :: eta_p, chi_p
    double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
    !separate polarised opacities. Or regroud in one array with Nsize, or pointers ?
+   !!missing opac here
    double precision, allocatable, dimension(:,:,:)   :: rho_p, epsilon_p !=etaQ,etaU,etaV
    double precision, allocatable, dimension(:,:)   :: jc
    double precision, allocatable, dimension(:,:,:) :: Kc

@@ -66,18 +66,10 @@ MODULE Opacity
   character(len=20) :: VoigtMethod="HUMLICEK"
   integer :: Nvspace, nv, nk
   double precision :: omegav(NvspaceMax), v0, v1, delta_vol_phi, xphi, yphi, zphi, dv, hc_4PI
-!vv(NLTEspec%Nwaves), vvoigt(NLTEspec%Nwaves),   						  
   exp_lambda = dexp(-hc_k / (NLTEspec%lambda * atmos%T(icell)))
   twohnu3_c2 = twohc / NLTEspec%lambda(:)**(3d0)
   hc_4PI = HPLANCK * CLIGHT / (4d0 * PI)
   
-!   v_proj in m/s at point icell
-!   omegav = 0d0
-!   Nvspace = 1
-!   if (.not.lstatic) then
-!    v0 = v_proj(icell,x,y,z,u,v,w)
-!    omegav(1) = v0
-!   end if
   
   do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -113,22 +105,6 @@ MODULE Opacity
     !after all populations have been converged
    	end do
    end if
-   
-   
-!    if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0) 
-!      Nvspace = max(2,nint(20*dv/aatom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
-!      omegav(Nvspace) = v1
-!      do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!      end do 
-!    end if
     
    do kr = 1, aatom%Nline
     line = aatom%lines(kr)
@@ -141,8 +117,6 @@ MODULE Opacity
     end if 
     gij = 0d0
     Vij = 0d0
-!     vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
-!            CLIGHT / (line%lambda0 * aatom%vbroad(icell))
 
     gij = line%Bji / line%Bij
     twohnu3_c2 = line%Aji / line%Bji
@@ -151,23 +125,7 @@ MODULE Opacity
     if (PRT_SOLUTION=="FULL_STOKES") &
     	allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
     CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
-!     if (line%voigt) then
-!       !some work to do here if line%damping_initialized = .true.==kept on the whole grid.
-!       CALL Damping(icell, aatom, kr, line%adamp)
-!        ! init for this line of this atom accounting for Velocity fields
-!        do nv=1, Nvspace
-!         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / aatom%vbroad(icell)
-! 
-!         phi(Nblue:Nred) = phi(Nblue:Nred) + &
-!             Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
-!                   phip, VoigtMethod) / Nvspace
-!       end do
-!      else !Gaussian
-!       do nv=1, Nvspace
-!         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / aatom%vbroad(icell)
-!        phi(Nblue:Nred) = phi(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
-!       end do
-!      end if !line%voigt
+
 
      Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * aatom%vbroad(icell))
