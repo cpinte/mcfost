@@ -357,6 +357,8 @@ MODULE lte
    CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
      if (atmos%Atoms(n)%ptr_atom%active) then
        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+       !Temporary
+       allocate(atmos%Atoms(n)%ptr_atom%Ckij(atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
        !open collision file
        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
      end if

@@ -7,14 +7,31 @@ MODULE atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2
-
+   real(8), parameter :: BRK=4.0
+   integer, parameter :: MSHELL=5
+   character(len=20), dimension(16) :: col_recipe !16 recipes for collision rates
+   data col_recipe / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
+                    "AR85-CHP", "AR85-CHH", "AR85-CEA", "BURGESS", "SHULL82",&
+                    "BADNELL", "SUMMERS", "AR85-CDI" /
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- TYPE ZeemanType
-  integer :: Ncomponent
-  integer, allocatable, dimension(:)  :: q
-  double precision, allocatable, dimension(:)  :: shift, strength
- END TYPE ZeemanType
+  TYPE ZeemanType
+   integer :: Ncomponent
+   integer, allocatable, dimension(:)  :: q
+   double precision, allocatable, dimension(:)  :: shift, strength
+  END TYPE ZeemanType
+ 
+  !Store for each atom, depth independant data necessary to compute C matrix
+  !at each cell. It avoids reading a file during the NLTE loop
+  TYPE CollisionData
+   integer :: NTMP
+   integer, dimension(16) :: ij, ji, ir !index to recipe
+   double precision, allocatable, dimension(:) :: TGRID
+  END TYPE CollisionData
+  
+  TYPE ptrCollisionArr
+   type (CollisionData) :: ptr_col
+  END TYPE ptrCollisionArr
  
   TYPE AtomicLine
    logical           :: symmetric, polarizable
@@ -77,7 +94,9 @@ MODULE atom_type
    real(8), allocatable, dimension(:) :: g, E, vbroad, ntotal
    real(8), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
-   real(8), dimension(:), allocatable :: C
+   type (ptrCollisionArr), dimension(:), allocatable :: col_data
+   real(8), dimension(:), allocatable :: C !Nlevel*Nlevel
+   real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
    double precision, dimension(:,:), allocatable :: Gamma !now depth dependence is dropped
    real(8), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
