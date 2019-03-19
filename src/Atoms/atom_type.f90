@@ -7,19 +7,42 @@ MODULE atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2
-
+   real(8), parameter :: BRK=4.0
+   integer, parameter :: MSHELL=5
+   character(len=20), dimension(16) :: col_recipe !16 recipes for collision rates
+   data col_recipe / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
+                    "AR85-CHP", "AR85-CHH", "AR85-CEA", "BURGESS", "SHULL82",&
+                    "BADNELL", "SUMMERS", "AR85-CDI" /
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  TYPE ZeemanType
+   integer :: Ncomponent
+   integer, allocatable, dimension(:)  :: q
+   double precision, allocatable, dimension(:)  :: shift, strength
+  END TYPE ZeemanType
+ 
+  !Store for each atom, depth independant data necessary to compute C matrix
+  !at each cell. It avoids reading a file during the NLTE loop
+  TYPE CollisionData
+   integer :: NTMP
+   integer, dimension(16) :: ij, ji, ir !index to recipe
+   double precision, allocatable, dimension(:) :: TGRID
+  END TYPE CollisionData
+  
+  TYPE ptrCollisionArr
+   type (CollisionData) :: ptr_col
+  END TYPE ptrCollisionArr
+ 
   TYPE AtomicLine
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
-   character(len=20) :: trtype="ATOMIC_LINE"
+   character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
    integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
-   real(8) :: qcore, qwing
+   real(8) :: qcore, qwing, glande_i, glande_j
    real(8), dimension(4) :: cvdWaals
    real(8), allocatable, dimension(:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
    !wlam is the integration wavelenght weigh = phi
@@ -33,7 +56,9 @@ MODULE atom_type
    !!proc what are the active transitions involved in the Gamma matrix.
    double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
+   integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
+   type (ZeemanType) :: zm
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
@@ -69,7 +94,9 @@ MODULE atom_type
    real(8), allocatable, dimension(:) :: g, E, vbroad, ntotal
    real(8), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
-   real(8), dimension(:), allocatable :: C
+   type (ptrCollisionArr), dimension(:), allocatable :: col_data
+   real(8), dimension(:), allocatable :: C !Nlevel*Nlevel
+   real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
    double precision, dimension(:,:), allocatable :: Gamma !now depth dependence is dropped
    real(8), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
@@ -100,11 +127,6 @@ MODULE atom_type
  END TYPE Element
 
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- TYPE ZeemanType
-  integer :: Ncomponent
-  integer, allocatable, dimension(:)  :: q
-  double precision, allocatable, dimension(:)  :: shift, strength
- END TYPE ZeemanType
 
  CONTAINS
 
@@ -262,8 +284,8 @@ MODULE atom_type
 
   S = (real(S,kind=8) - 1.)/2.
   L = getOrbital(orbit)
-  J = (g-1.)/2.
-  if (J.gt.(L+S)) then
+  J = L + S!(g-1.)/2.
+  if (J>(L+S)) then
    determined = .false.
   end if
 
@@ -294,5 +316,54 @@ MODULE atom_type
    !WK = wKul**2
   RETURN
   END FUNCTION wKul
+
+   SUBROUTINE PTrowcol(Z, row, col)
+   ! ---------------------------------------------------
+   ! Position in the periodic table of an atom according
+   ! to this Z number.
+   ! min row is 1, max row is 87 Francium
+   ! No special ceses yet for Lanthanides and Actinides
+   ! min col is 1, max col is 18
+   ! beware He, is on the 18 column, because they are 16
+   ! empty columns between H and He
+   ! ---------------------------------------------------
+
+   integer i
+   integer, intent(in) :: Z
+   integer, intent(out) :: row, col
+   integer :: istart(7)
+
+   row = 0
+   col = 0
+
+   istart = (/1, 3, 11, 19, 37, 55, 87/) !first Z of each rows
+
+   ! -- find row
+   do i=1,6
+    if ((Z .ge. istart(i)) .and. (Z .lt. istart(i + 1))) then
+     ! we are on the row istart(i)
+     row=i
+     exit
+    end if
+   end do
+   ! find column on the row
+   col = Z - istart(i) + 1
+
+   ! for relative position just comment out the following lines
+   ! or take col=col-10 (or-18 for He) for these cases.
+
+   ! special case of Z=2 for Helium because there are 16
+   ! empty columns between Hydrogen and Helium
+   if (Z.eq.2) then
+    col = col + 16
+   ! ten empty lines between Be and B
+   ! ten empty lines between Mg and Al
+   else if (((istart(i).eq.3).or.(istart(i)).eq.11).and.&
+      (Z.gt.istart(i)+1)) then
+    !row = istart(i)
+    col = col+10
+   end if
+  RETURN
+  END SUBROUTINE PTrowcol
 
 END MODULE atom_type

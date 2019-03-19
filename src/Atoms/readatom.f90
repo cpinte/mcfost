@@ -1,8 +1,8 @@
 MODULE readatom
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate
-  use atmos_type, only : atmos, Nelem, Hydrogen, Helium, freeAtom
-  use zeeman, only : Lande_eff
+  use atmos_type, only : atmos, Nelem, Hydrogen, Helium
+  use zeeman, only : Lande_eff, ZeemanMultiplet
   use getlambda
   use constant
   use uplow
@@ -12,6 +12,7 @@ MODULE readatom
   !$ use omp_lib
 
   !MCFOST's originals
+  use messages
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
 
@@ -62,7 +63,7 @@ MODULE readatom
 
     IDread(2:2) = to_lower(IDread(2:2))
     atom%ID = IDread
-    write(*,*) "AtomID = ", atom%ID
+    write(*,*) "Reading atomic model of atom ", atom%ID
 
     match = .false.
     do nll=1,Nelem
@@ -87,7 +88,8 @@ MODULE readatom
     CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
     read(inputline,*) atom%Nlevel, atom%Nline, atom%Ncont, atom%Nfixed
     write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
-              " Ncont=", atom%Ncont, " Nfixed=", atom%Nfixed
+              " Ncont=", atom%Ncont!, " Nfixed=", atom%Nfixed
+              !deprecated Nfixed will be removed
 
     !read for each level, Energie (%E), statistical weight (%g), label,
     ! stage and levelNo
@@ -155,12 +157,20 @@ MODULE readatom
      atom%lines(kr)%atom => atom
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
+     atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
      !atom%lines(kr)%trtype="ATOMIC_LINE"
      CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
      Nread = len(trim(inputline)) ! because, if blanck
            ! beyond cStark it will be interpreted
            ! has "additional geff", but its not.
            !
+     !futur implement: line%name
+     atom%lines(kr)%ZeemanPattern = 1
+     if ((PRT_SOLUTION == "WEAK_FIELD").or. (PRT_SOLUTION=="NO_STOKES").or. &
+       (.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
+     ! -1 = effective triplet, +1
+     
+     write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
          symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
@@ -168,17 +178,25 @@ MODULE readatom
          atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
          atom%lines(kr)%Grad, atom%lines(kr)%cStark
      else if (Nread.gt.112) then
-       write(*,*) "Read aditional g_lande_eff for that line"
+       write(*,*) " ->Read aditional g_lande_eff for that line"
        read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
        symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
        atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
        atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
        atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
-       atom%lines(kr)%g_Lande_eff
+       atom%lines(kr)%g_Lande_eff, atom%lines(kr)%glande_j, atom%lines(kr)%glande_i 
+       !if glande_eff given, we need to read a value for gi and gj even if it is 0.
+       !if glane is <= -99, gi, and gj and geff are computed eventually.
+       !landé upper / lower levels in case the coupling scheme is not accurate
+       if (atom%lines(kr)%g_lande_eff > -99) atom%lines(kr)%ZeemanPattern = -1 !effective T assumed
+       if (atom%lines(kr)%g_lande_eff <= -99) atom%lines(kr)%ZeemanPattern = 1 !Full using gi and gj
+       if (atom%lines(kr)%glande_j <= -99 .or. atom%lines(kr)%glande_i<= -99) then
+        CALL Warning("Unable to use read lande factors, try to compute them..")
+        atom%lines(kr)%g_lande_eff = -99 !force calculation
+       end if
      else
-       write(*,*) "Error reading line"
-       write(*,*) "exiting.."
-       stop
+       write(*,*) inputline
+       CALL error(" Unable to parse atomic file line")
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
@@ -208,6 +226,7 @@ MODULE readatom
        atom%Lorbit(atom%lines(kr)%i),&
        atom%qJ(atom%lines(kr)%i), &
        determined(atom%lines(kr)%i))
+       parse_label(atom%lines(kr)%i) = .true.
       end if
       if (.not.parse_label(atom%lines(kr)%j)) then
       CALL determinate(atom%label(atom%lines(kr)%j),&
@@ -216,6 +235,7 @@ MODULE readatom
        atom%Lorbit(atom%lines(kr)%j),&
        atom%qJ(atom%lines(kr)%j), &
        determined(atom%lines(kr)%j))
+       parse_label(atom%lines(kr)%i) = .true. !even if determined is false.
       end if
       ! not that if J > L+S determined is FALSE
       ! just like if the term could not be parsed
@@ -230,16 +250,19 @@ MODULE readatom
       !end if
       !write(*,'("S="(1F2.2)", L="(1I2)", J="(1F2.2))') &
       !  atom%qS(i), atom%Lorbit(i), atom%qJ(i)
-
-      if (((determined(atom%lines(kr)%j)).and.&
-          (determined(atom%lines(kr)%i))).and. &
-           atom%lines(kr)%g_Lande_eff.eq.-99) then
+      !!      			
+      !If Selection rule is OK and g_lande_eff not given from file and atomic label
+      !correctly determined
+      if ((abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.) .and. &
+           (atom%lines(kr)%g_Lande_eff <= -99) .and. &
+           (determined(atom%lines(kr)%j)) .and. (determined(atom%lines(kr)%i))) then !
        ! do not compute geff if term is not
        ! determined or if the geff is read from file
        ! ie if g_lande_eff > -99
        ! fill lande_g_factor if determined and not given
        ! for b-b transitions
        CALL Lande_eff(atom, kr)
+       !compute indiviual glande of levels also
        !!testing
        !!write(*,*) wKul(atom, kr, 0)**2
        !!write(*,*) wKul(atom, kr, 1)**2
@@ -247,6 +270,22 @@ MODULE readatom
        !!stop
        !write(*,*) "geff = ", atom%lines(kr)%g_lande_eff
       end if
+      !!atom%lines(kr)%has_alignement = .false. !different criterion than polarizable
+      atom%lines(kr)%polarizable = .false. !check also deltaJ
+      !write(*,*) "dJ=", abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j))
+      atom%lines(kr)%polarizable = (atmos%magnetized) .and. &
+      								(atom%lines(kr)%g_lande_eff > -99) .and. &
+      			(abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
+       !not need to be determined here. Because geff can be read from file and be > -99
+       !even if the levels are not determined. In this case deltaJ = 0 (-99+99).
+       !Exception if one of the level is determined but not the other, in this case
+       !line is assumed to be not polarizable and you have to chandle that in the atomic file.
+       ! Otherwise I assume you know what you do by providing a landé factor to a line.
+       !In case of PRT but the line is not polarized, set a Zeeman structure with Nc=1,
+       !S=0, q=0, shift=0
+       ! line%ZP = 0 if WEAK_FIEKD solution; otherwise has to be -1, 1 or .not.polarizable
+       if (atom%lines(kr)%ZeemanPattern /= 0) CALL ZeemanMultiplet(atom%lines(kr))
+
       ! oscillator strength saved
       atom%lines(kr)%fosc = f
       lambdaji = (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i))
@@ -347,31 +386,31 @@ MODULE readatom
       atom%lines(kr)%symmetric = .true.
       !write(*,*) "Symmetric line profile"
      end if
-     atom%lines(kr)%polarizable = .false.
 
-     if (atom%active) then !Should do it for passive atoms too
-     if (atmos%Magnetized) then !.or.line%scattpol ...
-      if (atom%lines(kr)%g_Lande_eff.gt.-99 .or. &
-          determined(atom%lines(kr)%i) .and. &
-          determined(atom%lines(kr)%j).and. &
-          abs(atom%qJ(atom%lines(kr)%i) - &
-           atom%qJ(atom%lines(kr)%j)).le.1.) then
 
-!        if (atom%lines(kr)%Ncomponent.gt.1) then
-!            !write(*,*) &
-!            !"Cannot treat composite line with polar"
-!            atom%lines(kr)%polarizable=.false.
-!        else
-         atom%lines(kr)%polarizable=.true.
-!        end if
-      end if
-     else
-      !write(*,*) "Treating line ",atom%lines(kr)%j,&
-      !    "->",atom%lines(kr)%i,&
-      !    " without polarization"
-      atom%lines(kr)%polarizable=.false.
-     end if !not mag
-    end if ! end loop over active b-b transitions of atom
+!      if (atom%active) then !Should do it for passive atoms too
+!      if (atmos%Magnetized) then !.or.line%scattpol ...
+!       if (atom%lines(kr)%g_Lande_eff.gt.-99 .or. &
+!           determined(atom%lines(kr)%i) .and. &
+!           determined(atom%lines(kr)%j).and. &
+!           abs(atom%qJ(atom%lines(kr)%i) - &
+!            atom%qJ(atom%lines(kr)%j)).le.1.) then
+! 
+! !        if (atom%lines(kr)%Ncomponent.gt.1) then
+! !            !write(*,*) &
+! !            !"Cannot treat composite line with polar"
+! !            atom%lines(kr)%polarizable=.false.
+! !        else
+!          atom%lines(kr)%polarizable=.true.
+! !        end if
+!       end if
+!      else
+!       !write(*,*) "Treating line ",atom%lines(kr)%j,&
+!       !    "->",atom%lines(kr)%i,&
+!       !    " without polarization"
+!       atom%lines(kr)%polarizable=.false.
+!      end if !not mag
+!     end if ! end loop over active b-b transitions of atom
    end do !end loop over bound-bound transitions
 
     ! ----------------------------------------- !
@@ -511,17 +550,19 @@ MODULE readatom
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
     atom%n = 0d0
-    atom%NLTEpops = .true.
+    atom%NLTEpops = .false. !Zero at first, and if .true. solvene will crash
+    !HOWever, if init_sol is old pops and u can read them here, set NLTEpops=.true.
+    !It will be used also for background
    else !not active
     if (atom%dataFile.ne."" & !atom%popsinFile.ne.""
        .and. atom%initial_solution &
         .eq. "OLD_POPULATIONS") then
-       atom%NLTEpops = .true.
        write(*,*) "First define a function that writes"
        write(*,*) "populations as fits and read it"
        stop
        allocate(atom%n(atom%Nlevel,atmos%Nspace))
        !CALL readPopulations(atom)
+       atom%NLTEpops = .true.
     else
      atom%NLTEpops=.false.
      atom%n => atom%nstar !initialised to zero
@@ -621,7 +662,7 @@ MODULE readatom
    ! check duplicates
    IDread(2:2) = to_lower(IDread(2:2))
    do mmet = 1,nmet-1 !compare the actual (IDread) with previous
-    write(*,*) mmet, nmet
+    !write(*,*) mmet, nmet
     if (atmos%Atoms(nmet)%ptr_atom%ID.eq.IDread) then
      write(*,*) "Already read a model for this atom ", IDread
      write(*,*) "exiting..."
@@ -636,8 +677,8 @@ MODULE readatom
    !write(*,*) "IS ACTIVE = ", atmos%Atoms(nmet)%active
    !atmos%Atoms(nmet)%ptr_atom = atom
    !CALL freeAtom(atom)
-   write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID
-   if (nmet>1) write(*,*) nmet-1, atmos%Atoms(nmet-1)%ptr_atom%ID
+   !write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID
+   !if (nmet>1) write(*,*) nmet-1, atmos%Atoms(nmet-1)%ptr_atom%ID
   end do
   close(unit)
 

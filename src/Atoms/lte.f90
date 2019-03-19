@@ -357,6 +357,8 @@ MODULE lte
    CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
      if (atmos%Atoms(n)%ptr_atom%active) then
        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+       !Temporary
+       allocate(atmos%Atoms(n)%ptr_atom%Ckij(atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
        !open collision file
        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
      end if
@@ -364,6 +366,10 @@ MODULE lte
 
   ! if (.not.chemEquil) then
   atmos%nHmin = 0d0 !init
+  
+  !!This is in case H is NLTE but has not converged pops yet, or not read from file
+  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
+                                            !for background Hydrogen and Hminus
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k, PhiHmin,j) &

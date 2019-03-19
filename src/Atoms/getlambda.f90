@@ -6,6 +6,7 @@ MODULE getlambda
   
   use parametres
   use utils, only : span, spanl, bubble_sort
+  use messages
   
   IMPLICIT NONE
   
@@ -74,6 +75,8 @@ MODULE getlambda
    !if (line%name == "Na D1" .or. line%name == "Na D2") then ...							 
    if (line%atom%ID=="Na") adamp_char = 50 !adamp/vbroad
    if (line%atom%ID=="Mg") adamp_char = 150
+   if (line%polarizable) atmos%v_char = atmos%v_char + &
+   				atmos%B_char*LARMOR/CLIGHT * (line%lambda0*NM_TO_M)**2 * line%g_lande_eff
    v_char = (atmos%v_char + vD*(1. + adamp_char)) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char * L
@@ -321,7 +324,8 @@ MODULE getlambda
     Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
     if (Atoms(n)%ptr_atom%continua(kc)%hydrogenic) deallocate(Atoms(n)%ptr_atom%continua(kc)%lambda)
     !cont%lambda is deallocated in fillPhotoionisationRates is case of cont is not hydrogenic
-    CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
+    !!if (Atoms(n)%ptr_atom%active) &
+      CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
@@ -412,7 +416,9 @@ MODULE getlambda
        (waves(cont%Nblue:cont%Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
 
     else !cont%alpha is allocated and filled with read values
-     write(*,*) "Interpolating photoionisation cross-section for atom", cont%atom%ID, atom%ID
+     CALL Warning(" Beware, memory error if tow many cross-sections")
+     write(*,*) "Interpolating photoionisation cross-section for atom ", &
+      cont%j,'->',cont%i,cont%atom%ID, " ", atom%ID
      allocate(old_alpha(size(cont%alpha)))
      old_alpha(:) = cont%alpha(:)
      deallocate(cont%alpha)

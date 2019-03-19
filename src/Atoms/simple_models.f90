@@ -1,7 +1,7 @@
 MODULE simple_models
 
  use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain, &
- 						free_atomic_atmos
+ 						free_atomic_atmos, init_magnetic_field
  
  ! MCFOST's modules
  use input
@@ -50,6 +50,7 @@ MODULE simple_models
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
+   double precision :: Bp, BR, Bz
    logical :: lwrite_model_ascii = .false.
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -62,6 +63,12 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .not.(lwrite_model_ascii)
    CALL init_atomic_atmos()
+   !For now we do not necessarily need to compute B if no polarization at all
+   atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
+   if (atmos%magnetized) then 
+    CALL init_magnetic_field()
+    atmos%B_char = 3d-2
+   end if
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
@@ -89,6 +96,11 @@ MODULE simple_models
    write(*,*) "Surface ", 100*Sr, "%"
    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
    write(*,*) "Mean molecular weight", atmos%avgWeight
+   !1G = 1e-4 T
+   Bp = 1d-4 * 4.2*1d2 * (rmi/2.2)*(2*Mstar*kg_to_Msun)**(0.25) * &
+   	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
+   write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
+  
    !now nH0 and Q0 are computed for each field lines assuming that Tring is the same
    !for all.
 !    nH0 = 1d3/masseH/atmos%avgWeight * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
@@ -180,6 +192,20 @@ MODULE simple_models
              !!if (z<0 .and.lmagnetoaccr) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
 
            end if
+           ! Now magnetic field
+            BR = Bp * (etoile(1)%r / r)**(3.0) * 3*dsqrt(y)*dsqrt(1.-y**2)
+            Bz = Bp * (etoile(1)%r / r)**(3.0) * (3*(1.-y)-1)
+            if (atmos%magnetized) then
+             atmos%Bxyz(icell,1) = BR
+             atmos%Bxyz(icell,2) = Bz
+             atmos%Bxyz(icell,3) = 0d0
+              if (.not.lmagnetoaccr) then !projection on the cell
+               atmos%Bxyz(icell,1) = BR*cos(phi)
+               atmos%Bxyz(icell,2) = BR*sin(phi)
+               atmos%Bxyz(icell,3) = Bz
+               if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
+              end if
+            end if
           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
@@ -242,11 +268,19 @@ MODULE simple_models
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
   ! ----------------------------------------------------------- !
    CALL init_atomic_atmos()!(n_cells)
+   atmos%magnetized = lmagnetic_field
+   if (atmos%magnetized) then 
+    CALL init_magnetic_field()
+   end if
+   atmos%Bxyz(:,:) = 3d3 * 1d-4 !T
+   atmos%B_char = maxval(atmos%Bxyz)
+   atmos%nHtot = 1e18
+   atmos%T = 3000d0
 
    !idk = 10
-!    atmos%nHtot =  2.27414200581936d16
-!    atmos%T = 45420d0
-!    atmos%ne = 2.523785d16
+    !atmos%nHtot =  2.27414200581936d16
+    !atmos%T = 45420d0
+    !atmos%ne = 2.523785d16
 
    !idk = 75
 !   atmos%T=7590d0
@@ -254,9 +288,9 @@ MODULE simple_models
 !   atmos%nHtot = 1.259814d23
 
     !idk = 81   
-    atmos%T=9400d0
-    atmos%ne = 3.831726d21
-    atmos%nHtot = 1.326625d23
+    !atmos%T=9400d0
+    !atmos%ne = 3.831726d21
+    !atmos%nHtot = 1.326625d23
 
     !idk = 0 
 !     atmos%T = 100000d0
@@ -265,8 +299,8 @@ MODULE simple_models
 
    lstatic = .true. !force to be static for this case
    !tmos%vturb = 9.506225d3 !m/s !idk=10
-   !atmos%vturb = 1.696164d3 !idk = 75
-   atmos%vturb = 1.806787d3 !idk=81
+   atmos%vturb = 1.696164d3 !idk = 75
+   !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
    atmos%v_char = maxval(atmos%vturb)
    CALL define_atomRT_domain()

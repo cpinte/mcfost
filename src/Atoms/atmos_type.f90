@@ -4,6 +4,8 @@ MODULE atmos_type
     AtomicLine, AtomicContinuum
   use uplow
   use constant
+  use messages
+  use constantes, only : tiny_dp
   
   !$ use omp_lib
   
@@ -49,9 +51,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
-   logical :: Magnetized = .false., XRD=.false., calc_ne, &
-     H_LTE=.false. ! force LTE populations of H for
-                   ! background opacities
+   logical :: Magnetized = .false., XRD=.false., calc_ne
    logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
   END TYPE GridType
 
@@ -61,7 +61,17 @@ MODULE atmos_type
 
 
   CONTAINS
+  
+  SUBROUTINE freeZeemanMultiplet(line)
+   type(AtomicLine), intent(inout) :: line
 
+   if (allocated(line%zm%strength)) deallocate(line%zm%strength)
+   if (allocated(line%zm%q)) deallocate(line%zm%q)
+   if (allocated(line%zm%shift)) deallocate(line%zm%shift)
+   
+  RETURN
+  END SUBROUTINE freeZeemanMultiplet
+ 
   SUBROUTINE freeAtom(atom)
   ! This subroutine free atmos%atoms properly including lines
   ! and continua.
@@ -133,6 +143,8 @@ MODULE atmos_type
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
 !       if (allocated(line%chi_down)) deallocate(line%chi_down)
 !       if (allocated(line%Uji_down)) deallocate(line%Uji_down)
+      if (associated(line%atom)) NULLIFY(line%atom)
+      CALL freeZeemanMultiplet(line)
      end do
       deallocate(atom%lines)
      end if
@@ -453,6 +465,7 @@ MODULE atmos_type
    if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
    if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
+
    
    atmos%ne = 0d0
    atmos%nHmin = 0d0
@@ -505,7 +518,58 @@ MODULE atmos_type
 
    RETURN
    END SUBROUTINE define_atomRT_domain
-
+   
+   SUBROUTINE init_magnetic_field()
+   ! ----------------------------------------- !
+   ! Allocate space for magnetic field
+   ! ----------------------------------------- !
+    !if (.not.atmos%magnetized) RETURN
+    allocate(atmos%Bxyz(atmos%Nspace, 3))
+    atmos%Bxyz = 0.0
+   RETURN
+   END SUBROUTINE init_magnetic_field
+   
+   FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(bproj)
+   ! ------------------------------------------- !
+   ! Returned the module of the magnetic field at
+   ! one point of the model icell and the angles
+   ! gamma and chi, the angle between B and the
+   ! line of sight and the azimuth respectively.
+   ! ------------------------------------------- !
+    integer :: icell
+    double precision :: x, y, z, u, v, w, bproj
+    double precision :: r, bx, by, bz
+    double precision, intent(inout) :: gamma, chi
+    
+     bproj = 0d0 !Module of B.
+     gamma = 0d0; chi = 0d0
+     if (lVoronoi) then !Bxyz in cartesian
+       !bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
+       !					   atmos%Bxyz(icell,3) * w
+       bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+     else
+      if (lmagnetoaccr) then
+       r = dsqrt(x**2 + y**2)
+       if (r <= tiny_dp) then
+        bproj = 0d0
+        RETURN
+       end if
+       bx = x/r * atmos%Bxyz(icell,1)
+       by = y/r * atmos%Bxyz(icell,1)
+       bz = atmos%Bxyz(icell,2)
+       if (z<0) bz = -bz
+       !module
+       bproj = dsqrt(bx**2 + by**2 +bz**2)!bx * u + by * v * bz * w
+      else
+       !temporary
+        bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+       !CALL Error("Geometry for magnetic field projection unkown")  
+      end if     
+     end if
+    
+    RETURN
+   END FUNCTION B_project
+   
    FUNCTION atomZnumber(atomID) result(Z)
    ! --------------------------------------
    ! return the atomic number of an atom
@@ -527,55 +591,6 @@ MODULE atmos_type
 
    RETURN
    END FUNCTION atomZnumber
-
-   SUBROUTINE PTrowcol(Z, row, col)
-   ! ---------------------------------------------------
-   ! Position in the periodic table of an atom according
-   ! to this Z number.
-   ! min row is 1, max row is 87 Francium
-   ! No special ceses yet for Lanthanides and Actinides
-   ! min col is 1, max col is 18
-   ! beware He, is on the 18 column, because they are 16
-   ! empty columns between H and He
-   ! ---------------------------------------------------
-
-   integer i
-   integer, intent(in) :: Z
-   integer, intent(out) :: row, col
-   integer :: istart(7)
-
-   row = 0
-   col = 0
-
-   istart = (/1, 3, 11, 19, 37, 55, 87/) !first Z of each rows
-
-   ! -- find row
-   do i=1,6
-    if ((Z .ge. istart(i)) .and. (Z .lt. istart(i + 1))) then
-     ! we are on the row istart(i)
-     row=i
-     exit
-    end if
-   end do
-   ! find column on the row
-   col = Z - istart(i) + 1
-
-   ! for relative position just comment out the following lines
-   ! or take col=col-10 (or-18 for He) for these cases.
-
-   ! special case of Z=2 for Helium because there are 16
-   ! empty columns between Hydrogen and Helium
-   if (Z.eq.2) then
-    col = col + 16
-   ! ten empty lines between Be and B
-   ! ten empty lines between Mg and Al
-   else if (((istart(i).eq.3).or.(istart(i)).eq.11).and.&
-      (Z.gt.istart(i)+1)) then
-    !row = istart(i)
-    col = col+10
-   end if
-  RETURN
-  END SUBROUTINE PTrowcol
 
 END MODULE atmos_type
 
