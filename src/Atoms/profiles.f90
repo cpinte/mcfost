@@ -6,6 +6,7 @@ MODULE PROFILES
  use spectrum_type, only			 : NLTEspec
  use voigtfunctions, only 			 : Voigt
  use broad, only 					 : Damping
+ use math
 
  ! MCFOST's original
  use mcfost_env, only : dp
@@ -97,6 +98,8 @@ MODULE PROFILES
       end do
  end if !line%voigt
  P(:) = P(:) / (SQRTPI * line%atom%vbroad(icell))
+ if (minval(P) < 0) CALL error("P should not be negative")
+
  !deallocate(vv, vvoigt, F)
  RETURN
  END SUBROUTINE IProfile
@@ -108,17 +111,18 @@ MODULE PROFILES
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV
+  double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV, vvoigt_b
   integer, parameter										:: NvspaceMax = 101, NbspaceMax=15
   double precision, dimension(NvspaceMax)					:: omegav
   double precision, dimension(NbspaceMax)					:: omegaB, gamma, chi
   integer													:: Nvspace, nv, Nred, Nblue, nc, &
-  															   Nbspace, nb, Nzc, i, j
+  															   Nbspace, nb, Nzc, i, j,qz
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB
   double precision, intent(out), dimension(:)               :: P
   double precision, intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
   double precision, dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
+  logical 													:: B_flag = .true.
   !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
 
   omegaB = 0d0
@@ -131,9 +135,10 @@ MODULE PROFILES
   end if
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
-  omegaB(1) = b0
+  omegaB(1) = b0; Nbspace = 1
   gamma(1) = g1; chi(1)=c1
 
+  if (maxval(abs(atmos%Bxyz(icell,:))) == 0d0) B_flag = .false.
    
   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
@@ -151,7 +156,7 @@ MODULE PROFILES
   end if
 
 
-  if (.not.lvoronoi) then
+  if (.not.lvoronoi .and. B_flag) then
       b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
       Nbspace = NbspaceMax
 !       dB = dabs(b1-b0) * LARMOR * (line%lambda0 * NM_TO_M) **2
@@ -203,54 +208,66 @@ MODULE PROFILES
   !allocate(LV(line%Nlambda), F(line%Nlambda), psi_zc(3,line%Nlambda),phi_zc(3,line%Nlambda))
   LV = 0d0
   F = 0d0
-  psi_zc = 0d0; phi_zc = 0d0
-  psi = 0d0; phi = 0d0
+  psi_zc(:,:) = 0d0; phi_zc(:,:) = 0d0
+  psi(:,:) = 0d0; phi(:,:) = 0d0
   !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
                         
         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
-         do nb=1,Nbspace
+        
+         do nb=1,Nbspace !Nbspace=1 if Voronoi, or magnetic field is 0d0.But present
          
           do nc=1,Nzc
              ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
              !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
-             vvoigt(:) = vvoigt(:) + line%zm%shift(nc) * omegaB(nb) * &
+             vvoigt_b(:) = vvoigt(:) + line%zm%shift(nc) * omegaB(nb) * &
                                   LARMOR * (line%lambda0 * NM_TO_M)**2 / line%atom%vbroad(icell)
              !The normalisation by Nzc is done when compute the strength*profiles.
              !In case of unpolarised line, Nzc = 1 and there is no need to normalised
-             LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt(:),F, VoigtMethod) / Nvspace / Nbspace
-             F(:) = F(:)/Nvspace/Nbspace
-             !write(*,*) "S^MjMi_JjJi=", line%zm%strength(nc) 
-             if (abs(line%zm%q(nc)) > 1) CALL Error("BUG")
-              psi_zc(-line%zm%q(nc),:) = psi_zc(-line%zm%q(nc),:) + &
+             LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt_b,F, VoigtMethod)
+             LV(:) = LV(:)/real(Nvspace,kind=8)/real(Nbspace,kind=8)
+             F(:) = F(:)/real(Nvspace,kind=8)/real(Nbspace,kind=8)
+             !qz = 1 if line%zm%q = - 1, 2 if line%zm%q=0, 3 if line%zm%q = 1
+             !with negative index, qz = -line%zm%q
+             SELECT CASE (line%zm%q(nc))
+              CASE (-1)
+               qz = 1
+              CASE (+0)
+               qz = 2
+              CASE (+1)
+               qz = 3
+              CASE DEFAULT
+               CALL ERROR("line%zm%q should be (/-1,0,1/)!")
+             END SELECT
+             !!if (abs(line%zm%q(nc)) > 1) CALL Error("BUG") !in the SELECT CASE
+             psi_zc(qz,:) = psi_zc(qz,:) + &
               		line%zm%strength(nc) * F(:) / (SQRTPI * line%atom%vbroad(icell))
-              phi_zc(-line%zm%q(nc),:) = phi_zc(-line%zm%q(nc),:) + &
-              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell)) 
-             F = 0d0
-             LV = 0d0
+             phi_zc(qz,:) = phi_zc(qz,:) + &
+              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell))
+             LV(:) = 0d0; F(:) = 0d0
           end do !components 
           !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
-          P(:) = P(:) + 0.5*(phi_zc(2,:) * sin(gamma(nb))**2 + \
-            0.5*(1+cos(gamma(nb))**2) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
+          !write(*,*) dsin(gamma(nb)), dcos(gamma(nb)), dsin(2*chi(nb)), dcos(2*chi(nb))
+          P(:) = P(:) + 5d-1 *(phi_zc(2,:) * dsin(gamma(nb))*dsin(gamma(nb)) + \
+            5d-1 *(1d0+dcos(gamma(nb))*dcos(gamma(nb))) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI
           psi(1,:) = psi(1,:) + &
-          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
+          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
           !rhoU/chiI
           psi(2,:) = psi(2,:) + &
           		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
           !rhoV/chiI
           psi(3,:) = psi(3,:) + 0.5*(psi_zc(3,:)-psi_zc(1,:))*cos(gamma(nb))
-          !etaQ/chiI
+          !chiQ/chiI
           phi(1,:) = phi(1,:) + &
           		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
-          !etaU/chiI
+          !chiU/chiI
           phi(2,:) = phi(2,:) + &
           		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
-          !etaV/chiI
+          !chiV/chiI
           phi(3,:) = phi(3,:) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
-          !write(*,*) line%i, line%j, nv, nb, maxval(phi), maxval(psi)
         end do !magnetic field     
         
        end do !velocity
@@ -261,7 +278,9 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE ZProfile
 
- 
+ !-> FUTUR DEPRECATION to easy to break if overlapping lines.
+ !  -> or store an array with weight for each transition * b, a blend factor Sum blend_fact = 1
+ ! -> And if non overlapping lines, can be computed by python code.
  SUBROUTINE WEAKFIELD_FLUX(ipix, jpix, ibin, iaz)
   use math, only : cent_deriv
   !Should be fine for non-overlapping lines
