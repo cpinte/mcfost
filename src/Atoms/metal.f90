@@ -228,12 +228,12 @@ MODULE metal
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
        		Vij(:) * (atom%n(i,icell)-gij*atom%n(j,icell))
-       		
+
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
        		twohnu3_c2 * gij * Vij(:) * atom%n(j,icell)
 
-     if (PRT_SOLUTION == "FULL_STOKES") then
+     if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        do nk = 1, 3
          !magneto-optical
          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &

@@ -704,7 +704,7 @@ MODULE readatom
     atmos%Atoms(nmet)%ptr_atom%periodic_table, atmos%Atoms(nmet)%ptr_atom%active, &
     atmos%Atoms(nmet)%ptr_atom%Nline, atmos%Atoms(nmet)%ptr_atom%Ncont
    ! create alias in atmos%Elements for elements that have
-   ! a model atom.
+   ! a model atom. It means all elements here.
    !atom => atmos%Atoms(nmet)
    atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%model &
          => atmos%Atoms(nmet)%ptr_atom

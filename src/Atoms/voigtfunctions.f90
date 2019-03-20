@@ -11,13 +11,13 @@ MODULE voigtfunctions
 
  SUBROUTINE Humlicek(N, a, v, W)
   ! W = L + i*F
-  double precision, intent(in)     :: a
-  double precision, intent(in)     :: v(:)
   integer, intent(in)              :: N
-  complex(kind=8), intent(out)     :: W(N)
+  double precision, intent(in)     :: a
+  double precision, intent(in)     :: v(N)
+  complex(kind=16), intent(out)    :: W(N)
   double precision                 :: s(N)
-  double complex                   :: z(N)
-  double complex                   :: u(N)
+  complex(kind=16)                 :: z(N)
+  complex(kind=16)                 :: u(N)
 
   z = cmplx(a,-v)
   s = abs(v) + a
@@ -56,12 +56,12 @@ MODULE voigtfunctions
   !
   ! Adapted from rh code (Uitenbroek 2001, ApJ 389-398)
  ! --------------------------------------------------------------------------- !
-  double precision              :: a
-  double precision, dimension(:):: v
-  integer                       :: N
+  integer, intent(in)           :: N
+  double precision, intent(in)  :: a
+  double precision, intent(in)  :: v(N)
   double precision              :: L(N)
   double precision, intent(out) :: F(N)
-  double complex                :: W(N)
+  complex(kind=16)              :: W(N)
 
   ! real of W is L, and imag is F
   CALL Humlicek(N, a, v, W)
@@ -81,7 +81,7 @@ MODULE voigtfunctions
   ! TBD: Faraday-Voigt profile
  ! --------------------------------------------------------------------------- !
   double precision              :: a
-  double precision, dimension(:):: v
+  double precision				:: v(N)
   integer                       :: N
   double precision              :: L(N)
   double precision              :: x(N)
@@ -138,11 +138,11 @@ MODULE voigtfunctions
   ! if desired (when polarisation is desired in fact)
   ! VoigtAlgorithm-> aglorithm for the voigt function
  ! --------------------------------------------------------------------------- !
-  double precision              :: a
-  double precision, dimension(:):: v
-  integer                       :: N !size of the final voigt
-  double precision, intent(out) :: F(:)
-  double precision              :: L(N)
+  integer, intent(in)                       :: N !size of the final voigt
+  double precision, intent(in)              :: a
+  double precision, intent(in)				:: v(N)
+  double precision, intent(out)				:: F(N)
+  double precision			                :: L(N)
   character(len=*), optional    :: VoigtAlgorithm
 
   if (.not. present(VoigtAlgorithm)) VoigtAlgorithm="HUMLICEK"

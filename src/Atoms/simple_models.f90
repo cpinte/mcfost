@@ -215,6 +215,7 @@ MODULE simple_models
       end do
      end do
     end do
+    atmos%Bxyz = 0d0
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
@@ -272,7 +273,7 @@ MODULE simple_models
    if (atmos%magnetized) then 
     CALL init_magnetic_field()
    end if
-   atmos%Bxyz(:,:) = 3d3 * 1d-4 !T
+   atmos%Bxyz(:,:) = 3d2 * 1d-4 !T
    atmos%B_char = maxval(atmos%Bxyz)
    atmos%nHtot = 1e18
    atmos%T = 3000d0

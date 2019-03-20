@@ -290,7 +290,7 @@ MODULE AtomicTransfer
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / (chiI + tiny_dp)
+                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / chiI
 
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
             NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)) / &
@@ -303,7 +303,7 @@ MODULE AtomicTransfer
 
 
       Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / (chiI + tiny_dp)
+                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / chiI
 
 
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + &
@@ -324,22 +324,49 @@ MODULE AtomicTransfer
      	-NLTEspec%AtomOpac%chiQUV_p(:,3,id) / chiI *  NLTEspec%StokesV(:,iray,id)
 
      NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-    
                              
-!      NLTEspec%StokesQ(:,iray,id) = NLTEspec%StokesQ(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,1,id) /chiI + &
-! sum of other term
-!      ) !end Snu_Q
-!      NLTEspec%StokesU(:,iray,id) = NLTEspec%StokesU(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,2,id) /chiI
-!      ) !end Snu_U
+     NLTEspec%StokesQ(:,iray,id) = NLTEspec%StokesQ(:,iray,id) + &
+                             exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+			NLTEspec%AtomOpac%etaQUV_p(:,1,id) /chiI - &
+			NLTEspec%AtomOpac%chiQUV_p(:,1,id) / chiI * NLTEspec%I(:,iray,id) - &
+			NLTEspec%AtomOpac%rho_p(:,3,id)/chiI * NLTEspec%StokesU(:,iray,id) + &
+			NLTEspec%AtomOpac%rho_p(:,2,id)/chiI * NLTEspec%StokesV(:,iray, id) &
+     ) !end Snu_Q
+     NLTEspec%StokesU(:,iray,id) = NLTEspec%StokesU(:,iray,id) + &
+                             exp(-tau) * (1.0_dp - exp(-dtau)) * (&
+			NLTEspec%AtomOpac%etaQUV_p(:,2,id) /chiI - &
+			NLTEspec%AtomOpac%chiQUV_p(:,2,id) / chiI * NLTEspec%I(:,iray,id) + &
+			NLTEspec%AtomOpac%rho_p(:,3,id)/chiI * NLTEspec%StokesQ(:,iray,id) - &
+			NLTEspec%AtomOpac%rho_p(:,1,id)/chiI * NLTEspec%StokesV(:,iray, id) &
+     ) !end Snu_U
      NLTEspec%StokesV(:,iray,id) = NLTEspec%StokesV(:,iray,id) + &
                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI &
+			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI - &
+			NLTEspec%AtomOpac%chiQUV_p(:,3,id) / chiI * NLTEspec%I(:,iray,id) - &
+			NLTEspec%AtomOpac%rho_p(:,2,id)/chiI * NLTEspec%StokesQ(:,iray,id) + &
+			NLTEspec%AtomOpac%rho_p(:,1,id)/chiI * NLTEspec%StokesU(:,iray, id) &
      ) !end Snu_V
 
+     do previous_cell = 1, NLTEspec%Nwaves
+      if (NLTEspec%StokesQ(previous_cell,iray,id) == NLTEspec%StokesQ(previous_cell,iray,id) +1 .or.&
+      NLTEspec%StokesQ(previous_cell, iray, id) /= NLTEspec%StokesQ(previous_Cell, iray,id)) then
+      write(*,*) tau(previous_cell), dtau(previous_cell), NLTEspec%I(previous_cell,iray,id), NLTEspec%StokesQ(previous_cell,iray,id)
+      	
+      call error ("stokesQ")
+      end if
+      if (NLTEspec%StokesU(previous_cell,iray,id) == NLTEspec%StokesU(previous_cell,iray,id) +1 .or.&
+      NLTEspec%StokesU(previous_cell, iray, id) /= NLTEspec%StokesU(previous_Cell, iray,id)) then
+      call error ("stokesu")
+      end if
+      if (NLTEspec%StokesV(previous_cell,iray,id) == NLTEspec%StokesV(previous_cell,iray,id) +1 .or.&
+      NLTEspec%StokesV(previous_cell, iray, id) /= NLTEspec%StokesV(previous_Cell, iray,id)) then
+      call error ("stokesv")
+      end if
+      if (NLTEspec%I(previous_cell,iray,id) == NLTEspec%i(previous_cell,iray,id) +1 .or.&
+      NLTEspec%i(previous_cell, iray, id) /= NLTEspec%i(previous_Cell, iray,id)) then
+      call error ("stokesi")
+      end if
+     end do
 
      facteur_tau = 1.0
 
@@ -704,8 +731,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-  ! CALL magneto_accretion_model()  
-  CALL uniform_law_model()
+   CALL magneto_accretion_model()  
+  !CALL uniform_law_model()
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
