@@ -120,21 +120,21 @@ END FUNCTION getPartitionFunctionk
   type (AtomType) :: atom
   double precision, dimension(:), intent(inout) :: fjk, dfjk
   double precision :: Uk, Ukp1, sum1, sum2
-  logical :: is_active=.false.
+  logical :: has_nlte_pops = .false.
   integer :: nll, j, i
 
   ! check if the element as an atomic model and it is active
-!   do nll=1,atmos%Nactiveatoms
-!    if (Elem%ID.eq.atmos%Atoms(nll)%ptr_atom%ID .and. &
-!        atmos%Atoms(nll)%ptr_atom%active) then
-!      is_active=.true.
+  do nll=1,atmos%Natom
+   if (Elem%ID.eq.atmos%Atoms(nll)%ptr_atom%ID .and. &
+       atmos%Atoms(nll)%ptr_atom%NLTEpops) then
+     has_nlte_pops=.true.
 !      write(*,*) "Atom ",Elem%ID,atmos%Atoms(nll)%ptr_atom%ID," is active"
 !      exit
-!    end if
-!   end do
+   end if
+  end do
 
   !may be active without NLTEpops or passive with read NLTE pops
-  if (atmos%Atoms(nll)%ptr_atom%NLTEpops) then!if (is_active) then
+  if (has_nlte_pops) then
    atom = Elem%model
    fjk = 0d0
    dfjk = 0d0
