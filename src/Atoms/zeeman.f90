@@ -75,7 +75,8 @@ MODULE zeeman
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
   type(AtomicLine), intent(inout) :: line  
   integer :: nc, i1, i2
-  double precision :: Mi, Mj, norm(3) !sum of -1, 0 and +1 components
+  double precision :: Mi, Mj!, norm(3) !sum of -1, 0 and +1 components
+  							!not need, j-symbols normalised
 
   ! IF PRT_SOLUTION IS WEAKFIELD WE NEVER ENTER HERE.
   ! but now we need also to test if line%polarizable, meaning it has a geff > -99
@@ -112,7 +113,6 @@ MODULE zeeman
    			  " Zeeman components, geff=", line%g_lande_eff
    write(*,*) "J' = ", line%atom%qJ(line%j), " J = ", line%atom%qJ(line%i)
    nc = 0
-   norm = 0d0
 !    do i1=1,2*line%atom%qJ(line%j)+1
 !      Mj = line%atom%qJ(line%j) + 1 - i1
 !      write(*,*) "Mj = ", Mj
@@ -128,8 +128,6 @@ MODULE zeeman
       line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,&
       						                line%atom%qJ(line%j), Mj)
       !write(*,*) "Strength = ",line%zm%strength(nc) 
-      !norm(-q) = norm(1) if q=-1, norm(0) if q=0 and norm(3)=norm(-1) if q=1
-      norm(-line%zm%q(nc)) = norm(line%zm%q(nc)+2) + line%zm%strength(nc)
      end if
     end do
    end do
