@@ -45,7 +45,7 @@ MODULE zeeman
    atom%lines(kr)%glande_i = gi
    atom%lines(kr)%glande_j = gj
    if (atmos%magnetized) & !otherwise we don't care seeing that
-   	write(*,*) " -> line gi = ", gi, " line gj = ", gj," line geff = ", g
+   	write(*,*) " -> line gi = ", gi, " line gj = ", gj!," line geff = ", g
 
  RETURN
  END SUBROUTINE Lande_eff
@@ -66,7 +66,6 @@ MODULE zeeman
     RETURN !should not happen
   end if
   
-  !are they normed ? Should be
   ZeemanStrength = 3d0 * w3js(int(2*Jj),int(2*Ji),2,&
                               -int(2*Mj),int(2*Mi),-2*q)**2
  RETURN
@@ -90,6 +89,9 @@ MODULE zeeman
    line%zm%shift = line%zm%q * line%g_Lande_eff !same shift
    write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
    			  " Zeeman components, geff=", line%g_lande_eff
+!    write(*,*) line%zm%q
+!    write(*,*) line%zm%shift
+!    write(*,*) line%zm%strength
    			  
   else if (line%ZeemanPattern == 1 .and. line%polarizable) then
    !Strength relative of all components
@@ -113,12 +115,6 @@ MODULE zeeman
    			  " Zeeman components, geff=", line%g_lande_eff
    write(*,*) "J' = ", line%atom%qJ(line%j), " J = ", line%atom%qJ(line%i)
    nc = 0
-!    do i1=1,2*line%atom%qJ(line%j)+1
-!      Mj = line%atom%qJ(line%j) + 1 - i1
-!      write(*,*) "Mj = ", Mj
-!     do i2=1,2*line%atom%qJ(line%i)+1
-!      Mi = line%atom%qJ(line%i) + 1 - i2
-!      write(*,*) "Mi = ", Mi
    do Mi=-line%atom%qJ(line%i),line%atom%qJ(line%i)
     do Mj=-line%atom%qJ(line%j),line%atom%qJ(line%j)
      if (abs(Mj-Mi) <= 1) then
@@ -127,7 +123,7 @@ MODULE zeeman
       line%zm%shift(nc) = line%glande_i * Mi - line%glande_j * Mj
       line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,&
       						                line%atom%qJ(line%j), Mj)
-      !write(*,*) "Strength = ",line%zm%strength(nc) 
+      write(*,*) line%zm%q(nc), line%zm%shift(nc), "Strength = ",line%zm%strength(nc) 
      end if
     end do
    end do

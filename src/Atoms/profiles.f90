@@ -112,7 +112,7 @@ MODULE PROFILES
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
   double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV, vvoigt_b
-  integer, parameter										:: NvspaceMax = 101, NbspaceMax=15
+  integer, parameter										:: NvspaceMax = 101, NbspaceMax=101
   double precision, dimension(NvspaceMax)					:: omegav
   double precision, dimension(NbspaceMax)					:: omegaB, gamma, chi
   integer													:: Nvspace, nv, Nred, Nblue, nc, &
@@ -158,10 +158,12 @@ MODULE PROFILES
 
   if (.not.lvoronoi .and. B_flag) then
       b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
-      Nbspace = NbspaceMax
-!       dB = dabs(b1-b0) * LARMOR * (line%lambda0 * NM_TO_M) **2
-!       Nbspace = max(2,nint(20*dB/atom%vbroad(icell)))
-!       Nbspace = min(Nbspace,NbspaceMax)
+      !Nbspace = NbspaceMax
+      dB = (b1-b0)
+      dB = dabs(dB * line%g_lande_eff) * LARMOR * line%lambda0 * NM_TO_M
+      Nbspace = max(2,nint(20*dB/line%atom%vbroad(icell)))
+      Nbspace = min(Nbspace,NbspaceMax)
+      !write(*,*) Nbspace, b1*1e4, b0*1e4, dB
       omegaB(Nbspace) = b1
       gamma(Nbspace) = g1; chi(Nbspace)=c1
       do nv=2,Nbspace-1
@@ -173,7 +175,6 @@ MODULE PROFILES
        gamma(nv) = g1; chi(nv)=c1
       end do      
   end if
-  
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
@@ -218,17 +219,15 @@ MODULE PROFILES
         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
         
          do nb=1,Nbspace !Nbspace=1 if Voronoi, or magnetic field is 0d0.But present
-         
+
           do nc=1,Nzc
              ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
              !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
              vvoigt_b(:) = vvoigt(:) + line%zm%shift(nc) * omegaB(nb) * &
-                                  LARMOR * (line%lambda0 * NM_TO_M)**2 / line%atom%vbroad(icell)
+                               LARMOR * line%lambda0 * NM_TO_M / line%atom%vbroad(icell)
              !The normalisation by Nzc is done when compute the strength*profiles.
              !In case of unpolarised line, Nzc = 1 and there is no need to normalised
              LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt_b,F, VoigtMethod)
-             LV(:) = LV(:)/real(Nvspace,kind=8)/real(Nbspace,kind=8)
-             F(:) = F(:)/real(Nvspace,kind=8)/real(Nbspace,kind=8)
              !qz = 1 if line%zm%q = - 1, 2 if line%zm%q=0, 3 if line%zm%q = 1
              !with negative index, qz = -line%zm%q
              SELECT CASE (line%zm%q(nc))
@@ -243,10 +242,11 @@ MODULE PROFILES
              END SELECT
              !!if (abs(line%zm%q(nc)) > 1) CALL Error("BUG") !in the SELECT CASE
              psi_zc(qz,:) = psi_zc(qz,:) + &
-              		line%zm%strength(nc) * F(:) / (SQRTPI * line%atom%vbroad(icell))
+              		line%zm%strength(nc) * F(:) / (SQRTPI * line%atom%vbroad(icell) * Nbspace*Nvspace)
              phi_zc(qz,:) = phi_zc(qz,:) + &
-              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell))
+              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell)* Nbspace*Nvspace)
              LV(:) = 0d0; F(:) = 0d0
+             !write(*,*) Nzc, qz, line%zm%q(nc), vvoigt_b(line%Nlambda/2+1), line%zm%shift(nc), line%zm%strength(nc), omegab(nb)
           end do !components 
           !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
           !write(*,*) dsin(gamma(nb)), dcos(gamma(nb)), dsin(2*chi(nb)), dcos(2*chi(nb))
@@ -254,20 +254,20 @@ MODULE PROFILES
             5d-1 *(1d0+dcos(gamma(nb))*dcos(gamma(nb))) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI
           psi(1,:) = psi(1,:) + &
-          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
+          		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
           !rhoU/chiI
           psi(2,:) = psi(2,:) + &
-          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
+          		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
           !rhoV/chiI
-          psi(3,:) = psi(3,:) + 0.5*(psi_zc(3,:)-psi_zc(1,:))*cos(gamma(nb))
+          psi(3,:) = psi(3,:) + 0.5*(real(psi_zc(3,:))-real(psi_zc(1,:)))*cos(gamma(nb))
           !chiQ/chiI
           phi(1,:) = phi(1,:) + &
-          		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
+          		0.5*(real(phi_zc(2,:))-0.5*real(phi_zc(1,:)+phi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
           !chiU/chiI
           phi(2,:) = phi(2,:) + &
-          		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
+          		0.5*(real(phi_zc(2,:))-0.5*real(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
           !chiV/chiI
-          phi(3,:) = phi(3,:) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
+          phi(3,:) = phi(3,:) + 0.5*(real(phi_zc(3,:))-real(phi_zc(1,:)))*cos(gamma(nb))
         end do !magnetic field     
         
        end do !velocity
@@ -288,15 +288,15 @@ MODULE PROFILES
   integer :: k, nat, Nred, Nblue
   type (AtomicLine) :: line
   type (AtomType), pointer :: atom
-  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves), dlamB21, dlamB22
-  
+  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves), dlamB21, dlamB22, dB
+  dB = LARMOR / CLIGHT
   do nat=1,atmos%Natom
    atom => atmos%Atoms(nat)%ptr_atom
    do k=1,atom%Nline
      line = atom%lines(k)
      Nred = line%Nred; Nblue=line%Nblue
      if (.not.line%polarizable) CYCLE !Should be Bl at the "surface"
-     dlamB = -line%g_lande_eff * maxval(atmos%Bxyz) * LARMOR * (line%lambda0**2) * NM_TO_M!can be 0 anyway
+     dlamB = -line%g_lande_eff * dB * (line%lambda0 * NM_TO_M)
      Ipol = 0d0
      CALL cent_deriv(line%Nlambda,NLTEspec%lambda(Nblue:Nred),&
               NLTEspec%Flux(Nblue:Nred,ipix, jpix,ibin, iaz)*dlamB, Ipol(3,Nblue:Nred))

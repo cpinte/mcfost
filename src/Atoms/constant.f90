@@ -48,8 +48,10 @@ MODULE constant
 
   real(8), parameter ::  TWOSQRTTWO = 0.35355339059327
 
-  real(8), parameter ::  LARMOR = (Q_ELECTRON / (4.0*PI*M_ELECTRON * CLIGHT **2)) !1 / m / T
+  double precision, parameter ::  LARMOR = (Q_ELECTRON / (4.0*PI*M_ELECTRON)) !s^-1 / T
   !LamB = nuL/nu0 * lambda0 = nuL/(c/lambda0) * lambda0 = nuL/c * lambda0**2
+  !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
+  !vB = nuL * lambda0 / vbroad in T^-1
 
 
   ! --- Ionization energy Hmin in [J] ---

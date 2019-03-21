@@ -347,27 +347,6 @@ MODULE AtomicTransfer
 			NLTEspec%AtomOpac%rho_p(:,1,id)/chiI * NLTEspec%StokesU(:,iray, id) &
      ) !end Snu_V
 
-     do previous_cell = 1, NLTEspec%Nwaves
-      if (NLTEspec%StokesQ(previous_cell,iray,id) == NLTEspec%StokesQ(previous_cell,iray,id) +1 .or.&
-      NLTEspec%StokesQ(previous_cell, iray, id) /= NLTEspec%StokesQ(previous_Cell, iray,id)) then
-      write(*,*) tau(previous_cell), dtau(previous_cell), NLTEspec%I(previous_cell,iray,id), NLTEspec%StokesQ(previous_cell,iray,id)
-      	
-      call error ("stokesQ")
-      end if
-      if (NLTEspec%StokesU(previous_cell,iray,id) == NLTEspec%StokesU(previous_cell,iray,id) +1 .or.&
-      NLTEspec%StokesU(previous_cell, iray, id) /= NLTEspec%StokesU(previous_Cell, iray,id)) then
-      call error ("stokesu")
-      end if
-      if (NLTEspec%StokesV(previous_cell,iray,id) == NLTEspec%StokesV(previous_cell,iray,id) +1 .or.&
-      NLTEspec%StokesV(previous_cell, iray, id) /= NLTEspec%StokesV(previous_Cell, iray,id)) then
-      call error ("stokesv")
-      end if
-      if (NLTEspec%I(previous_cell,iray,id) == NLTEspec%i(previous_cell,iray,id) +1 .or.&
-      NLTEspec%i(previous_cell, iray, id) /= NLTEspec%i(previous_Cell, iray,id)) then
-      call error ("stokesi")
-      end if
-     end do
-
      facteur_tau = 1.0
 
      tau = tau + dtau * facteur_tau
@@ -693,11 +672,6 @@ MODULE AtomicTransfer
   INTEG_RAY_LINE => INTEG_RAY_LINE_I
   optical_length_tot => atom_optical_length_tot
 
-!   if (PRT_SOLUTION == "FULL_STOKES") then
-!     write(*,*) "Polarized emission not included in stat equil yet."
-!     PRT_SOLUTION = "FIELD_FREE"
-!   end if
-
   if (.not.associated(optical_length_tot)) then
    write(*,*) "pointer optical_length_tot not associated"
    stop
@@ -732,7 +706,7 @@ MODULE AtomicTransfer
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
    CALL magneto_accretion_model()  
-  !CALL uniform_law_model()
+   !CALL uniform_law_model()
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !

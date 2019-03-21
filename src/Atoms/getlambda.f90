@@ -76,7 +76,7 @@ MODULE getlambda
    if (line%atom%ID=="Na") adamp_char = 50 !adamp/vbroad
    if (line%atom%ID=="Mg") adamp_char = 150
    if (line%polarizable) atmos%v_char = atmos%v_char + &
-   				atmos%B_char*LARMOR/CLIGHT * (line%lambda0*NM_TO_M)**2 * line%g_lande_eff
+   				atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
    v_char = (atmos%v_char + vD*(1. + adamp_char)) !=maximum extension of a line
    !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
    v0 = -v_char * L
