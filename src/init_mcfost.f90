@@ -1507,7 +1507,7 @@ subroutine display_help()
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
   write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
-  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, WEAK_FIELD, NO_STOKES (DEFAULT)"
+  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
