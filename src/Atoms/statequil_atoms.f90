@@ -78,33 +78,110 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillCrossCoupling_terms
  
- SUBROUTINE fillGamma(id,icell,iray,methode)
+ SUBROUTINE fillGamma(id,icell,iray,n_rayons, switch_to_ALI)
  !------------------------------------------------- !
   ! for all atoms, performs wavelength
   ! and angle integration of rate matrix
+  ! The angle integration is done by nray calls of 
+  ! this routine
+  ! What are the integration weights ??? 
+  ! I cannot use monte-carlo for wavelength integration
+  ! because lambda is fixed for each line.
+  ! or generate a grid and interpolate the value on this
+  ! random grid ?
  !------------------------------------------------- !
-  integer, intent(in) :: id, icell, iray
-  character(len=*), intent(in) :: methode !ALI, MALI
-  integer :: nact, nc, kr
+  integer, intent(in) :: id, icell, iray, n_rayons
+  logical, intent(in), optional :: switch_to_ALI
+  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
   type (AtomType), pointer :: atom
   double precision, dimension(:), allocatable :: Ieff
+  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2
+  double precision :: norm = 0d0, hc_4PI
+    
+  !FLAG to change from MALI to ALI
+  if (present(switch_to_ALI)) then
+   if (switch_to_ALI) switch = 0
+  else
+   switch = 1
+  end if
   
   allocate(Ieff(NLTEspec%Nwaves)); Ieff=0d0
-
-  do nact=1,atmos%Nactiveatoms
+  hc_4PI = HPLANCK * CLIGHT / 4d0 / PI
+  
+  do nact=1,atmos%Nactiveatoms !loop over each active atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
    Ieff(:) = NLTEspec%I(:,iray,id) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)!at this iray, id
    
-  end do
+   !loop over transitions, b-f and b-b for these atoms
+   !To do; define a transition_type with either cont or line
+   do kr=1,atom%Ncont
+    norm = atom%continua(kr)%Nlambda * hc_4PI/ n_rayons
+    i = atom%continua(kr)%i; j = atom%continua(kr)%j
+    Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
+    twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + hc_4PI * sum(Ieff(Nblue:Nred)) / norm
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) +  hc_4PI * sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%continua(kr)%gij(Nblue:Nred,id)) / norm
+    	
+    ! cross-coupling terms
+     atom%Gamma(i,j) = atom%Gamma(i,j) -sum(atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
+     	atom%Uji_down(j,:,id)) / norm
+     ! check if i is an upper level of another transition
+     do krr=1,atom%Ncont
+      jp = atom%continua(krr)%j
+      if (jp==i) then !i upper level of this transition
+       atom%Gamma(j,i) = atom%Gamma(j,i) + sum(atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
+       	atom%Uji_down(i,:,id)) / norm
+      end if 
+     end do
+    !
+   end do
+   do kr=1,atom%Nline
+    norm = sum(atom%lines(kr)%wlam(Nblue:Nred)) / n_rayons
+    i = atom%lines(kr)%i; j = atom%lines(kr)%j
+    Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
+    twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + sum(Ieff(Nblue:Nred)*atom%lines(kr)%wlam(Nblue:Nred))/ n_rayons
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) +  sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%lines(kr)%gij(Nblue:Nred,id)*atom%lines(kr)%wlam(Nblue:Nred)) / norm
+    	
+    ! cross-coupling terms
+     atom%Gamma(i,j) = atom%Gamma(i,j) -sum(atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
+     	atom%Uji_down(j,:,id)) / norm
+     ! check if i is an upper level of another transition
+     do krr=1,atom%Nline
+      jp = atom%lines(krr)%j
+      if (jp==i) then !i upper level of this transition
+       atom%Gamma(j,i) = atom%Gamma(j,i) + sum(atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
+       	atom%Uji_down(i,:,id)) / norm
+      end if 
+     end do
+    ! 
+   end do
+   
+   !remove diagonal here
+   
+   NULLIFY(atom)
+  end do !loop over atoms
   deallocate(Ieff)
-  NULLIFY(atom)
  RETURN
  END SUBROUTINE fillGamma
  
- SUBROUTINE SEE()
+ SUBROUTINE SEE_atom(atom)
+  type(AtomType), intent(inout) :: atom
+  
+  write(*,*) atom%Gamma
 
  RETURN
- END SUBROUTINE SEE
+ END SUBROUTINE SEE_atom
  
  SUBROUTINE initRadiativeRates(atom)
  ! ---------------------------------------- !

@@ -138,8 +138,9 @@ MODULE AtomicTransfer
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
-     if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
-
+     if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m !we enter at the cell, icell_in
+     														  !and we need to compute the length path
+     
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      CALL initCrossCoupling(id) !does nothing if not active atoms
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
@@ -207,7 +208,18 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
-     ! Define PSI Operators here
+    if ((nbr_cell == 1).and.labs) then 
+     if (lstore_opac) then
+      !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
+      NLTEspec%Psi(:,iray,id) = 1d0 - &
+      	dexp(-ds(iray,id)*(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
+                    NLTEspec%AtomOpac%Kc(icell,:,1))) 
+     else
+       NLTEspec%Psi(:,iray,id) = 1d0 - &
+      	dexp(-ds(iray,id)*(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)))
+     end if
+    end if
+
     end if  ! lcellule_non_vide
   end do infinie
   ! -------------------------------------------------------------- !
@@ -482,9 +494,6 @@ MODULE AtomicTransfer
      NLTEspec%F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) !U
      NLTEspec%F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) !Q
      NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) !V
-    else if (atmos%magnetized.and.PRT_SOLUTION == "WEAK_FIELD") then
-     CALL WEAKFIELD_FLUX(ipix, jpix, ibin, iaz)
-    !else FIELD_FREE do nothing here or no mag field
     end if
   end if
 
@@ -778,7 +787,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
-  CALL reallocate_mcfost_vars() !also allocates ds
+  CALL reallocate_mcfost_vars()
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
@@ -816,7 +825,6 @@ MODULE AtomicTransfer
  !CALL WRITEATOM() !keep C in memory for that ?
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()
- deallocate(ds)
  NULLIFY(optical_length_tot, Profile)
 
  RETURN
@@ -849,10 +857,15 @@ MODULE AtomicTransfer
   integer :: icell
   integer :: Nlevel_total = 0
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+
+  if (allocated(ds)) deallocate(ds)
+  allocate(ds(atmos%Nrays,NLTEspec%NPROC))
+  ds = 0d0 !meters
   
   n_rayons_max = atmos%Nrays
-  labs = .true.
+  labs = .true. !to have ds
   id = 1
+
   
   !only etape1 for now
   lfixed_rays = .true.
@@ -965,9 +978,19 @@ MODULE AtomicTransfer
 
       !Only compute continuum NLTE for iray==1, because indpendent of direction
       NLTEspec%AtomOpac%initialized(id) = (iray==1)
+      !Solve radiative transfer equation and compute Psi operator for the cell icell
       CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
-
+      !compute cross-coupling terms for this cell and ray
+      !comment to set to zero
+      CALL fillCrossCoupling_terms(id, icell)
+      !Fill gamma matrix and performs wavelength and direction integration
+      CALL fillGamma(id,icell,iray,n_rayons)
+stop
      end do !ray
+    
+     do nact=1,atmos%Nactiveatoms
+      CALL SEE_atom(atmos%ActiveAtoms(nact)%ptr_atom)
+     end do
      n_iter_loc = 0
      lconverged_loc = .false.
       
@@ -996,6 +1019,7 @@ MODULE AtomicTransfer
      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
    deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
   end do
+  deallocate(ds)
 stop
  ! ------------------------------------------------------------------------------------ !
  RETURN
@@ -1004,36 +1028,15 @@ stop
  
  SUBROUTINE adjustStokesMode(Solution)
  !
- ! Depending of the Solution of the polarized transfer equation
- ! Allocate Zeeman Opac and Stokes arrays. 
- ! if Field_Free for instance, nothing is allocated
- ! metal_bb, and in the futur NLTEOpac, point to the unmagnetic routine
- ! if for the image Solution=FULL_STOKES, arrays are allocated and intiialized
- ! to perform full polarised images.
- ! If First solution=FULL_STOKES, and images = FULL_STOKES, the arrays
- ! are just set to 0. They are deallocated if FIELD_FREE for image.
- ! if two times FIELD_FREE, nothing change
- ! SETTING field_free is equivalent to unpolarised transfer or not setting atmos%magnetized
- ! However it allows to perform polarised tranfer at the end if desired, which is not
- ! possible simply re seeting atmos%magnetized to true.
+ !
    character(len=*), intent(in) :: Solution
    
 !     if (.not.atmos%magnetized) then
 !      Profile => IProfile
 !      RETURN
 !     end if
-
-
-    if (SOLUTION=="WEAK_FIELD") then 
-      !if (associated(PRofile)) Profile => NULL()
-      !Profile => Iprofile, already init at this pointer
-    !Also reallocate with the good NRAYS if atmos%NRays has changed
-      !NEVER ALLOCATE NOR ENTER ZPROFILE IF WEAKFIELD
-     if (.not.allocated(NLTEspec%F_QUV)) &
-      	allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
-      NLTEspec%F_QUV = 0d0
       
-    else if (SOLUTION=="FIELD_FREE") then
+    if (SOLUTION=="FIELD_FREE") then
       !if (associated(Profile)) Profile => NULL()
       !Profile => Iprofile !already init to that
       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
@@ -1081,9 +1084,6 @@ stop
   !--> should move them to init_atomic_atmos ? or elsewhere
   !need to be deallocated at the end of molecule RT or its okey ?`
   integer :: la
-  if (allocated(ds)) deallocate(ds)
-  allocate(ds(atmos%Nrays,NLTEspec%NPROC))
-  ds = 0d0 !meters
   CALL init_directions_ray_tracing()
   if (.not.allocated(stars_map)) allocate(stars_map(npix_x,npix_y,3))
   if (.not.allocated(stars_map_cont)) allocate(stars_map_cont(npix_x,npix_y,3))
@@ -1105,6 +1105,7 @@ stop
   tab_lambda_sup = tab_lambda_inf + tab_delta_lambda
   ! computes stellar flux at the new wavelength points
   CALL deallocate_stellar_spectra()
+  ! probably do not deallocate, 'cause maybe dust is in here too.
   if (allocated(kappa)) deallocate(kappa) !do not use it anymore
   !used for star map ray-tracing.
   CALL allocate_stellar_spectra(n_lambda)

@@ -155,7 +155,7 @@ MODULE atmos_type
       if (allocated(cont%lambda)) deallocate(cont%lambda)
       if (allocated(cont%alpha)) deallocate(cont%alpha)
       if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
-      if (allocated(cont%wlam)) deallocate(cont%wlam)
+      !if (allocated(cont%wlam)) deallocate(cont%wlam)
       if (allocated(cont%gij)) deallocate(cont%gij)
       if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)

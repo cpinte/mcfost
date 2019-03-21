@@ -100,7 +100,7 @@ MODULE Opacity
     	gij * Vij * aatom%n(j,icell) * twohnu3_c2
     	
     	aatom%eta(:,id) = aatom%eta(:,id) + gij * Vij * aatom%n(j,icell) * twohnu3_c2
-        aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
+        !! aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged
    	end do
@@ -142,8 +142,6 @@ MODULE Opacity
        		twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
     aatom%eta(:,id) = aatom%eta(:,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
-    	
-    aatom%lines(kr)%wlam(Nblue:Nred) = hc_4PI*phi(Nblue:Nred)! / (SQRTPI * aatom%vbroad(icell))
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        do nk = 1, 3

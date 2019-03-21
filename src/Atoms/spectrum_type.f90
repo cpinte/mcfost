@@ -204,10 +204,13 @@ MODULE spectrum_type
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(NLTEspec%Nwaves ,NLTEspec%NPROC))
@@ -333,18 +336,18 @@ MODULE spectrum_type
 !         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
 !       end do
     end do
-    do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-      Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
-      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nblue
-      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nlambda
+!    do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
+!      Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
+!      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nblue
+!      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nlambda
       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(NLTEspec%Nwaves))
-      allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
-      atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
-!       do la=1,Nlambda!=Nblue, Nred
-!        atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
-!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-!       end do
-    end do  
+!      allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
+!      atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
+!!       do la=1,Nlambda!=Nblue, Nred
+!!        atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
+!!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
+!!       end do
+!    end do  
    end do
  
   RETURN

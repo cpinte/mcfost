@@ -65,7 +65,7 @@ MODULE atom_type
    logical :: hydrogenic
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(8) :: lambda0, isotope_Frac, alpha0
-   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, wlam
+   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij!, wlam
    !double precision, allocatable, dimension(:)  :: Jbar! (n_cells)
    double precision :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
