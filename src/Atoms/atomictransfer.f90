@@ -211,12 +211,15 @@ MODULE AtomicTransfer
     if ((nbr_cell == 1).and.labs) then 
      if (lstore_opac) then
       !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
-      NLTEspec%Psi(:,iray,id) = 1d0 - &
+      NLTEspec%Psi(:,iray,id) = (1d0 - &
       	dexp(-ds(iray,id)*(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
-                    NLTEspec%AtomOpac%Kc(icell,:,1))) 
+                    NLTEspec%AtomOpac%Kc(icell,:,1))) ) / &
+                    (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
+                    NLTEspec%AtomOpac%Kc(icell,:,1))
      else
-       NLTEspec%Psi(:,iray,id) = 1d0 - &
-      	dexp(-ds(iray,id)*(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)))
+       NLTEspec%Psi(:,iray,id) = (1d0 - &
+      	dexp(-ds(iray,id)*(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)))) / &
+      							(NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id))
      end if
     end if
 
