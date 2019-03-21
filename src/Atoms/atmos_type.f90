@@ -529,7 +529,8 @@ MODULE atmos_type
    RETURN
    END SUBROUTINE init_magnetic_field
    
-   FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(bproj)
+   !building
+   FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the angles
@@ -537,32 +538,40 @@ MODULE atmos_type
    ! line of sight and the azimuth respectively.
    ! ------------------------------------------- !
     integer :: icell
-    double precision :: x, y, z, u, v, w, bproj
+    double precision :: x, y, z, u, v, w, bproj, Bmodule
     double precision :: r, bx, by, bz
     double precision, intent(inout) :: gamma, chi
     
-     bproj = 0d0 !Module of B.
+     bproj = 0d0 
+     Bmodule = 0d0!Module of B.
      gamma = 0d0; chi = 0d0
      if (lVoronoi) then !Bxyz in cartesian
-       !bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
-       !					   atmos%Bxyz(icell,3) * w
-       bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+       bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
+       					   atmos%Bxyz(icell,3) * w
+       Bmodule = dsqrt(sum(atmos%Bxyz(icell,:)**2))
      else
       if (lmagnetoaccr) then
        r = dsqrt(x**2 + y**2)
-       if (r <= tiny_dp) then
-        bproj = 0d0
-        RETURN
-       end if
+       if (r <= tiny_dp) RETURN
        bx = x/r * atmos%Bxyz(icell,1)
        by = y/r * atmos%Bxyz(icell,1)
        bz = atmos%Bxyz(icell,2)
        if (z<0) bz = -bz
        !module
-       bproj = dsqrt(bx**2 + by**2 +bz**2)!bx * u + by * v * bz * w
+       Bmodule = dsqrt(bx**2 + by**2 +bz**2)
+       bproj = bx * u + by * v * bz * w
+       gamma = bproj / Bmodule
+       chi = asin(y/r)
       else
-       !temporary
-        bproj = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+       !temporary, to work with uniform
+        Bmodule = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+        r = dsqrt(x**2 + y**2 + z**2)
+        bx = x/r * atmos%Bxyz(icell,1)
+        by = y/r * atmos%Bxyz(icell,2)
+        bz = z/r * atmos%Bxyz(icell,3)
+        bproj = bx*u + by*v + bz*w
+        gamma = bproj / Bmodule
+        chi = acos(bx/dsqrt(bx**2+by**2))
        !CALL Error("Geometry for magnetic field projection unkown")  
       end if     
      end if
