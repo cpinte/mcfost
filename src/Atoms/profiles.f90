@@ -278,36 +278,6 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE ZProfile
 
- !-> FUTUR DEPRECATION to easy to break if overlapping lines.
- !  -> or store an array with weight for each transition * b, a blend factor Sum blend_fact = 1
- ! -> And if non overlapping lines, can be computed by python code.
- SUBROUTINE WEAKFIELD_FLUX(ipix, jpix, ibin, iaz)
-  use math, only : cent_deriv
-  !Should be fine for non-overlapping lines
-  integer, intent(in) :: ipix, jpix, ibin, iaz
-  integer :: k, nat, Nred, Nblue
-  type (AtomicLine) :: line
-  type (AtomType), pointer :: atom
-  double precision :: dlamB, Ipol(3,NLTEspec%Nwaves), dlamB21, dlamB22, dB
-  dB = LARMOR / CLIGHT
-  do nat=1,atmos%Natom
-   atom => atmos%Atoms(nat)%ptr_atom
-   do k=1,atom%Nline
-     line = atom%lines(k)
-     Nred = line%Nred; Nblue=line%Nblue
-     if (.not.line%polarizable) CYCLE !Should be Bl at the "surface"
-     dlamB = -line%g_lande_eff * dB * (line%lambda0 * NM_TO_M)
-     Ipol = 0d0
-     CALL cent_deriv(line%Nlambda,NLTEspec%lambda(Nblue:Nred),&
-              NLTEspec%Flux(Nblue:Nred,ipix, jpix,ibin, iaz)*dlamB, Ipol(3,Nblue:Nred))
-     NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) + &
-                   Ipol(3,:)
-   end do
-   NULLIFY(atom)
-  end do
- RETURN
- END SUBROUTINE
-
  !--> I should include the zeeman lines in phi, because it plays a role in opacity
  !and tau, so in the map calculations it might matter. But perhaps negligible
  SUBROUTINE Iprofile_lambda (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)

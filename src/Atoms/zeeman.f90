@@ -77,10 +77,6 @@ MODULE zeeman
   double precision :: Mi, Mj!, norm(3) !sum of -1, 0 and +1 components
   							!not need, j-symbols normalised
 
-  ! IF PRT_SOLUTION IS WEAKFIELD WE NEVER ENTER HERE.
-  ! but now we need also to test if line%polarizable, meaning it has a geff > -99
-  ! and abs(dj) <= 1
-
   if (line%ZeemanPattern == -1 .and. line%polarizable) then
    line%zm%Ncomponent = 3
    allocate(line%zm%q(3), line%zm%strength(3), line%zm%shift(3))

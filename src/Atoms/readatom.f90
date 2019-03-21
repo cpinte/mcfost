@@ -165,9 +165,8 @@ MODULE readatom
            ! has "additional geff", but its not.
            !
      !futur implement: line%name
-     atom%lines(kr)%ZeemanPattern = 1
-     if ((PRT_SOLUTION == "WEAK_FIELD").or. (PRT_SOLUTION=="NO_STOKES").or. &
-       (.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
+     atom%lines(kr)%ZeemanPattern = 1 !should be read in file
+     if ((PRT_SOLUTION=="NO_STOKES").or.(.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
      ! -1 = effective triplet, +1
      
      write(*,*) "Reading line #", kr
