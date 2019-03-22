@@ -717,8 +717,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
+   !CALL magneto_accretion_model()  
+   CALL uniform_law_model()
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -835,6 +835,15 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
 
  SUBROUTINE NLTEloop() !for all active atoms
+ ! -------------------------------------------------------- !
+  ! CASE : MALI
+  ! CASE : HOGEREIJDE
+  !      -> should be simpler (in reading and implementing)
+  !			than MALI
+  !		 -> less accurate than MALI
+  !		 -> faster than MALI
+  !		 -> should have a lower convergence speed ?
+ ! -------------------------------------------------------- !
  
 #include "sprng_f.h"
 
@@ -853,43 +862,41 @@ MODULE AtomicTransfer
 
   real :: rand, rand2, rand3, fac_etape
 
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme, dN
+  double precision :: l_dum, l_c_dum, l_v_dum, x1, x2, x3
+  integer 		   :: n_c_dum
 
   logical :: labs
   integer :: atomunit = 1, nact
   integer :: icell
-  integer :: Nlevel_total = 0
+  integer :: Nlevel_total = 0, NmaxLevel
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+  character(len=20) :: Methode
+  double precision, allocatable, dimension(:,:,:) :: pop_old, pop
+
+  Methode = "MALI"
+  write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
+
 
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
   
-  CALL alloc_wlambda() !only for lines actually
-  
   n_rayons_max = atmos%Nrays
   labs = .true. !to have ds
   id = 1
   
-  !only etape1 for now
-  lfixed_rays = .true.
-  n_rayons = 2 ! one up one down
-  iray_start = 1
-  lprevious_converged = .false.
-  lnotfixed_rays = .not.lfixed_rays
-  lconverged = .false.
-  n_iter = 0
-
  ! ----------------------------  INITIAL POPS------------------------------------------ !
-  write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
   ! CALL initialSol()
   ! if OLD_POPULATIONS, the init is done at the reading
   ! for now initialSol() is replaced by this if loop on active atoms
+  NmaxLevel = 0
   do nact=1,atmos%Nactiveatoms
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
      atmos%ActiveAtoms(nact)%ptr_atom%NLTEpops = .true.
      Nlevel_total = Nlevel_total + atmos%ActiveAtoms(nact)%ptr_atom%Nlevel**2
+     NmaxLevel = max(NmaxLevel, atmos%ActiveAtoms(nact)%ptr_atom%Nlevel)
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
      atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
@@ -916,37 +923,43 @@ MODULE AtomicTransfer
   	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
   end do
   !end replacing initSol()
-  
+
+        
+  allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
+  allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
+          
+  SELECT CASE (Methode)
+   CASE ("MALI")
+   
+   		lfixed_rays = .true.
+  		n_rayons = n_rayons_max
+  		iray_start = 1
+  		lprevious_converged = .false.
+  		lnotfixed_rays = .not.lfixed_rays
+  		lconverged = .false.
+  		n_iter = 0
+        CALL alloc_wlambda() !only for lines actually
  ! ---------------------------------- CELLS LOOP -------------------------------------- !
- ! Start loop here !
- !make sure to properly RETURN if NmaxIter=0
- !could be error in H background if not lstore_opac, cause opacities will be updated
- !but we do not want that
- do while (.not.lconverged) 
-  n_iter = n_iter + 1
-  write(*,*) " -> Iteration #", n_iter
-  if (lfixed_rays) then
-    stream = 0.0
-    do i=1,nb_proc
-     stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-    end do
-  end if
-  
-  !do icell=1, n_Cells
-  !	CALL initGamma(icell) !set Gamma to C for each active atom
-  !end do
-  
-  !$omp parallel &
-  !$omp default(none) &
-  !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-  !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell) &
-  !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
-  !$omp shared(atmos, n_cells) &
-  !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
-  !$omp do schedule(static,1)
-  do icell=1, n_cells
-   CALL initGamma(icell)
-   !$ id = omp_get_thread_num() + 1
+ 		! Start loop here !
+		!make sure to properly RETURN if NmaxIter=0
+        !could be error in H background if not lstore_opac, cause opacities will be updated
+       !but we do not want that
+        do while (.not.lconverged) 
+        	n_iter = n_iter + 1
+        	max_n_iter_loc = 0
+            write(*,*) " -> Iteration #", n_iter
+ 			!$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell, dN) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
+            !$omp shared(atmos, n_cells, pop_old, n_rayons_max) &
+            !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
+            !$omp do schedule(static,1)
+  			do icell=1, n_cells
+   				CALL initGamma(icell)
+   				write(*,*)"ok"
+   				!$ id = omp_get_thread_num() + 1
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
 !   ! the matrix is allocated for ACTIVE atoms only in setLTEcoefficients and the file open
@@ -960,25 +973,24 @@ MODULE AtomicTransfer
 !       !atom%C is fixed, therefore we only use initGamma. If they chane, call CollisionRate() again
 !   	end do
     !Formal solution for this cell, for all wavelength and angle
-   if (atmos%lcompute_atomRT(icell)) then
-     do iray=iray_start, iray_start-1+n_rayons
+   				if (atmos%lcompute_atomRT(icell)) then
+     				do iray=iray_start, n_rayons_max
       
-      !only etape1
-      x0 = r_grid(icell)
-      y0 = 0d0
-      z0 = z_grid(icell)
-      !Assume no keplerian
+      					x0 = r_grid(icell)
+      					y0 = 0d0
+      					z0 = z_grid(icell)
+      					!Assume no keplerian
       
-      norme = dsqrt(x0**2 + y0**2 + z0**2)
-      if (iray==1) then
-       u0 = x0/norme
-       v0 = y0/norme
-       w0 = z0/norme
-      else
-       u0 = -x0/norme
-       v0 = -y0/norme
-       w0 = -z0/norme
-      end if
+     					 norme = dsqrt(x0**2 + y0**2 + z0**2)
+      					if (iray==1) then
+      						u0 = x0/norme
+       						v0 = y0/norme
+       						w0 = z0/norme
+      					else
+       						u0 = -x0/norme
+       						v0 = -y0/norme
+       						w0 = -z0/norme
+      					end if
 
       !Only compute continuum NLTE for iray==1, because indpendent of direction
       !NLTEspec%AtomOpac%initialized(id) = (iray==1)
@@ -986,42 +998,181 @@ MODULE AtomicTransfer
       !so compute them for all cells, at each iteration, otherwise on the fly
       
       !Solve radiative transfer equation and compute Psi operator for the cell icell
-      CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
+      					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       !compute cross-coupling terms for this cell and ray
       !comment to set to zero
-      CALL fillCrossCoupling_terms(id, icell)
+      					CALL fillCrossCoupling_terms(id, icell)
       !Fill gamma matrix and performs wavelength and direction integration
-      CALL fillGamma(id,icell,iray,n_rayons)
-stop
-     end do !ray
+      					CALL fillGamma(id,icell,iray,n_rayons)
+     				end do !ray
     
     !Once gamma is filled (angle and wavelength integration)
     !update the populations for each atom by Solving the SEE
-     CALL updatePopulations()
+                    do nact=1,atmos%Nactiveatoms
+                     pop_old(nact, 1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel, id) = &
+                      atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+                    end do
+     				CALL updatePopulations(id, icell)
+     				
+     				diff = 0d0
+     				do nact=1,atmos%NactiveAtoms
+     				    dN = abs(maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
+     				    		atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)))
+     				    diff = max(diff, dN)
+     					write(*,*) " ->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+     				end do
 stop
-     n_iter_loc = 0
-     lconverged_loc = .false.
+
       
-     do while (.not.lconverged_loc)
-       n_iter_loc = n_iter_loc + 1
-       !do something
-       !return the criterion of local convergence
-       
-       if (diff < precision_sub) then
-        lconverged_loc = .true.
-       else
-        lconverged_loc = .false. !opacity recomputed in integ_ray_line
-       end if
-     end do
+   				end if
+  			end do !cell loop
+  			!$omp end do
+  			!$omp end parallel
+  			if (n_iter >= 10) exit
+ 		end do !loop over iteration, convergence global
+ 
+    CASE ("HOGEREIJDE")
+  
+  		!only etape1 for now
+  		lfixed_rays = .true.
+  		n_rayons = 2 ! one up one down
+  		iray_start = 1
+  		lprevious_converged = .false.
+  		lnotfixed_rays = .not.lfixed_rays
+  		lconverged = .false.
+  		n_iter = 0 
+
+        do while (.not.lconverged)
+  			if (lfixed_rays) then
+    			stream = 0.0
+    			do i=1,nb_proc
+     				stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+    			end do
+ 			 end if
+        	n_iter = n_iter + 1
+        	max_n_iter_loc = 0
+
+            write(*,*) " -> Iteration #", n_iter
+ 			!$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell, dN) &
+			!$omp private(n_c_dum, l_dum, l_v_dum, l_c_dum, x1,x2,x3) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
+            !$omp shared(atmos, n_cells, pop_old, pop) &
+            !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
+            !$omp do schedule(static,1)
+  			do icell=1, n_cells
+   				!$ id = omp_get_thread_num() + 1
+   				if (atmos%lcompute_atomRT(icell)) then
+     				do iray=iray_start, iray_start-1+n_rayons
       
-   end if
-  end do !cell loop
-  !$omp end do
-  !$omp end parallel
-  if (n_iter >= 10) exit
- end do !loop over iteration, convergence global
+      					x0 = r_grid(icell)
+      					y0 = 0d0
+      					z0 = z_grid(icell)
+      					!Assume no keplerian
+      
+     					 norme = dsqrt(x0**2 + y0**2 + z0**2)
+      					if (iray==1) then
+      						u0 = x0/norme
+       						v0 = y0/norme
+       						w0 = z0/norme
+      					else
+       						u0 = -x0/norme
+       						v0 = -y0/norme
+       						w0 = -z0/norme
+      					end if
+      
+      					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs) 	
+      				end do !iray		 
+     				n_iter_loc = 0
+    				lconverged_loc = .false.
+    				do nact=1,atmos%NactiveAtoms
+    				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
+    				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				end do
+     				!sub iteration on the local emissivity, keeping I fixed
+     				do while (.not.lconverged_loc)
+       					n_iter_loc = n_iter_loc + 1
+      
+                        pop_old(:,:,id) = pop(:,:,id)
+                        !calc J
+						!stat equil for all atoms
+						
+     					diff = 0d0
+     					do nact=1,atmos%NactiveAtoms
+     				    	dN = abs(maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
+     				    		atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)))
+     				    	diff = max(diff, dN)
+     						write(*,*) " ->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+     						pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)			
+     					end do				
+
+       					if (diff < precision_sub) then
+       						lconverged_loc = .true.
+       					else
+        					!recompute opacity of this cell., but I need angles and pos...
+       						!
+       						CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
+       						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
+       						NLTEspec%AtomOpac%chi(:,id) = 0d0
+       						NLTEspec%AtomOpac%eta(:,id) = 0d0
+       						!NOTE Zeeman opacities are not re set to zero and are accumulated
+       						!change that or always use FIELD_FREE
+       						CALL NLTEOpacity(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .false.)
+       					end if
+     				end do
+     	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+     			end if !lcompute_atomRT
+     		end do !icell
+        	!$omp end do
+        	!$omp end parallel
+        	
+        	!Global convergence critrium
+!         maxdiff = 0.0
+!         do icell = 1, n_cells
+!            if (lcompute_molRT(icell)) then
+!               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
+!                    tab_nLevel_old(icell,1:n_level_comp) + 1e-300_dp)
+!               if (diff > maxdiff) maxdiff = diff
+!            endif
+!         enddo ! icell
+! 
+!         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
+!         write(*,*) "Relative difference =", real(maxdiff)
+!         write(*,*) "Threshold =", precision*fac_etape
+! 
+!         if (maxdiff < precision*fac_etape) then
+!            if (lprevious_converged) then
+!               lconverged = .true.
+!            else
+!               lprevious_converged = .true.
+!            endif
+!         else
+!            lprevious_converged = .false.
+!            if (.not.lfixed_rays) then
+!               n_rayons = n_rayons * 2
+!              ! if (n_rayons > n_rayons_max) then
+!               if (n_iter >= n_iter2_max) then
+!               write(*,*) "Warning : not enough rays to converge !!"
+!                  lconverged = .true.
+!               endif
+! 
+!               ! On continue en calculant 2 fois plus de rayons
+!               ! On les ajoute a l'ensemble de ceux calcules precedemment
+! !              iray_start = iray_start + n_rayons
+! 
+!            endif
+!         endif
+! 
+!         write(*,*) "STAT", minval(tab_nLevel(:,1:n_level_comp)), maxval(tab_nLevel(:,1:n_level_comp))
+  		end do !while
+  CASE DEFAULT
+   CALL ERROR("Methode for SEE unknown", methode)
+  END SELECT
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
+  deallocate(pop_old, pop)
   do nact=1,atmos%Nactiveatoms
    if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
@@ -1055,6 +1206,24 @@ stop
       												NLTEspec%StokesU)
       write(*,*) " Using FIELD_FREE solution for the SEE!"
       CALL Warning("  Set PRT_SOLUTION to FULL_STOKES for images")
+      
+    else if (SOLUTION=="POLARIZATION_FREE") then
+     CALL ERROR("POLARIZATION_FREE solution not implemented yet")
+     !NLTE not implemented in integ_ray_line_z and Zprofile always compute the full
+     !propagation dispersion matrix, but only the first row is needed
+     if (associated(Profile)) Profile => NULL()
+     Profile => Zprofile
+     if (associated(INTEG_RAY_LINE)) INTEG_RAY_LINE => NULL()
+     INTEG_RAY_LINE => INTEG_RAY_LINE_Z
+     
+     !beware, only I! polarization is neglected hence not allocated
+      if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
+      	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%etaQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+        allocate(NLTEspec%AtomOpac%chiQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
+
+        write(*,*) " Using POLARIZATION_FREE solution for the SEE!"
+     end if
 							
     else if (SOLUTION=="FULL_STOKES") then !Solution unchanged here
       if (associated(Profile)) Profile => NULL()
@@ -1082,7 +1251,7 @@ stop
         write(*,*) " Using FULL_STOKES solution for the SEE!"
       end if
     else
-     CALL ERROR("Error in adjust StokesMode")
+     CALL ERROR("Error in adjust StokesMode with solution=",Solution)
     end if
  RETURN
  END SUBROUTINE adjustStokesMode

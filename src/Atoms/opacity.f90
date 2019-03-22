@@ -222,6 +222,7 @@ MODULE Opacity
      end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
+       write(*,*) "Beware, NLTE part of Zeeman opac not set to 0 between iteration!"
        do nk = 1, 3
          !magneto-optical
          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &

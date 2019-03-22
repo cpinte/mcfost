@@ -65,10 +65,7 @@ MODULE simple_models
    CALL init_atomic_atmos()
    !For now we do not necessarily need to compute B if no polarization at all
    atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
-   if (atmos%magnetized) then 
-    CALL init_magnetic_field()
-    atmos%B_char = 3d-2
-   end if
+   if (atmos%magnetized) CALL init_magnetic_field()
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
@@ -215,7 +212,6 @@ MODULE simple_models
       end do
      end do
     end do
-    atmos%Bxyz = 0d0
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
@@ -226,6 +222,11 @@ MODULE simple_models
     atmos%v_char = atmos%v_char + &
     minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
+   end if
+   
+   if (atmos%magnetized) then
+    atmos%B_char = maxval(sum(atmos%Bxyz(:,:)**2,dim=2))
+    write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
    end if
 
 !    atmos%T = 0d0
@@ -268,15 +269,17 @@ MODULE simple_models
    ! Fontenla et al. namely the FAL C model.
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
   ! ----------------------------------------------------------- !
-   CALL init_atomic_atmos()!(n_cells)
-   atmos%magnetized = lmagnetic_field
+   CALL init_atomic_atmos()
+   lstatic = .true. !force to be static for this case
+   atmos%magnetized = .false.
    if (atmos%magnetized) then 
     CALL init_magnetic_field()
+    atmos%Bxyz(:,:) = 1d2 * 1d-4 !T
+    atmos%B_char = maxval(atmos%Bxyz)
    end if
-   atmos%Bxyz(:,:) = 3d2 * 1d-4 !T
-   atmos%B_char = maxval(atmos%Bxyz)
    atmos%nHtot = 1e18
-   atmos%T = 3000d0
+   atmos%T = 6000d0
+   atmos%vturb = 5d0 * 1d3 !m/s
 
    !idk = 10
     !atmos%nHtot =  2.27414200581936d16
@@ -298,12 +301,10 @@ MODULE simple_models
 !     atmos%ne = 1.251891d16
 !     atmos%nHtot = 1.045714d16
 
-   lstatic = .true. !force to be static for this case
    !tmos%vturb = 9.506225d3 !m/s !idk=10
-   atmos%vturb = 1.696164d3 !idk = 75
+   !atmos%vturb = 1.696164d3 !idk = 75
    !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
-   atmos%v_char = maxval(atmos%vturb)
    CALL define_atomRT_domain()
 
   RETURN
