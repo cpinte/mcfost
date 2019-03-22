@@ -78,7 +78,7 @@ MODULE AtomicTransfer
   double precision :: facteur_tau !used only in molecular line to have emission for one
                                   !  half of the disk only. Note used in AL-RT.
                                   !  this is passed through the lonly_top or lonly_bottom.
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, get_wlam
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -142,10 +142,10 @@ MODULE AtomicTransfer
      														  !and we need to compute the length path
      
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
-     CALL initCrossCoupling(id) !does nothing if not active atoms
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
+     get_wlam = (labs .and. (nbr_cell == 1))
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, get_wlam)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -208,6 +208,7 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
+    !! calcule les poids d'integration pour chaque raies aussi ???
     if ((nbr_cell == 1).and.labs) then 
      if (lstore_opac) then
       !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
@@ -243,7 +244,7 @@ MODULE AtomicTransfer
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chiI
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, get_wlam = .false.
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -294,8 +295,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
-     CALL initCrossCoupling(id)
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, get_wlam)
 
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -865,10 +865,11 @@ MODULE AtomicTransfer
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
   
+  CALL alloc_wlambda() !only for lines actually
+  
   n_rayons_max = atmos%Nrays
   labs = .true. !to have ds
   id = 1
-
   
   !only etape1 for now
   lfixed_rays = .true.
@@ -980,7 +981,10 @@ MODULE AtomicTransfer
       end if
 
       !Only compute continuum NLTE for iray==1, because indpendent of direction
-      NLTEspec%AtomOpac%initialized(id) = (iray==1)
+      !NLTEspec%AtomOpac%initialized(id) = (iray==1)
+      !-> cannot do that because, icell changes during the propagation of the ray
+      !so compute them for all cells, at each iteration, otherwise on the fly
+      
       !Solve radiative transfer equation and compute Psi operator for the cell icell
       CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       !compute cross-coupling terms for this cell and ray
@@ -991,9 +995,10 @@ MODULE AtomicTransfer
 stop
      end do !ray
     
-     do nact=1,atmos%Nactiveatoms
-      CALL SEE_atom(atmos%ActiveAtoms(nact)%ptr_atom)
-     end do
+    !Once gamma is filled (angle and wavelength integration)
+    !update the populations for each atom by Solving the SEE
+     CALL updatePopulations()
+stop
      n_iter_loc = 0
      lconverged_loc = .false.
       

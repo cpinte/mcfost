@@ -36,7 +36,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
    double precision, allocatable, dimension(:,:)   :: jc
    double precision, allocatable, dimension(:,:,:) :: Kc
-   logical, dimension(:), allocatable :: initialized
+   !!logical, dimension(:), allocatable :: initialized
    									     !set to .true. for each cell, when iray=1.
    									     !.false. otherwise.
    									     !%initialized(id) = (iray == 1)
@@ -198,8 +198,8 @@ MODULE spectrum_type
    NLTEspec%AtomOpac%eta_p = 0.
    
    if (NLTEspec%Nact > 0) then !NLTE loop activated
-    allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
-    NLTEspec%AtomOpac%initialized(:) = .false.
+    !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
+    !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
@@ -250,7 +250,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
    if (NLTEspec%Nact > 0) then
-    deallocate(NLTEspec%Psi, NLTEspec%AtomOpac%initialized)
+    deallocate(NLTEspec%Psi)!, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -310,48 +310,6 @@ MODULE spectrum_type
     
   RETURN
   END SUBROUTINE initAtomOpac
-  
-  SUBROUTINE alloc_wlambda()
-  ! ---------------------------------------------- !
-   ! Allocates wavelength integration
-   ! weights.
-   ! only from Nblue to Nred !
-  ! ---------------------------------------------- !
-   use atmos_type, only : atmos
-   integer :: kr, kc, nact, Nred, Nblue, Nlambda, la
-   
-   do nact=1,atmos%Nactiveatoms
-    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-      Nred = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nred
-      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nblue
-      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda
-      ! actually to prevents to use to much memory
-      					! we could actually only store a Nlambda version of weights
-      					!instead of a Nwaves array
-      !allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(NLTEspec%Nwaves))
-      allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(Nlambda))
-      atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(:) = 0d0
-!       do la=1,Nlambda!la=Nblue, Nred 
-!        atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(la) = & 
-!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-!       end do
-    end do
-!    do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-!      Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
-!      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nblue
-!      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nlambda
-      !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(NLTEspec%Nwaves))
-!      allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
-!      atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
-!!       do la=1,Nlambda!=Nblue, Nred
-!!        atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
-!!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-!!       end do
-!    end do  
-   end do
- 
-  RETURN
-  END SUBROUTINE alloc_wlambda
 
  SUBROUTINE WRITE_FLUX()
  ! -------------------------------------------------- !

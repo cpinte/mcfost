@@ -269,7 +269,9 @@ MODULE readatom
        !!stop
        !write(*,*) "geff = ", atom%lines(kr)%g_lande_eff
       end if
-      !!atom%lines(kr)%has_alignement = .false. !different criterion than polarizable
+      !!atom%has_atomic_polarization = .false. !different criterion than polarizable
+      !!atom%lines(kr)%has_alignement = .false. !depending on the polarisability factor
+      											! if we neglect J-states coherences
       atom%lines(kr)%polarizable = .false. !check also deltaJ
       !write(*,*) "dJ=", abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j))
       atom%lines(kr)%polarizable = (atmos%magnetized) .and. &

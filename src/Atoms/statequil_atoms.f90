@@ -4,6 +4,9 @@ MODULE statequil_atoms
  use atom_type
  use spectrum_type, only : NLTEspec
  use constant
+ use opacity, only : cont_wlam
+ use math, only : locate
+ use utils, only : GaussSlv
 
  IMPLICIT NONE
 
@@ -38,7 +41,21 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE initGamma
 
-
+ SUBROUTINE initCrossCoupling(id)
+  integer, intent(in) :: id
+  integer :: nact
+  
+  do nact=1,atmos%Nactiveatoms
+   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
+   
+   !init eta at the same time
+   atmos%ActiveAtoms(nact)%ptr_atom%eta(:,id) = 0d0
+  end do
+ 
+ RETURN
+ END SUBROUTINE initCrossCoupling
  
  SUBROUTINE fillCrossCoupling_terms(id, icell)
  
@@ -52,6 +69,10 @@ MODULE statequil_atoms
   
   do nact=1,atmos%Nactiveatoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
+   !init for that atom for this (id,icell) point
+   atom%Uji_down(:,:,id) = 0d0
+   atom%chi_down(:,:,id) = 0d0; atom%chi_up(:,:,id) = 0d0
+
    do kl=1,atom%Ncont
     cont = atom%continua(kl)
     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NM_TO_M * NLTEspec%lambda)**(3d0)
@@ -96,7 +117,7 @@ MODULE statequil_atoms
   type (AtomType), pointer :: atom
   double precision, dimension(:), allocatable :: Ieff
   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2
-  double precision :: norm = 0d0, hc_4PI
+  double precision :: norm = 0d0, hc_4PI, diag
     
   !FLAG to change from MALI to ALI
   if (present(switch_to_ALI)) then
@@ -115,59 +136,66 @@ MODULE statequil_atoms
    !loop over transitions, b-f and b-b for these atoms
    !To do; define a transition_type with either cont or line
    do kr=1,atom%Ncont
-    norm = atom%continua(kr)%Nlambda * hc_4PI/ n_rayons
+    norm = sum(cont_wlam(atom%continua(kr))) / n_rayons
     i = atom%continua(kr)%i; j = atom%continua(kr)%j
     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
     
     !Ieff (Uij = 0 'cause i<j)
-    atom%Gamma(i,j) = atom%Gamma(i,j) + hc_4PI * sum(Ieff(Nblue:Nred)) / norm
+    atom%Gamma(i,j) = atom%Gamma(i,j) + hc_4PI * sum(Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) / norm
     !Uji + Vji*Ieff
     !Uji and Vji express with Vij
     atom%Gamma(j,i) = atom%Gamma(j,i) +  hc_4PI * sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-    	atom%continua(kr)%gij(Nblue:Nred,id)) / norm
+    	atom%continua(kr)%gij(Nblue:Nred,id)*cont_wlam(atom%continua(kr))) / norm
     	
     ! cross-coupling terms
-     atom%Gamma(i,j) = atom%Gamma(i,j) -sum(atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
-     	atom%Uji_down(j,:,id)) / norm
+     atom%Gamma(i,j) = atom%Gamma(i,j) -sum((atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
+     	atom%Uji_down(j,:,id))*cont_wlam(atom%continua(kr))) / norm
      ! check if i is an upper level of another transition
      do krr=1,atom%Ncont
       jp = atom%continua(krr)%j
       if (jp==i) then !i upper level of this transition
-       atom%Gamma(j,i) = atom%Gamma(j,i) + sum(atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
-       	atom%Uji_down(i,:,id)) / norm
+       atom%Gamma(j,i) = atom%Gamma(j,i) + sum((atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
+       	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) / norm
       end if 
      end do
     !
    end do
    do kr=1,atom%Nline
-    norm = sum(atom%lines(kr)%wlam(Nblue:Nred)) / n_rayons
     i = atom%lines(kr)%i; j = atom%lines(kr)%j
     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
     twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
     
     !Ieff (Uij = 0 'cause i<j)
-    atom%Gamma(i,j) = atom%Gamma(i,j) + sum(Ieff(Nblue:Nred)*atom%lines(kr)%wlam(Nblue:Nred))/ n_rayons
+    atom%Gamma(i,j) = atom%Gamma(i,j) + sum(Ieff(Nblue:Nred)*atom%lines(kr)%wlam(Nblue:Nred)) / n_rayons
     !Uji + Vji*Ieff
     !Uji and Vji express with Vij
     atom%Gamma(j,i) = atom%Gamma(j,i) +  sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-    	atom%lines(kr)%gij(Nblue:Nred,id)*atom%lines(kr)%wlam(Nblue:Nred)) / norm
+    	atom%lines(kr)%gij(Nblue:Nred,id)*atom%lines(kr)%wlam(Nblue:Nred)) / n_rayons
     	
     ! cross-coupling terms
      atom%Gamma(i,j) = atom%Gamma(i,j) -sum(atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
-     	atom%Uji_down(j,:,id)) / norm
+     	atom%Uji_down(j,:,id)) / n_rayons
      ! check if i is an upper level of another transition
      do krr=1,atom%Nline
       jp = atom%lines(krr)%j
       if (jp==i) then !i upper level of this transition
        atom%Gamma(j,i) = atom%Gamma(j,i) + sum(atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
-       	atom%Uji_down(i,:,id)) / norm
+       	atom%Uji_down(i,:,id)) / n_rayons
       end if 
      end do
     ! 
    end do
    
-   !remove diagonal here
+   !remove diagonal here, delat(l',l)
+   do i=1,atom%Nlevel
+    atom%Gamma(i,i) = 0d0 !because i that case Gamma_l"l = Cii - Cii = 0d0
+    diag = 0d0
+    do j=1,atom%Nlevel
+     diag = diag + atom%Gamma(i,j) 
+    end do
+    atom%Gamma(i,i) = atom%Gamma(i,i) - diag
+   end do
    
    NULLIFY(atom)
   end do !loop over atoms
@@ -175,13 +203,43 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillGamma
  
- SUBROUTINE SEE_atom(atom)
+ SUBROUTINE SEE_atom(id, icell, atom)
+  integer, intent(in) :: icell, id
   type(AtomType), intent(inout) :: atom
+  integer :: j, i, imaxpop
+  double precision, dimension(atom%Nlevel) :: nold
   
-  write(*,*) atom%Gamma
+  do i=1,atom%Nlevel
+  write(*,*) (atom%Gamma(i,j), j=1,atom%Nlevel)
+  end do
+  
+  nold(:) = atom%n(:,icell)
+  !search the row with maximum population and remove it
+  imaxpop = locate(nold, maxval(nold))
+  nold(imaxpop) = 1d0
+  
+  atom%Gamma(imaxpop,:) = 1d0
+  CALL GaussSlv(atom%Gamma, nold,atom%Nlevel)
+  atom%n(:,icell) = nold(:)
 
  RETURN
  END SUBROUTINE SEE_atom
+ 
+ SUBROUTINE updatePopulations(id, icell)
+  integer, intent(in) :: id, icell
+  type(AtomType), pointer :: atom
+  integer :: nat
+  
+  do nat=1,atmos%NactiveAtoms
+   atom => atmos%ActiveAtoms(nat)%ptr_atom
+   CALL SEE_atom(id, icell, atom)
+   !Ng's acceleration
+   !print Ng acceleration pops.
+   NULLIFY(atom)
+  end do
+ 
+ RETURN
+ END SUBROUTINE updatePopulations
  
  SUBROUTINE initRadiativeRates(atom)
  ! ---------------------------------------- !
