@@ -675,6 +675,7 @@ MODULE AtomicTransfer
   integer :: atomunit = 1, nact
   integer :: icell
   integer :: ibin, iaz, Nrayone = 1
+  real(kind=dp) :: dumm
   character(len=20) :: ne_start_sol = "H_IONISATION"
   character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES"
   logical :: lwrite_waves = .false.
@@ -728,7 +729,7 @@ MODULE AtomicTransfer
   ! on the whole grid space.
   CALL readAtomicModels(atomunit)
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 300
+   atmos%Nrays = 20
    write(*,*) " Using", atmos%Nrays," rays for NLTE line transfer"
   end if
 
@@ -759,7 +760,7 @@ MODULE AtomicTransfer
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
   NLTEspec%atmos => atmos
-  CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
+  CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
   if (lstore_opac) then !o nly Background lines and active transitions
                                          ! chi and eta, are computed on the fly.
@@ -796,6 +797,17 @@ MODULE AtomicTransfer
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
   if (atmos%Nactiveatoms > 0) CALL NLTEloop()
+  open(unit=12, file="Snu_nlte_conv.dat",status="unknown")
+  icell = 1
+  CALL initAtomOpac(1)
+  CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
+  CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
+  do nact=1, NLTEspec%Nwaves
+  write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1), &
+    NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
+  end do
+  close(12)
+  stop
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
@@ -849,7 +861,7 @@ MODULE AtomicTransfer
 
   integer, parameter :: n_rayons_start = 50 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 20
-  integer, parameter :: n_iter2_max = 10
+  integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp
   real, parameter :: precision_sub = 1.0e-3
@@ -915,6 +927,8 @@ MODULE AtomicTransfer
    end if
 
    do nact=1,atmos%Nactiveatoms
+     allocate(atmos%ActiveAtoms(nact)%ptr_atom%ndag(atmos%ActiveAtoms(nact)%ptr_atom%Nlevel, n_cells))
+     atmos%ActiveAtoms(nact)%ptr_atom%ndag = 0d0
      do icell=1,atmos%Nspace
 	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom) !open and allocated in LTE.f90
       !try keeping in memory until better collision routine !
@@ -923,10 +937,7 @@ MODULE AtomicTransfer
   	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
   end do
   !end replacing initSol()
-
-        
   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
-  allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
           
   SELECT CASE (Methode)
    CASE ("MALI")
@@ -957,8 +968,9 @@ MODULE AtomicTransfer
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
+
    				CALL initGamma(icell)
-   				write(*,*)"ok"
+
    				!$ id = omp_get_thread_num() + 1
 !   ! Read collisional data and fill collisional matrix C(Nlevel**2) for each ACTIVE atoms.
 !   ! Initialize at C=0.0 for each cell points.
@@ -974,15 +986,16 @@ MODULE AtomicTransfer
 !   	end do
     !Formal solution for this cell, for all wavelength and angle
    				if (atmos%lcompute_atomRT(icell)) then
-     				do iray=iray_start, n_rayons_max
+
+     				do iray=iray_start, max(2,n_rayons_max)!two rays minimum
       
       					x0 = r_grid(icell)
       					y0 = 0d0
       					z0 = z_grid(icell)
       					!Assume no keplerian
       
-     					 norme = dsqrt(x0**2 + y0**2 + z0**2)
-      					if (iray==1) then
+     					norme = dsqrt(x0**2 + y0**2 + z0**2)
+      					if (iray<max(2,n_rayons_max)/2+1) then
       						u0 = x0/norme
        						v0 = y0/norme
        						w0 = z0/norme
@@ -1001,33 +1014,44 @@ MODULE AtomicTransfer
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       !compute cross-coupling terms for this cell and ray
       !comment to set to zero
-      					CALL fillCrossCoupling_terms(id, icell)
+       					CALL initCrossCoupling(id)
+       					CALL fillCrossCoupling_terms(id, icell)
       !Fill gamma matrix and performs wavelength and direction integration
-      					CALL fillGamma(id,icell,iray,n_rayons)
+      					CALL fillGamma_OF(id,icell,iray,n_rayons)
      				end do !ray
+!       					CALL initCrossCoupling(id)
+!       					CALL fillCrossCoupling_terms(id, icell)
+!       				CALL Gamma_LTE(id,icell)
+					!CALL fillGamma(id, icell, n_rayons)
     
     !Once gamma is filled (angle and wavelength integration)
     !update the populations for each atom by Solving the SEE
                     do nact=1,atmos%Nactiveatoms
                      pop_old(nact, 1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel, id) = &
                       atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+                     atmos%ActiveAtoms(nact)%ptr_atom%ndag(:,icell) = &
+                     	atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
                     end do
      				CALL updatePopulations(id, icell)
-     				
-     				diff = 0d0
-     				do nact=1,atmos%NactiveAtoms
-     				    dN = abs(maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
-     				    		atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)))
-     				    diff = max(diff, dN)
-     					write(*,*) " ->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
-     				end do
-stop
 
-      
    				end if
   			end do !cell loop
   			!$omp end do
   			!$omp end parallel
+  			cell_loop : do icell=1, atmos%Nspace
+  			  	diff = 0d0
+  				if (atmos%lcompute_atomRT(icell)) then
+     				do nact=1,atmos%NactiveAtoms
+     				    dN = abs(maxval(atmos%ActiveAtoms(nact)%ptr_atom%ndag(:,icell))-&
+     				    		maxval(atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)))/&
+     				    	maxval(atmos%ActiveAtoms(nact)%ptr_atom%ndag(:,icell))
+     				    diff = max(diff, dN)
+     					if (diff > 1d0) &
+     						write(*,*) " ->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
+     					if (diff < precision) CYCLE cell_loop
+     				end do
+     			end if
+     		end do cell_loop
   			if (n_iter >= 10) exit
  		end do !loop over iteration, convergence global
  
@@ -1041,6 +1065,9 @@ stop
   		lnotfixed_rays = .not.lfixed_rays
   		lconverged = .false.
   		n_iter = 0 
+  		
+
+  		allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
 
         do while (.not.lconverged)
   			if (lfixed_rays) then
@@ -1172,14 +1199,15 @@ stop
   END SELECT
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
-  deallocate(pop_old, pop)
+  deallocate(pop_old)
+  if (allocated(pop)) deallocate(pop)
   do nact=1,atmos%Nactiveatoms
    if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
    deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
+   deallocate(atmos%ActiveAtoms(nact)%ptr_atom%ndag)
   end do
   deallocate(ds)
-stop
  ! ------------------------------------------------------------------------------------ !
  RETURN
  END SUBROUTINE NLTEloop

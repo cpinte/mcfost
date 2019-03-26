@@ -146,6 +146,8 @@ MODULE spectrum_type
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    
    integer :: nat, k
+   type (AtomicContinuum) :: cont
+   type (AtomicLine) 	  :: line
    
    if (allocated(NLTEspec%I)) then
     write(*,*) "Error I already allocated"
@@ -213,12 +215,16 @@ MODULE spectrum_type
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(NLTEspec%Nwaves ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(NLTEspec%Nwaves ,NLTEspec%NPROC))
+      cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(cont%Nlambda ,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Jbar(NLTEspec%Nproc))
      end do
      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(NLTEspec%Nwaves ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(NLTEspec%Nwaves ,NLTEspec%NPROC))
+      line = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(line%Nlambda ,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(line%Nlambda ,NLTEspec%NPROC))
+      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Jbar(NLTEspec%Nproc))
      end do
     end do
    end if

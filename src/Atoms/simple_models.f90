@@ -277,35 +277,41 @@ MODULE simple_models
     atmos%Bxyz(:,:) = 1d2 * 1d-4 !T
     atmos%B_char = maxval(atmos%Bxyz)
    end if
-   atmos%nHtot = 1e18
-   atmos%T = 6000d0
-   atmos%vturb = 5d0 * 1d3 !m/s
+   atmos%calc_ne = .false.
+   !atmos%nHtot = 1e18
+   !atmos%T = 6000d0
+   !atmos%vturb = 5d0 * 1d3 !m/s
 
    !idk = 10
-    !atmos%nHtot =  2.27414200581936d16
-    !atmos%T = 45420d0
-    !atmos%ne = 2.523785d16
-
+    atmos%nHtot =  2.27414200581936d16
+    atmos%T = 45420d0
+    atmos%ne = 2.523785d16
+    atmos%vturb = 9.506225d3 !m/s
+   
    !idk = 75
 !   atmos%T=7590d0
 !   atmos%ne = 4.446967d20
 !   atmos%nHtot = 1.259814d23
 
     !idk = 81   
-    !atmos%T=9400d0
-    !atmos%ne = 3.831726d21
-    !atmos%nHtot = 1.326625d23
+!     atmos%T=9400d0
+!     atmos%ne = 3.831726d21
+!     atmos%nHtot = 1.326625d23
+!     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
 !     atmos%T = 100000d0
 !     atmos%ne = 1.251891d16
 !     atmos%nHtot = 1.045714d16
-
-   !tmos%vturb = 9.506225d3 !m/s !idk=10
    !atmos%vturb = 1.696164d3 !idk = 75
-   !atmos%vturb = 1.806787d3 !idk=81
    !atmos%vturb = 10.680960d3 !idk=0
    CALL define_atomRT_domain()
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.) 
+   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%lcompute_atomRT==.true.)
 
   RETURN
   END SUBROUTINE uniform_law_model

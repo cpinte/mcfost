@@ -11,6 +11,7 @@ MODULE Opacity
  use parametres
  use profiles, only : Profile, Profile_lambda
  !!use molecular_emission, only : v_proj
+ use math, only : locate
 
 
  IMPLICIT NONE
@@ -22,6 +23,15 @@ MODULE Opacity
 
  CONTAINS
  
+  SUBROUTINE initJdag()
+  
+  RETURN
+  END SUBROUTINE initJdag
+ 
+  SUBROUTINE calc_Jdag()
+  
+  RETURN
+  END SUBROUTINE calc_Jdag
  
   SUBROUTINE alloc_wlambda()
   ! --------------------------------------------------- !
@@ -78,14 +88,25 @@ MODULE Opacity
  ! --------------------------------------------------------- !
   type(AtomicLine), intent(in) :: line
   double precision, dimension(line%Nlambda) :: wlam
-  integer :: la, Nblue, Nred
-  double precision :: PI4_HC = 4d0 * PI / HPLANCK / CLIGHT
+  integer :: la, Nblue, Nred, la_start, la_end
+  double precision :: norm = CLIGHT/HPLANCK
 
   Nblue = line%Nblue; Nred = line%Nred
+  la_start = 1; la_end = line%Nlambda
   !compute
-  do la=Nblue, Nred !first is Nblue - (Nblue -1) which exists
+  !check that we are not at the boundaries, otherwise we cannot go beyond
+  if (Nblue==1) then 
+   la_start = 2
+   wlam(1) = line%lambda0*(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
+  end if
+  
+  if (Nred==NLTEspec%Nwaves) then
+   la_end = line%Nlambda-1
+   wlam(line%Nlambda) = line%lambda0*(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
+  end if
+  do la=1,line%Nlambda! !first is Nblue - (Nblue -1) which exists
   					!last is Nred - (Nred-1)
-   wlam(la) = 0.5*(NLTEspec%lambda(la)-NLTEspec%lambda(la-1)) * CLIGHT / NLTEspec%lambda(la) * PI4_HC
+   wlam(la) = line%lambda0*(NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1) * norm
   end do
  
  RETURN
@@ -97,15 +118,28 @@ MODULE Opacity
  ! --------------------------------------------------------- !
   type(AtomicContinuum), intent(in) :: cont
   double precision, dimension(cont%Nlambda) :: wlam
-  integer :: la, Nblue, Nred
-  double precision :: PI4_H = 4d0 * PI / HPLANCK
+  integer :: la, Nblue, Nred, la_start, la_end
+  double precision :: norm = 1d0 / HPLANCK
   
 
   Nblue = cont%Nblue; Nred = cont%Nred
+  la_start = 1; la_end = cont%Nlambda
   !compute
-  do la=Nblue, Nred !first is Nblue - (Nblue -1) which exists
+  !check that we are not at the boundaries, otherwise we cannot go beyond
+  if (Nblue==1) then 
+   la_start = 2
+   wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
+  end if
+  
+  if (Nred==NLTEspec%Nwaves) then
+   la_end = cont%Nlambda-1
+   wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
+  end if
+  do la=la_start,la_end !first is Nblue - (Nblue -1) which exists
   					!last is Nred - (Nred-1)
-   wlam(la) = 0.5*(NLTEspec%lambda(la)-NLTEspec%lambda(la-1)) / NLTEspec%lambda(la) * PI4_H
+   
+   wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1) * norm
+   
   end do
  
  RETURN
@@ -129,7 +163,7 @@ MODULE Opacity
   integer, intent(in) :: id, icell
   double precision, intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
   logical, intent(in) :: get_weights
-  integer :: nact, Nred, Nblue, kc, kr, i, j
+  integer :: nact, Nred, Nblue, kc, kr, i, j, nk
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
@@ -139,8 +173,8 @@ MODULE Opacity
   double precision, allocatable :: phi(:), phiZ(:,:), psiZ(:,:)
   integer, parameter :: NvspaceMax = 100
   character(len=20) :: VoigtMethod="HUMLICEK"
-  integer :: Nvspace, nv, nk
-  double precision :: omegav(NvspaceMax), v0, v1, delta_vol_phi, xphi, yphi, zphi, dv, hc_4PI
+  double precision :: hc_4PI
+  
   exp_lambda = dexp(-hc_k / (NLTEspec%lambda * atmos%T(icell)))
   twohnu3_c2 = twohc / NLTEspec%lambda(:)**(3d0)
   hc_4PI = HPLANCK * CLIGHT / (4d0 * PI)
@@ -155,42 +189,47 @@ MODULE Opacity
     	Nred = cont%Nred; Nblue = cont%Nblue
     	i = cont%i; j=cont%j
         gij = 0d0
-   	 	Vij = cont%alpha !Zero outside cont%Nred and cont%Nblue
+   	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
     	if (aatom%n(j,icell) < tiny_dp) then
-     	CALL error("too small populations")
-     	CYCLE
+    	 write(*,*) aatom%n(j,icell)
+     	 CALL error("too small populations")
+     	 CYCLE
     	end if
-    	gij = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda
-    	aatom%continua(kc)%gij(:,id) = gij
-    	aatom%continua(kc)%Vij(:,id) = Vij
+    	gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
+    	aatom%continua(kc)%gij(:,id) = gij(Nblue:Nred)
+    	aatom%continua(kc)%Vij(:,id) = Vij(Nblue:Nred)
 
     
     !store total emissivities and opacities
-    	NLTEspec%AtomOpac%chi(:,id) = NLTEspec%AtomOpac%chi(:,id) + &
-    									Vij * (aatom%n(i, icell) - gij * aatom%n(j,icell))
-		NLTEspec%AtomOpac%eta(:,id) = NLTEspec%AtomOpac%eta(:,id) + &
-    	gij * Vij * aatom%n(j,icell) * twohnu3_c2
+       NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
+     		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+       		Vij(Nblue:Nred) * (aatom%n(i,icell)-gij(Nblue:Nred)*aatom%n(j,icell))
+       		
+		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
+    	gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
     	
-    	aatom%eta(:,id) = aatom%eta(:,id) + gij * Vij * aatom%n(j,icell) * twohnu3_c2
+    	aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
+    		gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
         !! aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
     !Do not forget to add continuum opacities to the all continnum opacities
-    !after all populations have been converged
+    !after all populations have been converged    
    	end do
-    
+
    do kr = 1, aatom%Nline
     line = aatom%lines(kr)
     Nred = line%Nred; Nblue = line%Nblue
     i = line%i; j=line%j
     
     if ((aatom%n(j,icell) <=tiny_dp).or.(aatom%n(i,icell) <=tiny_dp)) then !no transition
+        write(*,*) aatom%n(:,icell)
      	CALL error("too small populations")
      	CYCLE
     end if 
     gij = 0d0
     Vij = 0d0
 
-    gij = line%Bji / line%Bij
-    twohnu3_c2 = line%Aji / line%Bji
+    gij(:) = line%Bji / line%Bij
+    twohnu3_c2(Nblue:Nred) = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
     allocate(phi(line%Nlambda))
     if (PRT_SOLUTION=="FULL_STOKES") &
@@ -200,9 +239,9 @@ MODULE Opacity
 
      Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * aatom%vbroad(icell))
- 
-     aatom%lines(kr)%gij(:,id) = gij
-     aatom%lines(kr)%Vij(:,id) = Vij     
+    
+     aatom%lines(kr)%gij(:,id) = gij(Nblue:Nred)
+     aatom%lines(kr)%Vij(:,id) = Vij(Nblue:Nred)    
       
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
@@ -212,13 +251,12 @@ MODULE Opacity
      		NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
        		twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
        		
-    aatom%eta(:,id) = aatom%eta(:,id) + &
+    aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
     	
      if (get_weights) then
-      !wlam = phi/sqrt(pi)/vth * dv * 4pi/hc * lambda0/lambda
       !normalized
-      aatom%lines(kr)%wlam(:) = phi / sum(phi*line_wlam(aatom%lines(kr))) * line_wlam(aatom%lines(kr)) 
+      aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
      end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then

@@ -161,3 +161,80 @@ MODULE voigtfunctions
 
 
 END MODULE voigtfunctions
+! 
+! !--------------------------------------------------------------
+! ! Generates Voigt and anomalous dispersion profiles
+! ! See Humlicek (1982) JQSRT 27, 437
+! !--------------------------------------------------------------
+! 	function fvoigt(da, dv)
+! 	real*8 :: da
+! 	real*8 :: dv(:), fvoigt(size(dv))
+! 	complex :: w4, z, t, u, v4
+! 	real*8 :: s
+! 	integer :: i, n
+! 		
+! 		n = size(dv)
+! 		do i = 1, n
+! 			z = cmplx(dv(i), da)
+! 			t = cmplx(da, -dv(i))
+! 			s = dabs(dv(i)) + da
+! 			u = t*t
+! 
+! 
+! 			if (s >= 15.d0) then
+! 				w4 = t * 0.5641896d0 / (0.5d0+u)
+! 			elseif (s >= 5.5) then
+! 				w4 = t*(1.410474d0+u*0.5641896d0)/(0.75d0+u*(3.d0+u))
+! 			elseif (da >= 0.195d0*dabs(dv(i))-0.176d0) then
+! 				w4 = (16.4955d0+t*(20.20933d0+t*(11.96482d0+t*(3.778987d0+t*0.5642236d0)))) / &
+! 					(16.4955d0+t*(38.82363d0+t*(39.27121d0+t*(21.69274d0+t*(6.699398d0+t)))))
+! 			else 
+! 				w4 = t*(36183.31d0-u*(3321.9905d0-u*(1540.787d0-u*(219.0313d0-u*(35.76683d0-&
+! 					u*(1.320522d0-u*0.56419d0))))))
+! 				v4 = (32066.6d0-u*(24322.84d0-u*(9022.228d0-u*(2186.181d0-u*(364.2191d0-&
+! 					u*(61.57037d0-u*(1.841439d0-u)))))))
+! 				w4 = cexp(u) - w4/v4
+! 			endif
+! 			fvoigt(i) = dble(w4)
+! 		enddo                        
+! 
+! end function fvoigt
+! 
+! !--------------------------------------------------------------
+! ! Generates Voigt and anomalous dispersion profiles
+! ! See Humlicek (1982) JQSRT 27, 437
+! !--------------------------------------------------------------
+! 	function fvoigt_zeeman(da, dv)
+! 	real*8 :: da
+! 	real*8 :: dv(:), fvoigt_zeeman(2,size(dv))
+! 	complex :: w4, z, t, u, v4
+! 	real*8 :: s
+! 	integer :: i, n
+! 		
+! 		n = size(dv)
+! 		do i = 1, n
+! 			z = cmplx(dv(i), da)
+! 			t = cmplx(da, -dv(i))
+! 			s = dabs(dv(i)) + da
+! 			u = t*t
+! 
+! 
+! 			if (s >= 15.d0) then
+! 				w4 = t * 0.5641896d0 / (0.5d0+u)
+! 			elseif (s >= 5.5) then
+! 				w4 = t*(1.410474d0+u*0.5641896d0)/(0.75d0+u*(3.d0+u))
+! 			elseif (da >= 0.195d0*dabs(dv(i))-0.176d0) then
+! 				w4 = (16.4955d0+t*(20.20933d0+t*(11.96482d0+t*(3.778987d0+t*0.5642236d0)))) / &
+! 					(16.4955d0+t*(38.82363d0+t*(39.27121d0+t*(21.69274d0+t*(6.699398d0+t)))))
+! 			else 
+! 				w4 = t*(36183.31d0-u*(3321.9905d0-u*(1540.787d0-u*(219.0313d0-u*(35.76683d0-&
+! 					u*(1.320522d0-u*0.56419d0))))))
+! 				v4 = (32066.6d0-u*(24322.84d0-u*(9022.228d0-u*(2186.181d0-u*(364.2191d0-&
+! 					u*(61.57037d0-u*(1.841439d0-u)))))))
+! 				w4 = cexp(u) - w4/v4
+! 			endif
+! 			fvoigt_zeeman(1,i) = dble(w4)
+! 			fvoigt_zeeman(2,i) = aimag(w4)
+! 		enddo                        
+! 
+! end function fvoigt_zeeman	

@@ -85,7 +85,7 @@ MODULE PROFILES
           vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
 
           P(:) = P(:) + &
-            Voigt(line%Nlambda, line%adamp,vvoigt(:), &
+             Voigt(line%Nlambda, line%adamp,vvoigt(:), &
                   F, VoigtMethod) / Nvspace
 
       end do
