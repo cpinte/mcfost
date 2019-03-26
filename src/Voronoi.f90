@@ -56,7 +56,7 @@ module Voronoi_grid
   real, dimension(:,:), allocatable :: Voronoi_xyz
   real, dimension(:,:,:), allocatable :: Voronoi_neighbour_xyz
   type(Voronoi_wall), dimension(:), allocatable :: wall
-  integer, dimension(:), allocatable :: neighbours_list
+  integer, dimension(:), allocatable :: neighbours_list, stars_id
 
   type(Platonic_Solid) :: PS
 
@@ -64,12 +64,16 @@ module Voronoi_grid
 
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
+          n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr, &
+          n_stars, stars_radius, stars_cell) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
+       integer(c_int), intent(in), value :: n_stars
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
+       real(c_double), dimension(n_stars), intent(in) :: stars_radius
+       integer(c_int), dimension(n_stars), intent(in) :: stars_cell
        real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
        ! normal vectors to the cutting plane (need to be normalized)
        real(c_double), dimension(3,n_vectors), intent(in) :: cutting_vectors  ! access order is wrong, but only way to pass a 2d array to C with an unfixed dim
@@ -233,31 +237,36 @@ module Voronoi_grid
        deuxr2_star(istar) = (2*etoile(istar)%r)**2
     enddo
 
-    ! Filtering particles outside the limits and inside stars
+    !!!! Filtering particles outside the limits and inside stars
+    ! Now filtering particles outside the limits only AND inside the stars. Cells are cut
+    ! at the stellar interface if overlap the star
     icell = 0
     n_sublimate = 0
+    is_outside_stars = .true.
     do i=1, n_points
        ! We test if the point is in the model volume
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
              if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
 
-                ! We also test if the edge of the cell can be inside the star
-                ! We test for the edge, so the center needs to be at twice the radius
+                !!We also test if the edge of the cell can be inside the star
+                !!We test for the edge, so the center needs to be at twice the radius
+                ! -> now we only removed particle inside the stars
                 is_outside_stars = .true.
                 loop_stars : do istar=1, n_etoiles
                    dx = x(i) - etoile(istar)%x
                    dy = y(i) - etoile(istar)%y
                    dz = z(i) - etoile(istar)%z
 
-                   if (min(dx,dy,dz) < 2*etoile(istar)%r) then
+                   !if (min(dx,dy,dz) < 2*etoile(istar)%r) then
                       dist2 = dx**2 + dy**2 + dz**2
-                      if (dist2 < deuxr2_star(istar)) then
+					  !if (dist2 < deuxr2_star(istar)) then
+                      if (dist2 < (etoile(istar)%r)**2) then
                          is_outside_stars = .false.
                          n_sublimate = n_sublimate + 1
                          exit loop_stars
                       endif
-                   endif
+                   !endif
                 enddo loop_stars
 
                 if (is_outside_stars) then
@@ -270,7 +279,9 @@ module Voronoi_grid
        endif
     enddo
 
+    !now this should never happen
     if (n_sublimate > 0) then
+       write(*,*) "This should never happen!"
        write(*,*) n_sublimate, "particles have been sublimated"
        write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
     endif
@@ -323,9 +334,11 @@ module Voronoi_grid
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
 
+
     do i=1, n_etoiles
        Voronoi(etoile(i)%icell)%is_star = .true.
     enddo
+
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
@@ -342,6 +355,7 @@ module Voronoi_grid
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
+       !$omp shared(n_etoiles, etoile) &
        !$omp private(id,icell_start,icell_end,ierr) &
        !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid) &
        !$omp reduction(.or.:was_cell_cut)
@@ -351,7 +365,8 @@ module Voronoi_grid
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
-            n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut,ierr) ! icell & id shifted by 1 for C
+            n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut,ierr,&
+            n_etoiles, real(etoile(:)%r,kind=dp),etoile(:)%icell-1) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
