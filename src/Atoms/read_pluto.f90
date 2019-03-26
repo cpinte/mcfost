@@ -17,28 +17,40 @@ module READ_PLUTO
 
   CONTAINS
 
-  SUBROUTINE read_hdF5(filename, x, y, z)!rho, vx, vy, vz
+  SUBROUTINE read_hdF5(filename, N_points, x, y, z, h, rho,vx, vy, vz)
   ! ---------------------------------------------------------- !
    ! Read HDF5 files, formatted by C. Zanni and G. Pantolmos
    ! Presenlty.
   ! ---------------------------------------------------------- !
    character(len=*), intent(in)	:: filename
    integer :: icell, Nread, syst_status
-   character(len=MAX_LENGTH) :: inputline, FormatLine
-   double precision, dimension(:), allocatable, intent(out) :: x, y, z
+   character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
+   integer, intent(inout)										:: N_points
+   double precision, dimension(:), allocatable, intent(out) :: x, y, z, h
+   double precision, dimension(:), allocatable, intent(out) :: rho, vx, vy, vz
   
-  !CALL pluto_to_mcfost(Nmodel,x,y,z,h,vx,vy,vz)
+   !density_files(1) assumes only one model for pluto
+   !read here ....
+   ! h = 3d0 * Rsun !assuming a large h to now
+  
+   !convert from pluto to mcfost units
+   CALL pluto_to_mcfost(N_points,x,y,z,h)!,vx,vy,vz)
 
   RETURN
   END SUBROUTINE read_hdf5
 
 
-  SUBROUTINE pluto_to_mcfost(x,y,z,h)
+  SUBROUTINE pluto_to_mcfost(N, x,y,z,h)
+   integer, intent(in) 										  :: N
    double precision, intent(inout), allocatable, dimension(:) :: x,y,z,h
 
   ! Convert PLUTO quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! densities assumed in kg/m3 here and velocities in m/s
+  ! mcfost densities are in g/cm3 for dust and mol RT. But atom RT
+  ! uses SI.
+  ! Defines rings here ? and take into account them later?
+  ! before tesselation?
 
   
   !Force using MCFOST stars
@@ -54,10 +66,16 @@ module READ_PLUTO
   !density in PLUTO units to kg/m3
   !velocites --> m/s
   !positions read in m converted in AU
-  x = x * m_to_AU
-  y = y * m_to_AU
-  z = z * m_to_AU
-  h = h * m_to_AU
+  
+  if (lascii_pluto_file) then
+  ! grid written to ascii is in meters
+   x = x * m_to_AU
+   y = y * m_to_AU
+   z = z * m_to_AU
+   h = h * m_to_AU
+  else !HDF5 true pluto's model
+   !...
+  end if
 
  RETURN
  END SUBROUTINE pluto_to_mcfost
@@ -103,7 +121,7 @@ module READ_PLUTO
    close(unit=1)
    
    !also define stellar rings in this ?
-   CALL pluto_to_mcfost(x,y,z,h)
+   CALL pluto_to_mcfost(N_points, x,y,z,h)
 
   RETURN
   END SUBROUTINE readAtmos_ascii

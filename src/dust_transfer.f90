@@ -100,7 +100,7 @@ subroutine transfert_poussiere()
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else if (lpluto_file) then
-     CALL setup_pluto_to_mcfost("model.s")
+     CALL setup_pluto_to_mcfost(density_file)
      CALL setup_grid()
   else
      call setup_grid()

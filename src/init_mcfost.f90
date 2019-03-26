@@ -68,6 +68,7 @@ subroutine set_default_variables()
   lcontrib_function = .false.
   lmagnetoaccr = .false.
   lpluto_file = .false.
+  lascii_pluto_file = .false.
   lmagnetic_field = .true.
   ! AL-RT
   lpuffed_rim = .false.
@@ -671,13 +672,24 @@ subroutine initialisation_mcfost()
         lpluto_file=.true.
         lVoronoi = .true.
         l3D = .true.
-        !NOW read input files here, later, hardcoded name assumed for development
-        !call get_command_argument(i_arg,s)
-        !n_phantom_files = 1
-        !allocate(density_files(n_phantom_files))
-        !density_files(1) = s
-        !i_arg = i_arg + 1
-        !!DOing nothing special now
+        call get_command_argument(i_arg,s)
+        if (s=="") call error("Error, no filename provided for Pluto file!")
+        n_pluto_files = 1
+        allocate(density_files(n_pluto_files))
+        density_files(1) = s
+        i_arg = i_arg + 1
+     case("-ascii_pluto")
+        i_arg = i_arg + 1
+        lascii_pluto_file = .true.
+        lpluto_file = .true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        if (s=="") call error("Error, no filename provided for ascii Pluto file!")
+        density_file = s
+        allocate(density_files(1))
+        density_files(1) = density_file
+        i_arg = i_arg + 1
      case("-no_magnetic_field")
         i_arg = i_arg + 1
         lmagnetic_field=.false.
@@ -1102,6 +1114,15 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
+  
+  if ((lascii_pluto_file.or.lpluto_file).and.(lascii_sph_file.or.lphantom_file)) then
+   call error("Cannot use Phantom and Pluto files at the same time presently.")
+  end if
+  
+  if ((prt_solution /= 'FULL_STOKES').or.(prt_solution /= "NO_STOKES").or.&
+  	(prt_solution/="FIELD_FREE")) then
+   call error("Solution ", prt_solution," unknown")
+  end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1391,7 +1412,8 @@ subroutine display_help()
   write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
   write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
-  write(*,*) "        : -pluto : reads a pluto file (implementing)"
+  write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
+  write(*,*) "        : -ascii_pluto <file> : read the <file> pluto ascii file"
   write(*,*) "        : -no_magnetic_field : Force magnetic field to be zero."
 
 
