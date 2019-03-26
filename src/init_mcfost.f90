@@ -568,9 +568,8 @@ subroutine initialisation_mcfost()
         lstatic = .true.!futur deprecation
      case("-prt_solution")
         i_arg = i_arg + 1
-        call get_command_argument(i_arg,s)
+        call get_command_argument(i_arg,prt_solution)
         i_arg = i_arg + 1
-        read(s,*) prt_solution
      case("-store_atom_opac")
         i_arg = i_arg + 1
         lstore_opac = .true.
@@ -1119,9 +1118,9 @@ subroutine initialisation_mcfost()
    call error("Cannot use Phantom and Pluto files at the same time presently.")
   end if
   
-  if ((prt_solution /= 'FULL_STOKES').or.(prt_solution /= "NO_STOKES").or.&
-  	(prt_solution/="FIELD_FREE")) then
-   call error("Solution ", prt_solution," unknown")
+  if ((prt_solution /= "FULL_STOKES").and.(prt_solution /= "NO_STOKES").and.&
+  	(prt_solution /= "FIELD_FREE")) then
+   call error("Solution", prt_solution,"unknown")
   end if
 
   ! Correction sur les valeurs du .para
