@@ -23,16 +23,6 @@ MODULE Opacity
 
  CONTAINS
  
-  SUBROUTINE initJdag()
-  
-  RETURN
-  END SUBROUTINE initJdag
- 
-  SUBROUTINE calc_Jdag()
-  
-  RETURN
-  END SUBROUTINE calc_Jdag
- 
   SUBROUTINE alloc_wlambda()
   ! --------------------------------------------------- !
    ! Allocates wavelength integration

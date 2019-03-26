@@ -797,17 +797,17 @@ MODULE AtomicTransfer
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
   if (atmos%Nactiveatoms > 0) CALL NLTEloop()
-  open(unit=12, file="Snu_nlte_conv.dat",status="unknown")
-  icell = 1
-  CALL initAtomOpac(1)
-  CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
-  CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
-  do nact=1, NLTEspec%Nwaves
-  write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1), &
-    NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
-  end do
-  close(12)
-  stop
+!   open(unit=12, file="Snu_nlte_conv.dat",status="unknown")
+!   icell = 1
+!   CALL initAtomOpac(1)
+!   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
+!   CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
+!   do nact=1, NLTEspec%Nwaves
+!   write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1), &
+!     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
+!   end do
+!   close(12)
+!   stop
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
