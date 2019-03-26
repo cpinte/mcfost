@@ -321,11 +321,9 @@ MODULE getlambda
 !! For continuum transitions, lambda0 is at Nred, check definition of the wavelength grid
 !! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
 !! and l1, lam(Nlambda) = lambda0
-    Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))!locate(inoutgrid,Atoms(n)%continua(kc)%lambda0)
-    if (Atoms(n)%ptr_atom%continua(kc)%hydrogenic) deallocate(Atoms(n)%ptr_atom%continua(kc)%lambda)
-    !cont%lambda is deallocated in fillPhotoionisationRates is case of cont is not hydrogenic
-    !!if (Atoms(n)%ptr_atom%active) &
-      CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
+    Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))
+    CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, Nwaves, inoutgrid)
+      !!-> also deallocates cont%lambda
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
     ! = inoutgrid(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred)
@@ -372,64 +370,70 @@ MODULE getlambda
     type(AtomType), intent(inout) :: atom
     integer, intent(in) :: kc, Nwaves
     double precision, dimension(Nwaves) :: waves
-    type(AtomicContinuum) :: cont
-    integer :: i, j
+    integer :: i, j, Nblue, Nred
     double precision, dimension(Nwaves) :: uu, g_bf
-    double precision, dimension(:), allocatable :: old_alpha
+    double precision, dimension(:), allocatable :: old_alpha, old_lambda
     double precision :: n_eff, Z, gbf_0(1), uu0(1), lambdaEdge, sigma0
     
     !pour H only?
     sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
           (HPLANCK**(3d0)) / (CLIGHT * &
           (M_ELECTRON*Q_ELECTRON)**(2d0))
-
-    cont = atom%continua(kc)
     
-    i = cont%i; j = cont%j; Z = real(atom%stage(i)+1); lambdaEdge = cont%lambda0
+    i = atom%continua(kc)%i; j = atom%continua(kc)%j
+    Z = real(atom%stage(i)+1); lambdaEdge = atom%continua(kc)%lambda0
+    Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
 
-    if (cont%hydrogenic) then
+    if (atom%continua(kc)%hydrogenic) then
      
      if (atom%ID == "H ") then
       n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
      else
      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
      !if (.not.obtained_n) &
-        n_eff = Z*dsqrt(E_RYDBERG / (atom%E(cont%j) - atom%E(cont%i)))
+        n_eff = Z*dsqrt(E_RYDBERG / (atom%E(j) - atom%E(i)))
      end if
 
-     allocate(cont%alpha(Nwaves)) !it is allocated in readatom only for non
+     allocate(atom%continua(kc)%alpha(Nwaves)) !it is allocated in readatom only for non
      									   ! hydrogenic continua
-     cont%alpha = 0d0
+     atom%continua(kc)%alpha(:) = 0d0
      g_bf = 0d0
-
-    uu(cont%Nblue:cont%Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
-        (NM_TO_M*waves(cont%Nblue:cont%Nred)) / (Z*Z) / E_RYDBERG - 1.
-    uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
+     uu(Nblue:Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
+        (NM_TO_M*waves(Nblue:Nred)) / (Z*Z) / E_RYDBERG - 1.
+     uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
        
-    gbf_0 = Gaunt_bf(1, uu0, n_eff)
+     gbf_0 = Gaunt_bf(1, uu0, n_eff)
     
-    g_bf(cont%Nblue:cont%Nred) = &
-      Gaunt_bf(cont%Nlambda, uu(cont%Nblue:cont%Nred), n_eff)
+     g_bf(Nblue:Nred) = &
+      Gaunt_bf(atom%continua(kc)%Nlambda, uu(Nblue:Nred), n_eff)
       
-    cont%alpha(cont%Nblue:cont%Nred) = &
-     cont%alpha0 * g_bf(cont%Nblue:cont%Nred) * &
-       (waves(cont%Nblue:cont%Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
+     atom%continua(kc)%alpha(Nblue:Nred) = &
+        atom%continua(kc)%alpha0 * g_bf(Nblue:Nred) * &
+       (waves(Nblue:Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
+       
+     deallocate(atom%continua(kc)%lambda) !not used
 
     else !cont%alpha is allocated and filled with read values
-     CALL Warning(" Beware, memory error if tow many cross-sections")
+     !!CALL Warning(" Beware, memory error if tow many cross-sections")
      write(*,*) "Interpolating photoionisation cross-section for atom ", &
-      cont%j,'->',cont%i,cont%atom%ID, " ", atom%ID
-     allocate(old_alpha(size(cont%alpha)))
-     old_alpha(:) = cont%alpha(:)
-     deallocate(cont%alpha)
-     allocate(cont%alpha(Nwaves))
-     cont%alpha = 0d0
-     CALL bezier3_interp(size(old_alpha),cont%lambda, old_alpha, & !Now the interpolation grid
-             cont%Nlambda,  waves(cont%Nblue:cont%Nred), &
-             cont%alpha(cont%Nblue:cont%Nred)) !end
-     deallocate(old_alpha, cont%lambda)
+      j,'->',i,atom%continua(kc)%atom%ID, " (", atom%ID,')'
+     
+     !that is because in this case, %alpha and %lambda have their size taken from the atomic
+     !file with is not %Nlambda anymore at this point.
+     allocate(old_alpha(size(atom%continua(kc)%alpha(:))), old_lambda(size(atom%continua(kc)%alpha(:))))
+     old_alpha(:) = atom%continua(kc)%alpha(:)
+     old_lambda(:) = atom%continua(kc)%lambda(:)
+     !also deallocates %lambda
+     deallocate(atom%continua(kc)%alpha, atom%continua(kc)%lambda)
+     allocate(atom%continua(kc)%alpha(Nwaves))
+
+     atom%continua(kc)%alpha(:) = 0d0
+     CALL bezier3_interp(size(old_alpha),old_lambda, old_alpha, & !Now the interpolation grid
+             atom%continua(kc)%Nlambda,  waves(Nblue:Nred), &
+             atom%continua(kc)%alpha(Nblue:Nred)) !end
+     deallocate(old_alpha, old_lambda)
     end if
-    atom%continua(kc)%alpha = cont%alpha
+    !!if (atom%ID=="He") read(*,*)
   RETURN
   END SUBROUTINE fillPhotoionisationCrossSection
 
