@@ -797,6 +797,10 @@ latomic_line_profiles=.true.
    ! TO DO: add NLTE continua and LTE/NLTE lines if possible
    CALL reallocate_mcfost_wavelength_arrays() 
   end if
+!   write(*,*) atmos%atoms(1)%ptr_atom%lines(1)%i, atmos%atoms(1)%ptr_atom%lines(1)%j, maxval(atmos%atoms(1)%ptr_atom%continua(1)%alpha)
+!   write(*,*) atmos%passiveatoms(1)%ptr_atom%lines(1)%i, atmos%passiveatoms(1)%ptr_atom%lines(1)%j, maxval(atmos%passiveatoms(1)%ptr_atom%continua(1)%alpha)
+!   write(*,*) Hydrogen%lines(1)%i, Hydrogen%lines(1)%j, maxval(Hydrogen%continua(1)%alpha)
+
   if (atmos%Nrays /= Nrayone) CALL reallocate_rays_arrays(Nrayone)
   !Take into account the wavelength grid for images 
   !Except except ds(Nray,Nproc) and Polarized arrays which are: 1) deallocated if PRT_SOL

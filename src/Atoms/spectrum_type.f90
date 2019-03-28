@@ -122,17 +122,17 @@ MODULE spectrum_type
 !    N = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nlambda
 !    Nr = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nred
 !    Nb = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nblue
-
+N=1
    CALL freeSpectrum()
    allocate(NLTEspec%lambda(N))
    NLTEspec%atmos => atmos
-
+NLTEspec%lambda(N) = NLTEspec%wavelength_ref
    !NLTEspec%lambda(:) = old_grid(Nb:Nr)
-   dL = (657.5632775001934d0 - 655.3750469594274d0)/(N-1)
-   NLTEspec%lambda(1) = 655.3750469594274d0
-   do la=2,N!/2
-    NLTEspec%lambda(la)=NLTEspec%lambda(la-1)+dL
-   end do 
+!    dL = (657.5632775001934d0 - 655.3750469594274d0)/(N-1)
+!    NLTEspec%lambda(1) = 655.3750469594274d0
+!    do la=2,N!/2
+!     NLTEspec%lambda(la)=NLTEspec%lambda(la-1)+dL
+!    end do 
 !    dL = (1085d0 - 1082d0)/(N/2)
 !    NLTEspec%lambda(N/2+1)=1082d0
 !    do la=N/2+2,N

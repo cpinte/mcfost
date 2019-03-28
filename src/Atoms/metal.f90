@@ -603,8 +603,7 @@ MODULE metal
      i = line%i
      j = line%j
      
-     if (line%Nred == -99 .and. line%Nblue == -99) CYCLE
-
+     !if (line%Nred == -99 .and. line%Nblue == -99) CYCLE
      
      !wavelength does not fall inside line domaine? OK cylcle
      if ((NLTEspec%lambda(la) < NLTEspec%lambda(line%Nblue)).or.&
@@ -699,7 +698,7 @@ MODULE metal
    chi = 0d0
    eta = 0d0
 
-   NLTEspec%AtomOpac%Kc(icell,:,1) = Thomson(icell)
+  NLTEspec%AtomOpac%Kc(icell,:,1) = Thomson(icell)
 
    CALL Rayleigh(1, icell, Hydrogen)
    if (associated(Helium)) CALL Rayleigh(1, icell, Helium)
@@ -726,8 +725,8 @@ MODULE metal
     NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
    end if
 
-   if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
-   CALL Metal_bf(1, icell) !here we do not need id, because lstore_atom_opac=.true.
+    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
+    CALL Metal_bf(1, icell) !here we do not need id, because lstore_atom_opac=.true.
 
 
  RETURN
