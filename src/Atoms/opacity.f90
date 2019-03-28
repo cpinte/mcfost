@@ -135,7 +135,11 @@ MODULE Opacity
  RETURN
  END FUNCTION cont_wlam
 
- SUBROUTINE NLTEOpacity(id, icell, x, y, z, x1, y1, z1, u, v, w, l, get_weights)
+ !add options to save %eta, %gij %Vij only during the NLTEloop. For the image we
+ !do not need them as we do not update the pops
+ !same condition as get_weights
+ !Je n'ai besoin de gij, Vij qu'a l'indice de la cellule
+ SUBROUTINE NLTEOpacity(id, icell, x, y, z, x1, y1, z1, u, v, w, l, iterate)
   !
   !
   ! chi = Vij * (ni - gij * nj)
@@ -148,11 +152,12 @@ MODULE Opacity
   ! gij = Bji/Bij (*rho if exists)
   ! Vij = Bij * hc/4PI * phi
   !
-  ! if get_weights, compute lines weight for this cell icell and rays
+  ! if iterate, compute lines weight for this cell icell and rays and eta, Vij gij for that atom.
+  ! if not iterate means that atom%gij atom%vij atom%eta are not allocated (after NLTE for image for instance)
   !
   integer, intent(in) :: id, icell
   double precision, intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
-  logical, intent(in) :: get_weights
+  logical, intent(in) :: iterate
   integer :: nact, Nred, Nblue, kc, kr, i, j, nk
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
@@ -177,6 +182,8 @@ MODULE Opacity
    	do kc = 1, aatom%Ncont
     	cont = aatom%continua(kc)
     	Nred = cont%Nred; Nblue = cont%Nblue
+        if (Nred == -99 .and. Nblue == -99) CYCLE
+
     	i = cont%i; j=cont%j
         gij = 0d0
    	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
@@ -185,9 +192,8 @@ MODULE Opacity
      	 CALL error("too small populations")
      	 CYCLE
     	end if
-    	gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
-    	aatom%continua(kc)%gij(:,id) = gij(Nblue:Nred)
-    	aatom%continua(kc)%Vij(:,id) = Vij(Nblue:Nred)
+    	
+    	 gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
 
     
     !store total emissivities and opacities
@@ -198,9 +204,13 @@ MODULE Opacity
 		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
     	gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
     	
-    	aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
+    	if (iterate) then
+    	 aatom%continua(kc)%gij(:,id) = gij(Nblue:Nred)
+    	 aatom%continua(kc)%Vij(:,id) = Vij(Nblue:Nred)
+    	 aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     		gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
         !! aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
+    	end if
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged    
    	end do
@@ -208,6 +218,8 @@ MODULE Opacity
    do kr = 1, aatom%Nline
     line = aatom%lines(kr)
     Nred = line%Nred; Nblue = line%Nblue
+    !if (Nred == -99 .and. Nblue == -99) CYCLE
+
     i = line%i; j=line%j
     
     if ((aatom%n(j,icell) <=tiny_dp).or.(aatom%n(i,icell) <=tiny_dp)) then !no transition
@@ -228,10 +240,7 @@ MODULE Opacity
 
 
      Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
-                                                             ! / (SQRTPI * aatom%vbroad(icell))
-    
-     aatom%lines(kr)%gij(:,id) = gij(Nblue:Nred)
-     aatom%lines(kr)%Vij(:,id) = Vij(Nblue:Nred)    
+                                                             ! / (SQRTPI * aatom%vbroad(icell)) 
       
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
@@ -240,14 +249,15 @@ MODULE Opacity
      NLTEspec%AtomOpac%eta(Nblue:Nred,id)= &
      		NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
        		twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
-       		
-    aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
+      
+    if (iterate) then
+     aatom%lines(kr)%gij(:,id) = gij(Nblue:Nred)
+     aatom%lines(kr)%Vij(:,id) = Vij(Nblue:Nred)    		
+     aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
-    	
-     if (get_weights) then
-      !normalized
-      aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
-     end if
+
+     aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+    end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        write(*,*) "Beware, NLTE part of Zeeman opac not set to 0 between iteration!"
