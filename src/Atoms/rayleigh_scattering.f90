@@ -92,6 +92,7 @@ MODULE rayleigh_scattering
  !   find lambda_red, the longest wavelength covered by the
  !   transition less than lambda for this atom.
    do kr=1,atom%Nline
+    !if (atom%lines(kr)%Nred==-99 .and. atom%lines(kr)%Nblue==-99) CYCLE
     ! BEWARE: a line expands from Nblue to Nred but the reddest wavelength
     ! is line%lambda(Nlambda) = NLTEspec%lambda(Nred) by construction.
     !In getlambda.f90, a new grid is constructed and lambda(Nlambda) might not
@@ -106,6 +107,7 @@ MODULE rayleigh_scattering
   lambda2 = 0d0
 
  do kr=1,atom%Nline
+  !if (atom%lines(kr)%Nred==-99 .and. atom%lines(kr)%Nblue==-99) CYCLE
   lambda_red =  NLTEspec%lambda(atom%lines(kr)%Nred)
    if (atom%lines(kr)%i == 1) then
     where((NLTEspec%lambda > lambda_limit).and.(NLTEspec%lambda > lambda_red))
@@ -115,6 +117,7 @@ MODULE rayleigh_scattering
    end if 
  end do
 
+  !at worst we add zero and res=.false.
   scatt = sigma_e * fomega * atom%n(1,icell) !m^-1 = m^2 * m^-3
   
   if ((MAXVAL(scatt) > 0))  res = .true.
