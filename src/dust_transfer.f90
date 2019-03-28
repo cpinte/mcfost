@@ -1218,8 +1218,8 @@ subroutine dust_map(lambda,ibin,iaz)
 
      ! dx and dy are only required for stellar map here
      taille_pix = (map_size/zoom)  ! en AU
-     dx(:) = x_plan_image * taille_pix
-     dy(:) = y_plan_image * taille_pix
+     dx(:) = 0.
+     dy(:) = 0.
 
      i = 1
      j = 1
@@ -1269,6 +1269,9 @@ subroutine dust_map(lambda,ibin,iaz)
      !$omp end do
      !$omp end parallel
 
+     ! We need dx and dy /= 0 for star_map now
+     dx(:) = x_plan_image * taille_pix
+     dy(:) = y_plan_image * taille_pix
   else ! method 2 : echantillonnage lineaire avec sous-pixels
      lresolved = .true.
 
