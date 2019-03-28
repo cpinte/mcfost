@@ -120,12 +120,12 @@ MODULE atmos_type
      do l=1,atom%Nline
       line = atom%lines(l)
       if (allocated(line%phi)) deallocate(line%phi)
-      if (allocated(line%phi_Q)) deallocate(line%phi_Q)
-      if (allocated(line%phi_U)) deallocate(line%phi_U)
-      if (allocated(line%phi_V)) deallocate(line%phi_V)
-      if (allocated(line%psi_Q)) deallocate(line%psi_Q)
-      if (allocated(line%psi_U)) deallocate(line%psi_U)
-      if (allocated(line%psi_V)) deallocate(line%psi_V)
+!       if (allocated(line%phi_Q)) deallocate(line%phi_Q)
+!       if (allocated(line%phi_U)) deallocate(line%phi_U)
+!       if (allocated(line%phi_V)) deallocate(line%phi_V)
+!       if (allocated(line%psi_Q)) deallocate(line%psi_Q)
+!       if (allocated(line%psi_U)) deallocate(line%psi_U)
+!       if (allocated(line%psi_V)) deallocate(line%psi_V)
       if (allocated(line%lambda)) deallocate(line%lambda)
       !The net cooling rates is stored instead of the radiative rates
       !which are now scalar.
@@ -143,6 +143,7 @@ MODULE atmos_type
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
 !       if (allocated(line%chi_down)) deallocate(line%chi_down)
 !       if (allocated(line%Uji_down)) deallocate(line%Uji_down)
+      if (allocated(line%Jbar)) deallocate(line%Jbar)
       if (associated(line%atom)) NULLIFY(line%atom)
       CALL freeZeemanMultiplet(line)
      end do
@@ -161,12 +162,107 @@ MODULE atmos_type
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
 !       if (allocated(cont%chi_down)) deallocate(cont%chi_down)
 !       if (allocated(cont%Uji_down)) deallocate(cont%Uji_down)
+	  if (allocated(cont%Jbar)) deallocate(cont%Jbar)
+      if (associated(cont%atom)) NULLIFY(cont%atom)
      end do
       deallocate(atom%continua)
      end if
 
   RETURN
   END SUBROUTINE freeAtom
+  
+  !it is not a free atom, just a reduction of atom%lines array.
+  SUBROUTINE realloc_line_transitions(atom, Nl_new, mask)
+  !basicazlly does what PAck does
+   integer, intent(in) :: Nl_new
+   type (AtomType), intent(inout) :: atom
+   logical, intent(in), dimension(:) :: mask
+   !integer, intent(in), dimension(:) :: indexes
+   integer :: k, k1
+   type (AtomicLine), dimension(:), allocatable :: lines
+   
+    !temporary storage
+    allocate(lines(atom%Nline)); lines=atom%lines
+     do k=1,atom%Nline 
+      if (allocated(atom%lines(k)%phi)) &
+      	deallocate(atom%lines(k)%phi)
+      if (allocated(atom%lines(k)%lambda)) &
+      	deallocate(atom%lines(k)%lambda)
+      if (allocated(atom%lines(k)%CoolRates_ij)) &
+      	deallocate(atom%lines(k)%CoolRates_ij)
+      if (allocated(atom%lines(k)%wlam)) &
+      	deallocate(atom%lines(k)%wlam)
+      if (allocated(atom%lines(k)%rho_pfr)) &
+      	deallocate(atom%lines(k)%rho_pfr)
+      if (allocated(atom%lines(k)%gij)) &
+      	deallocate(atom%lines(k)%gij)
+      if (allocated(atom%lines(k)%Vij)) &
+      	deallocate(atom%lines(k)%Vij)
+
+      if (allocated(atom%lines(k)%Jbar)) &
+      	deallocate(atom%lines(k)%Jbar)
+      if (associated(atom%lines(k)%atom)) &
+      	NULLIFY(atom%lines(k)%atom)
+      CALL freeZeemanMultiplet(atom%lines(k))
+     end do
+    !Pack the transitions
+    deallocate(atom%lines)
+    allocate(atom%lines(Nl_new));atom%Nline=Nl_new
+    k1=1
+    do k=1,size(lines)
+     if (mask(k)==.true.) then 
+      atom%lines(k1) = lines(k)
+      k1 = k1 + 1
+     end if
+    end do
+    deallocate(lines)
+  
+  RETURN
+  END SUBROUTINE realloc_line_transitions
+  
+  SUBROUTINE realloc_continuum_transitions(atom, Nc_new, mask)
+   integer, intent(in) :: Nc_new
+   logical, intent(in), dimension(:) :: mask
+   type (AtomType), intent(inout) :: atom
+   !integer, intent(in), dimension(:) :: indexes
+   integer :: k, k1
+   type (AtomicContinuum), dimension(:), allocatable :: conta
+
+
+    allocate(conta(atom%Ncont)); conta=atom%continua
+    do k=1,atom%Ncont
+     if (allocated(atom%continua(k)%lambda)) &
+     	deallocate(atom%continua(k)%lambda)
+     if (allocated(atom%continua(k)%alpha)) &
+     	deallocate(atom%continua(k)%alpha)
+     if (allocated(atom%continua(k)%coolrates_ij)) &
+     	deallocate(atom%continua(k)%coolrates_ij)
+     !need to be reallocated in case of active atoms
+     if (allocated(atom%continua(k)%gij)) &
+     	deallocate(atom%continua(k)%gij)
+     if (allocated(atom%continua(k)%Vij)) &
+     	deallocate(atom%continua(k)%Vij)
+	 if (allocated(atom%continua(k)%Jbar)) &
+	    deallocate(atom%continua(k)%Jbar)
+     if (associated(atom%continua(k)%atom)) &
+     	NULLIFY(atom%continua(k)%atom)
+    end do
+    !Pack the transitions
+    deallocate(atom%continua)
+    allocate(atom%continua(Nc_new));atom%Ncont=Nc_new
+    k1=1
+    do k=1,size(conta)
+     !write(*,*) size(conta), k, k1, mask(k)
+     if (mask(k)==.true.) then 
+      atom%continua(k1) = conta(k)
+      !write(*,*) maxval(atmos%Atoms(n)%ptr_atom%continua(k1)%alpha), maxval(conta(k)%alpha)
+      k1 = k1 + 1
+     end if
+    end do
+    deallocate(conta)
+
+  RETURN
+  END SUBROUTINE realloc_continuum_transitions
 
   SUBROUTINE readKurucz_pf(code, Npf, Nstage, ionpot, pf)
    !return pf function for atom with Z = code
@@ -529,13 +625,16 @@ MODULE atmos_type
    RETURN
    END SUBROUTINE init_magnetic_field
    
-   !building
+
    FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the angles
-   ! gamma and chi, the angle between B and the
-   ! line of sight and the azimuth respectively.
+   ! gamma and chi.
+   ! Gamma is the angle between B and the los
+   ! chi is the angle between Bperp and ex
+   ! Bperp is the projection of B onto a plane
+   ! perpendicular to the los
    ! ------------------------------------------- !
     integer :: icell
     double precision :: x, y, z, u, v, w, bproj, Bmodule
@@ -549,6 +648,8 @@ MODULE atmos_type
        bproj = atmos%Bxyz(icell,1)*u + atmos%Bxyz(icell,2)*v + &
        					   atmos%Bxyz(icell,3) * w
        Bmodule = dsqrt(sum(atmos%Bxyz(icell,:)**2))
+       gamma = acos(bproj/Bmodule)
+       chi = atmos%Bxyz(icell,1) / Bmodule*sin(gamma)
      else
       if (lmagnetoaccr) then
        r = dsqrt(x**2 + y**2)

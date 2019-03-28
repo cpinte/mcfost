@@ -1,7 +1,7 @@
 MODULE spectrum_type
 
   use atom_type
-  use atmos_type, only : GridType
+  use atmos_type, only : GridType, atmos
   use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid!,&
   ! 						Nred_array, Nmid_array, Nblue_array
   
@@ -80,6 +80,8 @@ MODULE spectrum_type
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air, write_wavelength
       
+   NLTEspec%atmos => atmos
+
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
 
@@ -100,24 +102,54 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initSpectrum
   
-  SUBROUTINE initSpectrumImage(lam0, dL, resol)
+  !building
+  SUBROUTINE initSpectrumImage()
   ! -------------------------------------------------------------------- !
    ! Allocate a special wavelength grid for emission_line map.
-   !This allows to solve for the RT equation only for a specific line.
+   ! This allows to solve for the RT equation only for a specific line.
+   ! This fasten LTE calculation in case of 1 line.
    ! a LINEAR wavelength grid spanning from lam0-dL to lam0+dL with a
    ! constant resolution in km/s given by resol is built.
   ! -------------------------------------------------------------------- !
-   double precision, intent(in) :: lam0, resol, dL
-      
-   NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
-   NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
-   NLTEspec%NPROC = nb_proc
-   
-   !reallocate wavelength arrays and indexes
-   CALL adjust_wavelength_grid()
-   
-   NLTEspec%Nwaves = size(NLTEspec%lambda)
-  
+   double precision :: lam0, resol, dL
+   integer :: N = 80, la, Nr, Nb
+   double precision, dimension(:), allocatable :: old_Grid
+
+   write(*,*) " -> Redefining a wavelength grid for image.."
+   !create wavelength grid
+   allocate(old_grid(NLTEspec%Nwaves))
+   old_grid(:) = NLTEspec%lambda(:) !temporary
+!    N = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nlambda
+!    Nr = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nred
+!    Nb = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nblue
+
+   CALL freeSpectrum()
+   allocate(NLTEspec%lambda(N))
+   NLTEspec%atmos => atmos
+
+   !NLTEspec%lambda(:) = old_grid(Nb:Nr)
+   dL = (657.5632775001934d0 - 655.3750469594274d0)/(N-1)
+   NLTEspec%lambda(1) = 655.3750469594274d0
+   do la=2,N!/2
+    NLTEspec%lambda(la)=NLTEspec%lambda(la-1)+dL
+   end do 
+!    dL = (1085d0 - 1082d0)/(N/2)
+!    NLTEspec%lambda(N/2+1)=1082d0
+!    do la=N/2+2,N
+!     NLTEspec%lambda(la)=NLTEspec%lambda(la-1)+dL
+!    end do
+
+   !Reset the differents Nblue, Nred for atomic transitions
+   !and recompute photoionisation cross-section
+   write(*,*) " -> Using ", size(NLTEspec%lambda)," wavelengths for image and spectrum."
+
+   CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
+   deallocate(old_grid)
+   !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
+   NLTEspec%Nwaves = N
+   CALL allocSpectrum()
+   CALL writeWavelength()
+
   RETURN
   END SUBROUTINE initSpectrumImage
   
@@ -140,11 +172,11 @@ MODULE spectrum_type
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
   
   RETURN
-  END SUBROUTINE
+  END SUBROUTINE reallocate_rays_arrays
 
   SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
-   
+   !Polarized quantities allocated in adjustStokesMode
    integer :: nat, k
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line

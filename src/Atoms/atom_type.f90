@@ -44,7 +44,7 @@ MODULE atom_type
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing, glande_i, glande_j
    real(8), dimension(4) :: cvdWaals
-   real(8), allocatable, dimension(:)  :: phi, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
+   real(8), allocatable, dimension(:)  :: phi!, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
    !wlam is the integration wavelenght weigh = phi
    double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij, wlam, Jbar!, c_shift, c_fraction
    double precision :: Qelast, adamp, Rij, Rji
@@ -63,7 +63,7 @@ MODULE atom_type
   TYPE AtomicContinuum
    logical :: hydrogenic
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
-   real(8) :: lambda0, isotope_Frac, alpha0
+   real(8) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
    real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, Jbar, wlam
    double precision :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file

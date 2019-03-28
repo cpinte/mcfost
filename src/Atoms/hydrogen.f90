@@ -140,8 +140,9 @@ MODULE hydrogen_opacities
   ! LTE number of protons (H+)
   npstar = Hydrogen%nstar(Hydrogen%Nlevel,icell)
   do kr=1,Hydrogen%Ncont
+     continuum = Hydrogen%continua(kr)
+    !if (continuum%Nred==-99 .and. continuum%Nblue==-99) CYCLE
    sigma = 0d0
-   continuum = Hydrogen%continua(kr)
    lambdaEdge = continuum%lambda0 !ionisation frequency (min)
    i = continuum%i
     ! evaluate effective principal quantum number ->
@@ -201,7 +202,6 @@ MODULE hydrogen_opacities
 !      sigma0 * g_bf(continuum%Nblue:continuum%Nred) * &
 !        (NLTEspec%lambda(continuum%Nblue:continuum%Nred)/lambdaEdge)**3 * &
 !        n_eff / (Hydrogen%stage(i)+1)**2 !m^2
-
     sigma(continuum%Nblue:continuum%Nred) = continuum%alpha(continuum%Nblue:continuum%Nred)
 
     !! or use this (with sigma02)
@@ -210,7 +210,6 @@ MODULE hydrogen_opacities
     ! dpow(real(Hydrogen%stage(i)+1,kind=8),4d0) / &
     !   (dpow(n_eff,5d0) * &
     !     CUBEarr(NLTEspec%lambda*NM_TO_M/(HPLANCK*CLIGHT)))
-
 
     ! now computes emissivity and extinction
 !     expla(iLam) = dexp(-hc_kla(iLam)/atmos%T(icell))

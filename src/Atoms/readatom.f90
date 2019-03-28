@@ -425,7 +425,7 @@ MODULE readatom
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
      read(inputline, *) j, i, atom%continua(kr)%alpha0,&
-      atom%continua(kr)%Nlambda, nuDepChar, lambdamin
+      atom%continua(kr)%Nlambda, nuDepChar, atom%continua(kr)%lambdamin
      j = j + 1
      i = i + 1
      !because in C indexing starts at 0, but starts at 1 in fortran
@@ -433,6 +433,7 @@ MODULE readatom
      atom%continua(kr)%i = min(i,j)
      lambdaji = (HPLANCK*CLIGHT)/ (atom%E(j)-atom%E(i))
      atom%continua(kr)%lambda0 = lambdaji/NM_TO_M !nm
+     !lambdamin=atom%continua(kr)%lambdamin
 
      !write(*,*) "continuum ", atom%continua(kr)%j,&
      !    '->',atom%continua(kr)%i, " @",&
@@ -470,7 +471,7 @@ MODULE readatom
       end do
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
-       if (lambdamin.ge.atom%continua(kr)%lambda0) then
+       if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
         write(*,*) "Minimum wavelength for continuum is "&
           "larger than continuum edge."
         write(*,*) "exiting..."
@@ -480,7 +481,7 @@ MODULE readatom
        ! Matters only when the complete wavelength dependence
        ! is not read from file (HYDROGENIC).
        ! %lambda allocated inside the routines.
-       CALL make_sub_wavelength_grid_cont(atom%continua(kr), lambdamin)
+       CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin)
        !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
        !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
      else

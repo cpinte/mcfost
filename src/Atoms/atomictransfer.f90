@@ -14,7 +14,8 @@
 
 MODULE AtomicTransfer
 
- use metal, only                        : Background, BackgroundContinua, BackgroundLines
+ use metal, only                        : Background, BackgroundContinua, BackgroundLines, &
+ 										  storeBackground
  use opacity
  use Profiles
  use spectrum_type
@@ -78,7 +79,7 @@ MODULE AtomicTransfer
   double precision :: facteur_tau !used only in molecular line to have emission for one
                                   !  half of the disk only. Note used in AL-RT.
                                   !  this is passed through the lonly_top or lonly_bottom.
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, get_wlam
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -144,8 +145,8 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     get_wlam = (labs .and. (nbr_cell == 1))
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, get_wlam)
+     eval_operator = (labs .and. (nbr_cell == 1))
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -209,7 +210,7 @@ MODULE AtomicTransfer
      tau_c = tau_c + dtau_c
 
     !! calcule les poids d'integration pour chaque raies aussi ???
-    if ((nbr_cell == 1).and.labs) then 
+    if (eval_operator) then 
      if (lstore_opac) then
       !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
       NLTEspec%Psi(:,iray,id) = (1d0 - &
@@ -244,7 +245,7 @@ MODULE AtomicTransfer
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chiI
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, get_wlam = .false.
+  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -295,7 +296,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, get_wlam)
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)))
 
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -718,8 +719,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
-   CALL uniform_law_model()
+   CALL magneto_accretion_model()  
+   !CALL uniform_law_model()
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -759,35 +760,9 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
-  NLTEspec%atmos => atmos
   CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
-  if (lstore_opac) then !o nly Background lines and active transitions
-                                         ! chi and eta, are computed on the fly.
-                                         ! Background continua (=ETL) are kept in memory.
-   if (real(3*n_cells*NLTEspec%Nwaves)/(1024**3) < 1.) then
-    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**2), " MB of memory", &
-   	 " for Background continuum opacities."
-   else
-    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**3), " GB of memory", &
-   	 " for Background continuum opacities."
-   end if
-   !!To DO: keep line LTE opacities if lstatic
-   !$omp parallel &
-   !$omp default(none) &
-   !$omp private(icell) &
-   !$omp shared(atmos)
-   !$omp do
-   do icell=1,atmos%Nspace
-    CALL BackgroundContinua(icell)
-   end do
-   !$omp end do
-   !$omp end parallel
-   !!!TO DO:
-   ! At the end of NLTE transfer keep active continua in memory for images
-   !just like background conitua, avoiding te recompute them as they do not change
-   !! TDO DO2: try to keep lines opac also.
-  end if
+  if (lstore_opac) CALL storeBackground()
  ! ------------------------------------------------------------------------------------ !
  ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
@@ -811,11 +786,26 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
+latomic_line_profiles=.true.
+  if (latomic_line_profiles) then
+   CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
+   !shorter than the grid for NLTE / reallocate waves arrays
+   !write(*,*) maxval(Hydrogen%continua(1)%alpha), maxval(atmos%Atoms(1)%ptr_atom%continua(1)%alpha)
+   !write(*,*) loc(Hydrogen)==loc(Atmos%Atoms(1)%ptr_atom)
+
+   if (lstore_opac) CALL storeBackground() !recompute background opac
+   ! TO DO: add NLTE continua and LTE/NLTE lines if possible
+   CALL reallocate_mcfost_wavelength_arrays() 
+  end if
   if (atmos%Nrays /= Nrayone) CALL reallocate_rays_arrays(Nrayone)
+  !Take into account the wavelength grid for images 
   !Except except ds(Nray,Nproc) and Polarized arrays which are: 1) deallocated if PRT_SOL
   !is FIELD_FREE (or not allocated if no magnetic field), reallocated if FULL_STOKES.
   !And, atmos%Nrays = Nrayone if they are different.
   !This in order to reduce the memory of arrays in the map calculation
+  
+  !Add also a test, if the old solution is the same we do not beed that
+  !To do
   if (atmos%magnetized .and. PRT_SOLUTION /= "NO_STOKES") then
    if (PRT_SOLUTION == "FIELD_FREE") PRT_SOLUTION = newPRT_SOLUTION
     CALL adjustStokesMode(PRT_SOLUTION)
@@ -1328,5 +1318,36 @@ MODULE AtomicTransfer
 
  RETURN
  END SUBROUTINE reallocate_mcfost_vars
+ 
+ SUBROUTINE reallocate_mcfost_wavelength_arrays()
+  !--> should move them to init_atomic_atmos ? or elsewhere
+  !need to be deallocated at the end of molecule RT or its okey ?`
+  integer :: la
+  n_lambda = NLTEspec%Nwaves
+  if (allocated(tab_lambda)) deallocate(tab_lambda)
+  allocate(tab_lambda(n_lambda))
+  if (allocated(tab_delta_lambda)) deallocate(tab_delta_lambda)
+  allocate(tab_delta_lambda(n_lambda))
+  tab_lambda = NLTEspec%lambda / MICRON_TO_NM
+  tab_delta_lambda(1) = 0d0
+  do la=2,NLTEspec%Nwaves
+   tab_delta_lambda(la) = tab_lambda(la) - tab_lambda(la-1)
+  end do
+  !unlikely in NLTE because of the different atomic grids
+  !but if an image at only one wavelength --> tab_Delta_lambda=0
+  if (size(tab_lambda)==1) tab_delta_lambda = tab_delta_lambda + tiny_dp
+  if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
+  allocate(tab_lambda_inf(n_lambda))
+  if (allocated(tab_lambda_sup)) deallocate(tab_lambda_sup)
+  allocate(tab_lambda_sup(n_lambda))
+  tab_lambda_inf = tab_lambda
+  tab_lambda_sup = tab_lambda_inf + tab_delta_lambda
+  ! computes stellar flux at the new wavelength points
+  CALL deallocate_stellar_spectra()
+  CALL allocate_stellar_spectra(n_lambda)
+  CALL repartition_energie_etoiles()
+
+ RETURN
+ END SUBROUTINE reallocate_mcfost_wavelength_arrays
 
 END MODULE AtomicTransfer

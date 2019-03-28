@@ -84,6 +84,8 @@ MODULE metal
      i = continuum%i
      j = continuum%j !+1 wrt C indexing
      Nblue = continuum%Nblue; Nred = continuum%Nred
+     !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid continua not defined on the grid
+
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
                ! to unbound an electron
@@ -199,6 +201,8 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i; j = line%j
      Nred = line%Nred; Nblue = line%Nblue
+     !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid lines not defined on the grid
+
      allocate(Vij(line%Nlambda)); Vij = 0d0
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
@@ -320,6 +324,7 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i; j = line%j
      Nred = line%Nred; Nblue = line%Nblue
+     if (Nred == -99 .and. Nblue == -99) CYCLE !avoid lines not defined on the grid
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
@@ -598,6 +603,9 @@ MODULE metal
      i = line%i
      j = line%j
      
+     if (line%Nred == -99 .and. line%Nblue == -99) CYCLE
+
+     
      !wavelength does not fall inside line domaine? OK cylcle
      if ((NLTEspec%lambda(la) < NLTEspec%lambda(line%Nblue)).or.&
         (NLTEspec%lambda(la) > NLTEspec%lambda(line%Nred))) then
@@ -654,6 +662,32 @@ MODULE metal
  RETURN
  END SUBROUTINE Metal_bb_lambda
  
+ SUBROUTINE storeBackground()
+ !$ use omp_lib
+  integer :: icell
+  if (.not.lstore_opac) RETURN
+
+   if (real(3*n_cells*NLTEspec%Nwaves)/(1024**3) < 1.) then
+    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**2), " MB of memory", &
+   	 " for Background continuum opacities."
+   else
+    write(*,*) "Keeping", real(3*n_cells*NLTEspec%Nwaves)/(1024**3), " GB of memory", &
+   	 " for Background continuum opacities."
+   end if
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(icell) &
+   !$omp shared(atmos)
+   !$omp do
+   do icell=1,atmos%Nspace
+    CALL BackgroundContinua(icell)
+   end do
+   !$omp end do
+   !$omp end parallel
+
+ RETURN
+ END SUBROUTINE storeBackground
+ 
  SUBROUTINE BackgroundContinua (icell)
   integer, intent(in) :: icell
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu!,sca
@@ -675,11 +709,13 @@ MODULE metal
    CALL Hydrogen_ff(icell, chi)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
+
    
    CALL Hminus_bf(icell, chi,eta)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + eta
-   
+
+
    CALL Hminus_ff(icell, chi)
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + chi
    NLTEspec%AtomOpac%jc(icell,:) = NLTEspec%AtomOpac%jc(icell,:) + chi * Bpnu
