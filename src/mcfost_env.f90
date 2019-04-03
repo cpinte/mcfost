@@ -8,9 +8,10 @@ module mcfost_env
   character(8), parameter :: mcfost_release = "3.0.35"
   real, parameter :: required_utils_version = 3.0
 
-  character(len=128), parameter :: webpage       = "http://ipag.osug.fr/public/pintec/mcfost/"
-  character(len=128), parameter :: utils_webpage = "http://ipag.osug.fr/public/pintec/mcfost_utils/"
-  character(len=128), parameter :: doc_webpage   = "http://ipag.osug.fr/public/pintec/mcfost/docs/html/"
+  character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"
+  character(len=128) :: webpage       = "/mcfost/"
+  character(len=128) :: utils_webpage = "/mcfost_utils/"
+  character(len=128) :: doc_webpage   = "/mcfost/docs/html/"
 
   ! Système
   integer :: nb_proc
