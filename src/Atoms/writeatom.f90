@@ -145,9 +145,9 @@ MODULE writeatom
  ! write AtomType atom to atom%dataFile
  ! ------------------------------------ !
   type (AtomType), intent(in) :: atom
-  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  integer :: unit, EOF = 0, blocksize, naxes(6), naxis,group, bitpix, fpixel
   logical :: extend, simple
-  integer :: nelements
+  integer :: nelements, Nlevel2
   
   !get unique unit number
   CALL ftgiou(unit,EOF)
@@ -159,13 +159,6 @@ MODULE writeatom
   group = 1 
   fpixel = 1
   extend = .true.
-
-  ! First write atomic model
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-  ! Additional optional keywords
-  CALL ftpkys(unit, "UNIT", "m^-3", ' ', EOF)
-  !write data
-  CALL ftpprd(unit,group,fpixel,nelements,atmos%ne,EOF)  
     
   bitpix = -64
   if (lVoronoi) then
@@ -185,7 +178,31 @@ MODULE writeatom
     naxes(2) = nz
     nelements = naxes(1) * naxes(2) ! should be n_cells also
    end if
-  end if  
+  end if
+  
+  !temporary
+  Nlevel2 = atom%Nlevel*atom%Nlevel
+  ! First write collision
+  !add 1 axis for ij
+  if (lVoronoi) then
+   naxes(2) = Nlevel2
+  else
+   if (l3D) then
+    naxes(4) = Nlevel2
+   else
+    naxes(3) = Nlevel2
+   end if
+  end if
+  CALL ftphpr(unit,simple,bitpix,naxis+1,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "m^-3", ' ', EOF)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements*Nlevel2,atom%Ckij,EOF)
+  !write Collision
+  ! create new hdu
+  !CALL ftcrhd(unit, status)
+  !  Write the required header keywords.
+  !CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)  
   
   CALL ftclos(unit, EOF)
   CALL ftfiou(unit, EOF)

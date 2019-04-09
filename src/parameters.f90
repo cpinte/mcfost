@@ -63,6 +63,7 @@ module parametres
   															 !later this parameters should be
   															 !.false. if we only want pops
   															 !and cooling rates, and not spectra
+  										!lascii_wavelength_table <file> for image and spectrum
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
   ! PLUTO MHD

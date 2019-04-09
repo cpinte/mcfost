@@ -210,7 +210,7 @@ MODULE atmos_type
     allocate(atom%lines(Nl_new));atom%Nline=Nl_new
     k1=1
     do k=1,size(lines)
-     if (mask(k)==.true.) then 
+     if (mask(k)) then 
       atom%lines(k1) = lines(k)
       k1 = k1 + 1
      end if
@@ -253,7 +253,7 @@ MODULE atmos_type
     k1=1
     do k=1,size(conta)
      !write(*,*) size(conta), k, k1, mask(k)
-     if (mask(k)==.true.) then 
+     if (mask(k)) then 
       atom%continua(k1) = conta(k)
       !write(*,*) maxval(atmos%Atoms(n)%ptr_atom%continua(k1)%alpha), maxval(conta(k)%alpha)
       k1 = k1 + 1

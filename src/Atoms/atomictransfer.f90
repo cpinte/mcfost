@@ -145,7 +145,7 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     eval_operator = (labs .and. (nbr_cell == 1))
+     eval_operator = (labs .and. (nbr_cell == 1) .and..not.latomic_line_profiles)
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
@@ -296,7 +296,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)))
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)).and..not.latomic_line_profiles)
 
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -762,7 +762,13 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
   CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
   CALL allocSpectrum()
-  if (lstore_opac) CALL storeBackground()
+  !should consider to do that only if Nlte is on, otherwise we go directly to image
+  if (lstore_opac) then 
+  !if NLTE always compute it. If LTE and we do not use special grid for image, compute also
+   if ((atmos%NactiveAtoms > 0) .or.&
+      (atmos%NactiveAtoms==0 .and. .not.latomic_line_profiles)) &
+    CALL storeBackground()
+ end if
  ! ------------------------------------------------------------------------------------ !
  ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
@@ -773,7 +779,10 @@ MODULE AtomicTransfer
   !The BIG PART IS HERE
   if (atmos%Nactiveatoms > 0) CALL NLTEloop()
 !   open(unit=12, file="Snu_nlte_conv.dat",status="unknown")
-!   icell = 1
+!   icell = 1 !select cell
+!   do while (.not.atmos%lcompute_atomRT(icell))
+!    icell = icell + 1
+!   end do
 !   CALL initAtomOpac(1)
 !   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
 !   CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
@@ -786,8 +795,9 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
-latomic_line_profiles=.true.
+latomic_line_profiles=.false.
   if (latomic_line_profiles) then
+   !Check smarter to deallocate/reallocated NLTE wavelength arrays
    CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
    !shorter than the grid for NLTE / reallocate waves arrays
    !write(*,*) maxval(Hydrogen%continua(1)%alpha), maxval(atmos%Atoms(1)%ptr_atom%continua(1)%alpha)
@@ -878,6 +888,7 @@ latomic_line_profiles=.true.
   integer :: Nlevel_total = 0, NmaxLevel
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
   character(len=20) :: Methode
+  double precision, dimension(:), allocatable :: Ieff, etau
   double precision, allocatable, dimension(:,:,:) :: pop_old, pop
 
   Methode = "MALI"
@@ -905,7 +916,7 @@ latomic_line_profiles=.true.
      NmaxLevel = max(NmaxLevel, atmos%ActiveAtoms(nact)%ptr_atom%Nlevel)
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
-     atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
+     atmos%ActiveAtoms(nact)%ptr_atom%n = 0.97 * atmos%ActiveAtoms(nact)%ptr_atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
   end do
   
@@ -924,12 +935,15 @@ latomic_line_profiles=.true.
      allocate(atmos%ActiveAtoms(nact)%ptr_atom%ndag(atmos%ActiveAtoms(nact)%ptr_atom%Nlevel, n_cells))
      atmos%ActiveAtoms(nact)%ptr_atom%ndag = 0d0
      do icell=1,atmos%Nspace
+        if (atmos%lcompute_atomRT(icell)) &
 	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom) !open and allocated in LTE.f90
       !try keeping in memory until better collision routine !
   	end do
   	CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
+    CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom)
   	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
   end do
+  stop
   !end replacing initSol()
   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
           
@@ -982,7 +996,8 @@ latomic_line_profiles=.true.
    				if (atmos%lcompute_atomRT(icell)) then
 
      				do iray=iray_start, max(2,n_rayons_max)!two rays minimum
-      
+        				CALL initCrossCoupling(id) !zero eta and Xcoupling rates
+        					     
       					x0 = r_grid(icell)
       					y0 = 0d0
       					z0 = z_grid(icell)
@@ -1008,7 +1023,6 @@ latomic_line_profiles=.true.
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       !compute cross-coupling terms for this cell and ray
       !comment to set to zero
-       					CALL initCrossCoupling(id)
        					CALL fillCrossCoupling_terms(id, icell)
       !Fill gamma matrix and performs wavelength and direction integration
       					CALL fillGamma_OF(id,icell,iray,n_rayons)
@@ -1060,7 +1074,8 @@ latomic_line_profiles=.true.
   		lconverged = .false.
   		n_iter = 0 
   		
-
+        allocate(Ieff(NLTEspec%Nwaves), etau(NLTEspec%Nwaves))
+        Ieff=0d0; etau = 0d0
   		allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
 
         do while (.not.lconverged)
@@ -1080,7 +1095,7 @@ latomic_line_profiles=.true.
             !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell, dN) &
 			!$omp private(n_c_dum, l_dum, l_v_dum, l_c_dum, x1,x2,x3) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
-            !$omp shared(atmos, n_cells, pop_old, pop) &
+            !$omp shared(atmos, n_cells, pop_old, pop, Ieff, etau, ds) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
@@ -1117,8 +1132,15 @@ latomic_line_profiles=.true.
        					n_iter_loc = n_iter_loc + 1
       
                         pop_old(:,:,id) = pop(:,:,id)
-                        !calc J
-						!stat equil for all atoms
+                        do iray=1,iray_start !angle and wavelength integartion for atom
+                         do nact=1,atmos%NactiveAtoms
+                           etau(:) = dexp(-(ds(iray,id)*(NLTEspec%AtomOpac%chi(:,id)+&
+                           	NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%Kc(icell,:,1))))
+                           Ieff(:) = NLTEspec%I(iray,:,id) * etau !  (1d0 - etau)*&
+!                             atmos%ActiveAtoms(nact)%ptr_atom%eta(:,id)/NLTEspec%
+                        !CALL fillGamma(id, n_rayons, atom, Ipsi)
+						 end do
+						end do
 						
      					diff = 0d0
      					do nact=1,atmos%NactiveAtoms
@@ -1133,14 +1155,18 @@ latomic_line_profiles=.true.
        						lconverged_loc = .true.
        					else
         					!recompute opacity of this cell., but I need angles and pos...
-       						!
+       						!NLTEspec%I not changed
        						CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
        						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
        						NLTEspec%AtomOpac%chi(:,id) = 0d0
        						NLTEspec%AtomOpac%eta(:,id) = 0d0
+       						!set atom%eta to zero also
+							 CALL initCrossCoupling(id)
+       					     CALL fillCrossCoupling_terms(id, icell)
        						!NOTE Zeeman opacities are not re set to zero and are accumulated
        						!change that or always use FIELD_FREE
-       						CALL NLTEOpacity(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .false.)
+       						!is equivalent to P(icell,id, iray) ?
+       						CALL NLTEOpacity(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .true.)
        					end if
      				end do
      	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc

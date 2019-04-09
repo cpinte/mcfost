@@ -108,29 +108,14 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillCrossCoupling_terms
  
- SUBROUTINE calc_Jnu(id, nrays)
-  integer, intent(in) :: id, nrays
-  integer :: iray
-  
-  NLTEspec%J(:,id) = 0d0
-  NLTEspec%Jc(:,id) = 0d0
-  do iray = 1, nrays
-   
-   
-  end do
- 
- RETURN
- END SUBROUTINE calc_Jnu
- 
- SUBROUTINE fillGamma(id)
-  integer, intent(in) :: id
-  type (AtomType), pointer :: atom
+ SUBROUTINE fillGamma(id, n_rayons, atom, Ieff)
+  integer, intent(in) :: id, n_rayons
+  type (AtomType), intent(inout) :: atom
+  double precision, dimension(NLTEspec%Nwaves), intent(in) :: Ieff
   integer :: nact, i, j, Nred, Nblue, kr
   type (AtomicLine) :: line
   type (AtomicContinuum) :: cont
   
-  do nact=1,atmos%NactiveAtoms
-   atom => atmos%ActiveAtoms(nact)%ptr_atom
    do kr=1, atom%Ncont
     cont = atom%continua(kr)
     i = cont%i; j=cont%j
@@ -143,7 +128,6 @@ MODULE statequil_atoms
     Nred = line%Nred; Nblue = line%Nblue
           
    end do
-  end do
 
  RETURN
  END SUBROUTINE fillGamma

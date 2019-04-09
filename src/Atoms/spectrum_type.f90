@@ -163,12 +163,12 @@ NLTEspec%lambda(N) = NLTEspec%wavelength_ref
    
    deallocate(NLTEspec%I, NLTEspec%Ic)
    !except polarization which are (de)allocated in adjustStokesMode
-   if (NLTEspec%Nact > 0) deallocate(NLTEspec%Psi)
+   if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) deallocate(NLTEspec%Psi)
    !Could be also LTE opac if line are kept in memory ?
    allocate(NLTEspec%I(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    allocate(NLTEspec%Ic(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    NLTEspec%I = 0d0; NLTEspec%Ic = 0d0
-   if (NLTEspec%Nact) &
+   if (NLTEspec%Nact > 0) &
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
   
   RETURN
@@ -231,7 +231,8 @@ NLTEspec%lambda(N) = NLTEspec%wavelength_ref
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
    
-   if (NLTEspec%Nact > 0) then !NLTE loop activated
+   !do not try to realloc after non-LTE for image.
+   if (NLTEspec%Nact > 0 .and. .not.latomic_line_profiles) then !NLTE loop activated
     !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
     !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
@@ -250,13 +251,13 @@ NLTEspec%lambda(N) = NLTEspec%wavelength_ref
       cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(cont%Nlambda ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Jbar(NLTEspec%Nproc))
+      !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Jbar(NLTEspec%Nproc))
      end do
      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
       line = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(line%Nlambda ,NLTEspec%NPROC))
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(line%Nlambda ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Jbar(NLTEspec%Nproc))
+      !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Jbar(NLTEspec%Nproc))
      end do
     end do
    end if

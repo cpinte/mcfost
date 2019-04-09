@@ -45,8 +45,8 @@ MODULE simple_models
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=7d3, Macc = 1d-7
-   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.1!Rstar
+   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=7d3, Macc = 1d-9
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
@@ -136,6 +136,7 @@ MODULE simple_models
        !if r**3/rcyl**2 or Rm=r/sint**2 is between rmi and rmo it means that the
        !cell icell (r, theta) belongs to a field line.
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
+       y = min(y,0.9999)
        if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r  
           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
@@ -143,26 +144,26 @@ MODULE simple_models
           Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
           !write(*,*) icell, Rm, nH0, Q0, log10(Q0/nH0**2)
           !Interface funnels/disk
-          if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
-           !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
-           vp = 0d0
-           !atmos%Vxyz is initialized to 0 everywhere
-           if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
-           													!using analytical velocity law
-           													!hence if atmos%magnetoaccr = .false.
-            !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
-            !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
-            !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
-            atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
-            atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
-            !here it is better to have keplerian rotation than stellar rotation?
-           end if
-           !Density midplane of the disk
-           !using power law of the dust-gas disk (defined in another zone?)
-           atmos%nHtot(icell) = 1d19!
-           !Temperature still given by the same law as in accretion funnels yet.
-           !But probably different at this interface funnels/disk
-          else !accretion funnels
+!           if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
+!            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
+!            vp = 0d0
+!            !atmos%Vxyz is initialized to 0 everywhere
+!            if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
+!            													!using analytical velocity law
+!            													!hence if atmos%magnetoaccr = .false.
+!             !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
+!             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
+!             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
+!             atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
+!             atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
+!             !here it is better to have keplerian rotation than stellar rotation?
+!            end if
+!            !Density midplane of the disk
+!            !using power law of the dust-gas disk (defined in another zone?)
+!            atmos%nHtot(icell) = 1d23!
+!            !Temperature still given by the same law as in accretion funnels yet.
+!            !But probably different at this interface funnels/disk
+!           else !accretion funnels
           !Density
            atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
@@ -203,7 +204,7 @@ MODULE simple_models
                if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
               end if
             end if
-          end if
+!           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
@@ -282,11 +283,11 @@ MODULE simple_models
    !atmos%T = 6000d0
    !atmos%vturb = 5d0 * 1d3 !m/s
 
-   !idk = 10
-    atmos%nHtot =  2.27414200581936d16
-    atmos%T = 45420d0
-    atmos%ne = 2.523785d16
-    atmos%vturb = 9.506225d3 !m/s
+!    idk = 10
+!     atmos%nHtot =  2.27414200581936d16
+!     atmos%T = 45420d0
+!     atmos%ne = 2.523785d16
+!     atmos%vturb = 9.506225d3 !m/s
    
    !idk = 75
 !   atmos%T=7590d0
@@ -294,10 +295,10 @@ MODULE simple_models
 !   atmos%nHtot = 1.259814d23
 
     !idk = 81   
-!     atmos%T=9400d0
-!     atmos%ne = 3.831726d21
-!     atmos%nHtot = 1.326625d23
-!     atmos%vturb = 1.806787d3 !idk=81
+    atmos%T=9400d0
+    atmos%ne = 3.831726d21
+    atmos%nHtot = 1.326625d23
+    atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
 !     atmos%T = 100000d0
