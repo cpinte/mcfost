@@ -177,7 +177,7 @@ Symmetries
 
 * ``image symmetry``: Is the image left/right symmetric?
 
-* ``central symmetry``: Is the model structure symmetric releative to the origin?
+* ``central symmetry``: Is the model structure symmetric relative to the origin?
 
 * ``plane symmetry``: Is the model structure symmetric relative a vertical plane?
 
