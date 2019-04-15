@@ -7,6 +7,14 @@ MODULE voigtfunctions
 
  IMPLICIT NONE
 
+ double precision, dimension(0:23) :: an
+ data an /0.2954089751509193d0, 0.27584023329217705d0, 0.22457395522461585d0,0.1594149382739117d0,&
+    0.09866576641545417d0, 0.05324414078763942d0, 0.025052150005393646d0, 0.010277465670539542d0, &
+    0.003676164332844841d0, 0.0011464936412422387d0, 0.0003117570150461923d0, 0.00007391433429603544d0, &
+    0.00001527949342800332d0, 2.7539566082259447d-6, 4.327858781854298d-7, 5.9300304091976984d-8 , &
+    7.084490303405148d-9 , 7.379520677523531d-10 , 6.702171205812766d-11 , 5.30726900090507d-12 , &
+    3.6642873348622373d-13 , 2.2062473036786997d-14 , 1.1544519576969374d-15 ,5.62191094758381d-17 /
+
  CONTAINS
 
  SUBROUTINE Humlicek(N, a, v, W)
@@ -71,61 +79,72 @@ MODULE voigtfunctions
  RETURN
  END FUNCTION VoigtHumlicek
  
+ Function an_abra(j, tM) result(y)
+  integer, intent(in) :: j, tM
+  double precision :: y
+  
+   y = 2d0 * dsqrt(PI) / real(tM) * dexp(-j*j * PI*PI / real(tM) / real(tM)) 
+ return
+ end function an_abra
+ 
  FUNCTION VoigtAbrarov(N, a, v, F) result(L)
  ! --------------------------------------------------------------------------- !
-  ! S.M. Abrarov et al. JQSRT (2010) 372–375
+  ! S.M. Abrarov et al. JCPC (2010) 876–882
   ! Rapidly convergent series for high-accuracy calculation of the
   ! Voigt function
   !
   ! Accuracy up to 1d-13 ?
-  ! TBD: Faraday-Voigt profile
  ! --------------------------------------------------------------------------- !
   double precision              :: a
   double precision				:: v(N)
-  integer                       :: N
+  integer						:: N
   double precision              :: L(N)
-  double precision              :: x(N)
-  double precision              :: y
-  double precision              :: K
+  !double precision              :: x(N)
+  !double precision              :: y
   double precision, intent(out) :: F(N)
   integer                       :: j
-  integer                       :: tM
-  double precision              :: cosx(N)
-  double precision              :: sinx(N)
-  double precision              :: xpy(N)
-  double precision              :: ymx(N)
-  double precision              :: exptMy
-  double precision              :: exptMyp
-  double precision              :: tMx(N)
-  double precision              :: tMy
+  integer, parameter 			:: M = 24
+  integer, parameter            :: tM = 12
+  !integer						:: tM2
+  !double precision              :: xpy(N)
+  complex(kind=16)				:: jcmplx, z(N), w(N), A1(N), B(N), C(N) !,K(2, N)
   
-  x = dsqrt(log(2d0)) * v
-  y = dsqrt(log(2d0)) * a
-  tM = 12
-  
-  xpy = (x**2 + y**2)
-  ymx = (y**2 - x**2)
-  cosx = cos(tM*x)
-  sinx = sin(tM*x)
-  tMy = tM * y
-  exptMy = dexp(-tMy)
-  exptMyp = dexp(tMy)
-  tMx = tM * x
-  
-  L = - exptMy * (exptMyp*y - y*cosx+x*sinx) / (tM * xpy)
-  do j=0,2*tM - 1
-   K = 2d0 / tM * dexp(-(j*PI/tM)**2)
-   L = L + K * tM**2 * y * (j**2 * PI**2 + tM**2 * xpy) & 
-      / (j**4 * PI**4 + 2*j**2 * PI**2 * tM**2 * ymx + tM**4 *xpy**2) + &
-      0.5*tM * exptMy * (&
-       ((j*PI-tMx)*sin(j*PI-tMx) - tMy*cos(j*PI-tMx))/&
-        (j**2 * PI**2 - 2*j*PI*tMx + tM**2*xpy) + &
-       ((j*PI + tMx)*sin(j*PI+tMx)-tMy*cos(j*PI+tMx)) /& 
-        (j**2 * PI**2 + 2*j*PI*tMx + tM**2*xpy) &
-      )*K
+  jcmplx = cmplx(0d0, 1d0)
+
+  !Slower then humliceck why ?
+! --> Fatser, less accurate
+  z = cmplx(v, a)    																		  
+  A1 = tM*z; B = exp(jcmplx*A1); C = A1*A1
+  w = jcmplx * (1.-B) / A1
+  do j=1,M-1!M with an_abra(j, tM)
+   w = w + jcmplx * A1 * tM / dsqrt(PI) * an(j) * ((-1)**j * B - 1) / (j*j * PI*PI - C)
   end do
+  L = real(w); F = imag(w)
   
-  F = 0d0
+! --> to debug, it is more accurate
+!   K(:,:) = 0d0  
+!   x = dsqrt(log(2d0)) * v
+!   y = dsqrt(log(2d0)) * a
+!   xpy = (x**2 + y**2)
+!   an(:) = an(:)/(2d0*dsqrt(PI))
+! 
+!   tM2 = tM*tM
+!   do j=0, M-1
+!   
+!    K(1,:) = K(1,:) + an(j) * (((jcmplx*j*PI*tM + tM2*Y)*(1-exp(-jcmplx*j*PI-tM*Y)*cos(tM*x))+exp(-jcmplx*j*PI-tM*y)*tM2*x*sin(tM*x))/&
+!    (tM2*x**2 - (j*PI-jcmplx*tM*y)**2) - &
+!    ((jcmplx*j*PI*tM-tM2*y)*(1-exp(jcmplx*j*PI-tM*y)*cos(tM*x))-exp(jcmplx*j*PI-tM*y)*tM2*x*sin(tM*x)) /&
+!    (tM2*x**2 - (j*PI+jcmplx*tM*y)**2))
+!   
+!    K(2,:) = K(2,:) + an(j) * ((tM2*x - exp(jcmplx * j * PI + tM*y)*(tM2*x*cos(tM*x)+(jcmplx*j*PI*tM+tM2*y)*sin(tM*x)))/&
+!    (tM2*x**2 - (j*PI - jcmplx*tM*y)**2)+&
+!        (tM2*x - exp(jcmplx*j*PI -tM*y)*(tM2*x*cos(tM*x)-(jcmplx*j*PI*tM - tM2*y)*sin(tM*x)))/&
+!    (tM2*x**2 - (j*PI + jcmplx*tM*y)**2))
+! 
+!   end do
+!   L = real(K(1,:)) - an(0) * (y-exp(-tM*y)*(y*cos(tM*x)-x*sin(tM*x))) / xpy
+!   F = imag(K(2,:)) - an(0)*(x-exp(-tM*y)*(x*cos(tM*x)+y*sin(tM*x))) / xpy
+  
 
  RETURN
  END FUNCTION VoigtAbrarov
@@ -150,7 +169,7 @@ MODULE voigtfunctions
   SELECT CASE (VoigtAlgorithm)
    CASE ("HUMLICEK")
     L = VoigtHumlicek(N, a, v, F)
-   CASE ("ABRAROV2010")
+   CASE ("ABRAROV")
     L = VoigtAbrarov(N, a, v, F)
    CASE DEFAULT
     L = VoigtHumlicek(N, a, v, F) !using Humlicek by default
