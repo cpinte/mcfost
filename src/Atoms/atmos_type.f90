@@ -50,6 +50,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
+   character(len=10) :: nLTE_methode = "MALI"
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
    logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
@@ -575,10 +576,13 @@ MODULE atmos_type
    RETURN
    END SUBROUTINE init_atomic_atmos
 
+!to do
    SUBROUTINE define_atomRT_domain(itiny_T, itiny_nH)
    ! Set where to solve for the RT equation: where a cell is not 
    ! transparent = where there is a significant density and temperature.
    ! Determines also if we have to force electron density calculation
+   ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
+   !protoplanetary disk model.
     integer :: icell
     double precision, optional :: itiny_nH, itiny_T
     double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=5d2
