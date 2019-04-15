@@ -45,7 +45,7 @@ MODULE simple_models
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=7d3, Macc = 1d-9
+   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=1d4, Macc = 1d-9
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
@@ -136,7 +136,7 @@ MODULE simple_models
        !if r**3/rcyl**2 or Rm=r/sint**2 is between rmi and rmo it means that the
        !cell icell (r, theta) belongs to a field line.
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
-       y = min(y,0.9999)
+       y = min(y,0.99)
        if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r  
           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
@@ -216,6 +216,9 @@ MODULE simple_models
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
+    
+    if (Tmax > 0d0) atmos%T(:) = Tmax * atmos%T/maxval(atmos%T)
+    !atmos%T(:) = minval(atmos%nHtot)/atmos%nHtot * Tmax
 
    !! inclued in atom%vbroad so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)

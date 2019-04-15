@@ -795,7 +795,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
-latomic_line_profiles=.false.
+latomic_line_profiles=.true.
   if (latomic_line_profiles) then
    !Check smarter to deallocate/reallocated NLTE wavelength arrays
    CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
@@ -940,10 +940,10 @@ latomic_line_profiles=.false.
       !try keeping in memory until better collision routine !
   	end do
   	CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
-    CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom)
+    !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
   	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
   end do
-  stop
+
   !end replacing initSol()
   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
           

@@ -38,7 +38,7 @@ MODULE PROFILES
   															   v0, v1, dv
   double precision, intent(out), dimension(:)               :: P
   double precision, intent(out), dimension(:,:), optional   :: phi, psi
-
+VoigtMethod = "ABRAROV"
 
   ! v_proj in m/s at point icell
   omegav = 0d0
