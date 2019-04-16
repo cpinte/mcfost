@@ -96,7 +96,7 @@ MODULE atom_type
    real(8), dimension(:), allocatable :: C !Nlevel*Nlevel
    real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
    double precision, dimension(:,:), allocatable :: Gamma !now depth dependence is dropped
-   real(8), dimension(:,:), pointer :: n, nstar, ndag
+   real(8), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua

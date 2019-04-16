@@ -23,6 +23,38 @@ MODULE Opacity
 
  CONTAINS
  
+  SUBROUTINE calc_psi_operator(id, icell, iray, ds)
+  ! ----------------------------------------------------------- !
+   ! Computes Psi and Ieff at the cell icell, for the thread id
+   ! in the direction iray, using ds path length of the ray.
+  ! ----------------------------------------------------------- !
+   integer, intent(in) :: iray, id, icell
+   double precision, intent(in) :: ds
+   double precision, dimension(NLTEspec%Nwaves) :: chi
+  
+   if (lstore_opac) then
+     chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
+                    NLTEspec%AtomOpac%Kc(icell,:,1)
+   else
+     chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)
+   end if !store_opac
+   !Choose eval operatore depending on the method
+   !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
+   SELECT CASE (atmos%nLTE_methode)
+     CASE ("MALI")
+       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
+       NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
+     CASE ("HOGEREIJDE")
+       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi
+       NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
+     CASE DEFAULT
+       CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
+   END SELECT
+
+  RETURN
+  END SUBROUTINE calc_psi_operator
+
+ 
   SUBROUTINE alloc_wlambda()
   ! --------------------------------------------------- !
    ! Allocates wavelength integration
@@ -79,24 +111,37 @@ MODULE Opacity
   type(AtomicLine), intent(in) :: line
   double precision, dimension(line%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end
-  double precision :: norm = CLIGHT/HPLANCK
+  double precision :: norm !beware this is not the result of the integral 
+  						   ! just a factor to convert dv/c from dlambda/lambda
 
+  norm = CLIGHT/line%lambda0
   Nblue = line%Nblue; Nred = line%Nred
   la_start = 1; la_end = line%Nlambda
-  !compute
-  !check that we are not at the boundaries, otherwise we cannot go beyond
-  if (Nblue==1) then 
-   la_start = 2
-   wlam(1) = line%lambda0*(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
-  end if
-  
-  if (Nred==NLTEspec%Nwaves) then
-   la_end = line%Nlambda-1
-   wlam(line%Nlambda) = line%lambda0*(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
-  end if
-  do la=1,line%Nlambda! !first is Nblue - (Nblue -1) which exists
+!   compute
+!   check that we are not at the boundaries, otherwise we cannot go beyond
+!   if (Nblue==1) then 
+!    la_start = 2
+!    wlam(1) = line%lambda0*(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
+!   end if
+!   
+!   if (Nred==NLTEspec%Nwaves) then
+!    la_end = line%Nlambda-1
+!    wlam(line%Nlambda) = line%lambda0*(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
+!   end if
+!   do la=la_start,la_end! !first is Nblue - (Nblue -1) which exists
+!   					last is Nred - (Nred-1)
+!    wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / line%lambda0 * norm
+!   write(*,*) la, wlam(la)*HPLANCK /1000
+! 
+!   end do
+
+  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue))  * norm
+  wlam(line%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1))  * norm
+  do la=2,line%Nlambda! !first is Nblue - (Nblue -1) which exists
   					!last is Nred - (Nred-1)
-   wlam(la) = line%lambda0*(NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1) * norm
+   wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) * norm
+  !write(*,*) la, wlam(la)*HPLANCK /1000
+
   end do
  
  RETURN
@@ -104,34 +149,42 @@ MODULE Opacity
  
  FUNCTION cont_wlam(cont) result(wlam)
  ! --------------------------------------------------------- !
- ! computes dlam/lam for a continnum 
+  ! computes dlam/lam for a continnum 
+  ! dnu/hnu = dlam/hlam
  ! --------------------------------------------------------- !
   type(AtomicContinuum), intent(in) :: cont
   double precision, dimension(cont%Nlambda) :: wlam
-  integer :: la, Nblue, Nred, la_start, la_end
-  double precision :: norm = 1d0 / HPLANCK
-  
+  integer :: la, Nblue, Nred, la_start, la_end  
 
   Nblue = cont%Nblue; Nred = cont%Nred
   la_start = 1; la_end = cont%Nlambda
-  !compute
-  !check that we are not at the boundaries, otherwise we cannot go beyond
-  if (Nblue==1) then 
-   la_start = 2
-   wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
-  end if
-  
-  if (Nred==NLTEspec%Nwaves) then
-   la_end = cont%Nlambda-1
-   wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
-  end if
-  do la=la_start,la_end !first is Nblue - (Nblue -1) which exists
+!   compute
+!   check that we are not at the boundaries, otherwise we cannot go beyond
+!   if (Nblue==1) then 
+!    la_start = 2
+!    wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
+!   end if
+!   
+!   if (Nred==NLTEspec%Nwaves) then
+!    la_end = cont%Nlambda-1
+!    wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
+!   end if
+!   do la=la_start,la_end !first is Nblue - (Nblue -1) which exists
+!   					last is Nred - (Nred-1)
+!    
+!    wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1)
+!    write(*,*) la, wlam(la)/norm
+!    
+!   end do
+  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
+  wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
+  do la=2,cont%Nlambda-1 !first is Nblue - (Nblue -1) which exists
   					!last is Nred - (Nred-1)
    
-   wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1) * norm
+   wlam(la) = (NLTEspec%lambda(Nblue+la-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1)
    
   end do
- 
+
  RETURN
  END FUNCTION cont_wlam
 
@@ -256,7 +309,17 @@ MODULE Opacity
      aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
 
-     aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+     aatom%lines(kr)%wlam(:) = phi(:)!line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+     !write profile and exit
+!      if (j==3 .and. i==2) then
+!   		open(unit=12, file="profile.dat",status="unknown")
+!   		write(*,*) sum(phi*line_wlam(aatom%lines(kr))), sum(phi*aatom%lines(kr)%wlam(:))
+!   		do nk=1, line%Nlambda
+!   			write(12,"(3E)") NLTEspec%lambda(Nblue+nk-1), aatom%lines(kr)%wlam(nk), phi(nk)
+!   		end do
+!   		close(12)
+!   		stop
+!      end if
     end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then

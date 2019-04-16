@@ -60,7 +60,7 @@ MODULE spectrum_type
    !Contribution function
    double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   double precision, allocatable, dimension(:,:,:) :: Psi
+   double precision, allocatable, dimension(:,:,:) :: Psi, Ieff
    !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -160,8 +160,10 @@ MODULE spectrum_type
    allocate(NLTEspec%I(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    allocate(NLTEspec%Ic(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    NLTEspec%I = 0d0; NLTEspec%Ic = 0d0
-   if (NLTEspec%Nact > 0) &
+   if (NLTEspec%Nact > 0) then
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+   	allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  	  	
+   end if
   
   RETURN
   END SUBROUTINE reallocate_rays_arrays
@@ -228,6 +230,8 @@ MODULE spectrum_type
     !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
     !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+    allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
@@ -239,6 +243,7 @@ MODULE spectrum_type
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
+
      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
       cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
@@ -281,7 +286,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
    if (NLTEspec%Nact > 0) then
-    deallocate(NLTEspec%Psi)!, NLTEspec%AtomOpac%initialized)
+    deallocate(NLTEspec%Psi, NLTEspec%Ieff)!, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -309,8 +314,10 @@ MODULE spectrum_type
      stop
     end if
     
-    if (NLTEspec%Nact > 0) &
+    if (NLTEspec%Nact > 0) then
    		 NLTEspec%Psi(:,:,id) = 0d0
+   		 NLTEspec%Ieff(:,:,id) = 0d0
+   	end if
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
