@@ -307,7 +307,7 @@ Grain properties
 .. note:: there should be as many blocks containing the following parameters
           as there are zones in the disk. The code will crash otherwise.
 
-* ``N_species``: Number of dust populations present in the disk zone; if
+* ``n_species``: Number of dust populations present in the disk zone; if
   N_species > 1, the dust grains of different species are assumed to be
   physically disjoint, but distributed in the same manner through the
   disk. *All the following lines in the block must be duplicated
@@ -316,7 +316,7 @@ Grain properties
 * ``Grain_type:`` spherical grains (Mie) or distribution of hollow
   spheres (DHS)
 
-* ``N_components``: Number of materials that make up a given specie;
+* ``n_components``: Number of materials that make up a given specie;
   these materials are assumed to be physically joint within each dust
   grain. *The line with the optical indices and volume fraction must be
   duplicated N_components times if N_components > 1.*
@@ -402,14 +402,14 @@ Molecular RT settings
 
 * ``ray-tracing:`` produce or not a ray-traced data cube of the molecule
 
-* ``number of lines:`` number of transition ray-traced, the indices given
+* ``n_lines:`` number of transition ray-traced, the indices given
   in the next lines correspond to the transition indices in the LAMBDA
   files. For instance the J=1-0 transition is usually #0
 
 Star properties
 ---------------
 
-* ``num_stars:`` number of stars illuminating the disk. *If num_stars >
+* ``n_stars:`` number of stars illuminating the disk. *If num_stars >
   1, the following group of two lines must be duplicated num_stars times*
 
 * ``Temp``: effective temperature of the star (only used to compute the
