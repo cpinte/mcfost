@@ -412,10 +412,10 @@ Star properties
 * ``n_stars:`` number of stars illuminating the disk. *If num_stars >
   1, the following group of two lines must be duplicated num_stars times*
 
-* ``Temp``: effective temperature of the star (only used to compute the
+* ``Teff``: effective temperature of the star (only used to compute the
   stellar luminosity), in K
 
-* ``radius``: stellar radius (used to compute the stellar luminosity and
+* ``Rstar``: stellar radius (used to compute the stellar luminosity and
   set the spatial origin of the photon packets: the star is assumed to be
   a uniformly radiating sphere), in R\ :sub:`sun`
 
