@@ -154,13 +154,12 @@ MODULE AtomicTransfer
                     NLTEspec%AtomOpac%Kc(icell,:,1))
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
-               NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / &
+               NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / &
                  (NLTEspec%AtomOpac%Kc(icell,:,1) + &
                  NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%chi(:,id) + 1d-300)
-
-      Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
-            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)) / &
+                 ! + &NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)
+                 ! + &NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)
+      Snu_c = (NLTEspec%AtomOpac%jc(icell,:)) / &
             (NLTEspec%AtomOpac%Kc(icell,:,1) + 1d-300) !it is missing NLTE cont
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1
@@ -177,14 +176,13 @@ MODULE AtomicTransfer
       ! J and Jc are the mean radiation field for total and continuum intensities
       ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
       ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
-      Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / &
+      Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / &
                  (NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%chi(:,id) + 1d-300)
-
-
+      ! + &NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)
+      ! + &NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)
+      
       ! continuum source function
-      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + &
-            NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)) / &
+      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / &
             (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
@@ -291,11 +289,9 @@ MODULE AtomicTransfer
       dtau(:)   = l_contrib * chiI
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%Kc(icell,:,1)
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
-               NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)) / chiI
+               NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / chiI
 
-      Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + &
-            NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)) / &
+      Snu_c = (NLTEspec%AtomOpac%jc(icell,:)) / &
             (NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp)
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -304,12 +300,10 @@ MODULE AtomicTransfer
       dtau_c(:) = l_contrib * NLTEspec%AtomOpac%chi_c(:,id)
 
 
-      Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                  NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)) / chiI
+      Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / chiI
 
 
-      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + &
-            NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)) / &
+      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / &
             (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp)
     end if
     !continuum not affected by polarisation yet
@@ -804,7 +798,7 @@ latomic_line_profiles=.true.
 
   if (atmos%Nrays /= Nrayone) CALL reallocate_rays_arrays(Nrayone)
   !Take into account the wavelength grid for images 
-  !Except except ds(Nray,Nproc) and Polarized arrays which are: 1) deallocated if PRT_SOL
+  !Except ds(Nray,Nproc) and Polarized arrays which are: 1) deallocated if PRT_SOL
   !is FIELD_FREE (or not allocated if no magnetic field), reallocated if FULL_STOKES.
   !And, atmos%Nrays = Nrayone if they are different.
   !This in order to reduce the memory of arrays in the map calculation
@@ -951,7 +945,6 @@ latomic_line_profiles=.true.
         stop
  
     CASE ("HOGEREIJDE")
-      
   		!only etape2 or 3 for now
   		lfixed_rays = .true.
   		n_rayons = n_rayons_start !and will increase up atom%Nrays or n_rayons_max
@@ -989,6 +982,7 @@ latomic_line_profiles=.true.
   			do icell=1, n_cells
   			    CALL initGamma(icell)
    				!$ id = omp_get_thread_num() + 1
+                NLTEspec%J(:,id) = 0d0
    				if (atmos%lcompute_atomRT(icell)) then
      				do iray=iray_start, iray_start-1+n_rayons
       
@@ -1012,60 +1006,67 @@ latomic_line_profiles=.true.
       					!IFS = Idag
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       					!compute Gamma = wavelength and angle integration
-						CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
-						!CALL Gamma_LTE(id,icell)
-						!CALL fillGamma_Hogereijde(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
+						!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
+ 						!CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+						CALL Gamma_LTE(id,icell)
       				end do !iray
-      				
+
+!   		open(unit=12, file="Jnu.dat",status="unknown")
+!   		do nact=1, NLTEspec%Nwaves
+!   			write(12,"(2E)") NLTEspec%lambda(nact), NLTEspec%J(nact,id)
+!   		end do
+!   		close(12)
+
+
 					!Solve SEE for all atoms
-					CALL updatePopulations(id, icell)
+					!CALL updatePopulations(id, icell)
       				
      				n_iter_loc = 0
     				lconverged_loc = .false.
     				!save pops for all active atoms
     				!pop(NactAtom, Nmaxlvel, Nthreads)
-!     				do nact=1,atmos%NactiveAtoms
-!     				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
-!     				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
-!     				end do
-     				!sub iteration on the local emissivity, keeping Idag fixed
-     				! do while (.not.lconverged_loc)
-! !      					if (lfixed_rays) &
-! !      						stream(id) = init_sprng(gtype, id-1,NLTEspec%NPROC,seed,SPRNG_DEFAULT)
-! 
-!        					n_iter_loc = n_iter_loc + 1
-!       
-!                         pop_old(:,:,id) = pop(:,:,id)
-! 						
-! 						!Solve SEE for all atoms
-! 						CALL updatePopulations(id, icell)
-! 						
-!     				    do nact=1,atmos%NactiveAtoms
-!     				     pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
-!     				     atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
-!     				    end do
-! 						
-!      					diff = 0d0
-!      					do nact=1,atmos%NactiveAtoms
-!      				    	dN = abs(maxval((pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
-!      				    		pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))/&
-!      				    		pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)+1d-300))
-!      				    	diff = max(diff, dN)
-!      				    	if (dN > 1) then 
-!      						 write(*,*) " sub-it->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
-!      						 write(*,*) maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)), &
-!      						 maxval(pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))
-!      						end if
-!      					end do				
-! 
-!        					if (diff < precision_sub) then
-!        						lconverged_loc = .true.
-!        						 write(*,*) " sub it converged!"
-!        					else
-!         					!recompute opacity of this cell., but I need angles and pos...
-!        						!NLTEspec%I not changed
-!       						CALL initGamma(icell)
-! 							do iray=iray_start, iray_start-1+n_rayons
+    				do nact=1,atmos%NactiveAtoms
+    				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
+    				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				end do
+     				!!sub iteration on the local emissivity, keeping Idag fixed
+     				do while (.not.lconverged_loc)
+!      					if (lfixed_rays) &
+!      						stream(id) = init_sprng(gtype, id-1,NLTEspec%NPROC,seed,SPRNG_DEFAULT)
+
+       					n_iter_loc = n_iter_loc + 1
+      
+                        pop_old(:,:,id) = pop(:,:,id)
+						
+						!Solve SEE for all atoms
+						CALL updatePopulations(id, icell)
+						
+    				    do nact=1,atmos%NactiveAtoms
+    				     pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
+    				     atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				    end do
+						
+     					diff = 0d0
+     					do nact=1,atmos%NactiveAtoms
+     				    	dN = abs(maxval((pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
+     				    		pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))/&
+     				    		pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)+1d-300))
+     				    	diff = max(diff, dN)
+     				    	if (dN /= 0) then 
+     						 write(*,*) " sub-it->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
+     						 write(*,*) maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)), &
+     						 maxval(pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))
+     						end if
+     					end do				
+
+       					if (diff < precision_sub) then
+       						lconverged_loc = .true.
+       						 write(*,*) " sub it converged!", icell, diff
+       					else
+        					!recompute opacity of this cell., but I need angles and pos...
+       						!NLTEspec%I not changed
+      						CALL initGamma(icell); NLTEspec%J(:,id) = 0d0
+							do iray=iray_start, iray_start-1+n_rayons
 !                         		rand  = sprng(stream(id))
 !                         		rand2 = sprng(stream(id))
 !                        			rand3 = sprng(stream(id))
@@ -1080,15 +1081,15 @@ latomic_line_profiles=.true.
 !                         		ARGMT = PI * (2.0_dp * rand - 1.0_dp)
 !                         		U0 = SRW02 * cos(ARGMT)
 !                        		    V0 = SRW02 * sin(ARGMT)   
-!       							!I unchanged
-! 							    CALL init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
-! 								CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
-! 							    !CALL Gamma_LTE(id,icell)
-! 								!CALL fillGamma_Hogereijde(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
-!       						end do !iray
-!        					end if
-!      				end do
-!      	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+      							!I unchanged
+							    CALL init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
+								!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
+ 						        !CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+							    CALL Gamma_LTE(id,icell)
+      						end do !iray
+       					end if
+     				end do
+     	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
      			end if !lcompute_atomRT
      		end do !icell
         	!$omp end do
@@ -1138,7 +1139,7 @@ latomic_line_profiles=.true.
 
           	   end if
         	end if
-  		
+  		stop
 	    end do !while
 
   CASE DEFAULT

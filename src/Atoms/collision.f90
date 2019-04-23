@@ -59,7 +59,9 @@
 !Convention: C_ij = C[i][j] represents the
 !transition j --> i
 ! C_ij = C[ith ligne][jth column]
-! C_ij_fortran = C[jth column, ith ligne]
+! fortran is column row
+!     ij = (i-1)*atom%Nlevel +j : j-->i
+!     ji = (j-1)*atom%Nlevel +i : i-->j
 ! ----------------------------------------------------------------------
 
 

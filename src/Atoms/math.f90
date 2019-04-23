@@ -4,6 +4,34 @@ MODULE math
 
 
   CONTAINS
+  
+   FUNCTION Integrate_x(N, x, y) result(integ)
+    integer :: N
+    double precision, dimension(N) :: x, y
+    double precision :: integ
+    integer  :: k
+    
+    integ = 0.5 * dabs(x(2)-x(1)) * y(1)
+    do k=2,N
+     integ = integ + dabs(x(k)-x(k-1)) * 0.5 * (y(k)+y(k-1))
+    end do
+   
+   RETURN
+   END FUNCTION Integrate_x
+   
+   FUNCTION Integrate_dx(N, dx, y) result(integ)
+    integer :: N
+    double precision, dimension(N) :: dx, y
+    double precision :: integ
+    integer  :: k
+    
+    integ = 0.5 * dx(1) * y(1)
+    do k=2,N
+     integ = integ + dx(k) * 0.5 * (y(k)+y(k-1))
+    end do
+   
+   RETURN
+   END FUNCTION Integrate_dx
 
    FUNCTION SQ(x) result(y)
     double precision :: x, y
@@ -338,32 +366,12 @@ MODULE math
    double precision, DIMENSION(N1a,N2a), intent(in) :: ya
    double precision  :: y(N1,N2)
    integer :: i, j
-!    integer, intent(in) :: N1a, N2a, N1, N2
-!    REAL(8), intent(in) :: x1a(N1a), x2a(N2a)
-!    REAL(8), DIMENSION(N1a,N2a), intent(in) :: ya
-!    REAL(8), intent(in) :: x1(N1),x2(N2)
-!    REAL(8), dimension(N1,N2) :: y
-! 
-!    INTEGER :: m, n
-!    REAL(8), DIMENSION(N1a, N2) :: ymtmp
-!    real(8) :: yb(N2a), ym2(N2), yc(N1a), ym3(N1)
    
    do i=1,N1
     do j=1,N2
      y(i,j) = Interp2D(x1a, x2a, ya,x1(i),x2(j))
     end do
    end do
-
-
-!    do n=1,N1a ! y axis interpolation
-!     call bezier3_interp(N2a,&
-!            x2a,ya(n,:),N2, x2, ymtmp(n,:))
-!    end do
-!    do m =1,N2 ! interpolate on the x direction
-!    !y(:,m) = ymtmp(:,m)
-!    call bezier3_interp(N1a, &
-!            x1a, ymtmp(:,m), N1,x1, y(:,m))
-!    end do
    
    RETURN
   END FUNCTION interp2Darr

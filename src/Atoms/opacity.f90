@@ -11,7 +11,7 @@ MODULE Opacity
  use parametres
  use profiles, only : Profile, Profile_lambda
  !!use molecular_emission, only : v_proj
- use math, only : locate
+ use math, only : locate, integrate_dx
 
 
  IMPLICIT NONE
@@ -45,6 +45,7 @@ MODULE Opacity
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
        NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
      CASE ("HOGEREIJDE")
+       write(*,*) minval(chi), maxval(chi)
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi
        NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
      CASE DEFAULT
@@ -100,89 +101,74 @@ MODULE Opacity
   
  FUNCTION line_wlam(line) result(wlam)
  ! --------------------------------------------------------- !
-  ! The integral of I(nu, omega) over frequencies and
-  ! angles is:
-  ! int_omega int_nu I * phi(nu, omega) * domega* dnu/nu
-  ! or: (with integral boundaries reversed)
-  ! int_omega domega int_lambda I*phi  * dlambda/lambda
-  ! or:
-  ! int_omega domega int_v I*phi * dv * lambda0/lambda /c
+  ! gives dv/c = dlambda/lambda = dnu/nu
+  ! times c: dv.
+  ! the integral of the radiative rates is
+  ! integ (domega) * integ(dv/ch)
+  ! a 1/ch is missing. 
+  !
+  ! Vij = hnu/4pi * Bij * phi if integral is over dnu/hnu
+  ! and Vij = hc/4pi * Bij * phi if integral is over (dv/hc).
+  !
+  ! phi in s in the former case, and phi in s/m in the later.
  ! --------------------------------------------------------- !
   type(AtomicLine), intent(in) :: line
   double precision, dimension(line%Nlambda) :: wlam
-  integer :: la, Nblue, Nred, la_start, la_end
+  integer :: la, Nblue, Nred, la_start, la_end, la0
   double precision :: norm !beware this is not the result of the integral 
   						   ! just a factor to convert dv/c from dlambda/lambda
+   !la0: index of wavelengths on the frequency grid (size Nwaves). 
+   !la:  index of wavelengths on the lambda grid of the line (size Nlambda).
+   !la0 = Nblue - 1 + la; line expands from Nblue to Nred on the frequency grid.
+   !la=1 <=> la0=Nblue; la=Nlambda <=> la0 = Nred = Nblue - 1 + Nlambda
+   !dlambda = (lambda(la0 + 1) - lambda(la0 - 1)) * 0.5 <=> mean value.
 
-  norm = CLIGHT/line%lambda0
+  norm = 5d-1 * CLIGHT/line%lambda0
   Nblue = line%Nblue; Nred = line%Nred
   la_start = 1; la_end = line%Nlambda
-!   compute
-!   check that we are not at the boundaries, otherwise we cannot go beyond
-!   if (Nblue==1) then 
-!    la_start = 2
-!    wlam(1) = line%lambda0*(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue) * norm
-!   end if
-!   
-!   if (Nred==NLTEspec%Nwaves) then
-!    la_end = line%Nlambda-1
-!    wlam(line%Nlambda) = line%lambda0*(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred) * norm
-!   end if
-!   do la=la_start,la_end! !first is Nblue - (Nblue -1) which exists
-!   					last is Nred - (Nred-1)
-!    wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / line%lambda0 * norm
-!   write(*,*) la, wlam(la)*HPLANCK /1000
-! 
-!   end do
 
-  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue))  * norm
-  wlam(line%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1))  * norm
-  do la=2,line%Nlambda! !first is Nblue - (Nblue -1) which exists
-  					!last is Nred - (Nred-1)
-   wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) * norm
-  !write(*,*) la, wlam(la)*HPLANCK /1000
+
+  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) * norm
+  
+  wlam(line%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) * norm
+
+  do la=2,line%Nlambda-1
+
+   la0 = Nblue - 1 + la
+   wlam(la) = (NLTEspec%lambda(la0 + 1)-NLTEspec%lambda(la0 - 1)) * norm
 
   end do
- 
+
  RETURN
  END FUNCTION line_wlam
  
  FUNCTION cont_wlam(cont) result(wlam)
  ! --------------------------------------------------------- !
   ! computes dlam/lam for a continnum 
-  ! dnu/hnu = dlam/hlam
+  ! dnu/nu = dlam/lam
+  ! the integral of the radiative rates is
+  ! integ (domega) * integ(dlam/hlam)
+  ! a 1/h is missing
  ! --------------------------------------------------------- !
   type(AtomicContinuum), intent(in) :: cont
   double precision, dimension(cont%Nlambda) :: wlam
-  integer :: la, Nblue, Nred, la_start, la_end  
+  integer :: la, Nblue, Nred, la_start, la_end , la0
 
   Nblue = cont%Nblue; Nred = cont%Nred
   la_start = 1; la_end = cont%Nlambda
-!   compute
-!   check that we are not at the boundaries, otherwise we cannot go beyond
-!   if (Nblue==1) then 
-!    la_start = 2
-!    wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
-!   end if
-!   
-!   if (Nred==NLTEspec%Nwaves) then
-!    la_end = cont%Nlambda-1
-!    wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
-!   end if
-!   do la=la_start,la_end !first is Nblue - (Nblue -1) which exists
-!   					last is Nred - (Nred-1)
-!    
-!    wlam(la) = (NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1)
-!    write(*,*) la, wlam(la)/norm
-!    
-!   end do
-  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
-  wlam(cont%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
-  do la=2,cont%Nlambda-1 !first is Nblue - (Nblue -1) which exists
-  					!last is Nred - (Nred-1)
-   
-   wlam(la) = (NLTEspec%lambda(Nblue+la-1)-NLTEspec%lambda(la+Nblue-1-1)) / NLTEspec%lambda(la+Nblue-1)
-   
+
+  wlam(1) = 5d-1 * &
+  	(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
+  	
+  wlam(cont%Nlambda) = 5d-1 * & 
+  	(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
+  	
+  do la=2,cont%Nlambda-1
+  
+   la0 = Nblue - 1 + la
+   wlam(la) = 5d-1 * &
+   	(NLTEspec%lambda(la0+1)-NLTEspec%lambda(la0-1)) / NLTEspec%lambda(la0)
+   	
   end do
 
  RETURN
@@ -242,7 +228,7 @@ MODULE Opacity
    	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
     	if (aatom%n(j,icell) < tiny_dp) then
     	 write(*,*) aatom%n(j,icell)
-     	 CALL error("too small populations")
+     	 CALL Warning("too small cont populations") !or Error()
      	 CYCLE
     	end if
     	
@@ -262,7 +248,7 @@ MODULE Opacity
     	 aatom%continua(kc)%Vij(:,id) = Vij(Nblue:Nred)
     	 aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     		gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
-        !! aatom%continua(kc)%wlam(Nblue:Nred) = hc_4PI
+        !! aatom%continua(kc)%wlam(Nblue:Nred) = 
     	end if
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged    
@@ -277,7 +263,7 @@ MODULE Opacity
     
     if ((aatom%n(j,icell) <=tiny_dp).or.(aatom%n(i,icell) <=tiny_dp)) then !no transition
         write(*,*) aatom%n(:,icell)
-     	CALL error("too small populations")
+     	CALL Warning("too small line populations") !or Error()
      	CYCLE
     end if 
     gij = 0d0
@@ -309,18 +295,23 @@ MODULE Opacity
      aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
 
-     aatom%lines(kr)%wlam(:) = phi(:)!line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
-     !write profile and exit
-!      if (j==3 .and. i==2) then
+     ! unit is m/s / (m/s * s/m) = m/s
+     aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+!!!     !write profile and exit
+!        if (j==3 .and. i==2) then
 !   		open(unit=12, file="profile.dat",status="unknown")
+!   		!          int phi(u) du = 1   				!sum(phi * wi) / sum(phi * wi) = 1d0
 !   		write(*,*) sum(phi*line_wlam(aatom%lines(kr))), sum(phi*aatom%lines(kr)%wlam(:))
+!   		write(*,*) integrate_dx(aatom%lines(kr)%Nlambda, line_wlam(aatom%lines(kr)), phi(:))
 !   		do nk=1, line%Nlambda
-!   			write(12,"(3E)") NLTEspec%lambda(Nblue+nk-1), aatom%lines(kr)%wlam(nk), phi(nk)
+!   			write(12,"(4E)") NLTEspec%lambda(Nblue+nk-1), &
+!   				aatom%lines(kr)%wlam(nk)*sum(phi*line_wlam(aatom%lines(kr))), &
+!   														aatom%lines(kr)%wlam(nk), phi(nk)
 !   		end do
 !   		close(12)
 !   		stop
-!      end if
-    end if
+!        end if
+     end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        write(*,*) "Beware, NLTE part of Zeeman opac not set to 0 between iteration!"

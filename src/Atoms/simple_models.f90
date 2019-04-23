@@ -44,7 +44,7 @@ MODULE simple_models
    use utils, only : interp_dp
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: Tmax = 7d3, days_to_sec = 86400d0, Prot = 8. !days
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=1d4, Macc = 1d-9
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
@@ -52,6 +52,8 @@ MODULE simple_models
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
    double precision :: Bp, BR, Bz
    logical :: lwrite_model_ascii = .false.
+   !wind 
+   double precision :: Mdotwind=1d-9, Twind=8d3, beta=5d-1, vinf=400d0, vinit10d0
    
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
    !Lambda = Q/nH**2
@@ -209,6 +211,23 @@ MODULE simple_models
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
           !write(*,*) log10(L), Rm, rcyl/etoile(1)%r, atmos%T(icell), nH0, Q0
+          
+         !! Stellar wind 
+!        else if (r/Rstar>=3d0 .and. y <= sin(50d0*PI/180d0)**2) then !wind
+!            if (.not.lstatic) then
+!              vp = (vinit + (vinf - vinit) * (1d0 - 3d0*Rstar/r)**beta) * 1d3
+!              atmos%Vxyz(icell,1) = vp * dsqrt(y) !Rhat
+!              atmos%Vxyz(icell,2) = vp * dsqrt(1.-y) !zhat
+!              atmos%Vxyz(icell,3) = 0d0 !phihat
+!              if (.not.lmagnetoaccr) then !projection
+!               atmos%Vxyz(icell,3) = vp * dsqrt(1.-y) !zhat         
+!               atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * cos(phi) 
+!               atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * sin(phi) 
+!              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
+!              end if
+!            end if
+!           atmos%nHtot(icell) = Mdotwind * Msun_to_kg / year_to_sec / (4d0*PI*vp*(1.-cos(50d0*PI/180d0)**2))) / &
+!            (r*AU_to_m)**2 * rho_to_nH
        end if
       end do
      end do
@@ -287,10 +306,10 @@ MODULE simple_models
    !atmos%vturb = 5d0 * 1d3 !m/s
 
 !    idk = 10
-!     atmos%nHtot =  2.27414200581936d16
-!     atmos%T = 45420d0
-!     atmos%ne = 2.523785d16
-!     atmos%vturb = 9.506225d3 !m/s
+    atmos%nHtot =  2.27414200581936d16
+    atmos%T = 45420d0
+    atmos%ne = 2.523785d16
+    atmos%vturb = 9.506225d3 !m/s
    
    !idk = 75
 !   atmos%T=7590d0
@@ -298,10 +317,10 @@ MODULE simple_models
 !   atmos%nHtot = 1.259814d23
 
     !idk = 81   
-    atmos%T=9400d0
-    atmos%ne = 3.831726d21
-    atmos%nHtot = 1.326625d23
-    atmos%vturb = 1.806787d3 !idk=81
+!     atmos%T=9400d0
+!     atmos%ne = 3.831726d21
+!     atmos%nHtot = 1.326625d23
+!     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
 !     atmos%T = 100000d0
