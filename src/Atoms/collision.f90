@@ -57,7 +57,7 @@
 !Note: Unit of number density is m^-3.
 !
 !Convention: C_ij = C[i][j] represents the
-!transition j --> i
+!transition j --> i = Cul
 ! C_ij = C[ith ligne][jth column]
 ! fortran is column row
 !     ij = (i-1)*atom%Nlevel +j : j-->i
@@ -648,7 +648,7 @@ MODULE collision
   ! -- Initialise the collisional matrix at each cell--
   atom%C(:) = 0d0
   !temporary
-  atom%Ckij(icell,:) = 0d0
+  atom%Ckij(icell,:) = 0d0 !C j->i = C(j,i)
 
 
 

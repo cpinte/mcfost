@@ -848,7 +848,7 @@ latomic_line_profiles=.true.
  
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 5 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 50 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 50
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
@@ -865,10 +865,10 @@ latomic_line_profiles=.true.
 
   real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN
 
-  logical :: labs
+  logical :: labs, disable_subit
   integer :: atomunit = 1, nact
   integer :: icell
-  integer :: Nlevel_total = 0, NmaxLevel
+  integer :: Nlevel_total = 0, NmaxLevel, ilevel
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
   double precision, allocatable, dimension(:,:,:) :: pop_old, pop
   double precision, allocatable, dimension(:,:,:) :: gpop_old
@@ -898,7 +898,7 @@ latomic_line_profiles=.true.
      NmaxLevel = max(NmaxLevel, atmos%ActiveAtoms(nact)%ptr_atom%Nlevel)
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
-     atmos%ActiveAtoms(nact)%ptr_atom%n = atmos%ActiveAtoms(nact)%ptr_atom%nstar
+     atmos%ActiveAtoms(nact)%ptr_atom%n = 0.1*atmos%ActiveAtoms(nact)%ptr_atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
   end do
   
@@ -954,6 +954,7 @@ latomic_line_profiles=.true.
   		lconverged = .false.
   		n_iter = 0 
   		fac_etape = 1.0
+  		disable_subit = .false. !set to true to avoid subiterations over the emissivity
 
         do while (.not.lconverged)
   			if (lfixed_rays) then
@@ -982,7 +983,6 @@ latomic_line_profiles=.true.
   			do icell=1, n_cells
   			    CALL initGamma(icell)
    				!$ id = omp_get_thread_num() + 1
-                NLTEspec%J(:,id) = 0d0
    				if (atmos%lcompute_atomRT(icell)) then
      				do iray=iray_start, iray_start-1+n_rayons
       
@@ -1007,19 +1007,9 @@ latomic_line_profiles=.true.
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       					!compute Gamma = wavelength and angle integration
 						!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
- 						!CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
-						CALL Gamma_LTE(id,icell)
+ 						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+						!CALL Gamma_LTE(id,icell)
       				end do !iray
-
-!   		open(unit=12, file="Jnu.dat",status="unknown")
-!   		do nact=1, NLTEspec%Nwaves
-!   			write(12,"(2E)") NLTEspec%lambda(nact), NLTEspec%J(nact,id)
-!   		end do
-!   		close(12)
-
-
-					!Solve SEE for all atoms
-					!CALL updatePopulations(id, icell)
       				
      				n_iter_loc = 0
     				lconverged_loc = .false.
@@ -1029,13 +1019,16 @@ latomic_line_profiles=.true.
     				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
     				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
     				end do
+    				
+    				!lconverged_loc = disable_subit !to disable sub-it
+    				if (disable_subit) CALL updatePopulations(id, icell)
+    				
      				!!sub iteration on the local emissivity, keeping Idag fixed
      				do while (.not.lconverged_loc)
 !      					if (lfixed_rays) &
 !      						stream(id) = init_sprng(gtype, id-1,NLTEspec%NPROC,seed,SPRNG_DEFAULT)
 
        					n_iter_loc = n_iter_loc + 1
-      
                         pop_old(:,:,id) = pop(:,:,id)
 						
 						!Solve SEE for all atoms
@@ -1046,26 +1039,26 @@ latomic_line_profiles=.true.
     				     atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
     				    end do
 						
-     					diff = 0d0
+						diff = 0.0 !keeps track of the maximum dpops(dN) among each atom.
      					do nact=1,atmos%NactiveAtoms
-     				    	dN = abs(maxval((pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)-&
-     				    		pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))/&
-     				    		pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)+1d-300))
-     				    	diff = max(diff, dN)
-     				    	if (dN /= 0) then 
-     						 write(*,*) " sub-it->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
-     						 write(*,*) maxval(pop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id)), &
-     						 maxval(pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id))
-     						end if
+     						do ilevel=1,atmos%ActiveAtoms(nact)%ptr_atom%Nlevel
+     				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
+     				    			pop_old(nact,ilevel,id)+1d-300))
+     				    		diff = max(diff, dN)
+     				    		if (dN > 1) then 
+     							 write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+     							 	n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+     							end if
+     						end do
      					end do				
 
        					if (diff < precision_sub) then
        						lconverged_loc = .true.
-       						 write(*,*) " sub it converged!", icell, diff
+       						!write(*,*) " sub it converged! icell#", icell," maxdpops=", diff
        					else
         					!recompute opacity of this cell., but I need angles and pos...
        						!NLTEspec%I not changed
-      						CALL initGamma(icell); NLTEspec%J(:,id) = 0d0
+      						CALL initGamma(icell)
 							do iray=iray_start, iray_start-1+n_rayons
 !                         		rand  = sprng(stream(id))
 !                         		rand2 = sprng(stream(id))
@@ -1084,8 +1077,8 @@ latomic_line_profiles=.true.
       							!I unchanged
 							    CALL init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
 								!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
- 						        !CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
-							    CALL Gamma_LTE(id,icell)
+ 						        CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+							    !CALL Gamma_LTE(id,icell)
       						end do !iray
        					end if
      				end do
@@ -1094,7 +1087,7 @@ latomic_line_profiles=.true.
      		end do !icell
         	!$omp end do
         	!$omp end parallel
-        	
+
         	!Global convergence criterium
   			cell_loop2 : do icell=1, atmos%Nspace
   			  	diff = 0d0
@@ -1107,7 +1100,7 @@ latomic_line_profiles=.true.
      					if (dN>1) &
      						write(*,*) " g-it->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
      				end do
-     	     		if (diff < precision) CYCLE cell_loop2
+     	     		!if (diff < precision) CYCLE cell_loop2
      			end if
      		end do cell_loop2
 
@@ -1139,7 +1132,6 @@ latomic_line_profiles=.true.
 
           	   end if
         	end if
-  		stop
 	    end do !while
 
   CASE DEFAULT

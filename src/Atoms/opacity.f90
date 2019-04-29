@@ -45,7 +45,6 @@ MODULE Opacity
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
        NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
      CASE ("HOGEREIJDE")
-       write(*,*) minval(chi), maxval(chi)
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi
        NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
      CASE DEFAULT

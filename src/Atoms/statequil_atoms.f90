@@ -121,19 +121,15 @@ MODULE statequil_atoms
       end if 
      end do
     !
-    NLTEspec%J(:,id) = NLTEspec%J(:,id) + 4d0 * PI / n_rayons * NLTEspec%I(:,iray,id)
+    !NLTEspec%J(:,id) = NLTEspec%J(:,id) + 4d0 * PI / n_rayons * NLTEspec%I(:,iray,id)
 
    end do
    
-   !remove diagonal here, delat(l',l)
-   do i=1,atom%Nlevel
-    atom%Gamma(i,i) = 0d0 !because i that case Gamma_l"l = Cii - Cii = 0d0
-    diag = 0d0
-    do j=1,atom%Nlevel
-     diag = diag + atom%Gamma(j,i) 
-    end do
-    atom%Gamma(i,i) = -diag
-   end do
+   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
+   	do jp = 1, atom%Nlevel
+    	atom%Gamma(jp,jp) = -sum(atom%Gamma(jp,:)) !sum over rows for this column
+   	end do
+   end if
 
    NULLIFY(atom)
   end do !loop over atoms  
@@ -147,8 +143,16 @@ MODULE statequil_atoms
   ! Collision matrix has to be allocated
   ! if already allocated, simply set Gamma to its new icell
   ! value.
+  !
+  ! n(l)*Cl->lp = n(lp)*Clp->l
+  ! e.g.,
+  ! Cij = Cji * (nj/ni)^star, with Cji = C(ij) = 
+  ! colision rate from j to i.
+  !
+  ! (ij = j->i = (i-1)*N + j)
+  ! (ji = i->j = (j-1)*N + i)
  ! ------------------------------------------------------ !
-  integer :: nact, Nlevel, i, j, ij
+  integer :: nact, Nlevel, lp, l, ij, ji
   integer, intent(in) :: icell
   type (AtomType), pointer :: atom
   
@@ -157,10 +161,13 @@ MODULE statequil_atoms
    Nlevel = atom%Nlevel
    ij = 0
    if (.not.allocated(atom%Gamma)) allocate(atom%Gamma(Nlevel, Nlevel))
-   do i=1, Nlevel
-    do j=1,Nlevel
-      ij = ij + 1
-      atom%Gamma(i,j) = atom%Ckij(icell,ij)
+   do lp=1,Nlevel
+    do l=1,Nlevel
+      ij = (l-1)*nlevel + lp!lp->l
+      ji = (lp-1)*nlevel + l!l->lp
+      !          col/row
+      atom%Gamma(lp,l) = atom%Ckij(icell,ij) !Gamma_llp = Gamma(lp, l) rate from lp to l
+      !write(*,*) atom%Ckij(icell,ji), atom%Gamma(lp,l) * atom%nstar(lp, icell)/atom%nstar(l,icell)
     end do
    end do
 
@@ -238,11 +245,11 @@ MODULE statequil_atoms
 
  SUBROUTINE fillGamma_Hogereijde(id, icell, iray, n_rayons)
   integer, intent(in) :: id, icell, iray, n_rayons
-  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
+  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, l
   type (AtomType), pointer :: atom
   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
-  double precision :: norm = 0d0, hc_4PI, diag
-  integer :: c_nlte = 0
+  double precision :: norm = 0d0, hc_4PI
+  double precision :: c_nlte = 1d0
   
   hc_4PI = HPLANCK * CLIGHT / (4d0 * PI)
   
@@ -284,53 +291,93 @@ MODULE statequil_atoms
 
    end do
    
-   !remove diagonal here, delat(l',l)
-   do i=1,atom%Nlevel
-    atom%Gamma(i,i) = 0d0 !because i that case Gamma_l"l = Cii - Cii = 0d0
-    diag = 0d0
-    do j=1,atom%Nlevel
-     diag = diag + atom%Gamma(i,j) 
-    end do
-    atom%Gamma(i,i) = -diag
+   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
+   	do l = 1, atom%Nlevel
+    	atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
+   	end do
+   end if
+   
+   NULLIFY(atom)
+  end do !loop over atoms  
+
+ RETURN
+ END SUBROUTINE fillGamma_Hogereijde
+ 
+ SUBROUTINE FillGamma_ZeroRadiation(id, icell)
+  integer, intent(in) :: id, icell
+  integer :: nact, kr, i, j, l
+  type (AtomType), pointer :: atom
+  integer :: c_nlte = 1
+    
+  do nact=1,atmos%Nactiveatoms !loop over each active atoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+
+   do kr=1,atom%Nline
+    
+    i = atom%lines(kr)%i; j = atom%lines(kr)%j
+
+    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*atom%lines(kr)%Aji
+
+   end do
+
+   do l = 1, atom%Nlevel
+    atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
    end do
 
    NULLIFY(atom)
   end do !loop over atoms  
 
  RETURN
- END SUBROUTINE fillGamma_Hogereijde
+ END SUBROUTINE fillGamma_ZeroRadiation
+ 
 
  SUBROUTINE Gamma_LTE(id,icell)
  !------------------------------------------------- !
  !------------------------------------------------- !
   integer, intent(in) :: id, icell
-  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
+  integer :: nact, kr, l, lp
   type (AtomType), pointer :: atom
-  double precision :: diag, diag2
 
   
   do nact=1,atmos%Nactiveatoms !loop over each active atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
-   !remove diagonal here, delta(l',l)
-   do i=1,atom%Nlevel
-    atom%Gamma(i,i) = 0d0 !because i that case Gamma_l"l = Cii - Cii = 0d0
-    diag = 0d0
-    diag2 = 0d0
-    do j=1,atom%Nlevel !Sum over lprime prime for each l
-     diag = diag + atom%Gamma(i,j) 
-     diag2 = diag2 + atom%Gamma(j,i)
-    end do
-    atom%Gamma(i,i) = -diag !only if l=lprime
-   end do
-   write(*,*) diag, diag2
-
    
-   do i=1,atom%Nlevel
-   do j=1,atom%Nlevel
-    write(*,*) i, j, atom%Gamma(i,j), atom%Ckij(icell, (j-1)*atom%Nlevel+i)
+!      do i=1,atom%Nlevel
+!      do j=1,atom%Nlevel   
+!      !write(*,*) i, j, atom%Gamma(i, j) !should be the collision matrix
+!      !!!!!!                      j->i = C_ij = Cji = Cul
+!      !write(*,*) Cul, Clu, Cul*nstar(u)/nstar(l)=Clu
+!      write(*,*) i,j, atom%Ckij(icell, (i-1)*atom%Nlevel+j), &
+!      atom%Ckij(icell,(j-1)*atom%Nlevel+i), atom%Ckij(icell, (i-1)*atom%Nlevel+j)*atom%nstar(j, icell)/atom%nstar(i,icell)
+!      end do
+!     end do
+!    stop
+
+   !fill the diagonal here, delta(l',l)
+   !because for each G(i,i); Cii, Rii is 0.
+   !and Gii = -Sum_j Cij + Rij = -sum_j Gamma(i,j)
+   !diagonal of Gamma, Gamma(col,col) is sum_row Gamma(col,row)
+   !G(1,1) = - (G12 + G13 + G14 ...)
+   !G(2,2) = - (G21 + G23 + G24 ..) first index is for column and second row
+   do l = 1, atom%Nlevel
+    atom%Gamma(l,l) = 0d0
+    atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
    end do
-   end do
-   stop
+   
+!      do lp=1,atom%Nlevel
+!      do l=1,atom%Nlevel
+!      write(*,*) lp, l, atom%Gamma(lp,l)
+!      end do
+!     end do
+!    
+!     do l=1,atom%nlevel
+!      write(*,*) l, atom%n(l,icell), atom%nstar(l, icell)
+!     end do
+!     CALL SEE_atom(id, icell, atom)
+!     do l=1,atom%nlevel
+!      write(*,*) l, atom%n(l,icell), atom%nstar(l, icell)
+!     end do
+!    stop
    
    NULLIFY(atom)
   end do !loop over atoms
@@ -338,26 +385,50 @@ MODULE statequil_atoms
  END SUBROUTINE Gamma_LTE
 
  SUBROUTINE SEE_atom(id, icell, atom)
+ ! ------------------------------------------------------- !
+  ! We solve for :
+  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
+  !
+  ! which is equivalent in matrix notation to:
+  !
+  ! GG(l,l') dot n_l' = 0 with l is on the columns and l' on the rows
+  !
+  ! In particular for a 2-level atom the two equations are:
+  !
+  ! n1*G_11 + n2*G_21 = 0
+  ! n1*G12 + n2*G22 = 0,
+  ! with one of these equations has to be replaced by
+  ! n1 + n2 = N
+ ! ------------------------------------------------------- !
+
   integer, intent(in) :: icell, id
   type(AtomType), intent(inout) :: atom
-  integer :: j, i, imaxpop
+  integer :: lp, imaxpop
+  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
   
-  !search the row with maximum population and remove it
+  !we need to do that here as Gamma is updated for each rays.
+!    do lp = 1, atom%Nlevel
+!     write(*,*) atom%Gamma(lp,lp), sum(atom%Gamma(lp,:))
+!     atom%Gamma(lp,lp) = -sum(atom%Gamma(lp,:)) !sum over rows for this column
+!    end do
+  
+  !replace one equation by mass conservation law;
+  !in general this is the last one: Sum_l n_l = ntotal
+  !but for numerical stability we remove the level with le largest
+  !population at each iteration.
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
-  
   atom%n(:,icell) = 0d0
   atom%n(imaxpop,icell) = atom%ntotal(icell)
+
   
-  
-  atom%Gamma(imaxpop,:) = 1d0
-!   do i=1, atom%Nlevel
-!    write(*,*) atom%n(i,icell)
-!    do j=1, atom%Nlevel
-!    write(*,*) i, j, atom%gamma(i, j)
-!    end do
-!   end do
-!   stop
-  CALL GaussSlv(atom%Gamma, atom%n(:,icell),atom%Nlevel)
+  !Sum_l'_imaxpop * n_l' = N
+  atom%Gamma(:,imaxpop) = 1d0 !all columns of the last row for instance
+  !(G11 G21)  (n1)  (0)
+  !(       ) .(  ) =( )
+  !(1    1 )  (n2)  (N)
+  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
+  Aij = transpose(atom%Gamma)
+  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
 
  RETURN
  END SUBROUTINE SEE_atom
