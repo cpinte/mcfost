@@ -219,6 +219,7 @@ release : clean main
 	- git tag -d release
 	git tag release
 	git push github
+	git push github --tags --force
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/mac
