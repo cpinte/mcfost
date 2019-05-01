@@ -539,6 +539,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      return
   endif
 
+  ios=0
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
