@@ -44,8 +44,8 @@ MODULE simple_models
    use utils, only : interp_dp
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Tmax = 7d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=1d4, Macc = 1d-9
+   double precision, parameter :: Tmax = 0d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d4, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
@@ -285,31 +285,53 @@ MODULE simple_models
   END SUBROUTINE magneto_accretion_model
   
   SUBROUTINE uniform_law_model()
-  ! ----------------------------------------------------------- !
+  ! ----------------------------------------------------------------- !
    ! Implements a simple model with density and electron density
-   ! constant on the grid
+   ! constant on the grid, assuming a spherical model of Radius Rmax/2
    ! Values width idk are from a Solar model atmosphere by 
    ! Fontenla et al. namely the FAL C model.
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
-  ! ----------------------------------------------------------- !
+  ! ----------------------------------------------------------------- !
+   INTEGER :: i, j, k, icell
+   double precision :: r, rcyl, z
+
    CALL init_atomic_atmos()
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
-   if (atmos%magnetized) then 
-    CALL init_magnetic_field()
-    atmos%Bxyz(:,:) = 1d2 * 1d-4 !T
-    atmos%B_char = maxval(atmos%Bxyz)
-   end if
    atmos%calc_ne = .false.
-   !atmos%nHtot = 1e18
-   !atmos%T = 6000d0
-   !atmos%vturb = 5d0 * 1d3 !m/s
 
-!    idk = 10
-    atmos%nHtot =  2.27414200581936d16
-    atmos%T = 45420d0
-    atmos%ne = 2.523785d16
-    atmos%vturb = 9.506225d3 !m/s
+
+    do i=1, n_rad
+     do j=j_start,nz !j_start = -nz in 3D
+      do k=1, n_az
+       if (j==0) then !midplane
+        icell = cell_map(i,1,k)
+        rcyl = r_grid(icell) !AU
+        z = 0.0_dp
+       else
+        icell = cell_map(i,j,k)
+        rcyl = r_grid(icell)
+        z = z_grid(icell)/z_scaling_env
+       end if
+       r = dsqrt(z**2 + rcyl**2)
+       
+       if (r<=Rmax/2) then
+
+         atmos%nHtot(icell) =  2.27414200581936d16
+         atmos%T(icell) = 45420d0
+         atmos%ne(icell) = 2.523785d16
+        atmos%vturb(icell) = 9.506225d3 !m/s
+        
+       end if
+      end do
+     end do
+    end do
+
+   !idk = 10
+!     atmos%nHtot =  2.27414200581936d16
+!     atmos%T = 45420d0
+!     atmos%ne = 2.523785d16
+!     atmos%vturb = 9.506225d3 !m/s
    
    !idk = 75
 !   atmos%T=7590d0
@@ -323,11 +345,10 @@ MODULE simple_models
 !     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
-!     atmos%T = 100000d0
-!     atmos%ne = 1.251891d16
-!     atmos%nHtot = 1.045714d16
-   !atmos%vturb = 1.696164d3 !idk = 75
-   !atmos%vturb = 10.680960d3 !idk=0
+!      atmos%T = 100000d0
+!      atmos%ne = 1.251891d16
+!      atmos%nHtot = 1.045714d16 
+!      atmos%vturb = 10.680960d3 !idk=0
    CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
@@ -344,34 +365,31 @@ MODULE simple_models
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Tmax = 3d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: Macc = 1d-7, Vexp = 200d3
-   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
-   double precision :: Rstar, Mstar, normV(n_Cells), Omega
-   double precision :: rcyl, z, r, phi, Mdot
+   double precision, parameter :: Mdot = 1d-5, Vexp = 200d3, beta = 5d-1, nH0 = 1d14
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 0d0
+   double precision :: Rstar, Mstar, Vr, rhor, rho_to_nH
+   double precision :: rcyl, z, r, phi, Mdot_si
    
 
 
    linfall = .true.
    lkeplerian = .false.
    lmagnetoaccr = .false.
+   lstatic = .false.
    CALL init_atomic_atmos()
-   atmos%vturb = 0d3 !m/s
+   atmos%vturb = 1d3 !m/s
+   rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
+
    
-   if (linfall.or.lkeplerian) then 
+   if (linfall) then 
    	if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
    	deallocate(atmos%Vxyz)
    end if
 
    Rstar = etoile(1)%r * AU_to_m !AU_to_Rsun * Rsun !m
    Mstar = etoile(1)%M * Msun_to_kg !kg
-   Mdot = Macc * Msun_to_kg / year_to_sec !kg/s
+   Mdot_si = Mdot * Msun_to_kg / year_to_sec !kg/s
    
-   Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
-   
-   atmos%nHtot = 1d14
-   atmos%T = Tmax
-
     do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
       do k=1, n_az
@@ -387,80 +405,48 @@ MODULE simple_models
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
        
-       if (.not.lstatic) then
+       Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
+       rhor = Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
+       atmos%nHtot(icell) = rhor * rho_to_nH
+       atmos%T(icell) = (r0*etoile(1)%r/r)**2 * 3d3
+
        !!->expansion
-        if (.not.linfall.and..not.lmagnetoaccr) then !expansion not analytic
-         atmos%Vxyz(icell,1) = Vexp * z/r * cos(phi)
-         atmos%Vxyz(icell, 2) = Vexp * z/r * sin(phi)
-         atmos%Vxyz(icell,3) = Vexp * rcyl/r
-        else if (linfall.and..not.lmagnetoaccr) then !expansion analytic
-         Vfield(icell) = Vexp
-        else if (.not.linfall.and.lmagnetoaccr) then !rotation analytic
-         atmos%Vxyz(icell,1) = 0d0
-         atmos%Vxyz(icell,2) = 0d0 
-         atmos%Vxyz(icell,3) = Omega * (r*AU_to_m)
-        else if (lkeplerian) then !rotation analytic also
-         Vfield(icell) = Omega * (r*AU_to_m)
+        if (.not.linfall) then !expansion not analytic
+         atmos%Vxyz(icell,1) = Vr * z/r * cos(phi)  
+         atmos%Vxyz(icell,2) = Vr * z/r * sin(phi)
+         atmos%Vxyz(icell,3) = Vr * rcyl/r
+        else!expansion analytic
+         Vfield(icell) = Vr
         end if
-       end if !static
+
       end do
      end do
     end do
 
-   if (.not.lstatic) then
-    if (linfall.or.lkeplerian) then
-     NormV = Vfield
+
+    if (.not.linfall) then
+    	atmos%v_char = atmos%v_char + &
+    	minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
     else
-     NormV = dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2)
+        atmos%v_char = atmos%v_char + minval(Vfield)
     end if
-    atmos%v_char = atmos%v_char + minval(NormV,mask=NormV>0)
-   end if
+
 
    CALL define_atomRT_domain()
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.) 
 
   RETURN
   END SUBROUTINE spherical_shells_model
   
-  SUBROUTINE prop_law_model()
-  ! ----------------------------------------------------------- !
-   ! Implements a simple model with density and electron density
-   ! proportional to molecular/dust density and temperature.
-  ! ----------------------------------------------------------- !
-   double precision :: Vkepmax, Vkepmin
-   integer :: icell
-   
-   CALL init_atomic_atmos()!(n_cells)
-
-   atmos%nHtot = 1d14 * densite_gaz/MAXVAL(densite_gaz) + 1d12
-   atmos%T = 3000d0+Tdust
-   atmos%ne = 0d0
-
-   lkeplerian = .true.
-   atmos%vturb = 1d0
-
-   if (.not.lstatic) then
-   !we need vfield
-    if (.not.allocated(Vfield)) allocate(Vfield(n_cells))
-    deallocate(atmos%Vxyz) !supposing lkep or linf, Vfield is used and veloc is varying across cells
-    Vkepmax = dsqrt(Ggrav * sum(etoile%M) * Msun_to_kg * Rmin**2 / &
-                 ((Rmin**2 + minval(z_grid)**2)**1.5 * AU_to_m) )
-    if (lcylindrical_rotation) then ! Midplane Keplerian velocity
-      do icell=1, n_cells
-        Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
-      end do
-    else ! dependance en z
-       do icell=1, n_cells
-         Vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
-                ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
-       end do
-    end if
-    Vkepmin = minval(Vfield, mask=Vfield>0)
-    atmos%v_char = atmos%v_char + Vkepmin
-   end if
-   CALL define_atomRT_domain()
-
+  SUBROUTINE rectangular_slab_model()
+  
+  
   RETURN
-  END SUBROUTINE prop_law_model
+  END SUBROUTINE rectangular_slab_model
   
   SUBROUTINE writeAtmos_ascii()
   ! ------------------------------------- !

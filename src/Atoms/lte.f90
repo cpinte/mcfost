@@ -359,7 +359,8 @@ MODULE lte
        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
        !Temporary
        atmos%Atoms(n)%ptr_atom%C = 0d0
-       allocate(atmos%Atoms(n)%ptr_atom%Ckij(atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+       allocate(atmos%Atoms(n)%ptr_atom%Ckij(&
+       atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
        !open collision file
        atmos%Atoms(n)%ptr_atom%Ckij = 0d0
        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)

@@ -27,7 +27,7 @@ MODULE AtomicTransfer
  use solvene
  use statequil_atoms
  use writeatom
- use simple_models, only 				: magneto_accretion_model, uniform_law_model
+ use simple_models, only 				: magneto_accretion_model, uniform_law_model, spherical_shells_model
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -699,8 +699,9 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
-   CALL uniform_law_model()
+   CALL magneto_accretion_model()  
+   !CALL uniform_law_model()
+   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -710,7 +711,7 @@ MODULE AtomicTransfer
   ! on the whole grid space.
   CALL readAtomicModels(atomunit)
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 100
+   atmos%Nrays = 50
    write(*,*) " Using", atmos%Nrays," rays for NLTE line transfer"
   end if
 
@@ -757,6 +758,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
+  latomic_line_profiles = .false.
   if (atmos%Nactiveatoms > 0) CALL NLTEloop()
   open(unit=12, file="Snu_nlte.dat",status="unknown")
   icell = 1 !select cell
@@ -767,20 +769,20 @@ MODULE AtomicTransfer
   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
   CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
   do nact=1, NLTEspec%Nwaves
-!LTE
+! LTE
 !   write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact),&
 !    NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1), &
 ! NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1)
-!NLTE
+! NLTE
   write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1), &
     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
   end do
   close(12)
-  stop
+
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
-latomic_line_profiles=.true.
+! latomic_line_profiles=.true.
   if (latomic_line_profiles) then
    !Check smarter to deallocate/reallocated NLTE wavelength arrays
    CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
@@ -898,7 +900,7 @@ latomic_line_profiles=.true.
      NmaxLevel = max(NmaxLevel, atmos%ActiveAtoms(nact)%ptr_atom%Nlevel)
      write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
       atmos%ActiveAtoms(nact)%ptr_atom%active
-     atmos%ActiveAtoms(nact)%ptr_atom%n = 0.1*atmos%ActiveAtoms(nact)%ptr_atom%nstar
+     atmos%ActiveAtoms(nact)%ptr_atom%n = atmos%ActiveAtoms(nact)%ptr_atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
   end do
   
@@ -913,18 +915,23 @@ latomic_line_profiles=.true.
    	 " for Collisional matrix."
    end if
 
-   do nact=1,atmos%Nactiveatoms
+   do nact=1,atmos%Nactiveatoms !not parallel because we read in file Nspace time atm.
      do icell=1,atmos%Nspace
+        !allocate Gamma Here
+!         allocate(atmos%atoms(nact)%ptr_Atom%Gamma(&
+!         	atmos%atoms(nact)%ptr_atom%Nlevel,atmos%atoms(nact)%ptr_Atom%Nlevel))
+!         atmos%atoms(nact)%ptr_Atom%Gamma(:,:) = 0d0
         if (atmos%lcompute_atomRT(icell)) &
 	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom) !open and allocated in LTE.f90
       !try keeping in memory until better collision routine !
-  	end do
+  	end do	
   	CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
     !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
   	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
   end do
 
   !end replacing initSol()
+ ! ------------------------------------------------------------------------------------ !
   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
   allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
   allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,n_cells)); gpop_old = 0d0
@@ -945,6 +952,7 @@ latomic_line_profiles=.true.
         stop
  
     CASE ("HOGEREIJDE")
+
   		!only etape2 or 3 for now
   		lfixed_rays = .true.
   		n_rayons = n_rayons_start !and will increase up atom%Nrays or n_rayons_max
@@ -975,15 +983,16 @@ latomic_line_profiles=.true.
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,icell, dN) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
-            !$omp shared(atmos, n_cells, pop_old, pop, ds) &
+            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
-  			    CALL initGamma(icell)
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
+
+  			        CALL initGamma(icell)
      				do iray=iray_start, iray_start-1+n_rayons
       
       					!remember only 2 etape atm.
@@ -1002,14 +1011,15 @@ latomic_line_profiles=.true.
                         ARGMT = PI * (2.0_dp * rand - 1.0_dp)
                         U0 = SRW02 * cos(ARGMT)
                         V0 = SRW02 * sin(ARGMT)      					
-      					!Formal solution for all wavelength in direction (u0,v0,w0)
-      					!IFS = Idag
+
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
+
       					!compute Gamma = wavelength and angle integration
 						!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
-						!CALL Gamma_LTE(id,icell)
       				end do !iray
+      				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
+
       				
      				n_iter_loc = 0
     				lconverged_loc = .false.
@@ -1018,10 +1028,18 @@ latomic_line_profiles=.true.
     				do nact=1,atmos%NactiveAtoms
     				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
     				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				 pop_old(nact,:,id) = pop(nact,:,id)
     				end do
     				
     				!lconverged_loc = disable_subit !to disable sub-it
-    				if (disable_subit) CALL updatePopulations(id, icell)
+    				if (disable_subit) then
+    				 CALL updatePopulations(id, icell)
+    				 lconverged_loc = .true.
+    				 do nact=1,atmos%NactiveAtoms
+    				   pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
+    				   atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+                     end do
+    				end if
     				
      				!!sub iteration on the local emissivity, keeping Idag fixed
      				do while (.not.lconverged_loc)
@@ -1043,12 +1061,12 @@ latomic_line_profiles=.true.
      					do nact=1,atmos%NactiveAtoms
      						do ilevel=1,atmos%ActiveAtoms(nact)%ptr_atom%Nlevel
      				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
-     				    			pop_old(nact,ilevel,id)+1d-300))
+     				    			pop_old(nact,ilevel,id)+1d-30))
      				    		diff = max(diff, dN)
-     				    		if (dN > 1) then 
-     							 write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-     							 	n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
-     							end if
+!      				    		if (dN > 1) then 
+!      							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+!      								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+!      							end if
      						end do
      					end do				
 
@@ -1059,27 +1077,28 @@ latomic_line_profiles=.true.
         					!recompute opacity of this cell., but I need angles and pos...
        						!NLTEspec%I not changed
       						CALL initGamma(icell)
-							do iray=iray_start, iray_start-1+n_rayons
+ 							do iray=iray_start, iray_start-1+n_rayons
 !                         		rand  = sprng(stream(id))
 !                         		rand2 = sprng(stream(id))
 !                        			rand3 = sprng(stream(id))
 !                        			CALL  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
-! 
-!                         		! Direction de propagation aleatoire
-!                         		rand = sprng(stream(id))
-!                         		W0 = 2.0_dp * rand - 1.0_dp
-!                         		W02 =  1.0_dp - W0*W0
-!                         		SRW02 = sqrt(W02)
-!                         		rand = sprng(stream(id))
-!                         		ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-!                         		U0 = SRW02 * cos(ARGMT)
-!                        		    V0 = SRW02 * sin(ARGMT)   
+								x0 = r_grid(icell); z0 = z_grid(icell); y0 = 0d0
+								
+                        		! Direction de propagation aleatoire
+                        		rand = sprng(stream(id))
+                        		W0 = 2.0_dp * rand - 1.0_dp
+                        		W02 =  1.0_dp - W0*W0
+                        		SRW02 = sqrt(W02)
+                        		rand = sprng(stream(id))
+                        		ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                        		U0 = SRW02 * cos(ARGMT)
+                       		    V0 = SRW02 * sin(ARGMT)   
       							!I unchanged
 							    CALL init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
 								!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
  						        CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
-							    !CALL Gamma_LTE(id,icell)
       						end do !iray
+      						!!CALL Gamma_LTE(id,icell)
        					end if
      				end do
      	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc

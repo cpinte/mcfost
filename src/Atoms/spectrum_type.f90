@@ -155,15 +155,16 @@ MODULE spectrum_type
    
    deallocate(NLTEspec%I, NLTEspec%Ic)
    !except polarization which are (de)allocated in adjustStokesMode
-   if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) deallocate(NLTEspec%Psi)
+   if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) then 
+    deallocate(NLTEspec%Psi, NLTEspec%Ieff)
+   	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+   	allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
+   end if 
+    
    !Could be also LTE opac if line are kept in memory ?
    allocate(NLTEspec%I(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    allocate(NLTEspec%Ic(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    NLTEspec%I = 0d0; NLTEspec%Ic = 0d0
-   if (NLTEspec%Nact > 0) then
-   	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-   	allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  	  	
-   end if
   
   RETURN
   END SUBROUTINE reallocate_rays_arrays

@@ -54,7 +54,7 @@
 !END   -->  End of input data
 !----------------------------------------------------
 !
-!Note: Unit of number density is m^-3.
+!Note: C in Unit of number density is m^-3 and atom%Ckij and atom%C in s^-1.
 !
 !Convention: C_ij = C[i][j] represents the
 !transition j --> i = Cul

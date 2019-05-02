@@ -30,22 +30,26 @@ MODULE Opacity
   ! ----------------------------------------------------------- !
    integer, intent(in) :: iray, id, icell
    double precision, intent(in) :: ds
-   double precision, dimension(NLTEspec%Nwaves) :: chi
+   double precision, dimension(NLTEspec%Nwaves) :: chi, eta_loc
   
    if (lstore_opac) then
      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1)
+     eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
+                    NLTEspec%AtomOpac%jc(icell,:)
    else
      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)
+     eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)
    end if !store_opac
    !Choose eval operatore depending on the method
-   !NLTEspec%Psi(:, iray, id) = 1d0 - (1d0 - dexp(-ds(iray,id)))/ds(iray,id)
+
    SELECT CASE (atmos%nLTE_methode)
      CASE ("MALI")
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
        NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
      CASE ("HOGEREIJDE")
-       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi
+       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-ds*chi(:))) / chi  )* eta_loc
+       !or do not use atom%eta, and Psi = Psi * eta_total
        NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
      CASE DEFAULT
        CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
