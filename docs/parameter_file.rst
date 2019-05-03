@@ -339,7 +339,7 @@ Grain properties
 
 * ``DHS_Vmax``: maximum void fraction for DHS calculation
 
-* ``optical_indices``: file containing the optical index of the material
+* ``optical_indices_file``: file containing the optical index of the material
   as a function of wavelength (files must be located in
   ``$MCFOST_UTILS/Dust/``)
 
