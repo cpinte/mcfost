@@ -18,10 +18,11 @@ MODULE PROFILES
  IMPLICIT NONE
 
  PROCEDURE(Iprofile), pointer :: Profile => null()
- PROCEDURE(Iprofile_lambda), pointer :: Profile_lambda => null()
 
  CONTAINS
 
+ !TO DO: add the Dimension N of the output profile, could be usefull
+ !if we do wavelength by wavelength opacities.
  SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell
@@ -291,23 +292,6 @@ MODULE PROFILES
   !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt) 
  RETURN
  END SUBROUTINE ZProfile
-
- !--> I should include the zeeman lines in phi, because it plays a role in opacity
- !and tau, so in the map calculations it might matter. But perhaps negligible
- SUBROUTINE Iprofile_lambda (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P)
-  integer, intent(in) 							            :: icell
-  double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-                                				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !physical length of the cell
-  character(len=20)							                :: VoigtMethod = "HUMLICEK"
-  integer 													:: i, j
-  type (AtomicLine), intent(in)								:: line
-  double precision, intent(out), dimension(1) 				:: P
-
-  P(1) = 0d0
-
- RETURN
- END SUBROUTINE IProfile_lambda
 
 
 END MODULE PROFILES

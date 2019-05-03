@@ -315,6 +315,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
 
   use metal, only                         : Background, BackgroundLines, BackgroundLines_lambda, Backgroundcontinua
   use spectrum_type, only                 : NLTEspec, initAtomOpac
+  use opacity, only						  : NLTEOpacity, NLTEOpacity_lambda
 
   integer, intent(in)                    :: id, lambda, icell
   real(kind=dp),dimension(4), intent(in) :: Stokes
@@ -369,14 +370,15 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
            call initAtomOpac(id) !set opac to zero for this cell and thread.
            if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
-              !call NLTEOPAC_lambda()
+              !call NLTEOPACity_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+              call NLTEOPACity(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
               call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
                    NLTEspec%AtomOpac%chi_p(lambda,id) + &
                    NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
               kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
            else !on the fly calculations, slow but cheap in memory
-              !call NLTEOPAC()
+              call NLTEOPACity(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
               call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
                    NLTEspec%AtomOpac%chi_p(lambda,id)) * AU_to_m

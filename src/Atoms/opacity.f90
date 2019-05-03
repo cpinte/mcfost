@@ -9,7 +9,7 @@ MODULE Opacity
  !!use voigtfunctions, only 			 : Voigt
  use broad, only 					 : Damping
  use parametres
- use profiles, only : Profile, Profile_lambda
+ use profiles, only : Profile
  !!use molecular_emission, only : v_proj
  use math, only : locate, integrate_dx
 
@@ -48,7 +48,7 @@ MODULE Opacity
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
        NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
      CASE ("HOGEREIJDE")
-       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-ds*chi(:))) / chi  )* eta_loc
+       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-ds*chi(:))))* eta_loc/(chi+1d-300)
        !or do not use atom%eta, and Psi = Psi * eta_total
        NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
      CASE DEFAULT
@@ -208,7 +208,6 @@ MODULE Opacity
   double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   double precision, dimension(NLTEspec%Nwaves) :: Vij, exp_lambda, gij, twohnu3_c2
   double precision, allocatable :: phi(:), phiZ(:,:), psiZ(:,:)
-  integer, parameter :: NvspaceMax = 100
   character(len=20) :: VoigtMethod="HUMLICEK"
   double precision :: hc_4PI
   
@@ -218,13 +217,13 @@ MODULE Opacity
   
   do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
-   aatom%eta(:,id) = 0d0
+   if (iterate) aatom%eta(:,id) = 0d0 !init Etan only if iterate, for this cell and thread
 
    
    	do kc = 1, aatom%Ncont
     	cont = aatom%continua(kc)
     	Nred = cont%Nred; Nblue = cont%Nblue
-        if (Nred == -99 .and. Nblue == -99) CYCLE
+        if (Nred == -99 .and. Nblue == -99) CALL ERROR("NLTEOPAC")
 
     	i = cont%i; j=cont%j
         gij = 0d0
@@ -278,6 +277,8 @@ MODULE Opacity
     allocate(phi(line%Nlambda))
     if (PRT_SOLUTION=="FULL_STOKES") &
     	allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
+    !phiZ and psiZ are used only if Zeeman polarisation, which means we care only if
+    !they are allocated in this case.
     CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
 
 
@@ -300,20 +301,6 @@ MODULE Opacity
 
      ! unit is m/s / (m/s * s/m) = m/s
      aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
-!!!     !write profile and exit
-!        if (j==3 .and. i==2) then
-!   		open(unit=12, file="profile.dat",status="unknown")
-!   		!          int phi(u) du = 1   				!sum(phi * wi) / sum(phi * wi) = 1d0
-!   		write(*,*) sum(phi*line_wlam(aatom%lines(kr))), sum(phi*aatom%lines(kr)%wlam(:))
-!   		write(*,*) integrate_dx(aatom%lines(kr)%Nlambda, line_wlam(aatom%lines(kr)), phi(:))
-!   		do nk=1, line%Nlambda
-!   			write(12,"(4E)") NLTEspec%lambda(Nblue+nk-1), &
-!   				aatom%lines(kr)%wlam(nk)*sum(phi*line_wlam(aatom%lines(kr))), &
-!   														aatom%lines(kr)%wlam(nk), phi(nk)
-!   		end do
-!   		close(12)
-!   		stop
-!        end if
      end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
@@ -339,5 +326,112 @@ MODULE Opacity
  RETURN
  END SUBROUTINE NLTEOpacity
 
+ SUBROUTINE NLTEOpacity_lambda(la, id, icell, x, y, z, x1, y1, z1, u, v, w, l)
+  !Even if it is NLTEOpac, it means Opacity for Active atoms.
+  !It is called at the end of the NLTEloop
+  ! no pol yet.
+  integer, intent(in) :: id, icell, la
+  double precision, intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+  integer :: nact, Nred, Nblue, kc, kr, i, j, nk, Nlambda_line
+  type(AtomicLine) :: line
+  type(AtomicContinuum) :: cont
+  type(AtomType), pointer :: aatom
+  double precision, parameter :: twohc = (2. * HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
+  double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
+  double precision, dimension(1) :: Vij, exp_lambda, gij, twohnu3_c2
+  double precision, allocatable :: phi(:), phiZ(:,:), psiZ(:,:)
+  character(len=20) :: VoigtMethod="HUMLICEK"
+  double precision :: hc_4PI
+  
+  exp_lambda(1) = dexp(-hc_k / (NLTEspec%lambda(la) * atmos%T(icell)))
+  twohnu3_c2(1) = twohc / NLTEspec%lambda(1)**(3d0)
+  hc_4PI = HPLANCK * CLIGHT / (4d0 * PI)
+  
+  do nact = 1, atmos%Nactiveatoms
+   aatom => atmos%ActiveAtoms(nact)%ptr_atom
+
+   
+   	do kc = 1, aatom%Ncont
+    	cont = aatom%continua(kc)
+    	Nred = cont%Nred; Nblue = cont%Nblue
+     !wavelength does not fall inside line domaine? OK cylcle
+     if ((NLTEspec%lambda(la) < NLTEspec%lambda(Nblue)).or.&
+        (NLTEspec%lambda(la) > NLTEspec%lambda(Nred))) then
+       CYCLE
+     end if
+
+    	i = cont%i; j=cont%j
+        gij = 0d0
+   	 	Vij(1) = cont%alpha(la)
+    	if (aatom%n(j,icell) < tiny_dp) then
+    	 write(*,*) aatom%n(j,icell)
+     	 CALL Warning("too small cont populations") !or Error()
+     	 CYCLE
+    	end if
+    	
+    	 gij(1) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(1)
+
+    
+    !store total emissivities and opacities
+       NLTEspec%AtomOpac%chi(la,id) = &
+     		NLTEspec%AtomOpac%chi(la,id) + &
+       		Vij(1) * (aatom%n(i,icell)-gij(1)*aatom%n(j,icell))
+       		
+		NLTEspec%AtomOpac%eta(la,id) = NLTEspec%AtomOpac%eta(la,id) + &
+    	gij(1) * Vij(1) * aatom%n(j,icell) * twohnu3_c2(1)
+    	
+    !Do not forget to add continuum opacities to the all continnum opacities
+    !after all populations have been converged    
+   	end do
+
+   do kr = 1, aatom%Nline
+    line = aatom%lines(kr)
+    Nred = line%Nred; Nblue = line%Nblue
+
+     if ((NLTEspec%lambda(la) < NLTEspec%lambda(Nblue)).or.&
+        (NLTEspec%lambda(la) > NLTEspec%lambda(Nred))) then
+       CYCLE
+     end if
+
+    i = line%i; j=line%j
+    
+    if ((aatom%n(j,icell) <=tiny_dp).or.(aatom%n(i,icell) <=tiny_dp)) then !no transition
+        write(*,*) aatom%n(:,icell)
+     	CALL Warning("too small line populations") !or Error()
+     	CYCLE
+    end if 
+    gij = 0d0
+    Vij = 0d0
+
+    gij(1) = line%Bji / line%Bij
+    twohnu3_c2(1) = line%Aji / line%Bji
+    if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
+    Nlambda_line = line%Nlambda
+    line%Nlambda = 1
+    allocate(phi(line%Nlambda))
+
+    !phiZ and psiZ are used only if Zeeman polarisation, which means we care only if
+    !they are allocated in this case.
+    CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
+    line%Nlambda = Nlambda_line
+
+     Vij(1) = hc_4PI * line%Bij * phi(1) !normalized in Profile()
+                                                             ! / (SQRTPI * aatom%vbroad(icell)) 
+      
+     NLTEspec%AtomOpac%chi(la,id) = &
+     		NLTEspec%AtomOpac%chi(la,id) + &
+       		Vij(1) * (aatom%n(i,icell)-gij(1)*aatom%n(j,icell))
+       		
+     NLTEspec%AtomOpac%eta(la,id)= &
+     		NLTEspec%AtomOpac%eta(la,id) + &
+       		twohnu3_c2(1) * gij(1) * Vij(1) * aatom%n(j,icell)
+      
+    deallocate(phi)
+   end do
+  
+  end do !over activeatoms
+
+ RETURN
+ END SUBROUTINE NLTEOpacity_lambda
 
 END MODULE Opacity
