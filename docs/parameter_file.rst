@@ -419,7 +419,7 @@ Star properties
   set the spatial origin of the photon packets: the star is assumed to be
   a uniformly radiating sphere), in R\ :sub:`sun`
 
-* ``M``: stellar mass (only used for molecular line calculations,
+* ``Mstar``: stellar mass (only used for molecular line calculations,
   hudrostatic equilibrium and viscous heating via accretion, in
   M\ :sub:`sun`
 
