@@ -699,8 +699,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
+   !CALL magneto_accretion_model()  
+   CALL uniform_law_model()
    !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
@@ -778,7 +778,7 @@ MODULE AtomicTransfer
     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
   end do
   close(12)
-
+stop
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !

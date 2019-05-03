@@ -199,7 +199,7 @@ MODULE statequil_atoms
   type (AtomType), pointer :: atom
   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
   double precision :: norm = 0d0
-  double precision :: c_nlte = 0d0
+  double precision :: c_nlte = 1d0
   
   Ieff(:) = 0d0
   do nact=1,atmos%Nactiveatoms !loop over each active atoms
@@ -208,7 +208,7 @@ MODULE statequil_atoms
    !To do; define a transition_type with either cont or line
    Ieff(:) = NLTEspec%Ieff(:,iray,id) + NLTEspec%Psi(:,iray,id)! * atom%eta(:,id)
    do kr=1,atom%Ncont
-    norm = 4d0*PI / HPLANCK / n_rayons! ?? 1/4PI * 4PI or *4PI alone
+    norm = 1d0 / HPLANCK / n_rayons! ?? *4*PI ?
     
     i = atom%continua(kr)%i; j = atom%continua(kr)%j
     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
@@ -224,7 +224,7 @@ MODULE statequil_atoms
    end do
 
    do kr=1,atom%Nline
-    norm =  4d0 * PI / (CLIGHT * HPLANCK) / n_rayons! ?? 1/4PI * 4PI or *4PI alone
+    norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons! ?? 1/4PI * 4PI or *4PI alone
     
     i = atom%lines(kr)%i; j = atom%lines(kr)%j
     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 

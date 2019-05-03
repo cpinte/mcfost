@@ -146,26 +146,26 @@ MODULE simple_models
           Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
           !write(*,*) icell, Rm, nH0, Q0, log10(Q0/nH0**2)
           !Interface funnels/disk
-!           if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
-!            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
-!            vp = 0d0
-!            !atmos%Vxyz is initialized to 0 everywhere
-!            if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
-!            													!using analytical velocity law
-!            													!hence if atmos%magnetoaccr = .false.
-!             !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
-!             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
-!             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
-!             atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
-!             atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
-!             !here it is better to have keplerian rotation than stellar rotation?
-!            end if
-!            !Density midplane of the disk
-!            !using power law of the dust-gas disk (defined in another zone?)
-!            atmos%nHtot(icell) = 1d23!
-!            !Temperature still given by the same law as in accretion funnels yet.
-!            !But probably different at this interface funnels/disk
-!           else !accretion funnels
+          if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
+           !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
+           vp = 0d0
+           !atmos%Vxyz is initialized to 0 everywhere
+           if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
+           													!using analytical velocity law
+           													!hence if atmos%magnetoaccr = .false.
+            !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
+            !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
+            !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
+            atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
+            atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
+            !here it is better to have keplerian rotation than stellar rotation?
+           end if
+           !Density midplane of the disk
+           !using power law of the dust-gas disk (defined in another zone?)
+           atmos%nHtot(icell) = 1d23!
+           !Temperature still given by the same law as in accretion funnels yet.
+           !But probably different at this interface funnels/disk
+          else !accretion funnels
           !Density
            atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
@@ -206,7 +206,7 @@ MODULE simple_models
                if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
               end if
             end if
-!           end if
+           end if
           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
@@ -287,7 +287,7 @@ MODULE simple_models
   SUBROUTINE uniform_law_model()
   ! ----------------------------------------------------------------- !
    ! Implements a simple model with density and electron density
-   ! constant on the grid, assuming a spherical model of Radius Rmax/2
+   ! constant on the grid.
    ! Values width idk are from a Solar model atmosphere by 
    ! Fontenla et al. namely the FAL C model.
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
@@ -300,38 +300,38 @@ MODULE simple_models
    atmos%magnetized = .false.
    atmos%calc_ne = .false.
 
-
-    do i=1, n_rad
-     do j=j_start,nz !j_start = -nz in 3D
-      do k=1, n_az
-       if (j==0) then !midplane
-        icell = cell_map(i,1,k)
-        rcyl = r_grid(icell) !AU
-        z = 0.0_dp
-       else
-        icell = cell_map(i,j,k)
-        rcyl = r_grid(icell)
-        z = z_grid(icell)/z_scaling_env
-       end if
-       r = dsqrt(z**2 + rcyl**2)
-       
-       if (r<=Rmax/2) then
-
-         atmos%nHtot(icell) =  2.27414200581936d16
-         atmos%T(icell) = 45420d0
-         atmos%ne(icell) = 2.523785d16
-        atmos%vturb(icell) = 9.506225d3 !m/s
-        
-       end if
-      end do
-     end do
-    end do
+! 
+!     do i=1, n_rad
+!      do j=j_start,nz !j_start = -nz in 3D
+!       do k=1, n_az
+!        if (j==0) then !midplane
+!         icell = cell_map(i,1,k)
+!         rcyl = r_grid(icell) !AU
+!         z = 0.0_dp
+!        else
+!         icell = cell_map(i,j,k)
+!         rcyl = r_grid(icell)
+!         z = z_grid(icell)/z_scaling_env
+!        end if
+!        r = dsqrt(z**2 + rcyl**2)
+!        
+!        if (r<=Rmax/2) then
+! 
+!          atmos%nHtot(icell) =  2.27414200581936d16
+!          atmos%T(icell) = 45420d0
+!          atmos%ne(icell) = 2.523785d16
+!         atmos%vturb(icell) = 9.506225d3 !m/s
+!         
+!        end if
+!       end do
+!      end do
+!     end do
 
    !idk = 10
-!     atmos%nHtot =  2.27414200581936d16
-!     atmos%T = 45420d0
-!     atmos%ne = 2.523785d16
-!     atmos%vturb = 9.506225d3 !m/s
+    atmos%nHtot =  2.27414200581936d16
+    atmos%T = 45420d0
+    atmos%ne = 2.523785d16
+    atmos%vturb = 9.506225d3 !m/s
    
    !idk = 75
 !   atmos%T=7590d0
