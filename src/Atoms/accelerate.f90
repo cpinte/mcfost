@@ -3,8 +3,6 @@ MODULE accelerate
   !
   ! Implements Ng structure similar to RH for convergence
   ! acceleration
-  !
-  ! Do not work because are depth dependent and not parralel
   
   use utils, only :  GaussSlv
 
@@ -27,7 +25,7 @@ MODULE accelerate
   SUBROUTINE initNg(N, Ndelay, Norder, Nperiod, solution, Ngs)
    integer, intent(in) :: N, Ndelay, Norder, Nperiod
    integer :: k
-   real(8), allocatable, dimension(:), intent(in) :: solution
+   real(8), dimension(N), intent(in) :: solution
    type (Ng), intent(inout) :: Ngs
 
    Ngs%N = N
@@ -61,7 +59,7 @@ MODULE accelerate
    real(8), dimension(Ngs%N), intent(inout) :: solution
    !logical :: improve_sol = .true.
 
-   i = MOD(Ngs%count, (Ngs%Norder+2))
+   i = MOD(Ngs%count, (Ngs%Norder+2))+1
    do k=1,Ngs%N
     Ngs%previous(i,k) = solution(k)
    end do
@@ -74,8 +72,8 @@ MODULE accelerate
       allocate(weight(Ngs%N))
 
       do i=1,Ngs%Norder
-       ip = MOD(Ngs%count -1 -i, Ngs%Norder+2)
-       ipp = MOD(Ngs%count - 2 -i, Ngs%Norder+2)
+       ip = MOD(Ngs%count -1 -i, Ngs%Norder+2) + 1
+       ipp = MOD(Ngs%count - 2 -i, Ngs%Norder+2) + 1
        do k=1,Ngs%N
          Delta(i,k) = Ngs%previous(ip,k) - Ngs%previous(ipp,k)
        end do
@@ -105,13 +103,13 @@ MODULE accelerate
         end do
        end do
      end do
-   
-     !bourrin
+     !Ngs%A = transpose(Ngs%A)
+     !bourrin !Probably a transpose here
      CALL  GaussSlv(Ngs%A, Ngs%b, Ngs%Norder)
 
-     i0 = MOD(Ngs%count -1, Ngs%Norder+2)
+     i0 = MOD(Ngs%count -1, Ngs%Norder+2) + 1
      do i=1,Ngs%Norder
-      ip = MOD(Ngs%count-2-i, Ngs%Norder+2)
+      ip = MOD(Ngs%count-2-i, Ngs%Norder+2) + 1
       do k=1,Ngs%N
        solution(k) = solution(k) + Ngs%b(i) * &
              (Ngs%previous(ip,k) - Ngs%previous(i0,k))
@@ -143,16 +141,17 @@ MODULE accelerate
   END SUBROUTINE freeNg
 
   SUBROUTINE MaxChange(Ngs, text, verbose, dM)
+    ! Compare with some few previous iterations
     type(Ng), intent(in) :: Ngs
     logical, intent(in) :: verbose
     character(len=*), intent(in) :: text
-    real, intent(out) :: dM
+    real(8), intent(out) :: dM
     integer :: k
-    real(8), allocatable, dimension(:) :: old, new
+    real(8), dimension(Ngs%N) :: old, new
     dM = 0.
 
-    allocate(old(MOD(Ngs%count-2,Ngs%Norder+2)))
-    allocate(new(MOD(Ngs%count-1,Ngs%Norder+2)))
+    old(:) = Ngs%previous(MOD(Ngs%count-2+1,Ngs%Norder+2+1),:)
+    new(:) = Ngs%previous(MOD(Ngs%count-1+1,Ngs%Norder+2+1),:)
 
     do k=1,Ngs%N
      if (new(k).gt.0.) then
