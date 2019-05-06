@@ -1,6 +1,7 @@
 MODULE atom_type
 
   use math, only : w6js
+  use accelerate, only : Ng
 
   IMPLICIT NONE
 
@@ -104,6 +105,7 @@ MODULE atom_type
    !where I have to distinguish between atom own opac and overlapping transitions
    double precision, allocatable, dimension(:,:) :: eta
    double precision, allocatable, dimension(:,:,:) :: chi_up, chi_down, Uji_down
+   type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE Element
