@@ -94,9 +94,11 @@ MODULE metal
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
     if (metal%nstar(j,icell) <= tiny_dp) then
-       write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-       write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
-       write(*,*) "skipping this level"
+       if (metal%nstar(j,icell) < 0) then
+        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
+        write(*,*) "skipping this level"
+       end if
        CYCLE
     end if
 
@@ -180,7 +182,8 @@ MODULE metal
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
-  double precision, dimension(:), allocatable   			:: Vij
+  !double precision, dimension(:), allocatable   			:: Vij
+  double precision, dimension(NLTEspec%Nwaves)				:: Vij
   double precision 											:: twohnu3_c2, hc, fourPI, &
       														   hc_4PI, gij
   integer													:: Nred, Nblue
@@ -203,19 +206,21 @@ MODULE metal
      Nred = line%Nred; Nblue = line%Nblue
      !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid lines not defined on the grid
 
-     allocate(Vij(line%Nlambda)); Vij = 0d0
-
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a transition
      ! between the levels i and j, but not for the others.
      if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
-       write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-       write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
-       write(*,*) "skipping this level"
+       !but show the message only if pops is negative
+      if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
+        write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
+        write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+        write(*,*) "skipping this level"
+      end if
       CYCLE
      end if
 
+     !allocate(Vij(line%Nlambda)); Vij = 0d0
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
 
@@ -226,16 +231,16 @@ MODULE metal
      CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
 
      !Sum up all contributions for this line with the other
-     Vij(:) = &
+     Vij(Nblue:Nred) = &
       hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * atom%vbroad(icell))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-       		Vij(:) * (atom%n(i,icell)-gij*atom%n(j,icell))
+       		Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
 
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-       		twohnu3_c2 * gij * Vij(:) * atom%n(j,icell)
+       		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
 
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        do nk = 1, 3
@@ -250,7 +255,9 @@ MODULE metal
           twohnu3_c2 * gij * hc_4PI * line%Bij * atom%n(j,icell) * phiZ(nk,:)
        end do 
      end if
-     deallocate(Vij,phi)
+     
+     !deallocate(Vij,phi)
+     deallocate(phi)
      if (PRT_SOLUTION == "FULL_STOKES") deallocate(psiZ, phiZ)
     end do !end loop on lines for this atom
   end do !end loop over Natom
