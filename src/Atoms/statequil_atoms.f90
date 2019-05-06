@@ -9,10 +9,12 @@ MODULE statequil_atoms
  use math, only : locate
  use utils, only : GaussSlv
  use grid, only : cross_cell
+ use accelerate
 
  IMPLICIT NONE
 
  CONTAINS
+
  
  SUBROUTINE init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
   ! ------------------------------------------------------------------------- !
@@ -76,6 +78,7 @@ MODULE statequil_atoms
   do nact = 1, atmos%Nactiveatoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
    Nlevel = atom%Nlevel
+   if (allocated(atom%Ngs%previous)) atom%Ngs%previous(1,:) = atom%n(:,icell)
    if (.not.allocated(atom%Gamma)) allocate(atom%Gamma(Nlevel, Nlevel))
 !   open(unit=12, file="Cji_Cij_H4x4.dat",status="unknown")
 
@@ -115,9 +118,6 @@ MODULE statequil_atoms
    atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
    atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
    atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
-   
-   !init eta at the same time
-   atmos%ActiveAtoms(nact)%ptr_atom%eta(:,id) = 0d0
   end do
  
  RETURN
@@ -208,7 +208,8 @@ MODULE statequil_atoms
    !To do; define a transition_type with either cont or line
    Ieff(:) = NLTEspec%Ieff(:,iray,id) + NLTEspec%Psi(:,iray,id)! * atom%eta(:,id)
    do kr=1,atom%Ncont
-    norm = 1d0 / HPLANCK / n_rayons! ?? *4*PI ?
+    !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
+    norm = 4*PI / HPLANCK / n_rayons
     
     i = atom%continua(kr)%i; j = atom%continua(kr)%j
     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
@@ -224,7 +225,9 @@ MODULE statequil_atoms
    end do
 
    do kr=1,atom%Nline
-    norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons! ?? 1/4PI * 4PI or *4PI alone
+    !the 4PI is here to compensate the 1/4PI appearing in Vij.
+    !because int(dOmega/4PI) is replaced by 1/N Sum_rays here.
+    norm =  4d0 *PI / (CLIGHT * HPLANCK) / n_rayons
     
     i = atom%lines(kr)%i; j = atom%lines(kr)%j
     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
@@ -242,13 +245,16 @@ MODULE statequil_atoms
    	do l = 1, atom%Nlevel
     	atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
    	end do
-!    	write(*,*) icell, id, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
-!      do i=1,atom%Nlevel
-!      do j=1,atom%Nlevel
-!      write(*,*) i, j, atom%Gamma(i,j), atom%Gamma(i,i),  atom%Gamma(j,i), atom%Gamma(j,j)
-!      end do
-!     end do
-! !     stop
+   end if
+   	
+   	if (maxval(atom%Gamma) < 0d0) then  
+   	write(*,*) icell, id, iray, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
+     do i=1,atom%Nlevel
+     do j=1,atom%Nlevel
+     write(*,*) i, j, atom%Gamma(i,j), atom%Gamma(i,i),  atom%Gamma(j,i), atom%Gamma(j,j)
+     end do
+    end do
+  stop
    end if
    
    NULLIFY(atom)
@@ -256,6 +262,88 @@ MODULE statequil_atoms
 
  RETURN
  END SUBROUTINE fillGamma_Hogereijde
+ 
+ SUBROUTINE fillGamma_Hogereijdebis(id, icell, iray, n_rayons)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
+   ! of transition from level l' to l.
+   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   ! This is the case of Hogereijde, similar to molecular lines in MCFOST.
+   ! The intensity I in the rate matrix elements: 
+   !  Cl'l + Rl'l - delta(l,l') Sum_l" (Cllp" + Rll"); appearing in Rll' and
+   !  Rll" is directly replaced by Iexp(-dtau) + (1-exp(-dtau))*Snu; 
+   ! with Iexp(-dtau) = Ieff and eta*(1-exp(-dtau))/chi = Psi by definition.
+   ! I = Ieff + Psi * eta
+   !
+   ! The Sum_l" represents a sommation over each column for the lth row.
+   !
+  ! ------------------------------------------------------------------------- !
+
+  integer, intent(in) :: id, icell, iray, n_rayons
+  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, l
+  type (AtomType), pointer :: atom
+  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
+  double precision :: norm = 0d0
+  double precision :: c_nlte = 1d0, somme = 0d0, somme_c
+  
+  if (iray==1) then
+   somme = 0d0
+   somme_c = 0d0
+  end if
+  
+  Ieff(:) = 0d0
+  do nact=1,atmos%Nactiveatoms !loop over each active atoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+   !loop over transitions, b-f and b-b for these atoms
+   !To do; define a transition_type with either cont or line
+   Ieff(:) = NLTEspec%Ieff(:,iray,id) + NLTEspec%Psi(:,iray,id) !special case of Ieff and Psi for Hogereijde
+   do kr=1,atom%Ncont
+    !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
+    norm = 4*PI / HPLANCK / n_rayons
+    
+    i = atom%continua(kr)%i; j = atom%continua(kr)%j
+    Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
+    twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
+
+   end do
+
+   do kr=1,atom%Nline
+    ! the PI factor is here to transform dOmega/4PI in 1/N Sum_rays. 1/4PI appears in, Vij, Vji
+    norm =  4d0 * PI / (CLIGHT * HPLANCK) / n_rayons
+    
+    i = atom%lines(kr)%i; j = atom%lines(kr)%j
+    Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
+    twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
+    	
+   end do
+   
+   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
+   	do l = 1, atom%Nlevel
+    	atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
+   	end do
+   end if
+   
+   NULLIFY(atom)
+  end do !loop over atoms  
+
+ RETURN
+ END SUBROUTINE fillGamma_Hogereijdebis
  
  SUBROUTINE FillGamma_ZeroRadiation(id, icell)
   ! ------------------------------------------------------------------------- !
@@ -405,7 +493,7 @@ MODULE statequil_atoms
    end do
 
    do kr=1,atom%Nline
-    norm =  4d0 * PI / (CLIGHT * HPLANCK) / n_rayons !
+    norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons !
     
     i = atom%lines(kr)%i; j = atom%lines(kr)%j
     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
@@ -517,12 +605,17 @@ MODULE statequil_atoms
   integer, intent(in) :: id, icell
   type(AtomType), pointer :: atom
   integer :: nat
+  logical :: accelerate = .false.
+  double precision :: dM
   
   do nat=1,atmos%NactiveAtoms
    atom => atmos%ActiveAtoms(nat)%ptr_atom
    CALL SEE_atom(id, icell, atom)
    !Ng's acceleration
-   !print Ng acceleration pops.
+   if (allocated(atom%Ngs%previous)) then
+    CALL NgAcceleration(atom%Ngs, atom%n(:,icell), accelerate)
+    !CALL MaxChange(atom%Ngs, " -> Accelerate ", accelerate, dM)
+   end if
    NULLIFY(atom)
   end do
  

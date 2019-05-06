@@ -235,7 +235,7 @@ MODULE simple_models
     !The disk could be included as new zone or by extending the density to r>rmo
     !but it has keplerian rotation and not infall but mcfost cannot treat two
     !kind of velocities right?
-    
+
     if (Tmax > 0d0) atmos%T(:) = Tmax * atmos%T/maxval(atmos%T)
     !atmos%T(:) = minval(atmos%nHtot)/atmos%nHtot * Tmax
 

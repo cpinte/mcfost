@@ -135,6 +135,7 @@ MODULE spectrum_type
    !and recompute photoionisation cross-section
    write(*,*) " -> Using ", size(NLTEspec%lambda)," wavelengths for image and spectrum."
 
+   !Works for Active and Passive atoms alike.
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
    deallocate(old_grid)
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
@@ -188,7 +189,9 @@ MODULE spectrum_type
 
    allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
    allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
-   !! allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC))
+   !Just to try
+   CALL Warning("(allocSpectrum()) J20 allocated")
+   allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
    NLTEspec%J = 0.0
    NLTEspec%Jc = 0.0
       
@@ -273,6 +276,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
    deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
+   if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
    if (NLTEspec%atmos%Magnetized) then 
     !check allocation due to field_free sol
     if (allocated(NLTEspec%StokesQ)) & !same for all dangerous
@@ -329,8 +333,12 @@ MODULE spectrum_type
     end if !else thay are not allocated
     NLTEspec%AtomOpac%chi_p(:,id) = 0d0
     NLTEspec%AtomOpac%eta_p(:,id) = 0d0
-    NLTEspec%J(:,id) = 0d0
-    NLTEspec%Jc(:,id) = 0d0
+    
+    !Not here, otherwise it cannot be accumulated for each rays, as they are set
+    !to zero with opacities which are computed ray by ray.
+!     NLTEspec%J(:,id) = 0d0
+!     NLTEspec%Jc(:,id) = 0d0
+!     if (allocated(NLTEspec%J20)) NLTEspec%J20(:,id) = 0d0
     
     !Currently LTE or NLTE Zeeman opac are not stored on memory. They change with 
     !direction. BUT the star is assumed to not emit polarised photons (from ZeemanEffect)

@@ -217,12 +217,15 @@ MODULE Opacity
   
   do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
-   if (iterate) aatom%eta(:,id) = 0d0 !init Etan only if iterate, for this cell and thread
+   if (iterate) aatom%eta(:,id) = 0d0 !init Eta only if iterate, for this cell and thread
 
    
    	do kc = 1, aatom%Ncont
     	cont = aatom%continua(kc)
     	Nred = cont%Nred; Nblue = cont%Nblue
+    	!Should never happen. Because for NLTEOpac all transitions are present.
+    	!However, in the case of images, some transitions are removed. But anyway
+    	!
         if (Nred == -99 .and. Nblue == -99) CALL ERROR("NLTEOPAC")
 
     	i = cont%i; j=cont%j

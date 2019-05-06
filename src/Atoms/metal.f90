@@ -18,7 +18,7 @@ MODULE metal
  use spectrum_type, only			 : NLTEspec, initAtomOpac
  use hydrogen_opacities
  use voigtfunctions, only 			 : Voigt
- use Profiles, only					 : Profile, Profile_lambda
+ use Profiles, only					 : Profile!, Profile_lambda
  use broad, only 					 : Damping
  use thomson_scattering
  use Rayleigh_scattering
