@@ -73,7 +73,7 @@ MODULE AtomicTransfer
   double precision, intent(in) :: x,y,z
   logical, intent(in) :: labs !used in NLTE but why?
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, etau
+  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, etau, Istar
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau !used only in molecular line to have emission for one
@@ -100,6 +100,8 @@ MODULE AtomicTransfer
   ! -------------------------------------------------------------- !
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+  !Computes the stellar radiation for this direction
+  if (lintersect_stars) CALL add_stellar_radiation(NLTEspec%Nwaves,i_star, x, y, z, u,v,w,Istar)
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -186,6 +188,9 @@ MODULE AtomicTransfer
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / &
             (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
+    if (minval(Snu) < 0) then
+     call error("Snu negative")
+    end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
     !intgreation of the RTE from the observer to the source result in having the
@@ -208,14 +213,17 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
      
-    ! if (lintersect_stars) &
-!       CALL add_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w, \
-!     								 tau, tau_c, NLTEspec%I(:,iray,id), NLTEspec%Ic(:,iray,id))
+    if (lintersect_stars) then
+      NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
+      NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
+    end if
 
-    if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
+!     if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
 
     end if  ! lcellule_non_vide
   end do infinie
+  !only if nb_cell==1 and labs ie for labs and icell=icell_in; to check
+  if (eval_operator) CALL calc_psi_operator(id, icell_in, iray, ds(iray,id))
   ! -------------------------------------------------------------- !
   ! -------------------------------------------------------------- !
   RETURN
@@ -462,6 +470,8 @@ MODULE AtomicTransfer
 
   !Prise en compte de la surface du pixel (en sr)
 
+  !Because unit(Bnu)=unit(I) = W/m2/Hz/sr = unit(Blambda*lambda**2/c)
+  !if we want I in W/m2 --> I*nu
   nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !to get W/m2 instead of W/m2/Hz !in Hz
   ! Flux out of a pixel in W/m2/Hz
   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
@@ -637,18 +647,19 @@ MODULE AtomicTransfer
      !$omp end parallel
   end if
 
-  write(*,*) " -> Adding stellar flux"
-  !! This is slow in my implementation actually
-  do lambda = 1, NLTEspec%Nwaves
-   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-                                             !else it means that in FLUX_PIXEL_LINE, nu
-                                             !is 1d0 (to have flux in W/m2/Hz)
-   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-   NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
-                                         stars_map(:,:,1) / nu
-   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-                                         stars_map_cont(:,:,1) / nu
-  end do
+!   write(*,*) " -> Adding stellar flux" !Stellar flux by MCFOST is in W/m2 = Blambda*lambda
+!										 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
+!   !! This is slow in my implementation actually
+!   do lambda = 1, NLTEspec%Nwaves
+!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+!                                              !else it means that in FLUX_PIXEL_LINE, nu
+!                                              !is 1d0 (to have flux in W/m2/Hz)
+!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+!    NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
+!                                          stars_map(:,:,1) / nu
+!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+!                                          stars_map_cont(:,:,1) / nu
+!   end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -704,9 +715,9 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
+   CALL magneto_accretion_model()  
    !CALL uniform_law_model()
-   CALL spherical_shells_model
+   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -1329,35 +1340,33 @@ MODULE AtomicTransfer
  RETURN
  END SUBROUTINE reallocate_mcfost_wavelength_arrays
  
- SUBROUTINE add_stellar_radiation(N,i_star,x,y,z,u,v,w,tau,tauc,Inumu,Inumu_c)
- ! --------------------------------------------------------------!
-  ! Compute the stellar radiation field and add it to 
-  ! the total radiation Inumu.
-  ! Inumu is an array of size N, e.g., 
-  !  NLTEspecI(:,iray,id).
+ SUBROUTINE add_stellar_radiation(N,i_star,x,y,z,u,v,w,Istar)
+ ! ---------------------------------------------------------------!
+  ! Compute the stellar radiation field and in Istar:
+  ! Radiation emerging from the star (at the surface), corrected
+  ! by limb darkening.
   !
   ! tab_lambda has to be defined and repartition_energie_etoiles()
- ! ------------------------------------------------------------- !
+ ! -------------------------------------------------------------- !
   use input, only : limb_darkening, mu_limb_darkening
   integer, intent(in) :: N, i_star
-  real(kind=dp), dimension(N), intent(inout) :: Inumu, Inumu_c
-  real(kind=dp), dimension(N), intent(in) :: tau, tauc
+  real(kind=dp), dimension(N) :: Istar
   real(kind=dp), intent(in) :: u, v, w, x, y, z
-  real(kind=dp) :: energie_lambda(N), F_star(N), nu(N), gamma !contrast
-  real(kind=dp) :: mu, smu2, LimbDarkening
-  integer :: la, ns
+  real(kind=dp) :: energie(N), gamma !contrast
+  real(kind=dp) :: mu, smu2, LimbDarkening, surface
+  integer :: ns
   
-   nu(:) = c_light / tab_lambda(:) * 1d6
-   mu = abs(x*u + y*v + z*w)/etoile(i_star)%r !to check that
-
+   mu = abs(x*u + y*v + z*w)
+   surface = (etoile(i_star)%r * AU_to_Rsun)**2
    
-   !1) Get the energy radiated by the star
-   do la=1,N
-    energie_lambda(la) = E_stars(la) * tab_lambda(la) * 1.0e-6 &
-       / (distance*pc_to_AU*AU_to_Rsun)**2 * 1.35e-12
-    F_star(la) = energie_lambda(la) * prob_E_star(la,i_star) / nu(la)
-   end do
-       
+   !1) Get the energy radiated by the star at the stellar surface
+   !I need unit of I which is the unit of Bnu = W/m2/Hz/sr
+   !Here, E_stars in W/m2. But I is in W/m2/Hz/sr unit of Bnu.
+   !E_stars propto Blambda*lambda; remembering, Bnu = Blambda*c/nu**2 = Blambda*lambda**2/c
+   ! we get E_stars (in W/m2/Hz) = E_stars / lambda * lambda**2 / c
+   energie(:) = Prob_E_Star(:,i_star) * E_stars(:) * tab_lambda(:) * 1.0e-6 / surface &
+             * 1.35e-12 * (tab_lambda(:) * 1d-6) / C_LIGHT
+   
    !2) Correct with the contrast gamma of a hotter/cooler region if any
    do ns=1, etoile(i_star)%Nspot
     !ray falls in spot ?
@@ -1367,12 +1376,7 @@ MODULE AtomicTransfer
 
    !3) Apply Limb darkening   
    if (llimb_darkening) then
-     !smu2 = (x-etoile(i_star)%x)**2 + (y-etoile(i_star)%y)**2 + (z-etoile(i_star)%z)**2
-     !smu2 = u*(x-etoile(i_star)%x) + v*(y-etoile(i_star)%y) + w*(z-etoile(i_star)%z)
-     !mu = smu2
-     !write(*,*) x, y, z, etoile(i_star)%r, smu2, 1d0 - smu2/etoile(i_star)%r**2
-     !mu = dsqrt(1d0 - smu2/etoile(i_star)%r**2)
-     write(*,*) " limb cos(theta) =", mu
+     if (mu>1) write(*,*) " limb cos(theta) =", mu
      CALL Warning("Check mu calc before using LD here, in add_Stellar_intensity")
      !LimbDarkening = Interp1D(real(limb_darkening,kind=dp), real(mu_limb_darkening,kind=dp), mu)
      !LimbDarkening = interp(limb_darkening, mu_limb_darkening, mu)
@@ -1381,14 +1385,7 @@ MODULE AtomicTransfer
    else
      LimbDarkening = 1d0
    end if
-    
-   !4) Correct from Attenuation
-   !There is a mu appearing in compute_stars_map() which represents integ(dmu * mu * I) = F
-   !I guess... but here, we do not include it as we return the radiation of the star
-   ! in a specific direction. The flux calculation, per pixels is done as usual with
-   ! the total radiation. However, we can correct the stellar emission from LimbD ?
-   Inumu(:) = Inumu(:) + F_star(:) * LimbDarkening * dexp(-tau)
-   Inumu_c(:) = Inumu_c(:) + F_star(:) * LimbDarkening * dexp(-tauc)
+   Istar(:) = energie(:) * LimbDarkening
  
  RETURN
  END SUBROUTINE add_stellar_radiation
