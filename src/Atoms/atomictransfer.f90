@@ -118,11 +118,7 @@ MODULE AtomicTransfer
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
     
     if (lintersect_stars) then
-      if (icell == icell_star) then
-       CALL add_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w, \
-    								 tau, tau_c, NLTEspec%I(:,iray,id), NLTEspec%Ic(:,iray,id))
-       RETURN ! add stellar intensity and exit ?
-      end if
+      if (icell == icell_star) RETURN
     endif
 
     nbr_cell = nbr_cell + 1
@@ -211,6 +207,10 @@ MODULE AtomicTransfer
      ! dtau = chi * ds
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
+     
+    ! if (lintersect_stars) &
+!       CALL add_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w, \
+!     								 tau, tau_c, NLTEspec%I(:,iray,id), NLTEspec%Ic(:,iray,id))
 
     if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
 
@@ -637,18 +637,18 @@ MODULE AtomicTransfer
      !$omp end parallel
   end if
 
-!   write(*,*) " -> Adding stellar flux"
-!   !! This is slow in my implementation actually
-!   do lambda = 1, NLTEspec%Nwaves
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-!                                              !else it means that in FLUX_PIXEL_LINE, nu
-!                                              !is 1d0 (to have flux in W/m2/Hz)
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!    NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
-!                                          stars_map(:,:,1) / nu
-!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-!                                          stars_map_cont(:,:,1) / nu
-!   end do
+  write(*,*) " -> Adding stellar flux"
+  !! This is slow in my implementation actually
+  do lambda = 1, NLTEspec%Nwaves
+   nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
+                                             !else it means that in FLUX_PIXEL_LINE, nu
+                                             !is 1d0 (to have flux in W/m2/Hz)
+   CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+   NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
+                                         stars_map(:,:,1) / nu
+   NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
+                                         stars_map_cont(:,:,1) / nu
+  end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -996,7 +996,7 @@ MODULE AtomicTransfer
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
             !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell) &
             !$omp private(xyz0, uvw0) &
-            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
             !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
             !$omp do schedule(static,1)
@@ -1347,9 +1347,9 @@ MODULE AtomicTransfer
   real(kind=dp) :: mu, smu2, LimbDarkening
   integer :: la, ns
   
-   LimbDarkening = 1d0
-   mu = 1d0
    nu(:) = c_light / tab_lambda(:) * 1d6
+   mu = abs(x*u + y*v + z*w)/etoile(i_star)%r !to check that
+
    
    !1) Get the energy radiated by the star
    do la=1,N
@@ -1367,7 +1367,6 @@ MODULE AtomicTransfer
 
    !3) Apply Limb darkening   
    if (llimb_darkening) then
-     mu = abs(x*u + y*v + z*w)/etoile(i_star)%r !to check that
      !smu2 = (x-etoile(i_star)%x)**2 + (y-etoile(i_star)%y)**2 + (z-etoile(i_star)%z)**2
      !smu2 = u*(x-etoile(i_star)%x) + v*(y-etoile(i_star)%y) + w*(z-etoile(i_star)%z)
      !mu = smu2
@@ -1379,11 +1378,17 @@ MODULE AtomicTransfer
      !LimbDarkening = interp(limb_darkening, mu_limb_darkening, mu)
      !pol not included yet
      stop
+   else
+     LimbDarkening = 1d0
    end if
     
    !4) Correct from Attenuation
-   Inumu(:) = Inumu(:) + F_star(:) * mu * LimbDarkening * dexp(-tau)
-   Inumu_c(:) = Inumu_c(:) + F_star(:) * mu * LimbDarkening * dexp(-tauc)
+   !There is a mu appearing in compute_stars_map() which represents integ(dmu * mu * I) = F
+   !I guess... but here, we do not include it as we return the radiation of the star
+   ! in a specific direction. The flux calculation, per pixels is done as usual with
+   ! the total radiation. However, we can correct the stellar emission from LimbD ?
+   Inumu(:) = Inumu(:) + F_star(:) * LimbDarkening * dexp(-tau)
+   Inumu_c(:) = Inumu_c(:) + F_star(:) * LimbDarkening * dexp(-tauc)
  
  RETURN
  END SUBROUTINE add_stellar_radiation

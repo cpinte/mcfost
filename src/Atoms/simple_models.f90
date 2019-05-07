@@ -292,40 +292,10 @@ MODULE simple_models
    ! Fontenla et al. namely the FAL C model.
    ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
   ! ----------------------------------------------------------------- !
-   INTEGER :: i, j, k, icell
-   double precision :: r, rcyl, z
-
    CALL init_atomic_atmos()
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
    atmos%calc_ne = .false.
-
-! 
-!     do i=1, n_rad
-!      do j=j_start,nz !j_start = -nz in 3D
-!       do k=1, n_az
-!        if (j==0) then !midplane
-!         icell = cell_map(i,1,k)
-!         rcyl = r_grid(icell) !AU
-!         z = 0.0_dp
-!        else
-!         icell = cell_map(i,j,k)
-!         rcyl = r_grid(icell)
-!         z = z_grid(icell)/z_scaling_env
-!        end if
-!        r = dsqrt(z**2 + rcyl**2)
-!        
-!        if (r<=Rmax/2) then
-! 
-!          atmos%nHtot(icell) =  2.27414200581936d16
-!          atmos%T(icell) = 45420d0
-!          atmos%ne(icell) = 2.523785d16
-!         atmos%vturb(icell) = 9.506225d3 !m/s
-!         
-!        end if
-!       end do
-!      end do
-!     end do
 
    !idk = 10
     atmos%nHtot =  2.27414200581936d16
@@ -365,8 +335,8 @@ MODULE simple_models
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Mdot = 1d-5, Vexp = 200d3, beta = 5d-1, nH0 = 1d14
-   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 0d0
+   double precision, parameter :: Mdot = 1d-5, Vexp = 100d3, beta = 5d-1, nH0 = 1d12
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 0d0, Rlimit=0.8
    double precision :: Rstar, Mstar, Vr, rhor, rho_to_nH
    double precision :: rcyl, z, r, phi, Mdot_si
    
@@ -390,7 +360,7 @@ MODULE simple_models
    Mstar = etoile(1)%M * Msun_to_kg !kg
    Mdot_si = Mdot * Msun_to_kg / year_to_sec !kg/s
    
-    do i=1, n_rad
+   all_loop : do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
       do k=1, n_az
        if (j==0) then !midplane
@@ -405,10 +375,16 @@ MODULE simple_models
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
        
-       Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
-       rhor = Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
-       atmos%nHtot(icell) = rhor * rho_to_nH
-       atmos%T(icell) = (r0*etoile(1)%r/r)**2 * 3d3
+       if (r>Rlimit*Rmax) exit all_loop
+       
+       !Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
+       !rhor = Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
+       !atmos%nHtot(icell) = rhor * rho_to_nH
+
+       atmos%T(icell) = (r0*etoile(1)%r/r)**2 * etoile(1)%T
+       !atmos%T(icell) = etoile(1)%T !cte
+       atmos%nHtot = nH0 * (r0*etoile(1)%r / r)**(2d0-beta)
+       Vr = Vexp * (r0*etoile(1)%r / r)**beta
 
        !!->expansion
         if (.not.linfall) then !expansion not analytic
@@ -421,7 +397,7 @@ MODULE simple_models
 
       end do
      end do
-    end do
+    end do all_loop
 
 
     if (.not.linfall) then
