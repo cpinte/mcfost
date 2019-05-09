@@ -95,13 +95,14 @@ MODULE AtomicTransfer
   ! Therefore it is needed to reset it.
   NLTEspec%I(:,iray,id) = 0d0
   NLTEspec%Ic(:,iray,id) = 0d0
+  Istar(:) = 0d0
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
   ! -------------------------------------------------------------- !
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
   !Computes the stellar radiation for this direction
-  if (lintersect_stars) CALL add_stellar_radiation(NLTEspec%Nwaves,i_star, x, y, z, u,v,w,Istar)
+  if (lintersect_stars) CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x, y, z, u,v,w,Istar)
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -120,7 +121,11 @@ MODULE AtomicTransfer
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
     
     if (lintersect_stars) then
-      if (icell == icell_star) RETURN
+      if (icell == icell_star) then !this is equivalent to compute_stars_map()
+       NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
+       NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
+       RETURN
+      end if
     endif
 
     nbr_cell = nbr_cell + 1
@@ -212,18 +217,12 @@ MODULE AtomicTransfer
      ! dtau = chi * ds
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
-     
-    if (lintersect_stars) then
-      NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
-      NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
-    end if
 
-!     if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
+     !if outside loop, we will never compute it if icell=icell_star and lintersect
+     if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
 
     end if  ! lcellule_non_vide
   end do infinie
-  !only if nb_cell==1 and labs ie for labs and icell=icell_in; to check
-  if (eval_operator) CALL calc_psi_operator(id, icell_in, iray, ds(iray,id))
   ! -------------------------------------------------------------- !
   ! -------------------------------------------------------------- !
   RETURN
@@ -525,7 +524,6 @@ MODULE AtomicTransfer
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
-  write(*,*) "u=", u*rad_to_deg, "v=",v*rad_to_deg, "w=",w*rad_to_deg
 
   ! Definition des vecteurs de base du plan image dans le repere universel
   ! Vecteur x image sans PA : il est dans le plan (x,y) et orthogonal a uvw
@@ -648,7 +646,7 @@ MODULE AtomicTransfer
   end if
 
 !   write(*,*) " -> Adding stellar flux" !Stellar flux by MCFOST is in W/m2 = Blambda*lambda
-!										 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
+! 									 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
 !   !! This is slow in my implementation actually
 !   do lambda = 1, NLTEspec%Nwaves
 !    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
@@ -780,6 +778,10 @@ MODULE AtomicTransfer
   icell = 1 !select cell
   do while (.not.atmos%lcompute_atomRT(icell))
    icell = icell + 1
+   if (icell==atmos%Nspace) then
+    icell = 1
+    exit
+   end if
   end do
   CALL initAtomOpac(1)
   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
@@ -1340,7 +1342,7 @@ MODULE AtomicTransfer
  RETURN
  END SUBROUTINE reallocate_mcfost_wavelength_arrays
  
- SUBROUTINE add_stellar_radiation(N,i_star,x,y,z,u,v,w,Istar)
+ SUBROUTINE calc_stellar_radiation(N,i_star,x,y,z,u,v,w,Istar)
  ! ---------------------------------------------------------------!
   ! Compute the stellar radiation field and in Istar:
   ! Radiation emerging from the star (at the surface), corrected
@@ -1348,16 +1350,19 @@ MODULE AtomicTransfer
   !
   ! tab_lambda has to be defined and repartition_energie_etoiles()
  ! -------------------------------------------------------------- !
+  use ttauri_module, only : intersect_spots
   use input, only : limb_darkening, mu_limb_darkening
   integer, intent(in) :: N, i_star
   real(kind=dp), dimension(N) :: Istar
   real(kind=dp), intent(in) :: u, v, w, x, y, z
   real(kind=dp) :: energie(N), gamma !contrast
-  real(kind=dp) :: mu, smu2, LimbDarkening, surface
+  real(kind=dp) :: mu, smu2, LimbDarkening, surface, t1, p1
   integer :: ns
+  logical :: lintersect_spot
   
-   mu = abs(x*u + y*v + z*w)
+   mu = abs(x*u + y*v + z*w)/etoile(1)%r
    surface = (etoile(i_star)%r * AU_to_Rsun)**2
+   gamma = 1d0
    
    !1) Get the energy radiated by the star at the stellar surface
    !I need unit of I which is the unit of Bnu = W/m2/Hz/sr
@@ -1368,12 +1373,13 @@ MODULE AtomicTransfer
              * 1.35e-12 * (tab_lambda(:) * 1d-6) / C_LIGHT
    
    !2) Correct with the contrast gamma of a hotter/cooler region if any
-   do ns=1, etoile(i_star)%Nspot
-    !ray falls in spot ?
-    ! yes...
-    ! no cycle
-   end do
-
+!    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
+!    if (lintersect_spot) then
+!      energie(:) = energie(:) + etoile(i_star)%StarSpots(ns)%gamma * energie(:)
+!    end if
+   
+   energie(:) = energie(:)*gamma
+   
    !3) Apply Limb darkening   
    if (llimb_darkening) then
      if (mu>1) write(*,*) " limb cos(theta) =", mu
@@ -1383,11 +1389,12 @@ MODULE AtomicTransfer
      !pol not included yet
      stop
    else
-     LimbDarkening = 1d0
+     write(*,*) mu, x, u, y, v, z, w
+     LimbDarkening = 1d0*(1.+mu)/2d0
    end if
    Istar(:) = energie(:) * LimbDarkening
  
  RETURN
- END SUBROUTINE add_stellar_radiation
+ END SUBROUTINE calc_stellar_radiation
 
 END MODULE AtomicTransfer

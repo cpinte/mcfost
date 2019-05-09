@@ -187,13 +187,10 @@ module parametres
   integer :: n_phantom_files
 
   type spot_type
-     real(kind=dp) :: xs, ys, zs
+     real(kind=dp) :: xs, ys, zs, rs
      real(kind=dp) :: dOmega
-     real(kind=dp) :: theta0, dtheta, phi0, dphi
-     real(kind=dp) :: S, Ts !Ts should be position dependent
-     integer       :: shape ! 0 : circular spot, 1 : ring
-     real(kind=dp) :: gamma !constrast: array or not?
-  end type spot_type
+     real(kind=dp), allocatable, dimension(:,:) :: gamma !Ts should be position dependent
+ end type spot_type
 
   ! Stars
   ! 27/02/2019, adding spots coordinates

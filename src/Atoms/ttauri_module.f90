@@ -87,81 +87,40 @@ MODULE TTauri_module
   RETURN
   END SUBROUTINE TTauri_Temperature
   
-  SUBROUTINE Star_Addspot(istar, Ns, phi0a, dphia, theta0a, dthetaa, Tsa, Sa)
-   ! ----------------------------------------------------- !
-    ! Given coordinates, add bright or dark spots
-    ! at a stellar surface.
-    ! It changes the flux of the star at the spot location.
-    !
-    ! angle in degrees, surface in % and T in K
-   ! ----------------------------------------------------- !
-   integer, intent(in)			:: Ns, istar
-   double precision, dimension(Ns), intent(in) :: phi0a, dphia ,&
-   												  theta0a, dthetaa, Tsa, Sa
-   type (star_type) :: star
-   integer :: k
+  SUBROUTINE intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
+  ! ------------------------------------------------------------ !
+   ! Will a ray/packet hit a spot ?
+   ! suppose that no spot overlap.
    
-   star = etoile(istar)
-   
-   !for this star allocate StarSpots array
-   allocate(star%StarSpots(Ns))
-   !Fill each StarSpots with data
-   do k = 1, Ns
-    star%StarSpots(k)%phi0 = phi0a(k) * deg_to_rad
-    star%StarSpots(k)%dphi = dphia(k) * deg_to_rad
-    star%StarSpots(k)%theta0 = theta0a(k) * deg_to_rad
-    star%StarSpots(k)%dtheta = dthetaa(k) * deg_to_rad
-    star%StarSpots(k)%Ts = Tsa(k)
-    star%StarSpots(k)%S = Sa(k) * 1d-2   
-   end do
-   
+  ! ------------------------------------------------------------ !
+   real(kind=dp), intent(in) :: x,y,z, u,v,w
+   logical, intent(out) :: lintersect
+   integer, intent(in) :: i_star
+   integer, intent(out) :: ispot
 
+   real(kind=dp), dimension(3) :: r, k, delta_r
+   real(kind=dp) :: b,c, delta, rac, s1, s2
+   integer :: i
+   
+   r(1) = x ; r(2) = y ; r(3) = z
+   k(1) = u ; k(2) = v ; k(3) = w
+
+   ispot = 0
+   lintersect = .false.
+   spot_loop : do i = 1, etoile(i_star)%Nspot
+!      delta_r(:)  = r(:) - (/etoile(i_star)%Starspots(i)%xs, \
+!                         etoile(i_star)%Starspots(i)%ys, etoile(i_star)%Starspots(i)%zs/)
+!      b = dot_product(delta_r,k)
+!      c = dot_product(delta_r,delta_r) - (etoile(i_star)%Starspots(i)%rs)**2
+!      delta = b*b - c
+     if (delta>=0) then
+      ispot = i
+      lintersect = .true.
+     end if
+   end do spot_loop
+     
   RETURN
-  END SUBROUTINE Star_Addspot
+  END SUBROUTINE intersect_spots
   
-  SUBROUTINE TTauri_Accretion_schocks(rmi, rmo, Macc)
-   ! ----------------------------------------------------- !
-    ! Add an accretion ring on the T Tauri surface.
-    ! Assumes only 1 star.
-    ! Dark spots can be added too.
-   ! ----------------------------------------------------- ! 
-   double precision, intent(in) :: rmi, rmo, Macc
-   double precision :: r, Rstar, Mstar, Mdot, Lr, thetai, thetao, Tring, Sr
-   double precision, parameter ::  year_to_sec = 3.154d7
-   integer :: istar, k
-   
-   istar = 1
-   etoile(istar)%Nspot = 2! 2 Rings in that case
-   
-   Rstar = etoile(istar)%r * AU_to_m !AU_to_Rsun * Rsun !m
-   Mstar = etoile(istar)%M * Msun_to_kg !kg
-   Mdot = Macc * Msun_to_kg / year_to_sec !kg/s
-   Lr = Ggrav * Mstar * Mdot / Rstar * (1. - 2./(rmi + rmo))
-
-   thetai = asin(dsqrt(1d0/rmi))
-   thetao = asin(dsqrt(1d0/rmo))
-
-   Tring = Lr / (4d0 * PI * Rstar**2 * sigma * abs(cos(thetai)-cos(thetao)))
-   Tring = Tring**0.25
-   Sr = abs(cos(thetai)-cos(thetao)) !4pi*Rstar**2 * abs(c1-c2) / 4pi Rstar**2   
-    
-   allocate(etoile(istar)%StarSpots(etoile(istar)%Nspot))
-   do k=1, etoile(istar)%Nspot
-    etoile(istar)%StarSpots(k)%shape = 1
-    etoile(istar)%StarSpots(k)%theta0 = 0.5*(thetao + thetai)
-    etoile(istar)%StarSpots(k)%dtheta = abs(thetai - thetao)
-    etoile(istar)%StarSpots(k)%phi0 = -1d0
-    etoile(istar)%StarSpots(k)%dphi = -1d0
-    !phi is only important if shape /= 1 ie if it is not a ring
-    etoile(istar)%StarSpots(k)%S = Sr
-    etoile(istar)%StarSpots(k)%Ts = Tring
-    !etoile(istar)%StarSpots(k)%zs = cos(0.5*(thetao + thetai))
-    !etoile(istar)%StarSpots(k)%ys = sin(0.5*(thetao + thetai)) * sin(phi_spot/180.*pi)
-    !etoile(istar)%StarSpots(k)%xs = sin(0.5*(thetao + thetai)) * cos(phi_spot/180.*pi)
-    etoile(istar)%StarSpots(k)%dOmega = cos(0.5*(thetao + thetai))*dsqrt(1d0 - Sr)
-   end do
-  
-  RETURN
-  END SUBROUTINE TTauri_Accretion_schocks
   
 END MODULE TTauri_module
