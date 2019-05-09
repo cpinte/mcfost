@@ -242,7 +242,7 @@ MODULE lte
      write(*,*) "cell=",k, atom%ID, atmos%lcompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
      write(*,*) atom%nstar(:,k)
      write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
-     write(*,*) "Exciting..."
+     write(*,*) "stop!"
      stop !beware if low T, np -> 0, check to not divide by 0 density
     end if
    end do !over depth points
@@ -250,12 +250,12 @@ MODULE lte
    !$omp  end parallel
 !    write(*,*) "-------------------"
 
-   if (MAXVAL(atom%nstar) <= tiny_dp) then !Total
-     write(*,*) "cell=",k, atom%ID,atmos%lcompute_atomRT(k)
-     write(*,*) "Error, populations negative or lower than tiny dp for this atom on the grid!"
-     write(*,*) "Exciting..."
-     stop !beware if low T, np -> 0, check to not divide by 0 density
-   end if
+!    if (MAXVAL(atom%nstar) <= tiny_dp .and. atmos%lcompute_atomRT(k)) then !Total
+!      write(*,*) "cell=",k, atom%ID,atmos%lcompute_atomRT(k)
+!      write(*,*) "Error, populations negative or lower than tiny dp for this atom on the grid!"
+!      write(*,*) "Exciting..."
+!      stop !beware if low T, np -> 0, check to not divide by 0 density
+!    end if
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
