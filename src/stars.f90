@@ -830,5 +830,37 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
 end subroutine intersect_stars
 
+  SUBROUTINE intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
+  ! ------------------------------------------------------------ !
+   ! Knowing a ray/pack hits the star, will it hits a spot ?
+   ! suppose no spot overlap.
+  ! ------------------------------------------------------------ !
+   real(kind=dp), intent(in) :: x,y,z, u,v,w
+   logical, intent(out) :: lintersect
+   integer, intent(in) :: i_star
+   integer, intent(out) :: ispot
+
+   real(kind=dp), dimension(3) :: r, k, delta_r
+   real(kind=dp) :: b,c, delta, rac, s1, s2, norm
+   integer :: i
+   
+   r(1) = x ; r(2) = y ; r(3) = z
+   k(1) = u ; k(2) = v ; k(3) = w
+
+   ispot = 0
+   lintersect = .false.
+   spot_loop : do i = 1, etoile(i_star)%Nr
+      delta_r(:)  = r(:) - etoile(i_star)%SurfB(i)%r(:)
+      b = dot_product(delta_r,k)           !the spot lies on the stellar surface
+      c = dot_product(delta_r,delta_r) - (etoile(i_star)%r)**2
+      delta = b*b - c
+     if (delta>=0) then
+      ispot = i
+      lintersect = .true.
+     end if
+   end do spot_loop
+     
+  RETURN
+  END SUBROUTINE intersect_spots
 
 end module stars
