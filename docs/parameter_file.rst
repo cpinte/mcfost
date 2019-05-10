@@ -240,7 +240,7 @@ resolution of the spatial grid is high enough.
 Density structure
 -----------------
 
-* ``zone type``: disk (value: 1), disk with outer tapered-edge (value:
+* ``zone_type``: disk (value: 1), disk with outer tapered-edge (value:
   2), spherically symmetric envelope (value: 3), debris disk (value : 4)
   or an azimuthally asymetric wall (value : 5).
   If at least one of the zones is described as an envelope, the
@@ -339,7 +339,7 @@ Grain properties
 
 * ``DHS_Vmax``: maximum void fraction for DHS calculation
 
-* ``optical_indices``: file containing the optical index of the material
+* ``optical_indices_file``: file containing the optical index of the material
   as a function of wavelength (files must be located in
   ``$MCFOST_UTILS/Dust/``)
 
@@ -419,7 +419,7 @@ Star properties
   set the spatial origin of the photon packets: the star is assumed to be
   a uniformly radiating sphere), in R\ :sub:`sun`
 
-* ``M``: stellar mass (only used for molecular line calculations,
+* ``Mstar``: stellar mass (only used for molecular line calculations,
   hudrostatic equilibrium and viscous heating via accretion, in
   M\ :sub:`sun`
 
@@ -430,14 +430,15 @@ Star properties
   of temperature Temp? If not, the stellar spectrum indicated in the
   following line is used instead
 
-  .. note:: ``Teff`` vs stellar atmosphere model.
-          The effective temperature is only used to compute the total stellar
-          luminosity and it doesn't need to match the
-          atmosphere model. In practice, the atmosphere model shoud be chosen
-          with the effective temperature closest to the target's, use the same
-          Teff and adjust Rstar to get the right Lstar. However, one could use
-          more precise numbers for both Teff and Rstar (when available in the
-          literature, for instance).
+  .. note:: ``Teff`` vs stellar atmosphere model. The effective
+          temperature is only used to compute the total stellar
+          luminosity and it doesn't need to match the atmosphere
+          model. In practice, the atmosphere model shoud be chosen
+          with the effective temperature closest to the target's, use
+          the same ``Teff`` and adjust ``Rstar`` to get the right
+          Lstar. However, one could use more precise numbers for both
+          Teff and Rstar (when available in the literature, for
+          instance).
 
 
 * ``fUV, slope_fUV:`` photospheric UV excess and its slope in Fnu.
