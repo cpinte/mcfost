@@ -409,6 +409,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+  real(dp) :: vphi, vr, theta, cos_theta, sin_theta, r_cyl, r_cyl2, r_sph
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
@@ -586,6 +587,42 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
     if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
  enddo
+
+
+ if (lupdate_velocities) then
+    if (lno_vz) vz(:) = 0.
+
+    if (lno_vr) then
+       do i=1, n_SPH
+          theta = atan2(y(i),x(i)) ; cos_theta = cos(theta) ; sin_theta = sin(theta)
+          vphi = - vx(i) * sin_theta + vy(i) * cos_theta
+          !vr = vx(i) * cos_theta + vy(i) * sin_theta
+
+          ! vx = vr cos theta - vphi sin theta
+          ! vy = vr sin theta + vphi cos theta
+          vx(i) = - vphi * sin_theta
+          vy(i) = vphi * cos_theta
+
+       enddo
+    endif
+
+    if (lVphi_kep) then
+       do i=1, n_SPH
+          r_cyl2 = x(i)**2 + y(i)**2
+          r_cyl = sqrt(r_cyl2)
+          cos_theta = x(i)/r_cyl ; sin_theta = y(i)/r_cyl
+          r_sph = sqrt(r_cyl2 + z(i)**2)
+
+          vr  =  vx(i) * cos_theta + vy(i) * sin_theta
+          ! Keplerian vphi
+          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
+
+          vx(i) = vr * cos_theta - vphi * sin(theta)
+          vy(i) = vr * sin_theta + vphi * cos(theta)
+       enddo
+    endif
+ endif
+
 
  if (lplanet_az) then
     if ((nptmass /= 2).and.(which_planet==0)) call error("option -planet_az: you need to specify the sink particle with -planet option")

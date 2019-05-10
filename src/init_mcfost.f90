@@ -130,6 +130,10 @@ subroutine set_default_variables()
   lfix_star = .false.
   lscale_units = .false.
   lignore_dust = .false.
+  lupdate_velocities = .false.
+  lno_vr = .false.
+  lno_vz = .false.
+  lvphi_Kep = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -1008,6 +1012,18 @@ subroutine initialisation_mcfost()
      case("-ignore_dust")
         i_arg = i_arg + 1
         lignore_dust=.true.
+     case("-no_vr")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vr = .true.
+     case("-no_vz")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vz = .true.
+     case("-vphi_Kep","-vphi_kep")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lvphi_Kep = .true.
      case default
         call display_help()
      end select
@@ -1447,6 +1463,14 @@ subroutine display_help()
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) " "
+  write(*,*) " Options related to phantom"
+  write(*,*) "        : -fix_star"
+  write(*,*) "        : -scale_units"
+  write(*,*) "        : -ignore_dust"
+  write(*,*) "        : -no_vr : force the radial velocities to be 0"
+  write(*,*) "        : -no_vz : force the vertical velocities to be 0"
+  write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
