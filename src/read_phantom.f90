@@ -600,9 +600,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
           ! vx = vr cos theta - vphi sin theta
           ! vy = vr sin theta + vphi cos theta
-          vx(i) = - vphi * sin_theta
+          vx(i) = - vphi * sin_theta !  vr = 0
           vy(i) = vphi * cos_theta
-
        enddo
     endif
 
@@ -617,8 +616,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           ! Keplerian vphi
           vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
-          vx(i) = vr * cos_theta - vphi * sin(theta)
-          vy(i) = vr * sin_theta + vphi * cos(theta)
+          vx(i) = vr * cos_theta - vphi * sin_theta
+          vy(i) = vr * sin_theta + vphi * cos_theta
        enddo
     endif
  endif
