@@ -12,7 +12,8 @@ module stars
   public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
-       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, intersect_stars
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, intersect_stars, &
+       intersect_spots
 
   private
 
@@ -832,34 +833,43 @@ end subroutine intersect_stars
 
   SUBROUTINE intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
   ! ------------------------------------------------------------ !
-   ! Knowing a ray/pack hits the star, will it hits a spot ?
+   ! Knowing a ray/pack hits the star, will it hit a spot ?
    ! suppose no spot overlap.
+   ! Will the ray inside a circle of radius rstar*rspot
   ! ------------------------------------------------------------ !
    real(kind=dp), intent(in) :: x,y,z, u,v,w
    logical, intent(out) :: lintersect
    integer, intent(in) :: i_star
    integer, intent(out) :: ispot
 
-   real(kind=dp), dimension(3) :: r, k, delta_r
-   real(kind=dp) :: b,c, delta, rac, s1, s2, norm
+   real(kind=dp), dimension(3) :: r, k
+   real(kind=dp) :: mu, phi, dmu, dphi, mus
    integer :: i
    
    r(1) = x ; r(2) = y ; r(3) = z
    k(1) = u ; k(2) = v ; k(3) = w
-
+   
    ispot = 0
    lintersect = .false.
    spot_loop : do i = 1, etoile(i_star)%Nr
-      delta_r(:)  = r(:) - etoile(i_star)%SurfB(i)%r(:)
-      b = dot_product(delta_r,k)           !the spot lies on the stellar surface
-      c = dot_product(delta_r,delta_r) - (etoile(i_star)%r)**2
-      delta = b*b - c
-     if (delta>=0) then
-      ispot = i
-      lintersect = .true.
+!    
+!      mu = abs(dot_product(r,k))/dsqrt(x**2+y**2+z**2)
+!      phi = atan2(y,x)+pi!modulo(atan2(y,x),2*real(pi,kind=dp))!atan2(y,x)+pi
+! 
+!      mus = sqrt(1-0.2)!abs(dot_product(etoile(i_star)%SurfB(i)%r,k))
+!      dmu = dot_product(etoile(i_star)%SurfB(i)%r,etoile(i_star)%SurfB(i)%r1)
+!      dphi = maxval(etoile(i_star)%SurfB(i)%phibound) - minval(etoile(i_star)%SurfB(i)%phibound)
+      
+     if (mu**2 >= mus) then !inside the spot
+     write(*,*) mu
+
+       ispot = i
+       lintersect = .true.
+       stop
+       exit spot_loop
      end if
    end do spot_loop
-     
+
   RETURN
   END SUBROUTINE intersect_spots
 

@@ -48,7 +48,7 @@ MODULE simple_models
    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=1d4, Macc = 1d-9
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
-   double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
+   double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
    double precision :: Bp, BR, Bz, ts, ps
    logical :: lwrite_model_ascii = .false.
@@ -87,10 +87,10 @@ MODULE simple_models
     Tring = Tring**0.25
    else
     Tring = Tshk
-   end if
-   Sr = abs(cos(thetai)-cos(thetao)) !4pi*Rstar**2 * abs(c1-c2) / 4pi Rstar**2
+   end if                !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
+   Sr = abs(cos(thetai)-cos(thetao)) !2 * 2PI * Rstar**2 * abs(c1-c2) / 4pi Rstar**2
    write(*,*) "Ring T ", Tring, "K"
-   write(*,*) "Surface ", 100*Sr, "%"
+   write(*,*) "Surface ", 100*Sr, "%" !couverte par les deux anneaux sur toute la sphere
    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
    write(*,*) "Mean molecular weight", atmos%avgWeight
    !1G = 1e-4 T
@@ -99,23 +99,33 @@ MODULE simple_models
    write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
    
    !Add ring
-   etoile(1)%Nspot = 1 !2 rings
-   allocate(etoile(1)%StarSpots(etoile(1)%Nspot))
+   etoile(1)%Nr = 1! rings
+   allocate(etoile(1)%SurfB(etoile(1)%Nr))
    flip_flop = 0
-   do k=1,etoile(1)%Nspot
-    etoile(1)%StarSpots(k)%dOmega = 1d0 - Sr
-    !allocate space for the spatial dependence of the spot
-    allocate(etoile(1)%StarSpots(k)%gamma(51,51)); etoile(1)%StarSpots(k)%gamma(:,:)=0d0
-    do i=1,51
-     ps = 2d0 * PI * real(i-1)/real(51-1)
-     do j=1,51
-       ts = PI/2 * real(j-1)/real(51-1)
-       if ((ts>=thetao).and.(ts<=thetai)) &
-           etoile(1)%StarSpots(k)%gamma(j,i) = 10d0
-     end do
-    end do
+   do k=1,etoile(1)%Nr
+    Theta = 0d0
+    phi = 0d0
+    if (k==2) flip_flop = -1 !for the ring in the southern hemisphere
+    etoile(1)%SurfB(k)%T = 2*4d3*(1-1.5*flip_flop)
+    !center of the spot
+    etoile(1)%SurfB(k)%x = cos(phi)*sin(theta-PI*flip_flop)
+    etoile(1)%SurfB(k)%y = sin(phi)*sin(theta-PI*flip_flop)
+    etoile(1)%SurfB(k)%z = cos(theta-PI*flip_flop)
+    etoile(1)%SurfB(k)%r(:) = (/etoile(1)%SurfB(k)%x,etoile(1)%SurfB(k)%y,etoile(1)%SurfB(k)%z/)
+    !limits in colatitude on the sphere / disk: we store mu = cos(theta)
+    !etoile(1)%SurfB(k)%limits(1) = cos(thetai); etoile(1)%SurfB(k)%limits(2)=cos(thetao) 
+    etoile(1)%SurfB(k)%limits(1) = cos(theta)-0.2*cos(theta); etoile(1)%SurfB(k)%limits(2)=cos(theta)
+    !limits in azimuth on the sphere / disk
+    etoile(1)%SurfB(k)%limits(3) = phi; etoile(1)%SurfB(k)%limits(4)=2*PI
+    !Surface on the apparent radius of one ring
+    etoile(1)%SurfB(k)%Sp = (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
+    			abs(etoile(1)%SurfB(k)%limits(1)**2-etoile(1)%SurfB(k)%limits(2)**2) / (2d0 * PI)
+    etoile(1)%SurfB(k)%dOmega=dsqrt(1d0-etoile(1)%SurfB(k)%Sp)
+    write(*,*) " Surface on the disk of the spot ", k, etoile(1)%SurfB(k)%Sp, etoile(1)%SurfB(k)%dOmega, &
+    (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
+    			abs(etoile(1)%SurfB(k)%limits(1)-etoile(1)%SurfB(k)%limits(2)) / (4d0 * PI)
    end do
-   write(*,*) etoile(1)%StarSpots(1)%gamma
+
   
    !now nH0 and Q0 are computed for each field lines assuming that Tring is the same
    !for all.

@@ -186,11 +186,13 @@ module parametres
   character(len=512), dimension(:), allocatable :: density_files
   integer :: n_phantom_files
 
-  type spot_type
-     real(kind=dp) :: xs, ys, zs, rs
-     real(kind=dp) :: dOmega
-     real(kind=dp), allocatable, dimension(:,:) :: gamma !Ts should be position dependent
- end type spot_type
+  !Need to know the position on the star of the spot and its extent
+  type surface_brightness_type
+     real(kind=dp) :: x, y, z !coordinates of the center of circular region, of Surface Sr
+     real(kind=dp) :: r(3), limits(6)
+     real(kind=dp) :: dOmega, Sp
+     real(kind=dp) :: T ! Temperature of the region
+ end type surface_brightness_type
 
   ! Stars
   ! 27/02/2019, adding spots coordinates
@@ -200,8 +202,8 @@ module parametres
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell
-     integer :: Nspot = 0
-     type(spot_type), dimension(:), allocatable :: StarSpots
+     integer :: Nr = 0
+     type(surface_brightness_type), dimension(:), allocatable :: SurfB
   end type star_type
 
   integer :: n_etoiles

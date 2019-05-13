@@ -102,7 +102,8 @@ MODULE AtomicTransfer
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
   !Computes the stellar radiation for this direction
-  if (lintersect_stars) CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x, y, z, u,v,w,Istar)
+  !cannot be here if limbD depends on x0,y0,z0 than x,y,z
+!   if (lintersect_stars) CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x, y, z, u,v,w,Istar)
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -122,6 +123,11 @@ MODULE AtomicTransfer
     
     if (lintersect_stars) then
       if (icell == icell_star) then !this is equivalent to compute_stars_map()
+       !if we start at icell, computes the radiation from the star to icell.
+       !in particular, the cell icell can be the cell for which we solve the SEE/or
+       !a cell at the border of the grid for an image
+       !for LimbD, x0,y0,z0 changes
+       CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,Istar)
        NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
        NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
        RETURN
@@ -218,7 +224,9 @@ MODULE AtomicTransfer
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
 
-     !if outside loop, we will never compute it if icell=icell_star and lintersect
+     !if outside loop, we will never compute it
+     !the radiation from the star is not included as it is included only at icell=icell_star
+     !I have to move that
      if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
 
     end if  ! lcellule_non_vide
@@ -1350,49 +1358,64 @@ MODULE AtomicTransfer
   !
   ! tab_lambda has to be defined and repartition_energie_etoiles()
  ! -------------------------------------------------------------- !
-  use ttauri_module, only : intersect_spots
   use input, only : limb_darkening, mu_limb_darkening
+  use Planck, only : uLD, Bplanck
   integer, intent(in) :: N, i_star
-  real(kind=dp), dimension(N) :: Istar
+  real(kind=dp), dimension(N), intent(out) :: Istar
   real(kind=dp), intent(in) :: u, v, w, x, y, z
-  real(kind=dp) :: energie(N), gamma !contrast
-  real(kind=dp) :: mu, smu2, LimbDarkening, surface, t1, p1
+  real(kind=dp) :: energie(N), gamma(N)
+  real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
   integer :: ns
   logical :: lintersect_spot
   
-   mu = abs(x*u + y*v + z*w)/etoile(1)%r
+   HC = HPLANCK * CLIGHT / MICRON_TO_NM / NM_TO_M / KBOLTZMANN
+   gamma(:) = 1d0
+   !cos(theta) = dot(r,n)/module(r)/module(n)
+   mu = abs(x*u + y*v + z*w)/dsqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+   if (real(mu)>1d0) then !to avoid perecision error
+    write(*,*) "mu=",mu, x, y, z, u, v, w
+    CALL Error(" mu limb > 1!")
+   end if
+
+   !Re-norm E_stars(:)*Prob_E_Star(:,i_star) at the stellar surface
    surface = (etoile(i_star)%r * AU_to_Rsun)**2
-   gamma = 1d0
    
    !1) Get the energy radiated by the star at the stellar surface
    !I need unit of I which is the unit of Bnu = W/m2/Hz/sr
    !Here, E_stars in W/m2. But I is in W/m2/Hz/sr unit of Bnu.
    !E_stars propto Blambda*lambda; remembering, Bnu = Blambda*c/nu**2 = Blambda*lambda**2/c
    ! we get E_stars (in W/m2/Hz) = E_stars / lambda * lambda**2 / c
-   energie(:) = Prob_E_Star(:,i_star) * E_stars(:) * tab_lambda(:) * 1.0e-6 / surface &
-             * 1.35e-12 * (tab_lambda(:) * 1d-6) / C_LIGHT
+!    energie(:) = Prob_E_Star(:,i_star) * E_stars(:) * tab_lambda(:) * 1.0e-6 / surface &
+!              * 1.35e-12 * (tab_lambda(:) * 1d-6) / C_LIGHT
+   !write(*,*) maxval(energie)
+   !write(*,*) maxval(E_stars* (tab_lambda(:) * 1.0e-6)/CLIGHT)
+   CALL Bplanck(etoile(i_star)%T*1d0, energie) !it is not factorised for test cheks, but can be computed outside loop
+   !write(*,*) maxval(energie)
+   !stop
    
    !2) Correct with the contrast gamma of a hotter/cooler region if any
-!    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-!    if (lintersect_spot) then
-!      energie(:) = energie(:) + etoile(i_star)%StarSpots(ns)%gamma * energie(:)
-!    end if
-   
-   energie(:) = energie(:)*gamma
-   
+   CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
+   if (lintersect_spot) then
+!      gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
+!      			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
+!      write(*,*) maxval(gamma)!, &
+!      maxval((dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)), &
+!      maxval((dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1))
+    gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
+   end if
+
    !3) Apply Limb darkening   
    if (llimb_darkening) then
-     if (mu>1) write(*,*) " limb cos(theta) =", mu
-     CALL Warning("Check mu calc before using LD here, in add_Stellar_intensity")
-     !LimbDarkening = Interp1D(real(limb_darkening,kind=dp), real(mu_limb_darkening,kind=dp), mu)
+     LimbDarkening = Interp1D(real(limb_darkening,kind=dp), real(mu_limb_darkening,kind=dp), mu)
      !LimbDarkening = interp(limb_darkening, mu_limb_darkening, mu)
      !pol not included yet
      stop
    else
-     write(*,*) mu, x, u, y, v, z, w
-     LimbDarkening = 1d0*(1.+mu)/2d0
+     !write(*,*) maxval(uLD(real(etoile(i_star)%T,kind=dp))), minval(uLD(real(etoile(i_star)%T,kind=dp)))
+     ulimb = 0d0 ! could use BB slope
+     LimbDarkening = 1d0 - ulimb*(1d0-mu)
    end if
-   Istar(:) = energie(:) * LimbDarkening
+   Istar(:) = energie(:) * LimbDarkening * gamma(:)
  
  RETURN
  END SUBROUTINE calc_stellar_radiation
