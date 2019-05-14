@@ -13,7 +13,7 @@ MODULE statequil_atoms
 
  IMPLICIT NONE
  
- PROCEDURE(FillGamma_Mali), pointer :: Fill_Gamma => NULL()
+ PROCEDURE(FillGamma_Mali), pointer :: FillGamma => NULL()
 
  CONTAINS
 
@@ -362,11 +362,6 @@ MODULE statequil_atoms
    ! level j to lower level i.
    !
    ! It uses the fully preconditioned scheme of Rybciki and Hummer. 
-   ! Switch between Hogereijde like radiation field and (M-)ALI like radiation
-   ! field is done by changing Ieff.
-   ! I = Ieff + Psi*eta
-   ! Hogereijde: I = Idagexp(-dtau) + (1.-exp(-dtau))/chi * eta
-   ! MALI      : I = Idag - Psi * etadag + eta * Psi
   ! ------------------------------------------------------------------------- !
   integer, intent(in) :: id, icell, iray, n_rayons
   integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
@@ -454,6 +449,103 @@ MODULE statequil_atoms
   end do !loop over atoms  
  RETURN
  END SUBROUTINE fillGamma_MALI
+
+ SUBROUTINE fillGamma_MALI_hogereijde(id, icell, iray, n_rayons)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
+   ! of transition from level lp to l.
+   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   ! It uses the fully preconditioned scheme of Rybciki and Hummer with the 
+   ! radiation from Hogereijde 2000.
+  ! ------------------------------------------------------------------------- !
+  integer, intent(in) :: id, icell, iray, n_rayons
+  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
+  type (AtomType), pointer :: atom
+  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
+  double precision :: norm = 0d0, diag
+  double precision :: c_nlte = 1d0, dummy = 0
+  
+!   if (iray==1) dummy = 0
+  
+  do nact=1,atmos%Nactiveatoms !loop over each active atoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+   Ieff = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) - NLTEspec%Psi(:,iray,id)
+   !loop over transitions, b-f and b-b for these atoms
+   !To do; define a transition_type with either cont or line
+   do kr=1,atom%Ncont
+    norm = 4d0*PI / HPLANCK / n_rayons
+    
+    i = atom%continua(kr)%i; j = atom%continua(kr)%j
+    Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
+    twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
+
+    ! cross-coupling terms
+     atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum((atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
+     	atom%Uji_down(j,:,id))*cont_wlam(atom%continua(kr)))* norm
+
+     ! check if i is an upper level of another transition
+     do krr=1,atom%Ncont
+      jp = atom%continua(krr)%j
+      if (jp==i) then !i upper level of this transition
+       atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
+       	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) * norm
+      end if 
+     end do
+   end do
+
+   do kr=1,atom%Nline
+    norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons !
+    
+    i = atom%lines(kr)%i; j = atom%lines(kr)%j
+    Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
+    twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
+    
+    !Ieff (Uij = 0 'cause i<j)
+    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
+    !Uji + Vji*Ieff
+    !Uji and Vji express with Vij
+    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+    	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
+!     	
+!     if (j==3 .and. i==2) then 
+! dummy = dummy + sum(twohnu3_c2(Nblue:Nred)*atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:))*norm
+!      write(*,*) atom%lines(kr)%Aji/1d7, dummy/1d7
+!     end if
+!      write(*,*) 'line', atom%ID, icell, id, i, j, c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm	
+    	
+    ! cross-coupling terms
+     atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum(atom%chi_up(i,Nblue:Nred,id)*NLTEspec%Psi(Nblue:Nred, iray, id)*&
+     	atom%Uji_down(j,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
+     ! check if i is an upper level of another transition
+     do krr=1,atom%Nline
+      jp = atom%lines(krr)%j
+      if (jp==i) then !i upper level of this transition
+       atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum(atom%chi_down(j,Nblue:Nred,id)*nLTEspec%Psi(Nblue:Nred, iray, id)*&
+       	atom%Uji_down(i,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
+      end if 
+     end do
+   end do
+   
+   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
+   	do jp = 1, atom%Nlevel
+    	atom%Gamma(jp,jp) = -sum(atom%Gamma(jp,:)) !sum over rows for this column
+   	end do
+   end if
+
+   NULLIFY(atom)
+  end do !loop over atoms  
+ RETURN
+ END SUBROUTINE fillGamma_MALI_Hogereijde
 
  SUBROUTINE SEE_atom(id, icell, atom)
  ! --------------------------------------------------------------------!
