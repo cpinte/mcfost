@@ -5,13 +5,15 @@ MODULE statequil_atoms
  use spectrum_type, only : NLTEspec
  use constant
  use constantes, only : AU_to_m
- use opacity, only : cont_wlam, NLTEopacity, calc_psi_operator
+ use opacity, only : cont_wlam, NLTEopacity, add_to_psi_operator
  use math, only : locate
  use utils, only : GaussSlv
  use grid, only : cross_cell
  use accelerate
 
  IMPLICIT NONE
+ 
+ PROCEDURE(FillGamma_Mali), pointer :: Fill_Gamma => NULL()
 
  CONTAINS
 
@@ -48,7 +50,7 @@ MODULE statequil_atoms
   !Sinon, seulement Psi depend de chi a besoin d'être mis à jour.
   ds = l_dum * AU_to_m
   !recompute Psi and eventually Ieff.
-  CALL calc_psi_operator(id, icell, iray, ds)
+  CALL add_to_psi_operator(id, icell, iray, ds)
   
  RETURN
  END SUBROUTINE init_local_field_atom
@@ -206,7 +208,8 @@ MODULE statequil_atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
    !loop over transitions, b-f and b-b for these atoms
    !To do; define a transition_type with either cont or line
-   Ieff(:) = NLTEspec%Ieff(:,iray,id) + NLTEspec%Psi(:,iray,id)! * atom%eta(:,id)
+   Ieff(:) = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) + \
+             NLTEspec%Psi(:,iray,id)! * atom%eta(:,id)
    do kr=1,atom%Ncont
     !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
     norm = 4*PI / HPLANCK / n_rayons
@@ -262,88 +265,6 @@ MODULE statequil_atoms
 
  RETURN
  END SUBROUTINE fillGamma_Hogereijde
- 
- SUBROUTINE fillGamma_Hogereijdebis(id, icell, iray, n_rayons)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
-   ! of transition from level l' to l.
-   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! This is the case of Hogereijde, similar to molecular lines in MCFOST.
-   ! The intensity I in the rate matrix elements: 
-   !  Cl'l + Rl'l - delta(l,l') Sum_l" (Cllp" + Rll"); appearing in Rll' and
-   !  Rll" is directly replaced by Iexp(-dtau) + (1-exp(-dtau))*Snu; 
-   ! with Iexp(-dtau) = Ieff and eta*(1-exp(-dtau))/chi = Psi by definition.
-   ! I = Ieff + Psi * eta
-   !
-   ! The Sum_l" represents a sommation over each column for the lth row.
-   !
-  ! ------------------------------------------------------------------------- !
-
-  integer, intent(in) :: id, icell, iray, n_rayons
-  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, l
-  type (AtomType), pointer :: atom
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
-  double precision :: norm = 0d0
-  double precision :: c_nlte = 1d0, somme = 0d0, somme_c
-  
-  if (iray==1) then
-   somme = 0d0
-   somme_c = 0d0
-  end if
-  
-  Ieff(:) = 0d0
-  do nact=1,atmos%Nactiveatoms !loop over each active atoms
-   atom => atmos%ActiveAtoms(nact)%ptr_atom
-   !loop over transitions, b-f and b-b for these atoms
-   !To do; define a transition_type with either cont or line
-   Ieff(:) = NLTEspec%Ieff(:,iray,id) + NLTEspec%Psi(:,iray,id) !special case of Ieff and Psi for Hogereijde
-   do kr=1,atom%Ncont
-    !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
-    norm = 4*PI / HPLANCK / n_rayons
-    
-    i = atom%continua(kr)%i; j = atom%continua(kr)%j
-    Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
-    twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
-    
-    !Ieff (Uij = 0 'cause i<j)
-    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
-    !Uji + Vji*Ieff
-    !Uji and Vji express with Vij
-    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-    	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
-
-   end do
-
-   do kr=1,atom%Nline
-    ! the PI factor is here to transform dOmega/4PI in 1/N Sum_rays. 1/4PI appears in, Vij, Vji
-    norm =  4d0 * PI / (CLIGHT * HPLANCK) / n_rayons
-    
-    i = atom%lines(kr)%i; j = atom%lines(kr)%j
-    Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
-    twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
-    
-    !Ieff (Uij = 0 'cause i<j)
-    atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
-    !Uji + Vji*Ieff
-    !Uji and Vji express with Vij
-    atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-    	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-    	
-   end do
-   
-   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
-   	do l = 1, atom%Nlevel
-    	atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
-   	end do
-   end if
-   
-   NULLIFY(atom)
-  end do !loop over atoms  
-
- RETURN
- END SUBROUTINE fillGamma_Hogereijdebis
  
  SUBROUTINE FillGamma_ZeroRadiation(id, icell)
   ! ------------------------------------------------------------------------- !
@@ -433,7 +354,7 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE Gamma_LTE
  
- SUBROUTINE fillGamma(id, icell, iray, n_rayons, Ieff)
+ SUBROUTINE fillGamma_MALI(id, icell, iray, n_rayons)
   ! ------------------------------------------------------------------------- !
    ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
    ! of transition from level lp to l.
@@ -450,8 +371,7 @@ MODULE statequil_atoms
   integer, intent(in) :: id, icell, iray, n_rayons
   integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
   type (AtomType), pointer :: atom
-  double precision, dimension(NLTEspec%Nwaves), intent(inout) :: Ieff
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2
+  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
   double precision :: norm = 0d0, diag
   double precision :: c_nlte = 1d0, dummy = 0
   
@@ -459,8 +379,7 @@ MODULE statequil_atoms
   
   do nact=1,atmos%Nactiveatoms !loop over each active atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
-   if (atmos%nLTE_methode=="MALI") Ieff = &
-   						NLTEspec%I(:,iray,id) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
+   Ieff = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
    !loop over transitions, b-f and b-b for these atoms
    !To do; define a transition_type with either cont or line
    do kr=1,atom%Ncont
@@ -489,7 +408,6 @@ MODULE statequil_atoms
        	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) * norm
       end if 
      end do
-   NLTEspec%J(:,id) = NLTEspec%J(:,id) + 4d0 * PI / n_rayons * NLTEspec%I(:,iray,id)
    end do
 
    do kr=1,atom%Nline
@@ -524,9 +442,6 @@ MODULE statequil_atoms
        	atom%Uji_down(i,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
       end if 
      end do
-    !
-    !NLTEspec%J(:,id) = NLTEspec%J(:,id) + 4d0 * PI / n_rayons * NLTEspec%I(:,iray,id)
-
    end do
    
    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
@@ -538,7 +453,7 @@ MODULE statequil_atoms
    NULLIFY(atom)
   end do !loop over atoms  
  RETURN
- END SUBROUTINE fillGamma
+ END SUBROUTINE fillGamma_MALI
 
  SUBROUTINE SEE_atom(id, icell, atom)
  ! --------------------------------------------------------------------!

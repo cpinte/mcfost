@@ -161,6 +161,10 @@ MODULE AtomicTransfer
      !! at all wavelength points including vector fields in the bound-bound transitions
      eval_operator = (labs .and. (nbr_cell == 1) .and..not.latomic_line_profiles)
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
+     if (eval_operator) then
+       CALL FillCrossCoupling_terms(id, icell)
+       CALL add_to_psi_operator(id, icell, iray, ds(iray,id))
+     end if
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -223,11 +227,6 @@ MODULE AtomicTransfer
      ! dtau = chi * ds
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
-
-     !if outside loop, we will never compute it
-     !the radiation from the star is not included as it is included only at icell=icell_star
-     !I have to move that
-     if (eval_operator) CALL calc_psi_operator(id, icell, iray, ds(iray,id))
 
     end if  ! lcellule_non_vide
   end do infinie
@@ -721,9 +720,9 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL magneto_accretion_model()  
+   !CALL magneto_accretion_model()  
    !CALL uniform_law_model()
-   !CALL spherical_shells_model
+   CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -1024,7 +1023,6 @@ MODULE AtomicTransfer
   			do icell=1, n_cells
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
-                    !NLTEspec%J(:,id) = 0d0; NLTEspec%J20(:,id) = 0d0
   			        CALL initGamma(icell)
      				do iray=iray_start, iray_start-1+n_rayons
       
@@ -1048,16 +1046,12 @@ MODULE AtomicTransfer
 						xyz0(1,iray) = x0; xyz0(2,iray) = y0; xyz0(3,iray) = z0
 						uvw0(1,iray) = U0; uvw0(2,iray) = V0; uvw0(3,iray) = W0
 
-
+						!in practice only if MALI
+						CALL initCrossCoupling(id)
+						
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
 
-      					!compute Gamma = wavelength and angle integration
-						!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
- 						!NLTEspec%J(:,id) = NLTEspec%J(:,id) + NLTEspec%I(:,iray,id)/n_rayons
- 						!J20 = int(dOmega I(omega)*(3*(n*n) - 1)) = 3*K - J
-  						!NLTEspec%J20(:,id) = NLTEspec%J20(:,id) + &
-  						! (2*(dot_product(xyz0(:,iray),uvw0(:,iray)))**2-1d0)*NLTEspec%I(:,iray,id)/n_rayons
       				end do !iray
       				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
      				n_iter_loc = 0
@@ -1114,7 +1108,7 @@ MODULE AtomicTransfer
 							    CALL init_local_field_atom(id, icell, iray, &
 							         xyz0(1,iray), xyz0(2,iray), xyz0(3,iray), &
 							         uvw0(1,iray), uvw0(2,iray), uvw0(3,iray))
-								!CALL fillGamma(id, icell, iray, n_rayons, NLTEspec%Ieff(:,iray,id))
+
  						        CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
       						!!CALL Gamma_LTE(id,icell)

@@ -23,7 +23,7 @@ MODULE Opacity
 
  CONTAINS
  
-  SUBROUTINE calc_psi_operator(id, icell, iray, ds)
+  SUBROUTINE add_to_psi_operator(id, icell, iray, ds)
   ! ----------------------------------------------------------- !
    ! Computes Psi and Ieff at the cell icell, for the thread id
    ! in the direction iray, using ds path length of the ray.
@@ -45,18 +45,18 @@ MODULE Opacity
 
    SELECT CASE (atmos%nLTE_methode)
      CASE ("MALI")
-       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-ds*chi(:))) / chi !in meter
-       NLTEspec%Ieff(:,iray,id) = 0d0 !defined later in fillGamma()
+       NLTEspec%dtau(:,iray,id) = 0d0 !not used in SEE
+       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !in meter
      CASE ("HOGEREIJDE")
-       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-ds*chi(:))))* eta_loc/(chi+1d-300)
+       NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
+       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
        !or do not use atom%eta, and Psi = Psi * eta_total
-       NLTEspec%Ieff(:,iray,id) = NLTEspec%I(:,iray,id) * dexp(-ds*chi(:))
      CASE DEFAULT
        CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
    END SELECT
 
   RETURN
-  END SUBROUTINE calc_psi_operator
+  END SUBROUTINE add_to_psi_operator
 
  
   SUBROUTINE alloc_wlambda()

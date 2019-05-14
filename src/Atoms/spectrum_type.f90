@@ -60,7 +60,7 @@ MODULE spectrum_type
    !Contribution function
    double precision, allocatable, dimension(:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   double precision, allocatable, dimension(:,:,:) :: Psi, Ieff
+   double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -157,9 +157,9 @@ MODULE spectrum_type
    deallocate(NLTEspec%I, NLTEspec%Ic)
    !except polarization which are (de)allocated in adjustStokesMode
    if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) then 
-    deallocate(NLTEspec%Psi, NLTEspec%Ieff)
+    deallocate(NLTEspec%Psi, NLTEspec%dtau)
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-   	allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
+   	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
    end if 
     
    !Could be also LTE opac if line are kept in memory ?
@@ -190,8 +190,8 @@ MODULE spectrum_type
    allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
    allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
    !Just to try
-   CALL Warning("(allocSpectrum()) J20 allocated")
-   allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
+   !CALL Warning("(allocSpectrum()) J20 allocated")
+   !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
    NLTEspec%J = 0.0
    NLTEspec%Jc = 0.0
       
@@ -234,7 +234,7 @@ MODULE spectrum_type
     !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
     !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-    allocate(NLTEspec%Ieff(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
     
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
@@ -291,7 +291,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
    if (NLTEspec%Nact > 0) then
-    deallocate(NLTEspec%Psi, NLTEspec%Ieff)!, NLTEspec%AtomOpac%initialized)
+    deallocate(NLTEspec%Psi, NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -321,7 +321,7 @@ MODULE spectrum_type
     
     if (NLTEspec%Nact > 0) then
    		 NLTEspec%Psi(:,:,id) = 0d0
-   		 NLTEspec%Ieff(:,:,id) = 0d0
+   		 NLTEspec%dtau(:,:,id) = 0d0
    	end if
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
