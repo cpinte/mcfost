@@ -151,11 +151,13 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       Vphi = Omega * (r*AU_to_m) !m/s
-       if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat
 
        sinTheta = rcyl/r
        y = sinTheta**2
+
+       Vphi = Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
+       if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
+       
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
        y = min(y,0.99)
        if (Rm>=rmi .and. Rm<=rmo) then
@@ -213,6 +215,7 @@ MODULE simple_models
     end do
 
     if (Tmax > 0d0) atmos%T(:) = Tmax! * atmos%T/maxval(atmos%T)
+write(*,*) "Density and T set to zero for tetsting"
 atmos%nHtot=1d0
 atmos%T =1d0
    !! inclued in atom%vbroad so we do not count it here
@@ -311,10 +314,11 @@ atmos%T =1d0
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Mdot = 1d-5, Vexp = 100d3, beta = 5d-1, nH0 = 1d11
-   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 0d0, Rlimit=0.8
+   double precision, parameter :: Mdot = 1d-6, Vexp = 1000d3, beta = 2d0
+   double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 1d0, Rlimit=0.8
+   double precision, parameter :: finf = 0.1, vclp = 100d3
    double precision :: Rstar, Mstar, Vr, rhor, rho_to_nH
-   double precision :: rcyl, z, r, phi, Mdot_si
+   double precision :: rcyl, z, r, phi, Mdot_si, fclump, nH0
    
 
 
@@ -323,7 +327,6 @@ atmos%T =1d0
    lmagnetoaccr = .false.
    lstatic = .false.
    CALL init_atomic_atmos()
-   atmos%vturb = 1d3 !m/s
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
    
@@ -335,6 +338,9 @@ atmos%T =1d0
    Rstar = etoile(1)%r * AU_to_m !AU_to_Rsun * Rsun !m
    Mstar = etoile(1)%M * Msun_to_kg !kg
    Mdot_si = Mdot * Msun_to_kg / year_to_sec !kg/s
+   
+   nH0 = Mdot_si / 4d0 / PI / ((r0*etoile(1)%r*AU_to_m)**2 * v0) *rho_to_nH
+   write(*,*) "nH0 = ", nH0
    
    all_loop : do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
@@ -352,15 +358,14 @@ atmos%T =1d0
        r = dsqrt(z**2 + rcyl**2)
        
        !if (r>Rlimit*Rmax) exit all_loop
-       
-       !Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
-       !rhor = Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
-       !atmos%nHtot(icell) = rhor * rho_to_nH
-
+       Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
+       fclump = finf * (1d0 - finf) * dexp(-Vr/Vclp)
+       rhor = fclump * Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
+       atmos%nHtot(icell) = rhor * rho_to_nH
        atmos%T(icell) = (r0*etoile(1)%r/r)**2 * etoile(1)%T
-       !atmos%T(icell) = etoile(1)%T !cte
-       atmos%nHtot = nH0 * (r0*etoile(1)%r / r)**(2d0-beta)
-       Vr = Vexp * (r0*etoile(1)%r / r)**beta
+       atmos%vturb(icell) = 2d0 * (20d0 - 2d0) * Vr/Vexp
+       !atmos%nHtot = nH0 * (r0*etoile(1)%r / r)**(2d0-beta)
+       !Vr = Vexp * (r0*etoile(1)%r / r)**beta
 
        !!->expansion
         if (.not.linfall) then !expansion not analytic
@@ -374,7 +379,6 @@ atmos%T =1d0
       end do
      end do
     end do all_loop
-
 
     if (.not.linfall) then
     	atmos%v_char = atmos%v_char + &

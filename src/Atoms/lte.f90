@@ -45,7 +45,6 @@ MODULE lte
   !!maximum argument is 600, exp(600) = 3.77e260
   arg_exp = min(600d0,ionpot/(KBOLTZMANN*atmos%T(k)))
   phi = C1 * (Ujl / Uj1l) * dexp(arg_exp) / (atmos%T(k)**1.5)
-  
   RETURN
   END FUNCTION phi_jl
 
@@ -117,6 +116,7 @@ MODULE lte
    double precision :: NI, UI1, UI, chi, ne, phi, NI1
    phi = phi_jl(k, UI, UI1, chi) ! chi in J
    NI1 = NI/(phi*ne)
+
   RETURN
   END FUNCTION SahaEq
 
@@ -194,8 +194,7 @@ MODULE lte
      ! ni/n1 gives relative populations
      ! wrt the ground state for a specific ion stage I=stage(1)
 
-     atom%nstar(i,k)=&
-       BoltzmannEq4dot20b(k, dE, atom%g(1), atom%g(i))
+     atom%nstar(i,k)=BoltzmannEq4dot20b(k, dE, atom%g(1), atom%g(i))
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
      !!relative to n1j(1)
 !     write(*,*) k-1, "level=", i-1, " stage=", atom%stage(i), &
@@ -230,10 +229,10 @@ MODULE lte
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%ntotal(k)/sum
-!     write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
+    write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel !debug
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-!       write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+      write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
     end do
     !faster ? 
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
@@ -256,7 +255,7 @@ MODULE lte
 !      write(*,*) "Exciting..."
 !      stop !beware if low T, np -> 0, check to not divide by 0 density
 !    end if
-
+stop
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
  END SUBROUTINE LTEpops

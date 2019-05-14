@@ -25,7 +25,7 @@ MODULE solvene
  use constant
  use lte
  !use accelerate, only : initNg, freeNg, NgAcceleration
- 
+ use messages, only : Error, Warning
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -59,8 +59,8 @@ MODULE solvene
   double precision, intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ionpot(1))
 
-  !ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH)
-  ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
+  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH)
+  !ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
 
  RETURN
  END SUBROUTINE ne_Hionisation
@@ -194,7 +194,7 @@ END FUNCTION getPartitionFunctionk
   double precision :: ne_oldM, UkM, PhiHmin
 !   double precision, dimension(atmos%Nspace) :: np
   double precision, dimension(:), allocatable :: fjk, dfjk
-  integer :: Nmaxstage=0, n, k, niter, j
+  integer :: Nmaxstage=0, n, k, niter, j, ZM
 
   if (.not. present(ne_initial_solution)) then
       initial="H_IONISATION"!use HIONISAtion
@@ -227,7 +227,7 @@ END FUNCTION getPartitionFunctionk
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj) &
-  !$omp shared(atmos, initial,Hydrogen)
+  !$omp shared(atmos, initial,Hydrogen, ZM)
   !$omp do
   do k=1,atmos%Nspace
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
@@ -241,19 +241,26 @@ END FUNCTION getPartitionFunctionk
    
     !Initial solution ionisation of H
     Uk = getPartitionFunctionk(atmos%Elements(1), 1, k)
-    Ukp1 = 1d0 !getPartitionFunctionk(atmos%Elements(1), 2, k)
+    Ukp1 = getPartitionFunctionk(atmos%Elements(1), 2, k)
+
+    if (Ukp1 /= 1d0) CALL Warning("Partition function of H+ should be 1")
     CALL ne_Hionisation (k, Uk, Ukp1, ne_old)
-    Uk = getPartitionFunctionk(atmos%Elements(26), 1, k)
-    Ukp1 = getPartitionFunctionk(atmos%Elements(26), 2, k)
-    CALL ne_Metal(k, Uk, Ukp1, atmos%elements(26)%ionpot(1), &
-         atmos%elements(26)%Abund, ne_oldM)
+
+    if (atmos%T(k) >= 20d3) then
+      ZM = 2 !He
+    else
+      ZM = 26
+    end if    
+    !add Metal
+    Uk = getPartitionFunctionk(atmos%Elements(ZM), 1, k)
+    Ukp1 = getPartitionFunctionk(atmos%Elements(ZM), 2, k)
+    CALL ne_Metal(k, Uk, Ukp1, atmos%elements(ZM)%ionpot(1), &
+         atmos%elements(ZM)%Abund, ne_oldM)
     !write(*,*) "neMetal=",ne_oldM
     !if Abund << 1. and chiM << chiH then
     ! ne (H+M) = ne(H) + ne(M)
     ne_old = ne_old + ne_oldM
    end if
-   !write(*,*) "k=",k," ne_old=",ne_old, &
-   !       " ne_mod=",atmos%ne(k)
 
    atmos%ne(k) = ne_old
    niter=0
@@ -284,8 +291,6 @@ END FUNCTION getPartitionFunctionk
           (1.-atmos%nHtot(k)*sum)
     dne = dabs((atmos%ne(k)-ne_old)/ne_old)
     ne_old = atmos%ne(k)
-
-
     if (dne.le.MAX_ELECTRON_ERROR) then
       !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k)
      exit
