@@ -30,8 +30,8 @@ MODULE solvene
 
  IMPLICIT NONE
 
- double precision, parameter :: MAX_ELECTRON_ERROR=1e-5
- integer, parameter :: N_MAX_ELECTRON_ITERATIONS=30
+ double precision, parameter :: MAX_ELECTRON_ERROR=1e-6
+ integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
 
  CONTAINS
@@ -59,7 +59,7 @@ MODULE solvene
   double precision, intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ionpot(1))
 
-  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH)
+  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   !ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
 
  RETURN
@@ -138,7 +138,6 @@ END FUNCTION getPartitionFunctionk
    atom = Elem%model
    fjk = 0d0
    dfjk = 0d0
-
    !For Nlevel, Nlevel stages
    fjk(atom%stage(:))=fjk(atom%stage(:))+atom%stage(:)*atom%n(:,k)
    !For Nstage
@@ -264,7 +263,7 @@ END FUNCTION getPartitionFunctionk
 
    atmos%ne(k) = ne_old
    niter=0
-   do while (niter.lt.N_MAX_ELECTRON_ITERATIONS)
+   do while (niter < N_MAX_ELECTRON_ITERATIONS)
     error = ne_old/atmos%nHtot(k)
     sum = 0.
 
@@ -273,7 +272,7 @@ END FUNCTION getPartitionFunctionk
 
      CALL getfjk(atmos%Elements(n),ne_old,k,fjk,dfjk)
 
-     if (n.eq.1)  then ! H minus
+     if (n.eq.1)  then ! H minus for H
        PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
        ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
        error = error + ne_old*fjk(1)*PhiHmin
@@ -291,14 +290,19 @@ END FUNCTION getPartitionFunctionk
           (1.-atmos%nHtot(k)*sum)
     dne = dabs((atmos%ne(k)-ne_old)/ne_old)
     ne_old = atmos%ne(k)
+    
+!     write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
+!               "dne = ",dne, " ne=",atmos%ne(k)    
+    
+    niter = niter + 1
     if (dne.le.MAX_ELECTRON_ERROR) then
       !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k)
      exit
-    !else
-      !write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
-      !         "dne = ",dne, " ne=",atmos%ne(k)
+    else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
+      CALL Warning("Electron density not converged for this cell")
+      write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
+               "dne = ",dne, " ne=",atmos%ne(k)
     end if
-    niter = niter + 1
    end do !while loop
   end do !loop over spatial points
   !$omp end do
