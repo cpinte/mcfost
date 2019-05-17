@@ -18,6 +18,8 @@ MODULE writeatom
  !MCFOST's original modules
  use fits_utils, only : print_error
  use grid
+ use utils, only : appel_syst
+ use messages
 
  IMPLICIT NONE 
  
@@ -86,7 +88,7 @@ MODULE writeatom
  
  SUBROUTINE writeHydrogenDensity()
  ! ------------------------------------ !
- ! write nHtot density for testing in m^-3
+ ! write nHtot density m^-3
  ! ------------------------------------ !
   integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
   logical :: extend, simple
@@ -138,6 +140,149 @@ MODULE writeatom
  
  RETURN
  END SUBROUTINE writeHydrogenDensity
+ 
+ SUBROUTINE writePops(atom)
+ ! -------------------------------------------- !
+ ! write Atom populations.
+ ! First, NLTE populations, then LTE populations.
+ ! -------------------------------------------- !
+  type (AtomType), intent(in) :: atom
+  integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements, syst_status
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL appel_syst('mkdir -p '//trim(atom%ID),syst_status) !create a dir for populations
+  CALL ftinit(unit,trim(atom%ID)//"/"//trim(atom%dataFile),blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1 
+  fpixel = 1
+  extend = .true.
+  bitpix = -64  
+
+  naxes(1) = atom%Nlevel
+
+  if (lVoronoi) then
+   naxis = 2
+   naxes(2) = atmos%Nspace ! equivalent n_cells
+   nelements = naxes(1)*naxes(2)
+  else
+   if (l3D) then
+    naxis = 4
+    naxes(2) = n_rad
+    naxes(3) = 2*nz
+    naxes(4) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+   else
+    naxis = 3
+    naxes(2) = n_rad
+    naxes(3) = nz
+    nelements = naxes(1) * naxes(2) * naxes(3)
+   end if
+  end if
+  
+  
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "n (m^-3)", ' ', EOF)
+  !write NLTE pops
+  CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
+  !now LTE
+  CALL ftcrhd(unit, EOF)
+  !  Write the required header keywords.
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  CALL ftpkys(unit, "UNIT", "nstar (m^-3)", ' ', EOF)
+
+  CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
+
+  
+  CALL ftclos(unit, EOF) !close
+  CALL ftfiou(unit, EOF) !free
+  
+  if (EOF > 0) CALL print_error(EOF)
+ 
+ RETURN
+ END SUBROUTINE writePops
+ 
+ SUBROUTINE readPops(atom)
+ ! -------------------------------------------- !
+ ! read Atom populations.
+ ! First, NLTE populations, then LTE populations.
+ ! -------------------------------------------- !
+  type (AtomType), intent(in) :: atom
+  integer :: unit, EOF = 0, blocksize, naxis,group, bitpix, fpixel
+  logical :: extend, simple, anynull
+  integer :: nelements, naxis2(4), Nl, naxis_found, hdutype
+  character(len=256) :: some_comments
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  CALL ftopen(unit, trim(atom%ID)//"/"//TRIM(atom%dataFile), 0, blocksize, EOF)
+  CALL FTMAHD(unit,1,hdutype,EOF) !move to HDU, atom%n is first
+
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1 
+  fpixel = 1
+  extend = .true.
+  bitpix = -64  
+
+  if (lVoronoi) then
+   naxis = 2
+   CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, EOF)
+   CALL ftgkyj(unit, "NAXIS1", Nl, some_comments, EOF)
+   if (Nl /= atom%Nlevel) CALL Error(" Nlevel read from file different from actual model!")
+   nelements = Nl
+   CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, EOF)
+   nelements = nelements * naxis_found
+   if (nelements /= atom%Nlevel * atmos%Nspace) &
+    CALL Error (" Model read does not match simulation box")
+  else
+   if (l3D) then
+    naxis = 4
+    CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, EOF)
+    !if (naxis2 /= naxis) CALL Error(" Naxis read from file different from actual model!")
+    CALL ftgkyj(unit, "NAXIS1", Nl, some_comments, EOF)
+    if (Nl /= atom%Nlevel) CALL Error(" Nlevel read from file different from actual model!")
+    nelements = Nl
+    CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, EOF)
+    nelements = nelements * naxis_found
+    CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, EOF)
+    nelements = nelements * naxis_found
+    CALL ftgkyj(unit, "NAXIS4", naxis_found, some_comments, EOF)
+    nelements = nelements * naxis_found
+    if (nelements /= atom%Nlevel * atmos%Nspace) &
+    CALL Error (" Model read does not match simulation box")
+   else
+    naxis = 3
+    CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, EOF)
+    CALL ftgkyj(unit, "NAXIS1", Nl, some_comments, EOF)
+    if (Nl /= atom%Nlevel) CALL Error(" Nlevel read from file different from actual model!")
+    nelements = Nl
+    CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, EOF)
+    nelements = nelements * naxis_found
+    CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, EOF)
+    nelements = nelements * naxis_found
+    if (nelements /= atom%Nlevel * atmos%Nspace) &
+    CALL Error (" Model read does not match simulation box")
+   end if
+  end if
+
+  CALL FTG2Dd(unit,1,-999,shape(atom%n),atom%Nlevel,atmos%Nspace,atom%N,anynull,EOF)
+
+  CALL ftclos(unit, EOF) !close
+  CALL ftfiou(unit, EOF) !free
+  
+  if (EOF > 0) CALL print_error(EOF)
+ 
+ RETURN
+ END SUBROUTINE readPops
  
  !!!!!!!!!! BUILDING !!!!!!!!!!!!!!!
  SUBROUTINE writeAtomData(atom)

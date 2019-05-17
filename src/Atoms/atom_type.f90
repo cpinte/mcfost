@@ -96,7 +96,7 @@ MODULE atom_type
    type (ptrCollisionArr), dimension(:), allocatable :: col_data
    real(8), dimension(:), allocatable :: C !Nlevel*Nlevel
    real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
-   double precision, dimension(:,:), allocatable :: Gamma !now depth dependence is dropped
+   double precision, dimension(:,:,:), allocatable :: Gamma 
    real(8), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
