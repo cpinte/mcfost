@@ -8,6 +8,7 @@ MODULE readatom
   use uplow
   use getline
   use barklem, only : getBarklem
+  use writeatom, only : readPops
 
   !$ use omp_lib
 
@@ -552,20 +553,17 @@ MODULE readatom
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
     atom%n = 0d0
-    atom%NLTEpops = .false. !Zero at first, and if .true. solvene will crash
-    !HOWever, if init_sol is old pops and u can read them here, set NLTEpops=.true.
-    !It will be used also for background
-   else !not active
-    if (atom%dataFile.ne."" & !atom%popsinFile.ne.""
-       .and. atom%initial_solution &
-        .eq. "OLD_POPULATIONS") then
-       write(*,*) "First define a function that writes"
-       write(*,*) "populations as fits and read it"
-       stop
-       allocate(atom%n(atom%Nlevel,atmos%Nspace))
-       !CALL readPopulations(atom)
+    atom%NLTEpops = .false.
+	if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+       CALL readPops(atom)
        atom%NLTEpops = .true.
-    else
+    end if
+   else !not active
+    if (atom%dataFile.ne."" & .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+       allocate(atom%n(atom%Nlevel,atmos%Nspace)) !not allocated if passive, n->nstar
+       CALL readPops(atom)
+       atom%NLTEpops = .true.
+    else !pure passive without nlte pops from previous run
      atom%NLTEpops=.false.
      atom%n => atom%nstar !initialised to zero
      !atom%n is an alias for nstar in this case
