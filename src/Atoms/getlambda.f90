@@ -486,6 +486,7 @@ MODULE getlambda
    double precision, dimension(:), intent(inout) :: lambda
    integer :: Nwaves, n, kr, kc, Nlambda_original, Nblue, Nred, Natom
    double precision :: l0, l1 !ref wavelength of each transitions
+   double precision :: x0, x1 !bound of the new grid
    integer, dimension(:), allocatable :: sorted_indexes
    logical, dimension(:), allocatable :: trans_contribute
    type (AtomicContinuum), dimension(:), allocatable :: conta
@@ -498,6 +499,8 @@ MODULE getlambda
    sorted_indexes = bubble_sort(lambda)
    lambda(:) = lambda(sorted_indexes)
 
+   x0 = minval(lambda); x1 = maxval(lambda)
+
    !Realloc space for atoms
    !we need to test if a transition is on the new grid or not. Because the final grid
    !is not the sum of the individual grid, some transitions can be neglected because
@@ -509,26 +512,35 @@ MODULE getlambda
      Nlambda_original = Atoms(n)%ptr_atom%continua(kc)%Nlambda !on the old_grid
      Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue
      Nred = Atoms(n)%ptr_atom%continua(kc)%Nred
-     l0 = old_grid(Nblue)
-     l1 = old_grid(Nred)
+     l0 = Atoms(n)%ptr_atom%continua(kc)%lambdamin!old_grid(Nblue)
+     l1 = Atoms(n)%ptr_atom%continua(kc)%lambda0!old_grid(Nred)
      !!if l0 out of the new grid, remove it, otherwise get the new index
-     if (l1 < minval(lambda)) then
+     !if (l1 < minval(lambda)) then
+     if (l1 <= x0.or. l0 >= x1) then
+      !if l1 < x0 then automatically l0 < x0;
+									!because l0<l1.
+     								!and conversely, if l0 > x1 -> l1 > x1
       Atoms(n)%ptr_atom%continua(kc)%Nred = -99
-     else
-      Atoms(n)%ptr_atom%continua(kc)%Nred = locate(lambda,l1) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
-     end if
-     if (l0 > maxval(lambda)) then
       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
      else
-      Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0)
+      !Otherwise, if l1 in )x0, x1] and l0 < x0 then l0==x0
+      !and if l0 in [x0, x1( and l1 > x1 then l1 == x1
+      Atoms(n)%ptr_atom%continua(kc)%Nred = locate(lambda,l1) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
+      Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0) !
+      Nred = Atoms(n)%ptr_atom%continua(kc)%Nred; Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue
      end if
-     
-     if ((Atoms(n)%ptr_atom%continua(kc)%Nblue==-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred/=-99)) then
-      Atoms(n)%ptr_atom%continua(kc)%Nred=-99
-     end if
-     if ((Atoms(n)%ptr_atom%continua(kc)%Nblue/=-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred==-99)) then
-      Atoms(n)%ptr_atom%continua(kc)%Nblue=-99
-     end if
+!      if (l0 > maxval(lambda)) then
+!       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
+!      else
+!       Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0)
+!      end if
+!      
+!      if ((Atoms(n)%ptr_atom%continua(kc)%Nblue==-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred/=-99)) then
+!       Atoms(n)%ptr_atom%continua(kc)%Nred=-99
+!      end if
+!      if ((Atoms(n)%ptr_atom%continua(kc)%Nblue/=-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred==-99)) then
+!       Atoms(n)%ptr_atom%continua(kc)%Nblue=-99
+!      end if
      
      Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue; Nred = Atoms(n)%ptr_atom%continua(kc)%Nred
      if (Nred==-99.and.Nblue==-99) then
@@ -538,7 +550,7 @@ MODULE getlambda
       
       trans_contribute(kc) = .false.
       write(*,*) " :: b-f transition", Atoms(n)%ptr_atom%continua(kc)%j,"->",Atoms(n)%ptr_atom%continua(kc)%i,&
-       " for atom ",Atoms(n)%ptr_atom%ID," removed."
+       " for atom ",Atoms(n)%ptr_atom%ID, l0,"-",l1, " removed."
      else
       Atoms(n)%ptr_atom%continua(kc)%Nlambda = Atoms(n)%ptr_atom%continua(kc)%Nred - &
                                  Atoms(n)%ptr_atom%continua(kc)%Nblue + 1
@@ -564,23 +576,26 @@ MODULE getlambda
      l0 = old_grid(Nblue)
      l1 = old_grid(Nred)
      !if l0 out of the new grid, remove it, otherwise get the new index
-     if (l0 > maxval(lambda)) then
+     !if (l0 > maxval(lambda)) then
+     if (l1 <= x0 .or. l0 >= x1) then
       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
-     else
-      Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0)
-     end if
-     if (l1 < minval(lambda)) then
       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
      else
+      Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0)
       Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
      end if
-     
-     if ((Atoms(n)%ptr_atom%lines(kr)%Nblue==-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred/=-99)) then
-      Atoms(n)%ptr_atom%lines(kr)%Nred=-99
-     end if
-     if ((Atoms(n)%ptr_atom%lines(kr)%Nblue/=-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred==-99)) then
-      Atoms(n)%ptr_atom%lines(kr)%Nblue=-99
-     end if
+!      if (l1 < minval(lambda)) then
+!       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
+!      else
+!       Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
+!      end if
+!      
+!      if ((Atoms(n)%ptr_atom%lines(kr)%Nblue==-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred/=-99)) then
+!       Atoms(n)%ptr_atom%lines(kr)%Nred=-99
+!      end if
+!      if ((Atoms(n)%ptr_atom%lines(kr)%Nblue/=-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred==-99)) then
+!       Atoms(n)%ptr_atom%lines(kr)%Nblue=-99
+!      end if
      
      Nblue = Atoms(n)%ptr_atom%lines(kr)%Nblue; Nred = Atoms(n)%ptr_atom%lines(kr)%Nred
      if (Nred==-99.and.Nblue==-99) then
@@ -590,7 +605,7 @@ MODULE getlambda
 
       trans_contribute(kr) = .false.
       write(*,*) " :: b-b transition", Atoms(n)%ptr_atom%lines(kr)%j,"->",Atoms(n)%ptr_atom%lines(kr)%i,&
-       " for atom " ,Atoms(n)%ptr_atom%ID," removed."
+       " for atom " ,Atoms(n)%ptr_atom%ID, l0,"-",l1, " removed."
      else
       Atoms(n)%ptr_atom%lines(kr)%Nlambda = Atoms(n)%ptr_atom%lines(kr)%Nred - &
                                  Atoms(n)%ptr_atom%lines(kr)%Nblue + 1
@@ -606,7 +621,7 @@ MODULE getlambda
      deallocate(trans_contribute)
    end do !over atoms
    if (allocated(trans_contribute)) deallocate(trans_contribute) !in case
-  
+
   RETURN
   END SUBROUTINE adjust_wavelength_grid
 

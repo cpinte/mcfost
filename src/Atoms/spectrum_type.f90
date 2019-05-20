@@ -14,7 +14,7 @@ MODULE spectrum_type
 
    real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
    real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
-   character(len=*), parameter :: WAVES_FILE="wavelength_grid.fits.gz"
+   character(len=*), parameter :: WAVES_FILE="nLTE_waves_grid.fits.gz"
    ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
    ! F(x,y,0,lambda) in several directions.
    character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
@@ -70,7 +70,7 @@ MODULE spectrum_type
 
   CONTAINS
 
-  SUBROUTINE initSpectrum(lam0, vacuum_to_air, write_wavelength)
+  SUBROUTINE initSpectrum(lam0, vacuum_to_air)
    ! ------------------------------------------- !
     ! Allocate and store the wavelength grid for
     ! NLTE atomic line transfer.
@@ -78,17 +78,15 @@ MODULE spectrum_type
 
    !integer, intent(in) :: NPROC
    double precision, optional :: lam0
-   logical, optional :: vacuum_to_air, write_wavelength
+   logical, optional :: vacuum_to_air
       
    NLTEspec%atmos => atmos
 
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
-
    NLTEspec%NPROC = nb_proc!NPROC
    
    if (present(lam0)) NLTEspec%wavelength_ref = lam0
-   if (present(write_wavelength)) NLTEspec%write_wavelength_grid = write_wavelength
    if (present(vacuum_to_air)) NLTEspec%vacuum_to_air = vacuum_to_air
   
    ! Initialize the wavelength grid depending on the number of transitions PASSIVE/ACTIVE
@@ -122,12 +120,14 @@ MODULE spectrum_type
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    !Works for Active and Passive atoms alike.
+   !-> sort also the grid
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
    CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
    							   !NLTE eval_opartor condition never reached for images.
-   CALL writeWavelength()
+   !!CALL writeWavelength() !not useful because they are written with the flux and
+   						    ! here the wavelength comes from a file..
 
   RETURN
   END SUBROUTINE initSpectrumImage
@@ -500,6 +500,10 @@ MODULE spectrum_type
   SUBROUTINE writeWavelength()
   ! --------------------------------------------------------------- !
    ! Write wavelength grid build with each transition of each atom
+   !
+   ! To.Do: 
+   ! Write for each transition of each atom the part of the grid
+   ! associated to this transition.
   ! --------------------------------------------------------------- !
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
    logical :: extend, simple

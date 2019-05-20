@@ -201,8 +201,7 @@ MODULE AtomicTransfer
       ! + &NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)
       
       ! continuum source function
-      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / &
-            (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
+      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
     if (minval(Snu) < 0) then
      call error("Snu negative")
@@ -323,8 +322,7 @@ MODULE AtomicTransfer
       Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / chiI
 
 
-      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / &
-            (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp)
+      Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp)
     end if
     !continuum not affected by polarisation yet
      NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + &
@@ -493,6 +491,11 @@ MODULE AtomicTransfer
   if (RT_line_method==1) then
     NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0
     NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c
+    if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
+     NLTEspec%F_QUV(1,:,1,1,ibin,iaz) = QUV(1,:) !U
+     NLTEspec%F_QUV(2,:,1,1,ibin,iaz) = QUV(2,:) !Q
+     NLTEspec%F_QUV(3,:,1,1,ibin,iaz) = QUV(3,:) !V
+    end if
   else
     NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
     NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
@@ -638,7 +641,6 @@ MODULE AtomicTransfer
      id = 1 ! pour code sequentiel
      n_iter_min = 1 ! 3
      n_iter_max = 1 ! 6
-
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
@@ -686,7 +688,7 @@ MODULE AtomicTransfer
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   Profile => IProfile
   INTEG_RAY_LINE => INTEG_RAY_LINE_I
-  optical_length_tot => atom_optical_length_tot
+  optical_length_tot => atom_optical_length_tot !not used with the new version of Istar
 
   if (.not.associated(optical_length_tot)) then
    write(*,*) "pointer optical_length_tot not associated"
@@ -722,8 +724,8 @@ MODULE AtomicTransfer
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
    !CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
-   CALL spherical_shells_model
+   CALL uniform_law_model()
+   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -763,7 +765,9 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
-  CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
+  if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
+  !otherwise not necessary to write them, because they are in flux.fits
+  CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air)
   CALL allocSpectrum(.true.) !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
   							 !.false. => if NLTE, skip this allocation
   							 !we probably do an image and we do not need these values.
