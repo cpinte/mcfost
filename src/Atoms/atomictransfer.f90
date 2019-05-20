@@ -724,8 +724,8 @@ MODULE AtomicTransfer
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
    !CALL magneto_accretion_model()  
-   CALL uniform_law_model()
-   !CALL spherical_shells_model
+   !CALL uniform_law_model()
+   CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
