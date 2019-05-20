@@ -3,6 +3,7 @@ MODULE getlambda
   use atom_type, only : AtomicContinuum, AtomicLine, AtomType
   use atmos_type, only : atmos, atomPointerArray
   use constant
+  use getline, only : getnextline, MAX_LENGTH
   
   use parametres
   use utils, only : span, spanl, bubble_sort
@@ -13,6 +14,33 @@ MODULE getlambda
 !   double precision, dimension(:), allocatable :: Nred_array, Nblue_array, Nmid_array
 
   CONTAINS
+  
+  SUBROUTINE Read_wavelengths_table(lambda_table)
+   double precision, dimension(:), allocatable, intent(inout) :: lambda_table
+   character(len=MAX_LENGTH) :: inputline, FormatLine
+   integer :: Nread = 0, Nl, k
+   
+   if (.not.ltab_wavelength_image) RETURN
+   
+   if (allocated(lambda_table)) deallocate(lambda_table) !should not happen
+   write(FormatLine,'("(1"A,I3")")') "A", 256
+
+   open(unit=1, file=TRIM(tab_wavelength_image), status='old')
+   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   read(inputline,*) Nl
+   
+   allocate(lambda_table(Nl))
+   do k=1,Nl
+      CALL getnextline(1, "#", FormatLine, inputline, Nread)
+      read(inputline,*) lambda_table(k)
+   end do
+   
+   close(1)
+   
+   !...read
+   
+  RETURN
+  END SUBROUTINE Read_wavelengths_table
   
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !

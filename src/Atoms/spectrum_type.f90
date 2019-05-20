@@ -2,7 +2,7 @@ MODULE spectrum_type
 
   use atom_type
   use atmos_type, only : GridType, atmos
-  use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid!,&
+  use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid, Read_wavelengths_table!,&
   ! 						Nred_array, Nmid_array, Nblue_array
   
   !MCFOST's original modules
@@ -108,39 +108,25 @@ MODULE spectrum_type
    ! Allocate a special wavelength grid for emission_line map.
    ! This allows to solve for the RT equation only for a specific line.
    ! This fasten LTE calculation in case of 1 line.
-   ! a LINEAR wavelength grid spanning from lam0-dL to lam0+dL with a
-   ! constant resolution in km/s given by resol is built.
   ! -------------------------------------------------------------------- !
-   double precision :: lam0, resol, dL
-   integer :: N = 80, la, Nr, Nb
-   double precision, dimension(:), allocatable :: old_Grid
-
+   double precision, dimension(NLTEspec%Nwaves) :: old_grid
+   
+   old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
-   !create wavelength grid
-   allocate(old_grid(NLTEspec%Nwaves))
-   old_grid(:) = NLTEspec%lambda(:) !temporary
-   N = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nlambda
-   Nr = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nred
-   Nb = NLTEspec%Atmos%Atoms(1)%ptr_atom%lines(3)%Nblue
-!N=1
-   CALL freeSpectrum()
-   allocate(NLTEspec%lambda(N))
+   CALL freeSpectrum() !first free waves arrays
    NLTEspec%atmos => atmos
-!NLTEspec%lambda(N) = NLTEspec%wavelength_ref
-   NLTEspec%lambda(:) = old_grid(Nb:Nr)
-
-
 
    !Reset the differents Nblue, Nred for atomic transitions
    !and recompute photoionisation cross-section
-   write(*,*) " -> Using ", size(NLTEspec%lambda)," wavelengths for image and spectrum."
-
+   CALL Read_wavelengths_table(NLTEspec%lambda)
+   NLTEspec%Nwaves = size(NLTEspec%lambda)
+   write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    !Works for Active and Passive atoms alike.
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
-   deallocate(old_grid)
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
-   NLTEspec%Nwaves = N
-   CALL allocSpectrum()
+   CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
+   							   !even if NLTEpops are present
+   							   !NLTE eval_opartor condition never reached for images.
    CALL writeWavelength()
 
   RETURN
@@ -170,12 +156,13 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE reallocate_rays_arrays
 
-  SUBROUTINE allocSpectrum()!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
+  SUBROUTINE allocSpectrum(alloc_atom_nlte)!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    !Polarized quantities allocated in adjustStokesMode
    integer :: nat, k
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line
+   logical, intent(in)    :: alloc_atom_nlte
    
    if (allocated(NLTEspec%I)) then
     write(*,*) "Error I already allocated"
@@ -230,7 +217,9 @@ MODULE spectrum_type
    NLTEspec%AtomOpac%eta_p = 0.
    
    !do not try to realloc after non-LTE for image.
-   if (NLTEspec%Nact > 0 .and. .not.latomic_line_profiles) then !NLTE loop activated
+   !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
+   !in NLTEOpacity()
+   if (NLTEspec%Nact > 0 .and. alloc_atom_nlte) then !NLTE loop activated
     !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
     !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))

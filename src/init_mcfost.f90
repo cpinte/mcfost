@@ -57,6 +57,7 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  ltab_wavelength_image = .false.
   !Polarised RTE in presence of magnetic field
   prt_solution = "NO_STOKES"
   ! Atomic lines Radiative Transfer (AL-RT)
@@ -672,7 +673,7 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        if (s=="") call error("Error, no filename provided for Pluto file!")
+        if (s=="") call error("No filename provided for Pluto file!")
         n_pluto_files = 1
         allocate(density_files(n_pluto_files))
         density_files(1) = s
@@ -684,7 +685,7 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        if (s=="") call error("Error, no filename provided for ascii Pluto file!")
+        if (s=="") call error("No filename provided for ascii Pluto file!")
         density_file = s
         allocate(density_files(1))
         density_files(1) = density_file
@@ -692,6 +693,13 @@ subroutine initialisation_mcfost()
      case("-no_magnetic_field")
         i_arg = i_arg + 1
         lmagnetic_field=.false.
+     case("-tab_wavelength_image")
+        i_arg = i_arg + 1
+        ltab_wavelength_image = .true.
+        call get_command_argument(i_arg, s)
+        if (s=="") call error("No filename provided for frequency grid!")
+        tab_wavelength_image = s
+        i_arg = i_arg + 1
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1529,6 +1537,8 @@ subroutine display_help()
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
   write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
   write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
+  write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
+  write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

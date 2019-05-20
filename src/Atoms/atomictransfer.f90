@@ -159,7 +159,8 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
-     eval_operator = (labs .and. (nbr_cell == 1) .and..not.latomic_line_profiles)
+     eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
+     											  !so no pb if Nact>0 and we use a different grid
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      if (eval_operator) then
        CALL FillCrossCoupling_terms(id, icell)
@@ -299,7 +300,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id)
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)).and..not.latomic_line_profiles)
+     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)))
 
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -646,8 +647,8 @@ MODULE AtomicTransfer
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
                       i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
-        enddo !j
-     enddo !i
+        end do !j
+     end do !i
      !$omp end do
      !$omp end parallel
   end if
@@ -763,12 +764,14 @@ MODULE AtomicTransfer
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
   CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air,write_wavelength=lwrite_waves)
-  CALL allocSpectrum()
+  CALL allocSpectrum(.true.) !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
+  							 !.false. => if NLTE, skip this allocation
+  							 !we probably do an image and we do not need these values.
   !should consider to do that only if Nlte is on, otherwise we go directly to image
   if (lstore_opac) then 
   !if NLTE always compute it. If LTE and we do not use special grid for image, compute also
    if ((atmos%NactiveAtoms > 0) .or.&
-      (atmos%NactiveAtoms==0 .and. .not.latomic_line_profiles)) &
+      (atmos%NactiveAtoms==0 .and. .not.ltab_wavelength_image)) &
     CALL storeBackground()
  end if
  ! ------------------------------------------------------------------------------------ !
@@ -779,7 +782,6 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
-  latomic_line_profiles = .false.
   if (atmos%Nactiveatoms > 0) CALL NLTEloop()
   open(unit=12, file="Snu_nlte.dat",status="unknown")
   icell = 1 !select cell
@@ -803,12 +805,15 @@ MODULE AtomicTransfer
     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
   end do
   close(12)
-
+  
+  do icell=1,atmos%NactiveAtoms
+   CALL writePops(atmos%Atoms(icell)%ptr_atom)
+  end do
+  if (atmos%NactiveAtoms>0) stop !temporary
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
-! latomic_line_profiles=.true.
-  if (latomic_line_profiles) then
+  if (ltab_wavelength_image) then
    !Check smarter to deallocate/reallocated NLTE wavelength arrays
    CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
    !shorter than the grid for NLTE / reallocate waves arrays
@@ -1011,6 +1016,25 @@ MODULE AtomicTransfer
             end do
 
             write(*,*) " -> Iteration #", n_iter
+!  			!$omp parallel &
+!             !$omp default(none) &
+!             !$omp private(id,icell) &
+!             !$omp shared(n_cells, atmos, NLTEspec)
+!             !$omp do schedule(static,1)
+!   			do icell=1, n_cells
+!    				$ id = omp_get_thread_num() + 1
+!    				if (atmos%lcompute_atomRT(icell)) then
+!      			    write(*,*) "icell=", icell, " id=", id
+!   			        CALL initGamma(id,icell)
+!   			        write(*,*) Atmos%ActiveAtoms(1)%ptr_atom%Gamma(1,2,:)
+!   			    end if
+!   			end do
+!         	!$omp end do
+!         	!$omp end parallel
+!   			stop
+!   			
+  			
+  			
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
@@ -1023,7 +1047,8 @@ MODULE AtomicTransfer
   			do icell=1, n_cells
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
-  			        CALL initGamma(icell)
+  			        CALL initGamma(id,icell)
+  			        !write(*,*) "icell=", icell, " id=", id
      				do iray=iray_start, iray_start-1+n_rayons
       
       					!remember only 2 etape atm.
@@ -1050,10 +1075,12 @@ MODULE AtomicTransfer
 						CALL initCrossCoupling(id)
 						
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
-
+                        !+add cross_coupling for this cell in this direction in Gamma
+                        !then for next ray they are re init
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       				end do !iray
       				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
+      				
      				n_iter_loc = 0
     				lconverged_loc = .false.
     				!save pops for all active atoms
@@ -1102,14 +1129,14 @@ MODULE AtomicTransfer
        					else
         					!recompute opacity of this cell., but I need angles and pos...
        						!NLTEspec%I not changed
-      						CALL initGamma(icell)
+      						CALL initGamma(id,icell)
  							do iray=iray_start, iray_start-1+n_rayons
       							!I unchanged
 							    CALL init_local_field_atom(id, icell, iray, &
 							         xyz0(1,iray), xyz0(2,iray), xyz0(3,iray), &
 							         uvw0(1,iray), uvw0(2,iray), uvw0(3,iray))
-
- 						        CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+                               !! +add Xcoupling in Gamma for this cell/ray
+ 						       CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
       						!!CALL Gamma_LTE(id,icell)
        					end if
@@ -1125,7 +1152,7 @@ MODULE AtomicTransfer
         	!$omp end do
         	!$omp end parallel
 
-        	!Global convergence criterium
+        	!Global convergence criterion 
   			cell_loop2 : do icell=1, atmos%Nspace
   			  	diff = 0d0
   				if (atmos%lcompute_atomRT(icell)) then
@@ -1141,7 +1168,7 @@ MODULE AtomicTransfer
      			end if
      		end do cell_loop2
 
-         	if (maxval(max_n_iter_loc)> max_sub_iter) &
+         	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          		write(*,*) maxval(max_n_iter_loc), "sub-iterations"
          	write(*,*) "Relative difference =", real(diff)
         	write(*,*) "Threshold =", precision*fac_etape

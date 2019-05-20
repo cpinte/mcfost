@@ -58,12 +58,10 @@ module parametres
 
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
-       lcontrib_function, lmagnetoaccr, latomic_line_profiles!only compute images for
-  															 !specific lines
-  															 !later this parameters should be
-  															 !.false. if we only want pops
-  															 !and cooling rates, and not spectra
-  										!lascii_wavelength_table <file> for image and spectrum
+       lcontrib_function, lmagnetoaccr
+  !Wavelength table for spectrally resolved images and spectra
+  character(len=50) :: tab_wavelength_image
+  logical :: ltab_wavelength_image
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
   ! PLUTO MHD
