@@ -139,8 +139,12 @@ END FUNCTION getPartitionFunctionk
    fjk = 0d0
    dfjk = 0d0
    !For Nlevel, Nlevel stages
-   fjk(atom%stage(:))=fjk(atom%stage(:))+atom%stage(:)*atom%n(:,k)
-   !For Nstage
+   !fj = Nj/Ntot
+   !first, Nj = Sum_i nij
+   do i = 1, atom%Nlevel
+    fjk(atom%stage(i)) = fjk(atom%stage(i))+atom%stage(i)*atom%n(i,k)
+   end do
+   !Divide by Ntotal and retrieve fj = Nj/N for all j
    fjk(:) = fjk(:)/atom%ntotal(k)
 
   else !not active or active but first iteration of the NLTEloop so that
@@ -152,10 +156,13 @@ END FUNCTION getPartitionFunctionk
    Uk = getPartitionFunctionk(elem,1,k)
    do j=2,Elem%Nstage !-->vectorize ?
     Ukp1 = getPartitionFunctionk(elem,j,k)
-    ! fjk(j) = fjk(j-1)/(phi*ne) Saha equation
-    ! Nj = Nj-1/(phi*ne)
-    ! fj = Nj/N = Nj-1/N / (phi*ne)
-    ! See LTEpops_elem in LTE.f90 for further details
+    ! fjk(j) = Nj / Sum_j Nj
+    ! Nj = Nj-1/(phi*ne) Saha Equation
+    ! fj = Nj/N = Nj/N0 / N/N0
+    ! -> first computes Nj/N0 using Nj-1/N0 relative to N0
+    ! -> sum up = 1 + N1/N0 + Nj/N0
+    ! -> divide Nj/N0 by this sum and retrive Nj/N for all j
+    !  --> Nj/N0 / (1+Nj/N0) = Nj/(N0*(1+Nj/N0)) = Nj / (N0 + Nj) = fj
     fjk(j) = Sahaeq(k,fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
     !write(*,*) "j=",j," fjk=",fjk(j)
     dfjk(j) = -(j-1)*fjk(j)/ne
@@ -242,7 +249,11 @@ END FUNCTION getPartitionFunctionk
     Uk = getPartitionFunctionk(atmos%Elements(1), 1, k)
     Ukp1 = getPartitionFunctionk(atmos%Elements(1), 2, k)
 
-    if (Ukp1 /= 1d0) CALL Warning("Partition function of H+ should be 1")
+    if (Ukp1 /= 1d0) then 
+     CALL Warning("Partition function of H+ should be 1")
+     write(*,*) Uk, Ukp1
+     stop
+    end if
     CALL ne_Hionisation (k, Uk, Ukp1, ne_old)
 
     if (atmos%T(k) >= 20d3) then
