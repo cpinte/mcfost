@@ -215,9 +215,9 @@ MODULE simple_models
     end do
 
     if (Tmax > 0d0) atmos%T(:) = Tmax! * atmos%T/maxval(atmos%T)
-write(*,*) "Density and T set to zero for tetsting"
-atmos%nHtot=1d0
-atmos%T =1d0
+! write(*,*) "Density and T set to zero for tetsting"
+! atmos%nHtot=1d0
+! atmos%T =1d0
    !! inclued in atom%vbroad so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
@@ -274,18 +274,18 @@ atmos%T =1d0
    CALL init_atomic_atmos()
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
-   atmos%calc_ne = .false.
+   atmos%calc_ne = .true.
 
    !idk = 10
-    atmos%nHtot =  2.27414200581936d16
-    atmos%T = 45420d0
-    atmos%ne = 2.523785d16
-    atmos%vturb = 9.506225d3 !m/s
+!     atmos%nHtot =  2.27414200581936d16
+!     atmos%T = 45420d0
+!     atmos%ne = 2.523785d16
+!     atmos%vturb = 9.506225d3 !m/s
    
    !idk = 75
-!   atmos%T=7590d0
-!   atmos%ne = 4.446967d20
-!   atmos%nHtot = 1.259814d23
+  atmos%T=7590d0
+  atmos%ne = 4.446967d20
+  atmos%nHtot = 1.259814d23
 
     !idk = 81   
 !     atmos%T=9400d0
