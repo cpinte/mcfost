@@ -1025,7 +1025,9 @@ subroutine initialisation_mcfost()
         lupdate_velocities = .true.
         lvphi_Kep = .true.
      case default
-        call display_help()
+        write(*,*) "Error: unknown option: "//trim(s)
+        write(*,*) "Use 'mcfost -h' to get list of available options"
+        call exit(0)
      end select
   enddo ! while
 
