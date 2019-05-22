@@ -124,7 +124,7 @@ MODULE spectrum_type
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    do nat=1,NLTEspec%atmos%Natom
-    write(*,*) " -->", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
+    write(*,*) "   --> ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "(b-b)", &
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
    end do
