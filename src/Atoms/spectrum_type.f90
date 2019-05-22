@@ -108,6 +108,7 @@ MODULE spectrum_type
    ! This fasten LTE calculation in case of 1 line.
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
+   integer :: nat
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -122,6 +123,11 @@ MODULE spectrum_type
    !Works for Active and Passive atoms alike.
    !-> sort also the grid
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
+   do nat=1,NLTEspec%atmos%Natom
+    write(*,*) " -->", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
+     NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "(b-b)", &
+     NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
+   end do
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
    CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
@@ -279,7 +285,7 @@ MODULE spectrum_type
    !active
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
-   if (NLTEspec%Nact > 0) then
+   if (allocated(NLTEspec%Psi)) then
     deallocate(NLTEspec%Psi, NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
    end if
 
@@ -299,16 +305,17 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE freeSpectrum
 
-  SUBROUTINE initAtomOpac(id)
+  SUBROUTINE initAtomOpac(id, eval_operator)
     ! set opacities to 0d0 for thread id
     integer, intent(in) :: id
+    logical, intent(in) :: eval_operator
     
     if (id <= 0) then
      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
      stop
     end if
     
-    if (NLTEspec%Nact > 0) then
+    if (eval_operator) then
    		 NLTEspec%Psi(:,:,id) = 0d0
    		 NLTEspec%dtau(:,:,id) = 0d0
    	end if

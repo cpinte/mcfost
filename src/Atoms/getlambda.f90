@@ -37,8 +37,6 @@ MODULE getlambda
    
    close(1)
    
-   !...read
-   
   RETURN
   END SUBROUTINE Read_wavelengths_table
   
@@ -53,7 +51,7 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 51
+   integer, parameter :: Nlambda = 101
    integer :: la
    double precision :: l0, l1
    
@@ -89,7 +87,7 @@ MODULE getlambda
    integer :: la, Nlambda, Nmid
    double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.3, L = 10d0!50d0
-   integer, parameter :: Nc = 31, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 101, Nw = 31 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    !If it is needed we can develop an empirical recipe for the line and the element

@@ -156,11 +156,11 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m !we enter at the cell, icell_in
      														  !and we need to compute the length path
      
-     CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
+     CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      if (eval_operator) then
        CALL FillCrossCoupling_terms(id, icell)
@@ -298,7 +298,7 @@ MODULE AtomicTransfer
      l_contrib = l_contrib * AU_to_m
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
-     CALL initAtomOpac(id)
+     CALL initAtomOpac(id,(labs.and.(nbr_cell==1)))
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, (labs.and.(nbr_cell==1)))
 
      if (lstore_opac) then
@@ -796,7 +796,7 @@ MODULE AtomicTransfer
     exit
    end if
   end do
-  CALL initAtomOpac(1)
+  CALL initAtomOpac(1,.false.)
   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
   CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
   do nact=1, NLTEspec%Nwaves
@@ -813,7 +813,7 @@ MODULE AtomicTransfer
   do icell=1,atmos%NactiveAtoms
    CALL writePops(atmos%Atoms(icell)%ptr_atom)
   end do
-  if (atmos%NactiveAtoms>0) stop !temporary
+  !if (atmos%NactiveAtoms>0) stop !temporary
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
@@ -1002,7 +1002,7 @@ MODULE AtomicTransfer
   		n_iter = 0 
   		fac_etape = 1d-2 !1d0
   		disable_subit = .false. !set to true to avoid subiterations over the emissivity
-  		max_sub_iter = 30
+  		max_sub_iter = 20
 
         do while (.not.lconverged)
   			if (lfixed_rays) then
@@ -1120,10 +1120,10 @@ MODULE AtomicTransfer
      				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
      				    			pop_old(nact,ilevel,id)+1d-30))
      				    		diff = max(diff, dN)
-!      				    		if (dN /= 0) then 
-!      							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-!      								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
-!      							end if
+     				    		if (dN /= 0) then 
+     							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+     								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+     							end if
      						end do
      					end do
 
@@ -1211,7 +1211,7 @@ MODULE AtomicTransfer
   END SELECT
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
-  
+
   if (iterate_ne)  CALL writeElectron()
   
   deallocate(pop_old)

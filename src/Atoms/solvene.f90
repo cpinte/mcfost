@@ -146,6 +146,7 @@ END FUNCTION getPartitionFunctionk
    end do
    !Divide by Ntotal and retrieve fj = Nj/N for all j
    fjk(:) = fjk(:)/atom%ntotal(k)
+   !et la dérivée ? dfjk
 
   else !not active or active but first iteration of the NLTEloop so that
   	!NLTEpos has been set to .false., whateveeer, use LTE

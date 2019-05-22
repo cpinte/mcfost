@@ -653,30 +653,30 @@ MODULE atmos_type
        					   atmos%Bxyz(icell,3) * w
        Bmodule = dsqrt(sum(atmos%Bxyz(icell,:)**2))
        gamma = acos(bproj/Bmodule)
-       chi = atmos%Bxyz(icell,1) / Bmodule*sin(gamma)
+       chi = acos(u*sin(gamma))
      else
       if (lmagnetoaccr) then
        r = dsqrt(x**2 + y**2)
        if (r <= tiny_dp) RETURN
-       bx = x/r * atmos%Bxyz(icell,1)
-       by = y/r * atmos%Bxyz(icell,1)
-       bz = atmos%Bxyz(icell,2)
+       bx = x/r * atmos%Bxyz(icell,1) !R
+       by = y/r * atmos%Bxyz(icell,1) !theta
+       bz = atmos%Bxyz(icell,2) !z
        if (z<0) bz = -bz
        !module
        Bmodule = dsqrt(bx**2 + by**2 +bz**2)
        bproj = bx * u + by * v * bz * w
-       gamma = bproj / Bmodule
-       chi = asin(y/r)
+       gamma = acos(bproj / Bmodule)
+       chi = acos(u*sin(gamma))
       else
        !temporary, to work with uniform
         Bmodule = dsqrt(sum(atmos%Bxyz(icell,:)**2))
         r = dsqrt(x**2 + y**2 + z**2)
-        bx = x/r * atmos%Bxyz(icell,1)
-        by = y/r * atmos%Bxyz(icell,2)
-        bz = z/r * atmos%Bxyz(icell,3)
+        bx = x/r * atmos%Bxyz(icell,1) !x
+        by = y/r * atmos%Bxyz(icell,2) !y
+        bz = z/r * atmos%Bxyz(icell,3) !z
         bproj = bx*u + by*v + bz*w
-        gamma = bproj / Bmodule
-        chi = acos(bx/dsqrt(bx**2+by**2))
+        gamma = acos(bproj / Bmodule)
+        chi = acos(bx*sin(gamma))
        !CALL Error("Geometry for magnetic field projection unkown")  
       end if     
      end if

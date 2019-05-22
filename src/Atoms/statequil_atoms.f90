@@ -606,7 +606,7 @@ MODULE statequil_atoms
 
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   atom%n(:,icell) = 0d0
-  atom%n(imaxpop,icell) = atom%ntotal(icell)
+  atom%n(imaxpop,icell) = 1d0!atom%ntotal(icell)
 
   
   !Sum_l'_imaxpop * n_l' = N
@@ -619,6 +619,7 @@ MODULE statequil_atoms
 
   Aij = transpose(atom%Gamma(:,:,id))
   CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
+  atom%n(:,icell) = atom%n(:,icell) * atom%ntotal(icell)
   atom%Gamma(:,:,id) = -1d12
 
  RETURN

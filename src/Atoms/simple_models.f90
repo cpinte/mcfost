@@ -275,17 +275,23 @@ MODULE simple_models
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
    atmos%calc_ne = .true.
+   
+   if (n_cells > 1) then
+    atmos%T(:)=7590d0
+    atmos%ne(:) = 4.446967d20
+    atmos%nHtot(:) = 1.259814d23   
+   end if
 
    !idk = 10
-!     atmos%nHtot =  2.27414200581936d16
-!     atmos%T = 45420d0
-!     atmos%ne = 2.523785d16
-!     atmos%vturb = 9.506225d3 !m/s
+!     atmos%nHtot(1) =  2.27414200581936d16
+!     atmos%T(1) = 45420d0
+!     atmos%ne(1) = 2.523785d16
+!     atmos%vturb(1) = 9.506225d3 !m/s
    
    !idk = 75
-  atmos%T=7590d0
-  atmos%ne = 4.446967d20
-  atmos%nHtot = 1.259814d23
+!   atmos%T(1)=7590d0
+!   atmos%ne(1) = 4.446967d20
+!   atmos%nHtot(1) = 1.259814d23
 
     !idk = 81   
 !     atmos%T=9400d0
@@ -294,10 +300,10 @@ MODULE simple_models
 !     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
-!      atmos%T = 100000d0
-!      atmos%ne = 1.251891d16
-!      atmos%nHtot = 1.045714d16 
-!      atmos%vturb = 10.680960d3 !idk=0
+     atmos%T = 100000d0
+     atmos%ne = 1.251891d16
+     atmos%nHtot = 1.045714d16 
+     atmos%vturb = 10.680960d3 !idk=0
    CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
