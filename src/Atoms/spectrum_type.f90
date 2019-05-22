@@ -108,7 +108,7 @@ MODULE spectrum_type
    ! This fasten LTE calculation in case of 1 line.
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
-   integer :: nat
+   integer :: nat, kr
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -127,6 +127,14 @@ MODULE spectrum_type
     write(*,*) "   --> ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "(b-b)", &
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
+     do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
+       write(*,*) "    b-b #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
+        "nm"     
+     end do
+     do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
+       write(*,*) "    b-f #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
+        "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"    
+     end do
    end do
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
    CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
