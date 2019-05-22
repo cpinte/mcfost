@@ -119,10 +119,10 @@ MODULE spectrum_type
    !and recompute photoionisation cross-section
    CALL Read_wavelengths_table(NLTEspec%lambda)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
-   write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    !Works for Active and Passive atoms alike.
    !-> sort also the grid
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
+   write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    do nat=1,NLTEspec%atmos%Natom
     write(*,*) " -->", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "(b-b)", &

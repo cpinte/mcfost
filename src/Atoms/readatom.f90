@@ -170,7 +170,7 @@ MODULE readatom
      if ((PRT_SOLUTION=="NO_STOKES").or.(.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
      ! -1 = effective triplet, +1
      
-     write(*,*) "Reading line #", kr
+!      write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
          symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
@@ -200,6 +200,8 @@ MODULE readatom
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
+     write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), "nm"
+
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
       atom%lines(kr)%i = min(i,j)
@@ -429,6 +431,9 @@ MODULE readatom
       atom%continua(kr)%Nlambda, nuDepChar, atom%continua(kr)%lambdamin
      j = j + 1
      i = i + 1
+     write(*,*) "Reading continuum #", kr, atom%continua(kr)%lambdamin, "nm", &
+     					1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), "nm"
+
      !because in C indexing starts at 0, but starts at 1 in fortran
      atom%continua(kr)%j = max(i,j)
      atom%continua(kr)%i = min(i,j)
