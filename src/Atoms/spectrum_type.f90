@@ -108,6 +108,7 @@ MODULE spectrum_type
    ! This fasten LTE calculation in case of 1 line.
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
+   integer, dimension(:), allocatable :: Nlam_R
    integer :: nat, kr
    
    old_grid = NLTEspec%lambda
@@ -117,11 +118,16 @@ MODULE spectrum_type
 
    !Reset the differents Nblue, Nred for atomic transitions
    !and recompute photoionisation cross-section
-   CALL Read_wavelengths_table(NLTEspec%lambda)
+   CALL Read_wavelengths_table(NLTEspec%lambda, Nlam_R)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    !Works for Active and Passive atoms alike.
    !-> sort also the grid
-   CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, NLTEspec%atmos%Atoms)
+   !-> make sure to search for transitions in individual regions
+   ! and not in the total grid ! Otherwise, the transitions are kept if they fall
+   ! between lambda(min) and lambda(max)
+   CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, Nlam_R, NLTEspec%atmos%Atoms)
+   deallocate(Nlam_R) !not used anymore  
+   
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    do nat=1,NLTEspec%atmos%Natom
     write(*,*) "   --> ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
@@ -142,7 +148,6 @@ MODULE spectrum_type
    							   !NLTE eval_opartor condition never reached for images.
    !!CALL writeWavelength() !not useful because they are written with the flux and
    						    ! here the wavelength comes from a file..
-
   RETURN
   END SUBROUTINE initSpectrumImage
   

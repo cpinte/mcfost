@@ -15,10 +15,23 @@ MODULE getlambda
 
   CONTAINS
   
-  SUBROUTINE Read_wavelengths_table(lambda_table)
+  SUBROUTINE Read_wavelengths_table(lambda_table, Nlam_I)
+  ! -------------------------------------------------------- !
+  ! Read a wavelenth table of the form:
+  ! Nregion
+  ! Nlam_I(1)
+  ! Nlam_I(2)
+  ! ...
+  ! Nlam_I(Nregion)
+  ! lambda(1) (first region)
+  ! ....
+  ! lambda(sum(Nlam_I)) (last region, last point)
+  ! -------------------------------------------------------- !
+
    double precision, dimension(:), allocatable, intent(inout) :: lambda_table
+   integer, dimension(:), allocatable, intent(out) :: Nlam_I
    character(len=MAX_LENGTH) :: inputline, FormatLine
-   integer :: Nread = 0, Nl, k
+   integer :: Nread = 0, Nl, k, Nr, Nt
    
    if (.not.ltab_wavelength_image) RETURN
    
@@ -28,9 +41,18 @@ MODULE getlambda
    open(unit=1, file=TRIM(tab_wavelength_image), status='old')
    CALL getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline,*) Nl
+   allocate(Nlam_I(Nl)) !wavelength per regions
    
-   allocate(lambda_table(Nl))
    do k=1,Nl
+    CALL getnextline(1, "#", FormatLine, inputline, Nread)
+    read(inputline,*) Nr
+    Nlam_I(k) = Nr
+   end do
+   Nt = sum(Nlam_I)
+ 
+   !read wavelengths
+   allocate(lambda_table(Nt))
+   do k=1,Nt
       CALL getnextline(1, "#", FormatLine, inputline, Nread)
       read(inputline,*) lambda_table(k)
    end do
@@ -472,7 +494,7 @@ MODULE getlambda
   RETURN
   END SUBROUTINE fillPhotoionisationCrossSection
 
-  SUBROUTINE adjust_wavelength_grid(old_grid, lambda, Atoms)
+  SUBROUTINE adjust_wavelength_grid(old_grid, lambda, Lam_region, Atoms)
    ! ------------------------------------------ !
     ! Reallocate wavelengths and indexes arrays
     ! to compute images on a user defined grid
@@ -480,23 +502,27 @@ MODULE getlambda
    use math, only : locate
    use atmos_type, only : realloc_continuum_Transitions, realloc_line_Transitions
    double precision, dimension(:), intent(in) :: old_grid
+   integer, dimension(:), intent(in) :: lam_region
    type (atomPointerArray), dimension(:), intent(inout) :: Atoms
    double precision, dimension(:), intent(inout) :: lambda
-   integer :: Nwaves, n, kr, kc, Nlambda_original, Nblue, Nred, Natom
+   double precision, dimension(size(lambda)) :: lambda_us
+   integer :: Nwaves, n, kr, kc, Nlambda_original, Nblue, Nred, Natom, ll, lll
    double precision :: l0, l1 !ref wavelength of each transitions
    double precision :: x0, x1 !bound of the new grid
    integer, dimension(:), allocatable :: sorted_indexes
    logical, dimension(:), allocatable :: trans_contribute
    type (AtomicContinuum), dimension(:), allocatable :: conta
    type (AtomicLine), dimension(:), allocatable :: lines
+   logical :: in_chan
 
    Natom = size(Atoms)
    Nwaves = size(lambda)
    !check lambda is sorted ?
+   !--> moved after the test over transitions now
    allocate(sorted_indexes(Nwaves))
+   lambda_us(:) = lambda(:)
    sorted_indexes = bubble_sort(lambda)
    lambda(:) = lambda(sorted_indexes)
-
    x0 = minval(lambda); x1 = maxval(lambda)
 
    !Realloc space for atoms
@@ -514,18 +540,39 @@ MODULE getlambda
      l1 = Atoms(n)%ptr_atom%continua(kc)%lambda0!old_grid(Nred)
      !!if l0 out of the new grid, remove it, otherwise get the new index
      !if (l1 < minval(lambda)) then
+!      if (l1 <= x0.or. l0 >= x1) then
+!       !if l1 < x0 then automatically l0 < x0;
+! 									!because l0<l1.
+!      								!and conversely, if l0 > x1 -> l1 > x1
+!       Atoms(n)%ptr_atom%continua(kc)%Nred = -99
+!       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
+!      else
+!       !Otherwise, if l1 in )x0, x1] and l0 < x0 then l0==x0
+!       !and if l0 in [x0, x1( and l1 > x1 then l1 == x1
+!       Atoms(n)%ptr_atom%continua(kc)%Nred = locate(lambda,l1) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
+!       Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0) !
+!      end if
+     in_chan = .false. !equivalent of trans_contribute so be smarter please
+     ll = 0
+     region_loop : do kr=1, size(lam_region)
+     !relative index of regions
+     ll = 1 + ll; lll = sum(lam_region(1:kr))
+     x0 = minval(lambda_us(ll:lll)); x1 = maxval(lambda_us(ll:lll))
      if (l1 <= x0.or. l0 >= x1) then
-      !if l1 < x0 then automatically l0 < x0;
-									!because l0<l1.
-     								!and conversely, if l0 > x1 -> l1 > x1
-      Atoms(n)%ptr_atom%continua(kc)%Nred = -99
-      Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
+      in_chan = .false.
      else
-      !Otherwise, if l1 in )x0, x1] and l0 < x0 then l0==x0
-      !and if l0 in [x0, x1( and l1 > x1 then l1 == x1
+      in_chan = .true.
+      exit region_loop !because if in one region no need to test the others
+     end if
+     ll = ll + sum(lam_region(1:kr))
+     end do region_loop
+     if (in_chan) then
       Atoms(n)%ptr_atom%continua(kc)%Nred = locate(lambda,l1) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
       Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0) !
       Nred = Atoms(n)%ptr_atom%continua(kc)%Nred; Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue
+     else
+      Atoms(n)%ptr_atom%continua(kc)%Nred = -99
+      Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
      end if
 !      if (l0 > maxval(lambda)) then
 !       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
@@ -575,12 +622,40 @@ MODULE getlambda
      l1 = old_grid(Nred)
      !if l0 out of the new grid, remove it, otherwise get the new index
      !if (l0 > maxval(lambda)) then
-     if (l1 <= x0 .or. l0 >= x1) then
+     !relative index of regions
+!      if (l1 <= x0 .or. l0 >= x1) then
+!       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
+!       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
+!      else
+!       Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0)
+!       Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
+!       exit region_loop_l !because if in one region no need to test the others
+!      end if
+     in_chan = .false.
+     ll = 0
+     !!write(*,*) size(lam_region), l0, l1, Atoms(n)%ptr_atom%lines(kr)%lambda0
+     region_loop_l : do kc=1, size(lam_region)
+     !relative index of regions
+     ll = 1 + ll; lll = sum(lam_region(1:kc))
+     !!write(*,*) kc, ll, lll, lam_region(kc), lll-ll+1
+     x0 = minval(lambda_us(ll:lll)); x1 = maxval(lambda_us(ll:lll))
+     !!write(*,*) x0, x1
+     if (l1 <= x0.or. l0 >= x1) then
+      in_chan = .false.
+     else
+      in_chan = .true.
+      exit region_loop_l !because if in one region no need to test the others
+     end if
+     ll = sum(lam_region(1:kc))
+     end do region_loop_l
+     !!write(*,*) in_chan
+
+     if (in_chan) then
+      Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
+      Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1) !
+     else
       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
-     else
-      Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0)
-      Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
      end if
 !      if (l1 < minval(lambda)) then
 !       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
