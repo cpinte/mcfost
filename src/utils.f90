@@ -539,6 +539,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      return
   endif
 
+  ios=0
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
@@ -957,11 +958,18 @@ real function get_mcfost_utils_version()
   ! Check utils directory
   get_mcfost_utils_version = 0.0
   open(unit=1, file=trim(mcfost_utils)//"/Version", status='old',iostat=ios)
+  if (ios /= 0) then
+     write(*,*) "I could not find the file: "//trim(mcfost_utils)//"/Version"
+     get_mcfost_utils_version = 0.0
+  endif
   read(1,*,iostat=ios) get_mcfost_utils_version
   close(unit=1,iostat=ios)
-  if (ios /= 0) get_mcfost_utils_version = 0.0
+  if (ios /= 0) then
+     write(*,*) "I could not read the version number in file: "//trim(mcfost_utils)//"/Version"
+     get_mcfost_utils_version = 0.0
+  endif
 
-  if (abs(get_mcfost_utils_version) < 1e-6) call error("could not find current MCFOST utils version")
+  if (abs(get_mcfost_utils_version) < 1e-6) call error("I could not find current MCFOST utils version")
 
   return
 

@@ -235,13 +235,14 @@ release : clean main
 	- git tag -d release
 	git tag release
 	git push github
+	git push github --tags --force
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/linux web/macos
+	mkdir web web/linux web/mac
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
-	mv mcfost_bin.tgz web/macos/
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
+	mv mcfost_bin.tgz web/mac/
 	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
@@ -251,24 +252,25 @@ release : clean main
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update"
+	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 	rm -rf yorick web
 	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/macos
+	mkdir web web/mac
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
-	mv mcfost_bin.tgz web/macos/
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
+	mv mcfost_bin.tgz web/mac/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
+	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 	rm -rf yorick web
 
 release_utils :

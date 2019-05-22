@@ -145,6 +145,10 @@ subroutine set_default_variables()
   lfix_star = .false.
   lscale_units = .false.
   lignore_dust = .false.
+  lupdate_velocities = .false.
+  lno_vr = .false.
+  lno_vz = .false.
+  lvphi_Kep = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -233,6 +237,12 @@ subroutine initialisation_mcfost()
 
   ! Global logical variables
   call set_default_variables()
+
+  ! Setting up web-server
+  call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
+  webpage = trim(web_server)//trim(webpage)
+  utils_webpage = trim(web_server)//trim(utils_webpage)
+  doc_webpage = trim(web_server)//trim(doc_webpage)
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
@@ -1073,8 +1083,22 @@ subroutine initialisation_mcfost()
      case("-ignore_dust")
         i_arg = i_arg + 1
         lignore_dust=.true.
+     case("-no_vr")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vr = .true.
+     case("-no_vz")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vz = .true.
+     case("-vphi_Kep","-vphi_kep")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lvphi_Kep = .true.
      case default
-        call display_help()
+        write(*,*) "Error: unknown option: "//trim(s)
+        write(*,*) "Use 'mcfost -h' to get list of available options"
+        call exit(0)
      end select
   enddo ! while
 
@@ -1121,11 +1145,11 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
-  
+
   if ((lascii_pluto_file.or.lpluto_file).and.(lascii_sph_file.or.lphantom_file)) then
    call error("Cannot use Phantom and Pluto files at the same time presently.")
   end if
-  
+
   if ((prt_solution /= "FULL_STOKES").and.(prt_solution /= "NO_STOKES").and.&
   	(prt_solution /= "FIELD_FREE")) then
    call error("Solution", prt_solution,"unknown")
@@ -1539,6 +1563,14 @@ subroutine display_help()
   write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
+  write(*,*) " "
+  write(*,*) " Options related to phantom"
+  write(*,*) "        : -fix_star"
+  write(*,*) "        : -scale_units"
+  write(*,*) "        : -ignore_dust"
+  write(*,*) "        : -no_vr : force the radial velocities to be 0"
+  write(*,*) "        : -no_vz : force the vertical velocities to be 0"
+  write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

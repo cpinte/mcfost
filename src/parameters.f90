@@ -126,6 +126,7 @@ module parametres
   ! Phantom
   logical :: ldudt_implicit, lscale_units, lignore_dust
   real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax
+  logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep
 
   ! Disk parameters
   real :: distance ! Distance du disque en pc
