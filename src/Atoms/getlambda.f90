@@ -108,7 +108,8 @@ MODULE getlambda
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision :: adamp_char = 0d0
-   double precision, parameter :: wing_to_core = 0.3, L = 10d0!50d0
+   double precision, parameter :: wing_to_core = 0.3, L = 1.1d0!10d0!depends on what is v_char
+   		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
    integer, parameter :: Nc = 101, Nw = 31 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)

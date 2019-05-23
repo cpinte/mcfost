@@ -518,7 +518,7 @@ MODULE readatom
      !because it depends only on vD and v_char which depends on the atom and on the model.
      !This is because the Number of core/wing points are fixed.
      CALL make_sub_wavelength_grid_line(atom%lines(kr), &
-                                        minval(atom%vbroad,mask=atom%vbroad>0)) !MAXVAL(atom%vbroad)
+                                        maxval(atom%vbroad,mask=atom%vbroad>0)) !MAXVAL(atom%vbroad)
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
