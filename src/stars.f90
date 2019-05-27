@@ -852,6 +852,7 @@ end subroutine intersect_stars
    ispot = 0
    lintersect = .false.
    spot_loop : do i = 1, etoile(i_star)%Nr
+   mu = 0
 !    
 !      mu = abs(dot_product(r,k))/dsqrt(x**2+y**2+z**2)
 !      phi = atan2(y,x)+pi!modulo(atan2(y,x),2*real(pi,kind=dp))!atan2(y,x)+pi
@@ -861,7 +862,7 @@ end subroutine intersect_stars
 !      dphi = maxval(etoile(i_star)%SurfB(i)%phibound) - minval(etoile(i_star)%SurfB(i)%phibound)
       
      if (mu**2 >= mus) then !inside the spot
-     write(*,*) mu
+     write(*,*) "mu=",mu
 
        ispot = i
        lintersect = .true.
