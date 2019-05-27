@@ -121,6 +121,8 @@ MODULE AtomicTransfer
     ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
     
+    nbr_cell = nbr_cell + 1
+    
     if (lintersect_stars) then
       if (icell == icell_star) then !this is equivalent to compute_stars_map()
        !if we start at icell, computes the radiation from the star to icell.
@@ -134,7 +136,7 @@ MODULE AtomicTransfer
       end if
     endif
 
-    nbr_cell = nbr_cell + 1
+    !nbr_cell = nbr_cell + 1
 
     ! Calcul longeur de vol et profondeur optique dans la cellule
     previous_cell = 0 ! unused, just for Voronoi
@@ -723,8 +725,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
+   !CALL magneto_accretion_model()  
+   CALL uniform_law_model()
    !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
@@ -735,7 +737,7 @@ MODULE AtomicTransfer
   ! on the whole grid space.
   CALL readAtomicModels(atomunit)
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 50
+   atmos%Nrays = 100
    write(*,*) " Using", atmos%Nrays," rays for NLTE line transfer"
   end if
 
@@ -880,8 +882,8 @@ MODULE AtomicTransfer
  
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 5 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
-  integer, parameter :: n_rayons_start2 = 50
+  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp
@@ -983,7 +985,7 @@ MODULE AtomicTransfer
 
   		!only etape2 or 3 for now
   		lfixed_rays = .true.
-  		n_rayons = n_rayons_start !and will increase up atom%Nrays or n_rayons_max
+  		n_rayons = n_rayons_start
   		iray_start = 1
   		lprevious_converged = .false.
   		lnotfixed_rays = .not.lfixed_rays
@@ -1036,7 +1038,7 @@ MODULE AtomicTransfer
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
             !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell) &
-            !$omp private(xyz0, uvw0) &
+            !$omp private(xyz0, uvw0, atom) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
             !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
@@ -1083,8 +1085,9 @@ MODULE AtomicTransfer
     				!save pops for all active atoms
     				!pop(NactAtom, Nmaxlvel, Nthreads)
     				do nact=1,atmos%NactiveAtoms
-    				 pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
-    				  atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				 atom => atmos%ActiveAtoms(nact)%ptr_atom
+    				 pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
+    				 atom => NULL()
     				end do
     				
     				!lconverged_loc = disable_subit !to disable sub-it
@@ -1103,21 +1106,24 @@ MODULE AtomicTransfer
 						CALL updatePopulations(id, icell)
 						
     				    do nact=1,atmos%NactiveAtoms
-    				     pop(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,id) = &
-    				     atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell)
+    				     atom => atmos%ActiveAtoms(nact)%ptr_atom
+    				     pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
+    				     atom => NULL()
     				    end do
 						
 						diff = 0.0 !keeps track of the maximum dpops(dN) among each atom.
      					do nact=1,atmos%NactiveAtoms
-     						do ilevel=1,atmos%ActiveAtoms(nact)%ptr_atom%Nlevel
+     					    atom => atmos%ActiveAtoms(nact)%ptr_atom
+     						do ilevel=1,atom%Nlevel
      				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
      				    			pop_old(nact,ilevel,id)+1d-30))
      				    		diff = max(diff, dN)
      				    		! if (dN /= 0) then 
 !      							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-!      								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+!      								n_iter_loc, atom%ID, " dpops = ", dN
 !      							end if
      						end do
+     						atom => NULL()
      					end do
 
        					if (diff < precision_sub) then
@@ -1154,12 +1160,13 @@ MODULE AtomicTransfer
   			  	diff = 0d0
   				if (atmos%lcompute_atomRT(icell)) then
      				do nact=1,atmos%NactiveAtoms
-     				    dN = abs(maxval((gpop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,icell)-&
-     				    	atmos%ActiveAtoms(nact)%ptr_atom%n(:,icell))/&
-     				    	gpop_old(nact,1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,icell)+1d-300))
+     		            atom => atmos%ActiveAtoms(nact)%ptr_atom
+     				    dN = abs(maxval((gpop_old(nact,1:atom%Nlevel,icell)-atom%n(:,icell))/&
+     				    	gpop_old(nact,1:atom%Nlevel,icell)+1d-300))
      				    diff = max(diff, dN)
      					if (dN>1) &
-     						write(*,*) " g-it->", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN, diff
+     						write(*,*) " g-it->", atom%ID, " dpops = ", dN, diff
+     					atom => NULL()
      				end do
      	     		!if (diff < precision) CYCLE cell_loop2
      			end if
@@ -1210,10 +1217,12 @@ MODULE AtomicTransfer
   deallocate(pop_old)
   if (allocated(pop)) deallocate(pop)
   do nact=1,atmos%Nactiveatoms
+   atom  => atmos%ActiveAtoms(nact)%ptr_atom
    if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
    deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
    if (Ng_acceleration) CALL freeNg(atmos%ActiveAtoms(nact)%ptr_atom%Ngs)
+   atom => NULL()
   end do
   deallocate(ds)
  ! ------------------------------------------------------------------------------------ !

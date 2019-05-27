@@ -321,7 +321,7 @@ MODULE simple_models
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Mdot = 1d-6, Vexp = 1000d3, beta = 2d0
+   double precision, parameter :: Mdot = 1d-6, Vexp = 900d3, beta = 2d0
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 1d0, Rlimit=0.8
    double precision, parameter :: finf = 0.1, vclp = 100d3
    double precision :: Rstar, Mstar, Vr, rhor, rho_to_nH

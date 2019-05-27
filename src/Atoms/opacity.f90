@@ -267,6 +267,7 @@ MODULE Opacity
     i = line%i; j=line%j
     
     if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
+    	write(*,*) tiny_dp
         write(*,*) aatom%n(:,icell)
      	CALL Warning("too small line populations") !or Error()
      	CYCLE
