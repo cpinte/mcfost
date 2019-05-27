@@ -79,9 +79,14 @@ MODULE spectrum_type
    !integer, intent(in) :: NPROC
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air
+   logical :: alloc_nlte_vars, alloc_image_vars
       
    NLTEspec%atmos => atmos
-
+   alloc_nlte_vars = NLTEspec%atmos%Nactiveatoms > 0
+   alloc_image_vars = .not.ltab_wavelength_image
+   
+   if (.not.alloc_nlte_vars .and. .not.alloc_image_vars) RETURN
+   
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms
    NLTEspec%NPROC = nb_proc!NPROC
@@ -97,6 +102,12 @@ MODULE spectrum_type
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    CALL writeWavelength()
+   CALL allocSpectrum(alloc_nlte_vars,& !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
+  							 !.false. => if NLTE, skip this allocation
+  							 !we probably do an image and we do not need these values.
+       alloc_image_vars) !alloc flux only if we do not read an ascii waves list.
+   !should consider to do that only if Nlte is on, otherwise we go directly to image
+  
   RETURN
   END SUBROUTINE initSpectrum
   
@@ -143,7 +154,7 @@ MODULE spectrum_type
      end do
    end do
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
-   CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
+   CALL allocSpectrum(.false.,.true.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
    							   !NLTE eval_opartor condition never reached for images.
    !!CALL writeWavelength() !not useful because they are written with the flux and
@@ -175,13 +186,13 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE reallocate_rays_arrays
 
-  SUBROUTINE allocSpectrum(alloc_atom_nlte)!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
+  SUBROUTINE allocSpectrum(alloc_atom_nlte, alloc_image)!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    !Polarized quantities allocated in adjustStokesMode
    integer :: nat, k
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line
-   logical, intent(in)    :: alloc_atom_nlte
+   logical, intent(in)    :: alloc_atom_nlte, alloc_image
    
    if (allocated(NLTEspec%I)) then
     write(*,*) "Error I already allocated"
@@ -201,11 +212,13 @@ MODULE spectrum_type
    NLTEspec%J = 0.0
    NLTEspec%Jc = 0.0
       
-   allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
-   allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
+   if (alloc_image) then
+    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
+    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
 
-   NLTEspec%Flux = 0.0
-   NLTEspec%Fluxc = 0.0
+    NLTEspec%Flux = 0.0
+    NLTEspec%Fluxc = 0.0
+   end if
    
    !Now opacities
    if (lstore_opac) then !keep continuum LTE opacities in memory
@@ -238,12 +251,12 @@ MODULE spectrum_type
    !do not try to realloc after non-LTE for image.
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
    !in NLTEOpacity()
-   if (NLTEspec%Nact > 0 .and. alloc_atom_nlte) then !NLTE loop activated
+   if (alloc_atom_nlte) then !NLTE loop activated
     !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
     !NLTEspec%AtomOpac%initialized(:) = .false.
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
-    
+
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
@@ -282,8 +295,9 @@ MODULE spectrum_type
 
   SUBROUTINE freeSpectrum() 
    deallocate(NLTEspec%lambda)
-   deallocate(NLTEspec%J, NLTEspec%I, NLTEspec%Flux)
-   deallocate(NLTEspec%Jc, NLTEspec%Ic, NLTEspec%Fluxc)
+   deallocate(NLTEspec%J, NLTEspec%I)
+    if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)
+   deallocate(NLTEspec%Jc, NLTEspec%Ic)
    if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
    if (NLTEspec%atmos%Magnetized) then 
     !check allocation due to field_free sol

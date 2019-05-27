@@ -723,9 +723,9 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
+   CALL magneto_accretion_model()  
    !CALL uniform_law_model()
-   CALL spherical_shells_model
+   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -767,11 +767,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
   if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
   !otherwise not necessary to write them, because they are in flux.fits
-  CALL initSpectrum(lam0=656.398393d0,vacuum_to_air=lvacuum_to_air)
-  CALL allocSpectrum(.true.) !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
-  							 !.false. => if NLTE, skip this allocation
-  							 !we probably do an image and we do not need these values.
-  !should consider to do that only if Nlte is on, otherwise we go directly to image
+  CALL initSpectrum(vacuum_to_air=lvacuum_to_air)
   if (lstore_opac) then 
   !if NLTE always compute it. If LTE and we do not use special grid for image, compute also
    if ((atmos%NactiveAtoms > 0) .or.&
@@ -909,6 +905,7 @@ MODULE AtomicTransfer
   double precision, allocatable, dimension(:,:,:) :: pop_old, pop
   double precision, allocatable, dimension(:,:,:) :: gpop_old
   real(kind=dp), dimension(3, atmos%Nrays) :: xyz0, uvw0
+  type (AtomType), pointer :: atom
 
   write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
 
@@ -928,19 +925,27 @@ MODULE AtomicTransfer
   ! for now initialSol() is replaced by this if loop on active atoms
   NmaxLevel = 0
   do nact=1,atmos%Nactiveatoms
+     atom => atmos%ActiveAtoms(nact)%ptr_atom
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
-     atmos%ActiveAtoms(nact)%ptr_atom%NLTEpops = .true.
-     Nlevel_total = Nlevel_total + atmos%ActiveAtoms(nact)%ptr_atom%Nlevel**2
-     NmaxLevel = max(NmaxLevel, atmos%ActiveAtoms(nact)%ptr_atom%Nlevel)
-     write(*,*) "Setting initial solution for active atom ", atmos%ActiveAtoms(nact)%ptr_atom%ID, &
-      atmos%ActiveAtoms(nact)%ptr_atom%active
-     atmos%ActiveAtoms(nact)%ptr_atom%n = 1d0*atmos%ActiveAtoms(nact)%ptr_atom%nstar
+     atom%NLTEpops = .true.
+     Nlevel_total = Nlevel_total + atom%Nlevel**2
+     NmaxLevel = max(NmaxLevel, atom%Nlevel)
+     write(*,*) "Setting initial solution for active atom ", atom%ID, atom%active
+     atom%n = 1d0*atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
      !!Allocate Ng structure of all levels of all atoms, updated at each cell
-     if (Ng_acceleration) &
-     CALL initNg(atmos%ActiveAtoms(nact)%ptr_atom%Nlevel, \
-      2, 3, 6, atmos%ActiveAtoms(nact)%ptr_atom%n(:,1), atmos%ActiveAtoms(nact)%ptr_atom%Ngs)
+     !!-> check allocation in statequil
+     !!if (Ng_acceleration) CALL initNg(atom%Nlevel, 2, 3, 6,atom%n(:,1), atom%Ngs)
+     allocate(atom%Gamma(atom%Nlevel, atom%Nlevel,NLTEspec%NPROC))
+     do icell=1,atmos%Nspace
+        if (atmos%lcompute_atomRT(icell)) CALL CollisionRate(icell, atom) !open and allocated in LTE.f90
+      !try keeping in memory until better collision routine !
+  	 end do	
+  	 CALL closeCollisionFile(atom) !if opened
+    !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
+  	 deallocate(atom%C) !not used anymore if stored on RAM
+     atom => NULL()
   end do
   
   ! Temporary keep collision on RAM, BEWARE IT CAN BE LARGE, need a better collision routine
@@ -953,22 +958,6 @@ MODULE AtomicTransfer
     write(*,*) "Keeping", real(Nlevel_total*n_cells)/(1024**3), " GB of memory", &
    	 " for Collisional matrix."
    end if
-
-   do nact=1,atmos%Nactiveatoms !not parallel because we read in file Nspace time atm.
-     do icell=1,atmos%Nspace
-        !allocate Gamma Here
-!         allocate(atmos%atoms(nact)%ptr_Atom%Gamma(&
-!         	atmos%atoms(nact)%ptr_atom%Nlevel,atmos%atoms(nact)%ptr_Atom%Nlevel))
-!         atmos%atoms(nact)%ptr_Atom%Gamma(:,:) = 0d0
-        if (atmos%lcompute_atomRT(icell)) &
-	     CALL CollisionRate(icell, atmos%ActiveAtoms(nact)%ptr_atom) !open and allocated in LTE.f90
-      !try keeping in memory until better collision routine !
-  	end do	
-  	CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
-    !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
-  	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%C) !not used anymore if stored on RAM
-  end do
-
   !end replacing initSol()
  ! ------------------------------------------------------------------------------------ !
   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
@@ -1020,23 +1009,27 @@ MODULE AtomicTransfer
             end do
 
             write(*,*) " -> Iteration #", n_iter
-!  			!$omp parallel &
-!             !$omp default(none) &
-!             !$omp private(id,icell) &
-!             !$omp shared(n_cells, atmos, NLTEspec)
-!             !$omp do schedule(static,1)
+!  			$omp parallel &
+!             $omp default(none) &
+!             $omp private(id,icell) &
+!             $omp shared(n_cells, atmos, NLTEspec, Hydrogen)
+!             $omp do schedule(static,1)
 !   			do icell=1, n_cells
 !    				$ id = omp_get_thread_num() + 1
 !    				if (atmos%lcompute_atomRT(icell)) then
 !      			    write(*,*) "icell=", icell, " id=", id
 !   			        CALL initGamma(id,icell)
-!   			        write(*,*) Atmos%ActiveAtoms(1)%ptr_atom%Gamma(1,2,:)
+!   			        CALL initAtomOpac(id,.true.)
+!                     CALL fillGamma_Hogereijde(id, icell, 1, 1)
+!                     write(*,*) icell, id, atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell)
+!   			        write(*,*) icell, id, Hydrogen%Gamma(1,2,id), Hydrogen%Ckij(icell,1*4+1)
+!   			        if (Hydrogen%Gamma(1,2,id) > huge_dp) stop
 !   			    end if
 !   			end do
-!         	!$omp end do
-!         	!$omp end parallel
+!         	$omp end do
+!         	$omp end parallel
 !   			stop
-!   			
+  			
   			
   			
  			!$omp parallel &
@@ -1120,10 +1113,10 @@ MODULE AtomicTransfer
      				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
      				    			pop_old(nact,ilevel,id)+1d-30))
      				    		diff = max(diff, dN)
-     				    		if (dN /= 0) then 
-     							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-     								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
-     							end if
+     				    		! if (dN /= 0) then 
+!      							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+!      								n_iter_loc, atmos%ActiveAtoms(nact)%ptr_atom%ID, " dpops = ", dN
+!      							end if
      						end do
      					end do
 
@@ -1419,15 +1412,15 @@ MODULE AtomicTransfer
    !stop
    
    !2) Correct with the contrast gamma of a hotter/cooler region if any
-   CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-   if (lintersect_spot) then
-!      gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
-!      			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
-!      write(*,*) maxval(gamma)!, &
-!      maxval((dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)), &
-!      maxval((dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1))
-    gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
-   end if
+!    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
+!    if (lintersect_spot) then
+! !      gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
+! !      			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
+! !      write(*,*) maxval(gamma)!, &
+! !      maxval((dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)), &
+! !      maxval((dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1))
+!     gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
+!    end if
 
    !3) Apply Limb darkening   
    if (llimb_darkening) then
