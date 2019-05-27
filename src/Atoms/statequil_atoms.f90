@@ -82,10 +82,8 @@ MODULE statequil_atoms
   nati = 1; natf = atmos%Nactiveatoms
   do nact = nati, natf
    atom => atmos%ActiveAtoms(nact)%ptr_atom
-   !write(*,*) icell, id, nact, atom%ID
+!    write(*,*) "icell in initG", icell, "id=", id!, nact, atom%ID
    Nlevel = atom%Nlevel
-   if (allocated(atom%Ngs%previous)) atom%Ngs%previous(1,:) = atom%n(:,icell)
-   if (.not.allocated(atom%Gamma)) allocate(atom%Gamma(Nlevel, Nlevel,NLTEspec%NPROC))
 !   open(unit=12, file="Cji_Cij_H4x4.dat",status="unknown")
 
    do lp=1,Nlevel
@@ -93,7 +91,7 @@ MODULE statequil_atoms
       ij = (l-1)*nlevel + lp!lp->l
       ji = (lp-1)*nlevel + l!l->lp
       !          col/row
-      atom%Gamma(lp,l,id) = c_lte*atom%Ckij(icell,ij) !Gamma_llp = Gamma(lp, l) rate from lp to l
+      atom%Gamma(lp,l,id) =  c_lte*atom%Ckij(icell,ij)!Gamma_llp = Gamma(lp, l) rate from lp to l
       !!                                                      Cul                  Clu=Cul*nu/nl with Cul=Gul here
 !      write(12,'(6E)') real(lp), real(l), real(ij), real(ji), atom%Ckij(icell,ij), atom%Gamma(lp,l) * atom%nstar(lp, icell)/atom%nstar(l,icell)
     end do

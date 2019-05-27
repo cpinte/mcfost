@@ -44,8 +44,8 @@ MODULE simple_models
    use utils, only : interp_dp
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell, flip_flop
-   double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=1d4, Macc = 1d-9
+   double precision, parameter :: Tmax = 0d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=0d4, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
@@ -156,6 +156,7 @@ MODULE simple_models
        y = sinTheta**2
 
        Vphi = Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
+
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
        
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
@@ -222,7 +223,7 @@ MODULE simple_models
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
     atmos%v_char = atmos%v_char + &
-    minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
    
@@ -300,10 +301,10 @@ MODULE simple_models
 !     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
-     atmos%T = 100000d0
-     atmos%ne = 1.251891d16
-     atmos%nHtot = 1.045714d16 
-     atmos%vturb = 10.680960d3 !idk=0
+     atmos%T(1) = 100000d0
+     atmos%ne(1) = 1.251891d16
+     atmos%nHtot(1) = 1.045714d16 
+     atmos%vturb(1) = 10.680960d3 !idk=0
    CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
@@ -388,10 +389,10 @@ MODULE simple_models
 
     if (.not.linfall) then
     	atmos%v_char = atmos%v_char + &
-    	minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    	maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
     else
-        atmos%v_char = atmos%v_char + minval(Vfield)
+        atmos%v_char = atmos%v_char + maxval(Vfield)
     end if
 
 
