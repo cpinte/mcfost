@@ -835,15 +835,15 @@ end subroutine intersect_stars
   ! ------------------------------------------------------------ !
    ! Knowing a ray/pack hits the star, will it hit a spot ?
    ! suppose no spot overlap.
-   ! Will the ray inside a circle of radius rstar*rspot
   ! ------------------------------------------------------------ !
+   use simple_models, only : rotateZ
    real(kind=dp), intent(in) :: x,y,z, u,v,w
    logical, intent(out) :: lintersect
    integer, intent(in) :: i_star
    integer, intent(out) :: ispot
 
    real(kind=dp), dimension(3) :: r, k
-   real(kind=dp) :: mu, phi, dmu, dphi, mus
+   real(kind=dp) :: mu, phi
    integer :: i
    
    r(1) = x ; r(2) = y ; r(3) = z
@@ -852,21 +852,14 @@ end subroutine intersect_stars
    ispot = 0
    lintersect = .false.
    spot_loop : do i = 1, etoile(i_star)%Nr
-   mu = 0
-!    
-!      mu = abs(dot_product(r,k))/dsqrt(x**2+y**2+z**2)
-!      phi = atan2(y,x)+pi!modulo(atan2(y,x),2*real(pi,kind=dp))!atan2(y,x)+pi
-! 
-!      mus = sqrt(1-0.2)!abs(dot_product(etoile(i_star)%SurfB(i)%r,k))
-!      dmu = dot_product(etoile(i_star)%SurfB(i)%r,etoile(i_star)%SurfB(i)%r1)
-!      dphi = maxval(etoile(i_star)%SurfB(i)%phibound) - minval(etoile(i_star)%SurfB(i)%phibound)
-      
-     if (mu**2 >= mus) then !inside the spot
-     write(*,*) "mu=",mu
 
+      mu = abs(dot_product(r,etoile(i_star)%SurfB(i)%r))/dsqrt(x**2+y**2+z**2)
+      phi = modulo(atan2(y,x),2*real(pi,kind=dp))!atan2(y,x)+pi
+
+     if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
+        (mu>=etoile(i_star)%SurfB(i)%mui)) then !inside the spot
        ispot = i
        lintersect = .true.
-       stop
        exit spot_loop
      end if
    end do spot_loop

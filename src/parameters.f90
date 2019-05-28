@@ -187,9 +187,7 @@ module parametres
 
   !Need to know the position on the star of the spot and its extent
   type surface_brightness_type
-     real(kind=dp) :: x, y, z !coordinates of the center of circular region, of Surface Sr
-     real(kind=dp) :: r(3), limits(6)
-     real(kind=dp) :: dOmega, Sp
+     real(kind=dp) :: r(3), muo, mui
      real(kind=dp) :: T ! Temperature of the region
  end type surface_brightness_type
 

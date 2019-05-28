@@ -45,12 +45,12 @@ MODULE simple_models
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell, flip_flop
    double precision, parameter :: Tmax = 0d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=0d4, Macc = 1d-7
+   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=1d4, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
-   double precision :: Bp, BR, Bz, ts, ps
+   double precision :: Bp, BR, Bz, tc, phic
    logical :: lwrite_model_ascii = .false.
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -103,27 +103,23 @@ MODULE simple_models
    allocate(etoile(1)%SurfB(etoile(1)%Nr))
    flip_flop = 0
    do k=1,etoile(1)%Nr
-    Theta = 0d0
-    phi = 0d0
+    tc = 0d0 !center of vector position
+    phic = 0d0 !vector position, pointing to the center of the spot
     if (k==2) flip_flop = -1 !for the ring in the southern hemisphere
-    etoile(1)%SurfB(k)%T = 2*4d3*(1-1.5*flip_flop)
+    etoile(1)%SurfB(k)%T = Tring
     !center of the spot
-    etoile(1)%SurfB(k)%x = cos(phi)*sin(theta-PI*flip_flop)
-    etoile(1)%SurfB(k)%y = sin(phi)*sin(theta-PI*flip_flop)
-    etoile(1)%SurfB(k)%z = cos(theta-PI*flip_flop)
-    etoile(1)%SurfB(k)%r(:) = (/etoile(1)%SurfB(k)%x,etoile(1)%SurfB(k)%y,etoile(1)%SurfB(k)%z/)
-    !limits in colatitude on the sphere / disk: we store mu = cos(theta)
-    !etoile(1)%SurfB(k)%limits(1) = cos(thetai); etoile(1)%SurfB(k)%limits(2)=cos(thetao) 
-    etoile(1)%SurfB(k)%limits(1) = cos(theta)-0.2*cos(theta); etoile(1)%SurfB(k)%limits(2)=cos(theta)
-    !limits in azimuth on the sphere / disk
-    etoile(1)%SurfB(k)%limits(3) = phi; etoile(1)%SurfB(k)%limits(4)=2*PI
-    !Surface on the apparent radius of one ring
-    etoile(1)%SurfB(k)%Sp = (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
-    			abs(etoile(1)%SurfB(k)%limits(1)**2-etoile(1)%SurfB(k)%limits(2)**2) / (2d0 * PI)
-    etoile(1)%SurfB(k)%dOmega=dsqrt(1d0-etoile(1)%SurfB(k)%Sp)
-    write(*,*) " Surface on the disk of the spot ", k, etoile(1)%SurfB(k)%Sp, etoile(1)%SurfB(k)%dOmega, &
-    (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
-    			abs(etoile(1)%SurfB(k)%limits(1)-etoile(1)%SurfB(k)%limits(2)) / (4d0 * PI)
+    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc-PI*flip_flop)
+    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc-PI*flip_flop)
+    etoile(1)%SurfB(k)%r(3) = cos(tc-PI*flip_flop)
+    etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
+
+!     Surface on the apparent radius of one ring
+!     etoile(1)%SurfB(k)%Sp = (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
+!     			abs(etoile(1)%SurfB(k)%limits(1)**2-etoile(1)%SurfB(k)%limits(2)**2) / (2d0 * PI)
+!     etoile(1)%SurfB(k)%dOmega=dsqrt(1d0-etoile(1)%SurfB(k)%Sp)
+!     write(*,*) " Surface on the disk of the spot ", k, etoile(1)%SurfB(k)%Sp, etoile(1)%SurfB(k)%dOmega, &
+!     (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
+!     			abs(etoile(1)%SurfB(k)%limits(1)-etoile(1)%SurfB(k)%limits(2)) / (4d0 * PI)
    end do
 
   
@@ -364,15 +360,12 @@ MODULE simple_models
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
        
-       !if (r>Rlimit*Rmax) exit all_loop
        Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
        fclump = finf * (1d0 - finf) * dexp(-Vr/Vclp)
        rhor = fclump * Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
        atmos%nHtot(icell) = rhor * rho_to_nH
        atmos%T(icell) = (r0*etoile(1)%r/r)**2 * etoile(1)%T
        atmos%vturb(icell) = 2d0 * (20d0 - 2d0) * Vr/Vexp
-       !atmos%nHtot = nH0 * (r0*etoile(1)%r / r)**(2d0-beta)
-       !Vr = Vexp * (r0*etoile(1)%r / r)**beta
 
        !!->expansion
         if (.not.linfall) then !expansion not analytic

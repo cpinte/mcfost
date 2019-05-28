@@ -84,8 +84,7 @@ MODULE spectrum_type
    NLTEspec%atmos => atmos
    alloc_nlte_vars = NLTEspec%atmos%Nactiveatoms > 0
    alloc_image_vars = .not.ltab_wavelength_image
-   
-   if (.not.alloc_nlte_vars .and. .not.alloc_image_vars) RETURN
+
    
    NLTEspec%Nact = NLTEspec%atmos%Nactiveatoms
    NLTEspec%Npass = NLTEspec%atmos%Npassiveatoms

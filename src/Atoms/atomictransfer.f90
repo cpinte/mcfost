@@ -725,8 +725,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
-   CALL uniform_law_model()
+   CALL magneto_accretion_model()  
+   !CALL uniform_law_model()
    !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
@@ -770,12 +770,10 @@ MODULE AtomicTransfer
   if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
   !otherwise not necessary to write them, because they are in flux.fits
   CALL initSpectrum(vacuum_to_air=lvacuum_to_air)
-  if (lstore_opac) then 
-  !if NLTE always compute it. If LTE and we do not use special grid for image, compute also
-   if ((atmos%NactiveAtoms > 0) .or.&
-      (atmos%NactiveAtoms==0 .and. .not.ltab_wavelength_image)) &
-    CALL storeBackground()
- end if
+  if ((atmos%NactiveAtoms > 0) .or.&
+      (atmos%NactiveAtoms==0 .and. .not.ltab_wavelength_image)) then
+    if (lstore_opac) CALL storeBackground()
+  end if
  ! ------------------------------------------------------------------------------------ !
  ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
@@ -784,7 +782,14 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
-  if (atmos%Nactiveatoms > 0) CALL NLTEloop()
+  if (atmos%Nactiveatoms > 0) then 
+   CALL NLTEloop()
+   !Recompute Background opac if ne and Hydrogen%n have changed
+   ! if ne all storeBackground + LTEpops before
+   ! if not, only nH min bound-free
+!    if (lstore_opac) then 
+!     if (.not.ltab_wavelength_image)  CALL storeBackground()
+!    end if  
   open(unit=12, file="Snu_nlte.dat",status="unknown")
   icell = 1 !select cell
   do while (.not.atmos%lcompute_atomRT(icell))
@@ -806,12 +811,14 @@ MODULE AtomicTransfer
   write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta(nact,1), NLTEspec%AtomOpac%chi(nact, 1), &
     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
   end do
-  close(12)
-  
+  close(12) 
+  end if
+ ! ------------------------------------------------------------------------------------ !
+ ! ------------------------- WRITE CONVERGED POPULATIONS ------------------------------ !
+ ! ------------------------------------------------------------------------------------ !
   do icell=1,atmos%NactiveAtoms
    CALL writePops(atmos%Atoms(icell)%ptr_atom)
   end do
-  !if (atmos%NactiveAtoms>0) stop !temporary
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
@@ -824,7 +831,8 @@ MODULE AtomicTransfer
 
    if (lstore_opac) CALL storeBackground() !recompute background opac
    ! TO DO: add NLTE continua and LTE/NLTE lines if possible
-   CALL reallocate_mcfost_wavelength_arrays() 
+
+   CALL reallocate_mcfost_vars()
   end if
 !   write(*,*) atmos%atoms(1)%ptr_atom%lines(1)%i, atmos%atoms(1)%ptr_atom%lines(1)%j, maxval(atmos%atoms(1)%ptr_atom%continua(1)%alpha)
 !   write(*,*) atmos%passiveatoms(1)%ptr_atom%lines(1)%i, atmos%passiveatoms(1)%ptr_atom%lines(1)%j, maxval(atmos%passiveatoms(1)%ptr_atom%continua(1)%alpha)
@@ -1209,6 +1217,8 @@ MODULE AtomicTransfer
   CASE DEFAULT
    CALL ERROR("Methode for SEE unknown", atmos%nLTE_methode)
   END SELECT
+  
+  CALL calc_nHmin()
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
 
@@ -1421,15 +1431,12 @@ MODULE AtomicTransfer
    !stop
    
    !2) Correct with the contrast gamma of a hotter/cooler region if any
-!    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-!    if (lintersect_spot) then
-! !      gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
-! !      			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
-! !      write(*,*) maxval(gamma)!, &
-! !      maxval((dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)), &
-! !      maxval((dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1))
-!     gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
-!    end if
+   CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
+   if (lintersect_spot) then
+     gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
+     			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
+!    gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
+   end if
 
    !3) Apply Limb darkening   
    if (llimb_darkening) then
