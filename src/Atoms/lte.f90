@@ -121,8 +121,33 @@ MODULE lte
   RETURN
   END FUNCTION SahaEq
 
+  SUBROUTINE calc_nHmin()
+   integer :: k, j
+   double precision :: phiHmin
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(k, PhiHmin,j) &
+   !$omp shared(atmos,Hydrogen)
+   !$omp do
+   do k=1, atmos%Nspace
+    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
+    PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+     != 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
+    !nHmin is proportial to the total number of neutral Hydrogen
+    ! which for hydrogen is given by the sum of the indivdual
+    !levels except the last one which is the protons (or H+)
+    !number density. Remember:
+    ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
+    !j = -1 for Hminus (l=element=H)
+    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+   end do !over depth points
+   !$omp end do
+   !$omp  end parallel
 
+  RETURN
+  END SUBROUTINE calc_nHmin
+  
  SUBROUTINE LTEpops(atom, debeye)
   ! -------------------------------------------------------------- !
    ! Computes LTE populations of each level of the atom.
@@ -389,7 +414,7 @@ MODULE lte
   !!This is in case H is NLTE but has not converged pops yet, or not read from file
   if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
                                             !for background Hydrogen and Hminus
-                                            
+  ! CALL calc_nHmin()
   !now Hminus in computed with Saha equation during LTEpops
   !should be updated with NLTE pops at the end of the NLTE loop                                         
 
