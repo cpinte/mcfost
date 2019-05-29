@@ -128,7 +128,6 @@ MODULE AtomicTransfer
        !if we start at icell, computes the radiation from the star to icell.
        !in particular, the cell icell can be the cell for which we solve the SEE/or
        !a cell at the border of the grid for an image
-       !for LimbD, x0,y0,z0 changes
        CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,Istar)
        NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
        NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
@@ -1405,7 +1404,7 @@ MODULE AtomicTransfer
   integer :: ns
   logical :: lintersect_spot
   
-   HC = HPLANCK * CLIGHT / MICRON_TO_NM / NM_TO_M / KBOLTZMANN
+   HC = HPLANCK * CLIGHT / KBOLTZMANN / NM_TO_M
    gamma(:) = 1d0
    !cos(theta) = dot(r,n)/module(r)/module(n)
    mu = abs(x*u + y*v + z*w)/dsqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
@@ -1433,9 +1432,8 @@ MODULE AtomicTransfer
    !2) Correct with the contrast gamma of a hotter/cooler region if any
    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
    if (lintersect_spot) then
-     gamma(:) = (dexp(HC/tab_lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
-     			(dexp(HC/tab_lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
-!    gamma(:) = 1 + abs(etoile(i_star)%SurfB(ns)%T-real(etoile(i_star)%T,kind=dp))/real(etoile(i_star)%T,kind=dp)
+     gamma(:) = (dexp(HC/NLTEspec%lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
+     			(dexp(HC/NLTEspec%lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
    end if
 
    !3) Apply Limb darkening   
@@ -1446,7 +1444,7 @@ MODULE AtomicTransfer
      stop
    else
      !write(*,*) maxval(uLD(real(etoile(i_star)%T,kind=dp))), minval(uLD(real(etoile(i_star)%T,kind=dp)))
-     ulimb = 0d0 ! could use BB slope
+     ulimb = 0.6 ! could use BB slope
      LimbDarkening = 1d0 - ulimb*(1d0-mu)
    end if
    Istar(:) = energie(:) * LimbDarkening * gamma(:)

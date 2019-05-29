@@ -43,9 +43,9 @@ MODULE simple_models
    use math, only : interp1D
    use utils, only : interp_dp
    use TTauri_module, only : TTauri_temperature
-   integer :: n_zones = 1, izone, i, j, k, icell, flip_flop
-   double precision, parameter :: Tmax = 0d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=1d4, Macc = 1d-7
+   integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp
+   double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=1d4, Macc = 1d-9
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
@@ -97,31 +97,52 @@ MODULE simple_models
    Bp = 1d-4 * 4.2*1d2 * (rmi/2.2)*(2*Mstar*kg_to_Msun)**(0.25) * &
    	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
    write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
-   
-   !Add ring
-   etoile(1)%Nr = 1! rings
-   allocate(etoile(1)%SurfB(etoile(1)%Nr))
-   flip_flop = 0
-   do k=1,etoile(1)%Nr
-    tc = 0d0 !center of vector position
-    phic = 0d0 !vector position, pointing to the center of the spot
-    if (k==2) flip_flop = -1 !for the ring in the southern hemisphere
-    etoile(1)%SurfB(k)%T = Tring
-    !center of the spot
-    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc-PI*flip_flop)
-    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc-PI*flip_flop)
-    etoile(1)%SurfB(k)%r(3) = cos(tc-PI*flip_flop)
-    etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
-
-!     Surface on the apparent radius of one ring
+ 
+ 
+ !     Surface on the apparent radius of one ring
 !     etoile(1)%SurfB(k)%Sp = (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
 !     			abs(etoile(1)%SurfB(k)%limits(1)**2-etoile(1)%SurfB(k)%limits(2)**2) / (2d0 * PI)
 !     etoile(1)%SurfB(k)%dOmega=dsqrt(1d0-etoile(1)%SurfB(k)%Sp)
 !     write(*,*) " Surface on the disk of the spot ", k, etoile(1)%SurfB(k)%Sp, etoile(1)%SurfB(k)%dOmega, &
 !     (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
-!     			abs(etoile(1)%SurfB(k)%limits(1)-etoile(1)%SurfB(k)%limits(2)) / (4d0 * PI)
+!     			abs(etoile(1)%SurfB(k)%limits(1)-etoile(1)%SurfB(k)%limits(2)) / (4d0 * PI)  
+   !Add ring
+   etoile(1)%Nr = 2
+   allocate(etoile(1)%SurfB(etoile(1)%Nr))
+   southern_hemp = 1
+   do k=1,etoile(1)%Nr!should be 1 ring for testing
+    tc = 0d0 * PI/180 !center of vector position
+    phic = 0d0 !vector position, pointing to the center of the spot
+    if (k==2) southern_hemp = -1 !for the ring in the southern hemisphere
+    etoile(1)%SurfB(k)%T = Tring
+    !center of the spot
+    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
+    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
+    etoile(1)%SurfB(k)%r(3) = cos(tc)*southern_hemp
+    etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
+    etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
    end do
-
+!     tc = 0D0 !center of vector position
+!     phic = 1.1*PI !vector position, pointing to the center of the spot
+!     k=3
+!    etoile(1)%SurfB(k)%T = Tring
+!     etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
+!     etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
+!     etoile(1)%SurfB(k)%r(3) = cos(tc) * -1 !southern hemisphere
+!     etoile(1)%SurfB(k)%mui = 0.9; etoile(1)%SurfB(k)%muo = 0.999
+!     etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0 
+!     
+!     tc = 0. !center of vector position
+!     phic = 0d0 !vector position, pointing to the center of the spot
+!     k=4
+!    etoile(1)%SurfB(k)%T = Tring
+!     etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
+!     etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
+!     etoile(1)%SurfB(k)%r(3) = cos(tc)
+!     
+!     !on the disk
+!     etoile(1)%SurfB(k)%mui = 0.7; etoile(1)%SurfB(k)%muo = 1d0
+!     etoile(1)%SurfB(k)%phio = PI+3*PI/4; etoile(1)%SurfB(k)%phii = PI+PI/4
   
    !now nH0 and Q0 are computed for each field lines assuming that Tring is the same
    !for all.
@@ -211,8 +232,8 @@ MODULE simple_models
      end do
     end do
 
-    if (Tmax > 0d0) atmos%T(:) = Tmax! * atmos%T/maxval(atmos%T)
-! write(*,*) "Density and T set to zero for tetsting"
+    if (Tmax > 0d0) atmos%T(:) = Tmax * atmos%T/maxval(atmos%T)
+!  write(*,*) "Density and T set to zero for tetsting"
 ! atmos%nHtot=1d0
 ! atmos%T =1d0
    !! inclued in atom%vbroad so we do not count it here

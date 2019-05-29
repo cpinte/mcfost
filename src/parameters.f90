@@ -187,9 +187,9 @@ module parametres
 
   !Need to know the position on the star of the spot and its extent
   type surface_brightness_type
-     real(kind=dp) :: r(3), muo, mui
+     real(kind=dp) :: r(3), muo, mui, phio, phii
      real(kind=dp) :: T ! Temperature of the region
- end type surface_brightness_type
+  end type surface_brightness_type
 
   ! Stars
   ! 27/02/2019, adding spots coordinates

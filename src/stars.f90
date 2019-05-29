@@ -836,7 +836,6 @@ end subroutine intersect_stars
    ! Knowing a ray/pack hits the star, will it hit a spot ?
    ! suppose no spot overlap.
   ! ------------------------------------------------------------ !
-   use simple_models, only : rotateZ
    real(kind=dp), intent(in) :: x,y,z, u,v,w
    logical, intent(out) :: lintersect
    integer, intent(in) :: i_star
@@ -853,14 +852,19 @@ end subroutine intersect_stars
    lintersect = .false.
    spot_loop : do i = 1, etoile(i_star)%Nr
 
-      mu = abs(dot_product(r,etoile(i_star)%SurfB(i)%r))/dsqrt(x**2+y**2+z**2)
-      phi = modulo(atan2(y,x),2*real(pi,kind=dp))!atan2(y,x)+pi
+	  !angle between a ray-direction and the spot position vector
+      mu = dot_product(r,etoile(i_star)%SurfB(i)%r)/dsqrt(x**2+y**2+z**2)
+      !azimuth of a ray on the stellar disk
+      phi = modulo(atan2(y,x),2*real(pi,kind=dp))
 
      if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
-        (mu>=etoile(i_star)%SurfB(i)%mui)) then !inside the spot
-       ispot = i
-       lintersect = .true.
-       exit spot_loop
+        (mu>=etoile(i_star)%SurfB(i)%mui).and.&
+        (phi>=etoile(i_star)%SurfB(i)%phii).and.&
+        (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
+
+         ispot = i
+         lintersect = .true.
+         exit spot_loop
      end if
    end do spot_loop
 
