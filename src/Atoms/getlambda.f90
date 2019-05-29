@@ -73,7 +73,7 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 101
+   integer, parameter :: Nlambda = 51!101
    integer :: la
    double precision :: l0, l1
    
@@ -110,7 +110,7 @@ MODULE getlambda
    double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.3, L = 1.1d0!10d0!depends on what is v_char
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
-   integer, parameter :: Nc = 101, Nw = 31 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 51, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    !If it is needed we can develop an empirical recipe for the line and the element
