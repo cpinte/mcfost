@@ -45,7 +45,7 @@ MODULE simple_models
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp
    double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=1d4, Macc = 1d-9
+   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=8d3, Macc = 1d-9
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
