@@ -172,7 +172,7 @@ MODULE simple_models
        sinTheta = rcyl/r
        y = sinTheta**2
 
-       Vphi = Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
+       Vphi = 0d0!Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
 
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
        
