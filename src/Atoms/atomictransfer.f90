@@ -245,7 +245,7 @@ MODULE AtomicTransfer
   double precision, intent(in) :: x,y,z
   logical, intent(in) :: labs
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c
+  double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, Istar
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chiI
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
   double precision :: facteur_tau
@@ -282,7 +282,12 @@ MODULE AtomicTransfer
     
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
     if (lintersect_stars) then
-      if (icell == icell_star) RETURN
+      if (icell == icell_star) then
+       CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,Istar)
+       NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + Istar*dexp(-tau)
+       NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + Istar*dexp(-tau_c)
+       RETURN
+       endif
     endif
 
     nbr_cell = nbr_cell + 1
@@ -736,8 +741,7 @@ MODULE AtomicTransfer
   ! on the whole grid space.
   CALL readAtomicModels(atomunit)
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 100
-   write(*,*) " Using", atmos%Nrays," rays for NLTE line transfer"
+   atmos%Nrays = 100 !maximum number of rays allowed
   end if
 
   ! if the electron density is not provided by the model or simply want to
@@ -792,11 +796,11 @@ MODULE AtomicTransfer
   open(unit=12, file="Snu_nlte.dat",status="unknown")
   icell = 1 !select cell
   do while (.not.atmos%lcompute_atomRT(icell))
-   icell = icell + 1
    if (icell==atmos%Nspace) then
     icell = 1
     exit
    end if
+   icell = icell + 1
   end do
   CALL initAtomOpac(1,.false.)
   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
@@ -889,7 +893,7 @@ MODULE AtomicTransfer
  
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 3 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
@@ -1076,7 +1080,7 @@ MODULE AtomicTransfer
                         V0 = SRW02 * sin(ARGMT)      					
 						xyz0(1,iray) = x0; xyz0(2,iray) = y0; xyz0(3,iray) = z0
 						uvw0(1,iray) = U0; uvw0(2,iray) = V0; uvw0(3,iray) = W0
-
+!write(*,*) icell, "id", id,"rays ", xyz0(:,iray), uvw0(:,iray)
 						!in practice only if MALI
 						CALL initCrossCoupling(id)
 						
@@ -1142,6 +1146,7 @@ MODULE AtomicTransfer
       						CALL initGamma(id,icell)
  							do iray=iray_start, iray_start-1+n_rayons
       							!I unchanged
+!      	write(*,*) icell, "id", id,"rays sub-it", xyz0(:,iray), uvw0(:,iray)
 							    CALL init_local_field_atom(id, icell, iray, &
 							         xyz0(1,iray), xyz0(2,iray), xyz0(3,iray), &
 							         uvw0(1,iray), uvw0(2,iray), uvw0(3,iray))
@@ -1444,7 +1449,7 @@ MODULE AtomicTransfer
      stop
    else
      !write(*,*) maxval(uLD(real(etoile(i_star)%T,kind=dp))), minval(uLD(real(etoile(i_star)%T,kind=dp)))
-     ulimb = 0.6 ! could use BB slope
+     ulimb = 0.0 ! could use BB slope
      LimbDarkening = 1d0 - ulimb*(1d0-mu)
    end if
    Istar(:) = energie(:) * LimbDarkening * gamma(:)

@@ -108,7 +108,7 @@ MODULE getlambda
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision :: adamp_char = 0d0
-   double precision, parameter :: wing_to_core = 0.3, L = 1.1d0!10d0!depends on what is v_char
+   double precision, parameter :: wing_to_core = 0.3, L = 1.5d0!10d0!depends on what is v_char
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
    integer, parameter :: Nc = 51, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
@@ -126,14 +126,13 @@ MODULE getlambda
    if (line%atom%ID=="Mg") adamp_char = 150
    if (line%polarizable) atmos%v_char = atmos%v_char + &
    				atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
-   v_char = (atmos%v_char + vD*(1. + adamp_char)) !=maximum extension of a line
-   !atmos%v_char is minimum of Vfield and vD is minimum of atom%vbroad presently
+   v_char = (atmos%v_char + 2d0*vD*(1. + adamp_char)) !=maximum extension of a line
    v0 = -v_char * L
    v1 = +v_char * L
    vel = 0d0
    !transition between wing and core in velocity
    !vcore = L * v_char * wing_to_core ! == fraction of line extent
-   vcore = v_char * 1.5d0
+   vcore = v_char * L
 
    !from -v_char to 0
    dvw = (L * v_char-vcore)/real(Nw-1,kind=dp)
