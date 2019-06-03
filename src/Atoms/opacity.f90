@@ -30,16 +30,16 @@ MODULE Opacity
   ! ----------------------------------------------------------- !
    integer, intent(in) :: iray, id, icell
    double precision, intent(in) :: ds
-   double precision, dimension(NLTEspec%Nwaves) :: chi, eta_loc
+   double precision, dimension(NLTEspec%Nwaves) :: chi!, eta_loc
   
    if (lstore_opac) then
      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1)
-     eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-                    NLTEspec%AtomOpac%jc(icell,:)
+     !eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
+     !               NLTEspec%AtomOpac%jc(icell,:)
    else
      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)
-     eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)
+     !eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)
    end if !store_opac
    !Choose eval operatore depending on the method
 
@@ -49,7 +49,8 @@ MODULE Opacity
        NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !in meter
      CASE ("HOGEREIJDE")
        NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
-       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
+       !NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
+       NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+1d-300)
        !or do not use atom%eta, and Psi = Psi * eta_total
      CASE DEFAULT
        CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)

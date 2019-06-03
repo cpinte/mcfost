@@ -205,7 +205,7 @@ MODULE AtomicTransfer
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
     if (minval(Snu) < 0) then
-     call error("Snu negative")
+     call error("Snu negative")   
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
@@ -815,6 +815,7 @@ MODULE AtomicTransfer
     NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact), NLTEspec%AtomOpac%chi_p(nact,1)+NLTEspec%AtomOpac%Kc(icell,nact,1)
   end do
   close(12) 
+  !stop
   end if
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------- WRITE CONVERGED POPULATIONS ------------------------------ !
@@ -908,7 +909,7 @@ MODULE AtomicTransfer
 
   real :: rand, rand2, rand3, fac_etape
 
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1
 
   logical :: labs, disable_subit, Ng_acceleration = .false., iterate_ne = .false.
   integer :: atomunit = 1, nact
@@ -917,7 +918,7 @@ MODULE AtomicTransfer
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
   double precision, allocatable, dimension(:,:,:) :: pop_old, pop
   double precision, allocatable, dimension(:,:,:) :: gpop_old
-  real(kind=dp), dimension(3, atmos%Nrays) :: xyz0, uvw0
+  real(kind=dp), dimension(3, atmos%Nrays, nb_proc) :: xyz0, uvw0
   type (AtomType), pointer :: atom
 
   write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
@@ -945,7 +946,7 @@ MODULE AtomicTransfer
      Nlevel_total = Nlevel_total + atom%Nlevel**2
      NmaxLevel = max(NmaxLevel, atom%Nlevel)
      write(*,*) "Setting initial solution for active atom ", atom%ID, atom%active
-     atom%n = 1d0*atom%nstar
+     atom%n = 1*atom%nstar
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
      !!Allocate Ng structure of all levels of all atoms, updated at each cell
      !!-> check allocation in statequil
@@ -1004,7 +1005,7 @@ MODULE AtomicTransfer
   		n_iter = 0 
   		fac_etape = 1d-2 !1d0
   		disable_subit = .false. !set to true to avoid subiterations over the emissivity
-  		max_sub_iter = 20
+  		max_sub_iter = 50
 
         do while (.not.lconverged)
   			if (lfixed_rays) then
@@ -1016,45 +1017,23 @@ MODULE AtomicTransfer
         	n_iter = n_iter + 1
 
             max_n_iter_loc = 0
-            do nact=1, atmos%NactiveAtoms
-             gpop_old(nact, 1:atmos%ActiveAtoms(nact)%ptr_atom%Nlevel,:) = &
-             	atmos%ActiveAtoms(nact)%ptr_atom%n(:, :)
-            end do
 
-            write(*,*) " -> Iteration #", n_iter
-!  			$omp parallel &
-!             $omp default(none) &
-!             $omp private(id,icell) &
-!             $omp shared(n_cells, atmos, NLTEspec, Hydrogen)
-!             $omp do schedule(static,1)
-!   			do icell=1, n_cells
-!    				$ id = omp_get_thread_num() + 1
-!    				if (atmos%lcompute_atomRT(icell)) then
-!      			    write(*,*) "icell=", icell, " id=", id
-!   			        CALL initGamma(id,icell)
-!   			        CALL initAtomOpac(id,.true.)
-!                     CALL fillGamma_Hogereijde(id, icell, 1, 1)
-!                     write(*,*) icell, id, atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell)
-!   			        write(*,*) icell, id, Hydrogen%Gamma(1,2,id), Hydrogen%Ckij(icell,1*4+1)
-!   			        if (Hydrogen%Gamma(1,2,id) > huge_dp) stop
-!   			    end if
-!   			end do
-!         	$omp end do
-!         	$omp end parallel
-!   			stop
-  			
-  			
-  			
+            write(*,*) " -> Iteration #", n_iter 			
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell) &
-            !$omp private(xyz0, uvw0, atom) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom) &
+            !$omp shared(xyz0, uvw0) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN) &
+            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
+            	do nact=1, atmos%NactiveAtoms
+            	    atom => atmos%ActiveAtoms(nact)%ptr_atom
+             		gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+             		atom => NULL()
+            	end do
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
   			        CALL initGamma(id,icell)
@@ -1078,9 +1057,10 @@ MODULE AtomicTransfer
                         ARGMT = PI * (2.0_dp * rand - 1.0_dp)
                         U0 = SRW02 * cos(ARGMT)
                         V0 = SRW02 * sin(ARGMT)      					
-						xyz0(1,iray) = x0; xyz0(2,iray) = y0; xyz0(3,iray) = z0
-						uvw0(1,iray) = U0; uvw0(2,iray) = V0; uvw0(3,iray) = W0
-!write(*,*) icell, "id", id,"rays ", xyz0(:,iray), uvw0(:,iray)
+						xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
+						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
+! if (iray==1 .or. iray==n_rayons) &
+! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
 						!in practice only if MALI
 						CALL initCrossCoupling(id)
 						
@@ -1090,25 +1070,28 @@ MODULE AtomicTransfer
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       				end do !iray
       				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
-      				
-     				n_iter_loc = 0
-    				lconverged_loc = .false.
-    				!save pops for all active atoms
-    				!pop(NactAtom, Nmaxlvel, Nthreads)
-    				do nact=1,atmos%NactiveAtoms
-    				 atom => atmos%ActiveAtoms(nact)%ptr_atom
-    				 pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
-    				 atom => NULL()
-    				end do
+      	
     				
     				!lconverged_loc = disable_subit !to disable sub-it
     				if (disable_subit) then
     				 CALL updatePopulations(id, icell)
     				 lconverged_loc = .true.
+    				else
+    		     	 n_iter_loc = 0
+    				 lconverged_loc = .false.
+    				!save pops for all active atoms
+    				!pop(NactAtom, Nmaxlvel, Nthreads)
+    				 do nact=1,atmos%NactiveAtoms
+    				  atom => atmos%ActiveAtoms(nact)%ptr_atom
+    				  pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
+    				  atom => NULL()
+    				 end do
     				end if
     				
      				!!sub iteration on the local emissivity, keeping Idag fixed
+     				!!only iterate on cells which are not converged
      				do while (.not.lconverged_loc)
+     				write(*,*) "Starting subit for cell ", icell
        					n_iter_loc = n_iter_loc + 1
        					
                         pop_old(:,:,id) = pop(:,:,id)
@@ -1123,15 +1106,16 @@ MODULE AtomicTransfer
     				    end do
 						
 						diff = 0.0 !keeps track of the maximum dpops(dN) among each atom.
+								   !for this cell
      					do nact=1,atmos%NactiveAtoms
      					    atom => atmos%ActiveAtoms(nact)%ptr_atom
      						do ilevel=1,atom%Nlevel
-     				    		dN = abs(((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
-     				    			pop_old(nact,ilevel,id)+1d-30))
+     				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
+     				    			(pop_old(nact,ilevel,id)+1d-300))
      				    		diff = max(diff, dN)
      				    		! if (dN /= 0) then 
-!      							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-!      								n_iter_loc, atom%ID, " dpops = ", dN
+     							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+     								n_iter_loc, atom%ID, " dpops = ", dN, diff
 !      							end if
      						end do
      						atom => NULL()
@@ -1146,10 +1130,11 @@ MODULE AtomicTransfer
       						CALL initGamma(id,icell)
  							do iray=iray_start, iray_start-1+n_rayons
       							!I unchanged
-!      	write(*,*) icell, "id", id,"rays sub-it", xyz0(:,iray), uvw0(:,iray)
+!     if (iray==1 .or. iray==n_rayons) &
+!       	write(*,*) iray, icell, "id", id,"rays sub-it", xyz0(:,iray,id), uvw0(:,iray,id)
 							    CALL init_local_field_atom(id, icell, iray, &
-							         xyz0(1,iray), xyz0(2,iray), xyz0(3,iray), &
-							         uvw0(1,iray), uvw0(2,iray), uvw0(3,iray))
+							         xyz0(1,iray,id), xyz0(2,iray,id), xyz0(3,iray,id), &
+							         uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id))
                                !! +add Xcoupling in Gamma for this cell/ray
  						       CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
@@ -1167,26 +1152,31 @@ MODULE AtomicTransfer
         	!$omp end do
         	!$omp end parallel
 
-        	!Global convergence criterion 
+        	!Global convergence criterion
+        	!I cannot iterate on unconverged cells because the radiation coming for each cell
+        	!depends on the other cell.
+        	diff = 0d0
   			cell_loop2 : do icell=1, atmos%Nspace
-  			  	diff = 0d0
   				if (atmos%lcompute_atomRT(icell)) then
-     				do nact=1,atmos%NactiveAtoms
-     		            atom => atmos%ActiveAtoms(nact)%ptr_atom
-     				    dN = abs(maxval((gpop_old(nact,1:atom%Nlevel,icell)-atom%n(:,icell))/&
-     				    	gpop_old(nact,1:atom%Nlevel,icell)+1d-300))
-     				    diff = max(diff, dN)
-     					if (dN>1) &
-     						write(*,*) " g-it->", atom%ID, " dpops = ", dN, diff
-     					atom => NULL()
-     				end do
-     	     		!if (diff < precision) CYCLE cell_loop2
+						dN = 0d0 !for all levels of all atoms of this cell
+     					do nact=1,atmos%NactiveAtoms
+     					    atom => atmos%ActiveAtoms(nact)%ptr_atom
+     						do ilevel=1,atom%Nlevel
+     				    		dN1 = abs((gpop_old(nact,ilevel,icell)-atom%n(ilevel,icell))/&
+     				    			(gpop_old(nact,ilevel,icell)+1d-300))
+     						!if (dN>1) &
+     							write(*,*) icell, " **->", atom%ID, " ilevel", ilevel, " dpops = ", dN1
+     				    		dN = max(dN1, dN)
+     						end do
+     						atom => NULL()
+     					end do
+     					diff = max(diff, dN) !for all cells
      			end if
      		end do cell_loop2
 
          	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          		write(*,*) maxval(max_n_iter_loc), "sub-iterations"
-         	write(*,*) "Relative difference =", real(diff)
+         	write(*,*) "Relative difference =", diff
         	write(*,*) "Threshold =", precision*fac_etape
 
         	if (diff < precision*fac_etape) then

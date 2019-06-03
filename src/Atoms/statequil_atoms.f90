@@ -205,14 +205,16 @@ MODULE statequil_atoms
   double precision :: c_nlte = 1d0
   
   Ieff(:) = 0d0
-  nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
+
   do nact=nati,natf !loop over each active atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
    !loop over transitions, b-f and b-b for these atoms
    !To do; define a transition_type with either cont or line
    Ieff(:) = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) + \
-             NLTEspec%Psi(:,iray,id)! * atom%eta(:,id)
+             NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
    do kr=1,atom%Ncont
     !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
     norm = 4*PI / HPLANCK / n_rayons
@@ -341,9 +343,9 @@ MODULE statequil_atoms
   integer :: nact, kr, l, lp, nati, natf
   type (AtomType), pointer :: atom
 
-  nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-!   nati = 1; natf = atmos%Nactiveatoms
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
   do nact=nati,natf !loop over each active atoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
 !    do l=1,atom%Nlevel
@@ -604,7 +606,7 @@ MODULE statequil_atoms
 
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   atom%n(:,icell) = 0d0
-  atom%n(imaxpop,icell) = 1d0!atom%ntotal(icell)
+  atom%n(imaxpop,icell) = atom%ntotal(icell)
 
   
   !Sum_l'_imaxpop * n_l' = N
@@ -617,8 +619,8 @@ MODULE statequil_atoms
 
   Aij = transpose(atom%Gamma(:,:,id))
   CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
-  atom%n(:,icell) = atom%n(:,icell) * atom%ntotal(icell)
-  atom%Gamma(:,:,id) = -1d12
+  !atom%n(:,icell) = atom%n(:,icell) * atom%ntotal(icell)
+  !atom%Gamma(:,:,id) = -1d12
 
  RETURN
  END SUBROUTINE SEE_atom
@@ -636,17 +638,12 @@ MODULE statequil_atoms
   logical :: accelerate = .false.
   double precision :: dM
   
-  nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-!   nati = 1; natf = atmos%Nactiveatoms
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
   do nat=nati,natf !loop over each active atoms
    atom => atmos%ActiveAtoms(nat)%ptr_atom
    CALL SEE_atom(id, icell, atom)
-   !Ng's acceleration
-   if (allocated(atom%Ngs%previous)) then
-    CALL NgAcceleration(atom%Ngs, atom%n(:,icell), accelerate)
-    !CALL MaxChange(atom%Ngs, " -> Accelerate ", accelerate, dM)
-   end if
    NULLIFY(atom)
   end do
  
