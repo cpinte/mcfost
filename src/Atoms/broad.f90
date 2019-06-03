@@ -60,7 +60,7 @@ MODULE broad
   double precision :: vrel35_H, vrel35_He, fourPIeps0, deltaR
   double precision :: cross, gammaCorrH, gammaCorrHe, C625
 
-  Helium = atmos%Elements(2) ! Helium basic informations
+  Helium = atmos%Elements(2)%ptr_elem ! Helium basic informations
   line = atom%lines(kr)
 
   ! here, starts a 1 because it is j saved in line%j, which
@@ -250,7 +250,7 @@ MODULE broad
   end if
   C = a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * SQ(CM_TO_M)
 
-   GStark = C*dpow(atmos%ne(icell), 6.6666667d-1)
+   GStark = C*dpow(atmos%ne(icell), 2d0/3d0)
 
  RETURN
  END SUBROUTINE StarkLinear
@@ -275,28 +275,27 @@ MODULE broad
   if ((line%cvdWaals(1).gt.0).or.(line%cvdWaals(3).gt.0)) then
    CALL VanderWaals(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) "vdW(k)=",adamp(k), Qelast(k)
+    !write(*,*),"vdW", adamp* cDop/atom%vbroad(icell)
   end if
   ! Quadratic Stark broadening
-  if (line%cStark.ne.0.) then
+  if (line%cStark > 0.) then
    CALL Stark(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) "QStark(k)=",adamp(k), Qelast(k)
+    !write(*,*),"Stark2", adamp* cDop/atom%vbroad(icell)
   end if
   ! Linear Stark broadening only for Hydrogen
   if (atom%ID.eq."H ") then
    CALL StarkLinear(icell, atom,kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) "LStark(k)=",adamp(k), Qelast(k)
+    !write(*,*),"Stark1", adamp* cDop/atom%vbroad(icell)
   end if
   ! Store Qelast, total rate of elastic collisions, if PFR only
   if (line%PFR) then
    write(*,*) "PFR not handled yet, avoiding"
    ! line%Qelast = Qelast
   end if
-
+  !write(*,*) "Grad=", line%Grad * cDop/atom%vbroad(icell), cDop/atom%vbroad(icell)
    adamp = (line%Grad + Qelast)*cDop / atom%vbroad(icell)
-   !write(*,*) adamp(k), Qelast(k), cDop, atom%vbroad(k)
 
  RETURN
  END SUBROUTINE Damping

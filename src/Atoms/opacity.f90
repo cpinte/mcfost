@@ -279,6 +279,7 @@ MODULE Opacity
     gij(:) = line%Bji / line%Bij
     twohnu3_c2(Nblue:Nred) = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
+    if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp
     allocate(phi(line%Nlambda))
     if (PRT_SOLUTION=="FULL_STOKES") &
     	allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
@@ -304,7 +305,7 @@ MODULE Opacity
      aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
 
-     ! unit is m/s / (m/s * s/m) = m/s
+     ! unit is m/s / (m/s * s/m) = m/s !it is iray dependent as it is computed along each direction
      aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
      end if
     
