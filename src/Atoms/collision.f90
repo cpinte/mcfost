@@ -204,7 +204,7 @@ MODULE collision
   ! -- get iso-electronic sequence --
   ichrge = atom%stage(i) !stages from 0 for neutrals to N-1
   isoseq = iz-ichrge
-  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ID
+  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ptr_elem%ID
 
   ! -- Temperature in eV --
   bkt = KBOLTZMANN * atmos%T(k) / EV
@@ -328,7 +328,7 @@ MODULE collision
   ! -- charge of recombining ion --
   zz = atom%stage(j)
   isoseq = iz - atom%stage(i)
-  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ID
+  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ptr_elem%ID
 
   !write(*,*) i, j, zz, isoseq, cseq
 

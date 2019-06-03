@@ -68,12 +68,12 @@ MODULE readatom
 
     match = .false.
     do nll=1,Nelem
-     if (atmos%Elements(nll)%ID.eq.atom%ID) then
+     if (atmos%Elements(nll)%ptr_elem%ID.eq.atom%ID) then
       !write(*,*) "Abundance found for atom ",atom%ID,atmos%Elements(nll)%Abund
-      if (atmos%Elements(nll)%abundance_set.eqv..true.) then
+      if (atmos%Elements(nll)%ptr_elem%abundance_set.eqv..true.) then
         atom%periodic_table=nll
-        atom%Abund=atmos%Elements(nll)%Abund
-        atom%weight=atmos%Elements(nll)%weight
+        atom%Abund=atmos%Elements(nll)%ptr_elem%Abund
+        atom%weight=atmos%Elements(nll)%ptr_elem%weight
         match=.true.
       end if
       exit
@@ -689,6 +689,7 @@ MODULE readatom
 
   ! Alias to the most importent one
   Hydrogen=>atmos%Atoms(1)%ptr_atom
+  if (.not.associated(Hydrogen, atmos%Atoms(1)%ptr_atom)) CALL Warning(" Hydrogen alias not associated to atomic model!")
 
   ! Aliases to active atoms
   nact = 0; npass = 0
@@ -711,10 +712,15 @@ MODULE readatom
    ! create alias in atmos%Elements for elements that have
    ! a model atom. It means all elements here.
    !atom => atmos%Atoms(nmet)
-   atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%model &
+   atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model &
          => atmos%Atoms(nmet)%ptr_atom
-   if (atmos%Atoms(nmet)%ptr_atom%periodic_table.eq.2)  &
+   if (.not.associated(atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model, &
+    atmos%Atoms(nmet)%ptr_atom)) CALL Warning(" Elemental model not associated to atomic model!")
+   if (atmos%Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
            Helium => atmos%Atoms(nmet)%ptr_atom
+     if (.not.associated(Helium,atmos%Atoms(nmet)%ptr_atom)) &
+      CALL Warning(" Helium alias not associated to atomic model!")
+   end if
    if (allocated(atmos%ActiveAtoms)) then
      if (atmos%Atoms(nmet)%ptr_atom%active) then 
       nact = nact + 1 !got the next index of active atoms
@@ -733,6 +739,10 @@ MODULE readatom
      end if
    end if
   end do
+  
+!   write(*,*) atmos%Atoms(1)%ptr_Atom%ID,atmos%ActiveAtoms(1)%ptr_Atom%ID
+!   write(*,*) Hydrogen%ID, atmos%elements(1)%ptr_elem%model%ID
+!   stop
     
 !  NULLIFY(atom, atom2)
 

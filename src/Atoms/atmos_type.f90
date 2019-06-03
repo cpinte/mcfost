@@ -27,6 +27,10 @@ MODULE atmos_type
   TYPE atomPointerArray
    type(AtomType), pointer :: ptr_atom => NULL()
   END TYPE atomPointerArray
+  
+  TYPE elemPointerArray
+   type(Element), pointer :: ptr_elem => NULL()
+  END TYPE elemPointerArray
 
   ! Initialized only once at the begening of the main iteration loop !
   TYPE GridType
@@ -42,7 +46,8 @@ MODULE atmos_type
    ! ux(x,y,z) = ux(Nspace) and vel=(ux,uy,uz)
    ! Don't know yet if it is useful here
    double precision, allocatable, dimension(:,:) :: Vxyz, Bxyz
-   type (Element), dimension(:), allocatable :: Elements
+   !type (Element), dimension(:), allocatable :: Elements
+   type (elemPointerArray), dimension(:), allocatable :: Elements
    !!type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms
    !type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
    type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
@@ -357,12 +362,12 @@ MODULE atmos_type
 
   if (allocated(atmos%Elements)) then
     do n=1,Nelem
-     if (allocated(atmos%Elements(n)%mol_index)) deallocate (atmos%Elements(n)%mol_index)
-     if (allocated(atmos%Elements(n)%ionpot)) deallocate (atmos%Elements(n)%ionpot)
-     if (allocated(atmos%Elements(n)%pf)) deallocate (atmos%Elements(n)%pf)
-     if (allocated(atmos%Elements(n)%n))  deallocate (atmos%Elements(n)%n)
+     if (allocated(atmos%Elements(n)%ptr_elem%mol_index)) deallocate (atmos%Elements(n)%ptr_elem%mol_index)
+     if (allocated(atmos%Elements(n)%ptr_elem%ionpot)) deallocate (atmos%Elements(n)%ptr_elem%ionpot)
+     if (allocated(atmos%Elements(n)%ptr_elem%pf)) deallocate (atmos%Elements(n)%ptr_elem%pf)
+     if (allocated(atmos%Elements(n)%ptr_elem%n))  deallocate (atmos%Elements(n)%ptr_elem%n)
      !if alias exist for this element free it.
-     if (associated(atmos%Elements(n)%model)) NULLIFY(atmos%Elements(n)%model)
+     if (associated(atmos%Elements(n)%ptr_elem%model)) NULLIFY(atmos%Elements(n)%ptr_elem%model)
 !       ! de-alias %model to the proper atmos%Atoms(nmet), atmos%Atoms will be freed after.
     end do
    deallocate(atmos%Elements) !here it works
@@ -462,23 +467,25 @@ MODULE atmos_type
   do while (EOF.eq.0)
    read(1, '(1A4, 1F5.3)', IOSTAT=EOF) charID, A
    if (charID(1:1) /= '#') then
-    atmos%Elements(n)%weight=atomic_weights(n)
-    atmos%Elements(n)%ID = charID(1:2) !supposed to be lowercases!!!!!
-    atmos%Elements(n)%abund = 10.**(A-12.)
-    if (A <= -99) atmos%Elements(n)%abund = 0d0
+    allocate(atmos%Elements(n)%ptr_elem)
+    atmos%Elements(n)%ptr_elem%weight=atomic_weights(n)
+    atmos%Elements(n)%ptr_elem%ID = charID(1:2) !supposed to be lowercases!!!!!
+    atmos%Elements(n)%ptr_elem%abund = 10.**(A-12.)
+    if (A <= -99) atmos%Elements(n)%ptr_elem%abund = 0d0
     !write(*,*) " abund=",atmos%Elements(n)%abund, A
-    atmos%Elements(n)%abundance_set=.true.
+    atmos%Elements(n)%ptr_elem%abundance_set=.true.
 
-    !write(*,*) "Element ", atmos%Elements(n)%ID," has an abundance of A=",&
-    !           atmos%Elements(n)%abund," and a weight of w=",&
-    !           atmos%Elements(n)%weight
+!     write(*,*) "Element ", atmos%Elements(n)%ptr_elem%ID," has an abundance of A=",&
+!               atmos%Elements(n)%ptr_elem%abund," and a weight of w=",&
+!               atmos%Elements(n)%ptr_elem%weight
+!     stop
     if (n.gt.1 .and. atmos%metallicity.gt.0.) then
-     atmos%Elements(n)%abund = atmos%Elements(n)%abund * &
+     atmos%Elements(n)%ptr_elem%abund = atmos%Elements(n)%ptr_elem%abund * &
                              10.**(atmos%metallicity)
     end if
-    atmos%totalAbund = atmos%totalAbund+atmos%Elements(n)%abund
-    atmos%avgWeight = atmos%avgWeight+atmos%Elements(n)%abund* &
-                     atmos%Elements(n)%weight
+    atmos%totalAbund = atmos%totalAbund+atmos%Elements(n)%ptr_elem%abund
+    atmos%avgWeight = atmos%avgWeight+atmos%Elements(n)%ptr_elem%abund* &
+                     atmos%Elements(n)%ptr_elem%weight
     !write(*,*) "updating total Abundance = ",atmos%totalAbund
     !write(*,*) "updating average weight = ", atmos%avgWeight
 
@@ -486,8 +493,8 @@ MODULE atmos_type
     !the temperature grid is shared and saved in atmos%Tpf
     !write(*,*) "Fill partition function for element ", atmos%Elements(n)%ID
     CALL readKurucz_pf(n, atmos%Npf, &
-              atmos%Elements(n)%Nstage, atmos%Elements(n)%ionpot, &
-              atmos%Elements(n)%pf)
+              atmos%Elements(n)%ptr_elem%Nstage, atmos%Elements(n)%ptr_elem%ionpot, &
+              atmos%Elements(n)%ptr_elem%pf)
     !do i=1,atmos%Elements(n)%Nstage !convert from J->eV
     ! write(*,*) "Inpot for stage ", i, &
     !            atmos%Elements(n)%ionpot(i)*JOULE_TO_EV, " eV"
@@ -699,7 +706,7 @@ MODULE atmos_type
     !    Z = i
     !    exit
     !  end if
-    do while (atmos%Elements(Z)%ID.ne.atomID)
+    do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
      Z=Z+1
     end do
 

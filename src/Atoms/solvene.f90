@@ -26,6 +26,7 @@ MODULE solvene
  use lte
  !use accelerate, only : initNg, freeNg, NgAcceleration
  use messages, only : Error, Warning
+ use input
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -57,7 +58,7 @@ MODULE solvene
   double precision, intent(in) :: U0, U1
   double precision :: phiH
   double precision, intent(out) :: ne
-  phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ionpot(1))
+  phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
   ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   !ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
@@ -116,38 +117,37 @@ END FUNCTION getPartitionFunctionk
 
   double precision, intent(in) :: ne
   integer, intent(in) :: k
-  type (Element), intent(in) :: Elem
-  type (AtomType) :: atom
+  type (Element), intent(in), target :: Elem
+  type (AtomType), pointer :: atom
   double precision, dimension(:), intent(inout) :: fjk, dfjk
   double precision :: Uk, Ukp1, sum1, sum2
   logical :: has_nlte_pops = .false.
   integer :: nll, j, i
 
   ! check if the element as an atomic model and it is active
-  do nll=1,atmos%Natom
-   if (Elem%ID.eq.atmos%Atoms(nll)%ptr_atom%ID .and. &
-       atmos%Atoms(nll)%ptr_atom%NLTEpops) then
+  atom_loop : do nll=1,atmos%Natom
+
+   if (atmos%Atoms(nll)%ptr_atom%NLTEpops) then
      has_nlte_pops=.true.
-!      write(*,*) "Atom ",Elem%ID,atmos%Atoms(nll)%ptr_atom%ID," is active"
-!      exit
+     exit atom_loop
    end if
-  end do
+  end do atom_loop
 
   !may be active without NLTEpops or passive with read NLTE pops
   if (has_nlte_pops) then
-   atom = Elem%model
+   atom => atmos%Atoms(nll)%ptr_atom
    fjk = 0d0
    dfjk = 0d0
    !For Nlevel, Nlevel stages
    !fj = Nj/Ntot
    !first, Nj = Sum_i nij
    do i = 1, atom%Nlevel
-    fjk(atom%stage(i)) = fjk(atom%stage(i))+atom%stage(i)*atom%n(i,k)
+    fjk(atom%stage(i)+1) = fjk(atom%stage(i)+1)+atom%stage(i)*atom%n(i,k)
    end do
    !Divide by Ntotal and retrieve fj = Nj/N for all j
    fjk(:) = fjk(:)/atom%ntotal(k)
    !et la dérivée ? dfjk
-
+   atom => NULL()
   else !not active or active but first iteration of the NLTEloop so that
   	!NLTEpos has been set to .false., whateveeer, use LTE
    fjk(1)=1.
@@ -201,7 +201,7 @@ END FUNCTION getPartitionFunctionk
   double precision :: ne_oldM, UkM, PhiHmin
 !   double precision, dimension(atmos%Nspace) :: np
   double precision, dimension(:), allocatable :: fjk, dfjk
-  integer :: Nmaxstage=0, n, k, niter, j, ZM
+  integer :: Nmaxstage=0, n, k, niter, j, ZM, id, ninit, nfini
 
   if (.not. present(ne_initial_solution)) then
       initial="H_IONISATION"!use HIONISAtion
@@ -213,8 +213,9 @@ END FUNCTION getPartitionFunctionk
 !     end if
   end if
 
+  id = 1
   do n=1,Nelem
-   Nmaxstage=max(Nmaxstage,atmos%Elements(n)%Nstage)
+   Nmaxstage=max(Nmaxstage,atmos%Elements(n)%ptr_elem%Nstage)
   end do
   allocate(fjk(Nmaxstage))
   allocate(dfjk(Nmaxstage))
@@ -233,10 +234,11 @@ END FUNCTION getPartitionFunctionk
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
-  !$omp private(dne, akj) &
+  !$omp private(dne, akj, id, ninit, nfini) &
   !$omp shared(atmos, initial,Hydrogen, ZM)
   !$omp do
   do k=1,atmos%Nspace
+   !$ id = omp_get_thread_num() + 1
    if (.not.atmos%lcompute_atomRT(k)) CYCLE
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
@@ -247,8 +249,8 @@ END FUNCTION getPartitionFunctionk
    else !"H_IONISATION" or unkown
    
     !Initial solution ionisation of H
-    Uk = getPartitionFunctionk(atmos%Elements(1), 1, k)
-    Ukp1 = getPartitionFunctionk(atmos%Elements(1), 2, k)
+    Uk = getPartitionFunctionk(atmos%Elements(1)%ptr_elem, 1, k)
+    Ukp1 = getPartitionFunctionk(atmos%Elements(1)%ptr_elem, 2, k)
 
     if (Ukp1 /= 1d0) then 
      CALL Warning("Partition function of H+ should be 1")
@@ -263,10 +265,10 @@ END FUNCTION getPartitionFunctionk
       ZM = 26
     end if    
     !add Metal
-    Uk = getPartitionFunctionk(atmos%Elements(ZM), 1, k)
-    Ukp1 = getPartitionFunctionk(atmos%Elements(ZM), 2, k)
-    CALL ne_Metal(k, Uk, Ukp1, atmos%elements(ZM)%ionpot(1), &
-         atmos%elements(ZM)%Abund, ne_oldM)
+    Uk = getPartitionFunctionk(atmos%Elements(ZM)%ptr_elem, 1, k)
+    Ukp1 = getPartitionFunctionk(atmos%Elements(ZM)%ptr_elem, 2, k)
+    CALL ne_Metal(k, Uk, Ukp1, atmos%elements(ZM)%ptr_elem%ionpot(1), &
+         atmos%elements(ZM)%ptr_elem%Abund, ne_oldM)
     !write(*,*) "neMetal=",ne_oldM
     !if Abund << 1. and chiM << chiH then
     ! ne (H+M) = ne(H) + ne(M)
@@ -279,10 +281,12 @@ END FUNCTION getPartitionFunctionk
     error = ne_old/atmos%nHtot(k)
     sum = 0.
 
+    !ninit = (1. * (id-1)) / nb_proc * Nelem + 1
+    !nfini = (1. * id) / nb_proc * Nelem
     do n=1,Nelem
-     if (n.gt.N_MAX_ELEMENT) exit
+     if (n > N_MAX_ELEMENT) exit
 
-     CALL getfjk(atmos%Elements(n),ne_old,k,fjk,dfjk)
+     CALL getfjk(atmos%Elements(n)%ptr_elem,ne_old,k,fjk,dfjk)!
 
      if (n.eq.1)  then ! H minus for H
        PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
@@ -291,8 +295,8 @@ END FUNCTION getPartitionFunctionk
        sum = sum-(fjk(1)+ne_old*dfjk(1))*PhiHmin
        !write(*,*) "phiHmin=",PhiHmin,error, sum
      end if
-     do j=2,atmos%elements(n)%Nstage
-      akj = atmos%elements(n)%Abund*(j-1) !because j starts at 1
+     do j=2,atmos%elements(n)%ptr_elem%Nstage
+      akj = atmos%elements(n)%ptr_elem%Abund*(j-1) !because j starts at 1
       error = error -akj*fjk(j)
       sum = sum + akj*dfjk(j)
       !write(*,*) n-1, j-1, akj, error, sum

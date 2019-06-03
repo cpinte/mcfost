@@ -729,8 +729,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
+   !CALL magneto_accretion_model()  
+   CALL uniform_law_model()
    !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
@@ -911,7 +911,7 @@ MODULE AtomicTransfer
 
   real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1
 
-  logical :: labs, disable_subit, Ng_acceleration = .false., iterate_ne = .false.
+  logical :: labs, disable_subit, Ng_acceleration = .false., iterate_ne = .true.
   integer :: atomunit = 1, nact
   integer :: icell
   integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
@@ -1004,7 +1004,7 @@ MODULE AtomicTransfer
   		lconverged = .false.
   		n_iter = 0 
   		fac_etape = 1d-2 !1d0
-  		disable_subit = .false. !set to true to avoid subiterations over the emissivity
+  		disable_subit = .true. !set to true to avoid subiterations over the emissivity
   		max_sub_iter = 50
 
         do while (.not.lconverged)
@@ -1017,6 +1017,11 @@ MODULE AtomicTransfer
         	n_iter = n_iter + 1
 
             max_n_iter_loc = 0
+            
+        	if (iterate_ne .and. n_iter > 1)  then 
+        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	 CALL SolveElectronDensity(ne_start_sol)
+        	end if
 
             write(*,*) " -> Iteration #", n_iter 			
  			!$omp parallel &
@@ -1037,7 +1042,6 @@ MODULE AtomicTransfer
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
   			        CALL initGamma(id,icell)
-  			        !write(*,*) "icell=", icell, " id=", id
      				do iray=iray_start, iray_start-1+n_rayons
       
       					!remember only 2 etape atm.
@@ -1063,7 +1067,7 @@ MODULE AtomicTransfer
 ! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
 						!in practice only if MALI
 						CALL initCrossCoupling(id)
-						
+
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
                         !+add cross_coupling for this cell in this direction in Gamma
                         !then for next ray they are re init
@@ -1073,11 +1077,11 @@ MODULE AtomicTransfer
       	
     				
     				!lconverged_loc = disable_subit !to disable sub-it
+    		     	n_iter_loc = 0
     				if (disable_subit) then
     				 CALL updatePopulations(id, icell)
     				 lconverged_loc = .true.
     				else
-    		     	 n_iter_loc = 0
     				 lconverged_loc = .false.
     				!save pops for all active atoms
     				!pop(NactAtom, Nmaxlvel, Nthreads)
@@ -1204,19 +1208,24 @@ MODULE AtomicTransfer
           	   end if
         	end if
         	
-        	if (iterate_ne)  CALL SolveElectronDensity(ne_start_sol)
-        	
 	    end do !while
 
   CASE DEFAULT
    CALL ERROR("Methode for SEE unknown", atmos%nLTE_methode)
   END SELECT
   
-  CALL calc_nHmin()
+  if (iterate_ne) then
+   write(*,*) "  --> old max/min nHmin", maxval(atmos%nHmin), minval(atmos%nHmin,mask=atmos%nHmin>0)
+   CALL calc_nHmin()
+   do nact=1,atmos%NpassiveAtoms
+    atom => atmos%PassiveAtoms(nact)%ptr_atom
+    CALL LTEpops(atom,.true.)
+    atom => Null()
+   end do
+   !CALL writeElectron()
+  end if
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
-
-  if (iterate_ne)  CALL writeElectron()
   
   deallocate(pop_old)
   if (allocated(pop)) deallocate(pop)

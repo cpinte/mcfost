@@ -144,7 +144,8 @@ MODULE lte
    end do !over depth points
    !$omp end do
    !$omp  end parallel
-
+   write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%lcompute_atomRT==.true.)
   RETURN
   END SUBROUTINE calc_nHmin
   
