@@ -213,10 +213,10 @@ MODULE broad
  SUBROUTINE StarkLinear(icell, atom, kr, GStark)
  ! Linear Stark broadening by electrons for hydrogen lines.
  !
- ! See: K. Sutton (1978), JQSRT 20, 333-343
+ ! See: K. Sutton (1978), JQSRT 20, 333-343 (formula for z = nu)
  !
  ! GStark = a_1 * &
- !       [0.60 * (n_u^2 - n_l^2) * (N_e)^(2/3) * CM_TO_M^2]
+ !       [0.60 * (n_u^2 - n_l^2) * (N_e)^(2/3) * CM_TO_M^2] !s^-1, with N_e here in cm^-3
  !
   double precision, intent(out) :: GStark
   integer, intent(in) :: icell
@@ -243,7 +243,7 @@ MODULE broad
 !    stop
 !   end if
 
-  if ((n_upper-n_lower).eq.1) then
+  if ((n_upper-n_lower).eq.1) then !first line of the serie, dn=1
    a1 = 0.642
   else
    a1 = 1.
