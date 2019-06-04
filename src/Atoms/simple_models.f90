@@ -179,6 +179,7 @@ MODULE simple_models
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
        y = min(y,0.99)
        if (Rm>=rmi .and. Rm<=rmo) then
+       !write(*,*) 'R=', r*AU_to_Rsun, rcyl*au_to_rsun, z * au_to_rsun
           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
@@ -293,6 +294,7 @@ MODULE simple_models
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
    atmos%calc_ne = .true.
+   linfall = .false.; lkeplerian = .true.; lmagnetoaccr = .false.
    
    if (n_cells > 1) then
     atmos%T(:)=7590d0

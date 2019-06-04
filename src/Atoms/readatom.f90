@@ -200,7 +200,8 @@ MODULE readatom
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
-     write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), "nm"
+      
+     write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), 'nm'
 
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
@@ -298,6 +299,11 @@ MODULE readatom
                           *atom%lines(kr)%Aji
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
+      
+ 
+      write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
+        "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
+        "gj = ", atom%g(j)," gi = ",  atom%g(i)
 
       !write(*,*) "line ", atom%lines(kr)%j,'->',atom%lines(kr)%i, " @",&
       !           lambdaji/NM_TO_M," nm : Aji = ", &
