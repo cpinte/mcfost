@@ -729,8 +729,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL magneto_accretion_model()  
-   CALL uniform_law_model()
+   CALL magneto_accretion_model()  
+   !CALL uniform_law_model()
    !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
@@ -894,12 +894,12 @@ MODULE AtomicTransfer
  
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 3 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp
-  real, parameter :: precision_sub = 1.0e-2 !1e-3
+  real, parameter :: precision_sub = 1.0e-3 !1e-2
   real, parameter :: precision = 1.0e-1
   integer :: etape, etape_start, etape_end, iray, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
@@ -931,8 +931,9 @@ MODULE AtomicTransfer
   n_rayons_max = atmos%Nrays
   labs = .true. !to have ds
   id = 1
-  etape = 2 !only 1 etape at the moment
-  atmos%nLTE_methode="HOGEREIJDE"
+  etape_start = 1
+  etape_end = 2
+  atmos%nLTE_methode="HOGEREIJDE" !force Hogereijde, MALI not okay yet
  ! ----------------------------  INITIAL POPS------------------------------------------ !
   ! CALL initialSol()
   ! if OLD_POPULATIONS, the init is done at the reading
@@ -994,75 +995,125 @@ MODULE AtomicTransfer
         stop
  
     CASE ("HOGEREIJDE")
+    write(*,*) "kep=",lkeplerian, "inf",linfall, "magnetoacrr (rot+infall + eventually kep)",lmagnetoaccr
+     do etape=etape_start, etape_end
 
-  		!only etape2 or 3 for now
+      if (etape==1) then !two rays
+        lfixed_rays=.true.
+        n_rayons = 2
+        iray_start = 1
+        fac_etape = 1.
+        lprevious_converged = .false.
+      else if (etape==2) then
   		lfixed_rays = .true.
   		n_rayons = n_rayons_start
   		iray_start = 1
   		lprevious_converged = .false.
+  		fac_etape = 1. !1d-2
+  	  else
+  	    CALL ERROR("etape unkown")
+  	  end if
+  	  
   		lnotfixed_rays = .not.lfixed_rays
   		lconverged = .false.
   		n_iter = 0 
-  		fac_etape = 1d-2 !1d0
-  		disable_subit = .true. !set to true to avoid subiterations over the emissivity
+  		disable_subit = .false. !set to true to avoid subiterations over the emissivity
   		max_sub_iter = 50
 
         do while (.not.lconverged)
+        	n_iter = n_iter + 1    
+            write(*,*) " -> Iteration #", n_iter, " Step #", etape
+            	
   			if (lfixed_rays) then
     			stream = 0.0
     			do i=1,nb_proc
      				stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     			end do
  			 end if
-        	n_iter = n_iter + 1
 
             max_n_iter_loc = 0
-            
-        	if (iterate_ne .and. n_iter > 1)  then 
-        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-        	 CALL SolveElectronDensity(ne_start_sol)
-        	end if
-
-            write(*,*) " -> Iteration #", n_iter 			
  			!$omp parallel &
             !$omp default(none) &
-            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom) &
-            !$omp shared(xyz0, uvw0) &
-            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
-            !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc)
+            !$omp private(icell) &
+            !$omp shared(atmos, gpop_old, atom, nact)
             !$omp do schedule(static,1)
-  			do icell=1, n_cells
+            do icell=1, atmos%Nspace
             	do nact=1, atmos%NactiveAtoms
             	    atom => atmos%ActiveAtoms(nact)%ptr_atom
              		gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
              		atom => NULL()
             	end do
+            end do
+        	!$omp end do
+        	!$omp end parallel
+            
+        	if (iterate_ne .and. n_iter > 1)  then 
+        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	 CALL SolveElectronDensity(ne_start_sol)
+        	end if
+		
+ 			!$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom) &
+            !$omp shared(xyz0, uvw0, lkeplerian) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
+            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
+            !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
+            !$omp do schedule(static,1)
+  			do icell=1, n_cells
    				!$ id = omp_get_thread_num() + 1
    				if (atmos%lcompute_atomRT(icell)) then
   			        CALL initGamma(id,icell)
      				do iray=iray_start, iray_start-1+n_rayons
-      
-      					!remember only 2 etape atm.
+     				
+      					if (etape==1) then
+                        ! Position = milieu de la cellule
+                         x0 = r_grid(icell)
+                         y0 = 0.0_dp
+                         z0 = z_grid(icell)
+                         if (lkeplerian) then
+                       ! Direction verticale
+                          if (iray==1) then
+                           w0=1.0_dp
+                          else
+                           w0=-1.0_dp
+                          endif
+                          u0 = 0.0_dp
+                          v0 = 0.0_dp
+                          else !not keplerian, spherical, infall even lmagneto_accr
+                          norme = sqrt(x0*x0 + y0*y0 + z0*z0)
+                          if (iray==1) then
+                           u0 = x0/norme
+                           v0 = y0/norme
+                           w0 = z0/norme
+                          else
+                           u0 = -x0/norme
+                           v0 = -y0/norme
+                           w0 = -z0/norme
+                          endif
+                         endif !lkeplerian      					 
+      					else !etape 2, 3
                    	    ! Position aleatoire dans la cellule
-                        rand  = sprng(stream(id))
-                        rand2 = sprng(stream(id))
-                        rand3 = sprng(stream(id))
+                         rand  = sprng(stream(id))
+                         rand2 = sprng(stream(id))
+                         rand3 = sprng(stream(id))
                         
-                        CALL  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                         CALL  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
                         
                         ! Direction de propagation aleatoire
-                        rand = sprng(stream(id))
-                        W0 = 2.0_dp * rand - 1.0_dp
-                        W02 =  1.0_dp - W0*W0
-                        SRW02 = sqrt(W02)
-                        rand = sprng(stream(id))
-                        ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-                        U0 = SRW02 * cos(ARGMT)
-                        V0 = SRW02 * sin(ARGMT)      					
+                         rand = sprng(stream(id))
+                         W0 = 2.0_dp * rand - 1.0_dp
+                         W02 =  1.0_dp - W0*W0
+                         SRW02 = sqrt(W02)
+                         rand = sprng(stream(id))
+                         ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                         U0 = SRW02 * cos(ARGMT)
+                         V0 = SRW02 * sin(ARGMT)  
+						end if !etape    					
 						xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
 						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
+
 ! if (iray==1 .or. iray==n_rayons) &
 ! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
 						!in practice only if MALI
@@ -1095,7 +1146,7 @@ MODULE AtomicTransfer
      				!!sub iteration on the local emissivity, keeping Idag fixed
      				!!only iterate on cells which are not converged
      				do while (.not.lconverged_loc)
-     				write(*,*) "Starting subit for cell ", icell
+     				!write(*,*) "Starting subit for cell ", icell
        					n_iter_loc = n_iter_loc + 1
        					
                         pop_old(:,:,id) = pop(:,:,id)
@@ -1117,10 +1168,10 @@ MODULE AtomicTransfer
      				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
      				    			(pop_old(nact,ilevel,id)+1d-300))
      				    		diff = max(diff, dN)
-     				    		! if (dN /= 0) then 
-     							write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+     				    		if (diff > 1) then !(diff == dN)
+     							 write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
      								n_iter_loc, atom%ID, " dpops = ", dN, diff
-!      							end if
+      							end if
      						end do
      						atom => NULL()
      					end do
@@ -1144,7 +1195,7 @@ MODULE AtomicTransfer
       						end do !iray
       						!!CALL Gamma_LTE(id,icell)
        					end if
-       					if (n_iter_loc >= max_sub_iter) then !stops at 20
+       					if (n_iter_loc >= max_sub_iter) then 
        					  if (diff>1) write(*,*) " sub-it not converged after", n_iter_loc, &
        					  	" iterations; diff=", diff
        					  lconverged_loc = .true.
@@ -1168,19 +1219,20 @@ MODULE AtomicTransfer
      						do ilevel=1,atom%Nlevel
      				    		dN1 = abs((gpop_old(nact,ilevel,icell)-atom%n(ilevel,icell))/&
      				    			(gpop_old(nact,ilevel,icell)+1d-300))
-     						!if (dN>1) &
-     							write(*,*) icell, " **->", atom%ID, " ilevel", ilevel, " dpops = ", dN1
      				    		dN = max(dN1, dN)
+     						if (dN > 1) & !(dN == dN1)
+     							write(*,*) icell, " **->", atom%ID, " ilevel", ilevel, " dpops = ", dN1
      						end do
      						atom => NULL()
      					end do
      					diff = max(diff, dN) !for all cells
+     					write(*,*) icell, " dpops(atoms) = ", dN, " dpops(icell) =", diff
      			end if
      		end do cell_loop2
 
          	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          		write(*,*) maxval(max_n_iter_loc), "sub-iterations"
-         	write(*,*) "Relative difference =", diff
+         	write(*,*) "Relative difference =", diff !at the end of the loop over n_cells
         	write(*,*) "Threshold =", precision*fac_etape
 
         	if (diff < precision*fac_etape) then
@@ -1209,6 +1261,7 @@ MODULE AtomicTransfer
         	end if
         	
 	    end do !while
+	  end do !over etapes
 
   CASE DEFAULT
    CALL ERROR("Methode for SEE unknown", atmos%nLTE_methode)
