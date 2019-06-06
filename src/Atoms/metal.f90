@@ -89,19 +89,19 @@ MODULE metal
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
                ! to unbound an electron
-!! 15/05/2019
+
     ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
-	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
-!     if (metal%nstar(j,icell) <= tiny_dp) then
-!        if (metal%nstar(j,icell) < 0) then
-!         write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!         write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
-!         write(*,*) "skipping this level"
-!        end if
-!        CYCLE
-!     end if
+!	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
+    if (metal%nstar(j,icell) <= tiny_dp) then
+       if (metal%nstar(j,icell) <= 0) then
+        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
+        write(*,*) "skipping this level"
+       end if
+       CYCLE
+    end if
 
 !      Z = metal%stage(i) + 1
 !      !! Only for Hydrogen n_eff = dsqrt(metal%g(i)/2.)
@@ -211,17 +211,16 @@ MODULE metal
      ! -> prevents dividing by zero
      ! even if lcompute_atomRT(icell) it is still possible to not have a transition
      ! between the levels i and j, but not for the others.
-!! 15/05/2019
-       if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) CYCLE
-!      if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
-!        !but show the message only if pops is negative
-!       if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
-!         write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!         write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
-!         write(*,*) "skipping this level"
-!       end if
-!       CYCLE
-!      end if
+
+     if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
+       !but show the message only if pops is negative
+      if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
+        write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
+        write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+        write(*,*) "skipping this level"
+      end if
+      CYCLE
+     end if
 
      !allocate(Vij(line%Nlambda)); Vij = 0d0
      gij = line%Bji / line%Bij

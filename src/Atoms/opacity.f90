@@ -232,14 +232,14 @@ MODULE Opacity
     	i = cont%i; j=cont%j
         gij = 0d0
    	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
-    	if (aatom%n(j,icell) < tiny_dp) then
+    	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
     	 write(*,*) aatom%n(j,icell)
      	 CALL Warning("too small cont populations") !or Error()
      	 CYCLE
     	end if
     	
-    	 gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
-
+    	 
+    	gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
     
     !store total emissivities and opacities
        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
@@ -267,7 +267,7 @@ MODULE Opacity
 
     i = line%i; j=line%j
     
-    if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
+    if ((aatom%n(j,icell) <= tiny_dp).or.(aatom%n(i,icell) <= tiny_dp)) then !no transition
     	write(*,*) tiny_dp
         write(*,*) aatom%n(:,icell)
      	CALL Warning("too small line populations") !or Error()
@@ -277,6 +277,7 @@ MODULE Opacity
     Vij = 0d0
 
     gij(:) = line%Bji / line%Bij
+    
     twohnu3_c2(Nblue:Nred) = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
     if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp

@@ -205,6 +205,8 @@ MODULE AtomicTransfer
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id)) / (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300)
     end if
     if (minval(Snu) < 0) then
+      write(*,*) "eta", NLTEspec%AtomOpac%eta(:,id)
+      write(*,*) "chi", NLTEspec%AtomOpac%chi(:,id)
      call error("Snu negative")   
     end if
     !In ray-traced map (which is used this subroutine) we integrate from the observer
@@ -661,9 +663,9 @@ MODULE AtomicTransfer
      !$omp end parallel
   end if
 
-!   write(*,*) " -> Adding stellar flux" !Stellar flux by MCFOST is in W/m2 = Blambda*lambda
-! 									 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
-!   !! This is slow in my implementation actually
+!    write(*,*) " -> Adding stellar flux" !Stellar flux by MCFOST is in W/m2 = Blambda*lambda
+! ! 									 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
+! !   !! This is slow in my implementation actually
 !   do lambda = 1, NLTEspec%Nwaves
 !    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
 !                                              !else it means that in FLUX_PIXEL_LINE, nu
@@ -894,7 +896,7 @@ MODULE AtomicTransfer
  
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 10 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
@@ -932,7 +934,9 @@ MODULE AtomicTransfer
   labs = .true. !to have ds
   id = 1
   etape_start = 1
-  etape_end = 2
+  etape_end = 1
+  disable_subit = .true. !set to true to avoid subiterations over the emissivity
+  max_sub_iter = 50
   atmos%nLTE_methode="HOGEREIJDE" !force Hogereijde, MALI not okay yet
  ! ----------------------------  INITIAL POPS------------------------------------------ !
   ! CALL initialSol()
@@ -995,7 +999,6 @@ MODULE AtomicTransfer
         stop
  
     CASE ("HOGEREIJDE")
-    write(*,*) "kep=",lkeplerian, "inf",linfall, "magnetoacrr (rot+infall + eventually kep)",lmagnetoaccr
      do etape=etape_start, etape_end
 
       if (etape==1) then !two rays
@@ -1017,8 +1020,6 @@ MODULE AtomicTransfer
   		lnotfixed_rays = .not.lfixed_rays
   		lconverged = .false.
   		n_iter = 0 
-  		disable_subit = .false. !set to true to avoid subiterations over the emissivity
-  		max_sub_iter = 50
 
         do while (.not.lconverged)
         	n_iter = n_iter + 1    
@@ -1125,7 +1126,11 @@ MODULE AtomicTransfer
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       				end do !iray
       				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
-      	
+!       				NLTEspec%J(:,id) = 0d0; NLTEspec%Jc(:,id) = 0d0
+!       	            do iray=1,n_rayons
+!       	             NLTEspec%J(:,id)  NLTEspec%J(:,id) + NLTEspec%I(:,iray,id)/n_rayons
+!       	             NLTEspec%Jc(:,id)  NLTEspec%Jc(:,id) + NLTEspec%Ic(:,iray,id)/n_rayons
+!       	            end do
     				
     				!lconverged_loc = disable_subit !to disable sub-it
     		     	n_iter_loc = 0
@@ -1168,10 +1173,10 @@ MODULE AtomicTransfer
      				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/&
      				    			(pop_old(nact,ilevel,id)+1d-300))
      				    		diff = max(diff, dN)
-     				    		if (diff > 1) then !(diff == dN)
-     							 write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
-     								n_iter_loc, atom%ID, " dpops = ", dN, diff
-      							end if
+!      				    		if (diff > 1) then !(diff == dN)
+!      							 write(*,*) "icell#",icell," level#", ilevel, " sub-it->#", &
+!      								n_iter_loc, atom%ID, " dpops = ", dN, diff
+!       							end if
      						end do
      						atom => NULL()
      					end do
@@ -1191,7 +1196,7 @@ MODULE AtomicTransfer
 							         xyz0(1,iray,id), xyz0(2,iray,id), xyz0(3,iray,id), &
 							         uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id))
                                !! +add Xcoupling in Gamma for this cell/ray
- 						       CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+ 						       !CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
       						!!CALL Gamma_LTE(id,icell)
        					end if
@@ -1220,13 +1225,13 @@ MODULE AtomicTransfer
      				    		dN1 = abs((gpop_old(nact,ilevel,icell)-atom%n(ilevel,icell))/&
      				    			(gpop_old(nact,ilevel,icell)+1d-300))
      				    		dN = max(dN1, dN)
-     						if (dN > 1) & !(dN == dN1)
-     							write(*,*) icell, " **->", atom%ID, " ilevel", ilevel, " dpops = ", dN1
+ !     						if (dN > 1) & !(dN == dN1)
+!      							write(*,*) icell, " **->", atom%ID, " ilevel", ilevel, " dpops = ", dN1
      						end do
      						atom => NULL()
      					end do
      					diff = max(diff, dN) !for all cells
-     					write(*,*) icell, " dpops(atoms) = ", dN, " dpops(icell) =", diff
+!      					if (diff>1) write(*,*) icell, " dpops(atoms) = ", dN, " dpops(icell) =", diff
      			end if
      		end do cell_loop2
 
