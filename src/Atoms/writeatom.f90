@@ -9,7 +9,7 @@
 ! Atomic data are written to atom%dataFile
 ! Electronic density is also written in a separate file
 ! ---------------------------------------------------------------------- !
-MODULE writeatom
+MODULE writeatom !Futur write.... 
 
  use atmos_type, only : atmos
  use atom_type
@@ -25,9 +25,21 @@ MODULE writeatom
  
  character(len=15), parameter :: neFile = "ne.fits.gz"
  character(len=15), parameter :: nHFile = "nHtot.fits.gz"
+ character(len=50), parameter :: TemperatureFile = "Temperature.fits.gz"
 
  
  CONTAINS
+ 
+ SUBROUTINE writeIteration()
+ 
+ 
+ RETURN
+ END SUBROUTINE writeIteration
+ 
+ SUBROUTINE make_checkpoint()
+ 
+ RETURN
+ END SUBROUTINE make_checkpoint
  
  SUBROUTINE writeElectron()
  ! ------------------------------------ !
@@ -140,6 +152,61 @@ MODULE writeatom
  
  RETURN
  END SUBROUTINE writeHydrogenDensity
+ 
+ SUBROUTINE writeTemperature()
+ ! ------------------------------------ !
+ ! T in K
+ ! ------------------------------------ !
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL ftinit(unit,trim(TemperatureFile),blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1 !??
+  fpixel = 1
+  extend = .false. !??
+  bitpix = -64  
+
+  if (lVoronoi) then
+   naxis = 1
+   naxes(1) = atmos%Nspace ! equivalent n_cells
+   nelements = naxes(1)
+  else
+   if (l3D) then
+    naxis = 3
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) ! != n_cells ? should be
+   else
+    naxis = 2
+    naxes(1) = n_rad
+    naxes(2) = nz
+    nelements = naxes(1) * naxes(2) ! should be n_cells also
+   end if
+  end if
+  ! write(*,*) 'yoyo2', n_rad, nz, n_cells, atmos%Nspace
+  !  Write the required header keywords.
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "K", ' ', EOF)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements,atmos%T,EOF)
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+ 
+ RETURN
+ END SUBROUTINE writeTemperature
  
  SUBROUTINE writePops(atom)
  ! -------------------------------------------- !

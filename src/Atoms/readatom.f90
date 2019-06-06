@@ -396,6 +396,7 @@ MODULE readatom
       atom%lines(kr)%symmetric = .true.
       !write(*,*) "Symmetric line profile"
      end if
+     atom%lines(kr)%symmetric = .false.
 
 
 !      if (atom%active) then !Should do it for passive atoms too
