@@ -17,6 +17,24 @@ MODULE broad
 
  CONTAINS
 
+ SUBROUTINE Broad_Kurosawa(icell, atom, kr, adamp)
+ ! For testing, implementing the broadening for H alpha used by some people
+  type (AtomType), intent(in) :: atom
+  integer, intent(in) :: kr, icell
+  double precision, intent(out) :: adamp
+  double precision :: Crad, Cvdw, Cstark, G
+  
+  !AA
+  Crad = 6.5d-4; CvdW = 4.4d-4; Cstark = 1.17d-3
+  !in AA
+  G = Crad + Cvdw * (1d-6 * sum(atom%n(1:atom%Nlevel-1,icell))/1d16) * (atmos%T(icell)/5d3)**(0.3) + &
+      Cstark * (atmos%ne(icell)/1d12)**(2./3.) * 1d-4 !conversion from 12cm^-3 ^ 2/3 to 12m^-3 ^ 2/3
+  G = G * 1d-10 !in m
+  !conversion in s^-1 -> G(m) = G(s^-1) * lambda**2 / c : G(s^-1)/nu = G(m)/lambda -> G(m)*nu/lambda
+  adamp  = G * CLIGHT / atom%lines(kr)%lambda0**2 * 1d18!s^-1
+  !will be divided by 4PI later
+ RETURN
+ END SUBROUTINE Broad_Kurosawa
 
  SUBROUTINE VanderWaals(icell, atom, kr, GvdW)
  ! Compute van der Waals broadening in Lindholm theory with
@@ -129,9 +147,9 @@ MODULE broad
    stop
   END SELECT
 
-  ! Multiply with the Hydrogen ground level population
    !write(*,*) "GvdW=", GvdW(k)
-   GvdW = GvdW * Hydrogen%n(1,icell)
+   GvdW = GvdW * Hydrogen%n(1,icell) !ground level pops
+   !GvdW = GvdW * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell)) !total nH_I pops
 
  RETURN
  END SUBROUTINE VanderWaals
@@ -296,6 +314,13 @@ MODULE broad
   end if
   !write(*,*) "Grad=", line%Grad * cDop/atom%vbroad(icell), cDop/atom%vbroad(icell)
    adamp = (line%Grad + Qelast)*cDop / atom%vbroad(icell)
+
+!    if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
+!     CALL Broad_Kurosawa(icell, atom, kr, adamp)
+!     write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/atom%vbroad(icell), &
+!      " Ben=", (line%Grad + Qelast)*cDop / atom%vbroad(icell)
+!     !adamp = adamp * cDop / atom%vbroad(icell)
+!    end if
 
  RETURN
  END SUBROUTINE Damping
