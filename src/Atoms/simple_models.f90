@@ -10,6 +10,7 @@ MODULE simple_models
  use density
  use constantes
  use fits_utils, only : print_error
+ use writeAtom, only : writeTemperature
  
  IMPLICIT NONE
 
@@ -44,13 +45,13 @@ MODULE simple_models
    use utils, only : interp_dp
    use TTauri_module, only : TTauri_temperature
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp
-   double precision, parameter :: Tmax = 8d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=22d-1, rmo=30d-1, Tshk=8d3, Macc = 1d-9
+   double precision, parameter :: Tmax = 6d3, days_to_sec = 86400d0, Prot = 8. !days
+   double precision, parameter :: rmi=2.2, rmo=3., Tshk=8d3, Macc = 1d-7
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0
-   double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
+   double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
-   double precision :: Bp, BR, Bz, tc, phic
+   double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den
    logical :: lwrite_model_ascii = .false.
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -177,32 +178,39 @@ MODULE simple_models
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
        
        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
-       y = min(y,0.99)
+       !y = min(y,0.9999999999999999999999999999999999999)
+       if (y>0) then
+        Den = 1d0 / dsqrt(1d0-y)
+       else if (y==0d0) then
+        Den = 1d0 + 0.5 * y + 3d0/8d0 * y**2 !1
+       end if
        if (Rm>=rmi .and. Rm<=rmo) then
        !write(*,*) 'R=', r*AU_to_Rsun, rcyl*au_to_rsun, z * au_to_rsun
           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
-                       
-          Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
+          fp = 1
+          !Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1 / fp
+          Q0 = nH0**2 * 10**(interp1D(TL, Lambda, log10(Tring)))*0.1 / fp
+
 
           atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
                        (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
-                       dsqrt(4d0-3d0*y) / dsqrt(1d0-y) * &
-                       rho_to_nH  !kg/m3 ->/m3
+                       dsqrt(4d0-3d0*y) * Den * rho_to_nH  !kg/m3 ->/m3
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
            if (.not.lstatic) then
              atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rhat
              atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !zhat
              atmos%Vxyz(icell,3) = Vphi !phihat
+             if ( z < 0. ) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
              if (.not.lmagnetoaccr) then !projection
               atmos%Vxyz(icell,3) = atmos%Vxyz(icell,2) !zhat         
               atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) &
               						-Vphi*sin(phi)!xhat
               atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) &
               						+Vphi*cos(phi)!yhat
-             if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
+             if ( z < 0 ) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
              end if
              ! or theta > PI/2d0
              !Because z, is the second axis if Vxyz=(Vr, Vz, Vphi) and the third if the
@@ -225,15 +233,24 @@ MODULE simple_models
                if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
               end if
             end if
-          L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
-          !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
-          atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
+
+          L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2 * Q0!erg/cm3/s
+          atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
+          !atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
+
         end if
       end do
      end do
     end do
 
-    if (Tmax > 0d0) atmos%T(:) = Tmax * atmos%T/maxval(atmos%T)
+   if (Tmax > 0d0) then
+    Tmax_old = maxval(atmos%T)
+    do icell=1,n_Cells
+     atmos%T(icell) = Tmax*atmos%T(icell)/Tmax_old
+     !atmos%T(icell) = max(5d3,Tmax*atmos%T(icell)/Tmax_old)
+    end do
+   end if
+   CALL writeTemperature()
 !  write(*,*) "Density and T set to zero for tetsting"
 ! atmos%nHtot=1d0
 ! atmos%T =1d0
@@ -278,7 +295,7 @@ MODULE simple_models
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)  
-   
+
   RETURN
   END SUBROUTINE magneto_accretion_model
   
@@ -294,12 +311,13 @@ MODULE simple_models
    lstatic = .true. !force to be static for this case
    atmos%magnetized = .false.
    atmos%calc_ne = .true.
-   linfall = .false.; lkeplerian = .true.; lmagnetoaccr = .false.
+   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
    
    if (n_cells > 1) then
     atmos%T(:)=7590d0
     atmos%ne(:) = 4.446967d20
     atmos%nHtot(:) = 1.259814d23   
+    atmos%vturb(:) = 2d0
    end if
 
    !idk = 10
@@ -312,6 +330,7 @@ MODULE simple_models
 !   atmos%T(1)=7590d0
 !   atmos%ne(1) = 4.446967d20
 !   atmos%nHtot(1) = 1.259814d23
+!   atmos%vturb(1) = 2d0
 
     !idk = 81   
 !     atmos%T=9400d0
@@ -320,10 +339,10 @@ MODULE simple_models
 !     atmos%vturb = 1.806787d3 !idk=81
 
     !idk = 0 
-     atmos%T(1) = 100000d0
-     atmos%ne(1) = 1.251891d16
-     atmos%nHtot(1) = 1.045714d16 
-     atmos%vturb(1) = 10.680960d3 !idk=0
+!      atmos%T(1) = 100000d0
+!      atmos%ne(1) = 1.251891d16
+!      atmos%nHtot(1) = 1.045714d16 
+!      atmos%vturb(1) = 10.680960d3 !idk=0
    CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
@@ -340,7 +359,7 @@ MODULE simple_models
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: Mdot = 1d-6, Vexp = 900d3, beta = 2d0
+   double precision, parameter :: Mdot = 1d-4, Vexp = 40d3, beta = 0.5
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0 = 1d0, Rlimit=0.8
    double precision, parameter :: finf = 0.1, vclp = 100d3
    double precision :: Rstar, Mstar, Vr, rhor, rho_to_nH
@@ -384,11 +403,12 @@ MODULE simple_models
        r = dsqrt(z**2 + rcyl**2)
        
        Vr = v0 + (Vexp - v0) * (1d0 - (etoile(1)%r*r0)/r)**beta 
-       fclump = finf * (1d0 - finf) * dexp(-Vr/Vclp)
+       !fclump = finf * (1d0 - finf) * dexp(-Vr/Vclp)
+       fclump = 1d0
        rhor = fclump * Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
        atmos%nHtot(icell) = rhor * rho_to_nH
        atmos%T(icell) = (r0*etoile(1)%r/r)**2 * etoile(1)%T
-       atmos%vturb(icell) = 2d0 * (20d0 - 2d0) * Vr/Vexp
+       atmos%vturb(icell) = 5d0! * (20d0 - 2d0) * Vr/Vexp
 
        !!->expansion
         if (.not.linfall) then !expansion not analytic
