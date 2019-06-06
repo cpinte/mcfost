@@ -73,7 +73,7 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 51!101
+   integer, parameter :: Nlambda = 71!101
    integer :: la
    double precision :: l0, l1
    
@@ -108,9 +108,9 @@ MODULE getlambda
    double precision :: vcore, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision :: adamp_char = 0d0
-   double precision, parameter :: wing_to_core = 0.3, L = 1.5d0!10d0!depends on what is v_char
+   double precision, parameter :: wing_to_core = 0.5, L = 1d1
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
-   integer, parameter :: Nc = 51, Nw = 11 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 51, Nw = 21 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    !If it is needed we can develop an empirical recipe for the line and the element
@@ -125,14 +125,14 @@ MODULE getlambda
    if (line%atom%ID=="Na") adamp_char = 50 !adamp/vbroad
    if (line%atom%ID=="Mg") adamp_char = 150
    if (line%polarizable) atmos%v_char = atmos%v_char + &
-   				atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+   				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
    v_char = (atmos%v_char + 2d0*vD*(1. + adamp_char)) !=maximum extension of a line
    v0 = -v_char * L
    v1 = +v_char * L
    vel = 0d0
    !transition between wing and core in velocity
    !vcore = L * v_char * wing_to_core ! == fraction of line extent
-   vcore = v_char * L
+   vcore = v_char * wing_to_core
 
    !from -v_char to 0
    dvw = (L * v_char-vcore)/real(Nw-1,kind=dp)
@@ -149,7 +149,10 @@ MODULE getlambda
 !    !!write(*,*) la, vel(la)
 !    end do
 !! Log wing
-   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
+   !should be log from vcore to v0 not the opposite
+   !v0 is < 0 but spanl takes the abs
+!   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
+   vel(Nw:1:-1) = -real(spanl(real(vcore), real(v0), Nw),kind=dp)
 !! end scale of wing points
 !   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp) 
 !   write(*,*) Nw, vel(Nw), vcore
@@ -159,10 +162,9 @@ MODULE getlambda
    !is shared with the point vel(1) of the core grid.
    do la=Nw+1, Nc+Nw-1 !Half line core
     vel(la) = vel(la-1) + dvc
-!    write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
+    !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
    end do
-
    !! Just a check here, maybe forcing the mid point to be zero is brutal
    !! but by construction it should be zero !
    !if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
@@ -187,6 +189,7 @@ MODULE getlambda
 !    do la=1,Nlambda
 !     write(*,*) la, line%lambda(la), line%lambda0
 !    end do
+!    stop
 
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line  
