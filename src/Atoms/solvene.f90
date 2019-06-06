@@ -60,7 +60,9 @@ MODULE solvene
   double precision, intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
+  !if no free e-, Nt = NH + NH+ with NH+=ne
   ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+  !if free e-, Nt=Nhot + NH+ + ne
   !ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
 
  RETURN
