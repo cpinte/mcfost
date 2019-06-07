@@ -110,7 +110,7 @@ MODULE getlambda
    double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.5, L = 1d1
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
-   integer, parameter :: Nc = 51, Nw = 21 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 45, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
    !If it is needed we can develop an empirical recipe for the line and the element
@@ -122,8 +122,6 @@ MODULE getlambda
    !if (line%name == "Halpha") then ..
    !if (line%name == "Mgh" .or. line%name == "Mgk") then ...	
    !if (line%name == "Na D1" .or. line%name == "Na D2") then ...							 
-   if (line%atom%ID=="Na") adamp_char = 50 !adamp/vbroad
-   if (line%atom%ID=="Mg") adamp_char = 150
    if (line%polarizable) atmos%v_char = atmos%v_char + &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
    v_char = (atmos%v_char + 2d0*vD*(1. + adamp_char)) !=maximum extension of a line
