@@ -239,7 +239,15 @@ MODULE Opacity
     	end if
     	
     	 
-    	gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
+      gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
+      
+      !Cannot be negative because we alread tested if < tiny_dp
+      if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
+        (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
+         write(*,*) " ** Neglecting Stimulated emission for continuum transition", cont%j, cont%i, &
+          aatom%ID
+        gij(Nblue:Nred) = 0d0
+      end if
     
     !store total emissivities and opacities
        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
@@ -276,7 +284,14 @@ MODULE Opacity
     gij = 0d0
     Vij = 0d0
 
-    gij(:) = line%Bji / line%Bij
+    gij(:) = line%Bji / line%Bij !array of constant Bji/Bij
+    !Cannot be negative because we alread tested if < tiny_dp
+    if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
+        (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
+         write(*,*) " ** Neglecting Stimulated emission for line transition", line%j, line%i, &
+          aatom%ID
+        gij(Nblue:Nred) = 0d0
+    end if
     
     twohnu3_c2(Nblue:Nred) = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
