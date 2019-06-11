@@ -164,6 +164,8 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
      CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      if (eval_operator) then
+	   !in practice only if MALI
+	   CALL initCrossCoupling(id)
        CALL FillCrossCoupling_terms(id, icell)
        CALL add_to_psi_operator(id, icell, iray, ds(iray,id))
      end if
@@ -766,7 +768,6 @@ MODULE AtomicTransfer
    CALL SolveElectronDensity(ne_start_sol)
    CALL writeElectron()
   end if
-  CALL writeHydrogenDensity()
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
   !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
  ! ------------------------------------------------------------------------------------ !
@@ -789,6 +790,7 @@ MODULE AtomicTransfer
   !The BIG PART IS HERE
   if (atmos%Nactiveatoms > 0) then 
    CALL NLTEloop()
+  if (lstore_opac) then
    !Recompute Background opac if ne and Hydrogen%n have changed
    ! if ne all storeBackground + LTEpops before
    ! if not, only nH min bound-free
@@ -818,7 +820,8 @@ MODULE AtomicTransfer
   end do
   close(12) 
   !stop
-  end if
+  end if !test Sf
+  end if !NLTE loop
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------- WRITE CONVERGED POPULATIONS ------------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -931,12 +934,12 @@ MODULE AtomicTransfer
   ds = 0d0 !meters
   
   n_rayons_max = atmos%Nrays
-  labs = .true. !to have ds
+  labs = .true. !to have ds at cell icell
   id = 1
   etape_start = 1
   etape_end = 1
-  disable_subit = .true. !set to true to avoid subiterations over the emissivity
-  max_sub_iter = 50
+  disable_subit = .false. !set to true to avoid subiterations over the emissivity
+  max_sub_iter = 25
   atmos%nLTE_methode="HOGEREIJDE" !force Hogereijde, MALI not okay yet
  ! ----------------------------  INITIAL POPS------------------------------------------ !
   ! CALL initialSol()
@@ -1117,8 +1120,6 @@ MODULE AtomicTransfer
 
 ! if (iray==1 .or. iray==n_rayons) &
 ! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
-						!in practice only if MALI
-						CALL initCrossCoupling(id)
 
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
                         !+add cross_coupling for this cell in this direction in Gamma
@@ -1196,7 +1197,7 @@ MODULE AtomicTransfer
 							         xyz0(1,iray,id), xyz0(2,iray,id), xyz0(3,iray,id), &
 							         uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id))
                                !! +add Xcoupling in Gamma for this cell/ray
- 						       !CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
+ 						       CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
       						!!CALL Gamma_LTE(id,icell)
        					end if

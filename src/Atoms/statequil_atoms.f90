@@ -37,6 +37,7 @@ MODULE statequil_atoms
        						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
   NLTEspec%AtomOpac%chi(:,id) = 0d0
   NLTEspec%AtomOpac%eta(:,id) = 0d0
+  NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
   CALL initCrossCoupling(id)
   !NOTE Zeeman opacities are not re set to zero and are accumulated
