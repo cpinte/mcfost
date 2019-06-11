@@ -10,7 +10,7 @@ MODULE simple_models
  use density
  use constantes
  use fits_utils, only : print_error
- use writeAtom, only : writeTemperature
+ use writeAtom, only : writeTemperature, writeHydrogendensity
  
  IMPLICIT NONE
 
@@ -51,7 +51,7 @@ MODULE simple_models
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
-   double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den
+   double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den, r_red, z_red
    logical :: lwrite_model_ascii = .false.
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -69,6 +69,7 @@ MODULE simple_models
    if (atmos%magnetized) CALL init_magnetic_field()
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
+   fp = 1d0
 
    !Define some useful quantities
    !write(*,*) "Mstar ", etoile(1)%M, " Rstar ", etoile(1)%r*AU_to_Rsun
@@ -99,7 +100,9 @@ MODULE simple_models
    	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
    write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
  
- 
+!    write(*,*) Tring, Mstar, Rstar
+!    write(*,*) masseH * 1d-3, Msun_to_kg, Ggrav
+!    write(*,*) sigma, Mdot
  !     Surface on the apparent radius of one ring
 !     etoile(1)%SurfB(k)%Sp = (etoile(1)%SurfB(k)%limits(4)-etoile(1)%SurfB(k)%limits(3)) *&
 !     			abs(etoile(1)%SurfB(k)%limits(1)**2-etoile(1)%SurfB(k)%limits(2)**2) / (2d0 * PI)
@@ -162,55 +165,66 @@ MODULE simple_models
         icell = cell_map(i,1,k)
         rcyl = r_grid(icell) !AU
         z = 0.0_dp
+        
+        sinTheta = 1d0
+        y = 1d0
+        rM = rcyl/etoile(1)%r
+        r = rcyl
        else
         icell = cell_map(i,j,k)
         rcyl = r_grid(icell)
         z = z_grid(icell)/z_scaling_env
+        r = dsqrt(z**2 + rcyl**2)
+        sinTheta = rcyl/r
+        y = sinTheta**2
+        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
        end if
        phi = phi_grid(icell)
-       r = dsqrt(z**2 + rcyl**2)
 
-       sinTheta = rcyl/r
-       y = sinTheta**2
+       
+!        r_red = (rcyl - minval(r_grid)) / (maxval(r_grid)-minval(r_grid)) * (rmo-rmi)+rmi
+!        z_red = (z - minval(z_grid)) / (maxval(z_grid)-minval(z_grid)) * &
+!        			(pi/2.-asin(dsqrt(1d0/r_red)))+asin(dsqrt(1d0/r_red))
+! 
+!        y = sin(z_red)**2
+!        rM = r_red
+!        r = rM * y * etoile(1)%r
 
        Vphi = 0d0!Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
 
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
-       
-       Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
-       !y = min(y,0.9999999999999999999999999999999999999)
-       if (y>0) then
-        Den = 1d0 / dsqrt(1d0-y)
-       else if (y==0d0) then
-        Den = 1d0 + 0.5 * y + 3d0/8d0 * y**2 !1
-       end if
-       if (Rm>=rmi .and. Rm<=rmo) then
-       !write(*,*) 'R=', r*AU_to_Rsun, rcyl*au_to_rsun, z * au_to_rsun
+
+       Den = 1d0 / dsqrt(1d0 - min(y,0.999))
+       y = min(y, 0.999)
+
+       if (Rm>=rmi.and. Rm<=rmo) then!
           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
-                       (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
+                       (Rstar * r0)**(-5./2.) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
-          fp = 1
+
           !Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1 / fp
           Q0 = nH0**2 * 10**(interp1D(TL, Lambda, log10(Tring)))*0.1 / fp
+          
+          
+          write(*,*) "Rm=", Rm, "y=",y," r = ", r/etoile(1)%r
+          write(*,*) " logQ0=", log10(Q0), "rho0=", nH0/rho_to_nH, "den=", den
+          write(*,*) " nH0(log(cm^-3)) = ", log10(1d-6 * nH0)
 
-
-          atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
-                       (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
-                       dsqrt(4d0-3d0*y) * Den * rho_to_nH  !kg/m3 ->/m3
            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
            vp = -vp / dsqrt(4d0-3d0*y)
+           
            if (.not.lstatic) then
              atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rhat
              atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !zhat
              atmos%Vxyz(icell,3) = Vphi !phihat
-             if ( z < 0. ) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
+             !if ( z < 0. ) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2) !done in v_proj
              if (.not.lmagnetoaccr) then !projection
               atmos%Vxyz(icell,3) = atmos%Vxyz(icell,2) !zhat         
               atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) &
               						-Vphi*sin(phi)!xhat
               atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) &
               						+Vphi*cos(phi)!yhat
-             if ( z < 0 ) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
+             if ( z < 0 ) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3) !not done in v_proj
              end if
              ! or theta > PI/2d0
              !Because z, is the second axis if Vxyz=(Vr, Vz, Vphi) and the third if the
@@ -233,11 +247,19 @@ MODULE simple_models
                if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
               end if
             end if
+            
+          !Den = 1d0 / dsqrt(1d0 - min(y,0.99))
+          atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
+                       (AU_to_m * r)**(-5./2.) / dsqrt(2d0 * Ggrav * Mstar) * &
+                       dsqrt(4d0-3d0*y) * Den * rho_to_nH  !kg/m3 ->/m3
 
           L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2 * Q0!erg/cm3/s
           atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
           !atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-
+          write(*,*) "log(L)=", log10(L)
+          write(*,*) "log(Q)=",log10((r0*etoile(1)%r/r)**3*Q0)," rho=", atmos%nHtot(icell)/rho_to_nH, " T=", atmos%T(icell)
+          write(*,*) "nH(log(cm^-3)) = ", log10(1d-6*atmos%nHtot(icell))
+ 		  write(*,*) "***************"
         end if
       end do
      end do
@@ -247,10 +269,12 @@ MODULE simple_models
     Tmax_old = maxval(atmos%T)
     do icell=1,n_Cells
      atmos%T(icell) = Tmax*atmos%T(icell)/Tmax_old
-     !atmos%T(icell) = max(5d3,Tmax*atmos%T(icell)/Tmax_old)
     end do
    end if
    CALL writeTemperature()
+   CALL writeHydrogenDensity()
+   CALL writeVfield ()
+
 !  write(*,*) "Density and T set to zero for tetsting"
 ! atmos%nHtot=1d0
 ! atmos%T =1d0
@@ -441,11 +465,61 @@ MODULE simple_models
   RETURN
   END SUBROUTINE spherical_shells_model
   
-  SUBROUTINE rectangular_slab_model()
+  SUBROUTINE writeVfield()
+ ! ------------------------------------ !
+ ! ------------------------------------ !
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements
   
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL ftinit(unit,"Vfield.fits.gz",blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1
+  fpixel = 1
+  extend = .false.
+  bitpix = -64  
+
+  if (lVoronoi) then
+   naxis = 2
+   naxes(1) = atmos%Nspace 
+   naxes(2) = 3 
+   nelements = naxes(1) * naxes(2)
+  else
+   if (l3D) then
+    naxis = 4
+    naxes(4) = 3
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+   else
+    naxis = 3 !2 + 1 for all compo
+    naxes(3) = 3
+    naxes(1) = n_rad
+    naxes(2) = nz
+    nelements = naxes(1) * naxes(2) * naxes(3)
+   end if
+  end if
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "m.s^-1", ' ', EOF)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements,atmos%Vxyz,EOF)
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+   
   
   RETURN
-  END SUBROUTINE rectangular_slab_model
+  END SUBROUTINE writeVfield
   
   SUBROUTINE writeAtmos_ascii()
   ! ------------------------------------- !

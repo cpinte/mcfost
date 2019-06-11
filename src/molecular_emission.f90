@@ -734,6 +734,7 @@ function v_proj(icell,x,y,z,u,v,w) !
               vx = vx + x*norme*atmos%Vxyz(icell, 1) !Vr proj_x
               vy = vy + y*norme*atmos%Vxyz(icell, 1) !Vr proj_y
               vz = atmos%Vxyz(icell, 2) !Vz
+              if (z<0) vz = -vz
               v_proj = vx*u + vy*v + vz*w
            else
               v_proj = 0_dp
