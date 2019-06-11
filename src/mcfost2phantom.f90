@@ -134,10 +134,12 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
-    npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
+  subroutine run_mcfost_phantom(&
+    np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
+    xyzh,vxyzu,radiation,ikappa,&
+    iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tphantom,Frad,mu_gas,ierr,write_T_files,ISM,T_to_u)
+    Tphantom,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
     use constantes, only : mu
@@ -163,8 +165,9 @@ contains
 
 #include "sprng_f.h"
 
-    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,maxirad
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
+    real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
@@ -172,7 +175,7 @@ contains
     real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
-
+    integer, intent(in) :: ikappa
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
 
@@ -187,7 +190,6 @@ contains
     integer, intent(in) :: ISM ! ISM heating: 0 -> no ISM radiation field, 1 -> ProDiMo, 2 -> Bate & Keto
 
     real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
-    real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
@@ -228,7 +230,8 @@ contains
 
     ierr = 0
     mu_gas = mu ! Molecular weight
-    Frad = 0.
+
+    ! radiation(ikappa,:) = ?
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
