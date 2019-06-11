@@ -195,6 +195,8 @@ contains
 
     real, parameter :: Tmin = 1.
 
+    real(dp), dimension(n_cells) :: kappa_R
+
     real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH, SPH_grainsizes
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
@@ -230,8 +232,6 @@ contains
 
     ierr = 0
     mu_gas = mu ! Molecular weight
-
-    ! radiation(ikappa,:) = ?
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
@@ -373,6 +373,8 @@ contains
     endif
 
     call set_min_Temperature(Tmin)
+    call Rosseland_opacity(kappa_R)
+
     Tphantom = -1.0 ;
 
     if (present(write_T_files)) then
@@ -384,6 +386,7 @@ contains
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom) = Tdust(icell)
+          radiation(ikappa,i_Phantom) = kappa_R(icell)
        endif
     enddo
 
@@ -473,5 +476,51 @@ contains
     return
 
   end subroutine write_mcfost2phantom_temperature
+
+  !*************************************************************************
+
+  subroutine Rosseland_opacity(kappa_R)
+    ! Compute current Rosseland opacity for all cells
+    ! 1/k_R = int 1/kappa * dB/dT * dnu / int dB/dT * dnu
+
+    use parametres
+    use constantes
+    use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
+    use Temperature, only : Tdust
+    use dust_prop, only : kappa_abs_LTE
+
+    real(dp), dimension(n_cells) :: kappa_R
+
+    integer :: icell, lambda
+    real(dp) :: somme, somme2, Temp, cst, cst_wl, dB_dT, coeff_exp, wl, delta_wl
+
+    do icell=1, n_cells
+       Temp = Tdust(icell)
+
+       cst=cst_th/Temp
+       somme=0.0_dp
+       somme2 = 0.0_dp
+       do lambda=1, n_lambda
+          ! longueur d'onde en metre
+          wl = tab_lambda(lambda)*1.e-6
+          delta_wl=tab_delta_lambda(lambda)*1.e-6
+          cst_wl=cst/wl
+          if (cst_wl < 200.0) then
+             coeff_exp=exp(cst_wl)
+             dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+          else
+             dB_dT = 0.0_dp
+          endif
+          somme = somme + dB_dT/kappa_abs_LTE(icell,lambda) * delta_wl
+          somme2 = somme2 + dB_dT * delta_wl
+       enddo
+       kappa_R(icell) = somme2/somme
+
+    enddo ! icell
+
+    return
+
+  end subroutine Rosseland_opacity
+
 
 end module mcfost2phantom
