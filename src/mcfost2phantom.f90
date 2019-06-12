@@ -165,7 +165,8 @@ contains
 
 #include "sprng_f.h"
 
-    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,maxirad
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,&
+       maxirad,ikappa
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
@@ -175,7 +176,6 @@ contains
     real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
-    integer, intent(in) :: ikappa
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
 
@@ -373,7 +373,7 @@ contains
     endif
 
     call set_min_Temperature(Tmin)
-    call Rosseland_opacity(kappa_R)
+    call diffusion_opacity(kappa_R)
 
     Tphantom = -1.0 ;
 
@@ -485,7 +485,6 @@ contains
     ! Diffusion coefficient is D = 1/(rho * opacity)
     ! This opacity/diffusion coefficient includes scattering
     ! See Min et al 2009 and Robitaille et al 2010
-
     use parametres
     use constantes
     use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
