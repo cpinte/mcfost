@@ -59,7 +59,7 @@ MODULE Opacity
   RETURN
   END SUBROUTINE add_to_psi_operator
 
- 
+!--> futur deprecatio for saving memory
   SUBROUTINE alloc_wlambda()
   ! --------------------------------------------------- !
    ! Allocates wavelength integration

@@ -413,7 +413,7 @@ MODULE getlambda
   
   RETURN
   END SUBROUTINE make_wavelength_grid
-  
+!--> Futur deprecation of this. Two memory consuming  
   SUBROUTINE fillPhotoionisationCrossSection(atom, kc, old_waves, Nwaves, waves)
    !computes photoionisation Xsections on the waves grid.
    !Eventually interpolate the values of the old grid old_waves onto waves
