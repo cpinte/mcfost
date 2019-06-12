@@ -499,27 +499,31 @@ contains
     do icell=1, n_cells
        Temp = Tdust(icell)
 
-       cst=cst_th/Temp
-       somme=0.0_dp
-       somme2 = 0.0_dp
-       do lambda=1, n_lambda
-          ! longueur d'onde en metre
-          wl = tab_lambda(lambda)*1.e-6
-          delta_wl=tab_delta_lambda(lambda)*1.e-6
-          cst_wl=cst/wl
-          if (cst_wl < 200.0) then
-             coeff_exp=exp(cst_wl)
-             B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
-             !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
-          else
-             B = 0.0_dp
-             !dB_dT = 0.0_dp
-          endif
-          somme = somme + B/kappa(icell,lambda) * delta_wl
-          somme2 = somme2 + B * delta_wl
-       enddo
-       kappa_diffusion(icell) = somme2/somme * cm_to_AU ! en cm-1
-       kappa_diffusion(icell) =  kappa_diffusion(icell) * masse_mol_gaz * (m_to_cm)**3 ! cm2/g
+       if (Temp > 1) then
+          cst=cst_th/Temp
+          somme=0.0_dp
+          somme2 = 0.0_dp
+          do lambda=1, n_lambda
+             ! longueur d'onde en metre
+             wl = tab_lambda(lambda)*1.e-6
+             delta_wl=tab_delta_lambda(lambda)*1.e-6
+             cst_wl=cst/wl
+             if (cst_wl < 200.0) then
+                coeff_exp=exp(cst_wl)
+                B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+                !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+             else
+                B = 0.0_dp
+                !dB_dT = 0.0_dp
+             endif
+             somme = somme + B/kappa(icell,lambda) * delta_wl
+             somme2 = somme2 + B * delta_wl
+          enddo
+          kappa_diffusion(icell) = somme2/somme * cm_to_AU ! en cm-1
+          kappa_diffusion(icell) =  kappa_diffusion(icell) * masse_mol_gaz * (m_to_cm)**3 ! cm2/g
+       else
+          kappa_diffusion(icell) = 0. ! kappa not defined on star where Temp is set to 1
+       endif
 
     enddo ! icell
 
