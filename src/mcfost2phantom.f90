@@ -479,20 +479,23 @@ contains
 
   !*************************************************************************
 
-  subroutine Rosseland_opacity(kappa_R)
-    ! Compute current Rosseland opacity for all cells
-    ! 1/k_R = int 1/kappa * dB/dT * dnu / int dB/dT * dnu
+  subroutine diffusion_opacity(kappa_diffusion)
+    ! Compute current Planck reciprocal mean opacity for all cells
+    ! (note : diffusion coefficient needs to be defined with Rosseland opacity in B&W mode)
+    ! Diffusion coefficient is D = 1/(rho * opacity)
+    ! This opacity/diffusion coefficient includes scattering
+    ! See Min et al 2009 and Robitaille et al 2010
 
     use parametres
     use constantes
     use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
     use Temperature, only : Tdust
-    use dust_prop, only : kappa_abs_LTE
+    use dust_prop, only : kappa
 
-    real(dp), dimension(n_cells) :: kappa_R
+    real(dp), dimension(n_cells) :: kappa_diffusion ! cm2/g (ie per gram of gas)
 
     integer :: icell, lambda
-    real(dp) :: somme, somme2, Temp, cst, cst_wl, dB_dT, coeff_exp, wl, delta_wl
+    real(dp) :: somme, somme2, Temp, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
 
     do icell=1, n_cells
        Temp = Tdust(icell)
@@ -507,20 +510,23 @@ contains
           cst_wl=cst/wl
           if (cst_wl < 200.0) then
              coeff_exp=exp(cst_wl)
-             dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+             B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+             !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
           else
-             dB_dT = 0.0_dp
+             B = 0.0_dp
+             !dB_dT = 0.0_dp
           endif
-          somme = somme + dB_dT/kappa_abs_LTE(icell,lambda) * delta_wl
-          somme2 = somme2 + dB_dT * delta_wl
+          somme = somme + B/kappa(icell,lambda) * delta_wl
+          somme2 = somme2 + B * delta_wl
        enddo
-       kappa_R(icell) = somme2/somme
+       kappa_diffusion(icell) = somme2/somme * cm_to_AU ! en cm-1
+       kappa_diffusion(icell) =  kappa_diffusion(icell) * masse_mol_gaz * (m_to_cm)**3 ! cm2/g
 
     enddo ! icell
 
     return
 
-  end subroutine Rosseland_opacity
+  end subroutine diffusion_opacity
 
 
 end module mcfost2phantom
