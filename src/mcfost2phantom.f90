@@ -490,6 +490,8 @@ contains
     use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
     use Temperature, only : Tdust
     use dust_prop, only : kappa
+    use cylindrical_grid, only : volume
+    use density, only : masse_gaz, densite_gaz
 
     real(dp), dimension(n_cells) :: kappa_diffusion ! cm2/g (ie per gram of gas)
 
@@ -500,9 +502,9 @@ contains
        Temp = Tdust(icell)
 
        if (Temp > 1) then
+          somme=0.0_dp ; somme2 = 0.0_dp
+
           cst=cst_th/Temp
-          somme=0.0_dp
-          somme2 = 0.0_dp
           do lambda=1, n_lambda
              ! longueur d'onde en metre
              wl = tab_lambda(lambda)*1.e-6
@@ -519,8 +521,8 @@ contains
              somme = somme + B/kappa(icell,lambda) * delta_wl
              somme2 = somme2 + B * delta_wl
           enddo
-          kappa_diffusion(icell) = somme2/somme * cm_to_AU ! en cm-1
-          kappa_diffusion(icell) =  kappa_diffusion(icell) * masse_mol_gaz * (m_to_cm)**3 ! cm2/g
+          kappa_diffusion(icell) = somme2/somme * cm_to_AU  / (densite_gaz(icell) * masse_mol_gaz * (cm_to_m)**3) ! cm^2/g
+          ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
        else
           kappa_diffusion(icell) = 0. ! kappa not defined on star where Temp is set to 1
        endif
