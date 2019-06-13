@@ -136,7 +136,7 @@ contains
 
   subroutine run_mcfost_phantom(&
     np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
-    xyzh,vxyzu,radiation,ikappa,&
+    xyzh,vxyzu,radiation,ichi,&
     iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
     Tphantom,mu_gas,ierr,write_T_files,ISM,T_to_u)
@@ -166,7 +166,7 @@ contains
 #include "sprng_f.h"
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,&
-       maxirad,ikappa
+       maxirad,ichi
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
@@ -195,7 +195,8 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(n_cells) :: kappa_R
+    real(dp), allocatable :: chi_R(:)
+    real(dp) :: default_chi
 
     real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH, SPH_grainsizes
     integer, dimension(:), allocatable :: particle_id
@@ -373,7 +374,8 @@ contains
     endif
 
     call set_min_Temperature(Tmin)
-    call diffusion_opacity(kappa_R)
+    allocate(chi_R(n_cells))
+    call diffusion_opacity(chi_R,default_chi)
 
     Tphantom = -1.0 ;
 
@@ -381,12 +383,13 @@ contains
        if (write_T_files) call write_mcfost2phantom_temperature()
     endif
 
+    ! radiation(ichi,:) = default_chi
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom) = Tdust(icell)
-          radiation(ikappa,i_Phantom) = kappa_R(icell)
+          radiation(ichi,i_Phantom) = chi_R(icell)
        endif
     enddo
 
@@ -479,7 +482,7 @@ contains
 
   !*************************************************************************
 
-  subroutine diffusion_opacity(kappa_diffusion)
+  subroutine diffusion_opacity(kappa_diffusion,default_chi)
     ! Compute current Planck reciprocal mean opacity for all cells
     ! (note : diffusion coefficient needs to be defined with Rosseland opacity in B&W mode)
     ! Diffusion coefficient is D = 1/(rho * opacity)
@@ -493,14 +496,16 @@ contains
     use cylindrical_grid, only : volume
     use density, only : masse_gaz, densite_gaz
 
-    real(dp), dimension(n_cells) :: kappa_diffusion ! cm2/g (ie per gram of gas)
+    real(dp), allocatable, intent(inout) :: kappa_diffusion(:) ! cm2/g (ie per gram of gas)
+    real(dp), intent(out) :: default_chi
 
     integer :: icell, lambda
     real(dp) :: somme, somme2, Temp, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
 
+    default_chi = 0
+
     do icell=1, n_cells
        Temp = Tdust(icell)
-
        if (Temp > 1) then
           somme=0.0_dp ; somme2 = 0.0_dp
 
@@ -524,11 +529,11 @@ contains
           kappa_diffusion(icell) = somme2/somme * cm_to_AU  / (densite_gaz(icell) * masse_mol_gaz * (cm_to_m)**3) ! cm^2/g
           ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
        else
-          kappa_diffusion(icell) = 0. ! kappa not defined on star where Temp is set to 1
+          kappa_diffusion(icell) = 0
        endif
-
+       default_chi = default_chi + kappa_diffusion(icell)
     enddo ! icell
-
+    default_chi = default_chi / (n_cells - 1)
     return
 
   end subroutine diffusion_opacity
