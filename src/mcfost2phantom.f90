@@ -377,13 +377,11 @@ contains
     allocate(chi_R(n_cells))
     call diffusion_opacity(chi_R,default_chi)
 
-    Tphantom = -1.0 ;
-
     if (present(write_T_files)) then
        if (write_T_files) call write_mcfost2phantom_temperature()
     endif
-
-    ! radiation(ichi,:) = default_chi
+    Tphantom = -1.0 ; radiation(ichi,:) = -1.0 ! SPH particles ignored by mcfost
+    ! Remapping to phantom indices
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
