@@ -93,7 +93,7 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
-  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
+  if (lphantom_file .or. lphantom_hdf_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else
@@ -104,7 +104,7 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lphantom_hdf_file .or. lgadget2_file .or. lascii_SPH_file)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()

@@ -650,6 +650,17 @@ subroutine initialisation_mcfost()
         density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-phantom_hdf")
+        i_arg = i_arg + 1
+        lphantom_hdf_file=.true.
+        lVoronoi = .true.
+        l3D = .true.
+        call get_command_argument(i_arg,s)
+        n_phantom_files = 1
+        allocate(density_files(n_phantom_files))
+        density_files(1) = s
+        i_arg = i_arg + 1
+        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-phantom-multi","-phantom-add","-phantom-avg")
         if (s == "-phantom-avg") lphantom_avg = .true.
         i_arg = i_arg + 1

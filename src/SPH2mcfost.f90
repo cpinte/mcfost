@@ -11,7 +11,7 @@ contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
-    use read_phantom, only : read_phantom_files
+    use read_phantom, only : read_phantom_files, read_phantom_hdf_files
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
@@ -42,6 +42,33 @@ contains
           enddo
        endif
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
+            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+
+       if (lphantom_avg) then ! We are averaging the dump
+          factor = 1.0/n_phantom_files
+          massgas = massgas * factor
+          massdust = massdust * factor
+          rho = rho * factor
+          rhodust = rhodust * factor
+          h = h/(n_phantom_files**(1./3.))
+       endif
+
+       ! Todo : extra heating must be passed to mcfost
+       if (ierr /=0) then
+          write(*,*) "Error code =", ierr,  get_error_text(ierr)
+          call exit(1)
+       endif
+    elseif (lphantom_hdf_file) then
+       write(*,*) "Performing phantomhdf2mcfost setup"
+       if (n_phantom_files==1) then
+          write(*,*) "Reading phantom density file: "//trim(density_files(1))  ! todo : update: we do not use SPH_file anymore
+       else
+          write(*,*) "Reading phantom density files: "
+          do i=1,n_phantom_files
+             write(*,*) " - "//trim(density_files(i))  ! todo : update: we do not use SPH_file anymore
+          enddo
+       endif
+       call read_phantom_hdf_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
