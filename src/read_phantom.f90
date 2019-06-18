@@ -398,7 +398,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  character(len=200) :: fileident, filename
 
  logical :: smalldump,isothermal,ind_timesteps,const_av
- logical :: got_h,got_dustfrac,got_itype
+ logical :: got_dustfrac,got_itype
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
@@ -562,16 +562,17 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
        write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF particles group ***'
     endif
 
-    got_h = .false.
     got_dustfrac = .false.
     got_itype = .false.
 
     ! TODO: read particle arrays
     call read_from_hdf5(itype(np0+1:np0+np),'itype',hdf5_group_id,got,error)
+    if (got) got_itype = .true.
     call read_from_hdf5(xyzh(1:3,np0+1:np0+np),'xyz',hdf5_group_id,got,error)
     call read_from_hdf5(xyzh(4,np0+1:np0+np),'h',hdf5_group_id,got,error)
     call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,error)
     call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,error)
+    if (got) got_dustfrac = .true.
 
     if (error /= 0) then
        write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF particles group ***'
