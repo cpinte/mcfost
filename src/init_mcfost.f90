@@ -77,6 +77,7 @@ subroutine set_default_variables()
   ldensity_file=.false.
   lvelocity_file=.false.
   lphantom_file=.false.
+  lphantom_hdf_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
   lSPH_amin = .false.

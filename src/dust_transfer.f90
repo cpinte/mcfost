@@ -716,7 +716,7 @@ subroutine transfert_poussiere()
               call ecriture_temperature(2)
            endif
 
-           if (lphantom_file) call write_temperature_for_phantom(n_SPH)
+           if (lphantom_file .or. lphantom_hdf_file) call write_temperature_for_phantom(n_SPH)
 
            ! Remise a zero pour etape suivante
            sed=0.0; sed_q=0.0 ; sed_u=0.0 ; sed_v=0.0

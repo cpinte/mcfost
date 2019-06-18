@@ -101,7 +101,7 @@ contains
        if (allocated(rhodust)) deallocate(rhodust,massdust)
     endif
 
-    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
+    if ((.not.lfix_star).and.(lphantom_file .or. lphantom_hdf_file .or. lgadget2_file)) call compute_stellar_parameters()
 
     if (lscale_SPH) then
        write(*,*) "**************************************************"
