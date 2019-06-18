@@ -393,22 +393,18 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
- real(kind=4), allocatable :: dtind(:)
+ character(len=200) :: filename
 
- character(len=200) :: fileident, filename
-
- logical :: smalldump,isothermal,ind_timesteps,const_av
  logical :: got_dustfrac,got_itype
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
- integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
+ integer :: np,ntypes,nptmass,dustfluidtype,ndudt
  integer :: error,ndustsmall,ndustlarge
 
  integer, parameter :: maxtypes = 100
  integer, parameter :: nsinkproperties = 11
 
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
- real(dp), allocatable, dimension(:,:) :: nfiles_massoftype !(maxfiles,maxtypes)
  real(4),  allocatable, dimension(:)   :: tmp, tmp_header
  real(dp), allocatable, dimension(:)   :: dudt, tmp_dp
  real(dp), allocatable, dimension(:)   :: grainsize, graindens
@@ -564,6 +560,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
     got_dustfrac = .false.
     got_itype = .false.
+    ndudt = 0
 
     ! TODO: read particle arrays
     call read_from_hdf5(itype(np0+1:np0+np),'itype',hdf5_group_id,got,error)
