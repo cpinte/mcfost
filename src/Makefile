@@ -126,17 +126,13 @@ ifeq ($(IPO), yes)
     CCFLAGS+= ${IPOFLAGS}
 endif
 
-#------------------------------------------------------------------------------#
-# Library flags
-
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++
-
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
 
 #------------------------------------------------------------------------------#
 # HDF5 libraries
+# Will use the version compiled by install.sh by default but you can use
+# the system one if prefered
 #
-# Requires two directories:
+# In that case, it requires two directories:
 #   - include for Fortran .mod files
 #   - lib for the shared library .so files
 #
@@ -147,9 +143,8 @@ LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng
 # However, sometimes these directories are separate,
 # then you must set both HDF5INCLUDE and HDF5LIB.
 #
-ifeq ($(HDF5), yes)
 ifeq (X$(HDF5ROOT), X)
-    HDF5ROOT= /usr/local/opt/hdf5
+    HDF5ROOT=$(MCFOST_INSTALL)/hdf5/$(SYSTEM)
 endif
 ifeq (X$(HDF5INCLUDE), X)
     HDF5INCLUDE= $(HDF5ROOT)/include
@@ -157,10 +152,11 @@ endif
 ifeq (X$(HDF5LIB), X)
     HDF5LIB= $(HDF5ROOT)/lib
 endif
-    FFLAGS+= -I$(HDF5INCLUDE)
-    CCFLAGS+= -I$(HDF5INCLUDE)
-    LDFLAGS+= -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
-endif
+
+#------------------------------------------------------------------------------#
+# Library flags
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(HDF5INCLUDE)
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -176,7 +172,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
           io_prodimo.f90 disk_physics.f90 output.f90 mem.f90 optical_depth.f90 \
           init_mcfost.f90 io_phantom_infiles.f90 io_phantom_utils.f90          \
           utils_hdf5.f90 read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90      \
-			 dust_transfer.f90 mol_transfer.f90
+	  dust_transfer.f90 mol_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
