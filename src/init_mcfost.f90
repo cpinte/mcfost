@@ -77,7 +77,6 @@ subroutine set_default_variables()
   ldensity_file=.false.
   lvelocity_file=.false.
   lphantom_file=.false.
-  lphantom_hdf_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
   lSPH_amin = .false.
@@ -644,17 +643,6 @@ subroutine initialisation_mcfost()
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        n_phantom_files = 1
-        allocate(density_files(n_phantom_files))
-        density_files(1) = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-phantom_hdf")
-        i_arg = i_arg + 1
-        lphantom_hdf_file=.true.
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
