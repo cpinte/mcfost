@@ -4,14 +4,16 @@ module SPH2mcfost
   use constantes
   use utils
   use density, only : normalize_dust_density, reduce_density
+  use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
 
   implicit none
+
+  procedure(read_phantom_bin_files), pointer :: read_phantom_files => null()
 
 contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
-    use read_phantom, only : read_phantom_files, read_phantom_hdf_files
     use read_gadget2, only : read_gadget2_file
     use dump_utils, only : get_error_text
     use utils, only : read_comments
@@ -28,7 +30,7 @@ contains
 
     real(dp), dimension(6) :: SPH_limits
     real :: factor
-    integer :: ndusttypes, ierr, i
+    integer :: ndusttypes, ierr, i, ilen
     character(len=100) :: line_buffer
 
     if (lphantom_file) then
@@ -41,6 +43,16 @@ contains
              write(*,*) " - "//trim(density_files(i))  ! todo : update: we do not use SPH_file anymore
           enddo
        endif
+
+       ! Are we reading phantom binary of hdf5 files ?
+       ilen = index(density_files(1),'.',back=.true.) ! last position of the '/' character
+       if (density_files(1)(ilen:ilen+5) == ".hdf5") then
+          read_phantom_files => read_phantom_hdf_files
+       else
+          read_phantom_files => read_phantom_bin_files
+       endif
+
+
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 

@@ -9,7 +9,7 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
@@ -365,7 +365,7 @@ subroutine read_phantom_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particl
  deallocate(xyzh,itype,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
-end subroutine read_phantom_files
+end subroutine read_phantom_bin_files
 
 !*************************************************************************
 
