@@ -159,7 +159,7 @@ ifeq (X$(HDF5LIB), X)
 endif
     FFLAGS+= -I$(HDF5INCLUDE)
     CCFLAGS+= -I$(HDF5INCLUDE)
-    LDFLAGS+= -L$(HDF5LIB) -lhdf5 -lhdf5_fortran
+    LDFLAGS+= -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
 endif
 
 #------------------------------------------------------------------------------#
