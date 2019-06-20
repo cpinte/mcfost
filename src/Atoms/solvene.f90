@@ -43,6 +43,28 @@ MODULE solvene
  ! potential in cm-1, converted in the routines in J.
  ! ----------------------------------------------------------------------!
 
+ SUBROUTINE ne_Hionisation0 (k, U0, U1, ne)
+ ! ----------------------------------------------------------------------!
+  ! Application of eq. 4.35 of Hubeny & Mihalas to ionisation
+  ! of H.
+  ! Njl = Nj1l * ne * phi_jl
+  ! ne(H) = NH-1 / (NH * phi_-1l) chi = ionpot0
+  ! eq. 17.77 and 17.78
+  ! ne(H) = (sqrt(N*phiH + 1)-1)/phiH
+ ! ----------------------------------------------------------------------!
+
+  integer, intent(in) :: k
+  double precision, intent(in) :: U0, U1
+  double precision :: phiH
+  double precision, intent(out) :: ne
+  phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
+
+  !if no free e-, Nt = NH + NH+ with NH+=ne
+  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+
+
+ RETURN
+ END SUBROUTINE ne_Hionisation0
 
  SUBROUTINE ne_Hionisation (k, U0, U1, ne)
  ! ----------------------------------------------------------------------!
@@ -61,9 +83,9 @@ MODULE solvene
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
-  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+  !ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   !if free e-, Nt=Nhot + NH+ + ne
-  !ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
+  ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
 
  RETURN
  END SUBROUTINE ne_Hionisation
@@ -147,7 +169,7 @@ END FUNCTION getPartitionFunctionk
     fjk(atom%stage(i)+1) = fjk(atom%stage(i)+1)+atom%stage(i)*atom%n(i,k)
    end do
    !Divide by Ntotal and retrieve fj = Nj/N for all j
-   fjk(:) = fjk(:)/atom%ntotal(k)
+   fjk(:) = fjk(:)/(atmos%nHtot(k)*atom%Abund)
    !et la dérivée ? dfjk
    atom => NULL()
   else !not active or active but first iteration of the NLTEloop so that
@@ -241,7 +263,7 @@ END FUNCTION getPartitionFunctionk
   !$omp do
   do k=1,atmos%Nspace
    !$ id = omp_get_thread_num() + 1
-   if (.not.atmos%lcompute_atomRT(k)) CYCLE
+   if (atmos%icompute_atomRT(k) /= 1) CYCLE
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."N_PROTON") then
@@ -329,7 +351,7 @@ END FUNCTION getPartitionFunctionk
   deallocate(fjk, dfjk)
   
   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
-  write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%lcompute_atomRT==.true.)
+  write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
  RETURN
  END SUBROUTINE SolveElectronDensity
 
