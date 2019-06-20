@@ -13,6 +13,39 @@ MODULE TTauri_module
 
   CONTAINS  
   
+      subroutine gett(xlogq,t)
+	implicit none
+
+!	xlogq = log (heating_rate/n_h**2)
+!	give it xlogq; get temperature t
+
+!      new cooling law 3/21/81
+
+	double precision xlogq, t, xlt, xxx
+
+      if(xlogq.ge.-22.631e0) go to 100
+   
+      xxx=(-xlogq-22.e0)/10.e0
+      xlt=-0.5e0*dlog10(xxx)+3.6e0
+      t=10.e0**xlt
+      return
+
+  100 if(xlogq.ge.-21.8e0) go to 200
+      xlt=(xlogq+31.3561e0)/2.0774e0
+      t=10.d0**xlt
+      return
+
+  200 if(xlogq.ge.-21.2e0) go to 300
+      xlt=(xlogq+31.e0)/2.e0
+      t=10.e0**xlt
+      return
+
+  300 continue
+!      error prevent
+      t=1.e5
+      return
+      end
+  
   SUBROUTINE TTauri_Temperature(rmi, rmo, Macc)
   ! ---------------------------------------------------------------- !
    ! Computes temperature of accretion columns of T Tauri stars
