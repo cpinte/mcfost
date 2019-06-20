@@ -10,6 +10,7 @@ MODULE statequil_atoms
  use utils, only : GaussSlv
  use grid, only : cross_cell
  use accelerate
+ use collision, only : CollisionRate, Collision_Hydrogen
 
  IMPLICIT NONE
  
@@ -83,20 +84,26 @@ MODULE statequil_atoms
   nati = 1; natf = atmos%Nactiveatoms
   do nact = nati, natf
    atom => atmos%ActiveAtoms(nact)%ptr_atom
+   
 !    write(*,*) "icell in initG", icell, "id=", id!, nact, atom%ID
    Nlevel = atom%Nlevel
 !   open(unit=12, file="Cji_Cij_H4x4.dat",status="unknown")
 
-   do lp=1,Nlevel
-    do l=1,Nlevel
-      ij = (l-1)*nlevel + lp!lp->l
-      ji = (lp-1)*nlevel + l!l->lp
-      !          col/row
-      atom%Gamma(lp,l,id) =  c_lte*atom%Ckij(icell,ij)!Gamma_llp = Gamma(lp, l) rate from lp to l
-      !!                                                      Cul                  Clu=Cul*nu/nl with Cul=Gul here
-!      write(12,'(6E)') real(lp), real(l), real(ij), real(ji), atom%Ckij(icell,ij), atom%Gamma(lp,l) * atom%nstar(lp, icell)/atom%nstar(l,icell)
-    end do
-   end do
+!    do lp=1,Nlevel
+!     do l=1,Nlevel
+!       ij = (l-1)*nlevel + lp!lp->l
+!       ji = (lp-1)*nlevel + l!l->lp
+!       !          col/row
+!       atom%Gamma(lp,l,id) =  c_lte*atom%Ckij(icell,ij)!Gamma_llp = Gamma(lp, l) rate from lp to l
+!       !!                                                      Cul                  Clu=Cul*nu/nl with Cul=Gul here
+! !      write(12,'(6E)') real(lp), real(l), real(ij), real(ji), atom%Ckij(icell,ij), atom%Gamma(lp,l) * atom%nstar(lp, icell)/atom%nstar(l,icell)
+!     end do
+!    end do
+	 if (atom%ID=="H") then
+	  atom%Gamma(:,:,id) = Collision_Hydrogen(icell)
+	 else
+      atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
+     end if
 ! close(12)
    NULLIFY(atom)
   end do
@@ -142,7 +149,6 @@ MODULE statequil_atoms
   
   do nact=1,atmos%Nactiveatoms
    atom => atmos%ActiveAtoms(nact)%ptr_atom
-
    do kl=1,atom%Ncont
     cont = atom%continua(kl)
     Nblue = cont%Nblue; Nred = cont%Nred
@@ -256,7 +262,7 @@ MODULE statequil_atoms
    	end do
    end if
    	
-   	if (maxval(atom%Gamma(:,:,id)) < 0d0) then  
+   	if (maxval(atom%Gamma(:,:,id)) <= 0d0) then  
    	write(*,*) icell, id, iray, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
      do i=1,atom%Nlevel
      do j=1,atom%Nlevel
@@ -607,7 +613,7 @@ MODULE statequil_atoms
 
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   atom%n(:,icell) = 0d0
-  atom%n(imaxpop,icell) = atom%ntotal(icell)
+  atom%n(imaxpop,icell) = atmos%nHtot(icell)*atom%Abund
 
   
   !Sum_l'_imaxpop * n_l' = N
@@ -620,8 +626,8 @@ MODULE statequil_atoms
 
   Aij = transpose(atom%Gamma(:,:,id))
   CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
-  !atom%n(:,icell) = atom%n(:,icell) * atom%ntotal(icell)
-  !atom%Gamma(:,:,id) = -1d12
+  !atom%n(:,icell) = atom%n(:,icell) * atmos%nHtot(icell)*atom%Abund
+  atom%Gamma(:,:,id) = -1d100 !for checking, this should never be seen in Aij
 
  RETURN
  END SUBROUTINE SEE_atom
