@@ -217,12 +217,21 @@ MODULE hydrogen_opacities
 !     gijk(iLam) = Hydrogen%nstar(i,icell)/npstar * expla(iLam)
     gijk(continuum%Nblue:continuum%Nred) = Hydrogen%nstar(i,icell)/npstar * &
       expla(continuum%Nblue:continuum%Nred)
+      
+!       write(*,*)
+!       write(*,*) maxval(Hydrogen%n(i,icell)*(1.-expla(continuum%Nblue:continuum%Nred))), &
+!       	maxval(Hydrogen%n(i,icell)-gijk(continuum%Nblue:continuum%Nred)*np), np, hydrogen%n(continuum%j,icell),&
+!       Hydrogen%nstar(continuum%j,icell), atmos%Atoms(1)%ptr_atom%n(continuum%j,icell)
+!      stop     
+      
      ! at LTE only for chi
      ! see Hubeny & Mihalas eq. 14.16 to 14.18
      ! if LTE Hydrogen%n points to %nstar
 !    chi(iLam) = chi(iLam) + sigma(iLam) * (1.-expla(iLam)) * Hydrogen%n(i,icell)
+!     chi(continuum%Nblue:continuum%Nred) = chi(continuum%Nblue:continuum%Nred) + &
+!       sigma(continuum%Nblue:continuum%Nred) * (1.-expla(continuum%Nblue:continuum%Nred)) * Hydrogen%n(i,icell)
     chi(continuum%Nblue:continuum%Nred) = chi(continuum%Nblue:continuum%Nred) + &
-      sigma(continuum%Nblue:continuum%Nred) * (1.-expla(continuum%Nblue:continuum%Nred)) * Hydrogen%n(i,icell)
+      sigma(continuum%Nblue:continuum%Nred) * (Hydrogen%n(i,icell)-gijk(continuum%Nblue:continuum%Nred) * np)
 !   eta(iLam) = eta(iLam) + twohnu3_c2(iLam) * gijk(iLam) * sigma(iLam) * np       
     eta(continuum%Nblue:continuum%Nred) = eta(continuum%Nblue:continuum%Nred) + &
       twohnu3_c2(continuum%Nblue:continuum%Nred) * gijk(continuum%Nblue:continuum%Nred) * &
@@ -309,7 +318,7 @@ MODULE hydrogen_opacities
   
   !non zero only in this region
   where((NLTEspec%lambda > lambdaBF(1)).and.(NLTEspec%lambda < lambdaBF(NBF)))
-   ! note that nhmin is deduced from hydrogen%ntotal
+   ! note that nhmin is deduced from hydrogen nTotal = A*nHtot
    ! which is the total number of hydrogen in neutral and
    ! ionised form (H and H+).
    ! nHtot is the total number of Hydrogen present in
