@@ -25,6 +25,7 @@ MODULE spectrum_type
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
+!    double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
    ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
@@ -251,8 +252,12 @@ MODULE spectrum_type
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
    !in NLTEOpacity()
    if (alloc_atom_nlte) then !NLTE loop activated
-    !allocate(NLTEspec%AtomOpac%initialized(NLTEspec%NPROC))
-    !NLTEspec%AtomOpac%initialized(:) = .false.
+    
+    !!!!!!!!!!! POTENTIALLY ADD LARGE ARRAY HERE !!!!!!!!!!!!
+!     allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%atmos%Nspace, NLTEspec%Nwaves),&
+!      NLTEspec%AtomOpac%etac_nlte(NLTEspec%atmos%Nspace, NLTEspec%Nwaves))
+    !!!!!!!!!!! POTENTIALLY ADD LARGE ARRAY HERE !!!!!!!!!!!!
+     
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
