@@ -57,7 +57,7 @@ MODULE constant
   ! --- Ionization energy Hmin in [J] ---
 
   real(8), parameter ::  E_ION_HMIN = 0.754 * EV
-
+  double precision :: Vtherm = 2.*KBOLTZMANN/AMU !m^2/s^2/K
   real(8), dimension(NELEM_WEIGHTS) :: atomic_weights
   !starts at 1 for H, ends at NELEM_WEIGHTS
   DATA atomic_weights /1.008,4.003,6.939,9.013,10.81,12.01,  &
