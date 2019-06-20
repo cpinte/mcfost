@@ -44,9 +44,9 @@ contains
           enddo
        endif
 
-       ! Are we reading phantom binary of hdf5 files ?
-       ilen = index(density_files(1),'.',back=.true.) ! last position of the '/' character
-       if (density_files(1)(ilen:ilen+5) == ".hdf5") then
+       ! Are we reading phantom binary or HDF5 files ?
+       ilen = index(density_files(1),'.',back=.true.) ! last position of the '.' character
+       if (density_files(1)(ilen:ilen+3) == ".h5") then
           read_phantom_files => read_phantom_hdf_files
        else
           read_phantom_files => read_phantom_bin_files
@@ -54,33 +54,6 @@ contains
 
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
-
-       if (lphantom_avg) then ! We are averaging the dump
-          factor = 1.0/n_phantom_files
-          massgas = massgas * factor
-          massdust = massdust * factor
-          rho = rho * factor
-          rhodust = rhodust * factor
-          h = h/(n_phantom_files**(1./3.))
-       endif
-
-       ! Todo : extra heating must be passed to mcfost
-       if (ierr /=0) then
-          write(*,*) "Error code =", ierr,  get_error_text(ierr)
-          call exit(1)
-       endif
-    elseif (lphantom_hdf_file) then
-       write(*,*) "Performing phantomhdf2mcfost setup"
-       if (n_phantom_files==1) then
-          write(*,*) "Reading phantom density file: "//trim(density_files(1))  ! todo : update: we do not use SPH_file anymore
-       else
-          write(*,*) "Reading phantom density files: "
-          do i=1,n_phantom_files
-             write(*,*) " - "//trim(density_files(i))  ! todo : update: we do not use SPH_file anymore
-          enddo
-       endif
-       call read_phantom_hdf_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
@@ -113,7 +86,7 @@ contains
        if (allocated(rhodust)) deallocate(rhodust,massdust)
     endif
 
-    if ((.not.lfix_star).and.(lphantom_file .or. lphantom_hdf_file .or. lgadget2_file)) call compute_stellar_parameters()
+    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
     if (lscale_SPH) then
        write(*,*) "**************************************************"
