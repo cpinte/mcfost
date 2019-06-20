@@ -105,38 +105,35 @@ MODULE getlambda
    type (AtomicLine), intent(inout) :: line
    double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
    double precision :: v_char, dvc, dvw
-   double precision :: vcore, v0, v1!km/s
+   double precision :: vcore, vB, v0, v1!km/s
    integer :: la, Nlambda, Nmid
    double precision :: adamp_char = 0d0
-   double precision, parameter :: wing_to_core = 0.5, L = 1d1
+   double precision, parameter :: wing_to_core = 0.5, L = 5d0 !only if velocity field
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
    integer, parameter :: Nc = 45, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
-   !If it is needed we can develop an empirical recipe for the line and the element
-   !or used typical values, without knowing atom%n, which is not known
-   !because this routine is called in readatom, before lte populations are knonw
-   !even if used after in init_spectrum().
-   !one solution would be to compute and store the LTE pops in Elements(:)%n
-   !before the call of this function in readatom, so well well before LTE().
-   !if (line%name == "Halpha") then ..
-   !if (line%name == "Mgh" .or. line%name == "Mgk") then ...	
-   !if (line%name == "Na D1" .or. line%name == "Na D2") then ...							 
-   if (line%polarizable) atmos%v_char = atmos%v_char + &
+
+   adamp_char = 1d3 * L * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
+   !write(*,*) adamp_char*vD/1000.
+   vB = 0d0
+   if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
-   v_char = (atmos%v_char + 2d0*vD*(1. + adamp_char)) !=maximum extension of a line
-   v0 = -v_char * L
-   v1 = +v_char * L
-   vel = 0d0
+   								 
+   v_char = (atmos%v_char*L + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   vcore = (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) * wing_to_core
    !transition between wing and core in velocity
-   !vcore = L * v_char * wing_to_core ! == fraction of line extent
-   vcore = v_char * wing_to_core
+   !!vcore = L * v_char * wing_to_core ! == fraction of line extent
+   vcore = v_char * wing_to_core !with *L if velocity field
+
+   v0 = -v_char !* L
+   v1 = +v_char !* L
+   vel = 0d0
 
    !from -v_char to 0
-   dvw = (L * v_char-vcore)/real(Nw-1,kind=dp)
+   dvw = (v_char-vcore)/real(Nw-1,kind=dp) !(L * v_char-vcore)/real(Nw-1,kind=dp), old
    dvc = vcore/real(Nc-1,kind=dp)
-!    write(*,*) "line:", line%lambda0,line%j,"->",line%i, &
-!               " Resolution wing,core (km/s):", dvw/1d3,dvc/1d3
+   
 !! Linear wing
    !vel(1:Nw) = -real(span(real(v1), real(vcore), Nw),kind=dp)
    !vel(1) = v0 !half wing
@@ -151,6 +148,9 @@ MODULE getlambda
    !v0 is < 0 but spanl takes the abs
 !   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
    vel(Nw:1:-1) = -real(spanl(real(vcore), real(v0), Nw),kind=dp)
+!    do la=1,Nw
+!     write(*,*) la, vel(la)/1000., vcore, -v_char, adamp_char*vD / 1000.
+!    end do
 !! end scale of wing points
 !   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp) 
 !   write(*,*) Nw, vel(Nw), vcore
@@ -184,10 +184,12 @@ MODULE getlambda
 
    if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
    
+!    if (line%j==3 .and. line%i==2) then
 !    do la=1,Nlambda
 !     write(*,*) la, line%lambda(la), line%lambda0
 !    end do
-!    stop
+!    !stop
+!    end if
 
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line  
@@ -211,7 +213,7 @@ MODULE getlambda
    ! deallocating the array. It is reallocated when the final list is known.
    double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
    ! temporary storage for transitions, to count and add them.
-   integer, parameter :: MAX_TRANSITIONS = 10000
+   integer, parameter :: MAX_TRANSITIONS = 50000
    type (AtomicLine), allocatable, dimension(:) :: alllines
    type (AtomicContinuum), allocatable, dimension(:) :: allcont
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot
