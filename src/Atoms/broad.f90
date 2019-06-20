@@ -8,7 +8,7 @@ MODULE broad
 
  use constant
  use atom_type
- use atmos_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium, VBROAD_atom
  use math, only : dpow, SQ, CUBE
 
  IMPLICIT NONE
@@ -293,33 +293,33 @@ MODULE broad
   if ((line%cvdWaals(1).gt.0).or.(line%cvdWaals(3).gt.0)) then
    CALL VanderWaals(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*),"vdW", adamp* cDop/atom%vbroad(icell)
+    !write(*,*),"vdW", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Quadratic Stark broadening
   if (line%cStark > 0.) then
    CALL Stark(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*),"Stark2", adamp* cDop/atom%vbroad(icell)
+    !write(*,*),"Stark2", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Linear Stark broadening only for Hydrogen
   if (atom%ID.eq."H ") then
    CALL StarkLinear(icell, atom,kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*),"Stark1", adamp* cDop/atom%vbroad(icell)
+    !write(*,*),"Stark1", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Store Qelast, total rate of elastic collisions, if PFR only
   if (line%PFR) then
    write(*,*) "PFR not handled yet, avoiding"
    ! line%Qelast = Qelast
   end if
-  !write(*,*) "Grad=", line%Grad * cDop/atom%vbroad(icell), cDop/atom%vbroad(icell)
-   adamp = (line%Grad + Qelast)*cDop / atom%vbroad(icell)
+  !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
+   adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
 
 !    if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
 !     CALL Broad_Kurosawa(icell, atom, kr, adamp)
-!     write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/atom%vbroad(icell), &
-!      " Ben=", (line%Grad + Qelast)*cDop / atom%vbroad(icell)
-!     !adamp = adamp * cDop / atom%vbroad(icell)
+!     write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/VBROAD_atom(icell,atom), &
+!      " Ben=", (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
+!     !adamp = adamp * cDop / VBROAD_atom(icell,atom)
 !    end if
 
  RETURN
