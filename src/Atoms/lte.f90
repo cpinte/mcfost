@@ -12,6 +12,7 @@ MODULE lte
  use constant
  use math
  use collision, only : CollisionRate, openCollisionFile
+ use writeatom, only : writeHydrogenMinusDensity
  
  use constantes, only : tiny_dp, huge_dp
  
@@ -408,6 +409,12 @@ MODULE lte
 !        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
 !      end if
   end do
+  if (atmos%Nspace <= 82) then
+   write(*,*) "Checking nHmin"
+   do k=1, 82
+   write(*,*) "icell-1=", k-1,atmos%nHmin(k), Hydrogen%nstar(1,k),sum(Hydrogen%nstar(2:Hydrogen%Nlevel-1,k)), Hydrogen%nstar(Hydrogen%Nlevel,k)
+   end do
+  end if
 
   ! if (.not.chemEquil) then
   !atmos%nHmin = 0d0 !init
@@ -453,6 +460,7 @@ MODULE lte
   ! end if !if chemical equilibrium
    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
+   CALL writeHydrogenMinusDensity(.false.)
 ! stop
  RETURN
  END SUBROUTINE setLTEcoefficients

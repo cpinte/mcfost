@@ -29,6 +29,7 @@ MODULE writeatom !Futur write....
  !
  !
  character(len=15), parameter :: neFile = "ne.fits"
+ character(len=15), parameter :: nHminFile = "nHmin.fits"
  character(len=15), parameter :: nHFile = "nHtot.fits.gz"
  character(len=50), parameter :: TemperatureFile = "Temperature.fits.gz"
 
@@ -167,6 +168,71 @@ MODULE writeatom !Futur write....
  
  RETURN
  END SUBROUTINE writeHydrogenDensity
+
+ SUBROUTINE writeHydrogenMinusDensity(write_nHmin_nlte)
+ ! ------------------------------------ !
+ ! write H- density.
+ ! ------------------------------------ !
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple, already_exists = .false.
+  logical, optional :: write_nHmin_nlte
+  integer :: nelements, nfirst
+  
+  if (present(write_nHmin_nlte)) already_exists = (write_nHmin_nlte==.true.) !append the file
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+  blocksize=1
+  simple = .true. !Standard fits
+  group = 1 !??
+  fpixel = 1
+  extend = .true.
+  bitpix = -64  
+
+  if (lVoronoi) then
+   	naxis = 1
+   	naxes(1) = atmos%Nspace ! equivalent n_cells
+   	nelements = naxes(1)
+  else
+   	if (l3D) then
+    	naxis = 3
+    	naxes(1) = n_rad
+   	 	naxes(2) = 2*nz
+    	naxes(3) = n_az
+    	nelements = naxes(1) * naxes(2) * naxes(3) ! != n_cells ? should be
+   	else
+    	naxis = 2
+    	naxes(1) = n_rad
+    	naxes(2) = nz
+    	nelements = naxes(1) * naxes(2) ! should be n_cells also
+   	end if
+  end if
+  ! write(*,*) 'yoyo2', n_rad, nz, n_cells, atmos%Nspace
+  !  Write the required header keywords.
+  
+  if (already_exists) then !exits, expect to write nlte, read lte ne, append the file and write
+  	CALL ftopen(unit, TRIM(nHminFile), 1, blocksize, EOF) !1 stends for read and write
+  	!Compressed files may only be opened with read-only permission, so neFile is not .gz
+   	CALL ftcrhd(unit, EOF)
+   	CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  	CALL ftpkys(unit, "UNIT", "m^-3", '(NLTE)', EOF)
+  	CALL ftpprd(unit,group,fpixel,nelements,atmos%nHmin,EOF)
+  else !not exist, expected not nlte, create and write
+  	CALL ftinit(unit,trim(nHminFile),blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  	CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  	CALL ftpkys(unit, "UNIT", "m^-3", ' ', EOF)
+  !write data
+  	CALL ftpprd(unit,group,fpixel,nelements,atmos%nHmin,EOF)
+  end if !alreayd_exists
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+ 
+ RETURN
+ END SUBROUTINE writeHydrogenMinusDensity
  
  SUBROUTINE writeTemperature()
  ! ------------------------------------ !
