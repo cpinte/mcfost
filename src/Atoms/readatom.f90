@@ -46,7 +46,7 @@ MODULE readatom
     logical, dimension(:), allocatable :: determined, parse_label
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
-    real(8) :: C1, vtherm, f, lambdaji
+    real(8) :: C1, vDoppler, f, lambdaji
     real(8) :: lambdamin, geff!, c_sum
     EOF = 0
     !write(*,*) "Atom is part of the active atoms ?", atom%active
@@ -134,23 +134,26 @@ MODULE readatom
             ! here is +1 wrt the the number read in file.
 
     ! Check if there is at least one continuum transitions
-    if (atom%stage(atom%Nlevel).ne.&
-           atom%stage(atom%Nlevel-1)+1) then
+    if (atom%stage(atom%Nlevel) /= atom%stage(atom%Nlevel-1)+1) then
+     write(*,*) atom%stage
+     write(*,*) atom%stage(atom%Nlevel), atom%stage(atom%Nlevel-1)+1
      write(*,*) "Atomic model does not have an overlying continuum"
      write(*,*) "exiting..."
      stop
     end if
-
-    allocate(atom%ntotal(atmos%Nspace))
-    allocate(atom%vbroad(atmos%Nspace))
-    vtherm = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
-
-    atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
-    atom%ntotal = atom%Abund * atmos%nHtot
-!     write(*,*) atom%ID, " maxVD(km/s)=", maxval(atom%vbroad)/1d3,&
-!                          " minVD(km/s)=", minval(atom%vbroad,mask=atom%vbroad>0)/1d3
     !! DO NOT USE i as a loop index here !!
 
+    !deprecation, they are now computed cell by cell for saving memory
+    !allocate(atom%ntotal(atmos%Nspace))
+    !allocate(atom%vbroad(atmos%Nspace))
+    !write(*,*)
+    VDoppler = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
+
+    !atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
+    !atom%ntotal = atom%Abund * atmos%nHtot
+
+    Vdoppler = dsqrt(Vdoppler*maxval(atmos%T) + maxval(atmos%vturb)**2)
+!     write(*,*) Vdoppler, dsqrt(Vtherm*maxval(atmos%T)/atom%weight + maxval(atmos%vturb)**2)
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
 
@@ -169,7 +172,6 @@ MODULE readatom
      atom%lines(kr)%ZeemanPattern = 1 !should be read in file
      if ((PRT_SOLUTION=="NO_STOKES").or.(.not.atmos%magnetized)) atom%lines(kr)%ZeemanPattern = 0
      ! -1 = effective triplet, +1
-     
 !      write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
@@ -524,8 +526,7 @@ MODULE readatom
      !-> Actually with this grid, all lines of an atom have the same grid
      !because it depends only on vD and v_char which depends on the atom and on the model.
      !This is because the Number of core/wing points are fixed.
-     CALL make_sub_wavelength_grid_line(atom%lines(kr), &
-                                        maxval(atom%vbroad,mask=atom%vbroad>0)) !MAXVAL(atom%vbroad)
+     CALL make_sub_wavelength_grid_line(atom%lines(kr),Vdoppler) !MAXVAL(atom%vbroad)
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
