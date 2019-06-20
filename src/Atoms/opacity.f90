@@ -18,7 +18,7 @@ MODULE Opacity
 
  !store the pure continuum NLTE opacities to be added to the total
  !continuum opacity after NLTEloop ends, if lstore_opac add them to Kc and jc
- !double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
+ !They are temporary stored in a large array (Nspace, Nlambda)
 
 
  CONTAINS
@@ -233,29 +233,46 @@ MODULE Opacity
         gij = 0d0
    	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
     	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
-    	 write(*,*) aatom%n(j,icell)
+    	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
      	 CALL Warning("too small cont populations") !or Error()
-     	 CYCLE
+     	 ! if (aatom%n(i, icell) <= tiny_dp) CYCLE !but do not skip if atom%j < tiny_dp
+!      	 aatom%n(j,icell) = 0d0 !here because it is < tiny_dp, otherwise it is n(i) and we skip
     	end if
     	
-    	 
-      gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
-      
+!       if (aatom%nstar(j,icell) <= tiny_dp) then 
+!        gij(Nblue:Nred) = 0d0
+!       else	 
+       gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
+!       end if
+               write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
+                        write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
+
       !Cannot be negative because we alread tested if < tiny_dp
       if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
         (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
-         write(*,*) " ** Neglecting Stimulated emission for continuum transition", cont%j, cont%i, &
+         write(*,*) i, j, aatom%n(i,icell), aatom%n(j,icell)
+         write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
+         write(*,*) " ** Stimulated emission for continuum transition, chi < 0", cont%j, cont%i, &
           aatom%ID
-        gij(Nblue:Nred) = 0d0
+        stop
       end if
     
     !store total emissivities and opacities
-       NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
+        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
        		Vij(Nblue:Nred) * (aatom%n(i,icell)-gij(Nblue:Nred)*aatom%n(j,icell))
        		
 		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
     	gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
+    	
+    	!They are allocated if nlte so if we enter here
+!     	NLTEspec%AtomOpac%chic_nlte(icell, Nblue:Nred) = &
+!     	 NLTEspec%AtomOpac%chic_nlte(icell, Nblue:Nred) + &
+!     	 	Vij(Nblue:Nred) * (aatom%n(i,icell)-gij(Nblue:Nred)*aatom%n(j,icell))
+!     	NLTEspec%AtomOpac%etac_nlte(icell, Nblue:Nred) = &
+!     	 NLTEspec%AtomOpac%etac_nlte(icell, Nblue:Nred) + &
+!     	   gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
+
     	
     	if (iterate) then
     	 aatom%continua(kc)%gij(:,id) = gij(Nblue:Nred)
@@ -276,10 +293,9 @@ MODULE Opacity
     i = line%i; j=line%j
     
     if ((aatom%n(j,icell) <= tiny_dp).or.(aatom%n(i,icell) <= tiny_dp)) then !no transition
-    	write(*,*) tiny_dp
+    	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
         write(*,*) aatom%n(:,icell)
      	CALL Warning("too small line populations") !or Error()
-     	CYCLE
     end if 
     gij = 0d0
     Vij = 0d0
@@ -288,9 +304,9 @@ MODULE Opacity
     !Cannot be negative because we alread tested if < tiny_dp
     if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
         (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
-         write(*,*) " ** Neglecting Stimulated emission for line transition", line%j, line%i, &
-          aatom%ID
-        gij(Nblue:Nred) = 0d0
+         write(*,*) " ** Stimulated emission for line transition, chi < 0", line%j, line%i, &
+          aatom%ID, i, j,aatom%n(i,icell), aatom%n(j,icell), maxval(gij(Nblue:Nred)), minval(gij(Nblue:Nred))
+        stop
     end if
     
     twohnu3_c2(Nblue:Nred) = line%Aji / line%Bji
@@ -305,7 +321,7 @@ MODULE Opacity
 
 
      Vij(Nblue:Nred) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
-                                                             ! / (SQRTPI * aatom%vbroad(icell)) 
+                                                             ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
       
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
@@ -438,7 +454,7 @@ MODULE Opacity
     line%Nlambda = Nlambda_line
 
      Vij(1) = hc_4PI * line%Bij * phi(1) !normalized in Profile()
-                                                             ! / (SQRTPI * aatom%vbroad(icell)) 
+                                                             ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
       
      NLTEspec%AtomOpac%chi(la,id) = &
      		NLTEspec%AtomOpac%chi(la,id) + &

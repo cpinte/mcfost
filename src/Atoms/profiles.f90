@@ -1,6 +1,6 @@
 MODULE PROFILES
 
- use atmos_type, only                : atmos, B_project
+ use atmos_type, only                : atmos, B_project, VBROAD_atom
  use constant
  use atom_type
  use spectrum_type, only			 : NLTEspec
@@ -36,7 +36,7 @@ MODULE PROFILES
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv, Nred, Nblue, i, j
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv
+  															   v0, v1, dv, vbroad
   double precision, intent(out), dimension(:)               :: P
   double precision, intent(out), dimension(:,:), optional   :: phi, psi
 
@@ -47,12 +47,13 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
-
+  
+  vbroad = VBROAD_atom(icell,line%atom)
    
   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-     dv = dabs(v1-v0) 
-     Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
+     dv = dabs(v1-v0)
+     Nvspace = max(2,nint(20*dv/vbroad))
      Nvspace = min(Nvspace,NvspaceMax)
      omegav(Nvspace) = v1
     do nv=2,Nvspace-1
@@ -72,7 +73,7 @@ MODULE PROFILES
   !allocate(vv(line%Nlambda), F(line%Nlambda), vvoigt(line%Nlambda))
   vv = 0d0
   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
-           CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
+           CLIGHT / (line%lambda0 * vbroad)
 
 
   if (line%voigt) then
@@ -82,7 +83,7 @@ MODULE PROFILES
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
                         
-          vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+          vvoigt(:) = vv(:) - omegav(nv) / vbroad
 
           P(:) = P(:) + &
              Voigt(line%Nlambda, line%adamp,vvoigt(:), F, VoigtMethod) / Nvspace
@@ -91,12 +92,12 @@ MODULE PROFILES
   else !Gaussian !only for checking
       do nv=1, Nvspace
       
-         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+         vvoigt(:) = vv(:) - omegav(nv) / vbroad
          P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace 
          
       end do
  end if !line%voigt
- P(:) = P(:) / (SQRTPI * line%atom%vbroad(icell))
+ P(:) = P(:) / (SQRTPI * vbroad)
  if (minval(P) < 0) CALL error("P should not be negative")
 
  !deallocate(vv, vvoigt, F)
@@ -117,7 +118,7 @@ MODULE PROFILES
   integer													:: Nvspace, nv, Nred, Nblue, nc, &
   															   Nbspace, nb, Nzc, i, j,qz
   double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, b0, b1,g1,c1,dB
+  															   v0, v1, dv, b0, b1,g1,c1,dB,vbroad
   double precision, intent(out), dimension(:)               :: P
   double precision, intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
   double precision, dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
@@ -132,6 +133,8 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
+  
+  vbroad = VBROAD_atom(icell,line%atom)
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
   omegaB(1) = b0; Nbspace = 1
@@ -142,7 +145,7 @@ MODULE PROFILES
   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
-     Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
+     Nvspace = max(2,nint(20*dv/vbroad))
      Nvspace = min(Nvspace,NvspaceMax)
      omegav(Nvspace) = v1
     do nv=2,Nvspace-1
@@ -160,7 +163,7 @@ MODULE PROFILES
       !Nbspace = NbspaceMax
       dB = (b1-b0)
       dB = dabs(dB * line%g_lande_eff) * LARMOR * line%lambda0 * NM_TO_M
-      Nbspace = max(2,nint(20*dB/line%atom%vbroad(icell)))
+      Nbspace = max(2,nint(20*dB/vbroad))
       Nbspace = min(Nbspace,NbspaceMax)
       !write(*,*) Nbspace, b1*1e4, b0*1e4, dB
       omegaB(Nbspace) = b1
@@ -182,13 +185,13 @@ MODULE PROFILES
   !allocate(vv(line%Nlambda), vvoigt(line%Nlambda))
 
   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
-           CLIGHT / (line%lambda0 * line%atom%vbroad(icell))
+           CLIGHT / (line%lambda0 * vbroad)
 
   Nzc = line%zm%Ncomponent
   if (.not.line%voigt) then !unpolarised line assumed even if line%polarizable
       do nv=1, Nvspace
       
-         vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+         vvoigt(:) = vv(:) - omegav(nv) / vbroad
          P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace
       !derivative of Gaussian:
 !          F(Nblue:Nred) = F(Nblue:Nred) - &
@@ -196,7 +199,7 @@ MODULE PROFILES
 !            NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
 
       end do
-      P(:) = P(:) / (SQRTPI * line%atom%vbroad(icell))
+      P(:) = P(:) / (SQRTPI * vbroad)
 !       F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
       !deallocate(vv, vvoigt)
       RETURN
@@ -215,7 +218,7 @@ MODULE PROFILES
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
                         !                 2) Voronoi grid is used                 
                         
-        vvoigt(:) = vv(:) - omegav(nv) / line%atom%vbroad(icell)
+        vvoigt(:) = vv(:) - omegav(nv) / vbroad
         
          do nb=1,Nbspace !Nbspace=1 if Voronoi, or magnetic field is 0d0.But present
 
@@ -223,7 +226,7 @@ MODULE PROFILES
              ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
              !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
              vvoigt_b(:) = vvoigt(:) + line%zm%shift(nc) * omegaB(nb) * &
-                               LARMOR * line%lambda0 * NM_TO_M / line%atom%vbroad(icell)
+                               LARMOR * line%lambda0 * NM_TO_M / vbroad
              !The normalisation by Nzc is done when compute the strength*profiles.
              !In case of unpolarised line, Nzc = 1 and there is no need to normalised
              LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt_b,F, VoigtMethod)
@@ -241,9 +244,9 @@ MODULE PROFILES
              END SELECT
              !!if (abs(line%zm%q(nc)) > 1) CALL Error("BUG") !in the SELECT CASE
              psi_zc(qz,:) = psi_zc(qz,:) + &
-              		line%zm%strength(nc) * F(:) / (SQRTPI * line%atom%vbroad(icell) * Nbspace*Nvspace)
+              		line%zm%strength(nc) * F(:) / (SQRTPI * vbroad * Nbspace*Nvspace)
              phi_zc(qz,:) = phi_zc(qz,:) + &
-              		line%zm%strength(nc) * LV(:) / (SQRTPI * line%atom%vbroad(icell)* Nbspace*Nvspace)
+              		line%zm%strength(nc) * LV(:) / (SQRTPI * vbroad * Nbspace*Nvspace)
              LV(:) = 0d0; F(:) = 0d0
              !write(*,*) Nzc, qz, line%zm%q(nc), vvoigt_b(line%Nlambda/2+1), line%zm%shift(nc), line%zm%strength(nc), omegab(nb)
           end do !components 

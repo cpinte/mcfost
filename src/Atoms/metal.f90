@@ -11,7 +11,7 @@
 ! chi in m^-1, eta in J/m3/s/Hz/sr
 MODULE metal
 
- use atmos_type, only                : atmos, Hydrogen, Helium, B_project
+ use atmos_type, only                : atmos, Hydrogen, Helium, B_project, vbroad_atom
  use constant
  use math, only                      : bezier3_interp, cent_deriv
  use atom_type
@@ -143,22 +143,32 @@ MODULE metal
 !      end if !continuum type
      
      gijk(Nblue:Nred) = metal%nstar(i,icell)/metal%nstar(j,icell) * expla(Nblue:Nred)
+!      write(*,*)
+!       write(*,*) maxval(metal%n(i,icell)*(1.-expla(Nblue:Nred))), &
+!       	maxval(metal%n(i,icell)-gijk(Nblue:Nred)*metal%n(i,icell))
+!      stop
      if (lstore_opac) then !we don't care about proc id id
+!       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
+!        				continuum%alpha(Nblue:Nred) * &
+!        				(1.-expla(Nblue:Nred))*metal%n(i,icell)
       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
        				continuum%alpha(Nblue:Nred) * &
-       				(1.-expla(Nblue:Nred))*metal%n(i,icell)
-
+       				(metal%n(i,icell)-gijk(Nblue:Nred)*metal%n(i,icell))
+       				
       NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
        				twohnu3_c2(Nblue:Nred) * gijk(Nblue:Nred) * &
          			continuum%alpha(Nblue:Nred)*metal%n(j,icell)
      else !proc id is important
+!       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+!        				continuum%alpha(Nblue:Nred) * &
+!        				(1.-expla(Nblue:Nred))*metal%n(i,icell) !-->ETL only
       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
        				continuum%alpha(Nblue:Nred) * &
-       				(1.-expla(Nblue:Nred))*metal%n(i,icell)
+       				(metal%n(i,icell)-gijk(Nblue:Nred)*metal%n(j,icell))
 
       NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
       				twohnu3_c2(Nblue:Nred) * gijk(Nblue:Nred) * &
-         			continuum%alpha(Nblue:Nred)*metal%n(j,icell)     
+         			continuum%alpha(Nblue:Nred)*metal%n(j,icell)
      end if
 
     end do ! loop over Ncont
@@ -223,7 +233,7 @@ MODULE metal
      end if
 
      !allocate(Vij(line%Nlambda)); Vij = 0d0
-     gij = line%Bji / line%Bij
+     gij = line%Bji / line%Bij ! = gi/gj
      twohnu3_c2 = line%Aji / line%Bji
 
      allocate(phi(line%Nlambda))!; phi = 0d0
@@ -234,7 +244,7 @@ MODULE metal
 
      !Sum up all contributions for this line with the other
      Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * atom%vbroad(icell))
+      hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
@@ -243,6 +253,11 @@ MODULE metal
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
        		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
+
+!          write(*,*) "check"
+!          write(*,*) gij,  atom%g(i)/atom%g(j)
+!          write(*,*) atom%g(i)/atom%g(j)*atom%n(j,icell)/atom%n(i,icell), exp(-hc/KBOLTZMANN/atmos%T(icell)/NM_TO_M/line%lambda0)
+!          stop
 
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        do nk = 1, 3
@@ -314,7 +329,7 @@ MODULE metal
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
      !write(*,*) v0/1000, v1/1000, dv/1000
-     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = max(2,nint(20*dv/VBROAD_atom(icell,atom)))
      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
      omegav(Nvspace) = v1
      !write(*,*) Nvspace, Nvspacemax
@@ -349,7 +364,7 @@ MODULE metal
      phi = 0d0
      ! line dependent only
      vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
-           CLIGHT / (line%lambda0 * atom%vbroad(icell))
+           CLIGHT / (line%lambda0 * VBROAD_atom(icell,atom))
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
@@ -365,7 +380,7 @@ MODULE metal
                         !                 2) Voronoi grid is used                 
                         
         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
-                                       omegav(nv) / atom%vbroad(icell)
+                                       omegav(nv) / VBROAD_atom(icell,atom)
         !loop over components here
 
         phi(Nblue:Nred) = phi(Nblue:Nred) + &
@@ -375,7 +390,7 @@ MODULE metal
       end do
      else !Gaussian !only for checking
       do nv=1, Nvspace
-        vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / atom%vbroad(icell)
+        vvoigt(Nblue:Nred) = vv(Nblue:Nred) - omegav(nv) / VBROAD_atom(icell,atom)
        phi(Nblue:Nred) = phi(Nblue:Nred) + dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace
 
       end do
@@ -384,7 +399,7 @@ MODULE metal
      !Sum up all contributions for this line with the other
 
      Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * atom%vbroad(icell))
+      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * VBROAD_atom(icell,atom))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
@@ -445,7 +460,7 @@ MODULE metal
     if (.not.lstatic .and. .not.lVoronoi) then
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
-     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = max(2,nint(20*dv/VBROAD_atom(icell,atom)))
      Nvspace = min(Nvspace,NvspaceMax)
      omegav(Nvspace) = v1
      do nv=2,Nvspace-1
@@ -459,8 +474,6 @@ MODULE metal
     if (.not.lvoronoi) then
       b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
       Nbspace = NbspaceMax
-!       Nbspace = max(2,nint(20*dB/line%atom%vbroad(icell)))
-!       Nbspace = min(Nbspace,NbspaceMax)
       omegaB(Nbspace) = b1
       gamma(Nbspace) = g1; chi(Nbspace)=c1
       do nv=2,Nbspace-1
@@ -497,7 +510,7 @@ MODULE metal
      phiPol = 0d0
      ! line dependent only
      vv(Nblue:Nred) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
-           CLIGHT / (line%lambda0 * atom%vbroad(icell))
+           CLIGHT / (line%lambda0 * VBROAD_atom(icell,atom))
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
@@ -510,14 +523,14 @@ MODULE metal
                         !                 2) Voronoi grid is used                 
                         
         vvoigt(Nblue:Nred) = vv(Nblue:Nred) - &
-                                       omegav(nv) / atom%vbroad(icell)
+                                       omegav(nv) / VBROAD_atom(icell,atom)
          do nb=1,Nbspace
           if (Nzc == 0) & !line not polarizable or weak field
              phi(Nblue:Nred) = phi(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
                   			phip, VoigtMethod) / Nvspace / Nbspace
           do nc=1,Nzc
-             vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / atom%vbroad(icell) * &
+             vvoigt(Nblue:Nred) = vvoigt(Nblue:Nred) - omegaB(nb) / VBROAD_atom(icell,atom) * &
                                   LARMOR/CLIGHT * (line%lambda0 * NM_TO_M)**2 * line%zm%shift(nc)
              phi(Nblue:Nred) = phi(Nblue:Nred) + &
           					Voigt(line%Nlambda, line%adamp,vvoigt(Nblue:Nred), &
@@ -532,7 +545,7 @@ MODULE metal
      !Sum up all contributions for this line with the other
 
      Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * atom%vbroad(icell))
+      hc_4PI * line%Bij * phi(Nblue:Nred) / (SQRTPI * VBROAD_atom(icell,atom))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
@@ -594,7 +607,7 @@ MODULE metal
     if (.not.lstatic .and. .not.lVoronoi) then
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0) 
-     Nvspace = max(2,nint(20*dv/atom%vbroad(icell)))
+     Nvspace = max(2,nint(20*dv/VBROAD_atom(icell,atom)))
      Nvspace = min(Nvspace,NvspaceMax) !Ensure that we never have an allocation error
      omegav(Nvspace) = v1
      do nv=2,Nvspace-1
@@ -637,7 +650,7 @@ MODULE metal
      phiPol = 0d0
      ! line dependent only
      vv(1) = (NLTEspec%lambda(la)-line%lambda0) * &
-           CLIGHT / (line%lambda0 * atom%vbroad(icell))
+           CLIGHT / (line%lambda0 * VBROAD_atom(icell,atom))
 
      gij = line%Bji / line%Bij
      twohnu3_c2 = line%Aji / line%Bji
@@ -647,19 +660,19 @@ MODULE metal
       CALL Damping(icell, atom, kr, line%adamp)
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace 
-        vvoigt(1) = vv(1) -  omegav(nv) / atom%vbroad(icell)
+        vvoigt(1) = vv(1) -  omegav(nv) / VBROAD_atom(icell,atom)
 
         phi = phi + Voigt(1, line%adamp,vvoigt,phip, VoigtMethod) / Nvspace 
       end do
      else !Gaussian
       do nv=1, Nvspace
-        vvoigt(1) = vv(1) - omegav(nv) / atom%vbroad(icell)
+        vvoigt(1) = vv(1) - omegav(nv) / VBROAD_atom(icell,atom)
        phi(1) = phi(1) + dexp(-(vvoigt(1))**2) / Nvspace
       end do
      end if !line%voigt
     
 
-     Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * atom%vbroad(icell))
+     Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * VBROAD_atom(icell,atom))
      NLTEspec%AtomOpac%chi_p(la,id) = NLTEspec%AtomOpac%chi_p(la,id) +&
      								  Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
      NLTEspec%AtomOpac%eta_p(la,id) = NLTEspec%AtomOpac%eta_p(la,id) +&
@@ -702,7 +715,7 @@ MODULE metal
   integer, intent(in) :: icell
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu!,sca
 
-  if (.not.atmos%lcompute_atomRT(icell)) RETURN
+  if (atmos%icompute_atomRT(icell)<1) RETURN
   
    CALL Bplanck(atmos%T(icell), Bpnu)
 
@@ -748,7 +761,7 @@ MODULE metal
   double precision, intent(in) :: x, y, z, u, v, w, &
                                   x1, y1, z1, l
 
-  if (.not.atmos%lcompute_atomRT(icell)) RETURN 
+  if (atmos%icompute_atomRT(icell)<1) RETURN 
 
    if (atmos%Npassiveatoms == 0) RETURN
    CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
@@ -763,7 +776,7 @@ MODULE metal
   double precision, intent(in) :: x, y, z, u, v, w, &
                                   x1, y1, z1, l
 
-  if (.not.atmos%lcompute_atomRT(icell)) RETURN 
+  if (atmos%icompute_atomRT(icell)<1) RETURN 
 
 
    if (atmos%Npassiveatoms == 0) RETURN
@@ -778,7 +791,7 @@ MODULE metal
                                   x1, y1, z1, l!only relevant for b-b when vector fields are present
   double precision, dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu, chip!, sca
 
-  if (.not.atmos%lcompute_atomRT(icell)) RETURN !nH <= tiny_nH or T <= tiny_T == empty cell
+  if (atmos%icompute_atomRT(icell)<1) RETURN !nH <= tiny_nH or T <= tiny_T == empty cell
   ! all opac are zero, return.
 
 !   if ((atmos%nHtot(icell)==0d0).or.(atmos%T(icell)==0d0)) &
