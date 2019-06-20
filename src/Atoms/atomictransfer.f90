@@ -27,8 +27,8 @@ MODULE AtomicTransfer
  use solvene
  use statequil_atoms
  use writeatom
- use simple_models, only 				: magneto_accretion_model, uniform_law_model, &
- 											spherical_shells_model, spherical_star, feqv
+ use simple_models, only 				: magneto_accretion_model, magneto_accretion_diskwind_model, &
+ 										 FALC_MODEL, spherical_star, feqv
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -46,6 +46,8 @@ MODULE AtomicTransfer
  use density
 
  IMPLICIT NONE
+ 
+ logical :: lmcfost_star !TMP
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
  
@@ -146,7 +148,10 @@ MODULE AtomicTransfer
                      l, l_contrib, l_void_before)
 
     ! ************* TEST ************* !
-      ! l = l/feqv; l_contrib = l_contrib/feqv
+     if (lmcfost_star) then
+       if (nbr_cell == 1) CALL Warning("Rescaling path along cell!!")
+       l = feqv(0.99974392*1d0,1.00355514*1d0,l); l_contrib = feqv(0.99974392*1d0,1.00355514*1d0,l_contrib)
+     end if
     ! ******************************** !
 
 !     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
@@ -699,6 +704,7 @@ MODULE AtomicTransfer
   character(len=20) :: ne_start_sol = "H_IONISATION"
   character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES"
   logical :: lwrite_waves = .false.
+   
 !   
 !   integer :: i, j
 !   double precision, dimension(:), allocatable :: test_col
@@ -741,11 +747,11 @@ MODULE AtomicTransfer
   !later use the same density and T as defined in dust_transfer.f90
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
+  lmcfost_star = .false.
   if (.not.lpluto_file) then 
-   !CALL spherical_star()
+   !test
+   !CALL spherical_star(); lmcfost_star = .true.
    CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
-   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -793,8 +799,13 @@ MODULE AtomicTransfer
    CALL writeElectron()
   end if
 
+! atmos%Nspace = 82
+! CALL FALC_MODEL()
+! atmos%icompute_atomRT = 0
+! atmos%icompute_atomRT(1:82) = 1 
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
   !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
+! stop
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
