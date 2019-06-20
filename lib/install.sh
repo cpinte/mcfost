@@ -25,11 +25,22 @@ if [ -z $MCFOST_INSTALL ]; then echo "error: MCFOST_INSTALL needs to point to a 
 set -u
 
 if [ $SYSTEM = "ifort" ] ; then
-    echo "Building MCFOST's libraries with ifort" ; export CC=icc
+    echo "Building MCFOST's libraries with ifort"
+    export CC=icc
+    export FC=ifort
+    export CXX=icpc
 elif [ $SYSTEM = "gfortran" ] ; then
-    echo "Building MCFOST's libraries with gfortran" ; export CC=gcc
+    echo "Building MCFOST's libraries with gfortran"
+    export CC=gcc
+    export FC=gfortran
+    export CXX=g++
+    export CFLAGS="-m64"
 elif [ $SYSTEM = "xeon-phi" ] ; then
-    echo "Building MCFOST's libraries with ifort for Xeon-Phi" ; export CC=icc
+    echo "Building MCFOST's libraries with ifort for Xeon-Phi"
+    export CC=icc
+    export FC=ifort
+    export CXX=icpc
+    export CFLAGS=-mmic
 else
     echo "Unknown system to build mcfost: "$SYSTEM"\nPlease choose ifort or gfortran\ninstall.sh <system>\nExiting" ; exit 1
 fi
@@ -64,19 +75,14 @@ echo "Compiling cfitsio ..."
 # g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
 # Original version from ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
 tar xzvf cfitsio3420.tar.gz
-if [ "$SYSTEM" = "ifort" ] ; then
-    export CC="icc" ; export FC="ifort"
-elif [ "$SYSTEM" = "gfortran" ] ; then
-    export CFLAGS="-m64" ; export FC="gfortran"
-elif [ "$SYSTEM" = "xeon-phi" ] ; then
-    export CFLAGS=-mmic
-fi
-
 cd cfitsio
 ./configure --enable-ssse3
-# Tweaking Makefile
+
+#--- Tweaking Makefile
 if [ "$SYSTEM" = "xeon-phi" ] ; then \cp -f ../Makefile_cfitsio.xeon_phi Makefile ; fi
-cat Makefile | sed s/-DCFITSIO_HAVE_CURL=1// | sed s/-lcurl// >> Makefile.tmp && \mv -f Makefile.tmp Makefile # We do not want to have to link with libcurl
+# We do not want to have to link with libcurl
+cat Makefile | sed s/-DCFITSIO_HAVE_CURL=1// | sed s/-lcurl// >> Makefile.tmp && \mv -f Makefile.tmp Makefile
+
 make
 \cp libcfitsio.a ../lib
 cd ~1
@@ -104,6 +110,22 @@ mkdir -p ../include/voro++ ; \cp src/*.hh ../include/voro++/
 cd ~1
 echo "Done"
 
+#---------------------------------------------
+# hdf5 : you can skip hdf5 (slow to compile)
+# and use system library if prefered
+# In that case, you need to define HDF5ROOT
+# for the mcfost Makefile
+#---------------------------------------------
+if [ skip_hdf5 != "yes" ] ; then
+    echo "Compiling hdf5 ..."
+    tar xjvf hdf5-1.10.5.tar.bz2 ; mv hdf5-1.10.5 hdf5
+    cd hdf5
+    ./configure --prefix=$MCFOST_INSTALL/hdf5/$SYSTEM --enable-fortran
+    make install
+    cd ~1
+    echo "Done"
+fi
+
 #-- Put in final directory
 echo "Installing MCFOST libraries in "$MCFOST_INSTALL/lib/$SYSTEM
 mkdir -p $MCFOST_INSTALL/include
@@ -112,5 +134,5 @@ mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
 \cp -r lib/*.a $MCFOST_INSTALL/lib/$SYSTEM/
 
 #-- Final cleaning
-rm -rf lib include sprng2.0 cfitsio voro
+rm -rf lib include sprng2.0 cfitsio voro hdf5
 popd
