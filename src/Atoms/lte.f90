@@ -130,7 +130,7 @@ MODULE lte
    !$omp shared(atmos,Hydrogen)
    !$omp do
    do k=1, atmos%Nspace
-    if (.not.atmos%lcompute_atomRT(k)) CYCLE
+    if (atmos%icompute_atomRT(k) /= 1) CYCLE
 
     PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
      != 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
@@ -145,7 +145,7 @@ MODULE lte
    !$omp end do
    !$omp  end parallel
    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT > 0)
   RETURN
   END SUBROUTINE calc_nHmin
   
@@ -177,7 +177,7 @@ MODULE lte
    if (Debeye) then
     c2 = dsqrt(8.0*PI/KBOLTZMANN) * &
       (SQ(Q_ELECTRON)/(4.0*PI*EPSILON_0))**1.5
-   !write(*,*) "c2=",c2, atom%ntotal(1), atom%ntotal(2)
+   !write(*,*) "c2=",c2,  atom%Abund * atmos%nHtot(1),  atom%Abund * atmos%nHtot(2)
     allocate(nDebeye(atom%Nlevel))
     nDebeye(:)=0
     do i=2,atom%Nlevel !reject ground level
@@ -195,7 +195,7 @@ MODULE lte
    !$omp shared(atmos,Hydrogen,c2,atom, Debeye,nDebeye)
    !$omp do
    do k=1,atmos%Nspace
-    if (.not.atmos%lcompute_atomRT(k)) CYCLE
+    if (atmos%icompute_atomRT(k) /= 1) CYCLE
 
     if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
     sum = 1.
@@ -268,7 +268,7 @@ MODULE lte
 !     write(*,*) "-------------------"
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
-    atom%nstar(1,k) = atom%ntotal(k)/sum
+    atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
     !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel !debug
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
@@ -281,7 +281,7 @@ MODULE lte
     if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
 
     if (MAXVAL(atom%nstar(:,k)) <= tiny_dp) then !at the cell
-     write(*,*) "cell=",k, atom%ID, atmos%lcompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
+     write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
      write(*,*) atom%nstar(:,k)
      write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
      write(*,*) "stop!"
@@ -397,16 +397,16 @@ MODULE lte
 
    ! fill lte populations for each atom, active or not
    CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
-     if (atmos%Atoms(n)%ptr_atom%active) then
-       allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
-       !Temporary
-       atmos%Atoms(n)%ptr_atom%C = 0d0
-       allocate(atmos%Atoms(n)%ptr_atom%Ckij(&
-       atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
-       !open collision file
-       atmos%Atoms(n)%ptr_atom%Ckij = 0d0
-       CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
-     end if
+!      if (atmos%Atoms(n)%ptr_atom%active) then
+!        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+!        !Temporary
+!        atmos%Atoms(n)%ptr_atom%C = 0d0
+!        allocate(atmos%Atoms(n)%ptr_atom%Ckij(&
+!        atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+!        !open collision file
+!        atmos%Atoms(n)%ptr_atom%Ckij = 0d0
+!        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
+!      end if
   end do
 
   ! if (.not.chemEquil) then
@@ -452,7 +452,7 @@ MODULE lte
   !!!!$omp  end parallel
   ! end if !if chemical equilibrium
    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%lcompute_atomRT==.true.)
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
 ! stop
  RETURN
  END SUBROUTINE setLTEcoefficients
