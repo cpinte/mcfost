@@ -5,6 +5,27 @@ MODULE math
 
   CONTAINS
   
+   FUNCTION check_nan_infinity_dp(y) result(val)
+    double precision :: y(:,:)
+    integer :: val, i, j
+    
+     val = 0
+     do i=1,size(y(:,1))
+      do j=1, size(y(0,:))
+       if (y(i,j) /= y(i,j)) then
+        write(*,*) y(i,j)
+        val = 1
+        return
+       else if (y(i,j)==y(i,j)+1) then
+        write(*,*) y(i,j), y(i,j)+1
+        val = 2
+        return
+       end if      
+      end do
+     end do
+   RETURN
+   END FUNCTION check_nan_infinity_dp
+  
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
     double precision, dimension(N) :: x, y
@@ -401,16 +422,20 @@ MODULE math
   RETURN
   END FUNCTION gammln
   
-  FUNCTION locate(xx,x) result(y)
+  FUNCTION locate(xx,x,mask) result(y)
 
   double precision, dimension(:), intent(in) :: xx
   double precision, intent(in) :: x
+  logical, intent(in), dimension(:), optional :: mask
   integer :: y
 
-  
+  if (present(mask)) then
+   y = minloc((xx-x)**2,1,mask=mask)
+  else
   ! 1D array
-  y = minloc((xx-x)**2,1) !(xx(:)-x)*(xx(:)-x)
-
+   y = minloc((xx-x)**2,1) !(xx(:)-x)*(xx(:)-x)
+  end if
+  
   RETURN
   END FUNCTION locate
 
