@@ -149,6 +149,7 @@ subroutine set_default_variables()
   lno_vr = .false.
   lno_vz = .false.
   lvphi_Kep = .false.
+  lfluffy = .false.
 
   ! Geometrie Grille
   lcylindrical=.true.
@@ -1095,6 +1096,12 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lupdate_velocities = .true.
         lvphi_Kep = .true.
+     case("-fluffy","-fluffyness")
+        lfluffy = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) fluffyness
+        i_arg = i_arg + 1
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1571,6 +1578,7 @@ subroutine display_help()
   write(*,*) "        : -no_vr : force the radial velocities to be 0"
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
+  write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

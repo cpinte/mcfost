@@ -145,7 +145,7 @@ subroutine init_Doppler_profiles(imol)
   integer, intent(in) :: imol
 
   real(kind=dp) :: sigma2, sigma2_m1, vmax
-  integer :: icell, iv, n_speed
+  integer :: icell, n_speed
 
   n_speed = mol(imol)%n_speed_rt
 
@@ -485,7 +485,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
         if (eq==1) then
            JJmol = Jmol(iTrans,id)
         else
-           JJmol = Jmol(iTrans,id)
+           JJmol = Jmol2(iTrans,id)
         endif
 
         !write(*,*) "Jmol", iTrans, JJmol, Bnu(transfreq(iTrans),350.)
@@ -607,7 +607,6 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: etau, P, opacite, Snu
   real(kind=dp) :: somme, J
-
   integer :: iTrans, iray
 
   Jmol(:,id) = 0.0_dp
@@ -621,7 +620,7 @@ subroutine J_mol_loc(id,icell,n_rayons,ispeed)
         etau(:) = exp(-ds(iray,id) * opacite(:)) ! exp(-tau)
 
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) + &
-             emissivite_dust(iTrans,icell) ) / (opacite(:) + 1.0e-30_dp)
+             emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-30_dp)
 
         J = J + sum( (I0(:,iTrans,iray,id) * etau(:) + Snu(:) * (1.0_dp - etau(:))) * P(:))
         somme = somme + sum(P(:))

@@ -858,8 +858,7 @@ subroutine init_dust_mol(imol)
 
   ! Reallocation des tableaux de proprietes de poussiere
   ! n_lambda =   mol(imol)%nTrans_raytracing ! opacites dust considerees cst sur le profil de raie
-  n_lambda =   nTrans_tot ! opacites dust considerees cst sur le profil de raie
-
+  n_lambda = nTrans_tot ! opacites dust considerees cst sur le profil de raie
 
   ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
   ! -> pas de polarisation, on utilise une HG
