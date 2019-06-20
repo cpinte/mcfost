@@ -58,7 +58,9 @@ MODULE atmos_type
    character(len=10) :: nLTE_methode = "MALI"
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
-   logical, allocatable, dimension(:) :: lcompute_atomRT !where line RT is taken into account on the grid
+   !dark zone are in lcompute_atomRT->icompute_atomRT == -1
+   integer, allocatable, dimension(:) :: icompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
+   !logical, allocatable, dimension(:) :: lcompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
   END TYPE GridType
 
 
@@ -67,6 +69,26 @@ MODULE atmos_type
 
 
   CONTAINS
+ 
+ FUNCTION VBROAD_atom(icell, atom) result(vD)
+  double precision :: vD
+  integer :: icell
+  type (AtomType) :: atom
+  
+   vD = dsqrt(Vtherm*atmos%T(icell)/atom%weight + atmos%vturb(icell)**2)
+  
+ RETURN
+ END FUNCTION VBROAD_atom
+ 
+ FUNCTION nTotal_atom(icell, atom) result(ntotal)
+  double precision :: ntotal
+  integer :: icell
+  type (AtomType) :: atom
+  
+   ntotal =  atom%Abund * atmos%nHtot(icell)
+  
+ RETURN
+ END FUNCTION nTotal_atom
   
   SUBROUTINE freeZeemanMultiplet(line)
    type(AtomicLine), intent(inout) :: line
@@ -95,12 +117,14 @@ MODULE atmos_type
     if (allocated(atom%Lorbit)) deallocate(atom%Lorbit)
     if (allocated(atom%g)) deallocate(atom%g)
     if (allocated(atom%E)) deallocate(atom%E)
-    if (allocated(atom%vbroad)) deallocate(atom%vbroad)
-    if (allocated(atom%ntotal)) deallocate(atom%ntotal)
+    !if (allocated(atom%vbroad)) deallocate(atom%vbroad)
+    !if (allocated(atom%ntotal)) deallocate(atom%ntotal)
     if (allocated(atom%qS)) deallocate(atom%qS)
     if (allocated(atom%qJ)) deallocate(atom%qJ)
-    if (allocated(atom%C)) deallocate(atom%C)
+    !if (allocated(atom%C)) deallocate(atom%C)
+    !free collision here
     if (allocated(atom%Gamma)) deallocate(atom%Gamma)
+    if (allocated(atom%collision_lines)) deallocate(atom%collision_lines)
 
     !! maintenant se sont des pointeurs n et nstar
     !! so we need ot check if %n is an alias or not.
@@ -379,7 +403,9 @@ MODULE atmos_type
   if (allocated(atmos%T)) deallocate(atmos%T)
   if (allocated(atmos%vturb)) deallocate(atmos%vturb)
   if (allocated(atmos%nHmin)) deallocate(atmos%nHmin)
-  if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
+  if (allocated(atmos%icompute_atomRT)) deallocate(atmos%icompute_atomRT)
+!   if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
+!   if (allocated(atmos%ldark_zone)) deallocate(atmos%ldark_zone)
   if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
   if (allocated(atmos%Bxyz)) deallocate(atmos%Bxyz)
 
@@ -578,21 +604,27 @@ MODULE atmos_type
 
    CALL fillElements()
    
-   allocate(atmos%lcompute_atomRT(atmos%Nspace))
+!    allocate(atmos%lcompute_atomRT(atmos%Nspace))
+   allocate(atmos%icompute_atomRT(atmos%Nspace))
+
 
    RETURN
    END SUBROUTINE init_atomic_atmos
 
-!to do
+!to do, this routine should change according to mcfost denity array
    SUBROUTINE define_atomRT_domain(itiny_T, itiny_nH)
    ! Set where to solve for the RT equation: where a cell is not 
    ! transparent = where there is a significant density and temperature.
    ! Determines also if we have to force electron density calculation
    ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
    !protoplanetary disk model.
+   ! It is also set dark zones.
+   ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
+   ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
+   ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
     integer :: icell
     double precision, optional :: itiny_nH, itiny_T
-    double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=5d2
+    double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=5d1
     !with Very low value of densities or temperature it is possible to have
     !nan or infinity in the populations calculations because of numerical precisions
     
@@ -618,9 +650,12 @@ MODULE atmos_type
     end if
     
     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) 
+    atmos%icompute_atomRT(:) = 0 !transparent
     do icell=1,atmos%Nspace
-     atmos%lcompute_atomRT(icell) = &
-       (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+!      atmos%lcompute_atomRT(icell) = &
+!        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+    if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
+     	atmos%icompute_atomRT(icell) = 1 !filled
     end do
 
    RETURN
@@ -637,6 +672,7 @@ MODULE atmos_type
    END SUBROUTINE init_magnetic_field
    
 
+!building
    FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
@@ -691,6 +727,7 @@ MODULE atmos_type
     RETURN
    END FUNCTION B_project
    
+   !should be moved in Atom_type
    FUNCTION atomZnumber(atomID) result(Z)
    ! --------------------------------------
    ! return the atomic number of an atom
@@ -712,6 +749,204 @@ MODULE atmos_type
 
    RETURN
    END FUNCTION atomZnumber
+   
+  SUBROUTINE write_atmos_domain()
+ ! ------------------------------------ !
+ ! ------------------------------------ !
+  use fits_utils, only : print_error
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL ftinit(unit,"atomRT_domain.fits.gz",blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1
+  fpixel = 1
+  extend = .false.
+  bitpix = 16 
+
+  if (lVoronoi) then
+   naxis = 1
+   naxes(1) = atmos%Nspace 
+   nelements = naxes(1)
+  else
+   if (l3D) then
+    naxis = 3
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3)
+   else
+    naxis = 2
+    naxes(1) = n_rad
+    naxes(2) = nz
+    nelements = naxes(1) * naxes(2)
+   end if
+  end if
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "integer", "0=empty,1=filled;-1=dark", ' ', EOF)
+  !write data
+  CALL ftppri(unit,group,fpixel,nelements,atmos%icompute_atomRT,EOF)
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+   
+  
+  RETURN
+  END SUBROUTINE write_atmos_domain
+   
+  SUBROUTINE writeVfield()
+ ! ------------------------------------ !
+ ! ------------------------------------ !
+  use fits_utils, only : print_error
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL ftinit(unit,"Vfield.fits.gz",blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1
+  fpixel = 1
+  extend = .false.
+  bitpix = -64  
+
+  if (lVoronoi) then
+   naxis = 2
+   naxes(1) = atmos%Nspace 
+   naxes(2) = 3 
+   nelements = naxes(1) * naxes(2)
+  else
+   if (l3D) then
+    naxis = 4
+    naxes(4) = 3
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+   else
+    naxis = 3 !2 + 1 for all compo
+    naxes(3) = 3
+    naxes(1) = n_rad
+    naxes(2) = nz
+    nelements = naxes(1) * naxes(2) * naxes(3)
+   end if
+  end if
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "m.s^-1", ' ', EOF)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements,atmos%Vxyz,EOF)
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+   
+  
+  RETURN
+  END SUBROUTINE writeVfield
+  
+  SUBROUTINE writeAtmos_ascii()
+  ! ------------------------------------- !
+   ! Write GridType atmos to ascii file.
+   ! ultimately this model will be mapped
+   ! onto a Voronoi mesh.
+  ! ------------------------------------- !
+   use grid
+   character(len=10)	:: filename="model.s"
+   integer :: icell, i, j, k
+   double precision, dimension(n_cells) :: XX, YY, ZZ
+   double precision :: r, rcyl, phi, z, sinTheta, rho_to_nH, fact
+   double precision :: dx, dy, dz, smooth_scale
+   
+   rho_to_nH = 1d0 / AMU /atmos%avgWeight
+   
+   if (n_az <= 1) then
+    write(*,*) "Error, in this case, lmagnetoaccr is false, and", &
+    	' n_az > 1'
+    stop
+   end if
+   !X, Y, Z cartesian coordinates
+   do i=1, n_rad
+    do j=j_start,nz
+     do k=1, n_az
+      if (j==0) then !midplane
+        icell = cell_map(i,1,k)
+        rcyl = r_grid(icell) !AU
+        z = 0.0_dp
+      else
+       icell = cell_map(i,j,k)
+       rcyl = r_grid(icell)
+       z = z_grid(icell)/z_scaling_env
+      end if
+      phi = phi_grid(icell)
+      r = dsqrt(z**2 + rcyl**2)
+      fact = 1d0
+      if (z<0) fact = -1
+      sinTheta = fact*dsqrt(1.-(z/r)**2)
+      !XX(icell) = rcyl*cos(phi)*AU_to_m!r*cos(phi)*sinTheta * AU_to_m
+      !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
+       XX(icell) = r*cos(phi)*sinTheta * AU_to_m
+       YY(icell) = r*sin(phi)*sinTheta * AU_to_m   
+       ZZ(icell) = z*AU_to_m
+     end do
+    end do
+   end do
+   
+   if (lstatic) then 
+    allocate(atmos%Vxyz(n_cells,3))
+    atmos%Vxyz = 0d0
+   end if
+   
+   open(unit=1,file=trim(filename),status="replace")
+   atmos%nHtot = atmos%nHtot / rho_to_nH !using total density instead of nHtot for writing
+   !write Masses per cell instead of densities. Voronoi cells Volume is different than
+   !grid cell right ? 
+   write(*,*) "Maximum/minimum density in the model (kg/m^3):"
+   write(*,*) maxval(atmos%nHtot), minval(atmos%nHtot,mask=atmos%icompute_atomRT>0)
+   atmos%nHtot = atmos%nHtot * volume * AU3_to_m3  * kg_to_Msun!Msun
+   do icell=1, atmos%Nspace
+     dx = XX(icell) - etoile(1)%x*AU_to_m
+     dy = YY(icell) - etoile(1)%y*AU_to_m
+     dz = ZZ(icell) - etoile(1)%z*AU_to_m
+     smooth_scale = 5. * Rmax * AU_to_m
+     if (min(dx,dy,dz) < 2*etoile(1)%r*AU_to_m) then
+      if ((dx**2+dy**2+dz**2) < (2*etoile(1)%r*AU_to_m)**2) then
+         smooth_scale = dsqrt(dx**2+dy**2+dz**2)/3. * AU_to_m
+         !=etoile(1)%r*AU_to_m!etoile(1)%r/3. * AU_to_m!m
+      end if
+     end if
+        write(1,"(8E)") XX(icell), YY(icell), ZZ(icell), atmos%nHtot(icell), &
+    	 atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), smooth_scale
+   end do
+   write(*,*) "Maximum/minimum mass in the model (Msun):"
+   write(*,*) maxval(atmos%nHtot), minval(atmos%nHtot,mask=atmos%icompute_atomRT>0)
+   write(*,*) "Maximum/minimum mass in the model (Kg):"
+   write(*,*) maxval(atmos%nHtot)*Msun_to_kg, &
+   				minval(atmos%nHtot,mask=atmos%icompute_atomRT>0)*Msun_to_kg
+   write(*,*) "Maximum/minimum velocities in the model (km/s):"
+   write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+   close(unit=1)
+
+  RETURN
+  END SUBROUTINE writeAtmos_ascii
 
 END MODULE atmos_type
 

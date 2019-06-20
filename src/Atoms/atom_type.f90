@@ -7,11 +7,11 @@ MODULE atom_type
 
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
-   integer, parameter :: ATOM_ID_WIDTH=2
+   integer, parameter :: ATOM_ID_WIDTH=2, MAX_LENGTH=512
    real(8), parameter :: BRK=4.0
    integer, parameter :: MSHELL=5
-   character(len=20), dimension(16) :: col_recipe !16 recipes for collision rates
-   data col_recipe / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
+   character(len=20), dimension(16) :: col_recipes !16 recipes for collision rates
+   data col_recipes / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
                     "AR85-CHP", "AR85-CHH", "AR85-CEA", "BURGESS", "SHULL82",&
                     "BADNELL", "SUMMERS", "AR85-CDI" /
 
@@ -24,15 +24,13 @@ MODULE atom_type
  
   !Store for each atom, depth independant data necessary to compute C matrix
   !at each cell. It avoids reading a file during the NLTE loop
+  !then in Collision, a new function C(j,i) = ne(icell)*Collision_atom(atom, j, i) or for all j,i
+  !uses atom%col_data will be used. Note that ne is factorised out.
   TYPE CollisionData
-   integer :: NTMP
-   integer, dimension(16) :: ij, ji, ir !index to recipe
-   double precision, allocatable, dimension(:) :: TGRID
+   integer :: NT
+   double precision, allocatable, dimension(:,:) :: C1, C2, C3, C4, C5, C6
+   double precision, allocatable, dimension(:) :: T1, T2, T3, T4, T5, T6
   END TYPE CollisionData
-  
-  TYPE ptrCollisionArr
-   type (CollisionData) :: ptr_col
-  END TYPE ptrCollisionArr
  
   TYPE AtomicLine
    logical           :: symmetric, polarizable
@@ -90,11 +88,11 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: stage, Lorbit
    integer(8)            :: offset_coll, colunit
    real(8)                :: Abund, weight
-   real(8), allocatable, dimension(:) :: g, E, vbroad, ntotal
+   real(8), allocatable, dimension(:) :: g, E!, vbroad, ntotal
    real(8), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
-   type (ptrCollisionArr), dimension(:), allocatable :: col_data
-   real(8), dimension(:), allocatable :: C !Nlevel*Nlevel
+   character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+   type (CollisionData), dimension(6) :: col_data !only 6 recipes allowed now
    real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
    double precision, dimension(:,:,:), allocatable :: Gamma 
    real(8), dimension(:,:), pointer :: n, nstar
