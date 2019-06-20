@@ -651,9 +651,9 @@ contains
    write(*,*) atmos%v_char/1d3
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT)!==.true.)
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)!==.true.)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT)!==.true.) 
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)!==.true.) 
  
   RETURN
 
