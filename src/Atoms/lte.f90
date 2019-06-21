@@ -8,7 +8,7 @@
 MODULE lte
 
  use atom_type, only : AtomType, element
- use atmos_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium, ntotal_atom
  use constant
  use math
  use collision, only : CollisionRate, openCollisionFile
@@ -141,7 +141,9 @@ MODULE lte
     !number density. Remember:
     ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
     !j = -1 for Hminus (l=element=H)
-    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+    !atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+    !-> the following is in RH, but it doesn't make sens for me
+    atmos%nHmin(k) = nTotal_atom(k, Hydrogen) * atmos%ne(k)*PhiHmin!faster?
    end do !over depth points
    !$omp end do
    !$omp  end parallel
@@ -251,14 +253,14 @@ MODULE lte
      						   !with Sum_i nij = Nj
     end do
     !Incorpore Hminus
-    if (atom%ID=="H") then
-     phiHmin = atmos%ne(k)*phi_jl(k, 1d0, 2d0, E_ION_HMIN)
-     atmos%nHmin(k) = 1d0 * phiHmin!ground state of HI wrt to nH00
-     do i = 2, atom%Nlevel-1
-      atmos%nHmin(k) = atmos%nHmin(k) + atom%nstar(i,k) * phiHmin !wrt nH00
-     end do
-     sum = sum + atmos%nHmin(k)
-    end if
+!     if (atom%ID=="H") then
+!      phiHmin = atmos%ne(k)*phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+!      atmos%nHmin(k) = 1d0 * phiHmin!ground state of HI wrt to nH00
+!      do i = 2, atom%Nlevel-1
+!       atmos%nHmin(k) = atmos%nHmin(k) + atom%nstar(i,k) * phiHmin !wrt nH00
+!      end do
+!      sum = sum + atmos%nHmin(k)
+!     end if
     
      ! now we have, 1 + n2/n1 + ni/n1 = sum over all levels
      ! and each stage for each level,
@@ -274,12 +276,13 @@ MODULE lte
     do i=2,atom%Nlevel !debug
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
       !to avoid very low populations in calculations
-      if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
+      !if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
     end do
     !faster ? 
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
-    if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
+	!!Incorpore Hminus
+!     if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
 
     if (MAXVAL(atom%nstar(:,k)) <= tiny_dp) then !at the cell
      write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
@@ -304,6 +307,205 @@ MODULE lte
  RETURN
  END SUBROUTINE LTEpops
 
+
+ SUBROUTINE setLTEcoefficients ()
+  ! -------------------------------------------------------------- !
+   ! For each atom, fills LTE populations and
+   ! fill collisional matrix if it is active.
+  ! -------------------------------------------------------------- !
+  integer n, k, j
+  logical :: debeye=.true.
+  double precision :: PhiHmin
+
+  write(*,*) "Setting LTE populations..."
+  do n=1,atmos%Natom
+
+   ! fill lte populations for each atom, active or not
+   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+!      if (atmos%Atoms(n)%ptr_atom%active) then
+!        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+!        !Temporary
+!        atmos%Atoms(n)%ptr_atom%C = 0d0
+!        allocate(atmos%Atoms(n)%ptr_atom%Ckij(&
+!        atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
+!        !open collision file
+!        atmos%Atoms(n)%ptr_atom%Ckij = 0d0
+!        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
+!      end if
+  end do
+  
+  !!This is in case H is NLTE but has not converged pops yet, or not read from file
+  !!because we need this in opacity routines for H b-f, f-f, H- b-f, H- f-f ect
+  !!%NLTEpops is true only if %n /= 0 or after NLTE loop, or if pops are read from file.
+  !! otherwise it is FALSE, even at the begening of NLTE.
+  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
+                                            !for background Hydrogen and Hminus                                            
+  CALL calc_nHmin() !if not included in LTEpops()
+  
+
+!   Hydrogen%nstar=0d0
+!   CALL LTEpops_H(.true.)
+  if (atmos%Nspace <= 82) then
+   write(*,*) "Checking nHmin"
+   do k=1, 82
+   write(*,*) k-1, phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+   write(*,*) "icell-1=", k-1, atmos%ne(k), atmos%nHmin(k), nTotal_atom(k, Hydrogen),Hydrogen%nstar(1,k),sum(Hydrogen%nstar(2:Hydrogen%Nlevel-1,k)), Hydrogen%nstar(Hydrogen%Nlevel,k)
+   end do
+  end if
+
+  ! if (.not.chemEquil) then
+  !atmos%nHmin = 0d0 !init
+
+  !! CALL calc_nHmin()
+  !now Hminus in computed with Saha equation during LTEpops
+  !should be updated with NLTE pops at the end of the NLTE loop                                         
+
+  !!!$omp parallel &
+  !!!$omp default(none) &
+  !!!$omp private(k, PhiHmin,j) &
+  !!!$omp shared(atmos,Hydrogen)
+  !!!$omp do
+!   do k=1, atmos%Nspace
+!    if (.not.atmos%lcompute_atomRT(k)) CYCLE
+! 
+!    PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+   ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
+   ! nHmin is proportial to the total number of neutral Hydrogen
+   ! which for hydrogen is given by the sum of the indivdual
+   ! levels except the last one which is the protons (or H+)
+   ! number density. Remember:
+   ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
+   ! j = -1 for Hminus (l=element=H)
+!     do j=1,Hydrogen%Nlevel - 1
+!      atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
+!     end do
+!    atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
+!     atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+   !! comme %n pointe vers %nstar si pureETL (car pointeurs)
+   !! il n y pas besoin de preciser if %NLTEpops
+   !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
+   !!   ", nHmin(k), np(k)"
+!    write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%ptr_atom%n(1,k), &
+!    atmos%Atoms(1)%ptr_atom%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k),&
+!    atmos%PAssiveAtoms(1)%ptr_atom%n(1,k)
+!   end do !over depth points
+  !!!$omp end do
+  !!!!$omp  end parallel
+  ! end if !if chemical equilibrium
+   write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
+   CALL writeHydrogenMinusDensity(.false.)
+! stop
+ RETURN
+ END SUBROUTINE setLTEcoefficients
+ 
+ !!Testing i H- is the ground state from which we compute everything
+ SUBROUTINE LTEpops_H(debeye)
+  ! -------------------------------------------------------------- !
+   ! Computes LTE populations of each level of the atom.
+   ! Distributes populations among each level (ni) according
+   ! to the total population (NI) of each stage (I),
+   ! for which a level i belongs (Boltzmann's equation)
+  ! -------------------------------------------------------------- !
+  type (Atomtype), pointer :: atom
+  logical, intent(in) :: debeye
+  double precision :: dEion, dE, sum, c2, phik, phiHmin, g0
+  integer :: Z, dZ, k, i, m, istart
+  integer, allocatable, dimension(:) :: nDebeye
+  
+   atom => atmos%Atoms(1)%ptr_atom
+
+   if (Debeye) then
+    c2 = dsqrt(8.0*PI/KBOLTZMANN) * &
+      (SQ(Q_ELECTRON)/(4.0*PI*EPSILON_0))**1.5
+   !write(*,*) "c2=",c2,  atom%Abund * atmos%nHtot(1),  atom%Abund * atmos%nHtot(2)
+    allocate(nDebeye(atom%Nlevel))
+    nDebeye(:)=0
+    do i=2,atom%Nlevel !reject ground level
+     Z = atom%stage(i) !0 for neutrals, 1 for singly ionised
+     do m=1,atom%stage(i)-atom%stage(1) !relative to ground level
+      nDebeye(i) = nDebeye(i) + Z
+      Z = Z + 1
+     end do
+    end do
+   end if
+
+   g0 = 2d0
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(k, phik, dEion,i,dZ,dE,m,sum,phiHmin) &
+   !$omp shared(atmos,Hydrogen,c2,atom, Debeye,nDebeye,g0)
+   !$omp do
+   do k=1,atmos%Nspace
+    if (atmos%icompute_atomRT(k) /= 1) CYCLE
+
+    if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
+    sum = 1.
+    phik = atmos%ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
+    !a constant of the temperature and electron density
+
+    do i=1, atom%Nlevel
+     dE = atom%E(i) - E_ION_HMIN ! relative to ground level = H minus
+     dZ = atom%stage(i) + 1
+
+
+     if (Debeye) dE = dE - nDebeye(i)*dEion !J
+
+     ! --------- Boltzmann equation ------------------------------------------- !
+     ! relative to ni=n1, the populations 
+     ! of the ground state in stage stage(1).
+
+     atom%nstar(i,k)=BoltzmannEq4dot20b(k, dE, g0, atom%g(i))
+
+     ! ---------- Saha equation ------------------------------------------------ !
+     ! n1j+1 = n1j * exp(-ionpotj->j+1)/(ne*phi(T)) !or phik here
+     ! we can express all pops nij in specific ion stage j
+     ! wrt the groud state and ionisation stage of the ground state
+     ! namely n1j=1. Remembering that E0j+1-E0j = chiIj->j+1 = ionpot
+     
+     ! for this level i in stage stage(i),
+     ! we have dZ +1 ion stages from the
+     ! level 1 in stage stage(1).
+     ! the population of the ground state in stage (i)+dZ
+     ! is given by nstar(i,k)/(phik)**dZ.
+     ! because expressing dE has Eij - E00 will involved succesive division by phik
+     ! dZ + 1 times -> 0 times if same ion stage, +1 times if next ion, +2 times if
+     ! third ion ect ..
+
+     ! is equivalent to nstar(i,k)*(phik)**(-dZ)
+     ! if dZ = 0, same ion, no division, only Boltzmann eq.
+     ! if dZ = 1, dZ+1=2 -> another (next) ion, one div by phik = Saha
+     ! if dZ = 2, dZ+1=3 -> the next next ion, two div by phik ...
+     do m=2,dZ+1
+      atom%nstar(i,k)=atom%nstar(i,k)/phik
+     end do
+
+     ! by doing so we avoid the easiest case of using
+     ! partition function.
+     sum = sum+atom%nstar(i,k) !compute total pop = Sum_jSum_i nij
+     						   !with Sum_i nij = Nj
+    end do
+
+    atmos%nHmin(k) = nTotal_atom(k, atom)/sum
+    do i=1,atom%Nlevel
+      atom%nstar(i,k) = atom%nstar(i,k)*atmos%nHmin(k)
+    end do
+
+    if (MAXVAL(atom%nstar(:,k)) <= tiny_dp) then !at the cell
+     write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%nHmin(k)
+     write(*,*) atom%nstar(:,k)
+     write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
+     write(*,*) "stop!"
+     stop !beware if low T, np -> 0, check to not divide by 0 density
+    end if
+   end do !over depth points
+   !$omp end do
+   !$omp  end parallel
+
+  if (allocated(nDebeye)) deallocate(nDebeye)
+ RETURN
+ END SUBROUTINE LTEpops_H
+END MODULE lte
 !  SUBROUTINE LTEpops_element(elem)
 !   -------------------------------------------------------------- !
 !    Obtains the TOTAL LTE populations of each stage (NI)
@@ -382,87 +584,3 @@ MODULE lte
 ! 
 !   RETURN
 !  END SUBROUTINE LTEpops_element
-
-
- SUBROUTINE setLTEcoefficients ()
-  ! -------------------------------------------------------------- !
-   ! For each atom, fills LTE populations and
-   ! fill collisional matrix if it is active.
-  ! -------------------------------------------------------------- !
-  integer n, k, j
-  logical :: debeye=.true.
-  double precision :: PhiHmin
-
-  write(*,*) "Setting LTE populations..."
-  do n=1,atmos%Natom
-
-   ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
-!      if (atmos%Atoms(n)%ptr_atom%active) then
-!        allocate(atmos%Atoms(n)%ptr_atom%C(atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
-!        !Temporary
-!        atmos%Atoms(n)%ptr_atom%C = 0d0
-!        allocate(atmos%Atoms(n)%ptr_atom%Ckij(&
-!        atmos%Nspace,atmos%Atoms(n)%ptr_atom%Nlevel*atmos%Atoms(n)%ptr_atom%Nlevel))
-!        !open collision file
-!        atmos%Atoms(n)%ptr_atom%Ckij = 0d0
-!        CALL openCollisionFile(atmos%Atoms(n)%ptr_atom)
-!      end if
-  end do
-  if (atmos%Nspace <= 82) then
-   write(*,*) "Checking nHmin"
-   do k=1, 82
-   write(*,*) "icell-1=", k-1,atmos%nHmin(k), Hydrogen%nstar(1,k),sum(Hydrogen%nstar(2:Hydrogen%Nlevel-1,k)), Hydrogen%nstar(Hydrogen%Nlevel,k)
-   end do
-  end if
-
-  ! if (.not.chemEquil) then
-  !atmos%nHmin = 0d0 !init
-  
-  !!This is in case H is NLTE but has not converged pops yet, or not read from file
-  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
-                                            !for background Hydrogen and Hminus
-  ! CALL calc_nHmin()
-  !now Hminus in computed with Saha equation during LTEpops
-  !should be updated with NLTE pops at the end of the NLTE loop                                         
-
-  !!!$omp parallel &
-  !!!$omp default(none) &
-  !!!$omp private(k, PhiHmin,j) &
-  !!!$omp shared(atmos,Hydrogen)
-  !!!$omp do
-!   do k=1, atmos%Nspace
-!    if (.not.atmos%lcompute_atomRT(k)) CYCLE
-! 
-!    PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
-   ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
-   ! nHmin is proportial to the total number of neutral Hydrogen
-   ! which for hydrogen is given by the sum of the indivdual
-   ! levels except the last one which is the protons (or H+)
-   ! number density. Remember:
-   ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
-   ! j = -1 for Hminus (l=element=H)
-!     do j=1,Hydrogen%Nlevel - 1
-!      atmos%nHmin(k) = atmos%nHmin(k) + Hydrogen%n(j,k)
-!     end do
-!    atmos%nHmin(k) = atmos%nHmin(k) * atmos%ne(k) * Phihmin
-!     atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
-   !! comme %n pointe vers %nstar si pureETL (car pointeurs)
-   !! il n y pas besoin de preciser if %NLTEpops
-   !!write(*,*) "k, H%n(1,k), Atoms(1)%n(1,k), Atoms(1)%nstar(1,k)",&
-   !!   ", nHmin(k), np(k)"
-!    write(*,*) "icell=",k, Hydrogen%n(1,k), atmos%Atoms(1)%ptr_atom%n(1,k), &
-!    atmos%Atoms(1)%ptr_atom%nstar(1,k), atmos%nHmin(k), Hydrogen%n(Hydrogen%Nlevel,k),&
-!    atmos%PAssiveAtoms(1)%ptr_atom%n(1,k)
-!   end do !over depth points
-  !!!$omp end do
-  !!!!$omp  end parallel
-  ! end if !if chemical equilibrium
-   write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
-   CALL writeHydrogenMinusDensity(.false.)
-! stop
- RETURN
- END SUBROUTINE setLTEcoefficients
-
-END MODULE lte
