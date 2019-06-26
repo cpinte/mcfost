@@ -313,14 +313,15 @@ MODULE broad
    ! line%Qelast = Qelast
   end if
   !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
-   adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
+  adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
+  !write(*,*) "adamp (m/s) vBroad (m/s) = ", adamp*VBROAD_atom(icell,atom),VBROAD_atom(icell,atom)
 
-!    if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
-!     CALL Broad_Kurosawa(icell, atom, kr, adamp)
-!     write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/VBROAD_atom(icell,atom), &
-!      " Ben=", (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
-!     !adamp = adamp * cDop / VBROAD_atom(icell,atom)
-!    end if
+!     if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
+!      CALL Broad_Kurosawa(icell, atom, kr, adamp)
+!      write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/VBROAD_atom(icell,atom), &
+!       " Ben=", (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
+!      adamp = adamp * cDop / VBROAD_atom(icell,atom)
+!     end if
 
  RETURN
  END SUBROUTINE Damping
