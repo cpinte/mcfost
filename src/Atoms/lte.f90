@@ -141,9 +141,9 @@ MODULE lte
     !number density. Remember:
     ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
     !j = -1 for Hminus (l=element=H)
-    !atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
     !-> the following is in RH, but it doesn't make sens for me
-    atmos%nHmin(k) = nTotal_atom(k, Hydrogen) * atmos%ne(k)*PhiHmin!faster?
+     !atmos%nHmin(k) = nTotal_atom(k, Hydrogen) * atmos%ne(k)*PhiHmin!faster?
    end do !over depth points
    !$omp end do
    !$omp  end parallel
@@ -342,6 +342,10 @@ MODULE lte
                                             !for background Hydrogen and Hminus                                            
   CALL calc_nHmin() !if not included in LTEpops()
   
+!--> uncomment if computed in LTEpops()
+!    write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
+!    write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
+!    CALL writeHydrogenMinusDensity(.false.)  
 
 !   Hydrogen%nstar=0d0
 !   CALL LTEpops_H(.true.)
@@ -392,9 +396,6 @@ MODULE lte
   !!!$omp end do
   !!!!$omp  end parallel
   ! end if !if chemical equilibrium
-   write(*,*) "Maximum/minimum H minus density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT>0)
-   CALL writeHydrogenMinusDensity(.false.)
 ! stop
  RETURN
  END SUBROUTINE setLTEcoefficients
