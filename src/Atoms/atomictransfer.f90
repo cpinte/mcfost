@@ -146,10 +146,6 @@ MODULE AtomicTransfer
 
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
-!          if (icell<=n_cells) then            
-!          write(*,*) id, icell, next_cell,x,y,z,u,v,w
-!          write(*,*) , atmos%icompute_atomRT(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell)
-! 		 end if
 
     ! ************* TEST ************* !
      if (lmcfost_star) then
@@ -450,9 +446,7 @@ MODULE AtomicTransfer
      ! Boucle sur les sous-pixels qui calcule l'intensite au centre
      ! de chaque sous pixel
      do i = 1,subpixels
-!if (ipix==24) then
         do j = 1,subpixels
-!if (jpix==91 .or. jpix==92 .or. jpix==90) then
            ! Centre du sous-pixel
            x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
@@ -462,7 +456,6 @@ MODULE AtomicTransfer
            CALL move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            !write(*,*) i, j, lintersect, labs, n_cells, icell
-           write(*,*) "Intersection : ",ipix, jpix
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
@@ -473,9 +466,7 @@ MODULE AtomicTransfer
              end if
            !else !Outside the grid, no radiation flux
            endif
-!end if
         end do !j
-!end if
      end do !i
 
      I0 = I0 / npix2
