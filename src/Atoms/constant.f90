@@ -48,6 +48,7 @@ MODULE constant
 
   real(8), parameter ::  TWOSQRTTWO = 0.35355339059327
 
+  !there is an error in LL04
   double precision, parameter ::  LARMOR = (Q_ELECTRON / (4.0*PI*M_ELECTRON)) !s^-1 / T
   !LamB = nuL/nu0 * lambda0 = nuL/(c/lambda0) * lambda0 = nuL/c * lambda0**2
   !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
@@ -57,7 +58,10 @@ MODULE constant
   ! --- Ionization energy Hmin in [J] ---
 
   real(8), parameter ::  E_ION_HMIN = 0.754 * EV
-  double precision :: Vtherm = 2.*KBOLTZMANN/AMU !m^2/s^2/K
+  real(8), parameter, private :: factor1D = 2d0, factor3D = 8d0/PI
+  !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)
+  real(8), parameter :: Vtherm = KBOLTZMANN/AMU * factor3D !m^2/s^2/K
+  
   real(8), dimension(NELEM_WEIGHTS) :: atomic_weights
   !starts at 1 for H, ends at NELEM_WEIGHTS
   DATA atomic_weights /1.008,4.003,6.939,9.013,10.81,12.01,  &
