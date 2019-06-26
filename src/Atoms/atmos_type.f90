@@ -79,7 +79,7 @@ MODULE atmos_type
   type (AtomType) :: atom
   
    vD = dsqrt(Vtherm*atmos%T(icell)/atom%weight + atmos%vturb(icell)**2)
-  
+   
  RETURN
  END FUNCTION VBROAD_atom
  
@@ -165,7 +165,7 @@ MODULE atmos_type
       if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
 !       if (allocated(line%Rij)) deallocate(line%Rij)
 !       if (allocated(line%Rji)) deallocate(line%Rji)
-      if (allocated(line%wlam)) deallocate(line%wlam)
+      if (allocated(line%wlam_norm)) deallocate(line%wlam_norm)
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
       !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
@@ -223,8 +223,8 @@ MODULE atmos_type
       	deallocate(atom%lines(k)%lambda)
       if (allocated(atom%lines(k)%CoolRates_ij)) &
       	deallocate(atom%lines(k)%CoolRates_ij)
-      if (allocated(atom%lines(k)%wlam)) &
-      	deallocate(atom%lines(k)%wlam)
+      if (allocated(atom%lines(k)%wlam_norm)) &
+      	deallocate(atom%lines(k)%wlam_norm)
       if (allocated(atom%lines(k)%rho_pfr)) &
       	deallocate(atom%lines(k)%rho_pfr)
       if (allocated(atom%lines(k)%gij)) &
@@ -399,7 +399,7 @@ MODULE atmos_type
     end do
    deallocate(atmos%Elements) !here it works
   end if
-  
+    
   if (allocated(atmos%nHtot)) deallocate(atmos%nHtot)
   if (allocated(atmos%ne)) deallocate(atmos%ne)
   if (allocated(atmos%Tpf)) deallocate(atmos%Tpf)
@@ -569,7 +569,7 @@ MODULE atmos_type
    if (.not.lstatic.and..not.lvoronoi) then 
     !Nrad, Nz, Naz-> Velocity vector cartesian components
     allocate(atmos%Vxyz(atmos%Nspace,3))
-    atmos%Vxyz = 0d0
+    atmos%Vxyz(:,:) = 0d0
     !if lmagnetoaccr then atmos%Vxyz = (VRcyl, Vz, Vphi)
     !it is then projected like it is done in v_proj for keplerian rot
     !meaning that the velocity field has infinite resolution. 
@@ -591,7 +591,7 @@ MODULE atmos_type
    atmos%metallicity = 0. !not used yet
    atmos%Npf = 0
    atmos%calc_ne = .false.
-   atmos%T = 0d0
+   atmos%T(:) = 0d0
 
 
    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
@@ -600,16 +600,16 @@ MODULE atmos_type
    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
 
    
-   atmos%ne = 0d0
-   atmos%nHmin = 0d0
-   atmos%nHtot = 0d0
-   atmos%vturb = 0d0 !m/s
+   atmos%ne(:) = 0d0
+   atmos%nHmin(:) = 0d0
+   atmos%nHtot(:) = 0d0
+   atmos%vturb(:) = 0d0 !m/s
 
    CALL fillElements()
    
 !    allocate(atmos%lcompute_atomRT(atmos%Nspace))
    allocate(atmos%icompute_atomRT(atmos%Nspace))
-
+   atmos%icompute_atomRT(:) = 0 !everything transparent at init.
 
    RETURN
    END SUBROUTINE init_atomic_atmos
@@ -627,7 +627,7 @@ MODULE atmos_type
    ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
     integer :: icell
     double precision, optional :: itiny_nH, itiny_T
-    double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=5d1
+    double precision :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
     !with Very low value of densities or temperature it is possible to have
     !nan or infinity in the populations calculations because of numerical precisions
     
@@ -644,8 +644,8 @@ MODULE atmos_type
     if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
 
     if (tiny_T <= 0) then
-     write(*,*) "changing the value of tiny_T = ", tiny_T," to", 10d0
-     tiny_T = 10d0
+     write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
+     tiny_T = 2d0
     end if
     if (tiny_nH <= 0) then
      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
@@ -653,13 +653,16 @@ MODULE atmos_type
     end if
     
     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T) 
-    atmos%icompute_atomRT(:) = 0 !transparent
-    do icell=1,atmos%Nspace
-!      atmos%lcompute_atomRT(icell) = &
-!        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
-    if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
-     	atmos%icompute_atomRT(icell) = 1 !filled
-    end do
+    ! atmos%icompute_atomRT(:) = 0 !transparent !already init
+    where((atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T))
+    	atmos%icompute_atomRT = 1
+    end where
+!     do icell=1,atmos%Nspace
+! !      atmos%lcompute_atomRT(icell) = &
+! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+!     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
+!      	atmos%icompute_atomRT(icell) = 1 !filled
+!     end do
 
    RETURN
    END SUBROUTINE define_atomRT_domain
@@ -757,7 +760,7 @@ MODULE atmos_type
  ! ------------------------------------ !
  ! ------------------------------------ !
   use fits_utils, only : print_error
-  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  integer :: unit, EOF = 0, blocksize, naxes(3), naxis,group, bitpix, fpixel
   logical :: extend, simple
   integer :: nelements
   
@@ -765,13 +768,14 @@ MODULE atmos_type
   CALL ftgiou(unit,EOF)
 
   blocksize=1
+
   CALL ftinit(unit,"atomRT_domain.fits.gz",blocksize,EOF)
   !  Initialize parameters about the FITS image
   simple = .true. !Standard fits
   group = 1
   fpixel = 1
   extend = .false.
-  bitpix = 16 
+  bitpix = 64
 
   if (lVoronoi) then
    naxis = 1
@@ -796,7 +800,7 @@ MODULE atmos_type
   ! Additional optional keywords
   CALL ftpkys(unit, "integer", "0=empty,1=filled;-1=dark", ' ', EOF)
   !write data
-  CALL ftppri(unit,group,fpixel,nelements,atmos%icompute_atomRT,EOF)
+  CALL ftpprj(unit,group,fpixel,nelements,atmos%icompute_atomRT,EOF)
   
   CALL ftclos(unit, EOF)
   CALL ftfiou(unit, EOF)
