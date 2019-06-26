@@ -263,7 +263,7 @@ END FUNCTION getPartitionFunctionk
   !$omp do
   do k=1,atmos%Nspace
    !$ id = omp_get_thread_num() + 1
-   if (atmos%icompute_atomRT(k) /= 1) CYCLE
+   if (atmos%icompute_atomRT(k) <= 0) CYCLE !transparent or dark
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."N_PROTON") then
