@@ -17,7 +17,7 @@ MODULE math
         val = 1
         return
        else if (y(i,j)==y(i,j)+1) then
-        write(*,*) y(i,j), y(i,j)+1
+        write(*,*) y(i,j), y(i,j)*(1+0.1)
         val = 2
         return
        end if      

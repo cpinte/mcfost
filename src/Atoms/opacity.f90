@@ -244,18 +244,25 @@ MODULE Opacity
 !       else	 
        gij(Nblue:Nred) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * exp_lambda(Nblue:Nred)
 !       end if
-               write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
-                        write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
+!       write(*,*) " --------------------------------------------------------- "
+!       write(*,*) "-->", id, icell,i, j, aatom%n(i,icell), aatom%n(j,icell)
+!       write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+!       write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
+      !write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
 
       !Cannot be negative because we alread tested if < tiny_dp
       if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
         (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
+         write(*,*) " ** Stimulated emission for continuum transition, chi < 0", cont%i, cont%j, &
+          aatom%ID
          write(*,*) i, j, aatom%n(i,icell), aatom%n(j,icell)
          write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
-         write(*,*) " ** Stimulated emission for continuum transition, chi < 0", cont%j, cont%i, &
-          aatom%ID
+         write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+         write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
         stop
       end if
+!       write(*,*) " --------------------------------------------------------- "
+
     
     !store total emissivities and opacities
         NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &

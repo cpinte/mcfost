@@ -17,9 +17,32 @@ MODULE simple_models
  
  IMPLICIT NONE
  
- double precision, parameter :: feqv = 1d3 !1Rstar = feqv*R_au
 
  CONTAINS
+ 
+  FUNCTION feqv(R1, R2, rr, inverse) result (rrp)
+  !convert from mcfost grid to stellar grid
+   double precision :: R1, R2, rr, rrp
+   logical, optional :: inverse
+   logical :: get_rs
+   
+   get_rs = .false.
+   
+   if (present(inverse)) then
+    get_rs = inverse
+   end if
+   
+   
+   if (get_rs) then
+     rrp = (rr - R1) * (Rmax-Rmin) / (R2-R1) + Rmax 
+    return
+   end if
+   
+   rrp = (rr-Rmin) / (Rmax-Rmin) * (R2-R1) + Rmin
+!    write(*,*) rrp
+!    stop
+  RETURN
+  END FUNCTION feqv
  
   SUBROUTINE rotateZ(Vx, Vy, Vz, angle)
    !rotation around z-axis = rotation_3d((/0,0,1/), -angle, (/Vx, Vy, Vz/))
@@ -333,60 +356,85 @@ MODULE simple_models
   RETURN
   END SUBROUTINE magneto_accretion_model
   
-  SUBROUTINE uniform_law_model()
-  ! ----------------------------------------------------------------- !
-   ! Implements a simple model with density and electron density
-   ! constant on the grid.
-   ! Values width idk are from a Solar model atmosphere by 
-   ! Fontenla et al. namely the FAL C model.
-   ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
-  ! ----------------------------------------------------------------- !
-   CALL init_atomic_atmos()
-   lstatic = .true. !force to be static for this case
-   atmos%magnetized = .false.
-   atmos%calc_ne = .true.
-   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
-   
-   if (n_cells > 1) then
-    atmos%T(:)=7590d0
-    atmos%ne(:) = 4.446967d20
-    atmos%nHtot(:) = 1.259814d23   
-    atmos%vturb(:) = 2d0
+  SUBROUTINE magneto_accretion_diskwind_model()
+  
+  
+  END SUBROUTINE magneto_accretion_diskwind_model
+  
+  SUBROUTINE FALC_MODEL()
+  !Only for testing, set atmos%XX = FALC_xx
+   integer, parameter :: NDEP = 82
+   double precision, dimension(82) :: T, ne, nHtot, nHmin
+   double precision :: nH6(6,82) 
+  
+   data ne /1.251891d16, 1.304293d16, 1.366348d16, 1.467464d16,&
+       1.603707d16, 1.694766d16, 1.811689d16, 1.969550d16,&
+       2.192829d16, 2.344633d16, 2.523785d16, 2.748732d16,&
+       3.043595d16, 3.394113d16, 3.804151d16, 4.291177d16,&
+       4.860836d16, 5.337548d16, 5.700496d16, 6.137226d16,&
+       6.520094d16, 6.747161d16, 6.918466d16, 6.991762d16,&
+       6.967801d16, 6.848673d16, 6.599262d16, 6.265075d16,&
+       5.801540d16, 5.841143d16, 6.141942d16, 6.651616d16,&
+       7.168647d16, 7.561758d16, 7.846423d16, 8.095357d16,&
+       8.445100d16, 8.838377d16, 9.185673d16, 9.612962d16,&
+       1.031897d17, 1.137706d17, 1.220873d17, 1.280117d17,&
+       1.340907d17, 1.308237d17, 1.229867d17, 1.111659d17,&
+       9.742137d16, 8.363294d16, 7.544027d16, 9.114873d16,&
+       1.307890d17, 1.818187d17, 2.441017d17, 3.294358d17,&
+       4.648930d17, 7.167248d17, 1.099721d18, 1.680047d18,&
+       2.557346d18, 3.880555d18, 4.803401d18, 5.984860d18,&
+       7.584832d18, 9.816085d18, 1.329338d19, 1.950519d19,&
+       2.749041d19, 4.028244d19, 5.456858d19, 7.641340d19,&
+       1.099800d20, 1.719226d20, 2.789487d20, 4.446967d20,&
+       6.869667d20, 1.041290d21, 1.531806d21, 2.194603d21,&
+       2.952398d21, 3.831726d21 / 
+       
+  data T /100000.,  95600.,  90820.,  83890.,  75930.,  71340.,  66150.,&
+        60170.,  53280.,  49390.,  45420.,  41180.,  36590.,  32150.,&
+        27970.,  24060.,  20420.,  17930.,  16280.,  14520.,  13080.,&
+        12190.,  11440.,  10850.,  10340.,   9983.,   9735.,   9587.,&
+         9458.,   9358.,   9228.,   8988.,   8635.,   8273.,   7970.,&
+         7780.,   7600.,   7410.,   7220.,   7080.,   6910.,   6740.,&
+         6570.,   6370.,   6180.,   5950.,   5760.,   5570.,   5380.,&
+         5160.,   4900.,   4680.,   4560.,   4520.,   4500.,   4510.,&
+         4540.,   4610.,   4690.,   4780.,   4880.,   4990.,   5060.,&
+         5150.,   5270.,   5410.,   5580.,   5790.,   5980.,   6180.,&
+         6340.,   6520.,   6720.,   6980.,   7280.,   7590.,   7900.,&
+         8220.,   8540.,   8860.,   9140.,   9400. /
+  
+  data nHtot /1.04571358d16, 1.09401812d16, 1.15182218d16, 1.24723003d16,&
+       1.37824624d16, 1.46666937d16, 1.58073849d16, 1.73522158d16,&
+       1.95244380d16, 2.09965070d16, 2.27414201d16, 2.49529201d16,&
+       2.78867302d16, 3.14878205d16, 3.58761009d16, 4.12490015d16,&
+       4.80215027d16, 5.41514040d16, 5.91966052d16, 6.57624071d16,&
+       7.24630094d16, 7.75050116d16, 8.24780142d16, 8.72100175d16,&
+       9.21940221d16, 9.65480272d16, 1.00765034d17, 1.04571040d17,&
+       1.09119049d17, 1.12308055d17, 1.16667062d17, 1.28173075d17,&
+       1.50485091d17, 1.83065106d17, 2.26075118d17, 2.71927128d17,&
+       3.45149141d17, 4.76695155d17, 7.11571167d17, 1.04788518d18,&
+       1.73738021d18, 3.04612025d18, 5.24351028d18, 9.77814031d18,&
+       1.85672803d19, 3.66282003d19, 6.15684103d19, 9.80419662d19,&
+       1.48043185d20, 2.29178909d20, 3.65754559d20, 6.20960707d20,&
+       1.00590598d21, 1.47210490d21, 2.05290447d21, 2.84430487d21,&
+       4.10450602d21, 6.41610951d21, 9.93341605d21, 1.52160292d22,&
+       2.30240577d22, 3.43691248d22, 4.17101990d22, 5.01483483d22,&
+       5.97136909d22, 7.04214461d22, 8.21612134d22, 9.45184976d22,&
+       1.01434202d23, 1.08385618d23, 1.12638909d23, 1.16619660d23,&
+       1.20282003d23, 1.22812486d23, 1.24607714d23, 1.25981369d23,&
+       1.27401250d23, 1.28402892d23, 1.29180598d23, 1.30020496d23,&
+       1.31275567d23, 1.32662462d23/
+  
+
+   if (n_cells >= NDEP) then
+    atmos%ne(1:NDEP) = ne
+    atmos%T(1:NDEP) = T
+    atmos%nHtot(1:NDEP) = nHtot
+   else
+    CALL Error("Cannot associate FAL_C to MCFOST, increase number of depth points")
    end if
-
-   !idk = 10
-!     atmos%nHtot(1) =  2.27414200581936d16
-!     atmos%T(1) = 45420d0
-!     atmos%ne(1) = 2.523785d16
-!     atmos%vturb(1) = 9.506225d3 !m/s
-   
-   !idk = 75
-!   atmos%T(1)=7590d0
-!   atmos%ne(1) = 4.446967d20
-!   atmos%nHtot(1) = 1.259814d23
-!   atmos%vturb(1) = 2d0
-
-    !idk = 81   
-!     atmos%T=9400d0
-!     atmos%ne = 3.831726d21
-!     atmos%nHtot = 1.326625d23
-!     atmos%vturb = 1.806787d3 !idk=81
-
-    !idk = 0 
-!      atmos%T(1) = 100000d0
-!      atmos%ne(1) = 1.251891d16
-!      atmos%nHtot(1) = 1.045714d16 
-!      atmos%vturb(1) = 10.680960d3 !idk=0
-   CALL define_atomRT_domain()
-   write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
-   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0) 
-   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
-
+  
   RETURN
-  END SUBROUTINE uniform_law_model
+  END SUBROUTINE FALC_MODEL
   
   SUBROUTINE spherical_shells_model()
   ! ----------------------------------------------------------- !
@@ -593,7 +641,8 @@ MODULE simple_models
 
    R0s = etoile(1)%r!inner boundary in au
    Mstar = etoile(1)%M * Msun_to_kg !kg
-   Rstar = feqv !in au
+   Rstar = feqv(minval(r_mod), maxval(r_mod), 1d0, .true.) !in au
+   write(*,*) "Rstar in mcfost grid (au) = ", Rstar
    omega = 2d0 * PI / Prot / 86400d0
    Vrot = 1000d3 !Omega * (r*AU_to_m)
    
@@ -620,8 +669,8 @@ MODULE simple_models
        end if
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
-       rs = r / Rstar
-       
+
+       rs = feqv(minval(r_mod), maxval(r_mod), r)!in Rstar
        !get a value of column mass
        cm = interp_dp(m_mod, r_mod, rs)
        !then interpolate
@@ -655,260 +704,41 @@ MODULE simple_models
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0) 
-stop
+
   RETURN
   END SUBROUTINE spherical_star
   
+   !Futuru removing
+ SUBROUTINE uniform_law_model()
+  ! ----------------------------------------------------------------- !
+   ! Implements a simple model with density and electron density
+   ! constant on the grid.
+   ! Values width idk are from a Solar model atmosphere by 
+   ! Fontenla et al. namely the FAL C model.
+   ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
+  ! ----------------------------------------------------------------- !
+   CALL init_atomic_atmos()
+   lstatic = .true. !force to be static for this case
+   atmos%magnetized = .false.
+   atmos%calc_ne = .true.
+   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
+   
+
+   atmos%T(:)=7590d0
+   atmos%ne(:) = 4.446967d20
+   atmos%nHtot(:) = 1.259814d23   
+   atmos%vturb(:) = 2d0
+
+
+   CALL define_atomRT_domain()
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0) 
+   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
+
+  RETURN
+  END SUBROUTINE uniform_law_model
 
  END MODULE simple_models
-!    SUBROUTINE magneto_accretion_model()
-!   ! ----------------------------------------------------------- !
-!    ! Magnetospheric accretion model
-!    ! Field line equation:
-!    !	r(theta, Rm) = Rm * sin2(theta), with
-!    ! sintheta = R/sqrt(z**2+R**2) and r/sin2(theta) = cte along
-!    ! a line.
-!    !
-!   ! ----------------------------------------------------------- !
-!    use math, only : interp1D
-!    use utils, only : interp_dp
-!    use TTauri_module, only : TTauri_temperature
-!    integer :: n_zones = 1, izone, i, j, k, icell
-!    double precision, parameter :: Tmax = 0d3, days_to_sec = 86400d0, Prot = 8. !days
-!    double precision, parameter :: rmi=2.2d0, rmo=3.0d0, Tshk=0d4, Macc = 1d-9
-!    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, deltaz = 0.2!Rstar
-!    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0
-!    double precision :: vp, y, rcyl, z, r, phi, Mdot, sinTheta, Rm, L
-!    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
-!    double precision :: Bp, BR, Bz
-!    logical :: lwrite_model_ascii = .false.
-!    !wind 
-!    double precision :: Mdotwind=1d-9, Twind=8d3, beta=5d-1, vinf=400d0, vinit10d0
-!    
-!    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
-!    !Lambda = Q/nH**2
-!    data Lambda / -28.3, -26., -24.5, -23.6, -22.6, -21.8,-21.2, -21.2 / !log10? 
-!    
-!    Omega = 2.*PI / (Prot * days_to_sec) ! Angular velocity in rad/s
-! 
-!    linfall = .false.
-!    lkeplerian = .false.
-!    lmagnetoaccr = .not.(lwrite_model_ascii)
-!    CALL init_atomic_atmos()
-!    !For now we do not necessarily need to compute B if no polarization at all
-!    atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
-!    if (atmos%magnetized) CALL init_magnetic_field()
-!    
-!    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
-! 
-!    !Define some useful quantities
-!    !write(*,*) "Mstar ", etoile(1)%M, " Rstar ", etoile(1)%r*AU_to_Rsun
-!    Rstar = etoile(1)%r * AU_to_m !AU_to_Rsun * Rsun !m
-!    Mstar = etoile(1)%M * Msun_to_kg !kg
-!    Mdot = Macc * Msun_to_kg / year_to_sec !kg/s
-!    Lr = Ggrav * Mstar * Mdot / Rstar * (1. - 2./(rmi + rmo))
-!    !sqrt(2*GMstar/rstar)
-!    OmegasK = dsqrt(Mstar * Ggrav * 2d0 / Rstar)
-!    !maximum and minimum angle on the stellar surface
-!    !all field lines are between theta0 and thetai at the stellar surface (r=Rstar)
-!    thetai = asin(dsqrt(1d0/rmi)) !rmi and rmo in Rstar
-!    thetao = asin(dsqrt(1d0/rmo))
-!    !write(*,*) "Thetamax/Thetamin", thetai*rad_to_deg, thetao*rad_to_deg
-!    if (Tshk <= 0d0) then
-!     Tring = Lr / (4d0 * PI * Rstar**2 * sigma * abs(cos(thetai)-cos(thetao)))
-!     Tring = Tring**0.25
-!    else
-!     Tring = Tshk
-!    end if
-!    Sr = abs(cos(thetai)-cos(thetao)) !4pi*Rstar**2 * abs(c1-c2) / 4pi Rstar**2
-!    write(*,*) "Ring T ", Tring, "K"
-!    write(*,*) "Surface ", 100*Sr, "%"
-!    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
-!    write(*,*) "Mean molecular weight", atmos%avgWeight
-!    !1G = 1e-4 T
-!    Bp = 1d-4 * 4.2*1d2 * (rmi/2.2)*(2*Mstar*kg_to_Msun)**(0.25) * &
-!    	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
-!    write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
-!   
-!    !now nH0 and Q0 are computed for each field lines assuming that Tring is the same
-!    !for all.
-! !    nH0 = 1d3/masseH/atmos%avgWeight * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
-! !                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
-! !                        dsqrt(4d0-3d0*(r0/rmi)) / dsqrt(1d0-(r0/rmi))
-! !    if (dabs(1d0 - (r0/rmi)) <= 1e-15) write(*,*) "Error nH0",nH0
-! !    !!Q0 in J/m9/s
-! !    !!Q0 = nH0**2 * 10**(interp1D(TL, Lambda, log10(Tring)))*0.1 !0.1 = erg/cm3 to J/m3
-! !    Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
-! 
-!     do i=1, n_rad
-!      do j=j_start,nz !j_start = -nz in 3D
-!       do k=1, n_az
-!        if (j==0) then !midplane
-!         icell = cell_map(i,1,k)
-!         rcyl = r_grid(icell) !AU
-!         z = 0.0_dp
-!        else
-!         icell = cell_map(i,j,k)
-!         rcyl = r_grid(icell)
-!         z = z_grid(icell)/z_scaling_env
-!        end if
-!        phi = phi_grid(icell)
-!        r = dsqrt(z**2 + rcyl**2)
-!        Vphi = Omega * (r*AU_to_m) !m/s
-!        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat
-!        !from trigonometric relations we get y using rcyln 
-!        !and the radius at r(rcyln, zn)
-!        sinTheta = rcyl/r
-!        ! and cosTheta = z/r = sqrt(1.-y) = sqrt(1.-sinTheta**2)
-!        !from definition of y
-!        y = sinTheta**2!min(real(sinTheta**2), 0.9999)
-!        !here the trick is to handle y = 1 at z=0 because rcyl=r and 1/(1-y) = inf.
-!        !r is a field line radial distance (from the centre of the model to the centre
-!        !of the cell.
-!        !if r**3/rcyl**2 or Rm=r/sint**2 is between rmi and rmo it means that the
-!        !cell icell (r, theta) belongs to a field line.
-!        Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
-!        y = min(y,0.99)
-!        if (Rm>=rmi .and. Rm<=rmo) then !r>etoile(1)%r  
-!           nH0 = rho_to_nH * (Mdot * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
-!                        (Rstar * r0)**( real(-5./2.) ) / dsqrt(2d0 * Ggrav * Mstar) * &
-!                        dsqrt(4d0-3d0*(r0/Rm)) / dsqrt(1d0-(r0/Rm))
-!           Q0 = nH0**2 * 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1
-!           !write(*,*) icell, Rm, nH0, Q0, log10(Q0/nH0**2)
-!           !Interface funnels/disk
-! !           if (dabs(z*AU_to_m/Rstar)<=deltaZ) then!(z==0d0) then
-! !            !at z=0, r = rcyl = Rm here so 1/r - 1/Rm = 0d0 and y=1: midplane
-! !            vp = 0d0
-! !            !atmos%Vxyz is initialized to 0 everywhere
-! !            if (.not.lstatic.and..not.lmagnetoaccr) then!only project if we are not
-! !            													!using analytical velocity law
-! !            													!hence if atmos%magnetoaccr = .false.
-! !             !V . xhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,-sin(phi)phihat)
-! !             !V . yhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,cos(phi)phihat)
-! !             !V .zhat = (0rhat,0thetahat,Omega*r phihat) dot (..rhat,..thetahat,0phihat)
-! !             atmos%Vxyz(icell,1) = Vphi * -sin(phi) !xhat
-! !             atmos%Vxyz(icell,2) = Vphi *  cos(phi) !yhat
-! !             !here it is better to have keplerian rotation than stellar rotation?
-! !            end if
-! !            Density midplane of the disk
-! !            using power law of the dust-gas disk (defined in another zone?)
-! !            atmos%nHtot(icell) = 1d23!
-! !            Temperature still given by the same law as in accretion funnels yet.
-! !            But probably different at this interface funnels/disk
-! !           else !accretion funnels
-!           !Density
-!            atmos%nHtot(icell) = ( Mdot * Rstar )/ (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
-!                        (AU_to_m * r)**( real(-2.5) ) / dsqrt(2d0 * Ggrav * Mstar) * &
-!                        dsqrt(4d0-3d0*y) / dsqrt(1d0-y) * &
-!                        rho_to_nH  !kg/m3 ->/m3
-!            vp = OmegasK * dsqrt(etoile(1)%r/r - 1./Rm)
-!            vp = -vp / dsqrt(4d0-3d0*y)
-!            if (.not.lstatic) then
-!              atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) !Rhat
-!              atmos%Vxyz(icell,2) = vp * (2d0 - 3d0 * y) !zhat
-!              atmos%Vxyz(icell,3) = Vphi !phihat
-!              if (.not.lmagnetoaccr) then !projection
-!               atmos%Vxyz(icell,3) = atmos%Vxyz(icell,2) !zhat         
-!               atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * cos(phi) &
-!               						-Vphi*sin(phi)!xhat
-!               atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * dsqrt(1.-y) * sin(phi) &
-!               						+Vphi*cos(phi)!yhat
-!              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
-!              end if
-!              ! or theta > PI/2d0
-!              !Because z, is the second axis if Vxyz=(Vr, Vz, Vphi) and the third if the
-!              !velocity is projected on the cartesian coordinates
-!              !!the minus sign in case of lmagnetoaccr is now taken in v_proj
-!              !!if (z<0 .and.lmagnetoaccr) atmos%Vxyz(icell,2) = -atmos%Vxyz(icell,2)
-! 
-!            end if
-!            ! Now magnetic field
-!             BR = Bp * (etoile(1)%r / r)**(3.0) * 3*dsqrt(y)*dsqrt(1.-y**2)
-!             Bz = Bp * (etoile(1)%r / r)**(3.0) * (3*(1.-y)-1)
-!             if (atmos%magnetized) then
-!              atmos%Bxyz(icell,1) = BR
-!              atmos%Bxyz(icell,2) = Bz
-!              atmos%Bxyz(icell,3) = 0d0
-!               if (.not.lmagnetoaccr) then !projection on the cell
-!                atmos%Bxyz(icell,1) = BR*cos(phi)
-!                atmos%Bxyz(icell,2) = BR*sin(phi)
-!                atmos%Bxyz(icell,3) = Bz
-!                if (z<0) atmos%Bxyz(icell,3) = -atmos%Bxyz(icell,3)
-!               end if
-!             end if
-!            end if
-!           L = 10 * Q0*(r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2!erg/cm3/s
-!           !atmos%T(icell) = 10**(interp1D(Lambda, TL, log10(L)))
-!           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-!           !write(*,*) log10(L), Rm, rcyl/etoile(1)%r, atmos%T(icell), nH0, Q0
-!           
-!          !! Stellar wind 
-! !        else if (r/Rstar>=3d0 .and. y <= sin(50d0*PI/180d0)**2) then !wind
-! !            if (.not.lstatic) then
-! !              vp = (vinit + (vinf - vinit) * (1d0 - 3d0*Rstar/r)**beta) * 1d3
-! !              atmos%Vxyz(icell,1) = vp * dsqrt(y) !Rhat
-! !              atmos%Vxyz(icell,2) = vp * dsqrt(1.-y) !zhat
-! !              atmos%Vxyz(icell,3) = 0d0 !phihat
-! !              if (.not.lmagnetoaccr) then !projection
-! !               atmos%Vxyz(icell,3) = vp * dsqrt(1.-y) !zhat         
-! !               atmos%Vxyz(icell,1) = vp * 3d0 * dsqrt(y) * cos(phi) 
-! !               atmos%Vxyz(icell,2) = vp * 3d0 * dsqrt(y) * sin(phi) 
-! !              if (z < 0) atmos%Vxyz(icell,3) = -atmos%Vxyz(icell,3)
-! !              end if
-! !            end if
-! !           atmos%nHtot(icell) = Mdotwind * Msun_to_kg / year_to_sec / (4d0*PI*vp*(1.-cos(50d0*PI/180d0)**2))) / &
-! !            (r*AU_to_m)**2 * rho_to_nH
-! !        end if
-!       end do
-!      end do
-!     end do
-!     !The disk could be included as new zone or by extending the density to r>rmo
-!     !but it has keplerian rotation and not infall but mcfost cannot treat two
-!     !kind of velocities right?
-! 
-!     if (Tmax > 0d0) atmos%T(:) = Tmax * atmos%T/maxval(atmos%T)
-!     !atmos%T(:) = minval(atmos%nHtot)/atmos%nHtot * Tmax
-!     !atmos%T = 8d3
-! 
-!    if (.not.lstatic) then
-!     atmos%v_char = atmos%v_char + &
-!     minval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
-!     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
-!    end if
-!    
-!    if (atmos%magnetized) then
-!     atmos%B_char = maxval(sum(atmos%Bxyz(:,:)**2,dim=2))
-!     write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
-!    end if
-! 
-! !    atmos%T = 0d0
-! !    CALL TTauri_Temperature(rmi, rmo, Macc)
-!    CALL define_atomRT_domain()
-!    
-!    if (lwrite_model_ascii.and..not.lmagnetoaccr) then !for now
-!     CALL writeAtmos_ascii()
-!     !leave here, we enter here only to write the model for Voronoi tesselation
-!     CALL free_atomic_atmos()
-!     !densities will be fill again during the Voronoi tesselation
-!     !leave here with an empty atomic atmos that will be filled during the tesselation
-!     !using this model
-!      write(*,*) "Stop after writing for the moment"
-!      stop
-!    end if
-!    
-!    if (.not.lstatic) then
-!     write(*,*) "Maximum/minimum velocities in the model (km/s):"
-!     write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
-!      		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
-!      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
-!    end if
-!    write(*,*) "Typical velocity in the model (km/s):"
-!    write(*,*) atmos%v_char/1d3
-! 
-!    write(*,*) "Maximum/minimum Temperature in the model (K):"
-!    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%lcompute_atomRT==.true.)
-!    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-!    write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%lcompute_atomRT==.true.)  
-!    
-!   RETURN
-!   END SUBROUTINE magneto_accretion_model

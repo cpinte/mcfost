@@ -27,8 +27,8 @@ MODULE AtomicTransfer
  use solvene
  use statequil_atoms
  use writeatom
- use simple_models, only 				: magneto_accretion_model, uniform_law_model, &
- 											spherical_shells_model, spherical_star, feqv
+ use simple_models, only 				: magneto_accretion_model, magneto_accretion_diskwind_model, &
+ 										 FALC_MODEL, spherical_star, feqv
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -46,6 +46,8 @@ MODULE AtomicTransfer
  use density
 
  IMPLICIT NONE
+ 
+ logical :: lmcfost_star !TMP
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
  
@@ -146,7 +148,10 @@ MODULE AtomicTransfer
                      l, l_contrib, l_void_before)
 
     ! ************* TEST ************* !
-      ! l = l/feqv; l_contrib = l_contrib/feqv
+     if (lmcfost_star) then
+       if (nbr_cell == 1) CALL Warning("Rescaling path along cell!!")
+       l = feqv(0.99974392*1d0,1.00355514*1d0,l); l_contrib = feqv(0.99974392*1d0,1.00355514*1d0,l_contrib)
+     end if
     ! ******************************** !
 
 !     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
@@ -699,6 +704,7 @@ MODULE AtomicTransfer
   character(len=20) :: ne_start_sol = "H_IONISATION"
   character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES"
   logical :: lwrite_waves = .false.
+   
 !   
 !   integer :: i, j
 !   double precision, dimension(:), allocatable :: test_col
@@ -741,11 +747,11 @@ MODULE AtomicTransfer
   !later use the same density and T as defined in dust_transfer.f90
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
+  lmcfost_star = .false.
   if (.not.lpluto_file) then 
-   !CALL spherical_star()
+   !test
+   !CALL spherical_star(); lmcfost_star = .true.
    CALL magneto_accretion_model()  
-   !CALL uniform_law_model()
-   !CALL spherical_shells_model
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -793,8 +799,14 @@ MODULE AtomicTransfer
    CALL writeElectron()
   end if
 
+! atmos%Nspace = 82
+! CALL FALC_MODEL() !a model should already exists
+! atmos%icompute_atomRT = 0
+! atmos%icompute_atomRT(1:82) = 1 
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
   !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
+! stop
+
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -1078,8 +1090,8 @@ MODULE AtomicTransfer
             
  			!$omp parallel &
             !$omp default(none) &
-            !$omp private(icell, id, atom) &
-            !$omp shared(atmos, gpop_old,nact)
+            !$omp private(icell, id, atom,nact) &
+            !$omp shared(atmos, gpop_old)  !before nact was shared
             !$omp do schedule(static,1)
             do icell=1, atmos%Nspace
    				!$ id = omp_get_thread_num() + 1
@@ -1103,8 +1115,8 @@ MODULE AtomicTransfer
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom) &
-            !$omp shared(xyz0, uvw0, lkeplerian,n_iter,nact) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom,nact) &
+            !$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
             !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
@@ -1128,7 +1140,7 @@ MODULE AtomicTransfer
                           endif
                           u0 = 0.0_dp
                           v0 = 0.0_dp
-                          else !not keplerian, spherical, infall even lmagneto_accr
+                         else !not keplerian, spherical, infall even lmagneto_accr
                           norme = sqrt(x0*x0 + y0*y0 + z0*z0)
                           if (iray==1) then
                            u0 = x0/norme
@@ -1169,15 +1181,6 @@ MODULE AtomicTransfer
                         !then for next ray they are re init
  						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       				end do !iray
-    				 if (check_nan_infinity_dp(atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id))==1) then
-    				  write(*,*) "Gamma is nan"
-    				  write(*,*) atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id)
-    				  stop
-    				 else if(check_nan_infinity_dp(atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id))==2)  then
-    				  write(*,*) "Gamma is inf"
-    				  write(*,*) atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id)
-    				  stop
-    				 end if
       				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
 !       				NLTEspec%J(:,id) = 0d0; NLTEspec%Jc(:,id) = 0d0
 !       	            do iray=1,n_rayons

@@ -222,6 +222,7 @@ MODULE statequil_atoms
    !To do; define a transition_type with either cont or line
    Ieff(:) = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) + \
              NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
+
    do kr=1,atom%Ncont
     !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
     norm = 4*PI / HPLANCK / n_rayons
@@ -258,11 +259,15 @@ MODULE statequil_atoms
    
    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
    	do l = 1, atom%Nlevel
+   	    if (atom%Gamma(l,l,id) /= 0.) &
+   	     write(*,*) "diag(Gamma) should be zero ", l, atom%Gamma(l,l,id)
+   	    atom%Gamma(l,l,id) = 0d0
     	atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
    	end do
+   	write(*,*) id, icell, minval(atom%Gamma(:,:,id)), maxval(atom%Gamma(:,:,id))
    end if
    	
-   	if (maxval(atom%Gamma(:,:,id)) <= 0d0) then  
+   	if (iray==n_rayons .and. maxval(atom%Gamma(:,:,id)) <= 0d0) then  
    	write(*,*) icell, id, iray, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
      do i=1,atom%Nlevel
      do j=1,atom%Nlevel
@@ -651,6 +656,7 @@ MODULE statequil_atoms
   do nat=nati,natf !loop over each active atoms
    atom => atmos%ActiveAtoms(nat)%ptr_atom
    CALL SEE_atom(id, icell, atom)
+   write(*,*) "SEE min:", id, icell, locate(atom%n(:,icell), minval(atom%n(:,icell))), minval(atom%n(:,icell))
    NULLIFY(atom)
   end do
  
