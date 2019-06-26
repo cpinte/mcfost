@@ -690,7 +690,13 @@ function v_proj(icell,x,y,z,u,v,w) !
         vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field
-        if (.not.lmagnetoaccr) vitesse = vfield(icell)
+        if (.not.lmagnetoaccr.and.(lkeplerian.or.linfall)) &
+        	vitesse = vfield(icell)
+        	
+       !  if (.not.lmagnetoaccr.and.(.not.lkeplerian.and..not.linfall)) then
+!           v_proj = atmos%Vxyz(icell,1) * u + atmos%Vxyz(icell,2) * v + atmos%Vxyz(icell,3) * w
+!           return
+!         end if
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
