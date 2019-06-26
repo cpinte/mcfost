@@ -116,17 +116,17 @@ MODULE AtomicTransfer
 
     if (icell <= n_cells) then
      !lcellule_non_vide=.true.
+     !atmos%nHtot(icell)>0
      lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
      if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
     else
      lcellule_non_vide=.false.
     endif
-
+    
     ! Test sortie ! "The ray has reach the end of the grid"
     if (test_exit_grid(icell, x0, y0, z0)) RETURN
     
     nbr_cell = nbr_cell + 1
-!     if (abs(abs(z0)-0.05*etoile(1)%R)<=0.05*etoile(1)%R) RETURN
     if (lintersect_stars) then
       if (icell == icell_star) then !this is equivalent to compute_stars_map()
        !if we start at icell, computes the radiation from the star to icell.
@@ -146,10 +146,14 @@ MODULE AtomicTransfer
 
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, &
                      l, l_contrib, l_void_before)
+!          if (icell<=n_cells) then            
+!          write(*,*) id, icell, next_cell,x,y,z,u,v,w
+!          write(*,*) , atmos%icompute_atomRT(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell)
+! 		 end if
 
     ! ************* TEST ************* !
      if (lmcfost_star) then
-       if (nbr_cell == 1) CALL Warning("Rescaling path along cell!!")
+       !if (nbr_cell == 1) CALL Warning("Rescaling path along cell!!")
        l = feqv(0.99974392*1d0,1.00355514*1d0,l); l_contrib = feqv(0.99974392*1d0,1.00355514*1d0,l_contrib)
      end if
     ! ******************************** !
@@ -178,6 +182,7 @@ MODULE AtomicTransfer
 	   CALL initCrossCoupling(id)
        CALL FillCrossCoupling_terms(id, icell)
        CALL add_to_psi_operator(id, icell, iray, ds(iray,id))
+       !CALL FillGamma_Hogereijde(id, icell, iray, n_rayons)
      end if
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
@@ -445,7 +450,9 @@ MODULE AtomicTransfer
      ! Boucle sur les sous-pixels qui calcule l'intensite au centre
      ! de chaque sous pixel
      do i = 1,subpixels
+!if (ipix==24) then
         do j = 1,subpixels
+!if (jpix==91 .or. jpix==92 .or. jpix==90) then
            ! Centre du sous-pixel
            x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
@@ -455,6 +462,7 @@ MODULE AtomicTransfer
            CALL move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            !write(*,*) i, j, lintersect, labs, n_cells, icell
+           write(*,*) "Intersection : ",ipix, jpix
              CALL INTEG_RAY_LINE(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
@@ -465,7 +473,9 @@ MODULE AtomicTransfer
              end if
            !else !Outside the grid, no radiation flux
            endif
+!end if
         end do !j
+!end if
      end do !i
 
      I0 = I0 / npix2
@@ -551,7 +561,8 @@ MODULE AtomicTransfer
   integer :: ri_RT, phi_RT, lambda, lM, lR, lB, ll
   logical :: lresolved
 
-  write(*,*) "incl (deg) = ", tab_RT_incl(ibin), "azimuth (deg) = ", tab_RT_az(iaz)
+  write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
+  write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
 
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
   uvw = (/u,v,w/) !vector position
@@ -763,7 +774,6 @@ MODULE AtomicTransfer
   if (atmos%NactiveAtoms > 0) then 
    atmos%Nrays = 100 !maximum number of rays allowed
   end if
-  
 !   test Johnson
 !   atmos%T(1) = 2000.
 !   allocate(test_col(atmos%Atoms(1)%ptr_atom%Nlevel),&
@@ -805,6 +815,8 @@ MODULE AtomicTransfer
 ! atmos%icompute_atomRT(1:82) = 1 
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
   !set Hydrogen%n = Hydrogen%nstar for the background opacities calculations.
+  !check
+! if (.not.atmos%Atoms(1)%ptr_atom%active) CALL writePops(atmos%Atoms(1)%ptr_atom, -1)
 ! stop
 
  ! ------------------------------------------------------------------------------------ !
@@ -863,7 +875,8 @@ MODULE AtomicTransfer
  ! ------------------------- WRITE CONVERGED POPULATIONS ------------------------------ !
  ! ------------------------------------------------------------------------------------ !
   do icell=1,atmos%NactiveAtoms
-   CALL writePops(atmos%Atoms(icell)%ptr_atom)
+   !write final atom%n (count==0) + lte pops (ilte_only = .false.)
+   CALL writePops(atmos%Atoms(icell)%ptr_atom, 0)
   end do
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -877,7 +890,6 @@ MODULE AtomicTransfer
 
    if (lstore_opac) CALL storeBackground() !recompute background opac
    ! TO DO: add NLTE continua and LTE/NLTE lines if possible
-
    CALL reallocate_mcfost_vars()
   end if
 !   write(*,*) atmos%atoms(1)%ptr_atom%lines(1)%i, atmos%atoms(1)%ptr_atom%lines(1)%j, maxval(atmos%atoms(1)%ptr_atom%continua(1)%alpha)
@@ -965,7 +977,6 @@ MODULE AtomicTransfer
 
   write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
 
-
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
@@ -975,7 +986,7 @@ MODULE AtomicTransfer
   id = 1
   etape_start = 1
   etape_end = 1
-  disable_subit = .true. !set to true to avoid subiterations over the emissivity
+  disable_subit = .false. !set to true to avoid subiterations over the emissivity
   max_sub_iter = 25
   atmos%nLTE_methode="HOGEREIJDE" !force Hogereijde, MALI not okay yet
  ! ----------------------------  INITIAL POPS------------------------------------------ !
@@ -1175,7 +1186,6 @@ MODULE AtomicTransfer
 
 ! if (iray==1 .or. iray==n_rayons) &
 ! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
-
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
                         !+add cross_coupling for this cell in this direction in Gamma
                         !then for next ray they are re init
@@ -1574,8 +1584,8 @@ MODULE AtomicTransfer
 
    !3) Apply Limb darkening   
    if (llimb_darkening) then
-     LimbDarkening = Interp1D(real(limb_darkening,kind=dp), real(mu_limb_darkening,kind=dp), mu)
-     !LimbDarkening = interp(limb_darkening, mu_limb_darkening, mu)
+     !!LimbDarkening = Interp1D(real(mu_limb_darkening,kind=dp),real(limb_darkening,kind=dp),mu)
+     !LimbDarkening = interp_dp(limb_darkening, mu_limb_darkening, mu)
      !pol not included yet
      stop
    else
@@ -1589,42 +1599,3 @@ MODULE AtomicTransfer
  END SUBROUTINE calc_stellar_radiation
 
 END MODULE AtomicTransfer
-!         	  icell = 1 !select cell
-!   do while (atmos%icompute_atomRT(icell) /= 1) !search the next non dark non transparent cell
-!    if (icell==atmos%Nspace) then
-!     icell = 1
-!     exit
-!    end if
-!    icell = icell + 1
-!   end do
-!             atmos%T(icell) = 5000d0
-!             Hydrogen%nstar(:,icell)=1d0
-!             CALL initGamma(1,icell)
-!             write(*,*) Hydrogen%Gamma(:,:,1)
-!             Hydrogen%Gamma(:,:,1) = Collision_Hydrogen(icell)
-!             write(*,*) atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,1)
-!         	stop
-!         	
-!      		atom => atmos%Atoms(1)%ptr_atom
-!  			!$omp parallel &
-!             !$omp default(none) &
-!             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-!             !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell) &
-!             !$omp shared(xyz0, uvw0, lkeplerian, atom) &
-!             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-!             !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
-!             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
-!             !$omp do schedule(static,1)
-!   			do icell=1, n_cells
-!      				!$ id = omp_get_thread_num() + 1
-!    				if (atmos%icompute_atomRT(icell)>0) then
-!    				!!!!!$omp critical
-!    				!!!!!atom%Gamma(:,:,id) = CollisionRate(icell, atom)
-!    				CALL initGamma(id,icell)
-!    				write(*,*) icell, atom%Gamma(:,:,id)
-!    				!!!!$omp end critical 
-!    				end if
-!    			end do
-!         	!$omp end do
-!         	!$omp end parallel
-! 	stop
