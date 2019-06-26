@@ -55,7 +55,7 @@ MODULE atmos_type
    !type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
    type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
    !type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
-   double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
+   double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T!, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
    character(len=10) :: nLTE_methode = "MALI"
@@ -78,7 +78,7 @@ MODULE atmos_type
   integer :: icell
   type (AtomType) :: atom
   
-   vD = dsqrt(Vtherm*atmos%T(icell)/atom%weight + atmos%vturb(icell)**2)
+   vD = dsqrt(Vtherm*atmos%T(icell)/atom%weight)! + atmos%vturb(icell)**2)
    
  RETURN
  END FUNCTION VBROAD_atom
@@ -404,7 +404,7 @@ MODULE atmos_type
   if (allocated(atmos%ne)) deallocate(atmos%ne)
   if (allocated(atmos%Tpf)) deallocate(atmos%Tpf)
   if (allocated(atmos%T)) deallocate(atmos%T)
-  if (allocated(atmos%vturb)) deallocate(atmos%vturb)
+  !if (allocated(atmos%vturb)) deallocate(atmos%vturb)
   if (allocated(atmos%nHmin)) deallocate(atmos%nHmin)
   if (allocated(atmos%icompute_atomRT)) deallocate(atmos%icompute_atomRT)
 !   if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
@@ -595,7 +595,7 @@ MODULE atmos_type
 
 
    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
-   if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
+   !if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
    if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
    if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
 
@@ -603,7 +603,7 @@ MODULE atmos_type
    atmos%ne(:) = 0d0
    atmos%nHmin(:) = 0d0
    atmos%nHtot(:) = 0d0
-   atmos%vturb(:) = 0d0 !m/s
+   !atmos%vturb(:) = 0d0 !m/s
 
    CALL fillElements()
    

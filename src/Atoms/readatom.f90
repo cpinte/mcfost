@@ -152,7 +152,7 @@ MODULE readatom
     !atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
     !atom%ntotal = atom%Abund * atmos%nHtot
 
-    Vdoppler = dsqrt(Vdoppler*maxval(atmos%T) + maxval(atmos%vturb)**2)
+    Vdoppler = dsqrt(Vdoppler*maxval(atmos%T))! + maxval(atmos%vturb)**2)
 !     write(*,*) Vdoppler, dsqrt(Vtherm*maxval(atmos%T)/atom%weight + maxval(atmos%vturb)**2)
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
