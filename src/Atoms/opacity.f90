@@ -71,33 +71,22 @@ MODULE Opacity
    ! reducing the amount of memory needed.
    ! For lines we compute them in NLTEopac() for icell
    ! and iray, because of phi.
+   !
+   !
+   ! --> NOw i Only keep the normalisation of the weight
   ! --------------------------------------------------- !
    use atmos_type, only : atmos
    integer :: kr, kc, nact, Nred, Nblue, Nlambda, la
    
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-      Nred = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nred
-      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nblue
-      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda
-      allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(Nlambda))
-      atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(:) = 0d0
-!       do la=1,Nlambda!la=Nblue, Nred 
-!        atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(la) = & 
-!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-!       end do
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam_norm(NLTEspec%Nproc))
+!       Nred = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nred
+!       Nblue = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nblue
+!       Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda
+!       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(Nlambda))
+!       atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wlam(:) = 0d0
     end do
-!    do kc=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-!      Nred = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nred
-!      Nblue = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nblue
-!      Nlambda = atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%Nlambda
-!      allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(Nlambda))
-!      atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(:) = 0d0
-!!       do la=1,Nlambda!=Nblue, Nred
-!!        atmos%ActiveAtoms(nact)%ptr_atom%continua(kc)%wlam(la) = & 
-!!         NLTEspec%lambda(la+Nblue-1)-NLTEspec%lambda(la+Nblue-1-1)
-!!       end do
-!    end do  
    end do
  
   RETURN
@@ -135,13 +124,14 @@ MODULE Opacity
   wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) * norm
   
   wlam(line%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) * norm
-
+  !write(*,*) 1, wlam(1)
   do la=2,line%Nlambda-1
 
    la0 = Nblue - 1 + la
    wlam(la) = (NLTEspec%lambda(la0 + 1)-NLTEspec%lambda(la0 - 1)) * norm
-
+   !write(*,*) la, wlam(la)
   end do
+  !write(*,*) line%Nlambda, wlam(line%Nlambda)
 
  RETURN
  END FUNCTION line_wlam
@@ -158,7 +148,8 @@ MODULE Opacity
   double precision, dimension(cont%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end , la0
 
-  Nblue = cont%Nblue; Nred = cont%Nred
+  !Nblue = cont%Nblue; Nred = cont%Nred
+  Nblue = 1; Nred = NLTEspec%Nwaves !---> Because ATM cont are kept on the whole grid
   la_start = 1; la_end = cont%Nlambda
 
   wlam(1) = 5d-1 * &
@@ -227,11 +218,12 @@ MODULE Opacity
     	!Should never happen. Because for NLTEOpac all transitions are present.
     	!However, in the case of images, some transitions are removed. But anyway
     	!
-        if (Nred == -99 .and. Nblue == -99) CALL ERROR("NLTEOPAC")
+        !if (Nred == -99 .and. Nblue == -99) CALL ERROR("NLTEOPAC")
 
     	i = cont%i; j=cont%j
         gij = 0d0
-   	 	Vij(Nblue:Nred) = cont%alpha(Nblue:Nred)
+        Vij = 0d0
+   	 	Vij(:) = cont%alpha(:) !Nblue:Nred
     	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
     	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
      	 CALL Warning("too small cont populations") !or Error()
@@ -255,11 +247,11 @@ MODULE Opacity
         (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
          write(*,*) " ** Stimulated emission for continuum transition, chi < 0", cont%i, cont%j, &
           aatom%ID
-         write(*,*) i, j, aatom%n(i,icell), aatom%n(j,icell)
+         write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
          write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-        stop
+        CYCLE
       end if
 !       write(*,*) " --------------------------------------------------------- "
 
@@ -282,11 +274,10 @@ MODULE Opacity
 
     	
     	if (iterate) then
-    	 aatom%continua(kc)%gij(:,id) = gij(Nblue:Nred)
-    	 aatom%continua(kc)%Vij(:,id) = Vij(Nblue:Nred)
-    	 aatom%eta(Nblue:Nred,id) = aatom%eta(Nblue:Nred,id) + &
-    		gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
-        !! aatom%continua(kc)%wlam(Nblue:Nred) = 
+    	 aatom%continua(kc)%gij(:,id) = gij!(Nblue:Nred)
+    	 aatom%continua(kc)%Vij(:,id) = Vij!(Nblue:Nred)
+    	 aatom%eta(:,id) = aatom%eta(:,id) + &!Nblue:Nred
+    		gij(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2(:)
     	end if
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged    
@@ -311,8 +302,12 @@ MODULE Opacity
     !Cannot be negative because we alread tested if < tiny_dp
     if ((aatom%n(i,icell) <= minval(gij(Nblue:Nred))*aatom%n(j,icell)).or.&
         (aatom%n(i,icell) <= maxval(gij(Nblue:Nred))*aatom%n(j,icell))) then
-         write(*,*) " ** Stimulated emission for line transition, chi < 0", line%j, line%i, &
-          aatom%ID, i, j,aatom%n(i,icell), aatom%n(j,icell), maxval(gij(Nblue:Nred)), minval(gij(Nblue:Nred))
+         write(*,*) " ** Stimulated emission for line transition, chi < 0", line%i, line%j, &
+          aatom%ID
+         write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
+         write(*,*) minval(gij(Nblue:Nred)), maxval(gij(Nblue:Nred))
+         write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+         write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
         stop
     end if
     
@@ -345,7 +340,8 @@ MODULE Opacity
     	twohnu3_c2(Nblue:Nred) * gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell)
 
      ! unit is m/s / (m/s * s/m) = m/s !it is iray dependent as it is computed along each direction
-     aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+     !aatom%lines(kr)%wlam(:) = line_wlam(aatom%lines(kr)) / sum(phi*line_wlam(aatom%lines(kr)))
+     aatom%lines(kr)%wlam_norm(id) = 1d0 / sum(phi*line_wlam(aatom%lines(kr)))
      end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
