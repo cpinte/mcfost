@@ -73,15 +73,15 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
    double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2, rmo=3., Tshk=0d3, Macc = 1d-7, Tiso=0d3
+   double precision, parameter :: rmi=2.2, rmo=3., Tshk=8d3, Macc = 1d-8, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
-   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.99!99
+   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.9999
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L, r0
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
    double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den, Mdotfid = 0d0
    logical, dimension(:), allocatable :: dark_zone
-   logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.false.
+   logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.true.
    logical :: is_not_dark
    double precision :: zd_max = 0.05, dT, ne1
    !double precision, dimension(:), allocatable :: Told
