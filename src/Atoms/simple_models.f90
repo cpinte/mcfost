@@ -73,16 +73,17 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
    double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2, rmo=3., Tshk=8d3, Macc = 1d-8, Tiso=0d3
+   double precision, parameter :: rmi=2.2, rmo=3., Tshk=7.2d3, Macc = 1d-7, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
-   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 1. !, no pb if a disk
+   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.9999
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L, r0
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
    double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den, Mdotfid = 0d0
    logical, dimension(:), allocatable :: dark_zone
-   logical :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.true.
-   double precision :: zd_max = 0.1, dT, ne1
+   logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.false.
+   logical :: is_not_dark
+   double precision :: zd_max = 0.0, dT, ne1
    !double precision, dimension(:), allocatable :: Told
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -95,6 +96,7 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .not.(lwrite_model_ascii)
    lmagnetoaccr = .not.(lstatic)
+   !!lmagnetoaccr = .false. !test
    CALL init_atomic_atmos()
    !For now we do not necessarily need to compute B if no polarization at all
    atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
@@ -104,8 +106,9 @@ MODULE simple_models
    fp = 1d0
    r0 = rmo * yroot
    
+   is_not_dark = .true.
    if (include_dark_zone) then 
-    allocate(dark_zone(n_cells)); dark_zone = .false.
+    allocate(dark_zone(n_cells)); dark_zone(:) = .false.
    end if
 
    !Define some useful quantities
@@ -172,7 +175,7 @@ MODULE simple_models
         icell = cell_map(i,1,k)
         rcyl = r_grid(icell) !AU
         z = 0.0_dp
-        
+        if (include_dark_zone) dark_zone(icell) = (rcyl>=rmi*etoile(1)%r)
         sinTheta = 1d0
         y = 1d0
         rM = rcyl/etoile(1)%r
@@ -185,8 +188,12 @@ MODULE simple_models
         sinTheta = rcyl/r
         y = sinTheta**2
         Rm = r**3 / rcyl**2 / etoile(1)%r !in Rstar, same as rmi,o
+        if ((zd_max > 0 .and. abs(abs(z/etoile(1)%r)-zd_max) <= zd_max) .and.rcyl/etoile(1)%r >= rmi) then
+         if (include_dark_zone) dark_zone(icell) = .true.
+        end if
        end if
        phi = phi_grid(icell)
+       
 
        Vphi = 0d3!Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
 
@@ -194,17 +201,12 @@ MODULE simple_models
 
        Den = 1d0 / dsqrt(1d0 - min(y,y_lim_z0))
        y = min(y, y_lim_z0)
-    
 
-       if (include_dark_zone.and.&
-       	((zd_max > 0 .and. abs(abs(z/etoile(1)%r)-zd_max) <= zd_max) .and.rcyl/etoile(1)%r >= rmi)) then !disk zone
-         atmos%nHtot(icell) = 0d0
-         atmos%T(icell) = 0d0 !will not counted in solvene
-         dark_zone(icell) = .true.
-         !write(*,*) icell, " is dark"
-       else
+       !always true if not dark zone.
+       if (include_dark_zone) is_not_dark = .not.dark_zone(icell)
 
-        if (Rm>=rmi .and. Rm<=rmo) then!
+       !if not dark, possibly matter. But if Rm is out of range, it is transparent
+       if ((Rm>=rmi .and. Rm<=rmo).and.is_not_dark) then
           if (Mdotfid > 0) then
 !            nH0 = rho_to_nH * (Mdotfid * Rstar) /  (4d0*PI*(1d0/rmi - 1d0/rmo)) * &
 !                        (Rstar * r0)**(-5./2.) / dsqrt(2d0 * Ggrav * Mstar) * &
@@ -279,25 +281,19 @@ MODULE simple_models
            L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2 * Q0 * dsqrt(4d0-3d0*y)!erg/cm3/s
           end if
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
-          
 !           write(*,*) "log(L)=", log10(L)
 !           write(*,*) "log(Q)=",log10((r0*etoile(1)%r/r)**3*Q0)," rho=", atmos%nHtot(icell)/rho_to_nH, " T=", atmos%T(icell)
 !           write(*,*) "nH(log(cm^-3)) = ", log10(1d-6*atmos%nHtot(icell))
 !  		  write(*,*) "***************"
-        end if !rM <= rmo and >= rmi
-       end if !in disk
+       end if !rM <= rmo and >= rmi
       end do
      end do
     end do
 
-!  write(*,*) "Density and T set to zero for tetsting"
-! atmos%nHtot=1d0
-! atmos%T =1d0
    !! inclued in VBROAD_atom(icell,atom) so we do not count it here
    !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
    if (.not.lstatic) then
-    atmos%v_char = atmos%v_char + &
-    maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
    
@@ -306,14 +302,21 @@ MODULE simple_models
     write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
    end if
 
-   CALL define_atomRT_domain()
-   
-   where(dark_zone)
-    atmos%icompute_atomRT = -1
-   end where
-   
+  CALL define_atomRT_domain() !can be defined earlier so that we avoid create a dark_zone array?	
+  							  !for instance, cell by cell init of icompute_atomRT, when density
+  							  !is computed
+
+!  write(*,*) "Density and T set to zero for tetsting"
+!  atmos%icompute_atomRT(:) = 0
+
+   if (include_dark_zone) then !pass a mask to define_atomRT_domain() for that case?
+    where(dark_zone)
+     atmos%icompute_atomRT = -1
+    end where
+   end if
+
    CALL write_atmos_domain()
-   
+
    if (Tiso > 0d0) then
     where(atmos%icompute_atomRT > 0)
      atmos%T = Tiso
@@ -326,7 +329,8 @@ MODULE simple_models
    CALL writeTemperature()
    CALL writeHydrogenDensity()
    if (.not.lstatic) CALL writeVfield ()
-   
+
+
    if (lwrite_model_ascii.and..not.lmagnetoaccr) then !for now
     CALL writeAtmos_ascii()
     !leave here, we enter here only to write the model for Voronoi tesselation
@@ -346,6 +350,9 @@ MODULE simple_models
    end if
    write(*,*) "Typical velocity in the model (km/s):"
    write(*,*) atmos%v_char/1d3
+   
+   write(*,*) "Typical microturbulence in the model (km/s):"
+   write(*,*) sum(atmos%vturb)/sum(atmos%icompute_atomRT,mask=atmos%icompute_atomRT>0) /1d3
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
@@ -363,6 +370,7 @@ MODULE simple_models
   
   SUBROUTINE FALC_MODEL()
   !Only for testing, set atmos%XX = FALC_xx
+  ! it sets an EXISTING (important !!) model to the FAL C model
    integer, parameter :: NDEP = 82
    double precision, dimension(82) :: T, ne, nHtot, nHmin
    double precision :: nH6(6,82) 
