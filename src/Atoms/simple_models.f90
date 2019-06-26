@@ -73,9 +73,9 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
    double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2, rmo=3., Tshk=7.2d3, Macc = 1d-7, Tiso=0d3
+   double precision, parameter :: rmi=2.2, rmo=3., Tshk=0d3, Macc = 1d-7, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
-   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.9999
+   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.99!99
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L, r0
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
@@ -83,7 +83,7 @@ MODULE simple_models
    logical, dimension(:), allocatable :: dark_zone
    logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.false.
    logical :: is_not_dark
-   double precision :: zd_max = 0.0, dT, ne1
+   double precision :: zd_max = 0.05, dT, ne1
    !double precision, dimension(:), allocatable :: Told
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -104,6 +104,7 @@ MODULE simple_models
    
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
    fp = 1d0
+   
    r0 = rmo * yroot
    
    is_not_dark = .true.
@@ -139,6 +140,12 @@ MODULE simple_models
    	    (Macc * 1d8)**(0.5) * (Rstar/(2*Rsun))**(-3.)
    write(*,*) "Equatorial magnetic field", Bp*1d4, 'G'
  
+
+   if (Tshk > 0) then 
+    Tring = Tshk
+    write(*,*) " Changing value for Tring to ", Tshk
+   end if
+ 
 !    write(*,*) Tring, Mstar, Rstar
 !    write(*,*) masseH * 1d-3, Msun_to_kg, Ggrav
 !    write(*,*) sigma, Mdot
@@ -158,7 +165,7 @@ MODULE simple_models
     	tc = 0d0 * PI/180 !center of vector position
     	phic = 0d0 !vector position, pointing to the center of the spot
     	if (k==2) southern_hemp = -1 !for the ring in the southern hemisphere
-    	etoile(1)%SurfB(k)%T = Tshk
+    	etoile(1)%SurfB(k)%T = Tring
     !center of the spot
    	 etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
    	 etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
@@ -219,8 +226,7 @@ MODULE simple_models
                        (Rstar * r0)**(-5./2.) / dsqrt(2d0 * Ggrav * Mstar) * &
                        dsqrt(4d0-3d0*yroot) / dsqrt(1d0-yroot)         
 		  end if
-          !!Q0 = 10**(interp_dp(Lambda, TL, log10(Tring)))*0.1 / fp * nH0**2
-          Q0 = 10**(interp_dp(Lambda, TL, log10(Tmax)))*0.1 / fp * nH0**2 / dsqrt(4d0-3d0*yroot)
+          Q0 = 10**(interp_dp(Lambda, TL, log10(Tmax)))*0.1 / fp * nH0**2 !/ dsqrt(4d0-3d0*yroot)
 
           
           
@@ -278,7 +284,7 @@ MODULE simple_models
                        dsqrt(4d0-3d0*y) * Den * rho_to_nH
            L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%T(icell)**2 * Q0 * dsqrt(4d0-3d0*y)!erg/cm3/s
           else
-           L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2 * Q0 * dsqrt(4d0-3d0*y)!erg/cm3/s
+           L = fp * 10 * (r0*etoile(1)%r/r)**3 / atmos%nHtot(icell)**2 * Q0 !* dsqrt(4d0-3d0*y)!erg/cm3/s
           end if
           atmos%T(icell) = 10**(interp_dp(TL, Lambda, log10(L)))
 !           write(*,*) "log(L)=", log10(L)
@@ -290,8 +296,7 @@ MODULE simple_models
      end do
     end do
 
-   !! inclued in VBROAD_atom(icell,atom) so we do not count it here
-   !!if (maxval(atmos%vturb) > 0) atmos%v_char = minval(atmos%vturb,mask=atmos%vturb>0)
+   !! vturb if any inclued in VBROAD_atom(icell,atom) so we do not count it here
    if (.not.lstatic) then
     atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
@@ -351,8 +356,8 @@ MODULE simple_models
    write(*,*) "Typical velocity in the model (km/s):"
    write(*,*) atmos%v_char/1d3
    
-   write(*,*) "Typical microturbulence in the model (km/s):"
-   write(*,*) sum(atmos%vturb)/sum(atmos%icompute_atomRT,mask=atmos%icompute_atomRT>0) /1d3
+!    write(*,*) "Typical microturbulence in the model (km/s):"
+!    write(*,*) sum(atmos%vturb)/sum(atmos%icompute_atomRT,mask=atmos%icompute_atomRT>0) /1d3
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
@@ -496,7 +501,7 @@ MODULE simple_models
        rhor = fclump * Mdot_si / 4d0 / PI / ((r*AU_to_m)**2 * Vr) !kg/m3
        atmos%nHtot(icell) = rhor * rho_to_nH
        atmos%T(icell) = (r0*etoile(1)%r/r)**2 * etoile(1)%T
-       atmos%vturb(icell) = 5d0! * (20d0 - 2d0) * Vr/Vexp
+       !atmos%vturb(icell) = 5d0! * (20d0 - 2d0) * Vr/Vexp
 
        !!->expansion
         if (.not.linfall) then !expansion not analytic
@@ -687,7 +692,7 @@ MODULE simple_models
 
        !atmos%nHtot(icell) = interp_dp(rho_mod, r_mod, cm) * rho_to_nH
        atmos%nHtot(icell) = interp_dp(rho_mod, m_mod, cm) * rho_to_nH
-       atmos%vturb(icell) = 2d0
+       !!atmos%vturb(icell) = 2d0
        !atmos%T(icell) = interp_dp(T_mod, r_mod, cm)
        !atmos%ne(icell) = interp_dp(ne_mod, r_mod, cm)
        atmos%T(icell) = interp_dp(T_mod, m_mod, cm)
@@ -731,11 +736,13 @@ MODULE simple_models
    atmos%calc_ne = .true.
    linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
    
+   CALL Warning(&
+   	"Beware, I do not take into account vturb anymore. Small discrepancies can arise")
 
    atmos%T(:)=7590d0
    atmos%ne(:) = 4.446967d20
    atmos%nHtot(:) = 1.259814d23   
-   atmos%vturb(:) = 2d0
+   !!atmos%vturb(:) = 2d0
 
 
    CALL define_atomRT_domain()
