@@ -8,7 +8,7 @@ MODULE readatom
   use uplow
   use getline
   use barklem, only : getBarklem
-  use writeatom, only : readPops
+  use writeatom, only : readPops, create_pops_file
 
   !$ use omp_lib
 
@@ -531,10 +531,11 @@ MODULE readatom
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
     if (atom%ID(2:2) .eq." ") then
-      atom%dataFile = atom%ID(1:1)//".fits.gz"
+      atom%dataFile = atom%ID(1:1)//".fits"
     else
-      atom%dataFile = atom%ID(1:2)//".fits.gz"
+      atom%dataFile = atom%ID(1:2)//".fits"
     end if
+    CALL create_pops_file(atom,atom%Active)
     !write(*,*) "Populations file for writing: .", &
     !          trim(atom%popsoutFile),"."
 
