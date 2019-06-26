@@ -44,13 +44,12 @@ MODULE PROFILES
   omegav = 0d0
   Nvspace = 1
   if (.not.lstatic) then
-   v0 = v_proj(icell,x,y,z,u,v,w)
+   v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
    omegav(1) = v0
   end if
   
   vbroad = VBROAD_atom(icell,line%atom)
-   
-  if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
+  if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
      dv = dabs(v1-v0)
      Nvspace = max(2,nint(20*dv/vbroad))
