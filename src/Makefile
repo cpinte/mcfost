@@ -382,6 +382,7 @@ checksys:
 	    @echo system changed from ${LASTSYSTEM} to ${SYSTEM}
 	    @${MAKE} clean
 	    @echo $(SYSTEM) > .make_lastsystem
+	    @${MAKE} mcfost_env.o
        endif
    else
 	@echo ""
