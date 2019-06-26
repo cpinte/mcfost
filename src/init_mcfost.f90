@@ -152,8 +152,6 @@ subroutine set_default_variables()
   lfluffy = .false.
 
   ! Geometrie Grille
-  lcylindrical=.true.
-  lspherical=.not.lcylindrical
   z_scaling_env = 1.0
 
   ! Methodes par defaut
@@ -607,10 +605,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
         i_arg = i_arg+1
-     case("-spherical")
-        lcylindrical=.false.
-        lspherical=.true.
-        i_arg = i_arg + 1
      case("-no_backup")
         lno_backup=.true.
         i_arg = i_arg + 1
