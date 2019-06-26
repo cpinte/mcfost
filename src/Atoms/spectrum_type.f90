@@ -47,9 +47,10 @@ MODULE spectrum_type
    !n_proc should be the last index
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
+   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1, Nwaves_trans !maximum wavelength per transitions
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
+   double precision, allocatable, dimension(:) :: Istar !not polarised
    !nlambda, nrays, nproc
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nlambda, nproc
@@ -78,10 +79,11 @@ MODULE spectrum_type
    ! ------------------------------------------- !
 
    !integer, intent(in) :: NPROC
+   integer :: kr, nat
    double precision, optional :: lam0
    logical, optional :: vacuum_to_air
    logical :: alloc_nlte_vars, alloc_image_vars
-      
+    
    NLTEspec%atmos => atmos
    alloc_nlte_vars = NLTEspec%atmos%Nactiveatoms > 0
    alloc_image_vars = .not.ltab_wavelength_image
@@ -101,13 +103,27 @@ MODULE spectrum_type
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
+   
+   !determine maximum wavelength per transition
+   NLTEspec%Nwaves_trans = 0
+   do nat = 1, NLTEspec%atmos%Natom
+    do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
+     NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
+     	NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nlambda)
+    end do
+    do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
+     NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
+     	NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nlambda)    
+    end do
+   end do
+   write(*,*)"  Maximum number of wavelengths per transition is", NLTEspec%Nwaves_trans
+   
    CALL writeWavelength()
    CALL allocSpectrum(alloc_nlte_vars,& !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
   							 !.false. => if NLTE, skip this allocation
   							 !we probably do an image and we do not need these values.
        alloc_image_vars) !alloc flux only if we do not read an ascii waves list.
    !should consider to do that only if Nlte is on, otherwise we go directly to image
-  
   RETURN
   END SUBROUTINE initSpectrum
   
@@ -198,6 +214,12 @@ MODULE spectrum_type
     write(*,*) "Error I already allocated"
     stop
    end if
+   
+   !stellar radiation; without LD
+   !not included yet. Should be the stellar spectrum or
+   !should be a BB at a ref T, so that we only need to multiply
+   !by a correction depending on the real T of the star i_star
+   !if (allocated(NLTEspec%Istar)) allocate(NLTEspec%Istar(NLTEspec%NWAVES))
    
    allocate(NLTEspec%I(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
    allocate(NLTEspec%Ic(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
@@ -298,6 +320,8 @@ MODULE spectrum_type
   END SUBROUTINE allocSpectrum
 
   SUBROUTINE freeSpectrum() 
+  
+   if (allocated(NLTEspec%Istar)) deallocate(NLTEspec%Istar)
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%J, NLTEspec%I)
     if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)

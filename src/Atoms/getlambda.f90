@@ -375,6 +375,12 @@ MODULE getlambda
     Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))
     CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, &
     	Atoms(n)%ptr_atom%continua(kc)%lambda,Nwaves, inoutgrid)
+    	
+    !TEST 
+    Atoms(n)%ptr_atom%continua(kc)%Nlambda = size( Atoms(n)%ptr_atom%continua(kc)%alpha)
+
+    	
+    	
       !!-> also deallocates cont%lambda which is the original lambda read from file
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
@@ -465,7 +471,8 @@ MODULE getlambda
      gbf_0 = Gaunt_bf(1, uu0, n_eff)
     
      g_bf(Nblue:Nred) = &
-      Gaunt_bf(atom%continua(kc)%Nlambda, uu(Nblue:Nred), n_eff)
+      Gaunt_bf(Nred-Nblue+1, uu(Nblue:Nred), n_eff)
+      
      atom%continua(kc)%alpha(Nblue:Nred) = &
         atom%continua(kc)%alpha0 * g_bf(Nblue:Nred) * (waves(Nblue:Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
 
