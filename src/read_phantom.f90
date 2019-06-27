@@ -876,8 +876,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        do i=1, n_SPH
           phi = atan2(y(i),x(i)) ; cos_phi = cos(phi) ; sin_phi = sin(phi)
           vphi = - vx(i) * sin_phi + vy(i) * cos_phi
-          !vr = vx(i) * cos_phi + vy(i) * sin_phi
-
+          ! vr = vx(i) * cos_phi + vy(i) * sin_phi
           ! vx = vr cos phi - vphi sin phi
           ! vy = vr sin phi + vphi cos phi
           vx(i) = - vphi * sin_phi !  vr = 0
