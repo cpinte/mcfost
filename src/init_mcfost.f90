@@ -22,6 +22,7 @@ subroutine set_default_variables()
   nb_proc=1 ; lpara=.false.
 
   n_zones=1
+  lmcfost_lib = .false.
 
   ! Pour code parallel
   !$omp parallel default(none) &
