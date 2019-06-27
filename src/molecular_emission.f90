@@ -485,7 +485,7 @@ subroutine equilibre_rad_mol_loc(id,icell)
         if (eq==1) then
            JJmol = Jmol(iTrans,id)
         else
-           JJmol = Jmol(iTrans,id)
+           JJmol = Jmol2(iTrans,id)
         endif
 
         !write(*,*) "Jmol", iTrans, JJmol, Bnu(transfreq(iTrans),350.)

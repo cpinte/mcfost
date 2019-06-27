@@ -16,7 +16,7 @@ module spherical_grid
   private
 
   real(kind=dp), parameter :: prec_grille=1.0e-14_dp
-  real(kind=dp), parameter :: prec_grille_sph=1.0e-10_dp
+  real(kind=dp), parameter :: prec_grille_sph=1.0e-7_dp
 
 
 contains
