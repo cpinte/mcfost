@@ -47,7 +47,7 @@ MODULE spectrum_type
    !n_proc should be the last index
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1, Nwaves_trans !maximum wavelength per transitions
+   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1, Nvel = 101
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
    double precision, allocatable, dimension(:) :: Istar !not polarised
@@ -60,7 +60,8 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
    !!double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
-   double precision, allocatable, dimension(:,:,:) :: Ksi 
+   ! N_cells, Nvel, Ntrans, nincl, naz
+   double precision, allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
@@ -105,18 +106,18 @@ MODULE spectrum_type
    NLTEspec%Nwaves = size(NLTEspec%lambda)
    
    !determine maximum wavelength per transition
-   NLTEspec%Nwaves_trans = 0
-   do nat = 1, NLTEspec%atmos%Natom
-    do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
-     NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
-     	NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nlambda)
-    end do
-    do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
-     NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
-     	NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nlambda)    
-    end do
-   end do
-   write(*,*)"  Maximum number of wavelengths per transition is", NLTEspec%Nwaves_trans
+!    NLTEspec%Nwaves_trans = 0
+!    do nat = 1, NLTEspec%atmos%Natom
+!     do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
+!      NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
+!      	NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nlambda)
+!     end do
+!     do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
+!      NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
+!      	NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nlambda)    
+!     end do
+!    end do
+!    write(*,*)"  Maximum number of wavelengths per transition is", NLTEspec%Nwaves_trans
    
    CALL writeWavelength()
    CALL allocSpectrum(alloc_nlte_vars,& !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
@@ -136,7 +137,7 @@ MODULE spectrum_type
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
    integer, dimension(:), allocatable :: Nlam_R
-   integer :: nat, kr
+   integer :: nat, kr, Ntrans_new
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -154,7 +155,7 @@ MODULE spectrum_type
    ! between lambda(min) and lambda(max)
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, Nlam_R, NLTEspec%atmos%Atoms)
    deallocate(Nlam_R) !not used anymore  
-   
+   Ntrans_new = 0
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
    do nat=1,NLTEspec%atmos%Natom
     write(*,*) "   --> ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
@@ -162,13 +163,17 @@ MODULE spectrum_type
      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
        write(*,*) "    b-b #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
-        "nm"     
+        "nm"
+       Ntrans_new = Ntrans_new + 1     
      end do
      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
        write(*,*) "    b-f #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
-        "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"    
+        "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"  
+       Ntrans_new = Ntrans_new + 1  
      end do
    end do
+   write(*,*) "  ** Total number of transitions for image:", Ntrans_new
+   NLTEspec%Ntrans = Ntrans_new
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
    CALL allocSpectrum(.false.,.true.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
@@ -311,9 +316,14 @@ MODULE spectrum_type
    end if
 
    !Contribution function
-   if (lcontrib_function) then
-    allocate(NLTEspec%Ksi(NLTEspec%Ntrans, NLTEspec%atmos%Nspace, NLTEspec%Nwaves))
-    NLTEspec%Ksi = 0d0
+   if (lcontrib_function .and. ltab_wavelength_image) then !the tab is here to prevent allocating a large array
+		!hence ksi should be computed for small waves intervals.
+	 !because otherwise, it is allocated with the alloc spectrum before initSpectrumImage()
+     if (alloc_image) allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace, NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ))    
+    NLTEspec%Ksi(:,:,:,:) = 0d0
+   else if (lcontrib_function .and. .not.ltab_wavelength_image) then
+    CALL Warning(" Contribution function not taken into account. Use a wavelength table.")
+    lcontrib_function = .false.
    end if
 
   RETURN
@@ -357,6 +367,9 @@ MODULE spectrum_type
    end if
    NULLIFY(NLTEspec%atmos)
 !    deallocate(Nblue_array, Nmid_array, Nred_array)
+
+   if (allocated(NLTEspec%Ksi)) deallocate(NLTEspec%ksi)
+
   RETURN
   END SUBROUTINE freeSpectrum
 
@@ -644,6 +657,82 @@ MODULE spectrum_type
   RETURN
   END FUNCTION air2vacuum
   
+ !building 
+ SUBROUTINE WRITE_CNTRB()
+ ! -------------------------------------------------- !
+  ! Write contribution function to disk.
+ ! --------------------------------------------------- !
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(7) :: naxes
+  integer :: group,fpixel,nelements
+  logical :: simple, extend
+  character(len=6) :: comment=""
+  real :: pixel_scale_x, pixel_scale_y 
+  
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+   status=0
+   CALL ftgiou (unit,status)
+
+   !  Create the new empty FITS file.
+   blocksize=1
+   CALL ftinit(unit,"cntrb.fits.gz",blocksize,status)
+
+   simple=.true.
+   extend=.true.
+   group=1
+   fpixel=1
+
+   bitpix=-64
+   
+  if (lVoronoi) then
+   naxis = 4
+   naxes(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
+   naxes(2) = NLTEspec%Nwaves
+   naxes(3) = RT_n_incl
+   naxes(4) = RT_n_az
+   nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+  else
+   if (l3D) then
+    naxis = 6
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    naxes(4) = NLTEspec%Nwaves
+    naxes(5) = RT_n_incl
+    naxes(6) = RT_n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
+   else
+    naxis = 5
+    naxes(1) = n_rad
+    naxes(2) = nz
+    naxes(3) = NLTEspec%Nwaves
+    naxes(4) = RT_n_incl
+    naxes(5) = RT_n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) 
+   end if
+  end if
+
+  !  Write the required header keywords.
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  CALL ftpkys(unit,'UNIT',"W.m-2.Hz-1.pixel-1",'Ksi',status)
+
+
+  !  Write the array to the FITS file.
+  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%ksi,status)
+
+  !  Close the file and free the unit number.
+  CALL ftclos(unit, status)
+  CALL ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) then
+     CALL print_error(status)
+  endif
+
+ RETURN
+ END SUBROUTINE WRITE_CNTRB  
+  
+  !building 
   SUBROUTINE writeContrib()
   ! --------------------------------------------------------------- !
    ! Write the different contributions to opacities to fits file
