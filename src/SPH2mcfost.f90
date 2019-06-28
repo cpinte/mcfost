@@ -579,7 +579,6 @@ contains
      write(*,*) "Error in array size"
      stop
     end if
-    atmos%vturb = 0d0
     
     !*************************
     ! Densities
