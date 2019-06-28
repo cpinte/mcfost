@@ -34,6 +34,26 @@ MODULE metal
  IMPLICIT NONE
 
  CONTAINS
+ 
+ FUNCTION bound_free_Xsection(cont) result(alpha)
+  type (AtomicContinuum) :: cont
+  real(kind=dp) :: alpha(cont%Nlambda) !note that, size(cont%alpha) /= cont%Nlambda
+  									 !one represent the wavelength tabulated and the other one
+  									 !the number of points on the total grid between Nblue and Nred
+  									 
+  	!do not forget to not allocate cont%alpha if hydrogenic
+  
+   if (cont%Hydrogenic) then !Kramer's formula with quantum mechanical correction
+    alpha = 1d0
+   
+   else !interpolation of the read Cross-section
+    !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda)
+    !CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
+!     	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred)) !interpolation grid
+   endif
+ 
+ RETURN
+ END FUNCTION bound_free_Xsection
 
  SUBROUTINE Metal_bf(id, icell)
  !cross-section in cm2 per particle is given by Kramers’ formula
