@@ -9,8 +9,8 @@ module read_phantom
 
   contains
 
-    subroutine read_phantom_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
-         rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
@@ -365,7 +365,286 @@ module read_phantom
  deallocate(xyzh,itype,vxyzu)
  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
 
-end subroutine read_phantom_files
+end subroutine read_phantom_bin_files
+
+!*************************************************************************
+
+subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
+                                  particle_id,massgas,massdust,rhogas,rhodust, &
+                                  extra_heating,ndusttypes,SPH_grainsizes,     &
+                                  n_SPH,ierr)
+
+ use utils_hdf5, only:open_hdf5file,    &
+                      close_hdf5file,   &
+                      open_hdf5group,   &
+                      close_hdf5group,  &
+                      read_from_hdf5,   &
+                      HID_T
+
+ integer, intent(in) :: iunit, n_files
+ character(len=*),dimension(n_files), intent(in) :: filenames
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,        &
+                                                       vx,vy,vz,       &
+                                                       rhogas,massgas, &
+                                                       SPH_grainsizes
+ integer,  intent(out), dimension(:),   allocatable :: particle_id
+ real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
+
+ real, intent(out), dimension(:), allocatable :: extra_heating
+ integer, intent(out) :: ndusttypes,n_SPH,ierr
+
+ character(len=200) :: filename
+
+ logical :: got_dustfrac,got_itype
+
+ integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
+ integer :: np,ntypes,nptmass,dustfluidtype,ndudt
+ integer :: error,ndustsmall,ndustlarge
+
+ integer, parameter :: maxtypes = 100
+ integer, parameter :: nsinkproperties = 11
+
+ integer(kind=1), allocatable, dimension(:) :: itype, ifiles
+ real(4),  allocatable, dimension(:)   :: tmp, tmp_header
+ real(dp), allocatable, dimension(:)   :: dudt, tmp_dp
+ real(dp), allocatable, dimension(:)   :: grainsize, graindens
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
+ integer, allocatable, dimension(:) :: npartoftype
+ real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
+ real(dp) :: hfact,umass,utime,udist
+
+ integer(HID_T) :: hdf5_file_id
+ integer(HID_T) :: hdf5_group_id
+
+ logical :: got
+
+  error = 0
+  np_tot = 0
+  ntypes_tot = 0
+  ntypes_max = 0
+
+  ! Read file headers to get particle numbers
+  file_headers: do ifile=1, n_files
+
+    write(*,*) "---- Reading header file #", ifile
+
+    filename = trim(filenames(ifile))
+
+    ! open file
+    call open_hdf5file(filename,hdf5_file_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF file ***'
+    endif
+
+    ! open header group
+    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF header group ***'
+    endif
+
+    ! read header values
+    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,error)
+    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,error)
+    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,error)
+    if (.not. got) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,error)
+       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,error)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
+
+    ! close the header group
+    call close_hdf5group(hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF header group ***'
+    endif
+
+    ! close file
+    call close_hdf5file(hdf5_file_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF file ***'
+    endif
+
+    np_tot = np_tot + np
+    ntypes_tot = ntypes_tot + ntypes
+    ntypes_max = max(ntypes_max,ntypes)
+
+  enddo file_headers
+
+  ! Allocate arrays for SPH data
+  allocate(xyzh(4,np_tot),                        &
+           itype(np_tot),                         &
+           vxyzu(4,np_tot),                       &
+           dustfrac(ndusttypes,np_tot),           &
+           grainsize(ndusttypes),                 &
+           graindens(ndusttypes),                 &
+           dudt(np_tot),                          &
+           ifiles(np_tot),                        &
+           massoftype(n_files,ntypes_max),        &
+           npartoftype(ntypes_tot))
+
+  ! Read file data
+  np0 = 0
+  ntypes0 = 0
+  file_data: do ifile=1, n_files
+
+    ! open file
+    filename = trim(filenames(ifile))
+    call open_hdf5file(filename,hdf5_file_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF file ***'
+    endif
+
+    ! open header group
+    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF header group ***'
+    endif
+
+    ! read from header
+    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,error)
+    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,error)
+    call read_from_hdf5(npartoftype,'npartoftype',hdf5_group_id,got,error)
+    call read_from_hdf5(nptmass,'nptmass',hdf5_group_id,got,error)
+    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,error)
+    if (.not. got) then
+       ! ndusttypes is for pre-largegrain multigrain headers
+       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,error)
+       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,error)
+       ! ndusttype must be the same for all files : todo : add a test
+       ndusttypes = ndustsmall + ndustlarge
+    endif
+    call read_from_hdf5(massoftype(ifile,1:ntypes),'massoftype',hdf5_group_id,got,error)
+    call read_from_hdf5(hfact,'hfact',hdf5_group_id,got,error)
+    if (ndusttypes > 0) then
+       allocate(tmp_header(np))
+       call read_from_hdf5(tmp_header,'grainsize',hdf5_group_id,got,error)
+       grainsize(1:ndusttypes) = tmp_header(1:ndusttypes)
+       call read_from_hdf5(tmp_header,'graindens',hdf5_group_id,got,error)
+       graindens(1:ndusttypes) = tmp_header(1:ndusttypes)
+       deallocate(tmp_header)
+    endif
+    call read_from_hdf5(umass,'umass',hdf5_group_id,got,error)
+    call read_from_hdf5(utime,'utime',hdf5_group_id,got,error)
+    call read_from_hdf5(udist,'udist',hdf5_group_id,got,error)
+
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF header group ***'
+    endif
+
+    ! close the header group
+    call close_hdf5group(hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF header group ***'
+    endif
+
+    write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
+    write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
+    write(*,*) ' nptmass = ', nptmass
+
+    allocate(tmp(np), tmp_dp(np))
+
+    if (npartoftype(2) > 0) then
+       dustfluidtype = 2
+       write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
+    else
+       dustfluidtype = 1
+    endif
+
+    ! open particles group
+    call open_hdf5group(hdf5_file_id,'particles',hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF particles group ***'
+    endif
+
+    got_dustfrac = .false.
+    got_itype = .false.
+    ndudt = 0
+
+    ! TODO: read particle arrays
+    call read_from_hdf5(itype(np0+1:np0+np),'itype',hdf5_group_id,got,error)
+    if (got) got_itype = .true.
+    call read_from_hdf5(xyzh(1:3,np0+1:np0+np),'xyz',hdf5_group_id,got,error)
+    call read_from_hdf5(xyzh(4,np0+1:np0+np),'h',hdf5_group_id,got,error)
+    call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,error)
+    call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,error)
+    if (got) got_dustfrac = .true.
+
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF particles group ***'
+    endif
+
+    ! close the particles group
+    call close_hdf5group(hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF particles group ***'
+    endif
+
+    ! open sinks group
+    call open_hdf5group(hdf5_file_id,'sinks',hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF sinks group ***'
+    endif
+
+    ! read sinks
+    allocate(xyzmh_ptmass(5,nptmass))
+    call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,error)
+    call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,error)
+    call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,error)
+
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF sinks group ***'
+    endif
+
+    ! close the sinks group
+    call close_hdf5group(hdf5_group_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF sinks group ***'
+    endif
+
+    ! close file
+    call close_hdf5file(hdf5_file_id,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF file ***'
+    endif
+
+    ifiles(np0+1:np0+np) = ifile ! index of the file
+
+    if (.not. got_itype) then
+       itype(np0+1:np0+np) =  1
+    endif
+
+    np0 = np0 + np
+    ntypes0 = ntypes0 + ntypes
+
+  enddo file_data
+
+  if ((ndusttypes > 0) .and. .not. got_dustfrac) then
+     dustfrac = 0.
+  endif
+
+  if (ndudt == 0) then
+     dudt = 0.
+  endif
+
+  write(*,*) "Found", nptmass, "point masses in the phantom file"
+
+  call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
+                        dustfluidtype,xyzh,vxyzu,itype,grainsize,dustfrac, &
+                        massoftype,xyzmh_ptmass,hfact,umass,       &
+                        utime,udist,graindens,ndudt,dudt,ifiles,   &
+                        n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
+                        massgas,massdust,rhogas,rhodust,extra_heating)
+
+  write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
+
+  write(*,*) "Phantom dump file processed ok"
+  ierr = 0
+  deallocate(xyzh,itype,vxyzu)
+  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+
+end subroutine read_phantom_hdf_files
 
 !*************************************************************************
 
@@ -597,8 +876,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        do i=1, n_SPH
           phi = atan2(y(i),x(i)) ; cos_phi = cos(phi) ; sin_phi = sin(phi)
           vphi = - vx(i) * sin_phi + vy(i) * cos_phi
-          !vr = vx(i) * cos_phi + vy(i) * sin_phi
-
+          ! vr = vx(i) * cos_phi + vy(i) * sin_phi
           ! vx = vr cos phi - vphi sin phi
           ! vy = vr sin phi + vphi cos phi
           vx(i) = - vphi * sin_phi !  vr = 0
@@ -676,12 +954,16 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
 
  if (lplanet_az) then
-    if ((nptmass /= 2).and.(which_planet==0)) call error("option -planet_az: you need to specify the sink particle with -planet option")
+    if ((nptmass /= 2).and.(which_planet==0)) then
+       call error("option -planet_az: you need to specify the sink particle with -planet option")
+    endif
     if (nptmass == 2) which_planet=2
     if (which_planet > nptmass) call error("specified sink particle does not exist")
 
     RT_n_az = 1
-    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1),xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) / deg_to_rad
+    RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1), &
+                                  xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) &
+                            / deg_to_rad
     RT_az_max = RT_az_min
     write(*,*) "Moving sink particle #", which_planet, "to azimuth =", planet_az
     write(*,*) "WARNING: updating the azimuth to:", RT_az_min
