@@ -383,7 +383,7 @@ contains
        if (write_T_files) call write_mcfost2phantom_temperature()
     endif
 
-    ! radiation(ichi,:) = default_chi
+    radiation(ichi,:) = default_chi
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
