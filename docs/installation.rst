@@ -30,7 +30,6 @@ Email Christophe to ask for permission, and a link to download the tar ball with
 
      $ tar -xvzf mcfost.tgz
      $ chmod +x mcfost
-     $ rehash
 
 2. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
 

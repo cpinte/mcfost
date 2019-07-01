@@ -1,5 +1,7 @@
-MCFOST tools
-============
+Analysis tools
+==============
+
+.. important:: The recommended analysis tool is `pymcfost <https://github.com/cpinte/pymcfost>`__. Below are briefs descriptions of the alternative options, but support for them is now very limited.
 
 For visualization and fitting tools, several packages are available so far for
 MCFOST:
@@ -14,7 +16,6 @@ Only the analysis of the results are done with IDL or Yorick or Python.
 They are not required for the use of MCFOST, but make its use easier,
 especially when dealing with large numbers of models.
 
-.. important:: The recommended analysis tool is `pymcfost <https://github.com/cpinte/pymcfost>`__. Below are briefs descriptions of the alternative options, but support for them is now very limited.
 
 Tools for Creating Parameter Files
 ----------------------------------
