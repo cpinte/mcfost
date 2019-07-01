@@ -32,18 +32,24 @@ Email Christophe to ask for permission, and a link to download the tar ball with
      $ chmod +x mcfost
      $ rehash
 
-2. Make directories to store the mcfost binary and utility files. For instance::
+2. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
 
-     $ mkdir ~/mcfost/bin
-     $ mkdir ~/mcfost/utils
-
-3. Copy the file mcfost the previously defined directory (or somewhere in your shell $PATH)::
-
+     $ mkdir -p ~/mcfost/bin
      $ mv mcfost ~/mcfost/bin
 
-4. Set the environment variable ``MCFOST_UTILS`` to point to a directory
-   where you want mcfost to store its data files. E.g. edit your
-   shell startup files to include either::
+   You can then add this directory to your path with::
+
+   $ setenv PATH ${HOME}/mcfost/bin:${PATH}
+
+   for tcsh or csh shell, or::
+
+   $ export PATH=${HOME}/mcfost/bin:${PATH}
+
+   for bash or bash-like shell.
+
+3. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+   where you want mcfost to store its data files.
+   E.g. edit your shell startup files to include either::
 
    $ setenv MCFOST_UTILS ~/mcfost/utils
 
@@ -53,13 +59,16 @@ Email Christophe to ask for permission, and a link to download the tar ball with
 
    for bash or bash-like shell.
 
-5. You should now be able to run::
+4. You should now be able to run::
 
      $ mcfost --help
 
-     to get a short list of the available options.
 
-6. run ``mcfost -setup`` to download mcfost data files, current reference parameter files.
+ to get a short list of the available options.
+
+5. Download mcfost data files, current reference parameter files with::
+
+      $ mcfost -setup
 
 
 
