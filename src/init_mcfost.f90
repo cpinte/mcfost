@@ -136,6 +136,7 @@ subroutine set_default_variables()
   lno_vz = .false.
   lvphi_Kep = .false.
   lfluffy = .false.
+  tmp_dir = "./"
 
   ! Geometrie Grille
   z_scaling_env = 1.0
@@ -529,6 +530,11 @@ subroutine initialisation_mcfost()
         if (i_arg > nbr_arg) call error("root_dir needed")
         call get_command_argument(i_arg,s)
         root_dir=trim(root_dir)//"/"//s
+        i_arg = i_arg+1
+     case("-tmp_dir")
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) call error("root_dir needed")
+        call get_command_argument(i_arg,tmp_dir)
         i_arg = i_arg+1
      case("-dust_prop")
         i_arg = i_arg+1
@@ -1379,7 +1385,8 @@ subroutine display_help()
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
   write(*,*) "                         results stored in 'seed=XXX' directory"
-  write(*,*) "        : -root_dir <root_dir> : results stored in 'root_dir' directory"
+  write(*,*) "        : -root_dir <dir> : results stored in 'root_dir' directory"
+  write(*,*) '        : -tmp_dir <dir>  : redults where previous cartial calculations are store (default: ".")'
   write(*,*) "        : -no_backup  : stops if directory data_XX already exists"
   write(*,*) "                        without attempting to backup existing directory"
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
