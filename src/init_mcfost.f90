@@ -201,7 +201,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lpola
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -218,6 +218,7 @@ subroutine initialisation_mcfost()
   lHG = .false.
   lonly_scatt = .false.
   lno_T = .false.
+  lno_SED = .false.
   lpola = .false.
 
   ! Global logical variables
@@ -874,6 +875,9 @@ subroutine initialisation_mcfost()
      case("-no_T")
         i_arg = i_arg + 1
         lno_T=.true.
+     case("-no_SED")
+        i_arg = i_arg + 1
+        lno_SED=.true.
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
@@ -1033,6 +1037,8 @@ subroutine initialisation_mcfost()
      end select
   enddo ! while
 
+
+
   ! Display the disclaimer if needed
   mcfost_no_disclaimer = 0
   call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
@@ -1047,6 +1053,12 @@ subroutine initialisation_mcfost()
   endif
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
+
+  if (lno_T) ltemp = .false.
+  if (lno_SED) then
+     lsed = .false.
+     lsed_complete = .false.
+  endif
   if (map_size < tiny_real) call error("map size is set to 0")
 
   if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
@@ -1055,7 +1067,6 @@ subroutine initialisation_mcfost()
      lsepar_pola = .false.
   endif
 
-  if (lno_T) ltemp = .false.
   if (lpola) lsepar_pola = .true.
 
   if (lsepar_pola) then
@@ -1600,7 +1611,7 @@ subroutine save_data(para,base_para)
      etape_start=1
      etape_end=1
   else
-     if (ltemp.or.lsed) then
+     if (ltemp) then
         etape_start=1
      else
         etape_start=2
