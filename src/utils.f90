@@ -937,7 +937,8 @@ subroutine get_utils()
   integer :: syst_status
 
   write(*,*) "Downloading MCFOST UTILS (this may take a while) ..."
-  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzf - -C"//trim(mcfost_utils)
+  cmd = "mkdir -p "//trim(mcfost_utils)//&
+  " ; curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzf - -C"//trim(mcfost_utils)
   call appel_syst(cmd, syst_status)
   if (syst_status == 0) then
      write(*,*) "Done"

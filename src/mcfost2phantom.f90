@@ -192,7 +192,6 @@ contains
 
     real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
     real(sp), dimension(np), intent(out) :: n_packets ! number of packets that crossed the cell
-    real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
