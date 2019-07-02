@@ -664,9 +664,9 @@ subroutine save_dust_prop(letape_th)
   character(len=512) :: filename
 
   if (letape_th) then
-     filename="_dust_prop_th.tmp" ;
+     filename=trim(tmp_dir)//"/_dust_prop_th.tmp" ;
   else
-     filename="_dust_prop_SED.tmp" ;
+     filename=trim(tmp_dir)//"/_dust_prop_SED.tmp" ;
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
@@ -699,9 +699,9 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   if (lread_Misselt.or.lread_DustEM) return
 
   if (letape_th) then
-     filename="_dust_prop_th.tmp" ;
+     filename=trim(tmp_dir)//"/_dust_prop_th.tmp" ;
   else
-     filename="_dust_prop_SED.tmp" ;
+     filename=trim(tmp_dir)//"_dust_prop_SED.tmp" ;
   endif
 
   ! check if there is a dust population file

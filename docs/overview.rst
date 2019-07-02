@@ -27,7 +27,7 @@ and AGB stars.
 
 The core of the algorithms are described in
 `Pinte et al. (2006) <http://adsabs.harvard.edu/abs/2006A%26A...459..797P>`__
-and `Pinte et al. 2009
+and `Pinte et al. (2009)
 <http://adsabs.harvard.edu/abs/2009A%26A...498..967P>`__.
 However the code has been substantially further
 enhanced, with features that are mainly documented in this documentation.

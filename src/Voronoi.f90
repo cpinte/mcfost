@@ -518,7 +518,7 @@ module Voronoi_grid
 
     call get_voronoi_sha1(density_files(1), voronoi_sha1)
 
-    filename = "_voronoi.tmp"
+    filename = trim(tmp_dir)//"_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
     write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid, was_cell_cut
@@ -556,7 +556,7 @@ module Voronoi_grid
 
     call get_voronoi_sha1(density_files(1), voronoi_sha1)
 
-    filename = "_voronoi.tmp"
+    filename = trim(tmp_dir)//"_voronoi.tmp"
     ! check if there is a Voronoi file
     ios = 0
     open(1,file=filename,status='old',form='unformatted',iostat=ios)

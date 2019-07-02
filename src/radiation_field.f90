@@ -191,6 +191,7 @@ subroutine reset_radiation_field()
      xJ_abs(:,:,:) = 0.0_dp
      J0 = 0.0_dp
   endif
+  if (lmcfost_lib) xN_abs(:,:,:) = 0.0_dp
 
 !  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
 !

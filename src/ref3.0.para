@@ -12,8 +12,8 @@
   F T			  separation of different contributions?, stokes parameters?
 
 #Grid geometry and size
-  2			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
- 70 30 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
+  1			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
+ 100 70 1 20             n_rad (log distribution), nz (or n_theta), n_az, n_rad_in
 
 #Maps
   151 151 5.            grid (nx,ny), size [AU]

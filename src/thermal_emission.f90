@@ -333,18 +333,20 @@ subroutine repartition_wl_em()
   integer :: lambda
   real :: E_star_tot, E_disk_tot, E_ISM_tot, delta_wl, L_tot
 
-  spectre_emission_cumul(0) = 0.0
-  ! Fonction de répartition émssion
-  do lambda=1,n_lambda
-     delta_wl=tab_delta_lambda(lambda)*1.e-6
-     spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda-1) + &
-          (E_stars(lambda) + E_disk(lambda) + E_ISM(lambda)) * delta_wl
-  enddo
+  if (lTemp) then
+     spectre_emission_cumul(0) = 0.0
+     ! Fonction de répartition émssion
+     do lambda=1,n_lambda
+        delta_wl=tab_delta_lambda(lambda)*1.e-6
+        spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda-1) + &
+             (E_stars(lambda) + E_disk(lambda) + E_ISM(lambda)) * delta_wl
+     enddo
 
-  ! Normalisation
-  do lambda=1,n_lambda
-     spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
-  enddo
+     ! Normalisation
+     do lambda=1,n_lambda
+        spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda)/spectre_emission_cumul(n_lambda)
+     enddo
+  endif
 
   ! Energie des paquets pour step 1
   E_star_tot = 0.0

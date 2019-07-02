@@ -191,11 +191,7 @@ contains
     integer, intent(in) :: ISM ! ISM heating: 0 -> no ISM radiation field, 1 -> ProDiMo, 2 -> Bate & Keto
 
     real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
-<<<<<<< HEAD
-=======
     real(sp), dimension(np), intent(out) :: n_packets ! number of packets that crossed the cell
-    real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
->>>>>>> master
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
@@ -398,11 +394,9 @@ contains
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom) = Tdust(icell)
-<<<<<<< HEAD
           radiation(ichi,i_Phantom) = chi_R(icell)
-=======
           n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
->>>>>>> master
+          n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
        endif
     enddo
 
