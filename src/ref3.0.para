@@ -3,7 +3,7 @@
 #Number of photon packages
   1.28e5                  nbr_photons_eq_th  : T computation
   1.28e3	          nbr_photons_lambda : SED computation
-  1.28e7                  nbr_photons_image  : images computation
+  1.28e6                  nbr_photons_image  : images computation
 
 #Wavelength
   50  0.1 3000.0          n_lambda, lambda_min, lambda_max [mum] Do not change this line unless you know what you are doing
@@ -61,10 +61,10 @@
   0.2 			  v_turb (delta)
   1			  nmol
   co@xpol.dat 6           molecular data filename, level_max
-  1.0 20     	  	  vmax (km.s^-1), n_speed
+  10.0 20     	  	  vmax (km.s^-1), n_speed
   T 1.e-6 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
-  T  3                       ray tracing ?,  number of lines in ray-tracing
-  1 2 3	 		  transition numbers
+  T  2                       ray tracing ?,  number of lines in ray-tracing
+  2 3	 		  transition numbers
 
 #Star properties
   1 Number of stars
