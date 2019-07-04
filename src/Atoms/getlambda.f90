@@ -423,88 +423,6 @@ MODULE getlambda
   
   RETURN
   END SUBROUTINE make_wavelength_grid
-!--> Futur deprecation of this. Two memory consuming  
-  SUBROUTINE fillPhotoionisationCrossSection(atom, kc, old_waves, Nwaves, waves)
-   !computes photoionisation Xsections on the waves grid.
-   !Eventually interpolate the values of the old grid old_waves onto waves
-   use atmos_type, only : Hydrogen
-   use math, only : bezier3_interp, Gaunt_bf
-    type(AtomType), intent(inout) :: atom
-    integer, intent(in) :: kc, Nwaves
-    double precision, dimension(Nwaves) :: waves
-    integer :: i, j, Nblue, Nred
-    double precision, dimension(:), intent(in) :: old_waves
-    double precision, dimension(Nwaves) :: uu, g_bf
-    double precision, dimension(:), allocatable :: old_alpha
-    double precision :: n_eff, Z, gbf_0(1), uu0(1), lambdaEdge, sigma0
-    
-    !pour H only?
-    sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
-          (HPLANCK**(3d0)) / (CLIGHT * &
-          (M_ELECTRON*Q_ELECTRON)**(2d0))
-    
-    i = atom%continua(kc)%i; j = atom%continua(kc)%j
-    Z = real(atom%stage(i)+1); lambdaEdge = atom%continua(kc)%lambda0
-    Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
-    if (Nblue==-99 .and. Nred==-99) then
-     !if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda)
-     if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
-     RETURN !no need to compute
-    end if
-
-    if (atom%continua(kc)%hydrogenic) then
-     
-     if (atom%ID == "H ") then
-      n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
-     else
-     !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
-     !if (.not.obtained_n) &
-        n_eff = Z*dsqrt(E_RYDBERG / (atom%E(j) - atom%E(i)))
-     end if
-     if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
-     allocate(atom%continua(kc)%alpha(Nwaves)) !it is allocated in readatom only for non
-     									   ! hydrogenic continua
-     atom%continua(kc)%alpha(:) = 0d0
-     g_bf = 0d0
-     uu(Nblue:Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
-        (NM_TO_M*waves(Nblue:Nred)) / (Z*Z) / E_RYDBERG - 1.
-     uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
-       
-     gbf_0 = Gaunt_bf(1, uu0, n_eff)
-    
-     g_bf(Nblue:Nred) = &
-      Gaunt_bf(Nred-Nblue+1, uu(Nblue:Nred), n_eff)
-      
-     atom%continua(kc)%alpha(Nblue:Nred) = &
-        atom%continua(kc)%alpha0 * g_bf(Nblue:Nred) * (waves(Nblue:Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
-
-    else !cont%alpha is allocated and filled with read values
-     !!CALL Warning(" Beware, memory error if tow many cross-sections")
-     write(*,*) "Interpolating photoionisation cross-section for atom ", &
-      j,'->',i,atom%continua(kc)%atom%ID, " (", atom%ID,')'
-     
-     !that is because in this case, %alpha and %lambda have their size taken from the atomic
-     !file with is not %Nlambda anymore at this point.
-     allocate(old_alpha(size(old_waves)))
-     old_alpha(:) = atom%continua(kc)%alpha(:)
-!      if (size(waves)==1) then
-!      write(*,*) size(atom%continua(kc)%alpha(:)), size(old_waves)
-!      write(*,*) size(old_alpha)
-!      write(*,*) waves(Nblue:Nred), atom%continua(kc)%Nlambda
-!      end if
-     deallocate(atom%continua(kc)%alpha)
-     allocate(atom%continua(kc)%alpha(Nwaves))
-
-     atom%continua(kc)%alpha(:) = 0d0
-     CALL bezier3_interp(size(old_alpha),old_waves, old_alpha, & !Now the interpolation grid
-             atom%continua(kc)%Nlambda,  waves(Nblue:Nred), &
-             atom%continua(kc)%alpha(Nblue:Nred)) !end
-     deallocate(old_alpha)
-    end if
-    if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda) !not used
-    !!if (atom%ID=="He") read(*,*)
-  RETURN
-  END SUBROUTINE fillPhotoionisationCrossSection
 
   SUBROUTINE adjust_wavelength_grid(old_grid, lambda, Lam_region, Atoms)
    ! ------------------------------------------ !
@@ -712,3 +630,85 @@ MODULE getlambda
   END SUBROUTINE adjust_wavelength_grid
 
   END MODULE getlambda
+! --> Futur deprecation of this. Two memory consuming  
+!   SUBROUTINE fillPhotoionisationCrossSection(atom, kc, old_waves, Nwaves, waves)
+!    computes photoionisation Xsections on the waves grid.
+!    Eventually interpolate the values of the old grid old_waves onto waves
+!    use atmos_type, only : Hydrogen
+!    use math, only : bezier3_interp, Gaunt_bf
+!     type(AtomType), intent(inout) :: atom
+!     integer, intent(in) :: kc, Nwaves
+!     double precision, dimension(Nwaves) :: waves
+!     integer :: i, j, Nblue, Nred
+!     double precision, dimension(:), intent(in) :: old_waves
+!     double precision, dimension(Nwaves) :: uu, g_bf
+!     double precision, dimension(:), allocatable :: old_alpha
+!     double precision :: n_eff, Z, gbf_0(1), uu0(1), lambdaEdge, sigma0
+!     
+!     pour H only?
+!     sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
+!           (HPLANCK**(3d0)) / (CLIGHT * &
+!           (M_ELECTRON*Q_ELECTRON)**(2d0))
+!     
+!     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+!     Z = real(atom%stage(i)+1); lambdaEdge = atom%continua(kc)%lambda0
+!     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+!     if (Nblue==-99 .and. Nred==-99) then
+!      if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda)
+!      if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
+!      RETURN !no need to compute
+!     end if
+! 
+!     if (atom%continua(kc)%hydrogenic) then
+!      
+!      if (atom%ID == "H ") then
+!       n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
+!      else
+!      obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
+!      if (.not.obtained_n) &
+!         n_eff = Z*dsqrt(E_RYDBERG / (atom%E(j) - atom%E(i)))
+!      end if
+!      if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
+!      allocate(atom%continua(kc)%alpha(Nwaves)) !it is allocated in readatom only for non
+!      									   hydrogenic continua
+!      atom%continua(kc)%alpha(:) = 0d0
+!      g_bf = 0d0
+!      uu(Nblue:Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
+!         (NM_TO_M*waves(Nblue:Nred)) / (Z*Z) / E_RYDBERG - 1.
+!      uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
+!        
+!      gbf_0 = Gaunt_bf(1, uu0, n_eff)
+!     
+!      g_bf(Nblue:Nred) = &
+!       Gaunt_bf(Nred-Nblue+1, uu(Nblue:Nred), n_eff)
+!       
+!      atom%continua(kc)%alpha(Nblue:Nred) = &
+!         atom%continua(kc)%alpha0 * g_bf(Nblue:Nred) * (waves(Nblue:Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
+! 
+!     else !cont%alpha is allocated and filled with read values
+!      !CALL Warning(" Beware, memory error if tow many cross-sections")
+!      write(*,*) "Interpolating photoionisation cross-section for atom ", &
+!       j,'->',i,atom%continua(kc)%atom%ID, " (", atom%ID,')'
+!      
+!      that is because in this case, %alpha and %lambda have their size taken from the atomic
+!      file with is not %Nlambda anymore at this point.
+!      allocate(old_alpha(size(old_waves)))
+!      old_alpha(:) = atom%continua(kc)%alpha(:)
+!      if (size(waves)==1) then
+!      write(*,*) size(atom%continua(kc)%alpha(:)), size(old_waves)
+!      write(*,*) size(old_alpha)
+!      write(*,*) waves(Nblue:Nred), atom%continua(kc)%Nlambda
+!      end if
+!      deallocate(atom%continua(kc)%alpha)
+!      allocate(atom%continua(kc)%alpha(Nwaves))
+! 
+!      atom%continua(kc)%alpha(:) = 0d0
+!      CALL bezier3_interp(size(old_alpha),old_waves, old_alpha, & !Now the interpolation grid
+!              atom%continua(kc)%Nlambda,  waves(Nblue:Nred), &
+!              atom%continua(kc)%alpha(Nblue:Nred)) !end
+!      deallocate(old_alpha)
+!     end if
+!     if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda) !not used
+!     !if (atom%ID=="He") read(*,*)
+!   RETURN
+!   END SUBROUTINE fillPhotoionisationCrossSection
