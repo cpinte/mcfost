@@ -185,11 +185,11 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
 	        $(Atom_dir)/collision.f90 $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90  \
 	        $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	        $(Atom_dir)/rayleigh_scattering.f90 $(Atom_dir)/thomson_scattering.f90 \
-	        $(Atom_dir)/hydrogen.f90 $(Atom_dir)/opacity.f90                       \
-	        $(Atom_dir)/statequil_atoms.f90 $(Atom_dir)/planck.f90                 \
-	        $(Atom_dir)/metal.f90 optical_depth.f90 dust_transfer.f90              \
+	        $(Atom_dir)/hydrogen.f90 $(Atom_dir)/planck.f90 $(Atom_dir)/metal.f90 \
+			$(Atom_dir)/opacity.f90 $(Atom_dir)/statequil_atoms.f90 \
+			optical_depth.f90 dust_transfer.f90              \
 	        mol_transfer.f90 $(Atom_dir)/simple_models.f90                         \
-	        $(Atom_dir)/atomictransfer.f90
+	        $(Atom_dir)/init_solution.f90 $(Atom_dir)/atomictransfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
