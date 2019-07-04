@@ -73,7 +73,7 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 71!101
+   integer, parameter :: Nlambda = 51!101
    integer :: la
    double precision :: l0, l1
    
@@ -110,7 +110,7 @@ MODULE getlambda
    double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.5, L = 5d0 !only if velocity field
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
-   integer, parameter :: Nc = 45, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
+   integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
 
@@ -373,11 +373,13 @@ MODULE getlambda
 !! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
 !! and l1, lam(Nlambda) = lambda0
     Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(inoutgrid,0.5*(l0+l1))
-    CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, &
-    	Atoms(n)%ptr_atom%continua(kc)%lambda,Nwaves, inoutgrid)
-    	
-    !TEST 
-    Atoms(n)%ptr_atom%continua(kc)%Nlambda = size( Atoms(n)%ptr_atom%continua(kc)%alpha)
+    if (Atoms(n)%ptr_atom%continua(kc)%Hydrogenic) deallocate(atoms(n)%ptr_atom%continua(kc)%lambda) !kept only if we interpolate
+!!deprecated
+!     CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, &
+!     	Atoms(n)%ptr_atom%continua(kc)%lambda,Nwaves, inoutgrid)
+!     	
+!     !TEST 
+!     Atoms(n)%ptr_atom%continua(kc)%Nlambda = size( Atoms(n)%ptr_atom%continua(kc)%alpha)
 
     	
     	
@@ -613,7 +615,8 @@ MODULE getlambda
       Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(lambda,lambda(Atoms(n)%ptr_atom%continua(kc)%Nlambda)/2+1)
      !cont%alpha presently defined on old_lambda, and then on new lambda lambda.
      !cont%lambda deallocated
-      CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, old_grid, Nwaves, lambda)
+     !!deprectaed
+      !!CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, old_grid, Nwaves, lambda)
       !!-> also deallocates cont%lambda for hydrogenic atoms
       !! for all transitions even if we removed them?
      end if                          
