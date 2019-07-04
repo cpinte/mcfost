@@ -58,7 +58,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T!, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
-   character(len=10) :: nLTE_methode = "MALI"
+   character(len=10) :: nLTE_methode = "HOGEREIJDE"
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
    !dark zone are in lcompute_atomRT->icompute_atomRT == -1
@@ -165,18 +165,18 @@ MODULE atmos_type
       if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
 !       if (allocated(line%Rij)) deallocate(line%Rij)
 !       if (allocated(line%Rji)) deallocate(line%Rji)
-      if (allocated(line%wlam_norm)) deallocate(line%wlam_norm)
+      !if (allocated(line%wlam)) deallocate(line%wlam) !over frequencies and angles and proc
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
       !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
       !if (allocated(line%adamp)) deallocate(line%adamp)
       if (allocated(line%rho_pfr)) deallocate(line%rho_pfr)
-      if (allocated(line%gij)) deallocate(line%gij)
-      if (allocated(line%Vij)) deallocate(line%Vij)
+      !if (allocated(line%gij)) deallocate(line%gij)
+      !if (allocated(line%Vij)) deallocate(line%Vij)
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
 !       if (allocated(line%chi_down)) deallocate(line%chi_down)
 !       if (allocated(line%Uji_down)) deallocate(line%Uji_down)
-      if (allocated(line%Jbar)) deallocate(line%Jbar)
+      !!if (allocated(line%Jbar)) deallocate(line%Jbar)
       if (associated(line%atom)) NULLIFY(line%atom)
       CALL freeZeemanMultiplet(line)
      end do
@@ -190,12 +190,12 @@ MODULE atmos_type
       if (allocated(cont%alpha)) deallocate(cont%alpha)
       if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
       !if (allocated(cont%wlam)) deallocate(cont%wlam)
-      if (allocated(cont%gij)) deallocate(cont%gij)
-      if (allocated(cont%Vij)) deallocate(cont%Vij)
+      !if (allocated(cont%gij)) deallocate(cont%gij)
+      !if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
 !       if (allocated(cont%chi_down)) deallocate(cont%chi_down)
 !       if (allocated(cont%Uji_down)) deallocate(cont%Uji_down)
-	  if (allocated(cont%Jbar)) deallocate(cont%Jbar)
+	  !!if (allocated(cont%Jbar)) deallocate(cont%Jbar)
       if (associated(cont%atom)) NULLIFY(cont%atom)
      end do
       deallocate(atom%continua)
@@ -223,17 +223,19 @@ MODULE atmos_type
       	deallocate(atom%lines(k)%lambda)
       if (allocated(atom%lines(k)%CoolRates_ij)) &
       	deallocate(atom%lines(k)%CoolRates_ij)
-      if (allocated(atom%lines(k)%wlam_norm)) &
-      	deallocate(atom%lines(k)%wlam_norm)
+      !if (allocated(atom%lines(k)%wlam)) &
+      !	deallocate(atom%lines(k)%wlam)
+      if (allocated(atom%lines(k)%phi)) &
+      	deallocate(atom%lines(k)%phi)
       if (allocated(atom%lines(k)%rho_pfr)) &
       	deallocate(atom%lines(k)%rho_pfr)
-      if (allocated(atom%lines(k)%gij)) &
-      	deallocate(atom%lines(k)%gij)
-      if (allocated(atom%lines(k)%Vij)) &
-      	deallocate(atom%lines(k)%Vij)
+      !if (allocated(atom%lines(k)%gij)) &
+      !	deallocate(atom%lines(k)%gij)
+      !if (allocated(atom%lines(k)%Vij)) &
+      !	deallocate(atom%lines(k)%Vij)
 
-      if (allocated(atom%lines(k)%Jbar)) &
-      	deallocate(atom%lines(k)%Jbar)
+      !!if (allocated(atom%lines(k)%Jbar)) &
+      	!!deallocate(atom%lines(k)%Jbar)
       if (associated(atom%lines(k)%atom)) &
       	NULLIFY(atom%lines(k)%atom)
       CALL freeZeemanMultiplet(atom%lines(k))
@@ -271,12 +273,12 @@ MODULE atmos_type
      if (allocated(atom%continua(k)%coolrates_ij)) &
      	deallocate(atom%continua(k)%coolrates_ij)
      !need to be reallocated in case of active atoms
-     if (allocated(atom%continua(k)%gij)) &
-     	deallocate(atom%continua(k)%gij)
-     if (allocated(atom%continua(k)%Vij)) &
-     	deallocate(atom%continua(k)%Vij)
-	 if (allocated(atom%continua(k)%Jbar)) &
-	    deallocate(atom%continua(k)%Jbar)
+     !if (allocated(atom%continua(k)%gij)) &
+     !	deallocate(atom%continua(k)%gij)
+     !if (allocated(atom%continua(k)%Vij)) &
+     !	deallocate(atom%continua(k)%Vij)
+	 !!if (allocated(atom%continua(k)%Jbar)) &
+	    !!deallocate(atom%continua(k)%Jbar)
      if (associated(atom%continua(k)%atom)) &
      	NULLIFY(atom%continua(k)%atom)
     end do

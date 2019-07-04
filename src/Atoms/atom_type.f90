@@ -22,16 +22,6 @@ MODULE atom_type
    double precision, allocatable, dimension(:)  :: shift, strength
   END TYPE ZeemanType
  
-  !Store for each atom, depth independant data necessary to compute C matrix
-  !at each cell. It avoids reading a file during the NLTE loop
-  !then in Collision, a new function C(j,i) = ne(icell)*Collision_atom(atom, j, i) or for all j,i
-  !uses atom%col_data will be used. Note that ne is factorised out.
-  TYPE CollisionData
-   integer :: NT
-   double precision, allocatable, dimension(:,:) :: C1, C2, C3, C4, C5, C6
-   double precision, allocatable, dimension(:) :: T1, T2, T3, T4, T5, T6
-  END TYPE CollisionData
- 
   TYPE AtomicLine
    logical           :: symmetric, polarizable
    logical           :: Voigt=.true., PFR=.false.,&
@@ -43,17 +33,18 @@ MODULE atom_type
    real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(8) :: qcore, qwing, glande_i, glande_j
    real(8), dimension(4) :: cvdWaals
-   !Nlambda, Nrays, Nproc
+   !Nlambda,Nproc
+   !for one direction and one cell
    real(8), allocatable, dimension(:,:,:)  :: phi!, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
    !wlam is the integration wavelenght weigh = phi
-   double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij, Jbar, wlam_norm!,wlam, c_shift, c_fraction
+   double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij
    double precision :: Qelast, adamp, Rij, Rji
    real(8), allocatable, dimension(:,:) :: rho_pfr
    !!Nlevel, wavelength and proc
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
    !!and to compute the cross-coupling terms. We need to know for each wavelength and each
    !!proc what are the active transitions involved in the Gamma matrix.
-   double precision, allocatable, dimension(:,:)  :: gij, Vij
+   !double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
@@ -64,11 +55,11 @@ MODULE atom_type
    logical :: hydrogenic
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(8) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
-   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, Jbar!, wlam
+   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij
    double precision :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
-   double precision, allocatable, dimension(:,:)  :: gij, Vij
+   !double precision, allocatable, dimension(:,:)  :: gij, Vij
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -93,8 +84,7 @@ MODULE atom_type
    real(8), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
    character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
-   type (CollisionData), dimension(6) :: col_data !only 6 recipes allowed now
-   real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
+   !!real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
    double precision, dimension(:,:,:), allocatable :: Gamma 
    real(8), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
@@ -102,7 +92,7 @@ MODULE atom_type
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   double precision, allocatable, dimension(:,:) :: eta
+   double precision, allocatable, dimension(:,:,:) :: eta
    double precision, allocatable, dimension(:,:,:) :: chi_up, chi_down, Uji_down
    type (Ng) :: Ngs
   END TYPE AtomType
