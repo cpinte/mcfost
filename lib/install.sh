@@ -120,8 +120,8 @@ if [ skip_hdf5 != "yes" ] ; then
     echo "Compiling hdf5 ..."
     tar xjvf hdf5-1.10.5.tar.bz2 ; mv hdf5-1.10.5 hdf5
     cd hdf5
-    ./configure --prefix=$MCFOST_INSTALL/hdf5/$SYSTEM --enable-fortran
-    make install
+    ./configure --prefix=$MCFOST_INSTALL/hdf5/$SYSTEM --enable-fortran --disable-shared
+    make -j -l6 install
     cd ~1
     echo "Done"
 fi
