@@ -37,25 +37,144 @@ MODULE metal
  
  FUNCTION bound_free_Xsection(cont) result(alpha)
   type (AtomicContinuum) :: cont
+  !real(kind=dp) :: n_eff, g_bf(cont%Nlambda), uu(cont%Nlambda), Z, uu0(1), g_bf0(1)
   real(kind=dp) :: alpha(cont%Nlambda) !note that, size(cont%alpha) /= cont%Nlambda
   									 !one represent the wavelength tabulated and the other one
   									 !the number of points on the total grid between Nblue and Nred
   									 
-  	!do not forget to not allocate cont%alpha if hydrogenic
-  
+!   Z = real(cont%atom%stage(cont%i) + 1,kind=dp)
    if (cont%Hydrogenic) then !Kramer's formula with quantum mechanical correction
-    alpha = 1d0
-   
+     alpha = H_bf_Xsection(cont)
+!      if (cont%atom%ID == "H ") then
+!       n_eff = dsqrt(Hydrogen%g(cont%i)/2.)  !only for Hydrogen !
+!      else
+!      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
+!      !if (.not.obtained_n) &
+!         n_eff = Z*dsqrt(E_RYDBERG / (cont%atom%E(cont%j) - cont%atom%E(cont%i))) 
+!      end if
+!      sigma0_H
+!      uu(:) = n_eff*n_eff*HPLANCK*CLIGHT / (NM_TO_M*NLTEspec%lambda(cont%Nblue:cont%Nred)) &
+!      	/ (Z*Z) / E_RYDBERG - 1.
+!      uu0(1) = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * cont%lambda0) / Z / Z / E_RYDBERG - 1.
+!        
+!      g_bf0(:) = Gaunt_bf(1, uu0, n_eff)
+!     
+!      g_bf(:) = Gaunt_bf(cont%Nlambda, uu(:), n_eff)
+! 
+!      alpha = &
+!         cont%alpha0 * g_bf(:) * (NLTEspec%lambda(cont%Nblue:cont%Nred)/cont%lambda0)**3  / g_bf0(1)!m^2
    else !interpolation of the read Cross-section
-    !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda)
-    !CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
-!     	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred)) !interpolation grid
+    !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda(cont%Nblue:cont%Nred))
+    CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
+     	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred), alpha) !interpolation grid
    endif
  
  RETURN
  END FUNCTION bound_free_Xsection
 
  SUBROUTINE Metal_bf(id, icell)
+ !cross-section in cm2 per particle is given by Kramers’ formula
+  !with n the principal quantum number of the level i from
+ !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
+ !Gaunt factor, a quantummechanical correction factor of order unity.
+ !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
+ !being zero below it because the threshold energy is the required minimum. Think the
+  ! inverse in terms of wavelengths
+  integer, intent(in)							            :: icell, id
+  logical 										            :: obtained_n
+  integer                                                   :: m, kr, i, j, Z, nc, Nblue, Nred
+  type (AtomType)                                           :: metal
+  type (AtomicContinuum)                                    :: continuum
+  double precision                                          :: lambdaEdge
+  double precision, dimension(:), allocatable               :: twohnu3_c2, gijk
+   !obtained_n = .false. !true if the routine to read principal quantum number is fine
+   
+   if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
+   ! else if H is not passive (active) it will not be the first.
+   ! If H is passive it is always the first one (And if active the first one).
+
+
+  ! Go throught all bound-free transitions of each PASSIVE
+  ! metal and add the opacity and emissivity if lambda
+  ! is lower (greater) than the wavelength threshold lambdaEdge
+  ! (the frequency threshold) and if greater (lower) than
+  ! wavelength min (frequency max). See Hydrogen b-f for more
+  ! informations, and Hubeny & Mihalas chap. 7
+
+
+  do m=1,atmos%Npassiveatoms
+  ! run over all passive atoms
+   metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
+   if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
+
+    do kr=1,metal%Ncont
+     continuum = metal%continua(kr)
+     i = continuum%i
+     j = continuum%j !+1 wrt C indexing
+     Nblue = continuum%Nblue; Nred = continuum%Nred
+     !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid continua not defined on the grid
+     
+     allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda))
+     !hc_kla = hc_k/NLTEspec%lambda(Nblue:Nred) !factor 1/NM_TO_M in hc_k
+     twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
+
+     lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
+               ! associated to the minimal frquency needed
+               ! to unbound an electron
+
+    ! -> prevents dividing by zero
+     ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
+     ! between the level i and j, but not for the others.
+!	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
+    if (metal%nstar(j,icell) <= tiny_dp) then
+       if (metal%nstar(j,icell) <= 0) then
+        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
+        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
+        write(*,*) "skipping this level"
+       end if
+       CYCLE
+    end if
+
+     
+     gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
+     			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
+
+!      write(*,*)
+!       write(*,*) maxval(metal%n(i,icell)*(1.-expla(Nblue:Nred))), &
+!       	maxval(metal%n(i,icell)-gijk(Nblue:Nred)*metal%n(i,icell))
+!      stop
+     if (lstore_opac) then !we don't care about proc id id
+!       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
+!        				continuum%alpha(Nblue:Nred) * &
+!        				(1.-expla(Nblue:Nred))*metal%n(i,icell)
+      NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
+       				bound_free_Xsection(continuum) * &
+       				(metal%n(i,icell)-gijk(:)*metal%n(i,icell))
+       				
+      NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
+       				twohnu3_c2(:) * gijk(:) * &
+         			bound_free_Xsection(continuum)*metal%n(j,icell)
+     else !proc id is important
+!       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+!        				continuum%alpha(Nblue:Nred) * &
+!        				(1.-expla(Nblue:Nred))*metal%n(i,icell) !-->ETL only
+      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+       				bound_free_Xsection(continuum) * &
+       				(metal%n(i,icell)-gijk(:)*metal%n(j,icell))
+
+      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+      				twohnu3_c2(:) * gijk(:) * &
+         			bound_free_Xsection(continuum)*metal%n(j,icell)
+     end if
+
+     deallocate(gijk, twohnu3_c2)
+    end do ! loop over Ncont
+  end do !loop over metals
+
+ RETURN
+ END SUBROUTINE Metal_bf
+ 
+  SUBROUTINE Metal_bf_old(id, icell)
  !cross-section in cm2 per particle is given by Kramers’ formula
   !with n the principal quantum number of the level i from
  !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
@@ -195,13 +314,13 @@ MODULE metal
   end do !loop over metals
 
  RETURN
- END SUBROUTINE Metal_bf
+ END SUBROUTINE Metal_bf_old
 
  SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
   ! not treated in NLTE.
-  ! Because damping is wavelength dependent and depend only on
+  ! Because damping is wavelength independent and depend only on
   ! the grid (cell) points, here, if line%damping_initialized
   ! do not CALL Damping()
   ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
@@ -213,19 +332,13 @@ MODULE metal
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   character(len=20)							                :: VoigtMethod = "HUMLICEK"
-  !double precision, dimension(:), allocatable   			:: Vij
-  double precision, dimension(NLTEspec%Nwaves)				:: Vij
-  double precision 											:: twohnu3_c2, hc, fourPI, &
-      														   hc_4PI, gij
+  double precision, dimension(:), allocatable				:: Vij
+  double precision 											:: twohnu3_c2, gij
   integer													:: Nred, Nblue
   type (AtomicLine)										    :: line
   type (AtomType)											:: atom
   double precision, dimension(:,:), allocatable 			:: psiZ, phiZ
   double precision, allocatable, dimension(:) 				:: phi(:)
-
-  hc = HPLANCK * CLIGHT
-  fourPI = 4.*PI
-  hc_4PI = hc/fourPI
 
 
   do m=1,atmos%Npassiveatoms
@@ -236,6 +349,7 @@ MODULE metal
      i = line%i; j = line%j
      Nred = line%Nred; Nblue = line%Nblue
      !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid lines not defined on the grid
+     allocate(Vij(line%Nlambda))
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
      ! -> prevents dividing by zero
@@ -263,16 +377,13 @@ MODULE metal
      CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, phi, phiZ, psiZ)
 
      !Sum up all contributions for this line with the other
-     Vij(Nblue:Nred) = &
-      hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
+     Vij(:) = hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-       		Vij(Nblue:Nred) * (atom%n(i,icell)-gij*atom%n(j,icell))
+     		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + Vij(:) * (atom%n(i,icell)-gij*atom%n(j,icell))
 
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-       		twohnu3_c2 * gij * Vij(Nblue:Nred) * atom%n(j,icell)
+     		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + twohnu3_c2 * gij * Vij(:) * atom%n(j,icell)
 
 !          write(*,*) "check"
 !          write(*,*) gij,  atom%g(i)/atom%g(j)
@@ -293,8 +404,8 @@ MODULE metal
        end do 
      end if
      
-     !deallocate(Vij,phi)
-     deallocate(phi)
+     deallocate(Vij,phi)
+     !deallocate(phi)
      if (PRT_SOLUTION == "FULL_STOKES") deallocate(psiZ, phiZ)
     end do !end loop on lines for this atom
   end do !end loop over Natom
