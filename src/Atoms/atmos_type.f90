@@ -25,10 +25,13 @@ MODULE atmos_type
   character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
   !path to your partition function data
 
+  !Wrappers to create arrays of Pointers
+
   TYPE atomPointerArray
    type(AtomType), pointer :: ptr_atom => NULL()
   END TYPE atomPointerArray
   
+  !Is this one really needed ? and why it doesn't work in solvene ?
   TYPE elemPointerArray
    type(Element), pointer :: ptr_elem => NULL()
   END TYPE elemPointerArray
@@ -548,9 +551,10 @@ MODULE atmos_type
   end do
   atmos%wght_per_H = atmos%avgWeight
   atmos%avgWeight = atmos%avgWeight/atmos%totalAbund
-  !write(*,*) "Final total A = ", atmos%totalAbund
-  !write(*,*) "Final total average weight = ", atmos%avgWeight
-  !write(*,*) "Weight per Hydrogen = ", atmos%wght_per_H
+  write(*,*) "Total Abundance in the atmosphere = ", atmos%totalAbund
+  write(*,*) "Total average weight = ", atmos%avgWeight
+  write(*,*) "Weight per Hydrogen = ", atmos%wght_per_H
+  write(*,*) ""
   close(unit=1)
 
   RETURN

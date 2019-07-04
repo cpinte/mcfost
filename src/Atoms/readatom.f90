@@ -69,7 +69,7 @@ MODULE readatom
     match = .false.
     do nll=1,Nelem
      if (atmos%Elements(nll)%ptr_elem%ID.eq.atom%ID) then
-      !write(*,*) "Abundance found for atom ",atom%ID,atmos%Elements(nll)%Abund
+      write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund
       if (atmos%Elements(nll)%ptr_elem%abundance_set.eqv..true.) then
         atom%periodic_table=nll
         atom%Abund=atmos%Elements(nll)%ptr_elem%Abund
