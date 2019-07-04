@@ -13,7 +13,7 @@
 MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
- use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, CollisionData
+ use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol
  use readatom,only : path_to_atoms
  use atmos_type, only : atomZnumber, atmos, Hydrogen, Helium
  use getline
@@ -1063,515 +1063,48 @@ MODULE collision
  
 !-> Futur deprecation, will be computed on the fly, but his routine will be kept
 !-> Or data should be kept in memory but seems diffcult to handle all cases
- SUBROUTINE CollisionRate_File(icell, atom)
- ! --------------------------------------------------
- ! Computes collisional rates and fills the C matrix.
- ! The routine is made such that new recipe can be
- ! implemented easily (I think).
- ! C_ij = C(i,j) = C j->i
- ! Remeber, atom%C(Nlevel*Nlevel) now
- ! we define indexes ij, and ji to run in the matrix
- !
- !
- ! (1) atomic file is opened with openCollisionFile at the
- ! atom%offset_coll position in the file. Before leaving
- ! the subroutine, the cursor is reset to atom%offset_coll position
- ! for next cell point. 
- ! The file is closed at the end of the simulation. 
- ! This trick avoid closing/reopening the file at each cell point.
- ! --------------------------------------------------
-  type (AtomType), intent(inout) :: atom
-  integer, intent(in) :: icell
-  integer :: ij, k, Nread, countline=0, colunit, checkfseek, fseek
-  integer :: NTMP, n, m, ii, Nitem, i1, i2, i, j, ji, Nitem2
-  character(len=8) :: END_OF_FILE="END     ", key
-  real(8), dimension(:), allocatable :: TGRID, coeff
-  double precision :: C(atom%Nlevel*atom%Nlevel), np, CC
-  real(8) :: deltaE, C0, Cdown, Cup, gij, xj, fac, fxj
-  integer :: Ncoef, Nrow
-  character(len=MAX_LENGTH) :: inputline, FormatLine
-  real(8), dimension(:,:), allocatable :: badi, cdi
-  real(8) :: acolsh, tcolsh, aradsh, xradsh, adish, bdish
-  real(8) :: t0sh, t1sh, summrs, tg, cdn, ccup
-  real(8) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
-  real(8) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl=0.0
-
-  ! -- Nitem2 is here to check
-  ! that Nitem (read) is equals to the acutla number
-  ! of item read Nitem2
-  ! Actually the error will be in read(inputline,*)
-  ! because it reads in an array of size Nitem, so
-  ! Nitem are expected to be read and an error will be
-  ! raise otherwise.
-
-  ! file is already opened, and will be close at the end of the RT run
-  colunit = atom%colunit
-  !write(*,*) "Collision()->colunit = ", colunit, atom%colunit
- 
-  write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-  
-  C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
-
-  ! -- Initialise the collisional matrix at each cell--
-  C(:) = 0d0
-  !temporary
-  atom%Ckij(icell,:) = 0d0 !C j->i = C(j,i)
-
-
-
-  key="        "
-  ! -- Go throught the remaining lines in the file --
-  ! read collisional data depending the cases of recipes.
-
-  do while(key.ne.END_OF_FILE)
-   countline = countline + 1
-   CALL getnextline(colunit, COMMENT_CHAR, FormatLine, inputline, Nread)
-
-   ! do not go further, because after there is
-   ! the number of grid points, which is in general
-   ! one or two digits.
-   ! if you intend to increase the number of grid points
-   ! for the interpolation of the coefficients
-   ! you have to modify the file to flush right
-   ! everything after the TEMP keyword.
-
-   key = adjustl(inputline(1:len(key)))
-   !write(*,*) trim(inputline)
-   !write(*,*) "Line = ", countline, " key=",key,"."
-   if (key.eq."TEMP") then
-    read(inputline(len(key)+1:len(key)+3), *) NTMP
-    !write(*,*) "NTMP = ", NTMP
-    if (allocated(TGRID)) deallocate(TGRID)
-    allocate(TGRID(NTMP))
-    ! Nread is len(NTMP) in string format, offset
-    ! inputline to read TGRID only, after NTMP.
-
-    read(inputline(len(key)+3:Nread),*) (TGRID(k), k=1,NTMP)
-    !write(*,*) (TGRID(k), k=1,NTMP)
-    Nitem = NTMP
-    Nitem2 = size(TGRID)
-
-   else if ((key.eq."OMEGA") .or. (key.eq."CE") .or.&
-        (key.eq."CI") .or. (key.eq."CP") .or. &
-        (key.eq."CH0") .or. (key.eq."CH+") .or. &
-        (key.eq."CH") .or. (key.eq."CR")) then
-
-    ! -- read level indices and collision coefficients --
-    Nitem = NTMP
-    if (allocated(coeff)) deallocate(coeff)
-    allocate(coeff(Nitem))
-    ! offset inputline to avoid re-reading key.
-    ! but read(inputline,*) key, i1, i2, coeff is OK
-    !write(*,*) key, inputline(len(key)+1:)
-    read(inputline(len(key)+1:),*) i1, i2, &
-         (coeff(k),k=1,Nitem)
-
-    Nitem2 = size(coeff)
-
-    i = MIN(i1,i2) + 1
-    j = MAX(i1,i2) + 1 !from 1 to Nlevel (in C, 0 to Nlevel-1)
-    ij = (i-1)*atom%Nlevel + j!j->i
-    ji = (j-1)*atom%Nlevel + i !i->j
-    ! -- Note:
-    ! Cf = C(Nlevel,Nlevel).flatten, of size Nlevel*Nlevel
-    ! C(i,j) = Cf(ij) = Cf(i*Nlevel + j)
-    ! C(1,1) = Cf(1) -> i*Nlevel +j = 1 -> i=i-1
-
-   else if ((key.eq."AR85-CHP").or.(key.eq."AR85-CHH")) then
-    Nitem = 6
-    if (allocated(coeff)) deallocate(coeff)
-    allocate(coeff(Nitem))
-    read(inputline(len(key)+1:),*) i1, i2, &
-        (coeff(k),k=1,Nitem)
-    !write(*,*) inputline(len(key)+1:)
-
-    Nitem2 = size(coeff)
-
-    i = MIN(i1,i2) + 1
-    j = MAX(i1,i2) + 1
-    ij = (i-1)*atom%Nlevel + j
-    ji = (j-1)*atom%Nlevel + i
-
-   else if ((key.eq.'AR85-CEA').or.(key.eq."BURGESS")) then
-     Nitem = 1
-     if (allocated(coeff)) deallocate(coeff)
-     allocate(coeff(Nitem))
-
-     read(inputline(len(key)+1:),*) i1, i2, coeff(1)
-     i = MIN(i1,i2) + 1
-     j = MAX(i1,i2) + 1
-     ij = (i-1)*atom%Nlevel + j
-     ji = (j-1)*atom%Nlevel + i
-
-     Nitem2 = size(coeff)
-     !write(*,*) "CEA or BURGESS", i1, i2, i, ij
-
-   else if (key.eq."SHULL82") then
-     Nitem = 8
-     if (allocated(coeff)) deallocate(coeff)
-     allocate(coeff(Nitem))
-
-     read(inputline(len(key)+1:),*) i1, i2,&
-         (coeff(k),k=1,Nitem)
-     i = MIN(i1,i2) + 1
-     j = MAX(i1,i2) + 1
-     ij = (i-1)*atom%Nlevel+j
-     ji = (j-1)*atom%Nlevel +i
-
-     Nitem2 = size(coeff)
-
-
-   else if (key.eq."BADNELL") then
-    ! -- BADNELL formula for dielectronic recombination --
-
-    !write(*,*) inputline, Nread
-    read(inputline(len(key)+1:),*) i1, i2, Ncoef
-    Nrow = 2
-    Nitem = Nrow*Ncoef
-    allocate(badi(Nrow,Ncoef))
-    ! they are two lines of Nitem elements to read
-    !write(*,*) i1, i2, Ncoef
-    do m=1,Nrow
-      CALL getnextline(colunit, COMMENT_CHAR, &
-             FormatLine, inputline, Nread)
-      !write(*,*) 'row=',m, inputline, Nread
-      read(inputline,*) (badi(m,k),k=1,Ncoef)
-    end do
-    i = MIN(i1,i2) + 1
-    j = MAX(i1,i2) + 1
-    ij = atom%Nlevel*(i-1) + j
-    ji = atom%Nlevel*(j-1) + i
-
-    Nitem2 = size(badi(1,:)) * size(badi(:,1))
-
-   else if (key.eq."SUMMERS") then
-    ! -- Switch for density dependent DR coefficient
-    !
-    ! Give the default multiplication factor of summers
-    ! density dependence of dielectronic recombination:
-    ! sumscl = 0. -> no density dependence
-    ! sumscl = 1. -> full density dependence
-
-    Nitem = 1
-    read(inputline(len(key)+1:), *) sumscl
-
-    Nitem2 = 1
-
-   else if (key.eq."AR85-CDI") then
-    read(inputline(len(key)+1:),*) i1, i2, Nrow
-
-    if (Nrow.gt.MSHELL) then
-     write(*,*) "Nrow is greater than MSHELL, exiting..."
-     stop
-    end if
-    Nitem = Nrow*MSHELL
-    allocate(cdi(Nrow, MSHELL))
-    do m=1,Nrow
-      CALL getnextline(colunit, COMMENT_CHAR, &
-       FormatLine, inputline, Nread)
-      read(inputline,*) (cdi(m,k),k=1,MSHELL)
-    end do
-
-    Nitem2 = size(cdi(1,:)) * size(cdi(:,1))
-
-    i = MIN(i1,i2) + 1
-    j = MAX(i1,i2) + 1
-    ij = (i-1)*atom%Nlevel +j
-    ji = (j-1)*atom%Nlevel +i
-
-   else if (key.eq.END_OF_FILE) then
-    exit
-   else
-    write(*,*) "Keyword '", key,"' unknown!"
-    write(*,*) "exiting..."
-    stop
-   end if ! end over possible cases key
-
-   if (Nitem2 .ne. Nitem) then
-    ! -- Actually, the error should be in the reading.
-    write(*,*) "Error, read ", Nitem2," items->expected ", &
-     Nitem
-    write(*,*) "This should never happen, here."
-    write(*,*) "Exiting..."
-    stop
-   end if
-
-   ! -- END of reading, filling now ...
-
-   if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
-       (key.eq."CI") .or. (key.eq."CP") .or. &
-       (key.eq."CH0") .or. (key.eq."CH+") .or. &
-       (key.eq."CH") .or. (key.eq."CR") ) then
-
-
-                      !here Nitem is NTMP !!
-    CC = interp_dp(coeff, TGRID, atmos%T(icell))
-
-   end if
-   if (key.eq."OMEGA") then
-    ! -- Collisional excitation of ions
-
-    !!do k=1, atmos%Nspace !! cell by cell
-     !! C is a constant, replace by C(k) if for all grid at once
-     !! and C(ij) by C(ij,k)
-     Cdown = C0 * atmos%ne(icell) * CC / &
-      (atom%g(j)*dsqrt(atmos%T(icell)))
-     C(ij) = C(ij) + Cdown
-     ! remember the relation between Cij and Cji
-     ! which takes place at LTE.
-     C(ji) = C(ji) + Cdown * &
-      atom%nstar(j,icell)/atom%nstar(i,icell)
-    !!end do !! cell by cell
-   else if (key.eq."CE") then
-    ! -- Collisional excitation of neutrals
-    gij = atom%g(i)/atom%g(j)
-    !!do k=1,atmos%Nspace
-     Cdown = CC * atmos%ne(icell) * gij * dsqrt(atmos%T(icell))
-     !write(*,*) key, "k=",k, "Cdown = ", Cdown, C(k)
-     !write(*,*) "ne=",atmos%ne(k), gij, "sqrt(T)=",dsqrt(atmos%T(k))
-     C(ij) = C(ij) + Cdown
-     C(ji) = C(ji) + Cdown * &
-      atom%nstar(j,icell)/atom%nstar(i,icell)
-    !!end do
-   else if (key.eq."CI") then
-    ! -- Collisional ionisation
-    deltaE = atom%E(j) - atom%E(i)
-    !!do k=1,atmos%Nspace
-     Cup = CC * atmos%ne(icell) * &
-       exp(-deltaE/(KBOLTZMANN*atmos%T(icell))) *dsqrt(atmos%T(icell))
-     !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
-     !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*atmos%T(k)))
-     C(ji) = C(ji) + Cup
-     C(ij) = C(ij) + Cup * &
-      atom%nstar(i,icell)/atom%nstar(j,icell)
-    !!end do
-   else if (key.eq."CR") then
-    ! -- Collisional de-excitation by electrons
-    !!do k=1,atmos%Nspace
-     Cdown = atmos%ne(icell) * CC
-     C(ij) = C(ij) + Cdown
-    !!end do
-   else if (key.eq."CP") then
-    ! -- collisions with protons
-    ! protons are the last level of Hydrogen atoms
-    np = Hydrogen%n(Hydrogen%Nlevel,icell)
-    !!do k=1,atmos%Nspace
-     Cdown = np * CC
-     C(ij) = C(ij) + Cdown
-     C(ji) = C(ji) + Cdown * &
-     atom%nstar(j,icell) / atom%nstar(i,icell)
-    !!end do
-   else if (key.eq."CH") then
-    ! -- Collisions with neutral hydrogen
-    !!do k=1,atmos%Nspace
-     Cup = Hydrogen%n(1,icell) * CC
-     C(ji) = C(ji) + Cup
-     C(ij) = C(ij) + Cup * &
-      atom%nstar(i,icell) / atom%nstar(j,icell)
-   !! end do
-   else if (key.eq."CH0") then
-    ! -- Charge exchange with neutral hydrogen
-    !!do k=1,atmos%Nspace
-     C(ij) = C(ij) + Hydrogen%n(1,icell)*CC
-    !!end do
-   else if (key.eq."CH+") then
-    ! -- charge exchange with protons
-    np = Hydrogen%n(Hydrogen%Nlevel,icell)
-    !!do k=1,atmos%Nspace
-     C(ji) = C(ji) + np*CC
-    !!end do
-   else if (key.eq."SHULL82") then
-    acolsh = coeff(1)
-    tcolsh = coeff(2)
-    aradsh = coeff(3)
-    xradsh = coeff(4)
-    adish = coeff(5)
-    bdish = coeff(6)
-    t0sh = coeff(7)
-    t1sh = coeff(8)
-    !!do k=1,atmos%Nspace
-     summrs = sumscl*summers(i,j,atmos%ne(icell),atom)
-     summrs = summrs + (1.-sumscl)
-     tg = atmos%T(icell)
-     cdn = aradsh * dpow(tg/1.d4, -xradsh) + &
-       summrs*adish / tg / dsqrt(tg) * exp(-t0sh/tg) * &
-       (1. + (bdish*exp(-t1sh/tg)))
-     cup = acolsh * dsqrt(tg) * exp(-tcolsh/tg) / &
-      (1. + 0.1*tg/tcolsh)
-     ! -- convert from cm3 /s to m3/s
-     cdn = cdn * atmos%ne(icell) * CUBE(CM_TO_M)
-     cup = cup*atmos%ne(icell)*CUBE(CM_TO_M)
-     ! -- 3-body recombination (high density limit)
-     cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
-     !write(*,*) "k=",k, " cdn = ", cdn
-     C(ij) = C(ij) + cdn
-     C(ji) = C(ji) + cup
-    !!end do
-   else if (key.eq."BADNELL") then
-    ! -- Fit for dielectronic recombination form Badnell
-    ! First line coefficients are energies in K (from Chianti)
-    ! Second line coefficients are coefficients (from Chianti)
-    ! See Badnell 2006 for more details
-
-    !!do k =1,atmos%Nspace
-     summrs = sumscl*summers(i,j,atmos%ne(icell),atom) + &
-       (1.-sumscl)
-     tg = atmos%T(icell)
-     cdn = 0.
-     do ii=1,Ncoef
-      cdn = cdn + badi(2,ii) * exp(-badi(1,ii)/tg)
-     end do
-     cdn = cdn * dpow(tg, -1.5d0)
-     !write(*,*) "k=",k, " cdn = ", cdn, " summrs = ",summrs, "cdn=", cdn
-     ! -- convert from cm3/s to m3/s
-     cdn = cdn *atmos%ne(icell) * summrs * CUBE(CM_TO_M)
-     cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
-
-     cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
-
-     C(ij) = C(ij) + cdn
-     C(ji) = C(ji) + cup
-     !write(*,*) "BADNELL", cdn, cup
-    !!end do
-    deallocate(badi)
-   else if (key.eq."AR85-CDI") then
-    ! -- Direct collisional ionisation
-    !!do k=1,atmos%Nspace
-     cup = 0.
-     tg = atmos%T(icell)
-     do m=1,Nrow
-      xj = cdi(m,1) * EV/ (KBOLTZMANN*tg)
-      fac = exp(-xj) * dsqrt(xj)
-      fxj = cdi(m,2) + cdi(m,3) * (1.+xj) + &
-       (cdi(m,4) - xj*(cdi(m,2)+cdi(m,3)*(2.+xj)))*&
-        fone(xj) + cdi(m,5)*xj*ftwo(xj)
-      fxj = fxj * fac
-      !write(*,*) fxj, ftwo(xj), fone(xj)
-      fac = 6.69d-7 / dpow(cdi(m,1),1.5d0)
-      cup = cup + fac*fxj*CUBE(CM_TO_M)
-     end do
-     if (cup.lt.0.) cup = 0.
-     cup = cup * atmos%ne(icell)
-     cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
-     C(ij) = C(ij) + cdn
-     C(ji) = C(ji) + cup
-     !write(*,*) "CDU", cdn, cup
-     !write(*,*) "CDI: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
-     ! " C[ji,k]=",C(ji,k)
-    !!end do
-    deallocate(cdi)
-   else if (key.eq."AR85-CEA") then
-    ! -- Autoionisation
-    !!do k=1,atmos%Nspace
-     fac = ar85cea(i,j,icell,atom)
-     !write(*,*) "fac=", fac
-     cup = coeff(1)*fac*atmos%ne(icell)
-     C(ji) = C(ji) + cup
-     !write(*,*) "AR85-CEA, cup=", cup
-     !write(*,*) "CEA: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
-     !  " C[ji,k]=",C(ji,k)
-    !!end do
-   else if (key.eq."AR85-CHP") then
-    ! -- Charge transfer with ionised Hydrogen
-    ar85t1 = coeff(1)
-    ar85t2 = coeff(2)
-    ar85a = coeff(3)
-    ar85b = coeff(4)
-    ar85c = coeff(5)
-    ar85d = coeff(6)
-    !!do k =1,atmos%Nspace
-     if ((atmos%T(icell).ge.ar85t1).and.&
-          (atmos%T(icell).le.ar85t2)) then
-      t4 = atmos%T(icell)/1d4
-      cup = ar85a * 1d-9 * dpow(t4,ar85b) * &
-        exp(-ar85c*t4) * &
-        exp(-ar85d*EV/KBOLTZMANN/atmos%T(icell)) * &
-        Hydrogen%n(Hydrogen%Nlevel,icell) * &
-        CUBE(CM_TO_M)
-      C(ji) = C(ji) + cup
-     end if
-    !!end do
-   else if (key.eq."AR85-CHH") then
-    ! Charge transfer with neutral Hydrogen
-    ar85t1 = coeff(1)
-    ar85t2 = coeff(2)
-    ar85a = coeff(3)
-    ar85b = coeff(4)
-    ar85c = coeff(5)
-    ar85d = coeff(6)
-    !!do k=1,atmos%Nspace
-     if ((atmos%T(icell).ge.ar85t1).and.&
-         (atmos%T(icell).le.ar85t2)) then
-      t4 = atmos%T(icell)/1d4
-      cdn = ar85a * 1d-9 * dpow(t4, ar85b) * &
-       (1. + ar85c*exp(ar85d*t4)) * &
-       Hydrogen%n(1,icell) * CUBE(CM_TO_M)
-      C(ij) = C(ij) + cdn
-     end if
-    !!end do
-   else if (key.eq."BURGESS") then
-    write(*,*) "BURGESS NOT CHECK"
-    ! -- Electron impact ionisation from Burgess Chidichimo
-    ! 1983, MNRAS, 203, 1269-1280
-    de = (atom%E(j)-atom%E(i))/EV
-    zz = atom%stage(i) !0 for neutrals
-    betab = 0.25*(dsqrt((100.*zz+91)/(4.*zz+3.))-5.)
-    cbar = 2.3
-    !!do k=1,atmos%Nspace
-     dekt = de*EV / (KBOLTZMANN*atmos%T(k))
-     dekt = MIN(500., dekt)
-     dekti = 1./dekt
-     wlog = log(1.+dekti)
-     wb = dpow(wlog, betab/(1.+dekti))
-     cup = 2.1715d-8 * cbar * dpow(13.6/de, 1.5d0) * &
-         dsqrt(dekt) * E1(dekt) * wb * atmos%ne(icell) * &
-         CUBE(CM_TO_M)
-     ! -- Fudge factor
-     cup = cup * coeff(1)
-     cdn = cup * atom%nstar(i,icell) / atom%nstar(j,icell)
-     write(*,*) "BRUGESS, cdn=", cdn, " cup=", cup
-     C(ji) = C(ji) + cup
-     C(ij) = C(ij) + cdn
-    !!end do
-   end if
-  end do !loop over (remaining) lines (of the atomic model)
-
- 
- !!close(colunit) !! closed latter
- !! reset the cursor for next cell point !!
- checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
- if (checkfseek.gt. 0 ) then 
-   write(*,*) 'fseek error'
-   stop 
- end if
-
- atom%Ckij(icell,:) = C(:)
- deallocate(TGRID)
- !!deallocate(C) !! not an array anymore
- deallocate(coeff)
-
- RETURN
- END SUBROUTINE CollisionRate_File
-
-END MODULE collision
-
-
- 
-!building
-!  SUBROUTINE fill_ColData(atom)
-!  !once before NLTE loop
-!  ! depth independent because ne factorised out
-!  ! for all j, i so that initGamma() -> atom%Gamma(icell) = ne(icell)%Collsion_Atom(atom)
+!  SUBROUTINE CollisionRate_File(icell, atom)
+!  ! --------------------------------------------------
+!  ! Computes collisional rates and fills the C matrix.
+!  ! The routine is made such that new recipe can be
+!  ! implemented easily (I think).
+!  ! C_ij = C(i,j) = C j->i
+!  ! Remeber, atom%C(Nlevel*Nlevel) now
+!  ! we define indexes ij, and ji to run in the matrix
+!  !
+!  !
+!  ! (1) atomic file is opened with openCollisionFile at the
+!  ! atom%offset_coll position in the file. Before leaving
+!  ! the subroutine, the cursor is reset to atom%offset_coll position
+!  ! for next cell point. 
+!  ! The file is closed at the end of the simulation. 
+!  ! This trick avoid closing/reopening the file at each cell point.
+!  ! --------------------------------------------------
 !   type (AtomType), intent(inout) :: atom
-!   integer :: colunit, i1, i2, NTMP, Nitem, i, j, Nrow, ij, ji
-!   integer :: countline=0, Nread, k, Nr = 0
-!   character(len=MAX_LENGTH) :: inputline, FormatLine
-!   double precision :: C0, gij, deltaE
-!   double precision, allocatable, dimension(:) :: coeffs, Temp
+!   integer, intent(in) :: icell
+!   integer :: ij, k, Nread, countline=0, colunit, checkfseek, fseek
+!   integer :: NTMP, n, m, ii, Nitem, i1, i2, i, j, ji, Nitem2
 !   character(len=8) :: END_OF_FILE="END     ", key
-!   
-!   CALL openCollisionFile(atom)
-!   
+!   real(8), dimension(:), allocatable :: TGRID, coeff
+!   double precision :: C(atom%Nlevel*atom%Nlevel), np, CC
+!   real(8) :: deltaE, C0, Cdown, Cup, gij, xj, fac, fxj
+!   integer :: Ncoef, Nrow
+!   character(len=MAX_LENGTH) :: inputline, FormatLine
+!   real(8), dimension(:,:), allocatable :: badi, cdi
+!   real(8) :: acolsh, tcolsh, aradsh, xradsh, adish, bdish
+!   real(8) :: t0sh, t1sh, summrs, tg, cdn, ccup
+!   real(8) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
+!   real(8) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl=0.0
+! 
+!   ! -- Nitem2 is here to check
+!   ! that Nitem (read) is equals to the acutla number
+!   ! of item read Nitem2
+!   ! Actually the error will be in read(inputline,*)
+!   ! because it reads in an array of size Nitem, so
+!   ! Nitem are expected to be read and an error will be
+!   ! raise otherwise.
+! 
+!   ! file is already opened, and will be close at the end of the RT run
 !   colunit = atom%colunit
 !   !write(*,*) "Collision()->colunit = ", colunit, atom%colunit
 !  
@@ -1579,14 +1112,20 @@ END MODULE collision
 !   
 !   C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
 ! 
+!   ! -- Initialise the collisional matrix at each cell--
+!   C(:) = 0d0
+!   !temporary
+!   atom%Ckij(icell,:) = 0d0 !C j->i = C(j,i)
+! 
+! 
+! 
 !   key="        "
 !   ! -- Go throught the remaining lines in the file --
 !   ! read collisional data depending the cases of recipes.
-!   ! Read blocks by blocks
 ! 
 !   do while(key.ne.END_OF_FILE)
 !    countline = countline + 1
-!    CALL getnextline(colunit, COMMENT_CHAR,FormatLine, inputline, Nread)
+!    CALL getnextline(colunit, COMMENT_CHAR, FormatLine, inputline, Nread)
 ! 
 !    ! do not go further, because after there is
 !    ! the number of grid points, which is in general
@@ -1602,175 +1141,416 @@ END MODULE collision
 !    if (key.eq."TEMP") then
 !     read(inputline(len(key)+1:len(key)+3), *) NTMP
 !     !write(*,*) "NTMP = ", NTMP
-!     if (allocated(temp)) deallocate(Temp)
-!     allocate(temp(NTMP))
+!     if (allocated(TGRID)) deallocate(TGRID)
+!     allocate(TGRID(NTMP))
 !     ! Nread is len(NTMP) in string format, offset
 !     ! inputline to read TGRID only, after NTMP.
 ! 
-!     read(inputline(len(key)+3:Nread),*) (temp, k=1,NTMP)
+!     read(inputline(len(key)+3:Nread),*) (TGRID(k), k=1,NTMP)
+!     !write(*,*) (TGRID(k), k=1,NTMP)
 !     Nitem = NTMP
-!     
+!     Nitem2 = size(TGRID)
+! 
 !    else if ((key.eq."OMEGA") .or. (key.eq."CE") .or.&
 !         (key.eq."CI") .or. (key.eq."CP") .or. &
 !         (key.eq."CH0") .or. (key.eq."CH+") .or. &
 !         (key.eq."CH") .or. (key.eq."CR")) then
 ! 
-!      Nr = Nr + 1
-!      ! -- read level indices and collision coefficients --
-!      if (allocated(coeffs)) deallocate(coeffs)
-!      allocate(coeffs(NTMP))
-! 
+!     ! -- read level indices and collision coefficients --
+!     Nitem = NTMP
+!     if (allocated(coeff)) deallocate(coeff)
+!     allocate(coeff(Nitem))
 !     ! offset inputline to avoid re-reading key.
 !     ! but read(inputline,*) key, i1, i2, coeff is OK
 !     !write(*,*) key, inputline(len(key)+1:)
-!      read(inputline(len(key)+1:),*) i1, i2, (coeffs(k),k=1,NTMP)
+!     read(inputline(len(key)+1:),*) i1, i2, &
+!          (coeff(k),k=1,Nitem)
+! 
+!     Nitem2 = size(coeff)
+! 
+!     i = MIN(i1,i2) + 1
+!     j = MAX(i1,i2) + 1 !from 1 to Nlevel (in C, 0 to Nlevel-1)
+!     ij = (i-1)*atom%Nlevel + j!j->i
+!     ji = (j-1)*atom%Nlevel + i !i->j
+!     ! -- Note:
+!     ! Cf = C(Nlevel,Nlevel).flatten, of size Nlevel*Nlevel
+!     ! C(i,j) = Cf(ij) = Cf(i*Nlevel + j)
+!     ! C(1,1) = Cf(1) -> i*Nlevel +j = 1 -> i=i-1
+! 
+!    else if ((key.eq."AR85-CHP").or.(key.eq."AR85-CHH")) then
+!     Nitem = 6
+!     if (allocated(coeff)) deallocate(coeff)
+!     allocate(coeff(Nitem))
+!     read(inputline(len(key)+1:),*) i1, i2, &
+!         (coeff(k),k=1,Nitem)
+!     !write(*,*) inputline(len(key)+1:)
+! 
+!     Nitem2 = size(coeff)
+! 
+!     i = MIN(i1,i2) + 1
+!     j = MAX(i1,i2) + 1
+!     ij = (i-1)*atom%Nlevel + j
+!     ji = (j-1)*atom%Nlevel + i
+! 
+!    else if ((key.eq.'AR85-CEA').or.(key.eq."BURGESS")) then
+!      Nitem = 1
+!      if (allocated(coeff)) deallocate(coeff)
+!      allocate(coeff(Nitem))
+! 
+!      read(inputline(len(key)+1:),*) i1, i2, coeff(1)
 !      i = MIN(i1,i2) + 1
 !      j = MAX(i1,i2) + 1
-!      ij = (i-1)*atom%Nlevel + j  
-!      ji = (j-1)*atom%Nlevel + i 
-!     !Remember ji = i->j; ij = j->i
-! !    else if .... Nrec = Nrec + 1..
+!      ij = (i-1)*atom%Nlevel + j
+!      ji = (j-1)*atom%Nlevel + i
+! 
+!      Nitem2 = size(coeff)
+!      !write(*,*) "CEA or BURGESS", i1, i2, i, ij
+! 
+!    else if (key.eq."SHULL82") then
+!      Nitem = 8
+!      if (allocated(coeff)) deallocate(coeff)
+!      allocate(coeff(Nitem))
+! 
+!      read(inputline(len(key)+1:),*) i1, i2,&
+!          (coeff(k),k=1,Nitem)
+!      i = MIN(i1,i2) + 1
+!      j = MAX(i1,i2) + 1
+!      ij = (i-1)*atom%Nlevel+j
+!      ji = (j-1)*atom%Nlevel +i
+! 
+!      Nitem2 = size(coeff)
+! 
+! 
+!    else if (key.eq."BADNELL") then
+!     ! -- BADNELL formula for dielectronic recombination --
+! 
+!     !write(*,*) inputline, Nread
+!     read(inputline(len(key)+1:),*) i1, i2, Ncoef
+!     Nrow = 2
+!     Nitem = Nrow*Ncoef
+!     allocate(badi(Nrow,Ncoef))
+!     ! they are two lines of Nitem elements to read
+!     !write(*,*) i1, i2, Ncoef
+!     do m=1,Nrow
+!       CALL getnextline(colunit, COMMENT_CHAR, &
+!              FormatLine, inputline, Nread)
+!       !write(*,*) 'row=',m, inputline, Nread
+!       read(inputline,*) (badi(m,k),k=1,Ncoef)
+!     end do
+!     i = MIN(i1,i2) + 1
+!     j = MAX(i1,i2) + 1
+!     ij = atom%Nlevel*(i-1) + j
+!     ji = atom%Nlevel*(j-1) + i
+! 
+!     Nitem2 = size(badi(1,:)) * size(badi(:,1))
+! 
+!    else if (key.eq."SUMMERS") then
+!     ! -- Switch for density dependent DR coefficient
+!     !
+!     ! Give the default multiplication factor of summers
+!     ! density dependence of dielectronic recombination:
+!     ! sumscl = 0. -> no density dependence
+!     ! sumscl = 1. -> full density dependence
+! 
+!     Nitem = 1
+!     read(inputline(len(key)+1:), *) sumscl
+! 
+!     Nitem2 = 1
+! 
+!    else if (key.eq."AR85-CDI") then
+!     read(inputline(len(key)+1:),*) i1, i2, Nrow
+! 
+!     if (Nrow.gt.MSHELL) then
+!      write(*,*) "Nrow is greater than MSHELL, exiting..."
+!      stop
+!     end if
+!     Nitem = Nrow*MSHELL
+!     allocate(cdi(Nrow, MSHELL))
+!     do m=1,Nrow
+!       CALL getnextline(colunit, COMMENT_CHAR, &
+!        FormatLine, inputline, Nread)
+!       read(inputline,*) (cdi(m,k),k=1,MSHELL)
+!     end do
+! 
+!     Nitem2 = size(cdi(1,:)) * size(cdi(:,1))
+! 
+!     i = MIN(i1,i2) + 1
+!     j = MAX(i1,i2) + 1
+!     ij = (i-1)*atom%Nlevel +j
+!     ji = (j-1)*atom%Nlevel +i
+! 
 !    else if (key.eq.END_OF_FILE) then
 !     exit
 !    else
-!     write(*,*) key
-!     CALL Error("Not handled yet")
+!     write(*,*) "Keyword '", key,"' unknown!"
+!     write(*,*) "exiting..."
+!     stop
 !    end if ! end over possible cases key
-!    ! -- END of reading, filling now ... before going to next block
+! 
+!    if (Nitem2 .ne. Nitem) then
+!     ! -- Actually, the error should be in the reading.
+!     write(*,*) "Error, read ", Nitem2," items->expected ", &
+!      Nitem
+!     write(*,*) "This should never happen, here."
+!     write(*,*) "Exiting..."
+!     stop
+!    end if
+! 
+!    ! -- END of reading, filling now ...
+! 
+!    if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
+!        (key.eq."CI") .or. (key.eq."CP") .or. &
+!        (key.eq."CH0") .or. (key.eq."CH+") .or. &
+!        (key.eq."CH") .or. (key.eq."CR") ) then
+! 
+! 
+!                       !here Nitem is NTMP !!
+!     CC = interp_dp(coeff, TGRID, atmos%T(icell))
+! 
+!    end if
 !    if (key.eq."OMEGA") then
 !     ! -- Collisional excitation of ions
-!      k = 1
-!      if (.not.allocated(atom%col_data(k)%C)) then 
-!       allocate(atom%col_data(k)%C(atom%Nlevel*atom%Nlevel, atom%col_data%NT))
-!       allocate(atom%col_data(k)%T(atom%col_data%NT))
-!       atom%col_data%C1 = 0d0
-!      end if
-!      !Cji = C(ij) = C(j,i) / ne for all T of the grid
-! !      atom%col_data%Cji_omega(ij,:) = C0 * coeffs(:) / (atom%g(j)*dsqrt(atom%col_data%TGRID))
-!      atom%col_data%C1(ij,:) = atom%col_data%C1(ij,:) + C0 * coeffs(:) / (atom%g(j)*dsqrt(atom%col_data%TGRID))
-!      !C(j,i)_icell = interp(Cji_omega((i-1)*N+j,:))_atmos%T(icell) * atmos%ne(icell)
-!      !C(i,j)_icell = C(j,i_icell * (njstar_nistar)_icell
+! 
+!     !!do k=1, atmos%Nspace !! cell by cell
+!      !! C is a constant, replace by C(k) if for all grid at once
+!      !! and C(ij) by C(ij,k)
+!      Cdown = C0 * atmos%ne(icell) * CC / &
+!       (atom%g(j)*dsqrt(atmos%T(icell)))
+!      C(ij) = C(ij) + Cdown
+!      ! remember the relation between Cij and Cji
+!      ! which takes place at LTE.
+!      C(ji) = C(ji) + Cdown * &
+!       atom%nstar(j,icell)/atom%nstar(i,icell)
+!     !!end do !! cell by cell
 !    else if (key.eq."CE") then
-! !      allocate(atom%col_data%Cji_ce(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!      if (.not.allocated(atom%col_data%C1)) then 
-!       allocate(atom%col_data%C1(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C1 = 0d0
-!      end if
 !     ! -- Collisional excitation of neutrals
-!      gij = atom%g(i)/atom%g(j)
-!      atom%col_data%C1(ij,:) =  atom%col_data%C1(ij,:) + coeffs * gij * dsqrt(atom%col_data%TGRID) !/ne
-!    else if (key.eq."CI") then !here Cij=C(ji) is stored
-!      if (.not.allocated(atom%col_data%C2)) then
-!       allocate(atom%col_data%C2(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C2 = 0d0
-!      end if
+!     gij = atom%g(i)/atom%g(j)
+!     !!do k=1,atmos%Nspace
+!      Cdown = CC * atmos%ne(icell) * gij * dsqrt(atmos%T(icell))
+!      !write(*,*) key, "k=",k, "Cdown = ", Cdown, C(k)
+!      !write(*,*) "ne=",atmos%ne(k), gij, "sqrt(T)=",dsqrt(atmos%T(k))
+!      C(ij) = C(ij) + Cdown
+!      C(ji) = C(ji) + Cdown * &
+!       atom%nstar(j,icell)/atom%nstar(i,icell)
+!     !!end do
+!    else if (key.eq."CI") then
 !     ! -- Collisional ionisation
 !     deltaE = atom%E(j) - atom%E(i)
-!      atom%col_data%C2(ji,:) = atom%col_data%C2(ji,:) + coeffs * &
-!        exp(-deltaE/(KBOLTZMANN*atom%col_data%TGRID)) *dsqrt(atom%col_data%TGRID)
+!     !!do k=1,atmos%Nspace
+!      Cup = CC * atmos%ne(icell) * &
+!        exp(-deltaE/(KBOLTZMANN*atmos%T(icell))) *dsqrt(atmos%T(icell))
+!      !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
+!      !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*atmos%T(k)))
+!      C(ji) = C(ji) + Cup
+!      C(ij) = C(ij) + Cup * &
+!       atom%nstar(i,icell)/atom%nstar(j,icell)
+!     !!end do
 !    else if (key.eq."CR") then
-!      if (.not.allocated(atom%col_data%C1)) then
-!       allocate(atom%col_data%C1(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C1 = 0d0
-!      end if
 !     ! -- Collisional de-excitation by electrons
-!      atom%col_data%C1(ij,:) = atom%col_data%C1(ij,:) + coeffs
+!     !!do k=1,atmos%Nspace
+!      Cdown = atmos%ne(icell) * CC
+!      C(ij) = C(ij) + Cdown
+!     !!end do
 !    else if (key.eq."CP") then
-!      if (.not.allocated(atom%col_data%C3)) then
-!       allocate(atom%col_data%C3(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C3 = 0d0
-!      end if
 !     ! -- collisions with protons
 !     ! protons are the last level of Hydrogen atoms
-!     !here we need to multiply by np instead ne
-!      atom%col_data%C3(ij,:)  = atom%col_data%C3(ij,:) + coeffs(:)
+!     np = Hydrogen%n(Hydrogen%Nlevel,icell)
+!     !!do k=1,atmos%Nspace
+!      Cdown = np * CC
+!      C(ij) = C(ij) + Cdown
+!      C(ji) = C(ji) + Cdown * &
+!      atom%nstar(j,icell) / atom%nstar(i,icell)
+!     !!end do
 !    else if (key.eq."CH") then
-!      if (.not.allocated(atom%col_data%C4)) then
-!       allocate(atom%col_data%C4(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C4 = 0d0
-!      end if    
-!      ! -- Collisions with neutral hydrogen
-!     !here we need to multiply by neutral H
-!     atom%col_data%C4(ij,:) = atom%col_data%C4(ij,:) + coeffs(:)
+!     ! -- Collisions with neutral hydrogen
+!     !!do k=1,atmos%Nspace
+!      Cup = Hydrogen%n(1,icell) * CC
+!      C(ji) = C(ji) + Cup
+!      C(ij) = C(ij) + Cup * &
+!       atom%nstar(i,icell) / atom%nstar(j,icell)
+!    !! end do
 !    else if (key.eq."CH0") then
-!      if (.not.allocated(atom%col_data%C5)) then
-!       allocate(atom%col_data%C5(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C5 = 0d0
-!      end if        
-!      ! -- Charge exchange with neutral hydrogen
-!     atom%col_data%C5(ji,:) = atom%col_data%C5(ji,:) + coeffs(:)
+!     ! -- Charge exchange with neutral hydrogen
+!     !!do k=1,atmos%Nspace
+!      C(ij) = C(ij) + Hydrogen%n(1,icell)*CC
+!     !!end do
 !    else if (key.eq."CH+") then
-!      if (.not.allocated(atom%col_data%C6)) then
-!       allocate(atom%col_data%C6(atom%Nlevel*atom%Nlevel, atom%col_data%NTMP))
-!       atom%col_data%C6 = 0d0
-!      end if   
 !     ! -- charge exchange with protons
-!     !here it is Cij instead of Cji and we have to multiply by neutral H
-!     atom%col_data%C6(ji,:) = atom%col_data%C6(ji,:) + coeffs(:)
+!     np = Hydrogen%n(Hydrogen%Nlevel,icell)
+!     !!do k=1,atmos%Nspace
+!      C(ji) = C(ji) + np*CC
+!     !!end do
+!    else if (key.eq."SHULL82") then
+!     acolsh = coeff(1)
+!     tcolsh = coeff(2)
+!     aradsh = coeff(3)
+!     xradsh = coeff(4)
+!     adish = coeff(5)
+!     bdish = coeff(6)
+!     t0sh = coeff(7)
+!     t1sh = coeff(8)
+!     !!do k=1,atmos%Nspace
+!      summrs = sumscl*summers(i,j,atmos%ne(icell),atom)
+!      summrs = summrs + (1.-sumscl)
+!      tg = atmos%T(icell)
+!      cdn = aradsh * dpow(tg/1.d4, -xradsh) + &
+!        summrs*adish / tg / dsqrt(tg) * exp(-t0sh/tg) * &
+!        (1. + (bdish*exp(-t1sh/tg)))
+!      cup = acolsh * dsqrt(tg) * exp(-tcolsh/tg) / &
+!       (1. + 0.1*tg/tcolsh)
+!      ! -- convert from cm3 /s to m3/s
+!      cdn = cdn * atmos%ne(icell) * CUBE(CM_TO_M)
+!      cup = cup*atmos%ne(icell)*CUBE(CM_TO_M)
+!      ! -- 3-body recombination (high density limit)
+!      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
+!      !write(*,*) "k=",k, " cdn = ", cdn
+!      C(ij) = C(ij) + cdn
+!      C(ji) = C(ji) + cup
+!     !!end do
+!    else if (key.eq."BADNELL") then
+!     ! -- Fit for dielectronic recombination form Badnell
+!     ! First line coefficients are energies in K (from Chianti)
+!     ! Second line coefficients are coefficients (from Chianti)
+!     ! See Badnell 2006 for more details
+! 
+!     !!do k =1,atmos%Nspace
+!      summrs = sumscl*summers(i,j,atmos%ne(icell),atom) + &
+!        (1.-sumscl)
+!      tg = atmos%T(icell)
+!      cdn = 0.
+!      do ii=1,Ncoef
+!       cdn = cdn + badi(2,ii) * exp(-badi(1,ii)/tg)
+!      end do
+!      cdn = cdn * dpow(tg, -1.5d0)
+!      !write(*,*) "k=",k, " cdn = ", cdn, " summrs = ",summrs, "cdn=", cdn
+!      ! -- convert from cm3/s to m3/s
+!      cdn = cdn *atmos%ne(icell) * summrs * CUBE(CM_TO_M)
+!      cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
+! 
+!      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
+! 
+!      C(ij) = C(ij) + cdn
+!      C(ji) = C(ji) + cup
+!      !write(*,*) "BADNELL", cdn, cup
+!     !!end do
+!     deallocate(badi)
+!    else if (key.eq."AR85-CDI") then
+!     ! -- Direct collisional ionisation
+!     !!do k=1,atmos%Nspace
+!      cup = 0.
+!      tg = atmos%T(icell)
+!      do m=1,Nrow
+!       xj = cdi(m,1) * EV/ (KBOLTZMANN*tg)
+!       fac = exp(-xj) * dsqrt(xj)
+!       fxj = cdi(m,2) + cdi(m,3) * (1.+xj) + &
+!        (cdi(m,4) - xj*(cdi(m,2)+cdi(m,3)*(2.+xj)))*&
+!         fone(xj) + cdi(m,5)*xj*ftwo(xj)
+!       fxj = fxj * fac
+!       !write(*,*) fxj, ftwo(xj), fone(xj)
+!       fac = 6.69d-7 / dpow(cdi(m,1),1.5d0)
+!       cup = cup + fac*fxj*CUBE(CM_TO_M)
+!      end do
+!      if (cup.lt.0.) cup = 0.
+!      cup = cup * atmos%ne(icell)
+!      cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
+!      C(ij) = C(ij) + cdn
+!      C(ji) = C(ji) + cup
+!      !write(*,*) "CDU", cdn, cup
+!      !write(*,*) "CDI: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
+!      ! " C[ji,k]=",C(ji,k)
+!     !!end do
+!     deallocate(cdi)
+!    else if (key.eq."AR85-CEA") then
+!     ! -- Autoionisation
+!     !!do k=1,atmos%Nspace
+!      fac = ar85cea(i,j,icell,atom)
+!      !write(*,*) "fac=", fac
+!      cup = coeff(1)*fac*atmos%ne(icell)
+!      C(ji) = C(ji) + cup
+!      !write(*,*) "AR85-CEA, cup=", cup
+!      !write(*,*) "CEA: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
+!      !  " C[ji,k]=",C(ji,k)
+!     !!end do
+!    else if (key.eq."AR85-CHP") then
+!     ! -- Charge transfer with ionised Hydrogen
+!     ar85t1 = coeff(1)
+!     ar85t2 = coeff(2)
+!     ar85a = coeff(3)
+!     ar85b = coeff(4)
+!     ar85c = coeff(5)
+!     ar85d = coeff(6)
+!     !!do k =1,atmos%Nspace
+!      if ((atmos%T(icell).ge.ar85t1).and.&
+!           (atmos%T(icell).le.ar85t2)) then
+!       t4 = atmos%T(icell)/1d4
+!       cup = ar85a * 1d-9 * dpow(t4,ar85b) * &
+!         exp(-ar85c*t4) * &
+!         exp(-ar85d*EV/KBOLTZMANN/atmos%T(icell)) * &
+!         Hydrogen%n(Hydrogen%Nlevel,icell) * &
+!         CUBE(CM_TO_M)
+!       C(ji) = C(ji) + cup
+!      end if
+!     !!end do
+!    else if (key.eq."AR85-CHH") then
+!     ! Charge transfer with neutral Hydrogen
+!     ar85t1 = coeff(1)
+!     ar85t2 = coeff(2)
+!     ar85a = coeff(3)
+!     ar85b = coeff(4)
+!     ar85c = coeff(5)
+!     ar85d = coeff(6)
+!     !!do k=1,atmos%Nspace
+!      if ((atmos%T(icell).ge.ar85t1).and.&
+!          (atmos%T(icell).le.ar85t2)) then
+!       t4 = atmos%T(icell)/1d4
+!       cdn = ar85a * 1d-9 * dpow(t4, ar85b) * &
+!        (1. + ar85c*exp(ar85d*t4)) * &
+!        Hydrogen%n(1,icell) * CUBE(CM_TO_M)
+!       C(ij) = C(ij) + cdn
+!      end if
+!     !!end do
+!    else if (key.eq."BURGESS") then
+!     write(*,*) "BURGESS NOT CHECK"
+!     ! -- Electron impact ionisation from Burgess Chidichimo
+!     ! 1983, MNRAS, 203, 1269-1280
+!     de = (atom%E(j)-atom%E(i))/EV
+!     zz = atom%stage(i) !0 for neutrals
+!     betab = 0.25*(dsqrt((100.*zz+91)/(4.*zz+3.))-5.)
+!     cbar = 2.3
+!     !!do k=1,atmos%Nspace
+!      dekt = de*EV / (KBOLTZMANN*atmos%T(k))
+!      dekt = MIN(500., dekt)
+!      dekti = 1./dekt
+!      wlog = log(1.+dekti)
+!      wb = dpow(wlog, betab/(1.+dekti))
+!      cup = 2.1715d-8 * cbar * dpow(13.6/de, 1.5d0) * &
+!          dsqrt(dekt) * E1(dekt) * wb * atmos%ne(icell) * &
+!          CUBE(CM_TO_M)
+!      ! -- Fudge factor
+!      cup = cup * coeff(1)
+!      cdn = cup * atom%nstar(i,icell) / atom%nstar(j,icell)
+!      write(*,*) "BRUGESS, cdn=", cdn, " cup=", cup
+!      C(ji) = C(ji) + cup
+!      C(ij) = C(ij) + cdn
+!     !!end do
 !    end if
-!    
-!   end do !loop over blocks
+!   end do !loop over (remaining) lines (of the atomic model)
 ! 
-!   deallocate(coeffs)
+!  
+!  !!close(colunit) !! closed latter
+!  !! reset the cursor for next cell point !!
+!  checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
+!  if (checkfseek.gt. 0 ) then 
+!    write(*,*) 'fseek error'
+!    stop 
+!  end if
 ! 
-!   CALL closeCollisionFile(atom)
+!  atom%Ckij(icell,:) = C(:)
+!  deallocate(TGRID)
+!  !!deallocate(C) !! not an array anymore
+!  deallocate(coeff)
+! 
 !  RETURN
-!  END SUBROUTINE fill_ColData
-!building 
-!  FUNCTION calc_collision_atom(icell, atom) result(C)
-!   !The depth dependence appears in np, ne and T
-!   integer, intent(in) :: icell
-!   type (AtomType), intent(in) :: atom
-!   integer :: i, j, Nl, k, ij, ji
-!   double precision :: T, nr, np, ne, nHI
-!   double precision, dimension(atom%Nlevel,atom%Nlevel) :: C
-!   
-!   C(:,:) = 0d0
-!   Nl = atom%Nlevel
-!   T = atmos%T(icell)
-!   ne = atmos%ne(icell)
-!   nHI = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell))!atmos%Hydrogen%n(1,icell)
-!   np = Hydrogen%n(Hydrogen%Nlevel,icell)
-! 
-! !!!CHECK THE SENS OF IJ, JI MIGHT BE WRONG FOR C4 AND C5
-!   do j=1,atom%Nlevel
-!    do i=1, atom%Nlevel
-!     ij = (i-1)*Nl + j
-!     ji = (j-1)*Nl + i
-!     nr = atom%nstar(j,icell)/atom%nstar(i,icell) !from (j,i) to (i,j)
-!     if (allocated(atom%col_data%C1)) then
-!    	 C(j,i) = C(j,i) + &
-!    		interp_dp(atom%col_data%C1(ij,:),atom%col_data%TGRID,T)*ne
-!    		!interp1D(atom%col_data%TGRID,atom%col_data%C1(ij,:),T)*ne
-!    	 C(i,j) = C(i,j) + C(j,i) * nr
-!     else if (allocated(atom%col_data%C2)) then
-!      C(i,j) = C(i,j) + &
-!      	interp_dp(atom%col_data%C2(ji,:),atom%col_data%TGRID,T)*ne
-!      	!interp1D(atom%col_data%TGRID, atom%col_data%C2(ji,:),T)*ne
-!      C(j,i) = C(j,i) + C(i,j) / nr
-!     else if (allocated(atom%col_data%C3)) then
-!    	 C(j,i) = C(j,i) + &
-!    		interp_dp(atom%col_data%C3(ij,:),atom%col_data%TGRID,T)*np
-!     	!interp1D(atom%col_data%TGRID,atom%col_data%C3(ij,:),T)*np
-!    	 C(i,j) = C(i,j) + C(j,i) * nr
-!     else if (allocated(atom%col_data%C4)) then
-!    	 C(j,i) = C(j,i) + &
-!    		interp_dp(atom%col_data%C4(ij,:),atom%col_data%TGRID,T)*nHI
-!    		!interp1D(atom%col_data%TGRID,atom%col_data%C4(ij,:),T)*nHI
-!    	 C(i,j) = C(i,j) + C(j,i) * nr
-!     else if (allocated(atom%col_data%C5)) then
-!      C(i,j) = C(i,j) + &
-!      	interp_dp(atom%col_data%C5(ji,:),atom%col_data%TGRID, T)*nHI
-!      	!interp1D(atom%col_data%TGRID, atom%col_data%C5(ji,:),T)*nHI
-!      C(j,i) = C(j,i) + C(i,j) / nr
-!     else if (allocated(atom%col_data%C6)) then
-!      C(i,j) = C(i,j) + &
-!      	interp_dp(atom%col_data%C6(ji,:),atom%col_data%TGRID, T)*np
-!      	!interp1D(atom%col_data%TGRID, atom%col_data%C5(ji,:),T)*np
-!      C(j,i) = C(j,i) + C(i,j) / nr
-!     end if
-!    end do
-!   end do
-!   
-!  RETURN
-!  END FUNCTION calc_collision_atom
+!  END SUBROUTINE CollisionRate_File
+
+END MODULE collision
