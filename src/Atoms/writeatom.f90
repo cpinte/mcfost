@@ -546,6 +546,9 @@ MODULE writeatom !Futur write....
   
   !get unique unit number
   CALL ftgiou(unit,EOF)
+  
+  CALL Warning("writeAtomData, not implemented yet")
+  RETURN
 
   blocksize=1
   CALL ftinit(unit,trim(atom%dataFile),blocksize,EOF)
@@ -592,7 +595,7 @@ MODULE writeatom !Futur write....
   ! Additional optional keywords
   CALL ftpkys(unit, "UNIT", "m^-3", ' ', EOF)
   !write data
-  CALL ftpprd(unit,group,fpixel,nelements*Nlevel2,atom%Ckij,EOF)
+  !CALL ftpprd(unit,group,fpixel,nelements*Nlevel2,atom%.....,EOF)
   !write Collision
   ! create new hdu
   !CALL ftcrhd(unit, status)
