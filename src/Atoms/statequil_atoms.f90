@@ -1,63 +1,38 @@
 MODULE statequil_atoms
 
- use atmos_type, only : atmos
+ use atmos_type, only : atmos, nTotal_atom
  use atom_type
  use spectrum_type, only : NLTEspec
  use constant
- use constantes, only : AU_to_m
- use opacity, only : cont_wlam, NLTEopacity, add_to_psi_operator, line_wlam
+ use opacity
  use math, only : locate
  use utils, only : GaussSlv
- use grid, only : cross_cell
+ use parametres
  use accelerate
  use collision, only : CollisionRate, Collision_Hydrogen
+ use metal, only : bound_free_Xsection
 
  IMPLICIT NONE
- 
- PROCEDURE(FillGamma_Mali), pointer :: FillGamma => NULL()
+
+ PROCEDURE (FillGamma_bf_Hjde), pointer :: FillGamma_bf => NULL()
+ PROCEDURE (FillGamma_bb_Hjde), pointer :: FillGamma_bb => NULL()
 
  CONTAINS
-
  
- SUBROUTINE init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
-  ! ------------------------------------------------------------------------- !
-   ! Computes local radiation field, keeping External radiation constant
-   ! in case of sub-iterations are turned on.
-   ! The local radiation field is proportional to Snu = eta / chi, for each
-   ! atom, for each cell and thread.
-  ! ------------------------------------------------------------------------- !  
+ SUBROUTINE initGamma_atom(id, icell, atom)
+  integer, intent(in) :: icell, id
+  type (AtomType), pointer, intent(inout) :: atom
   
-  double precision, intent(in) :: x0, y0, z0, u0, v0, w0
-  integer, intent(in) :: id, icell, iray
-  double precision :: l_dum, l_c_dum, l_v_dum, x1, x2, x3, ds
-  integer 		   :: n_c_dum
-  !recompute opacity of this cell., but I need angles and pos...
-  !NLTEspec%I not changed
-  ! move to the cell icell.
-  CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
-       						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
-  NLTEspec%AtomOpac%chi(:,id) = 0d0
-  NLTEspec%AtomOpac%eta(:,id) = 0d0
-  NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
-  !set atom%eta to zero also
-  CALL initCrossCoupling(id)
-  !NOTE Zeeman opacities are not re set to zero and are accumulated
-  !change that or always use FIELD_FREE
-  !is equivalent to P(icell,id, iray) ?
-  !Compute opacity, eta and chi for this cell in the direction u0, v0, w0
-  CALL NLTEOpacity(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .true.)
-  !last .true. is to compute atom%gij, atom%Uji,atom%Vij 
-  CALL fillCrossCoupling_terms(id, icell)
-  !il faut recalculer Psi dans les sous-iterations et Ieff si Hogereijde.
-  !Sinon, seulement Psi depend de chi a besoin d'être mis à jour.
-  ds = l_dum * AU_to_m
-  !recompute Psi and eventually Ieff.
-  CALL add_to_psi_operator(id, icell, iray, ds)
+	 if (atom%ID=="H") then
+	  atom%Gamma(:,:,id) = Collision_Hydrogen(icell)
+	 else
+      atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
+     end if
   
- RETURN
- END SUBROUTINE init_local_field_atom
+  RETURN 
+ END SUBROUTINE initGamma_atom
  
- 
+  
  SUBROUTINE initGamma(id, icell)
  ! ------------------------------------------------------ !
   !for each active atom, allocate and init Gamma matrix
@@ -99,42 +74,244 @@ MODULE statequil_atoms
 ! !      write(12,'(6E)') real(lp), real(l), real(ij), real(ji), atom%Ckij(icell,ij), atom%Gamma(lp,l) * atom%nstar(lp, icell)/atom%nstar(l,icell)
 !     end do
 !    end do
-	 if (atom%ID=="H") then
-	  atom%Gamma(:,:,id) = Collision_Hydrogen(icell)
-	 else
-      atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
-     end if
+	 CALL initGamma_atom(id, icell, atom)
+! 	 if (atom%ID=="H") then
+! 	  atom%Gamma(:,:,id) = Collision_Hydrogen(icell)
+! 	 else
+!       atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
+!      end if
+     !write(*,*) id, icell, 'max,min Cul for atom', atom%ID, maxval(atom%Gamma(:,:,id)), minval(atom%Gamma(:,:,id))
+     
 ! close(12)
    NULLIFY(atom)
   end do
  RETURN
  END SUBROUTINE initGamma
-
- SUBROUTINE initCrossCoupling(id)
-  ! --------------------------------------------------- !
-   ! Init the X coupling terms for each active atoms.
-   ! they are used in the Rybicki Hummer MALI scheme,
-   ! with full preconditioning (overlapping transitions
-   ! and background continua)
+ 
+ SUBROUTINE fillGamma(id, icell, n_rayons, switch_to_lte)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
+   ! of transition from level l' to l.
+   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
    !
-   ! init a cell level (when eval_operator is true) for
-   ! thread id.
-   ! For all wavelength
-  ! --------------------------------------------------- !
+   !
+   ! The Sum_l" represents a sommation over each column for the lth row.
+   !
+  ! ------------------------------------------------------------------------- !
 
-  integer, intent(in) :: id
+  integer, intent(in) :: id, n_rayons, icell !here for debug not used
+  logical, optional, intent(in) :: switch_to_lte
   integer :: nact
+  type (AtomType), pointer :: atom
   
-  do nact=1,atmos%Nactiveatoms
-   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
-  end do
- 
+  !this pointers functions depends on the choice of the methode
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_bf(id, icell, atom, n_rayons, switch_to_lte)
+   CALL FillGamma_bb(id, atom, n_rayons, switch_to_lte)
+   atom=>NULL()
+  enddo
+
  RETURN
- END SUBROUTINE initCrossCoupling
+ END SUBROUTINE fillGamma
+
+ ! for that atom
+ SUBROUTINE FillGamma_bf_hjde(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons, icell
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l
+  !type (AtomType), pointer :: atom
+  type (AtomicContinuum) :: cont
+  real(kind=dp), allocatable, dimension(:,:) :: Ieff
+  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk, Jnu
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+   
+   do kr=1,atom%Ncont
+    cont = atom%continua(kr)
+    i = cont%i; j = cont%j
+    Nblue = cont%Nblue; Nred = cont%Nred
+    
+    allocate(Ieff(cont%Nlambda,n_rayons), twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
+    allocate(Jnu(cont%Nlambda))
+    !Accelerated I
+    Ieff(:,:) = NLTEspec%I(Nblue:Nred,:,id)*dexp(-NLTEspec%dtau(Nblue:Nred,:,id)) + \
+             NLTEspec%Psi(Nblue:Nred,:,id) * atom%eta(Nblue:Nred,:,id)
+    Jnu(:) = sum(Ieff,dim=2) / n_rayons  !sum over rays
+!     write(*,*) maxval(Ieff(1,:)), minval(Ieff(1,:))
+!     write(*,*) Jnu(1)
+
+             
+    !nstar(i)/nstar(j)*exp(-hnu/kT)
+    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    !2hnu3/c2 = 2hc/lambda3
+    twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
+    
+    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont) / n_rayons
+    ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
+
+    !explicit do loop
+    do l=1,cont%Nlambda
+     !write(*,*) j, i, NLTEspec%lambda(Nblue+l-1), Jnu(l)
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu(l)*weight(l)
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu(l)+twohnu3_c2k(l))*gijk(l)*weight(l)
+    enddo
+    
+    deallocate(Ieff,twohnu3_c2k, weight, gijk, Jnu)
+   end do !over cont
+   
+   !atom => NULL()
+  !enddo !over atom
+  
+ RETURN
+ END SUBROUTINE FillGamma_bf_hjde
  
- SUBROUTINE fillCrossCoupling_terms(id, icell)
+ SUBROUTINE FillGamma_bb_hjde(id, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l, iray
+  !type (AtomType), pointer :: atom
+  type (AtomicLine) :: line
+  real(kind=dp), dimension(:), allocatable :: Ieff, weight
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, norm, norm_test, WTest(1)
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  factor = n_rayons / CLIGHT
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+
+   do kr=1,atom%Nline
+    line = atom%lines(kr)
+    i = line%i; j = line%j
+    Nblue = line%Nblue; Nred = line%Nred
+    
+    allocate(Ieff(line%Nlambda), weight(line%Nlambda))
+
+    twohnu3_c2 = line%Aji / line%Bji 
+
+    norm = 0d0
+    do iray=1, n_rayons
+     norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))/n_rayons !angle and frequency integrated
+    enddo
+    
+    weight(:) =  line_wlam(line) / norm / factor
+!     write(*,*) id, j, i, maxval(weight), norm
+    
+    gij = line%Bji/line%Bij
+
+    do iray=1, n_rayons
+      Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%dtau(Nblue:Nred,iray,id)) + \
+             NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)
+             !* NLTEspec%AtomOpac%eta(Nblue:Nred,id)  
+     do l=1,line%Nlambda
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff(l)*weight(l)
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*(line%Aji+line%Bji*Ieff(l))
+     enddo
+    enddo
+
+    deallocate(Ieff, weight)
+   enddo !over lines
+   !NULLIFY(atom)
+  !end do !loop over atoms    
+  
+ RETURN 
+ END SUBROUTINE FillGamma_bb_hjde
+
+ 
+ SUBROUTINE FillGamma_bf_zero_radiation(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons, icell
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l
+  !type (AtomType), pointer :: atom
+  type (AtomicContinuum) :: cont
+  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+   
+   do kr=1,atom%Ncont
+    cont = atom%continua(kr)
+    i = cont%i; j = cont%j
+    Nblue = cont%Nblue; Nred = cont%Nred
+    
+    allocate(twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
+       
+    !nstar(i)/nstar(j)*exp(-hnu/kT)
+    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    !2hnu3/c2 = 2hc/lambda3
+    twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
+    
+    weight(:) = fourPI * cont_wlam(cont) * bound_free_Xsection(cont)
+    ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
+
+    !explicit do loop
+    do l=1,cont%Nlambda
+     !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + twohnu3_c2k(l)*gijk(l)*weight(l)
+    enddo
+    
+    deallocate(twohnu3_c2k, weight, gijk)
+   end do !over cont
+   
+   !atom => NULL()
+  !enddo !over atom
+  
+ RETURN
+ END SUBROUTINE FillGamma_bf_zero_radiation
+ 
+ SUBROUTINE FillGamma_bb_zero_radiation(id, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j
+  !type (AtomType), pointer :: atom
+  type (AtomicLine) :: line
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+
+   do kr=1,atom%Nline
+    line = atom%lines(kr)
+    i = line%i; j = line%j
+
+    !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
+    atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%Aji !integration over domega/4PI dv phi = 1
+
+   enddo !over lines
+   !NULLIFY(atom)
+  !end do !loop over atoms    
+  
+ RETURN 
+ END SUBROUTINE FillGamma_bb_zero_radiation
+ 
+ !building
+ SUBROUTINE fill_XCoupling(id, icell)
   ! -------------------------------------------- !
    ! fill X coupling terms for all transitions
    ! of all active atoms.
@@ -145,6 +322,7 @@ MODULE statequil_atoms
   type (AtomType), pointer :: atom
   type (AtomicContinuum) :: cont
   type (AtomicLine) :: line
+  real(kind=dp), allocatable :: Vij(:,:), gij(:,:)
   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, chicc
   
   do nact=1,atmos%Nactiveatoms
@@ -155,14 +333,14 @@ MODULE statequil_atoms
     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NM_TO_M * NLTEspec%lambda)**(3d0)
     i = cont%i; j = cont%j
     chicc = 0d0
-    chicc(Nblue:Nred) = cont%Vij(:,id) * (atom%n(i,icell) &
-    					-cont%gij(:,id)*atom%n(j,icell))
-    					
-    atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) +&
-    				 twohnu3_c2(Nblue:Nred)*cont%gij(:,id)*cont%Vij(:,id)
-    				 
-    atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
-    atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     chicc(Nblue:Nred) = cont%Vij(:,id) * (atom%n(i,icell) &
+!     					-cont%gij(:,id)*atom%n(j,icell))
+!     					
+!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) +&
+!     				 twohnu3_c2(Nblue:Nred)*cont%gij(:,id)*cont%Vij(:,id)
+!     				 
+!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
    end do
 
    do kl=1,atom%Nline
@@ -171,218 +349,230 @@ MODULE statequil_atoms
     i = line%i; j = line%j
     Nblue = line%Nblue; Nred=line%Nred
     chicc = 0d0
-    chicc(Nblue:Nred) = line%Vij(:,id) * (atom%n(i,icell) &
-    					- line%gij(:,id)*atom%n(j,icell))
-
-    atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) + &
-    				twohnu3_c2(Nblue:Nred)*line%gij(:,id)*line%Vij(:,id)
-    				
-    atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
-    atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     chicc(Nblue:Nred) = line%Vij(:,id) * (atom%n(i,icell) &
+!     					- line%gij(:,id)*atom%n(j,icell))
+! 
+!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) + &
+!     				twohnu3_c2(Nblue:Nred)*line%gij(:,id)*line%Vij(:,id)
+!     				
+!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
     
    end do   
    NULLIFY(atom)
   end do
  RETURN
- END SUBROUTINE fillCrossCoupling_terms
-
- SUBROUTINE fillGamma_Hogereijde(id, icell, iray, n_rayons)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
-   ! of transition from level l' to l.
-   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! This is the case of Hogeriejde, similar to molecular lines in MCFOST.
-   ! The intensity I in the rate matrix elements: 
-   !  Cl'l + Rl'l - delta(l,l') Sum_l" (Cllp" + Rll"); appearing in Rll' and
-   !  Rll" is directly replaced by Iexp(-dtau) + (1-exp(-dtau))*Snu; 
-   ! with Iexp(-dtau) = Ieff and (1-exp(-dtau))/chi = Psi by definition.
-   ! I = Ieff + Psi * eta
-   !
-   ! The Sum_l" represents a sommation over each column for the lth row.
-   !
-  ! ------------------------------------------------------------------------- !
-
-  integer, intent(in) :: id, iray, n_rayons, icell !here for debug not used
-  integer :: nact, kr, i, j, Nblue, Nred, l, nc, nl
-  type (AtomType), pointer :: atom
-  type (AtomicContinuum) :: cont
+ END SUBROUTINE fill_Xcoupling
+ 
+ SUBROUTINE FillGamma_bb_mali(id, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j
+  !type (AtomType), pointer :: atom
   type (AtomicLine) :: line
-  double precision, dimension(:), allocatable :: twohnu3_c2, Ieff, weight
-  double precision :: norm = 0d0
-  double precision :: c_nlte = 1d0
-  
-  !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
-  norm = 4*PI / HPLANCK / n_rayons * c_nlte
-  do nact=1,atmos%NactiveAtoms !loop over each active atoms
-  
-   atom => atmos%ActiveAtoms(nact)%ptr_atom
-   do kr=1,atom%Ncont
-    cont = atom%continua(kr)
-    i = cont%i; j = cont%j
-    Nblue = cont%Nblue; Nred = cont%Nred
-    !beware if cont are allocated on the whole grid, but Nblue:Nred is wrong becayse they are
-    !not the lower upper boundary of tje whomle grid but the boundary of cont. Outside these
-    !bounds the cont is 0
-    allocate(Ieff(cont%Nlambda), twohnu3_c2(cont%Nlambda), weight(cont%Nlambda))
-    Ieff(:) = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) + \
-             NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
+   
+ RETURN
+ END SUBROUTINE FillGamma_bb_mali
  
-    twohnu3_c2(:) = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda(:)*NM_TO_M)**3.
-    
-    weight(:) = cont_wlam(cont) * norm
-    
-    !explicit do loop
-    do nc=1,cont%Nlambda
-     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + cont%Vij(nc,id)*Ieff(nc)*weight(nc)
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Ieff(nc)+twohnu3_c2(nc))*&
-    											cont%Vij(nc,id)*cont%gij(nc,id)*weight(nc)
-    enddo
-
-!      if (maxval(abs(atom%Gamma(:,:,id))) > 1d10) then
-!     write(*,*) "------------------"
-!    write(*,*) "(2)", id, icell, iray, kr, "cont", i, j,sum(atom%continua(kr)%Vij(:,id)*Ieff(:)*weight), &
-!    sum((Ieff(:)+twohnu3_c2(:))*&
-!     	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*weight)
-!    write(*,*) id, icell, iray, kr, "cont", i, j, minval(Ieff(:)), maxval(Ieff(:)), &
-!     minval(twohnu3_c2(:)), maxval(twohnu3_c2(:)), minval(atom%continua(kr)%Vij(:,id)), &
-!     maxval(atom%continua(kr)%Vij(:,id)), minval(atom%continua(kr)%gij(:,id)), maxval(atom%continua(kr)%gij(:,id))
-!     write(*,*) "------------------"
-!       write(*,*) id, icell, iray
-!       write(*,*) atom%Gamma(:,:,id)
-!       stop
-!      end if
-     
-   deallocate(Ieff, twohnu3_c2, weight)
-   end do
-
-   do kr=1,atom%Nline
-    line = atom%lines(kr)
-    i = line%i; j = line%j
-    Nblue = line%Nblue; Nred = line%Nred
-    
-    allocate(Ieff(line%Nlambda), twohnu3_c2(1), weight(line%Nlambda))
-    Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%dtau(Nblue:Nred,iray,id)) + \
-             NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,id)    
-
-    twohnu3_c2(1) = line%Aji / line%Bji 
-
-    weight(:) = norm * line_wlam(line) * line%wlam_norm(id)
-    
-    do nl=1,line%Nlambda
-    atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Vij(nl,id)*Ieff(nl)* weight(nl)
-    atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Ieff(nl)+twohnu3_c2(1))*&
-    								   line%Vij(nl,id)*line%gij(nl,id)*weight(nl)
-    enddo
-    	
-!      if (maxval(abs(atom%Gamma(:,:,id))) > 1d16) then
-!     write(*,*) "------------------"
-!    write(*,*) "(1)", id, icell, iray, kr, "line", i, j
-!    write(*,*) id, icell, iray, kr, "line", i, j, minval(Ieff(:)), maxval(Ieff(:)), &
-!     minval(twohnu3_c2(:)), maxval(twohnu3_c2(:)), minval(atom%lines(kr)%Vij(:,id)), &
-!     maxval(atom%lines(kr)%Vij(:,id)), minval(atom%lines(kr)%gij(:,id)), maxval(atom%lines(kr)%gij(:,id)), &
-!     maxval(weight), minval(weight), atom%lines(kr)%wlam_norm(:)
-!     write(*,*) "------------------"
-!       write(*,*) id, icell, iray, size(Ieff), size(atom%lines(kr)%Vij(:,id))
-!       write(*,*) atom%Gamma(:,:,id)
-!       write(*,*) "***"
-!       write(*,*) (Ieff(:)+twohnu3_c2(1))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*weight
-!     	      write(*,*) "***"
-! write(*,*) atom%lines(kr)%Vij(:,id)*Ieff(:)*weight
-!       write(*,*) "***"
-! 
-!       !stop
-!     end if
-    deallocate(Ieff, twohnu3_c2,weight)
-   end do
-!    write(*,*) id, icell, iray, "Cul", minval(GT(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT(1:atom%Nlevel, 1:atom%Nlevel)), &
-!    " Cont", minval(GT2(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT2(1:atom%Nlevel, 1:atom%Nlevel)),&
-!    " Line",minval(GT3(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT3(1:atom%Nlevel, 1:atom%Nlevel))
+ SUBROUTINE FillGamma_bf_mali(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons, icell
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j
+  !type (AtomType), pointer :: atom
+  type (AtomicContinuum) :: cont
    
-   if (iray==n_rayons) then !otherwise we remove several times GammaDiag
-   	do l = 1, atom%Nlevel
-   	    if (atom%Gamma(l,l,id) /= 0.) &
-   	     write(*,*) "diag(Gamma) should be zero ", l, atom%Gamma(l,l,id)
-   	    atom%Gamma(l,l,id) = 0d0
-    	atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-   	end do
-   	!write(*,*) "MaxMin Gamma:", id, icell, iray, minval(atom%Gamma(:,:,id)), maxval(atom%Gamma(:,:,id))
-   end if
+ RETURN
+ END SUBROUTINE FillGamma_bf_mali
+ 
+ !-->Deprecating
+!  SUBROUTINE fillGamma_MALI(id, icell, iray, n_rayons)
+!   ! ------------------------------------------------------------------------- !
+!    ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
+!    ! of transition from level lp to l.
+!    ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
+!    ! level j to lower level i.
+!    !
+!    ! It uses the fully preconditioned scheme of Rybciki and Hummer. 
+!   ! ------------------------------------------------------------------------- !
+!   integer, intent(in) :: id, icell, iray, n_rayons
+!   integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
+!   type (AtomType), pointer :: atom
+!   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
+!   double precision :: norm = 0d0, diag
+!   double precision :: c_nlte = 0d0, dummy = 0
+! !   
+! ! !   if (iray==1) dummy = 0
+! !   
+! !   do nact=1,atmos%Nactiveatoms !loop over each active atoms
+! !    atom => atmos%ActiveAtoms(nact)%ptr_atom
+! !    Ieff = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
+! !    !loop over transitions, b-f and b-b for these atoms
+! !    !To do; define a transition_type with either cont or line
+! !    do kr=1,atom%Ncont
+! !     norm = 4d0*PI / HPLANCK / n_rayons
+! !     
+! !     i = atom%continua(kr)%i; j = atom%continua(kr)%j
+! !     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
+! !     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
+! !     
+! !     !Ieff (Uij = 0 'cause i<j)
+! !     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
+! !     !Uji + Vji*Ieff
+! !     !Uji and Vji express with Vij
+! !     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+! !     	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
+! ! 
+! !     ! cross-coupling terms
+! !      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum((atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
+! !      	atom%Uji_down(j,:,id))*cont_wlam(atom%continua(kr)))* norm
+! ! 
+! !      ! check if i is an upper level of another transition
+! !      do krr=1,atom%Ncont
+! !       jp = atom%continua(krr)%j
+! !       if (jp==i) then !i upper level of this transition
+! !        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
+! !        	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) * norm
+! !       end if 
+! !      end do
+! !    end do
+! ! 
+! !    do kr=1,atom%Nline
+! !     norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons !
+! !     
+! !     i = atom%lines(kr)%i; j = atom%lines(kr)%j
+! !     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
+! !     twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
+! !     
+! !     !Ieff (Uij = 0 'cause i<j)
+! !     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
+! !     !Uji + Vji*Ieff
+! !     !Uji and Vji express with Vij
+! !     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+! !     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
+! ! !     	
+! ! !     if (j==3 .and. i==2) then 
+! ! ! dummy = dummy + sum(twohnu3_c2(Nblue:Nred)*atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:))*norm
+! ! !      write(*,*) atom%lines(kr)%Aji/1d7, dummy/1d7
+! ! !     end if
+! ! !      write(*,*) 'line', atom%ID, icell, id, i, j, c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
+! ! !     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm	
+! !     	
+! !     ! cross-coupling terms
+! !      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum(atom%chi_up(i,Nblue:Nred,id)*NLTEspec%Psi(Nblue:Nred, iray, id)*&
+! !      	atom%Uji_down(j,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
+! !      ! check if i is an upper level of another transition
+! !      do krr=1,atom%Nline
+! !       jp = atom%lines(krr)%j
+! !       if (jp==i) then !i upper level of this transition
+! !        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum(atom%chi_down(j,Nblue:Nred,id)*nLTEspec%Psi(Nblue:Nred, iray, id)*&
+! !        	atom%Uji_down(i,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
+! !       end if 
+! !      end do
+! !    end do
+! !    
+! !    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
+! !    	do jp = 1, atom%Nlevel
+! !     	atom%Gamma(jp,jp) = -sum(atom%Gamma(jp,:)) !sum over rows for this column
+! !    	end do
+! !    end if
+! ! 
+! !    NULLIFY(atom)
+! !   end do !loop over atoms  
+!  RETURN
+!  END SUBROUTINE fillGamma_MALI
 
-   	
-   	if (iray==n_rayons .and. maxval(atom%Gamma(:,:,id)) <= 0d0) then  
-   	write(*,*) icell, id, iray, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
-     do i=1,atom%Nlevel
-     do j=1,atom%Nlevel
-     write(*,*) "Gamma:", i, j, atom%Gamma(i,j,id), atom%Gamma(i,i,id),  atom%Gamma(j,i,id), atom%Gamma(j,j,id)
-     end do
-    end do
-  stop
-   end if
-   
-   NULLIFY(atom)
-  end do !loop over atoms  
+ SUBROUTINE SEE_atom(id, icell,atom)
+ ! --------------------------------------------------------------------!
+  ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
+  !
+  ! We solve for :
+  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
+  !
+  ! which is equivalent in matrix notation to:
+  !
+  ! GG(l,l') dot n_l' = 0 with l' is on the columns and l on the rows
+  !
+  ! In particular for a 2-level atom the two equations are:
+  !
+  ! n1*G_11 + n2*G_21 = 0
+  ! n1*G12 + n2*G22 = 0,
+  ! with one of these equations has to be replaced by
+  ! n1 + n2 = N
+  !
+  ! For numerical stability, the row with the largest populations is 
+  ! removed (i.e., it is replaced by the mass conservation law).
+  !
+  ! This matrix Gamma for atoms (or later molecules) is compared to 
+  ! molecules A matrix in mcfost:
+  ! diag(Gamma) = -diag(A); offdiag(Gamma) = -offdiag(A)
+  ! A = transpose(Gamma)
+ ! --------------------------------------------------------------------!
+  
+  integer, intent(in) :: icell, id
+  type(AtomType), intent(inout) :: atom
+  integer :: lp, imaxpop, l
+  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
+  
+  !we need to do that here as Gamma is updated for each rays.
+!!atom%Gamma(:,:,id)=atom%Gamma(:,:,id)*-1d0
+   do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!!atom%Gamma(l,l,id) = sum(abs(atom%Gamma(l,:,id))) !sum over rows for this column
+   end do
+  !write(*,*) atom%ID, id, icell, maxval(atom%Gamma(:,:,id)), minval(atom%Gamma(:,:,id))
+  !write(*,*) id, icell, atom%n(:,icell)
+
+  imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
+  !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
+  atom%n(:,icell) = 0d0
+  atom%n(imaxpop,icell) = nTotal_atom(icell, atom)
+
+  
+  !Sum_l'_imaxpop * n_l' = N
+  atom%Gamma(:,imaxpop,id) = 1d0 !all columns of the last row for instance
+  !(G11 G21)  (n1)  (0)
+  !(       ) .(  ) =( )
+  !(1    1 )  (n2)  (N)
+  
+  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
+
+  Aij = transpose(atom%Gamma(:,:,id))
+  !!Aij = atom%Gamma(:,:,id)
+  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
+  !!atom%n(:,icell) = atom%n(:,icell) * nTotal_atom(icell, atom)
+  !write(*,*) id, icell, atom%n(:,icell)
 
  RETURN
- END SUBROUTINE fillGamma_Hogereijde
+ END SUBROUTINE SEE_atom
  
- SUBROUTINE FillGamma_ZeroRadiation(id, icell)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
-   ! of transition from level lp to l.
-   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! This is the case where the radiation field is O, hence
-   ! Gamma(l',l) = Cl'l + Al'l - delta(l,l')Sum_l" (Cll" + All") for a line
-   !
-   ! This Gamma is frequency and angle independent. 
-   ! Like Gamma_LTE, it is called outside NLTE loop.
-  ! ------------------------------------------------------------------------- !
+ SUBROUTINE updatePopulations(id, icell)
+ ! --------------------------------------------------------------------!
+  ! Performs a solution of SEE for each atom.
+  !
+  ! to do: implements Ng's acceleration iteration. 
+ ! --------------------------------------------------------------------!
+
   integer, intent(in) :: id, icell
-  integer :: nact, kr, i, j, l
-  type (AtomType), pointer :: atom
-  double precision, parameter :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, gij, exp_lambda
-  integer :: c_nlte = 1, Nred, Nblue
-!     
-!   twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
-!   exp_lambda = dexp(-hc_k / (NLTEspec%lambda * atmos%T(icell)))
-!   do nact=1,atmos%Nactiveatoms !loop over each active atoms
-!    atom => atmos%ActiveAtoms(nact)%ptr_atom
-! 
-!    do kr=1,atom%Ncont
-!     gij(:) = 0d0
-!     i = atom%continua(kr)%i; j = atom%continua(kr)%j
-!     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
-!     gij(Nblue:Nred) = atom%nstar(i, icell)/atom%nstar(j,icell) * exp_lambda(Nblue:Nred)
-!     
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum(twohnu3_c2(Nblue:Nred)*&
-!     	atom%continua(kr)%alpha(Nblue:Nred)*gij(Nblue:Nred)*&
-!     	cont_wlam(atom%continua(kr))) * 4d0*PI / HPLANCK
-! 
-!    end do
-!    do kr=1,atom%Nline
-!     
-!     i = atom%lines(kr)%i; j = atom%lines(kr)%j
-! 
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*atom%lines(kr)%Aji
-! 
-!    end do
-! 
-!    do l = 1, atom%Nlevel
-!     atom%Gamma(l,l) = -sum(atom%Gamma(l,:)) !sum over rows for this column
-!    end do
-! 
-!    NULLIFY(atom)
-!   end do !loop over atoms  
-
- RETURN
- END SUBROUTINE fillGamma_ZeroRadiation
+  type(AtomType), pointer :: atom
+  integer :: nat, nati, natf
+  logical :: accelerate = .false.
+  double precision :: dM
+  
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
+  do nat=nati,natf !loop over each active atoms
+   atom => atmos%ActiveAtoms(nat)%ptr_atom
+   CALL SEE_atom(id, icell, atom)
+   atom => NULL()
+  end do
  
-
+ RETURN
+ END SUBROUTINE updatePopulations
+ 
  SUBROUTINE Gamma_LTE(id,icell)
   ! ------------------------------------------------------------------------- !
    ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
@@ -394,7 +584,7 @@ MODULE statequil_atoms
    ! Gamma(l',l) = Cl'l - delta(l,l')Sum_l" (Cll").
    !
    ! This Gamma is frequency and angle independent. 
-   !
+   ! FOR ALL ATOMS
   ! ------------------------------------------------------------------------- !
   integer, intent(in) :: id, icell
   integer :: nact, kr, l, lp, nati, natf
@@ -422,291 +612,12 @@ MODULE statequil_atoms
     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
    end do
 
-!     do lp=1, atom%Nlevel
-!     do l=1,atom%nlevel
-!      write(*,*) lp, l, atom%Gamma(lp,l)
-!     end do
-!     end do
    
    NULLIFY(atom)
   end do !loop over atoms
+
  RETURN
  END SUBROUTINE Gamma_LTE
- 
- SUBROUTINE fillGamma_MALI(id, icell, iray, n_rayons)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
-   ! of transition from level lp to l.
-   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! It uses the fully preconditioned scheme of Rybciki and Hummer. 
-  ! ------------------------------------------------------------------------- !
-  integer, intent(in) :: id, icell, iray, n_rayons
-  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
-  type (AtomType), pointer :: atom
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
-  double precision :: norm = 0d0, diag
-  double precision :: c_nlte = 0d0, dummy = 0
-!   
-! !   if (iray==1) dummy = 0
-!   
-!   do nact=1,atmos%Nactiveatoms !loop over each active atoms
-!    atom => atmos%ActiveAtoms(nact)%ptr_atom
-!    Ieff = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) - NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
-!    !loop over transitions, b-f and b-b for these atoms
-!    !To do; define a transition_type with either cont or line
-!    do kr=1,atom%Ncont
-!     norm = 4d0*PI / HPLANCK / n_rayons
-!     
-!     i = atom%continua(kr)%i; j = atom%continua(kr)%j
-!     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
-!     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
-!     
-!     !Ieff (Uij = 0 'cause i<j)
-!     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
-!     !Uji + Vji*Ieff
-!     !Uji and Vji express with Vij
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
-! 
-!     ! cross-coupling terms
-!      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum((atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
-!      	atom%Uji_down(j,:,id))*cont_wlam(atom%continua(kr)))* norm
-! 
-!      ! check if i is an upper level of another transition
-!      do krr=1,atom%Ncont
-!       jp = atom%continua(krr)%j
-!       if (jp==i) then !i upper level of this transition
-!        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
-!        	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) * norm
-!       end if 
-!      end do
-!    end do
-! 
-!    do kr=1,atom%Nline
-!     norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons !
-!     
-!     i = atom%lines(kr)%i; j = atom%lines(kr)%j
-!     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
-!     twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
-!     
-!     !Ieff (Uij = 0 'cause i<j)
-!     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
-!     !Uji + Vji*Ieff
-!     !Uji and Vji express with Vij
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-! !     	
-! !     if (j==3 .and. i==2) then 
-! ! dummy = dummy + sum(twohnu3_c2(Nblue:Nred)*atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:))*norm
-! !      write(*,*) atom%lines(kr)%Aji/1d7, dummy/1d7
-! !     end if
-! !      write(*,*) 'line', atom%ID, icell, id, i, j, c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-! !     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm	
-!     	
-!     ! cross-coupling terms
-!      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum(atom%chi_up(i,Nblue:Nred,id)*NLTEspec%Psi(Nblue:Nred, iray, id)*&
-!      	atom%Uji_down(j,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
-!      ! check if i is an upper level of another transition
-!      do krr=1,atom%Nline
-!       jp = atom%lines(krr)%j
-!       if (jp==i) then !i upper level of this transition
-!        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum(atom%chi_down(j,Nblue:Nred,id)*nLTEspec%Psi(Nblue:Nred, iray, id)*&
-!        	atom%Uji_down(i,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
-!       end if 
-!      end do
-!    end do
-!    
-!    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
-!    	do jp = 1, atom%Nlevel
-!     	atom%Gamma(jp,jp) = -sum(atom%Gamma(jp,:)) !sum over rows for this column
-!    	end do
-!    end if
-! 
-!    NULLIFY(atom)
-!   end do !loop over atoms  
- RETURN
- END SUBROUTINE fillGamma_MALI
-
- SUBROUTINE fillGamma_MALI_hogereijde(id, icell, iray, n_rayons)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
-   ! of transition from level lp to l.
-   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! It uses the fully preconditioned scheme of Rybciki and Hummer with the 
-   ! radiation from Hogereijde 2000.
-  ! ------------------------------------------------------------------------- !
-  integer, intent(in) :: id, icell, iray, n_rayons
-  integer :: nact, nc, kr, switch,i, j, Nblue, Nred, jp, krr
-  type (AtomType), pointer :: atom
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
-  double precision :: norm = 0d0, diag
-  double precision :: c_nlte = 0d0, dummy = 0
-  
-!   if (iray==1) dummy = 0
-!   
-!   do nact=1,atmos%Nactiveatoms !loop over each active atoms
-!    atom => atmos%ActiveAtoms(nact)%ptr_atom
-!    Ieff = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) - NLTEspec%Psi(:,iray,id)
-!    !loop over transitions, b-f and b-b for these atoms
-!    !To do; define a transition_type with either cont or line
-!    do kr=1,atom%Ncont
-!     norm = 4d0*PI / HPLANCK / n_rayons
-!     
-!     i = atom%continua(kr)%i; j = atom%continua(kr)%j
-!     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
-!     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
-!     
-!     !Ieff (Uij = 0 'cause i<j)
-!     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
-!     !Uji + Vji*Ieff
-!     !Uji and Vji express with Vij
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
-! 
-!     ! cross-coupling terms
-!      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum((atom%chi_up(i,:,id)*NLTEspec%Psi(:, iray, id)*&
-!      	atom%Uji_down(j,:,id))*cont_wlam(atom%continua(kr)))* norm
-! 
-!      ! check if i is an upper level of another transition
-!      do krr=1,atom%Ncont
-!       jp = atom%continua(krr)%j
-!       if (jp==i) then !i upper level of this transition
-!        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((atom%chi_down(j,:,id)*nLTEspec%Psi(:, iray, id)*&
-!        	atom%Uji_down(i,:,id))*cont_wlam(atom%continua(kr))) * norm
-!       end if 
-!      end do
-!    end do
-! 
-!    do kr=1,atom%Nline
-!     norm =  1d0 / (CLIGHT * HPLANCK) / n_rayons !
-!     
-!     i = atom%lines(kr)%i; j = atom%lines(kr)%j
-!     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
-!     twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
-!     
-!     !Ieff (Uij = 0 'cause i<j)
-!     atom%Gamma(i,j) = atom%Gamma(i,j) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
-!     !Uji + Vji*Ieff
-!     !Uji and Vji express with Vij
-!     atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-! !     	
-! !     if (j==3 .and. i==2) then 
-! ! dummy = dummy + sum(twohnu3_c2(Nblue:Nred)*atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:))*norm
-! !      write(*,*) atom%lines(kr)%Aji/1d7, dummy/1d7
-! !     end if
-! !      write(*,*) 'line', atom%ID, icell, id, i, j, c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-! !     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm	
-!     	
-!     ! cross-coupling terms
-!      atom%Gamma(i,j) = atom%Gamma(i,j) -c_nlte*sum(atom%chi_up(i,Nblue:Nred,id)*NLTEspec%Psi(Nblue:Nred, iray, id)*&
-!      	atom%Uji_down(j,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
-!      ! check if i is an upper level of another transition
-!      do krr=1,atom%Nline
-!       jp = atom%lines(krr)%j
-!       if (jp==i) then !i upper level of this transition
-!        atom%Gamma(j,i) = atom%Gamma(j,i) + c_nlte*sum(atom%chi_down(j,Nblue:Nred,id)*nLTEspec%Psi(Nblue:Nred, iray, id)*&
-!        	atom%Uji_down(i,Nblue:Nred,id)*atom%lines(kr)%wlam(:)) * norm
-!       end if 
-!      end do
-!    end do
-!    
-!    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
-!    	do jp = 1, atom%Nlevel
-!     	atom%Gamma(jp,jp) = -sum(atom%Gamma(jp,:)) !sum over rows for this column
-!    	end do
-!    end if
-! 
-!    NULLIFY(atom)
-!   end do !loop over atoms  
- RETURN
- END SUBROUTINE fillGamma_MALI_Hogereijde
-
- SUBROUTINE SEE_atom(id, icell, atom)
- ! --------------------------------------------------------------------!
-  ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
-  !
-  ! We solve for :
-  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
-  !
-  ! which is equivalent in matrix notation to:
-  !
-  ! GG(l,l') dot n_l' = 0 with l' is on the columns and l on the rows
-  !
-  ! In particular for a 2-level atom the two equations are:
-  !
-  ! n1*G_11 + n2*G_21 = 0
-  ! n1*G12 + n2*G22 = 0,
-  ! with one of these equations has to be replaced by
-  ! n1 + n2 = N
-  !
-  ! For numerical stability, the row with the largest populations is 
-  ! removed (i.e., it is replaced by the mass conservation law).
-  !
- ! --------------------------------------------------------------------!
-
-  integer, intent(in) :: icell, id
-  type(AtomType), intent(inout) :: atom
-  integer :: lp, imaxpop
-  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
-  
-  !we need to do that here as Gamma is updated for each rays.
-!    do lp = 1, atom%Nlevel
-!     write(*,*) atom%Gamma(lp,lp), sum(atom%Gamma(lp,:))
-!     atom%Gamma(lp,lp) = -sum(atom%Gamma(lp,:)) !sum over rows for this column
-!    end do
-  
-
-  imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
-  atom%n(:,icell) = 0d0
-  atom%n(imaxpop,icell) = atmos%nHtot(icell)*atom%Abund
-
-  
-  !Sum_l'_imaxpop * n_l' = N
-  atom%Gamma(:,imaxpop,id) = 1d0 !all columns of the last row for instance
-  !(G11 G21)  (n1)  (0)
-  !(       ) .(  ) =( )
-  !(1    1 )  (n2)  (N)
-  
-  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
-
-  Aij = transpose(atom%Gamma(:,:,id))
-  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
-  !atom%n(:,icell) = atom%n(:,icell) * atmos%nHtot(icell)*atom%Abund
-  atom%Gamma(:,:,id) = -1d100 !for checking, this should never be seen in Aij
-
- RETURN
- END SUBROUTINE SEE_atom
- 
- SUBROUTINE updatePopulations(id, icell)
- ! --------------------------------------------------------------------!
-  ! Performs a solution of SEE for each atom.
-  !
-  ! to do: implements Ng's acceleration iteration. 
- ! --------------------------------------------------------------------!
-
-  integer, intent(in) :: id, icell
-  type(AtomType), pointer :: atom
-  integer :: nat, nati, natf
-  logical :: accelerate = .false.
-  double precision :: dM
-  
-  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-  nati = 1; natf = atmos%Nactiveatoms
-  do nat=nati,natf !loop over each active atoms
-   atom => atmos%ActiveAtoms(nat)%ptr_atom
-   CALL SEE_atom(id, icell, atom)
-   !write(*,*) "SEE min:", id, icell, locate(atom%n(:,icell), minval(atom%n(:,icell))), minval(atom%n(:,icell))
-   NULLIFY(atom)
-  end do
- 
- RETURN
- END SUBROUTINE updatePopulations
  
  SUBROUTINE initRadiativeRates(atom)
  ! ---------------------------------------- !
@@ -766,142 +677,3 @@ MODULE statequil_atoms
 
 
 END MODULE statequil_atoms
-!  SUBROUTINE fillGamma_Hogereijde(id, icell, iray, n_rayons)
-!   ! ------------------------------------------------------------------------- !
-!    ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
-!    ! of transition from level l' to l.
-!    ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
-!    ! level j to lower level i.
-!    !
-!    ! This is the case of Hogeriejde, similar to molecular lines in MCFOST.
-!    ! The intensity I in the rate matrix elements: 
-!    !  Cl'l + Rl'l - delta(l,l') Sum_l" (Cllp" + Rll"); appearing in Rll' and
-!    !  Rll" is directly replaced by Iexp(-dtau) + (1-exp(-dtau))*Snu; 
-!    ! with Iexp(-dtau) = Ieff and (1-exp(-dtau))/chi = Psi by definition.
-!    ! I = Ieff + Psi * eta
-!    !
-!    ! The Sum_l" represents a sommation over each column for the lth row.
-!    !
-!   ! ------------------------------------------------------------------------- !
-! 
-!   integer, intent(in) :: id, icell, iray, n_rayons
-!   integer :: nact, kr, switch,i, j, Nblue, Nred, l, nati, natf, nc, nl
-!   type (AtomType), pointer :: atom
-!   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, Ieff
-!   double precision :: norm = 0d0
-!   double precision :: c_nlte = 1d0
-!   
-!   Ieff(:) = 0d0
-!   !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-!   !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-!   nati = 1; natf = atmos%Nactiveatoms
-! 
-!   do nact=nati,natf !loop over each active atoms
-!    atom => atmos%ActiveAtoms(nact)%ptr_atom
-!    !loop over transitions, b-f and b-b for these atoms
-!    !To do; define a transition_type with either cont or line
-!    Ieff(:) = NLTEspec%I(:,iray,id)*dexp(-NLTEspec%dtau(:,iray,id)) + \
-!              NLTEspec%Psi(:,iray,id) * atom%eta(:,id)
-! 
-!    do kr=1,atom%Ncont
-!     !the 4pi is here, because int(dOmega) is replaced by 4PI * 1/N Sum_rays
-!     norm = 4*PI / HPLANCK / n_rayons
-!     
-!     i = atom%continua(kr)%i; j = atom%continua(kr)%j
-!     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred 
-!     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NLTEspec%lambda*NM_TO_M)**3.
-!     
-!     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + c_nlte*sum(atom%continua(kr)%Vij(:,id)*Ieff(Nblue:Nred)*cont_wlam(atom%continua(kr))) * norm
-!     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%continua(kr)%Vij(:,id)*atom%continua(kr)%gij(:,id)*cont_wlam(atom%continua(kr))) * norm
-!     	
-!      if (maxval(abs(atom%Gamma(:,:,id))) > 1d10) then
-!     write(*,*) "------------------"
-!    write(*,*) "2", id, icell, iray, kr, "line", i, j,sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm, &
-!    sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-!    write(*,*) id, icell, iray, kr, "line", i, j, minval(Ieff(Nblue:Nred)), maxval(Ieff(Nblue:Nred)), &
-!     minval(twohnu3_c2(Nblue:Nred)), maxval(twohnu3_c2(Nblue:Nred)), minval(atom%lines(kr)%Vij(:,id)), &
-!     maxval(atom%lines(kr)%Vij(:,id)), minval(atom%lines(kr)%gij(:,id)), maxval(atom%lines(kr)%gij(:,id)), &
-!     minval(atom%lines(kr)%wlam(:)), maxval(atom%lines(kr)%wlam(:))
-!     write(*,*) "------------------"
-!       write(*,*) id, icell, iray
-!       write(*,*) atom%Gamma(:,:,id)
-!       stop
-!      end if
-!    end do
-! 
-!    do kr=1,atom%Nline
-!     !the 4PI is here to compensate the 1/4PI appearing in Vij.
-!     !because int(dOmega/4PI) is replaced by 1/N Sum_rays here.
-!     norm =  4d0 *PI / (CLIGHT * HPLANCK) / n_rayons
-!     
-!     i = atom%lines(kr)%i; j = atom%lines(kr)%j
-!     Nblue = atom%lines(kr)%Nblue; Nred = atom%lines(kr)%Nred 
-!     twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji 
-!     
-!     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + c_nlte*sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm
-!     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + c_nlte*sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-!     	
-! !     nl = Nblue
-! !     do nc=1, atom%lines(kr)%Nlambda
-! !      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + c_nlte*(atoms%lines(kr)%Vij(nc,id)*Ieff(nl)**atom%lines(kr)%wlam(nc)*norm)
-! !      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + c_nlte*((Ieff(nl)+twohnu3_c2(nl))*atom%lines(kr)%Vij(nc,id)*&
-! !      											atom%lines(kr)%gij(nc,id)*atom%lines(kr)%wlam(nc))*norm
-! !      nl = nl + 1 !goes to Nred
-! !     end do
-!     	
-!      if (maxval(abs(atom%Gamma(:,:,id))) > 1d16) then
-!     write(*,*) "------------------"
-!    write(*,*) "1", id, icell, iray, kr, "line", i, j,sum(atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:)) * norm, &
-!    sum((Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-!     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:)) * norm
-!    write(*,*) Ieff(Nblue:Nred)
-! !    write(*,*) id, icell, iray, kr, "line", i, j, minval(Ieff(Nblue:Nred)), maxval(Ieff(Nblue:Nred)), &
-! !     minval(twohnu3_c2(Nblue:Nred)), maxval(twohnu3_c2(Nblue:Nred)), minval(atom%lines(kr)%Vij(:,id)), &
-! !     maxval(atom%lines(kr)%Vij(:,id)), minval(atom%lines(kr)%gij(:,id)), maxval(atom%lines(kr)%gij(:,id)), &
-! !     minval(atom%lines(kr)%wlam(:)), maxval(atom%lines(kr)%wlam(:))
-! !     write(*,*) "------------------"
-! !       write(*,*) id, icell, iray
-! !       write(*,*) atom%Gamma(:,:,id)
-! !       write(*,*) "***"
-! !       write(*,*) (Ieff(Nblue:Nred)+twohnu3_c2(Nblue:Nred))*&
-! !     	atom%lines(kr)%Vij(:,id)*atom%lines(kr)%gij(:,id)*atom%lines(kr)%wlam(:) * norm
-! !     	      write(*,*) "***"
-! ! write(*,*) atom%lines(kr)%Vij(:,id)*Ieff(Nblue:Nred)*atom%lines(kr)%wlam(:) * norm
-! !       write(*,*) "***"
-! 
-!       stop
-!      end if
-!    end do
-! !    write(*,*) id, icell, iray, "Cul", minval(GT(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT(1:atom%Nlevel, 1:atom%Nlevel)), &
-! !    " Cont", minval(GT2(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT2(1:atom%Nlevel, 1:atom%Nlevel)),&
-! !    " Line",minval(GT3(1:atom%Nlevel, 1:atom%Nlevel)), maxval(GT3(1:atom%Nlevel, 1:atom%Nlevel))
-!    
-!    if (iray==n_rayons) then !otherwise we remove several times GammaDiag
-!    	do l = 1, atom%Nlevel
-!    	    if (atom%Gamma(l,l,id) /= 0.) &
-!    	     write(*,*) "diag(Gamma) should be zero ", l, atom%Gamma(l,l,id)
-!    	    atom%Gamma(l,l,id) = 0d0
-!     	atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-!    	end do
-!    	write(*,*) "MaxMin Gamma:", id, icell, iray, minval(atom%Gamma(:,:,id)), maxval(atom%Gamma(:,:,id))
-!    end if
-! 
-!    	
-!    	if (iray==n_rayons .and. maxval(atom%Gamma(:,:,id)) <= 0d0) then  
-!    	write(*,*) icell, id, iray, "Gamma (i, j, G(i,j), G(i,i), G(j,i), G(j,j)" !Remember that even if no continuum transitions, Gamma is init to Cji
-!      do i=1,atom%Nlevel
-!      do j=1,atom%Nlevel
-!      write(*,*) "Gamma:", i, j, atom%Gamma(i,j,id), atom%Gamma(i,i,id),  atom%Gamma(j,i,id), atom%Gamma(j,j,id)
-!      end do
-!     end do
-!   stop
-!    end if
-!    
-!    NULLIFY(atom)
-!   end do !loop over atoms  
-! 
-!  RETURN
-!  END SUBROUTINE fillGamma_Hogereijde

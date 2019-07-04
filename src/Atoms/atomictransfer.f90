@@ -26,6 +26,7 @@ MODULE AtomicTransfer
  use collision
  use solvene
  use statequil_atoms
+ use init_solution, only 			: Init_NLTE, free_NLTE_sol, gpop_old, pop_old, pop
  use writeatom
  use simple_models, only 				: magneto_accretion_model, magneto_accretion_diskwind_model, &
  										 FALC_MODEL, spherical_star, feqv
@@ -176,14 +177,7 @@ MODULE AtomicTransfer
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
      CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
-     if (eval_operator) then
-	   !in practice only if MALI
-	   CALL initCrossCoupling(id)
-       CALL FillCrossCoupling_terms(id, icell)
-       CALL add_to_psi_operator(id, icell, iray, ds(iray,id))
-       !CALL FillGamma_Hogereijde(id, icell, iray, n_rayons)
-     end if
+     CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -253,6 +247,11 @@ MODULE AtomicTransfer
      ! dtau = chi * ds
      tau = tau + dtau * facteur_tau
      tau_c = tau_c + dtau_c
+
+     !here because %chip, chi have to be allocated
+     if (eval_operator) then
+       CALL add_to_psi_operator(id, icell, iray, ds(iray,id))
+     end if
 
     end if  ! lcellule_non_vide
   end do infinie
@@ -330,7 +329,7 @@ MODULE AtomicTransfer
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
      CALL initAtomOpac(id,(labs.and.(nbr_cell==1)))
-     CALL NLTEopacity(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l, .false.)!(labs.and.(nbr_cell==1)))
+     CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, .false.)!(labs.and.(nbr_cell==1)))
 
      if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
@@ -500,6 +499,9 @@ MODULE AtomicTransfer
      else
         ! On fait le test sur a difference
         diff = maxval( abs(I0 - Iold) / (I0 + 1e-300_dp) )
+        ! There is no iteration for Q, U, V, assuming that if I is converged, then Q, U, V also.
+        ! Can be added and then use diff as max(diff, diffQ, diffU, diffV)
+        if (diff > 1) write(*,*) 'iter pixels:', iter, subpixels, diff
         if (diff > precision ) then
            ! On est pas converge
            subpixels = subpixels * 2
@@ -677,8 +679,8 @@ MODULE AtomicTransfer
 
      ! loop on pixels
      id = 1 ! pour code sequentiel
-     n_iter_min = 1 ! 3
-     n_iter_max = 1 ! 6
+     n_iter_min = 3 !1
+     n_iter_max = 6 !1
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
@@ -864,7 +866,7 @@ MODULE AtomicTransfer
   end do
   CALL initAtomOpac(1,.false.)
   CALL BackgroundLines(1,icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm)
-  CALL NLTEopacity(1, icell, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
+  CALL NLTEopacity(1, icell, 1, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, dumm, .false.)
   do nact=1, NLTEspec%Nwaves
 ! LTE
 !   write(12,"(5E)") NLTEspec%lambda(nact), NLTEspec%AtomOpac%eta_p(nact,1)+NLTEspec%AtomOpac%jc(icell,nact),&
@@ -950,18 +952,11 @@ MODULE AtomicTransfer
 
  SUBROUTINE NLTEloop() !for all active atoms
  ! -------------------------------------------------------- !
-  ! CASE : MALI
-  ! CASE : HOGEREIJDE
-  !      -> should be simpler (in reading and implementing)
-  !			than MALI
-  !		 -> less accurate than MALI
-  !		 -> faster than MALI
-  !		 -> should have a lower convergence speed ?
+  ! Descriptor here
  ! -------------------------------------------------------- !
- 
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 10 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
@@ -978,13 +973,11 @@ MODULE AtomicTransfer
 
   real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1
 
-  logical :: labs, disable_subit, Ng_acceleration = .false., iterate_ne = .true.
+  logical :: labs, disable_subit, Ng_acceleration, iterate_ne, force_lte
   integer :: atomunit = 1, nact
   integer :: icell
   integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
-  double precision, allocatable, dimension(:,:,:) :: pop_old, pop
-  double precision, allocatable, dimension(:,:,:) :: gpop_old
   real(kind=dp), dimension(3, atmos%Nrays, nb_proc) :: xyz0, uvw0
   type (AtomType), pointer :: atom
 
@@ -999,84 +992,74 @@ MODULE AtomicTransfer
   id = 1
   etape_start = 1
   etape_end = 1
-  disable_subit = .false. !set to true to avoid subiterations over the emissivity
+  disable_subit = .true. !set to true to avoid subiterations over the emissivity
+  Ng_acceleration = .false.
+  iterate_ne = .true.
+  force_lte = .false.
   max_sub_iter = 25
-  atmos%nLTE_methode="HOGEREIJDE" !force Hogereijde, MALI not okay yet
  ! ----------------------------  INITIAL POPS------------------------------------------ !
-  ! CALL initialSol()
-  ! if OLD_POPULATIONS, the init is done at the reading
-  ! for now initialSol() is replaced by this if loop on active atoms
-  NmaxLevel = 0
-  do nact=1,atmos%Nactiveatoms
-     atom => atmos%ActiveAtoms(nact)%ptr_atom
-     !Now we can set it to .true. The new background pops or the new ne pops
-     !will used the H%n
-     atom%NLTEpops = .true.
-     Nlevel_total = Nlevel_total + atom%Nlevel**2
-     NmaxLevel = max(NmaxLevel, atom%Nlevel)
-     write(*,*) "Setting initial solution for active atom ", atom%ID, atom%active
-     atom%n(:,:) = 1d0*atom%nstar(:,:)
-
-!!Check collisionRate new before completely removing atom%Ckij
+   CALL Init_NLTE()!Ng_acceleration
+!   if OLD_POPULATIONS, the init is done at the reading
+!   for now initialSol() is replaced by this if loop on active atoms
+!   NmaxLevel = 0
+!   do nact=1,atmos%Nactiveatoms
+!      atom => atmos%ActiveAtoms(nact)%ptr_atom
+!      Now we can set it to .true. The new background pops or the new ne pops
+!      will used the H%n
+!      atom%NLTEpops = .true.
+!      Nlevel_total = Nlevel_total + atom%Nlevel**2
+!      NmaxLevel = max(NmaxLevel, atom%Nlevel)
+!      write(*,*) "Setting initial solution for active atom ", atom%ID, atom%active
+!      atom%n(:,:) = 1d0*atom%nstar(:,:)
+! 
+! !Check collisionRate new before completely removing atom%Ckij
 !        allocate(atom%Ckij(atmos%Nspace,atom%Nlevel*atom%Nlevel))
 !        !open collision file
 !        atom%Ckij = 0d0
-     CALL openCollisionFile(atom) !closed at the end of the NLTE, it is not nice to do that
-       								!but cheap in memory. Cause problem if parallel or
-       								!run on a machine. Extra I/O overhead expected
-
-     !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
-     !!Allocate Ng structure of all levels of all atoms, updated at each cell
-     !!-> check allocation in statequil
-     !!if (Ng_acceleration) CALL initNg(atom%Nlevel, 2, 3, 6,atom%n(:,1), atom%Ngs)
-     allocate(atom%Gamma(atom%Nlevel, atom%Nlevel,NLTEspec%NPROC))
-
-	 CALL Keep_collision_lines(atom) !an array containing the lines in file read from atom%offset_col to END
-	 !it avoids reading in the file, instead it reads an array (small)
-	 CALL closeCollisionFile(atom)
+!      CALL openCollisionFile(atom) !closed at the end of the NLTE, it is not nice to do that
+!        								but cheap in memory. Cause problem if parallel or
+!        								run on a machine. Extra I/O overhead expected
+! 
+!      CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
+!      !Allocate Ng structure of all levels of all atoms, updated at each cell
+!      !-> check allocation in statequil
+!      !if (Ng_acceleration) CALL initNg(atom%Nlevel, 2, 3, 6,atom%n(:,1), atom%Ngs)
+!      allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))
+! 
+! 	 CALL Keep_collision_lines(atom) !an array containing the lines in file read from atom%offset_col to END
+! 	 it avoids reading in the file, instead it reads an array (small)
+! 	 CALL closeCollisionFile(atom)
 !      do icell=1,atmos%Nspace
 !         if (atmos%lcompute_atomRT(icell)) CALL CollisionRate(icell, atom) !open and allocated in LTE.f90
 !       !try keeping in memory until better collision routine !
 !   	 end do	
 !   	 write(*,*) "Fill collision rates for that atom.."
 !   	 CALL closeCollisionFile(atom) !if opened
-    !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
-  	 !deallocate(atom%C) !not used anymore if stored on RAM
-     atom => NULL()
-  end do
-  
-  ! Temporary keep collision on RAM, BEWARE IT CAN BE LARGE, need a better collision routine
-  ! which stores the required data to compute on the fly the Cij, instead of reading it
-  ! each cell
-!    if (real(Nlevel_total*n_cells)/(1024**3) < 1.) then
-!     write(*,*) "Keeping", real(Nlevel_total*n_cells)/(1024**2), " MB of memory", &
-!    	 " for Collisional matrix."
-!    else
-!     write(*,*) "Keeping", real(Nlevel_total*n_cells)/(1024**3), " GB of memory", &
-!    	 " for Collisional matrix."
+!     !CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
+!   	 deallocate(atom%C) !not used anymore if stored on RAM
+!      atom => NULL()
+!   end do
+!   FillGamma_bb => FillGamma_bb_zero_radiation
+!   FillGamma_bf => FillGamma_bf_zero_Radiation
+!   write(*,*) " --> (forcing) ZERO_RADIATION initial SOLUTION!"
+!   do icell=1,n_Cells
+!    if (atmos%icompute_atomRT(icell)>0) then
+!     CALL initGamma(id, icell)
+!     CALL FillGamma(1, icell, n_rayons)
+!     CALL updatePopulations(id, icell)
+!     write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
+!     write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
 !    end if
-  !end replacing initSol()
- ! ------------------------------------------------------------------------------------ !
-  allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
-  allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
-  allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,n_cells)); gpop_old = 0d0
-  
-  CALL alloc_wlambda() !only for lines actually
-          
-  SELECT CASE (atmos%nLTE_methode)
-   CASE ("MALI")
-   
-   		lfixed_rays = .true.
-  		n_rayons = n_rayons_max
-  		iray_start = 1
-  		lprevious_converged = .false.
-  		lnotfixed_rays = .not.lfixed_rays
-  		lconverged = .false.
-  		n_iter = 0
-        write(*,*) " Implementing ..."
-        stop
- 
-    CASE ("HOGEREIJDE")
+!   end do
+!   FillGamma_bb => NULL(); FillGamma_bf => NULL()
+!   end replacing initSol()
+!  ------------------------------------------------------------------------------------ !
+!   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
+!   allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
+!   allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,n_cells)); gpop_old = 0d0
+!   
+!   CALL alloc_phi_lambda() !alloc space for line profiles for each line: line%phi(line%Nlambda, Nrays, Nproc)
+
      do etape=etape_start, etape_end
 
       if (etape==1) then !two rays
@@ -1129,11 +1112,6 @@ MODULE AtomicTransfer
             end do
         	!$omp end do
         	!$omp end parallel
-
-        	if (iterate_ne .and. n_iter > 1)  then 
-        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-        	 CALL SolveElectronDensity(ne_start_sol)
-        	end if
         	
 
  			!$omp parallel &
@@ -1142,7 +1120,7 @@ MODULE AtomicTransfer
             !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom,nact) &
             !$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old) &
+            !$omp shared(atmos, n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old,force_lte) &
             !$omp shared(NLTEspec, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
             !$omp do schedule(static,1)
   			do icell=1, n_cells  !!atom is shared or private???
@@ -1197,41 +1175,16 @@ MODULE AtomicTransfer
 						xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
 						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
 
-! if (iray==1 .or. iray==n_rayons) &
-! write(*,*) iray, icell, "id", id,"rays ", xyz0(:,iray,id), uvw0(:,iray,id)
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
-                        !+add cross_coupling for this cell in this direction in Gamma
-                        !then for next ray they are re init
- 						CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       				end do !iray
-      				!!CALL Gamma_LTE(id,icell) !G(j,i) = C(j,i) + ...
-!       				NLTEspec%J(:,id) = 0d0; NLTEspec%Jc(:,id) = 0d0
-!       	            do iray=1,n_rayons
-!       	             NLTEspec%J(:,id)  NLTEspec%J(:,id) + NLTEspec%I(:,iray,id)/n_rayons
-!       	             NLTEspec%Jc(:,id)  NLTEspec%Jc(:,id) + NLTEspec%Ic(:,iray,id)/n_rayons
-!       	            end do		
-    				!lconverged_loc = disable_subit !to disable sub-it
+      				!Fill the Rate matrix and integrates over rays and frequencies
+      				!rays and waves integration for all atoms
+                    CALL FillGamma(id, icell, n_rayons, force_lte)
+
     		     	n_iter_loc = 0
     				if (disable_subit) then
-! atom => atmos%ActiveAtoms(1)%ptr_atom
-!     				 write(*,*) "Before update"
-!     				 write(*,*) maxval(atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id)), &
-!     				 maxval(atmos%ActiveAtoms(1)%ptr_atom%n(:,icell))
-!!!!$omp critical
     				 CALL updatePopulations(id, icell)
-!!!$omp end critical
-!     				 CALL SEE_atom(id, icell, atom)
-!     				 write(*,*) maxval(atmos%ActiveAtoms(1)%ptr_atom%Gamma(:,:,id)), &
-!     				 maxval(atmos%ActiveAtoms(1)%ptr_atom%n(:,icell))
-!     				 write(*,*) "after update"
-    				 ! stop
     				 lconverged_loc = .true.
-!     if (n_iter == 2) then
-!     	write(*,*) id, icell, atom%ID, loc(atom)
-!     	write(*,*) atom%n(:,icell)
-!     	write(*,*) gpop_old(1,:,icell)
-!    end if
-! atom=>NULL()
     				else
     				 lconverged_loc = .false.
     				!save pops for all active atoms
@@ -1242,13 +1195,13 @@ MODULE AtomicTransfer
     				  atom => NULL()
     				 end do
     				end if
-    				
+
+!if (n_iter==2) stop
      				!!sub iteration on the local emissivity, keeping Idag fixed
      				!!only iterate on cells which are not converged
      				do while (.not.lconverged_loc)
      				!write(*,*) "Starting subit for cell ", icell
        					n_iter_loc = n_iter_loc + 1
-       					
                         pop_old(:,:,id) = pop(:,:,id)
 						
 						!Solve SEE for all atoms
@@ -1285,15 +1238,14 @@ MODULE AtomicTransfer
   			        		CALL initGamma(id,icell)
  							do iray=iray_start, iray_start-1+n_rayons
       							!I unchanged
-!     if (iray==1 .or. iray==n_rayons) &
-!       	write(*,*) iray, icell, "id", id,"rays sub-it", xyz0(:,iray,id), uvw0(:,iray,id)
 							    CALL init_local_field_atom(id, icell, iray, &
 							         xyz0(1,iray,id), xyz0(2,iray,id), xyz0(3,iray,id), &
 							         uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id))
-                               !! +add Xcoupling in Gamma for this cell/ray
- 						       CALL fillGamma_Hogereijde(id, icell, iray, n_rayons)
       						end do !iray
-      						!!CALL Gamma_LTE(id,icell)
+							
+							!rays, waves integration for all atoms
+      				        CALL FillGamma(id, icell, n_rayons, force_lte) !more General
+
        					end if
        					if (n_iter_loc >= max_sub_iter) then 
        					  if (diff>1) write(*,*) " sub-it not converged after", n_iter_loc, &
@@ -1306,7 +1258,7 @@ MODULE AtomicTransfer
      		end do !icell
         	!$omp end do
         	!$omp end parallel
-!if (n_iter == 2) stop
+
         	!Global convergence criterion
         	!I cannot iterate on unconverged cells because the radiation coming for each cell
         	!depends on the other cell.
@@ -1360,12 +1312,13 @@ MODULE AtomicTransfer
           	   end if
         	end if
         	
+        	if (iterate_ne)  then !.and. n_iter > 1
+        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	 CALL SolveElectronDensity(ne_start_sol)
+        	end if
+        	
 	    end do !while
 	  end do !over etapes
-
-  CASE DEFAULT
-   CALL ERROR("Methode for SEE unknown", atmos%nLTE_methode)
-  END SELECT
   
   if (iterate_ne) then
    write(*,*) "  --> old max/min nHmin", maxval(atmos%nHmin), minval(atmos%nHmin,mask=atmos%nHmin>0)
@@ -1379,19 +1332,20 @@ MODULE AtomicTransfer
   end if
  ! -------------------------------- CLEANING ------------------------------------------ !
   ! Remove NLTE quantities not useful now
-  
-  deallocate(pop_old)
-  if (allocated(pop)) deallocate(pop)
-  do nact=1,atmos%Nactiveatoms
-   atom  => atmos%ActiveAtoms(nact)%ptr_atom
-   !!!!CALL closeCollisionFile(atom) 
-   if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
-     deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
-   if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)) deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
-   if (Ng_acceleration) CALL freeNg(atmos%ActiveAtoms(nact)%ptr_atom%Ngs)
-   atom => NULL()
-  end do
-  deallocate(ds)
+  CALL free_nlte_sol(Ng_acceleration)
+  deallocate(ds)  
+!   deallocate(pop_old)
+!   if (allocated(pop)) deallocate(pop)
+!   CALL dealloc_phi_lambda() !not used anymore, except if we kept them in Profile() ?
+!   do nact=1,atmos%Nactiveatoms
+!    atom  => atmos%ActiveAtoms(nact)%ptr_atom
+!    !!!!CALL closeCollisionFile(atom) 
+!    if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
+!      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
+!    !!if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)) deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
+!    if (Ng_acceleration) CALL freeNg(atmos%ActiveAtoms(nact)%ptr_atom%Ngs)
+!    atom => NULL()
+!   end do
  ! ------------------------------------------------------------------------------------ !
  RETURN
  END SUBROUTINE NLTEloop
