@@ -23,16 +23,43 @@ Unless you need to dif into the source, this is the recommended installation
 procedure. The binaries have been compiled with the Intel compiler and should
 be optmized for most architectures.
 
-1. Copy the file mcfost to somewhere in your shell $PATH.
-2. ``chmod +x mcfost; rehash``
-3. You should now be able to run ``mcfost --help``
+
+Email Christophe to ask for permission, and a link to download the tar ball with MCFOST.
+
+1. Extract the file and make it executable::
+
+     $ tar -xvzf mcfost.tgz
+     $ chmod +x mcfost
+     $ rehash
+
+2. Make directories to store the mcfost binary and utility files. For instance::
+
+     $ mkdir ~/mcfost/bin
+     $ mkdir ~/mcfost/utils
+
+3. Copy the file mcfost the previously defined directory (or somewhere in your shell $PATH)::
+
+     $ mv mcfost ~/mcfost/bin
+
 4. Set the environment variable ``MCFOST_UTILS`` to point to a directory
    where you want mcfost to store its data files. E.g. edit your
-   shell startup files to include either:
+   shell startup files to include either::
 
-   - ``setenv MCFOST_UTILS /path/you/put/the/files`` [tcsh or csh shell], or
-   - ``export MCFOST_UTILS=/path/you/put/the/files`` [bash or bash-like shell]
-5. run ``mcfost -setup`` to download mcfost data files, current reference parameter files.
+   $ setenv MCFOST_UTILS ~/mcfost/utils
+
+   for tcsh or csh shell, or::
+
+   $ export MCFOST_UTILS=~/mcfost/utils
+
+   for bash or bash-like shell.
+
+5. You should now be able to run::
+
+     $ mcfost --help
+
+     to get a short list of the available options.
+
+6. run ``mcfost -setup`` to download mcfost data files, current reference parameter files.
 
 
 
@@ -46,7 +73,7 @@ Installation from source
      $ export MCFOST_GIT=1
      $ export MCFOST_AUTO_UPDATE=0
 
-(The last line will prevent the mcfost binary to try to update itself).
+(The last line will prevent the mcfost binary to try to update itself, which is probably not desired if you compile it yourself).
 
 3. Select your compiler::
 

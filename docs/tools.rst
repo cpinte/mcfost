@@ -1,17 +1,20 @@
 MCFOST tools
 ============
 
-For visualization and fitting tools, 3 packages are available so far for
+For visualization and fitting tools, several packages are available so far for
 MCFOST:
 
 -  an IDL GUI interface (lead author: Perrin)
 -  a more simple, command-line based IDL interface (lead author: Duchene)
--  a command-line based, Yorick interface (lead author: Pinte).
--  [new] a Python package for display and manipulation of models. (Work in progress; Perrin & Pinte)
+-  a command-line based, Yorick interface (lead author: Pinte, deprecated).
+-  the python package `pymcfost <https://github.com/cpinte/pymcfost>`__ (lead author: Pinte).
+-  an alternative, unmaintained python package `mcfost-python <https://github.com/cpinte/pymcfost>`__ lead author: Perrin).
 
 Only the analysis of the results are done with IDL or Yorick or Python.
 They are not required for the use of MCFOST, but make its use easier,
 especially when dealing with large numbers of models.
+
+.. important:: The recommended analysis tool is `pymcfost <https://github.com/cpinte/pymcfost>`__. Below are briefs descriptions of the alternative options, but support for them is now very limited.
 
 Tools for Creating Parameter Files
 ----------------------------------
@@ -69,8 +72,6 @@ The right way to do this depends on what machine you're running on.
 
 IDL Tools for Visualizing MCFOST Output
 ---------------------------------------
-
-.. note:: this tool is now deprecated. Use the Python tools instead.
 
 MCRE (MCFOST Results Explorer, author : Marshall) is a graphical
 application for browsing and analyzing large (10k-100k+) model grids
