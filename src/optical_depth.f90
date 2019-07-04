@@ -308,6 +308,7 @@ end subroutine dust_and_mol_optical_length_tot
 
 !***********************************************************
 
+!--> dprecated
 subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
   ! ------------------------------------------------------------------ !
   ! special for atomic line RT.
@@ -315,7 +316,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
 
   use metal, only                         : Background, BackgroundLines, BackgroundLines_lambda, Backgroundcontinua
   use spectrum_type, only                 : NLTEspec, initAtomOpac
-  use opacity, only						  : NLTEOpacity, NLTEOpacity_lambda
+  use opacity, only						  : NLTEOpacity!, NLTEOpacity_lambda
 
   integer, intent(in)                    :: id, lambda, icell
   real(kind=dp),dimension(4), intent(in) :: Stokes
@@ -371,14 +372,14 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
            if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
               !call NLTEOPACity_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-              call NLTEOPACity(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
+              call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
               call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
                    NLTEspec%AtomOpac%chi_p(lambda,id) + &
                    NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
               kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
            else !on the fly calculations, slow but cheap in memory
-              call NLTEOPACity(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
+              call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
               call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
                    NLTEspec%AtomOpac%chi_p(lambda,id)) * AU_to_m
