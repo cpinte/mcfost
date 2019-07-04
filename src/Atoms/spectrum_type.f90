@@ -47,7 +47,7 @@ MODULE spectrum_type
    !n_proc should be the last index
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
-   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1, Nvel = 101
+   integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
    double precision :: wavelength_ref=0.d0 !nm optionnal
    double precision, allocatable, dimension(:) :: lambda
    double precision, allocatable, dimension(:) :: Istar !not polarised
@@ -194,9 +194,11 @@ MODULE spectrum_type
    deallocate(NLTEspec%I, NLTEspec%Ic)
    !except polarization which are (de)allocated in adjustStokesMode
    if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) then 
-    deallocate(NLTEspec%Psi, NLTEspec%dtau)
+    deallocate(NLTEspec%Psi)
+    if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-   	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
+   	if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") &
+   		allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
    end if 
     
    !Could be also LTE opac if line are kept in memory ?
@@ -286,9 +288,12 @@ MODULE spectrum_type
     !!!!!!!!!!! POTENTIALLY ADD LARGE ARRAY HERE !!!!!!!!!!!!
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-    allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") &
+    	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
+    if (NLTEspec%atmos%NLTE_methode=="MALI") then
+     CALL Warning("Allocating space for Cross-coupling terms")
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up = 0d0
@@ -298,20 +303,22 @@ MODULE spectrum_type
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
      (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
+    end if !methode==MALI
+    
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
 
-     do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
-      cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(cont%Nlambda ,NLTEspec%NPROC))
+     ! do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
+!       cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
+!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
+!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(cont%Nlambda ,NLTEspec%NPROC))
       !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Jbar(NLTEspec%Nproc))
-     end do
-     do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
-      line = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(line%Nlambda ,NLTEspec%NPROC))
-      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(line%Nlambda ,NLTEspec%NPROC))
+!      end do
+!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
+!       line = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)
+!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(line%Nlambda ,NLTEspec%NPROC))
+!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(line%Nlambda ,NLTEspec%NPROC))
       !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Jbar(NLTEspec%Nproc))
-     end do
+     !end do
     end do
    end if
 
@@ -351,7 +358,8 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
    if (allocated(NLTEspec%Psi)) then
-    deallocate(NLTEspec%Psi, NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
+    deallocate(NLTEspec%Psi)
+    if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -385,7 +393,7 @@ MODULE spectrum_type
     
     if (eval_operator) then
    		 NLTEspec%Psi(:,:,id) = 0d0
-   		 NLTEspec%dtau(:,:,id) = 0d0
+   		 if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0
    	end if
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
@@ -421,6 +429,68 @@ MODULE spectrum_type
     
   RETURN
   END SUBROUTINE initAtomOpac
+  
+  
+  SUBROUTINE alloc_phi_lambda()
+  ! --------------------------------------------------- !
+   ! line%phi(line%Nlambda, atmos%Nrays, Nb_proc)
+  ! --------------------------------------------------- !
+   use atmos_type, only : atmos
+   integer :: kr, nact
+   
+   do nact=1,atmos%Nactiveatoms
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+       		
+       !!if I keep phi, I should condiser using it everywhere in Profile() !! ??
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%&
+       		phi(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda,atmos%Nrays,NLTEspec%Nproc))
+    end do
+   end do
+ 
+  RETURN
+  END SUBROUTINE alloc_phi_lambda
+  
+  SUBROUTINE dealloc_phi_lambda()
+  ! --------------------------------------------------- !
+   !
+  ! --------------------------------------------------- !
+   use atmos_type, only : atmos
+   integer :: kr, nact
+   
+   do nact=1,atmos%Nactiveatoms
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+       		
+       !!if I keep phi, I should condiser using it everywhere in Profile() !! ??
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi)
+    end do
+   end do
+ 
+  RETURN
+  END SUBROUTINE dealloc_phi_lambda
+  
+ SUBROUTINE init_XCoupling(id)
+  ! --------------------------------------------------- !
+   ! Init the X coupling terms for each active atoms.
+   ! they are used in the Rybicki Hummer MALI scheme,
+   ! with full preconditioning (overlapping transitions
+   ! and background continua)
+   !
+   ! init a cell level (when eval_operator is true) for
+   ! thread id.
+   ! For all wavelength
+  ! --------------------------------------------------- !
+
+  integer, intent(in) :: id
+  integer :: nact
+  
+  do nact=1,atmos%Nactiveatoms
+   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
+  end do
+ 
+ RETURN
+ END SUBROUTINE init_XCoupling
 
  SUBROUTINE WRITE_FLUX()
  ! -------------------------------------------------- !
