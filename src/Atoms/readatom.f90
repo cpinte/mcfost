@@ -20,7 +20,7 @@ MODULE readatom
   IMPLICIT NONE
 
   character, parameter :: COMMENT_CHAR="#"
-  character(len=*), parameter :: ATOMS_INPUT = "/Atoms/atoms.input"
+  character(len=*), parameter :: ATOMS_INPUT = "./atoms.input"!"/Atoms/atoms.input"
   character(len=*), parameter :: path_to_atoms = "/Atoms/"
   !real, parameter :: MAX_ABUND_ERROR=0.001
 
@@ -613,7 +613,7 @@ MODULE readatom
 
   atmos%Nactiveatoms = 0
   atmos%Npassiveatoms = 0
-  open(unit=unit,file=trim(mcfost_utils)//TRIM(ATOMS_INPUT), status="old")
+  open(unit=unit,file=TRIM(ATOMS_INPUT), status="old")!mcfost_utils)//TRIM(ATOMS_INPUT)
 
   !get number of atomic models to read
   CALL getnextline(unit, COMMENT_CHAR,FormatLine, &

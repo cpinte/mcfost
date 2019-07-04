@@ -21,8 +21,9 @@ MODULE atmos_type
 
   ! relative location in mcfost/utils/ specified by the mcfost environnement
   ! variables.
-  character(len=50), parameter :: ABUNDANCE_FILE="/Atoms/abundance.input"
+  character(len=50), parameter :: ABUNDANCE_FILE="./abundance.input"!"/Atoms/abundance.input"
   character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
+  !path to your partition function data
 
   TYPE atomPointerArray
    type(AtomType), pointer :: ptr_atom => NULL()
@@ -494,7 +495,7 @@ MODULE atmos_type
   !write(*,*) "Metallicity = ", atmos%metallicity
 
   !read abundances
-  open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")
+  open(unit=1, file=TRIM(ABUNDANCE_FILE),status="old")!trim(mcfost_utils)//TRIM(ABUNDANCE_FILE)
   do while (EOF.eq.0)
    read(1, '(1A4, 1F5.3)', IOSTAT=EOF) charID, A
    if (charID(1:1) /= '#') then
