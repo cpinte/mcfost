@@ -72,18 +72,18 @@ MODULE simple_models
    use TTauri_module, only : gett
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
-   double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 8. !days
-   double precision, parameter :: rmi=2.2, rmo=3., Tshk=8d3, Macc = 1d-8, Tiso=0d3
+   double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 6.53 !days
+   double precision, parameter :: rmi=2.2, rmo=3.0, Tshk=8d3, Macc = 1d-9, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
-   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.9999
+   double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.99!99
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
    double precision :: vp, y, rcyl, z, r, phi, Theta, Mdot, sinTheta, Rm, L, r0
    double precision :: Omega, Vphi, TL(8), Lambda(8), rho_to_nH !K and erg/cm3/s
    double precision :: Bp, BR, Bz, tc, phic, Tmax_old, Den, Mdotfid = 0d0
    logical, dimension(:), allocatable :: dark_zone
-   logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.true.
+   logical, parameter :: lwrite_model_ascii = .false., accretion_spots = .true., include_dark_zone=.false.
    logical :: is_not_dark
-   double precision :: zd_max = 0.05, dT, ne1
+   double precision :: zd_max = 0., dT, ne1
    !double precision, dimension(:), allocatable :: Told
       
    data TL / 3.70, 3.80, 3.90, 4.00, 4.20, 4.60, 4.90, 5.40 / !log10 ?
@@ -125,7 +125,7 @@ MODULE simple_models
    !all field lines are between theta0 and thetai at the stellar surface (r=Rstar)
    thetai = asin(dsqrt(1d0/rmi)) !rmi and rmo in Rstar
    thetao = asin(dsqrt(1d0/rmo))
-   !write(*,*) "Thetamax/Thetamin", thetai*rad_to_deg, thetao*rad_to_deg
+   write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
    Tring = Lr / (4d0 * PI * Rstar**2 * sigma * abs(cos(thetai)-cos(thetao)))
    Tring = Tring**0.25
    
@@ -202,7 +202,7 @@ MODULE simple_models
        phi = phi_grid(icell)
        
 
-       Vphi = 0d3!Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
+       Vphi = Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
 
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
 
