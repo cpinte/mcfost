@@ -6,6 +6,7 @@ MODULE constant
   ! ----------------------------------------------------------------- !
 
   use constantes, only : PI, KM_TO_M! MCFOST
+  use mcfost_env, only : dp
 
   integer, parameter :: NELEM_WEIGHTS = 99
 
@@ -36,10 +37,20 @@ MODULE constant
   double precision, parameter ::  JOULE_TO_CM1=5.040963080525957d+22
   double precision, parameter ::  G_TO_KG=1.0d-03
   double precision, parameter ::  MICRON_TO_NM=1.0d+03
-
+  
+  ! ------- Useful RT constants --------- !
+  real(kind=dp), parameter    :: hc = HPLANCK * CLIGHT
+  real(kind=dp), parameter    :: fourPI = 4d0*PI
+  real(kind=dp), parameter    :: hc_4PI = hc/fourPI
+  real(kind=dp), parameter    :: twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
+  real(kind=dp), parameter    :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
+  real(kind=dp), parameter    :: fourPI_h = fourPI / HPLANCK
+  !Photoionisation Xsection of Hydrogen
+  real(kind=dp), parameter    :: sigma0_H = (32d0)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
+          (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0))
+          
+          
  ! --- Mathematical constants ---
-
-
   !double precision, parameter ::  PI  =3.14159265358979
   double precision, parameter ::  SQRTPI=1.77245385090551
 
@@ -56,7 +67,6 @@ MODULE constant
 
 
   ! --- Ionization energy Hmin in [J] ---
-
   real(8), parameter ::  E_ION_HMIN = 0.754 * EV
   real(8), parameter, private :: factor1D = 2d0, factor3D = 8d0/PI
   !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)
