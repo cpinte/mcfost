@@ -1,7 +1,7 @@
 MODULE rayleigh_scattering
 
  use atom_type, only       : AtomType
- use atmos_type, only      : atmos
+ use atmos_type, only      : atmos, Hydrogen, Helium
  use spectrum_type, only   : NLTEspec
  use constant
  use parametres
@@ -12,25 +12,21 @@ MODULE rayleigh_scattering
 
  CONTAINS
  
- SUBROUTINE HRayleigh(id, icell, atom)
+ SUBROUTINE HI_Rayleigh(id, icell)
  ! ------------------------------------------------------------- !
   ! Rayleigh scattering on neutral Hydrogen.
   ! Baschek & Scholz 1982
 
  ! ------------------------------------------------------------- !
-  type (AtomType), intent(in)                               :: atom
+  !type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell, id
-  double precision 											:: lambda_limit, sigma_e
+  double precision 											:: lambda_limit!, sigma_e
   double precision, dimension(NLTEspec%Nwaves) 				:: scatt
   
-  if (atom%ID /= "H") RETURN
+  !if (atom%ID /= "H") RETURN
   
   lambda_limit = 121.6d0
   scatt = 0d0
-  
-  sigma_e = 8.0*PI/3.0 * &
-         (Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
-         (dsqrt(M_ELECTRON)*CLIGHT)))**4.d0
 
   where(NLTEspec%lambda >= lambda_limit)
    scatt = (1d0 + (1566d0/NLTEspec%lambda)**2.d0 + &
@@ -39,14 +35,49 @@ MODULE rayleigh_scattering
 
   if (lstore_opac) then
    NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + &
-   									 scatt * sigma_e * atom%n(icell,1) !m^-1
+   									 scatt * sigma_e * Hydrogen%n(icell,1) !m^-1
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
-   									 scatt * sigma_e * atom%n(icell,1)
+   									 scatt * sigma_e * Hydrogen%n(icell,1)
   end if
    
  RETURN
- END SUBROUTINE HRayleigh
+ END SUBROUTINE HI_Rayleigh
+ 
+ SUBROUTINE HeI_Rayleigh(id, icell)!, atom)
+ ! ------------------------------------------------------------- !
+  ! Rayleigh scattering on neutral Helium.
+  ! Baschek & Scholz 1982
+
+ ! ------------------------------------------------------------- !
+  !type (AtomType), intent(in)                               :: atom
+  integer, intent(in)                                       :: icell, id
+  double precision 											:: lambda_limit!, sigma_e
+  double precision, dimension(NLTEspec%Nwaves) 				:: scatt
+  
+  !if (atom%ID /= "He") RETURN
+  if (.not.associated(Helium)) RETURN
+  write(*,*) "Computing HE I rayleigh"
+  
+  lambda_limit = 121.6d0
+  scatt = 0d0
+
+
+  where(NLTEspec%lambda >= lambda_limit)
+   scatt = 4d0 * (1d0 + (669d0/NLTEspec%lambda)**2.d0 + &
+   			(641d0/NLTEspec%lambda)**4d0)*(379d0/NLTEspec%lambda)**4d0
+  end where
+
+  if (lstore_opac) then
+   NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + &
+   									 scatt * sigma_e * Helium%n(icell,1) !m^-1
+  else
+   NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
+   									 scatt * sigma_e * Helium%n(icell,1)
+  end if
+   
+ RETURN
+ END SUBROUTINE HeI_Rayleigh
  
  SUBROUTINE Rayleigh(id, icell, atom)
  ! ------------------------------------------------------------- !
@@ -69,18 +100,19 @@ MODULE rayleigh_scattering
   integer, intent(in)                                       :: icell, id
   logical                                                   :: res
   integer                                                   :: kr, k, la
-  double precision                                          :: lambda_red, lambda_limit, &
-   															   sigma_e
+  double precision                                          :: lambda_red, lambda_limit!, &
+   															   !sigma_e
   double precision, dimension(NLTEspec%Nwaves) 				:: fomega, lambda2, scatt
   
   lambda_limit = LONG_RAYLEIGH_WAVE
-  sigma_e = 8.0*PI/3.0 * &
-         dpow(Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
-         (dsqrt(M_ELECTRON)*CLIGHT)), 4.d0)
+!   sigma_e = 8.0*PI/3.0 * &
+!          dpow(Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
+!          (dsqrt(M_ELECTRON)*CLIGHT)), 4.d0)
   res = .false. !init, if .false. do not consider Rayleigh
                 !of this atom in opac module.
                 
   scatt = 0d0
+  if (atom%ID=="He") write(*,*) "Rayleigh for Helium" !a test to remove later
 
   if (atom%stage(1) /= 0) then
    write(*,*) "Lowest level of atom is not a neutral stage"
