@@ -1,6 +1,5 @@
 Troubleshooting
 ===================
-This section needs a full rewriting
 
 
 Most common error messages
@@ -27,3 +26,16 @@ You're trying to run a Linux version of MCFOST on a Mac, or vice versa,
 or some other incorrect operating system combination. You probably
 downloaded or copied the wrong file by accident, and should just obtain
 a new copy from the download site.
+
+
+I get random segmentation faults
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Make sure you have increased the stacksize::
+
+  $ export OMP_STACKSIZE=512M
+  $ ulimit -s unlimited
+
+.. note::
+
+   There is a hard limit at 64kB for the stacksize on MacOS. This will prevent post-processing of large phantom dumps (more than 2 millions particles). The solution is either to move to linux, or to re-compile the code with gfortran (which relies less on the stack than ifort), but this will result in some speed penalties.

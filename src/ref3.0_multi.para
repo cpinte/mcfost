@@ -80,10 +80,10 @@
   0.2 			  v_turb (delta)
   1			  nmol
   co@xpol.dat 6           molecular data filename, level_max
-  1.0 20     	  	  vmax (km.s^-1), n_speed
+  10.0 20     	  	  vmax (km.s^-1), n_speed
   T 1.e-6 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
-  T  3                       ray tracing ?,  number of lines in ray-tracing
-  1 2 3	 		  transition numbers
+  T  2                       ray tracing ?,  number of lines in ray-tracing
+  2 3	 		  transition numbers
 
 #Star properties
   1 Number of stars
