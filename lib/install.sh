@@ -1,3 +1,20 @@
+#--------------------------------------------------------
+# This script downloads and installs the libraries
+# required by mcfost:
+#  - sprng2
+#  - cfitsio
+#  - voro++
+#  - hdf5
+#
+# It is likely that you some of the libaries already
+# available on your system. You are free to use them
+# if you wish a "cleaner" installation. The versions
+# provided here have been tested with mcfost.
+#
+# The libraries will be installed in $MCFOST_INSTALL
+#
+# Please refer to the licenses for each library.
+#--------------------------------------------------------
 #!/bin/bash
 set -eu
 
@@ -6,15 +23,6 @@ for comm in svn make tar git-lfs
 do
     command -v $comm
     if [ $? != 0 ] ; then echo "error: $comm command not found"; exit 1; fi
-done
-
-
-du *tar.gz | while read line
-do
-   typeset -i size=$(echo $line | awk '{print $1}')
-   if (($size<1000)); then
-       git lfs pull
-   fi
 done
 
 if [ ! $# = 0 ]; then SYSTEM=$1 ; fi
@@ -51,11 +59,21 @@ rm -rf lib include sprng2.0 cfitsio voro
 mkdir lib include
 pushd .
 
+#-- Downloading libraries
+wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
+wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-3.47.tar.gz
+if [ skip_hdf5 != "yes" ] ; then
+    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+fi
+svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
+cd voro
+svn up -r604
+cd ~1
+
 #-------------------------------------------
 # SPRNG
 #-------------------------------------------
 echo "Compiling sprng ..."
-#Original version from http://sprng.cs.fsu.edu/Version2.0/sprng2.0b.tar.gz
 tar xzvf sprng2.0b.tar.gz
 \cp -f $SYSTEM/make.CHOICES sprng2.0
 \cp -f $SYSTEM/make.INTEL sprng2.0/SRC
@@ -72,9 +90,8 @@ echo "Done"
 # cfitsio
 #-------------------------------------------
 echo "Compiling cfitsio ..."
-# g77 ou f77 needed by configure to set up the fortran wrapper in Makefile
-# Original version from ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio3420.tar.gz
-tar xzvf cfitsio3420.tar.gz
+tar xzvf cfitsio-3.47.tar.gz
+mv cfitsio-3.47 cfitsio
 cd cfitsio
 ./configure --enable-ssse3
 
@@ -92,9 +109,6 @@ echo "Done"
 # voro++
 #-------------------------------------------
 echo "Compiling voro++ ..."
-# Downloading last version tested with mcfost : git clone git@bitbucket.org:cpinte/voro.git
-# Original voro++ can be obtained from svn checkout --username anonsvn https://code.lbl.gov/svn/voro/trunk voro
-svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
 if [ "$SYSTEM" = "ifort" ] ; then
     \cp -f  ifort/config.mk voro
 elif [ "$SYSTEM" = "xeon-phi" ] ; then
@@ -117,6 +131,7 @@ echo "Done"
 # for the mcfost Makefile
 #---------------------------------------------
 if [ skip_hdf5 != "yes" ] ; then
+    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling hdf5 ..."
     tar xjvf hdf5-1.10.5.tar.bz2 ; mv hdf5-1.10.5 hdf5
     cd hdf5
@@ -134,5 +149,5 @@ mkdir -p $MCFOST_INSTALL/lib/$SYSTEM
 \cp -r lib/*.a $MCFOST_INSTALL/lib/$SYSTEM/
 
 #-- Final cleaning
-rm -rf lib include sprng2.0 cfitsio voro hdf5
+./clean.sh
 popd
