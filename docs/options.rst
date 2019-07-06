@@ -189,7 +189,7 @@ observer when using the central azimuthal bin.
 darkening) on the stellar photosphere. Exemples of limb darkening files can be found in
 ``$MCFOST_UTILS/Stellar_Polarization``.
 
-``-age <age>`` (default: 3) [Ma]. When using results from hydrodynamics
+``-age <age>`` (default: 3Myr). When using results from hydrodynamics
 simulations (e.g., SPH), mcfost  will assume an age to determine the stellar
 luminosity and temperature from the mass. The age can be selected using::
 Isochrones are found in ``$MCFOST_UTILS/Stellar_Polarization/Siess``.
