@@ -137,6 +137,29 @@ mcfost source code is hosted on github (as a private directory, public release w
 
      $ make libmcfost.a
 
+7. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+   where you want mcfost to store its data files.
+   E.g. edit your shell startup files to include either::
+
+   $ setenv MCFOST_UTILS ~/mcfost/utils
+
+   for tcsh or csh shell, or::
+
+   $ export MCFOST_UTILS=~/mcfost/utils
+
+   for bash or bash-like shell.
+
+8. You should now be able to run::
+
+     $ mcfost --help
+
+
+ to get a short list of the available options.
+
+9. Download mcfost data files with::
+
+      $ mcfost -setup
+
 
 MCFOST_UTILS Environment variable
 ----------------------------------
