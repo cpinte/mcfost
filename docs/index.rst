@@ -13,8 +13,9 @@ Welcome to MCFOST's documentation
    input
    options
    3D_models
-   tools
    mcfost+phantom
+   tools
+   test_suite
    troubleshooting
 
 .. role:: math(raw)

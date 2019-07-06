@@ -69,8 +69,32 @@ Q/I, U/I, V/I]. That is to say, all the polarizations are written with
 the same dimensionality as intensities and units of
 W.m\ :sup:`-2`.pixel\ :sup:`-1`.
 
-Other kinds of output
---------------------------------
+.. note:: the -casa option makes the fits file compliant with casa and reduces the number of dimensions. Only the first inclination and azimuth are considered. Additional keywords are added for casa, units are changed to Jy/pixel.
+
+
+Outputs from Molecular Line calculations
+----------------------------------------
+
+-  A copy of the input parameter file. A new line will be added at the
+   end of this file, recording any command line options given in the
+   call to MCFOST.
+
+-  ``lines.fits.gz``: ray-traced data cube
+
+Units are in  W.m\ :sup:`-2`.pixel\ :sup:`-1`. These images have 6 dimensions, 2 for spatial dimensions,
+1 for velocity, 1 for the transition number, and 2 for the system inclination and azimuth.
+
+The files contains multiple HDUs.
+The 2nd HDU contains the continuum images, it has the same dimension as the main cube without the velocity.
+The 3rd and 4th HDUs contain the transition numbers and frequencies respectively.
+
+
+.. note:: the -casa option makes the fits file compliant with casa and reduces the number of dimensions. Only the first inclination and azimuth are considered.
+          The fits file also only contains the main HDU in that case.
+
+
+Additional optional outputs
+---------------------------
 
 Disk Density Files
 ^^^^^^^^^^^^^^^^^^
