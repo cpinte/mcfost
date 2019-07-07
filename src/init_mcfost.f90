@@ -127,6 +127,7 @@ subroutine set_default_variables()
   lplanet_az = .false.
   which_planet = 0
   lscale_SPH = .false.
+  lML = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_units = .false.
@@ -174,13 +175,14 @@ subroutine get_mcfost_utils_dir()
      search_dir(1) = "." ; search_dir(2) = my_mcfost_utils ; search_dir(3) = mcfost_utils ;
   endif
 
-  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir))
-  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ;
+  allocate(dust_dir(n_dir),mol_dir(n_dir),star_dir(n_dir),lambda_dir(n_dir),ML_dir(n_dir))
+  dust_dir(1) = "./" ; mol_dir(1) = "./" ; star_dir(1) = "./" ; lambda_dir(1) = "./" ; ML_dir(1) = "./"
   do i=2,n_dir
      dust_dir(i)   = trim(search_dir(i))//"/Dust/"
      mol_dir(i)    = trim(search_dir(i))//"/Molecules/"
      star_dir(i)   = trim(search_dir(i))//"/Stellar_Spectra/"
      lambda_dir(i) = trim(search_dir(i))//"/Lambda/"
+     ML_dir(i) = trim(search_dir(i))//"/ML/"
   enddo
 
   return
@@ -1006,6 +1008,9 @@ subroutine initialisation_mcfost()
      case("-pola")
         i_arg = i_arg + 1
         lpola=.true.
+     case("-ML","-ml")
+        i_arg = i_arg + 1
+        lML=.true.
      case("-fix_star")
         i_arg = i_arg + 1
         lfix_star=.true.
@@ -1192,6 +1197,25 @@ subroutine initialisation_mcfost()
   data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
   lmono = lmono0
 
+  if (lProDiMo .and. (mcfost2ProDiMo_version == 1)) then
+     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
+     write(*,*) "***************************"
+     write(*,*) "* Modelling for ProDiMo   *"
+     write(*,*) "* Forcing wavelength grid *"
+     write(*,*) "***************************"
+     n_lambda = 39 ; lambda_min = 0.0912 ; lambda_max = 3410.85
+     lsed=.true. ; lsed_complete = .true.
+  endif
+
+  if (lML) then ! We use the same wavelength in step2 as in the DENT grid
+     write(*,*) "***************************************************"
+     write(*,*) "* Forcing wavelength grid for xgboost predictions *"
+     write(*,*) "***************************************************"
+     lsed=.true. ; lsed_complete = .false.
+     tab_wavelength = DENT_tab_wavelength
+     lscatt_ray_tracing = .false. ; call warning("turning ray-tracing off")
+  endif
+
   ! Discrimination type de run (image vs SED/Temp)
   !                       et
   ! verification coherence du fichier de parametres
@@ -1256,18 +1280,6 @@ subroutine initialisation_mcfost()
 
   endif
 
-  if (lProDiMo .and. (mcfost2ProDiMo_version == 1) ) then
-     ! Version 1: lambda : 13 bins entre 0.0912 et 3410.85 microns donne les 11 bins de ProDiMo
-     write(*,*) "***************************"
-     write(*,*) "* Modelling for ProDiMo   *"
-     write(*,*) "* Forcing wavelength grid *"
-     write(*,*) "***************************"
-     n_lambda = 39
-     lambda_min = 0.0912
-     lambda_max = 3410.85
-     lsed_complete = .true.
-  endif
-
   if (lspot) then
      if (lscatt_ray_tracing) call error("stellar spots are not implemented in ray-tracing mode yet")
      if (etoile(1)%fUV > 0.) call error("stellar spots are not implemented if the star has a fUV")
@@ -1311,14 +1323,19 @@ subroutine initialisation_mcfost()
 
   if (linfall) l_sym_ima = .false.
 
-  if (lscatt_ray_tracing .and. (.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
-     if (lmono0.and.(.not.l3D)) then
-        lscatt_ray_tracing2 = .true.
-        write(*,*) "Using ray-tracing method 2"
-     else
-        lscatt_ray_tracing1 = .true.
-        write(*,*) "Using ray-tracing method 1"
+  if (lscatt_ray_tracing) then
+     if ((.not. lscatt_ray_tracing1) .and. (.not. lscatt_ray_tracing2)) then
+        if (lmono0.and.(.not.l3D)) then
+           lscatt_ray_tracing2 = .true.
+           write(*,*) "Using ray-tracing method 2"
+        else
+           lscatt_ray_tracing1 = .true.
+           write(*,*) "Using ray-tracing method 1"
+        endif
      endif
+  else
+     lscatt_ray_tracing1 = .false.
+     lscatt_ray_tracing2 = .false.
   endif
 
   ! Forcing azimuthal angle to 0 in rt2

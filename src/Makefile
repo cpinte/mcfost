@@ -64,6 +64,7 @@ ifeq ($(SYSTEM), ifort)
     FOMPFLAGS= -fopenmp
     IPOFLAGS= -ipo
     CC= icc
+    CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
@@ -80,6 +81,7 @@ ifeq ($(SYSTEM), xeonphi)
     FOMPFLAGS= -qopenmp
     IPOFLAGS= -ipo
     CC= icc
+    CXX=icpc -std=c++11
     CCFLAGS= -O3 -no-prev-div -traceback -mmic
     COMPFLAGS= -qopenmp
     LIBCXX= -cxxlib
@@ -126,7 +128,6 @@ ifeq ($(IPO), yes)
     CCFLAGS+= ${IPOFLAGS}
 endif
 
-
 #------------------------------------------------------------------------------#
 # HDF5 libraries
 # Will use the version compiled by install.sh by default but you can use
@@ -156,7 +157,7 @@ endif
 #------------------------------------------------------------------------------#
 # Library flags
 INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(HDF5INCLUDE)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -169,10 +170,10 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90       \
           input.f90 benchmarks.f90 read_param.f90 dust_ray_tracing.f90         \
           radiation_field.f90 thermal_emission.f90 diffusion.f90               \
-          io_prodimo.f90 disk_physics.f90 output.f90 mem.f90 optical_depth.f90 \
-          init_mcfost.f90 io_phantom_infiles.f90 io_phantom_utils.f90          \
-          utils_hdf5.f90 read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90      \
-	  dust_transfer.f90 mol_transfer.f90
+          io_prodimo.f90 disk_physics.f90 output.f90 ML_prodimo.f90 mem.f90    \
+	  optical_depth.f90 init_mcfost.f90 io_phantom_infiles.f90             \
+	  io_phantom_utils.f90  utils_hdf5.f90 read_phantom.f90                \
+	  read_gadget2.f90 SPH2mcfost.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
@@ -184,8 +185,8 @@ main : mcfost
 
 all : mcfost libmcfost.a
 
-mcfost :  $(OBJECTS) voro++_wrapper.o mcfost.o
-	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o mcfost.o $(LDFLAGS)
+mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
+	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
@@ -206,7 +207,10 @@ io_phantom_utils.o :  io_phantom_utils.f90
 	$(FC) $(FFLAGS) -c $(DBLFLAG) io_phantom_utils.f90
 
 voro++_wrapper.o :  voro++_wrapper.cpp
-	$(CC) $(CCFLAGS) -c voro++_wrapper.cpp $(INCLUDE)
+	$(CXX) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
+
+xgboost_wrapper.o :  xgboost_wrapper.cpp
+	$(CXX) $(CCFLAGS) $(COMPFLAGS) -c xgboost_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
@@ -325,10 +329,8 @@ cleanall : clean cleandata
 .PHONY : save
 
 save :
-	#git push phare
 	git push bitbucket --all
 	git push github --all
-	#git push dmz
 
 #------------------------------------------------------------------------------#
 # Testing
