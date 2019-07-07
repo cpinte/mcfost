@@ -39,6 +39,7 @@ module ProDiMo
 
   ! Grille de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
+  character(len=32), parameter :: DENT_tab_wavelength = "DENT.lambda"
 
   real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo, N_ProDiMo
   real(kind=dp), dimension(:,:), allocatable :: n_phot_envoyes_ISM
@@ -179,7 +180,6 @@ contains
     if (alloc_status > 0) call error('Allocation error n_phot_envoyes_ISM')
     n_phot_envoyes_ISM = 0.0
 
-
     ! Calcul des fPAH pour ProDiMo
     lPAH = .false.
     test_PAH : do i=1, n_pop
@@ -286,7 +286,7 @@ contains
     ! Step2
     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
-         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda  ! ICI
+         * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
     do ri=1, n_rad
        do zj=j_start,nz
@@ -723,7 +723,7 @@ contains
 
        wl = tab_lambda(lambda) * 1e-6
        energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*(R_ISM*Rmax)**2) / n_photons_envoyes / pi  ! ici
+           * (4.*pi*R_ISM**2) / n_photons_envoyes / pi
 
        do ri=1, n_rad
           do zj=1,nz
@@ -733,8 +733,6 @@ contains
           enddo
        enddo
     enddo ! lambda
-
-
 
     ! Inversion de l'ordre des dimensions + passage en simple precision
     do ri=1, n_rad

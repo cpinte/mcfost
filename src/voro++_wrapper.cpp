@@ -1,4 +1,4 @@
-#include "voro++.hh"
+#include <voro++/voro++.hh>
 #include <iostream>
 #include <iomanip>
 using namespace voro;
