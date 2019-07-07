@@ -130,13 +130,16 @@ echo "Done"
 #-------------------------------------------
 echo "Compiling xgboost ..."
 cd xgboost
-git checkout v0.72
+git checkout v0.90
 if [ "$SYSTEM" = "ifort" ] ; then
     \cp ../ifort/xgboost/base.h include/xgboost/base.h
 fi
 make -j
 \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
 \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
+#We will need the .h file when linking mcfost, the path is hard-coded in the the xgboost files
+mkdir -p  $MCFOST_INSTALL/src/common
+\cp -r src/common/*.h $MCFOST_INSTALL/src/common
 cd ~1
 echo "Done"
 
