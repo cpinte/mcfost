@@ -1,1 +1,1 @@
-rm -rf include lib sprng2.0 cfitsio voro xgboost
+rm -rf include lib sprng2.0 cfitsio voro xgboost hdf5 *.tar.*

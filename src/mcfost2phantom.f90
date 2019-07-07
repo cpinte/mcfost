@@ -37,6 +37,7 @@ contains
 
     ! Global logical variables
     call set_default_variables()
+    lmcfost_lib = .true.
 
     if (present(keep_particles)) then
        SPH_keep_particles = keep_particles
@@ -137,13 +138,13 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
     npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tphantom,Frad,mu_gas,ierr,write_T_files,ISM,T_to_u)
+    Tphantom,Frad,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
     use constantes, only : mu
     use read_phantom
     use stars, only : E_ISM
-    use radiation_field, only : reset_radiation_field
+    use radiation_field, only : reset_radiation_field, xN_abs
     use thermal_emission, only : select_wl_em, repartition_energie, init_reemission, &
          temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, reset_temperature, E_abs_nRE
     use mem, only : alloc_dynamique, deallocate_densities
@@ -187,6 +188,7 @@ contains
     integer, intent(in) :: ISM ! ISM heating: 0 -> no ISM radiation field, 1 -> ProDiMo, 2 -> Bate & Keto
 
     real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
+    real(sp), dimension(np), intent(out) :: n_packets ! number of packets that crossed the cell
     real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
@@ -204,7 +206,7 @@ contains
     real(kind=dp) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
-    integer :: itime !, time_begin, time_end, time_tick, time_max
+    integer :: itime, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
@@ -248,6 +250,9 @@ contains
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then
        call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
+       alloc_status = 0
+       allocate(xN_abs(n_SPH + n_etoiles,1,nb_proc),  stat=alloc_status)
+       if (alloc_status /= 0) call error("Allocation error xN_abs")
        lfirst_time = .false.
     endif
     call no_dark_zone()
@@ -369,6 +374,8 @@ contains
        ! TBD
     endif
 
+
+
     call set_min_Temperature(Tmin)
     Tphantom = -1.0 ;
 
@@ -381,6 +388,7 @@ contains
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom) = Tdust(icell)
+          n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
        endif
     enddo
 

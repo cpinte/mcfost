@@ -12,6 +12,10 @@ It can be used with the command::
 
 $ mcfost <parameter_file> -density_file <your_density_file.fits.gz> -3D (+ any other option)
 
+
+.. important:: When using the `-density_file` or `-sigma_file` options, the number of zones must be set to 1 in mcfost
+
+
 The density array in the FITS file must have 4 dimensions : ``density(1:n_rad, 1:nz, 1:n_az, 1:n_grains)``
 (it then has n_rad x nz x n_az x n_grains elements).
 
@@ -98,3 +102,6 @@ given in km/s.
 .. note:: If the velocity is not passed via the fits interface, mcfost will assume
           that the velocity field is Keplerian (unless modified by command line
           options).
+
+
+An alternative option `-sigma_file` works in a similar way with the vertical dimension and passes only the surface density. mcfost use the scale height and flaring index provided in the parameter file to reconstruct the 3D density structure.

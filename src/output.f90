@@ -817,12 +817,14 @@ subroutine ecriture_map_ray_tracing()
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+  call ftpkys(unit,'CUNIT1',"deg",'',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+  call ftpkys(unit,'CUNIT2',"deg",'',status)
 
   if (lcasa) then
      call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
@@ -834,12 +836,14 @@ subroutine ecriture_map_ray_tracing()
      call ftpkye(unit,'CRVAL3',1.0,-7,'',status)
      call ftpkye(unit,'CDELT3',1.0,-7,'',status)
      call ftpkyj(unit,'CRPIX3',1,'',status)
+     call ftpkys(unit,'CUNIT3',"",'',status)
 
      ! 4eme axe
      call ftpkys(unit,'CTYPE4',"FREQ",' ',status)
      call ftpkyd(unit,'CRVAL4',c_light/(tab_lambda(lambda)*1e-6),-14,'Hz',status)
      call ftpkye(unit,'CDELT4',2e9,-7,'Hz',status) ! 2GHz by default
      call ftpkyj(unit,'CRPIX4',0,'',status)
+     call ftpkys(unit,'CUNIT4',"Hz",'',status)
   else
      call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
   endif
@@ -3068,17 +3072,20 @@ subroutine ecriture_spectre(imol)
   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+  call ftpkys(unit,'CUNIT1',"deg",'',status)
 
   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
   call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+  call ftpkys(unit,'CUNIT2',"deg",'',status)
 
   call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
   call ftpkye(unit,'CRVAL3',0.,-7,'',status)
   call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
   call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
+  call ftpkys(unit,'CUNIT3',"km/s",'',status)
 
   if (lcasa) then
      call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)

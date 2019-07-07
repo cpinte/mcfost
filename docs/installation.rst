@@ -1,10 +1,10 @@
 Requirements and Installation
 =============================
 
-MCFOST is written in Fortran 90 and parallelized with the Open MP
+MCFOST is written in Fortran 90 (with a few function in C++) and parallelized with the Open MP
 protocol, i.e. it can use several processors and/or cores on a single
-machine. For simplicity, we provide pre-compiled binaries which do not
-have any dependencies. Source code can also be provided if needed.
+machine. For simplicity, we provide pre-compiled binaries which are statically linked and do not
+have any dependencies. Source code is available on github and acces can also be provided if needed.
 
 The following environment is required for the binaries:
 
@@ -19,34 +19,82 @@ yet. Stay tuned.
 Binary Installation Procedure
 -----------------------------
 
-Unless you need to dif into the source, this is the recommended installation
+Unless you need to dig into the source, this is the recommended installation
 procedure. The binaries have been compiled with the Intel compiler and should
-be optmized for most architectures.
+be optmized for most architectures. The binary also updates itself regularly (unless this options is truened off) making sure you have an up-to-date version.
 
-1. Copy the file mcfost to somewhere in your shell $PATH.
-2. ``chmod +x mcfost; rehash``
-3. You should now be able to run ``mcfost --help``
-4. Set the environment variable ``MCFOST_UTILS`` to point to a directory
-   where you want mcfost to store its data files. E.g. edit your
-   shell startup files to include either:
+Email Christophe to ask for permission, and a link to download the tar ball with MCFOST.
 
-   - ``setenv MCFOST_UTILS /path/you/put/the/files`` [tcsh or csh shell], or
-   - ``export MCFOST_UTILS=/path/you/put/the/files`` [bash or bash-like shell]
-5. run ``mcfost -setup`` to download mcfost data files, current reference parameter files.
+1. Extract the file and make it executable::
+
+     $ tar -xvzf mcfost.tgz
+     $ chmod +x mcfost
+
+2. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
+
+     $ mkdir -p ~/mcfost/bin
+     $ mv mcfost ~/mcfost/bin
+
+   You can then add this directory to your path with::
+
+   $ setenv PATH ${HOME}/mcfost/bin:${PATH}
+
+   for tcsh or csh shell, or::
+
+   $ export PATH=${HOME}/mcfost/bin:${PATH}
+
+   for bash or bash-like shell.
+
+3. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+   where you want mcfost to store its data files.
+   E.g. edit your shell startup files to include either::
+
+   $ setenv MCFOST_UTILS ~/mcfost/utils
+
+   for tcsh or csh shell, or::
+
+   $ export MCFOST_UTILS=~/mcfost/utils
+
+   for bash or bash-like shell.
+
+4. You should now be able to run::
+
+     $ mcfost --help
+
+
+ to get a short list of the available options.
+
+5. Download mcfost data files, current reference parameter files with::
+
+      $ mcfost -setup
 
 
 
 Installation from source
 ------------------------
 
-1. Clone the repository (ask Christophe for access). ``git-lfs`` is required.
+mcfost source code is hosted on github (as a private directory, public release will be made soon).
+
+
+1. Clone the repository (ask Christophe for access).
+
+.. important::
+   ``git-lfs`` is required to clone the repository. If you have never used git-lfs, you need to run::
+
+     $ git lfs install
+
+
+  If your git installation is too old, you will get an error message.
+  In this case, please update or ask your system admin to update your copy of git
+
+
 2. Set the following environment variables::
 
      $ export MCFOST_INSTALL=/my/install/dir
      $ export MCFOST_GIT=1
      $ export MCFOST_AUTO_UPDATE=0
 
-(The last line will prevent the mcfost binary to try to update itself).
+(The last line will prevent the mcfost binary to try to update itself, which is probably not desired if you compile it yourself).
 
 3. Select your compiler::
 
@@ -55,6 +103,25 @@ Installation from source
    or::
 
      $ export SYSTEM=gfortran
+
+.. important:: If you use gfortran on a mac, please make sure you actually use the GNU gcc/g++/gfortran compiler suite. mcfost has been tested with the homebrew version of the gcc suite. In particular, the default mac gcc is aliased to clang, which has issues compiling some of the libraries.
+
+   To test if you use the system compiler, simply run::
+
+     $ which gcc
+
+   The homebrew version of gcc should be ``/usr/local/bin/gcc``.
+   If the output is ``/usr/bin/gcc``, it is likely that you will have issues at the linking stage.
+
+   The solution is to run::
+
+     $ brew link gcc
+
+   which should result in::
+
+     $ which gcc
+     /usr/local/bin/gcc
+
 
 4. Change directory to ``mcfost/lib`` and run the installation script::
 
@@ -65,6 +132,33 @@ Installation from source
 5. Enter the src directory and compile with::
 
      $ make
+
+6. If you plan to use ``mcfost+phantom`` to perform live rdaiation hydrodynamics calculations, you can compile the mcfost library with::
+
+     $ make libmcfost.a
+
+7. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+   where you want mcfost to store its data files.
+   E.g. edit your shell startup files to include either::
+
+   $ setenv MCFOST_UTILS ~/mcfost/utils
+
+   for tcsh or csh shell, or::
+
+   $ export MCFOST_UTILS=~/mcfost/utils
+
+   for bash or bash-like shell.
+
+8. You should now be able to run::
+
+     $ mcfost --help
+
+
+ to get a short list of the available options.
+
+9. Download mcfost data files with::
+
+      $ mcfost -setup
 
 
 MCFOST_UTILS Environment variable
@@ -143,7 +237,7 @@ Here are similar results for the ref2.19.para reference parameter file:
 Setting the stacksize
 ---------------------
 
-To speed the calculations, MCFOST stores some arrays privately for each
+To speed up the calculations, MCFOST stores some arrays privately for each
 thread. This means that storage can exceed the default OpenMP stacksize. To
 avoid this, include those commeand in your ``.bashrc`` or equivalent::
 

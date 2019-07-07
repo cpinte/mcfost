@@ -121,7 +121,6 @@ endif
 
 ifeq ($(OPENMP), yes)
     FFLAGS+= ${FOMPFLAGS}
-    CCFLAGS+= ${COMPFLAGS}
 endif
 
 ifeq ($(IPO), yes)
@@ -130,28 +129,53 @@ ifeq ($(IPO), yes)
 endif
 
 #------------------------------------------------------------------------------#
+# HDF5 libraries
+# Will use the version compiled by install.sh by default but you can use
+# the system one if prefered
+#
+# In that case, it requires two directories:
+#   - include for Fortran .mod files
+#   - lib for the shared library .so files
+#
+# Often both directories are under one root,
+# e.g. HDF5ROOT= /usr/local/opt/hdf5
+# In this case just set HDF5ROOT for your machine.
+#
+# However, sometimes these directories are separate,
+# then you must set both HDF5INCLUDE and HDF5LIB.
+#
+ifeq (X$(HDF5ROOT), X)
+    HDF5ROOT=$(MCFOST_INSTALL)/hdf5/$(SYSTEM)
+endif
+ifeq (X$(HDF5INCLUDE), X)
+    HDF5INCLUDE= $(HDF5ROOT)/include
+endif
+ifeq (X$(HDF5LIB), X)
+    HDF5LIB= $(HDF5ROOT)/lib
+endif
+
+#------------------------------------------------------------------------------#
 # Library flags
-
-INCLUDE+= -I$(MCFOST_INSTALL)/include
-
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(HDF5INCLUDE)
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
 
 #------------------------------------------------------------------------------#
 # Sources and objects
 
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90 operating_system.f90 \
-	random_numbers.f90 utils.f90 fits_utils.f90 grains.f90 \
-	cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 Voronoi.f90 grid.f90 \
-	wavelengths.f90 stars.f90 read_DustEM.f90 Temperature.f90 density.f90 read_opacity.f90 \
-	scattering.f90  coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90 \
-	input.f90 benchmarks.f90 read_param.f90 dust_ray_tracing.f90 radiation_field.f90 \
-	thermal_emission.f90 diffusion.f90 io_prodimo.f90 disk_physics.f90 output.f90  ML_prodimo.f90 mem.f90 \
-	optical_depth.f90 init_mcfost.f90 \
-	io_phantom_infiles.f90 io_phantom_utils.f90 read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90 \
-	dust_transfer.f90 mol_transfer.f90
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
+          operating_system.f90 random_numbers.f90 utils.f90 fits_utils.f90     \
+          grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90       \
+          Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90       \
+          Temperature.f90 density.f90 read_opacity.f90 scattering.f90          \
+          coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90       \
+          input.f90 benchmarks.f90 read_param.f90 dust_ray_tracing.f90         \
+          radiation_field.f90 thermal_emission.f90 diffusion.f90               \
+          io_prodimo.f90 disk_physics.f90 output.f90 ML_prodimo.f90 mem.f90    \
+	  optical_depth.f90 init_mcfost.f90 io_phantom_infiles.f90             \
+	  io_phantom_utils.f90  utils_hdf5.f90 read_phantom.f90                \
+	  read_gadget2.f90 SPH2mcfost.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
-
 
 #------------------------------------------------------------------------------#
 # Compile
@@ -221,18 +245,19 @@ mcfost2prodimo :  mcfost mcfost2prodimo.o
 
 .PHONY : release release_mac release_utils fosti dmz wardlaw
 
-release : main
+release : clean main
 	- git tag -d release
 	git tag release
 	git push github
+	git push github --tags --force
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/linux web/macos
+	mkdir web web/linux web/mac
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
-	mv mcfost_bin.tgz web/macos/
-	ssh $(LINUX_SERVER) "cd mcfost/src ; git pull origin master ; git fetch --tags ; git checkout release ; export MCFOST_GIT=1 ; export MAKEFLAGS= ; make clean mcfost ; \cp -f mcfost ~/mcfost_cigri ; \cp -f mcfost mcfost_update ; rm -f mcfost.sha1 ; tar czf mcfost_bin.tgz mcfost_update --remove-files ; sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
+	mv mcfost_bin.tgz web/mac/
+	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
@@ -241,24 +266,25 @@ release : main
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	ssh horus "cd  /user/publicdir/pintec/mcfost/macos ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; \cp -f mcfost_update mcfost ; tar czf mcfost.tgz mcfost --remove-files ; rm -f mcfost_update"
+	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 	rm -rf yorick web
 	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
-	mkdir web web/macos
+	mkdir web web/mac
 	cp mcfost mcfost_update
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
-	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/macos/mcfost.sha1
-	mv mcfost_bin.tgz web/macos/
+	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
+	mv mcfost_bin.tgz web/mac/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
 	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
 	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
+	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 	rm -rf yorick web
 
 release_utils :
@@ -303,10 +329,8 @@ cleanall : clean cleandata
 .PHONY : save
 
 save :
-	#git push phare
 	git push bitbucket --all
 	git push github --all
-	#git push dmz
 
 #------------------------------------------------------------------------------#
 # Testing
@@ -337,6 +361,7 @@ checksys:
 	    @echo system changed from ${LASTSYSTEM} to ${SYSTEM}
 	    @${MAKE} clean
 	    @echo $(SYSTEM) > .make_lastsystem
+	    @${MAKE} mcfost_env.o
        endif
    else
 	@echo ""

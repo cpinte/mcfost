@@ -51,7 +51,7 @@ Wavelength setup
 .. note:: ``lambda_min`` and ``lambad_max`` are the extreme wavelengths at the edges of
           the bins; the central wavelengths of the bins will be a little bit
           inside those extreme values. If you need to force specific wavelengths,
-          use the ``use default wavelength grid`` flag.
+          use the ``use_default_wavelength_grid`` flag.
 
 * ``ltemp:`` do you want to compute the temperature map? Most of the time
   it's T (unless you have already previously computed the temperature but
@@ -60,22 +60,22 @@ Wavelength setup
 * ``lsed:`` do you want to compute an SED? Most of the time it's T (unless
   you care only about the temperature structure of the disk)
 
-* ``use default wavelength grid``: are you happy with the default evenly log-spaced
+* ``use_default_wavelength_grid``: are you happy with the default evenly log-spaced
   sampling in wavelength (T) or do you want to use the wavelength file
   indicated in the following line (F)
 
-* ``wavelength file``: a text file containing the wavelengths at which the
+* ``wavelength_file``: a text file containing the wavelengths at which the
   SED is to be sampled. One entry per line, all entries in microns. The
   file should be located in ``$MCFOST_UTILS/Lambda/`` or in the local
   directory where MCFOST is executed, and a copy will be placed in the
   ``data_th``  directory
 
-* ``separate contributions:`` Save output file that tracks the various
+* ``separate_contributions:`` Save output file that tracks the various
   different contributions (star vs disk, scattered vs direct). Applicable
   to both SED and image calculations, works in RT mode. In MC SED mode,
   this setting is *always* on, as it is almost free to track this.
 
-* ``output stokes parameters``: Keep track of the Stokes parameters for
+* ``output_stokes_parameters``: Keep track of the Stokes parameters for
   each photon. Output images will include polarization axis. Only
   applicable to image calculations, works in RT mode.
 
@@ -146,14 +146,14 @@ Images
 
 * ``distance``: Distance to the object in pc
 
-* ``disk PA``: Position angle of the semi-minor axis of the disk, measured
+* ``disk_PA``: Position angle of the semi-minor axis of the disk, measured
   counter-clockwise. If disk PA is not set to 0\ :sup:`o`, some of the
   image symmetries (see below) will automatically be set to F
 
 Scattering Method
 -----------------
 
-``scattering method``: compute the average dust properties per grain
+``scattering_method``: compute the average dust properties per grain
 size (value: 1), per grid cell (value: 2), or the most appropriate for
 the ongoing calculation (value: 0, preferred in virtually all cases).
 Value 2 can not be used if the Stokes parameters are required.
@@ -175,11 +175,11 @@ used to randomly select scattering angles.
 Symmetries
 ----------
 
-* ``image symmetry``: Is the image left/right symmetric?
+* ``image_symmetry``: Is the image left/right symmetric?
 
-* ``central symmetry``: Is the model structure symmetric releative to the origin?
+* ``central_symmetry``: Is the model structure symmetric relative to the origin?
 
-* ``plane symmetry``: Is the model structure symmetric relative a vertical plane?
+* ``plane_symmetry``: Is the model structure symmetric relative a vertical plane?
 
 In most cases for a 2D model, all three symmetries should be set to T. If you
 use an asymmetric disk structure, or if there is more than one star
@@ -209,16 +209,16 @@ Disk physics
 * ``a_strat``: minimum size [microns] for grains affected by vertical
   settling (for parametric settling)
 
-* ``dust radial_migration``: simple prescription for radial migration of
+* ``dust_radial_migration``: simple prescription for radial migration of
   dust grains (TBW)
 
-* ``hydrostatic equilibrium``: (*work in progress*) compute the
+* ``hydrostatic_equilibrium``: (*work in progress*) compute the
   hydrostatic equilibrium assuming Tgas = Tdust
 
 * ``sublimate_dust``: this option will iteratively remove the dust if the
   temperature reaches the dust sublimation temperature
 
-* ``viscous heating``: (*work in progress*) includes additional heating
+* ``viscous_heating``: (*work in progress*) includes additional heating
   source due to viscous accretion (note that it does not account for the
   accretion shock on the star)
 
@@ -240,23 +240,23 @@ resolution of the spatial grid is high enough.
 Density structure
 -----------------
 
-* ``zone type``: disk (value: 1), disk with outer tapered-edge (value:
+* ``zone_type``: disk (value: 1), disk with outer tapered-edge (value:
   2), spherically symmetric envelope (value: 3), debris disk (value : 4)
   or an azimuthally asymetric wall (value : 5).
   If at least one of the zones is described as an envelope, the
   computing grid must be spherical.
 
-* ``disk dust mass``: in units of M\ :sub:`sun`
+* ``disk_dust_mass``: in units of M\ :sub:`sun`
 
-* ``gas-to-dust ratio``: quantity only used in molecular emission
+* ``gas_to_dust_ratio``: quantity only used in molecular emission
   calculations
 
-* ``scale height H0:`` value of the disk scale height (technically, sigma
+* ``scale_height_H0:`` value of the disk scale height (technically, sigma
   of the Gaussian vertical density profile) at the reference radius, in au
 
-* ``reference radius R0``: in au
+* ``reference_radius_R0``: in au
 
-* ``vertical profile exponent``: exponent of vertical
+* ``vertical_profile_exponent``: exponent of vertical
   density profile (only relevant for type 4, debris disk)
 
 * ``Rin``: inner radius of disk or envelope in AU (assuming sublimation
@@ -307,7 +307,7 @@ Grain properties
 .. note:: there should be as many blocks containing the following parameters
           as there are zones in the disk. The code will crash otherwise.
 
-* ``N_species``: Number of dust populations present in the disk zone; if
+* ``n_species``: Number of dust populations present in the disk zone; if
   N_species > 1, the dust grains of different species are assumed to be
   physically disjoint, but distributed in the same manner through the
   disk. *All the following lines in the block must be duplicated
@@ -316,12 +316,12 @@ Grain properties
 * ``Grain_type:`` spherical grains (Mie) or distribution of hollow
   spheres (DHS)
 
-* ``N_components``: Number of materials that make up a given specie;
+* ``n_components``: Number of materials that make up a given specie;
   these materials are assumed to be physically joint within each dust
   grain. *The line with the optical indices and volume fraction must be
   duplicated N_components times if N_components > 1.*
 
-* ``mixing rule:`` are the components randomly mixed within the volume of
+* ``mixing_rule:`` are the components randomly mixed within the volume of
   a grain (value: 1, effective mixing theory following Bruggeman rule) or
   is the second component forming a coating on top of the first one
   (value: 2). The effective optical index of the new "mixed" grain is
@@ -333,13 +333,13 @@ Grain properties
 * ``porosity``: porosity of the dust grains (in the [0,1] range, 0 for
   compact grains, near 1 for porous ones)
 
-* ``mass fraction``: fraction of the mass contained in this specie (the
+* ``mass_fraction``: fraction of the mass contained in this specie (the
   sum of the N_species mass fractions should be equal to 1, MCFOST will
   renormalize the values so that the sum is 1)
 
 * ``DHS_Vmax``: maximum void fraction for DHS calculation
 
-* ``optical indices``: file containing the optical index of the material
+* ``optical_indices_file``: file containing the optical index of the material
   as a function of wavelength (files must be located in
   ``$MCFOST_UTILS/Dust/``)
 
@@ -347,7 +347,7 @@ Grain properties
   this component (the sum of the N_components volume fractions should
   be equal to 1, MCFOST will renormalize the values so that the sum is 1)
 
-* ``heating method``: indicated whether radiative equilibrium and local
+* ``heating_method``: indicated whether radiative equilibrium and local
   thermal equilibrium are assumed: for an optically thick disk, both
   should be true (value: 1); for an optically thin disk, only the RE is
   assumed (value: 2, will yield a temperature map that has a third
@@ -381,15 +381,15 @@ Molecular RT settings
 
 * ``LTE:`` assume LTE level populations
 
-* ``profile width:`` internal line width used for the line transfer
+* ``profile_width:`` internal line width used for the line transfer
   calculation. Bascically, it means that cells with relative projected
   velocities that exceed this value will not see each other during the
   transfer. The value needs to be larger than the local line width.
 
-* ``molecular data file:`` LAMBDA data file used for the line transfer
+* ``molecular_data_file:`` LAMBDA data file used for the line transfer
 
-* ``level max:`` maximum level up to which the line transfer will be
-  performed. Level above ``level max`` will not be populated
+* ``level_max:`` maximum level up to which the line transfer will be
+  performed. Level above ``level_max`` will not be populated
 
 * ``vmax [km/s]:`` maximum velocity is the produced channel maps
 
@@ -400,44 +400,45 @@ Molecular RT settings
   abundance from the following fits file. The resolution of the fits file
   must be the same as the grid used by mcfost.
 
-* ``ray-tracing:`` produce or not a ray-traced data cube of the molecule
+* ``ray_tracing:`` produce or not a ray-traced data cube of the molecule
 
-* ``number of lines:`` number of transition ray-traced, the indices given
+* ``n_lines:`` number of transition ray-traced, the indices given
   in the next lines correspond to the transition indices in the LAMBDA
   files. For instance the J=1-0 transition is usually #0
 
 Star properties
 ---------------
 
-* ``num_stars:`` number of stars illuminating the disk. *If num_stars >
+* ``n_stars:`` number of stars illuminating the disk. *If num_stars >
   1, the following group of two lines must be duplicated num_stars times*
 
-* ``Temp``: effective temperature of the star (only used to compute the
+* ``Teff``: effective temperature of the star (only used to compute the
   stellar luminosity), in K
 
-* ``radius``: stellar radius (used to compute the stellar luminosity and
+* ``Rstar``: stellar radius (used to compute the stellar luminosity and
   set the spatial origin of the photon packets: the star is assumed to be
   a uniformly radiating sphere), in R\ :sub:`sun`
 
-* ``M``: stellar mass (only used for molecular line calculations,
+* ``Mstar``: stellar mass (only used for molecular line calculations,
   hudrostatic equilibrium and viscous heating via accretion, in
   M\ :sub:`sun`
 
 * ``x``, ``y``, ``z``: position of the star, in au. If this is not (0,0,0), the
   image symmetries must be set to F
 
-* ``is a blackbody``: is the stellar emission approximated by a blackbody
+* ``is_blackbody``: is the stellar emission approximated by a blackbody
   of temperature Temp? If not, the stellar spectrum indicated in the
   following line is used instead
 
-  .. note:: ``Teff`` vs stellar atmosphere model.
-          The effective temperature is only used to compute the total stellar
-          luminosity and it doesn't need to match the
-          atmosphere model. In practice, the atmosphere model shoud be chosen
-          with the effective temperature closest to the target's, use the same
-          Teff and adjust Rstar to get the right Lstar. However, one could use
-          more precise numbers for both Teff and Rstar (when available in the
-          literature, for instance).
+  .. note:: ``Teff`` vs stellar atmosphere model. The effective
+          temperature is only used to compute the total stellar
+          luminosity and it doesn't need to match the atmosphere
+          model. In practice, the atmosphere model shoud be chosen
+          with the effective temperature closest to the target's, use
+          the same ``Teff`` and adjust ``Rstar`` to get the right
+          Lstar. However, one could use more precise numbers for both
+          Teff and Rstar (when available in the literature, for
+          instance).
 
 
 * ``fUV, slope_fUV:`` photospheric UV excess and its slope in Fnu.

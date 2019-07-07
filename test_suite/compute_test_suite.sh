@@ -5,6 +5,11 @@ export mcfost=$(pwd)/../src/mcfost
 for dir in test_data/*; do
     param=`basename "$dir".para`
     pushd "$dir"
+
+    echo "---------------------------------------------"
+    pwd
+    echo "---------------------------------------------"
+
     rm -rf data_*
     if [ "$param" == "discF_00500.para" ]; then
         opt="-phantom discF_00500"

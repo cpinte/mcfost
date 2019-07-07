@@ -22,6 +22,7 @@ subroutine set_default_variables()
   nb_proc=1 ; lpara=.false.
 
   n_zones=1
+  lmcfost_lib = .false.
 
   ! Pour code parallel
   !$omp parallel default(none) &
@@ -79,6 +80,8 @@ subroutine set_default_variables()
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
+  lSPH_amin = .false.
+  lSPH_amax = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -129,10 +132,14 @@ subroutine set_default_variables()
   lfix_star = .false.
   lscale_units = .false.
   lignore_dust = .false.
+  lupdate_velocities = .false.
+  lno_vr = .false.
+  lno_vz = .false.
+  lvphi_Kep = .false.
+  lfluffy = .false.
+  tmp_dir = "./"
 
   ! Geometrie Grille
-  lcylindrical=.true.
-  lspherical=.not.lcylindrical
   z_scaling_env = 1.0
 
   ! Methodes par defaut
@@ -197,7 +204,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lpola
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -214,10 +221,17 @@ subroutine initialisation_mcfost()
   lHG = .false.
   lonly_scatt = .false.
   lno_T = .false.
+  lno_SED = .false.
   lpola = .false.
 
   ! Global logical variables
   call set_default_variables()
+
+  ! Setting up web-server
+  call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
+  webpage = trim(web_server)//trim(webpage)
+  utils_webpage = trim(web_server)//trim(utils_webpage)
+  doc_webpage = trim(web_server)//trim(doc_webpage)
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
@@ -519,6 +533,11 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         root_dir=trim(root_dir)//"/"//s
         i_arg = i_arg+1
+     case("-tmp_dir")
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) call error("root_dir needed")
+        call get_command_argument(i_arg,tmp_dir)
+        i_arg = i_arg+1
      case("-dust_prop")
         i_arg = i_arg+1
         ldust_prop=.true.
@@ -558,10 +577,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) puffed_rim_delta_r
         i_arg = i_arg+1
-     case("-spherical")
-        lcylindrical=.false.
-        lspherical=.true.
-        i_arg = i_arg + 1
      case("-no_backup")
         lno_backup=.true.
         i_arg = i_arg + 1
@@ -666,6 +681,18 @@ subroutine initialisation_mcfost()
         density_file = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
+     case("-SPH_amin")
+        lSPH_amin = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) SPH_amin
+        i_arg = i_arg + 1
+     case("-SPH_amax")
+        lSPH_amax = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) SPH_amax
+        i_arg = i_arg + 1
      case("-gadget","-gadget2")
         i_arg = i_arg + 1
         lgadget2_file=.true.
@@ -856,6 +883,9 @@ subroutine initialisation_mcfost()
      case("-no_T")
         i_arg = i_arg + 1
         lno_T=.true.
+     case("-no_SED")
+        i_arg = i_arg + 1
+        lno_SED=.true.
      case("-ISM_heating")
         i_arg = i_arg + 1
         lISM_heating=.true.
@@ -993,10 +1023,32 @@ subroutine initialisation_mcfost()
      case("-ignore_dust")
         i_arg = i_arg + 1
         lignore_dust=.true.
+     case("-no_vr")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vr = .true.
+     case("-no_vz")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lno_vz = .true.
+     case("-vphi_Kep","-vphi_kep")
+        i_arg = i_arg + 1
+        lupdate_velocities = .true.
+        lvphi_Kep = .true.
+     case("-fluffy","-fluffyness")
+        lfluffy = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) fluffyness
+        i_arg = i_arg + 1
      case default
-        call display_help()
+        write(*,*) "Error: unknown option: "//trim(s)
+        write(*,*) "Use 'mcfost -h' to get list of available options"
+        call exit(0)
      end select
   enddo ! while
+
+
 
   ! Display the disclaimer if needed
   mcfost_no_disclaimer = 0
@@ -1012,6 +1064,12 @@ subroutine initialisation_mcfost()
   endif
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
+
+  if (lno_T) ltemp = .false.
+  if (lno_SED) then
+     lsed = .false.
+     lsed_complete = .false.
+  endif
   if (map_size < tiny_real) call error("map size is set to 0")
 
   if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
@@ -1020,7 +1078,6 @@ subroutine initialisation_mcfost()
      lsepar_pola = .false.
   endif
 
-  if (lno_T) ltemp = .false.
   if (lpola) lsepar_pola = .true.
 
   if (lsepar_pola) then
@@ -1345,7 +1402,8 @@ subroutine display_help()
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
   write(*,*) "                         results stored in 'seed=XXX' directory"
-  write(*,*) "        : -root_dir <root_dir> : results stored in 'root_dir' directory"
+  write(*,*) "        : -root_dir <dir> : results stored in 'root_dir' directory"
+  write(*,*) '        : -tmp_dir <dir>  : redults where previous cartial calculations are store (default: ".")'
   write(*,*) "        : -no_backup  : stops if directory data_XX already exists"
   write(*,*) "                        without attempting to backup existing directory"
   write(*,*) "        : -prodimo_input_dir <dir> : input files for ProDiMo"
@@ -1444,6 +1502,15 @@ subroutine display_help()
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) " "
+  write(*,*) " Options related to phantom"
+  write(*,*) "        : -fix_star"
+  write(*,*) "        : -scale_units"
+  write(*,*) "        : -ignore_dust"
+  write(*,*) "        : -no_vr : force the radial velocities to be 0"
+  write(*,*) "        : -no_vz : force the vertical velocities to be 0"
+  write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
+  write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
@@ -1568,7 +1635,7 @@ subroutine save_data(para,base_para)
      etape_start=1
      etape_end=1
   else
-     if (ltemp.or.lsed) then
+     if (ltemp) then
         etape_start=1
      else
         etape_start=2

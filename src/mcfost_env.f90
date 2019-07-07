@@ -8,9 +8,10 @@ module mcfost_env
   character(8), parameter :: mcfost_release = "3.0.35"
   real, parameter :: required_utils_version = 3.0
 
-  character(len=128), parameter :: webpage       = "http://ipag.osug.fr/public/pintec/mcfost/"
-  character(len=128), parameter :: utils_webpage = "http://ipag.osug.fr/public/pintec/mcfost_utils/"
-  character(len=128), parameter :: doc_webpage   = "http://ipag.osug.fr/public/pintec/mcfost/docs/html/"
+  character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"
+  character(len=128) :: webpage       = "/mcfost/"
+  character(len=128) :: utils_webpage = "/mcfost_utils/"
+  character(len=128) :: doc_webpage   = "/mcfost/docs/html/"
 
   ! Système
   integer :: nb_proc
@@ -24,7 +25,7 @@ module mcfost_env
   real :: max_mem = 4. ! GBytes maximum size for 1 array (mcfost can have 2 arrays of this size)
   logical :: low_mem_scattering, low_mem_th_emission, low_mem_th_emission_nLTE, lMueller_pos_multi
 
-  character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, basename_data_dir, seed_dir
+  character(len=512) :: mcfost_utils, my_mcfost_utils, data_dir, root_dir, tmp_dir, basename_data_dir, seed_dir
   character(len=512) :: lambda_filename, band, model_pah, pah_grain, cmd_opt
   character(len=512), dimension(100) :: data_dir2, basename_data_dir2
   character(len=512), dimension(:), allocatable :: search_dir, dust_dir, mol_dir, star_dir, lambda_dir, ML_dir

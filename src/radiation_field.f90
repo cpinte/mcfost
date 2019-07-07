@@ -28,28 +28,27 @@ module radiation_field
 
 contains
 
-subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
+subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, x1,y1,z1, u,v, w, flag_star, flag_direct_star)
 
   use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola, n_az_rt, n_phi_I, n_theta_I, I_spec_star, I_spec
 
-  integer, intent(in) :: id,lambda,p_lambda,icell0
+  integer, intent(in) :: id,lambda,p_lambda,icell
   real(kind=dp), dimension(4), intent(in) :: Stokes
   real(kind=dp) :: l, x0,y0,z0, x1,y1,z1, u,v,w
   logical, intent(in) :: flag_star, flag_direct_star
 
-
   real(kind=dp) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
-
   if (letape_th) then
-     if (lRE_LTE) xKJ_abs(icell0,id) = xKJ_abs(icell0,id) + kappa_abs_LTE(icell0,lambda) * l * Stokes(1)
-     if (lxJ_abs_step1) xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+     if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(icell,lambda) * l * Stokes(1)
+     if (lxJ_abs_step1) xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
+     if (lmcfost_lib) xN_abs(icell,1,id) = xN_abs(icell,1,id) + 1.0 ! We do not store the wl dependence
   else
      if (lxJ_abs) then ! loutput_UV_field .or. loutput_J .or. lprodimo
-        xJ_abs(icell0,lambda,id) = xJ_abs(icell0,lambda,id) + l * Stokes(1)
+        xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
         ! Pour statistique: nbre de paquet contribuant a intensite specifique
-        if (lProDiMo) xN_abs(icell0,lambda,id) = xN_abs(icell0,lambda,id) + 1.0
+        if (lProDiMo) xN_abs(icell,lambda,id) = xN_abs(icell,lambda,id) + 1.0
      endif ! lProDiMo
 
      if (lscatt_ray_tracing1) then
@@ -73,16 +72,16 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
         endif
 
         if (lsepar_pola) then
-           call calc_xI_scatt_pola(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(:),flag_star)
+           call calc_xI_scatt_pola(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(:),flag_star)
         else
            ! ralentit d'un facteur 5 le calcul de SED
            ! facteur limitant
-           call calc_xI_scatt(id,lambda,p_lambda,icell0,phi_k,psup,l,Stokes(1),flag_star)
+           call calc_xI_scatt(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(1),flag_star)
         endif
 
      else if (lscatt_ray_tracing2) then ! only 2D
         if (flag_direct_star) then
-           I_spec_star(icell0,id) = I_spec_star(icell0,id) + l * Stokes(1)
+           I_spec_star(icell,id) = I_spec_star(icell,id) + l * Stokes(1)
         else
            xm = 0.5_dp * (x0 + x1)
            ym = 0.5_dp * (y0 + y1)
@@ -108,13 +107,13 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell0, Stokes, l,  x0,y0,z0,
            endif
            if (theta_I > n_theta_I) theta_I = n_theta_I
 
-           I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell0,id) + l * Stokes(1:n_Stokes)
+           I_spec(1:n_Stokes,theta_I,phi_I,icell,id) = I_spec(1:n_Stokes,theta_I,phi_I,icell,id) + l * Stokes(1:n_Stokes)
 
            if (lsepar_contrib) then
               if (flag_star) then
-                 I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell0,id) + l * Stokes(1)
+                 I_spec(n_Stokes+2,theta_I,phi_I,icell,id) = I_spec(n_Stokes+2,theta_I,phi_I,icell,id) + l * Stokes(1)
               else
-                 I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell0,id) + l * Stokes(1)
+                 I_spec(n_Stokes+4,theta_I,phi_I,icell,id) = I_spec(n_Stokes+4,theta_I,phi_I,icell,id) + l * Stokes(1)
               endif
            endif ! lsepar_contrib
 
@@ -192,6 +191,7 @@ subroutine reset_radiation_field()
      xJ_abs(:,:,:) = 0.0_dp
      J0 = 0.0_dp
   endif
+  if (lmcfost_lib) xN_abs(:,:,:) = 0.0_dp
 
 !  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
 !

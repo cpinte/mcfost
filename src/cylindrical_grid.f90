@@ -704,14 +704,7 @@ end subroutine define_cylindrical_grid
 
     if (r2 < r_lim_2(0)) then
        ri_out=0
-       if (abs(zin) > zmax(1)) then
-          zj_out = nz+1
-          if (l3D) then
-             if (zin < 0.0)  zj_out = -zj_out
-          endif
-       else
-          zj_out=1
-       endif
+       zj_out=1
        phik_out=1
     else if (r2 > Rmax2) then
        ri_out=n_rad+1
@@ -971,20 +964,25 @@ end subroutine define_cylindrical_grid
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
        ri1=ri0+delta_rad
-       if ((ri1<1).or.(ri1>n_rad)) then
-          zj1=zj0
-       else
-          zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
-          if (zj1>nz) zj1=nz+1
-          if (l3D.and.(z1 < 0.0)) zj1=-zj1
-       endif
 
-       k1=k0
-       if (l3D) then
-          ! We need to find the azimuth when we enter the disc
-          ! It can be different from the initial azimuth if the star is not centered
-          ! so we need to compute it here
-          if (ri0==0) then
+       if (ri1==0) then
+          zj1 = 1
+          k1 = 1
+       else
+          ! We need to update the z index
+          if (ri1>n_rad) then
+             zj1=zj0
+          else
+             zj1= floor(min(real(abs(z1)/zmax(ri1)*nz),real(max_int))) + 1
+             if (zj1>nz) zj1=nz+1
+             if (l3D.and.(z1 < 0.0)) zj1=-zj1
+          endif
+
+          k1=k0
+          if ((ri0==0).and.l3D) then
+             ! We need to find the azimuth when we enter the disc
+             ! It can be different from the initial azimuth if the star is not centered
+             ! so we need to compute it here
              phi=modulo(atan2(y1,x1),2*real(pi,kind=dp))
              k1=floor(phi*un_sur_deux_pi*real(N_az))+1
              if (k1==n_az+1) k1=n_az
