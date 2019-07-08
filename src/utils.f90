@@ -493,15 +493,21 @@ end function get_NH
 
 subroutine mcfost_setup()
 
-  character(len=512) :: cmd
-  integer ::  syst_status
+  character(len=512) :: cmd, s
+  integer ::  syst_status, mcfost_git
 
   call get_utils()
-  call mcfost_get_ref_para()
   ! Write date of the last time an update was search for
   cmd = "rm -rf "//trim(mcfost_utils)//"/.last_update"//" ; date +%s > "&
        //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
+
+  ! We do not need to download the parameter file if we use the sources
+  call get_environment_variable('MCFOST_GIT',s)
+  if (s/="") then
+     read(s,*) mcfost_git
+     if (mcfost_git /= 1) call mcfost_get_ref_para()
+  endif
 
   write(*,*) "MCFOST set-up was sucessful"
 
@@ -921,9 +927,7 @@ subroutine update_utils(lforce_update)
      lupdate = .true.
   endif
 
-  if (lupdate) then
-     call get_utils()
-  endif
+  if (lupdate) call get_utils()
 
   return
 
@@ -937,7 +941,10 @@ subroutine get_utils()
   integer :: syst_status
 
   write(*,*) "Downloading MCFOST UTILS (this may take a while) ..."
-  cmd = "curl "//trim(utils_webpage)//"mcfost_utils.tgz -s | tar xzf - -C"//trim(mcfost_utils)
+  write(*,*) "from "//trim(utils_webpage)//"mcfost_utils.tgz"
+
+  cmd = "mkdir -p "//trim(mcfost_utils)//&
+  " ; curl "//trim(utils_webpage)//"mcfost_utils.tgz | tar xzf - -C"//trim(mcfost_utils)
   call appel_syst(cmd, syst_status)
   if (syst_status == 0) then
      write(*,*) "Done"

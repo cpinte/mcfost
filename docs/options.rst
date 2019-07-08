@@ -141,23 +141,29 @@ than at inner radius
 
 ``-tilt``: <angle> [degrees]
 
-``-cavity <h0> <r0> <flaring exponent>``
+``-cavity <h0> <r0> <flaring exponent>``: carves a cavity in the the disc. Defines a surface, and empties the density above this surface.
 
-``-output_J``
+``-output_J``: outputs the radiation field in each cell
 
-``-output_UV_field``
+``-output_UV_field``: output the UV radation field between 912 and 2000 Angströms in each cell. units: Habings
 
-``-puffed_up_rim  <h rim / h0> <r> <delta_r>``
+``-puffed_up_rim  <h_rim / h0> <r_rim> <delta_r>``: add a puffed up inner rim to the disc, with an increased scale height by a factor  <h rim / h0> and up to a radius r. The width over the scale goes back to normal is delta_r
 
-``-density_file or -df <density_file>``
+The updated scale height is
 
-``-sigma_file or -sigma <surface_density_file>``
+.. math::
+   h(r) = h_0(r) \times \left(1.0 + \frac{\frac{h_{rim}}{h_0} - 1.0}{\exp(\frac{r- r_{rim}}{\Delta r}) + 1.0} \right)
 
-``-correct_density <factor> <Rmin> <Rmax>``
 
-``-gap <depth> <R> <sigma>`` [depth is between 0 and 1, R and Sigma in au]
+``-density_file or -df <density_file>``: reads a fits file with the density (gas + dust + velocity, see section "Running a 3D model")
 
-``-Seb_F <number>``  1 = gaussian, 2 = cst diffusion coeff
+``-sigma_file or -sigma <surface_density_file>``: reads a fits file with the surface density
+
+``-correct_density <factor> <Rmin> <Rmax>``: applies a correcting factir to the density between Rmin and Rmax.  Can be used to generate rings or gaps.
+
+``-gap <depth> <R> <sigma>``: creates a Gaussian gap in the disc [depth is between 0 and 1, R and Sigma in au]
+
+``-Seb_F <number>``: select the dust diffusion method frollowing Sebastian Fromang's prescriptions.  1 = gaussian, 2 = cst diffusion coeff
 
 ``-cutoff <number>``: upper limit of the grid [scale height] default = 7
 
@@ -183,7 +189,7 @@ observer when using the central azimuthal bin.
 darkening) on the stellar photosphere. Exemples of limb darkening files can be found in
 ``$MCFOST_UTILS/Stellar_Polarization``.
 
-``-age <age>`` (default: 3) [Ma]. When using results from hydrodynamics
+``-age <age>`` (default: 3Myr). When using results from hydrodynamics
 simulations (e.g., SPH), mcfost  will assume an age to determine the stellar
 luminosity and temperature from the mass. The age can be selected using::
 Isochrones are found in ``$MCFOST_UTILS/Stellar_Polarization/Siess``.
@@ -219,20 +225,20 @@ results stored in ``average_grain_size.fits.gz``
 
 ``-phase-function <s11.fits>``: uses a tabulated phase function (rt2 only)
 
-``-tau=1_surface``
+``-tau=1_surface``: when computing an image, generates a fits file with the coordinates x,y,z of the tau=1 surface for each pixel. The dimension of the fits file is the same as the image fits file + an extra dimension with the 3 values x,y and z.
 
 Options related to molecular emission
 -------------------------------------
 
-``-freeze-out <T>``
+``-freeze-out <T>``: freeze-out molecules (abundance = 0) in regions below this temperature
 
-``-freeze-out_depletion <relative depletion>`` between 0 and 1
+``-freeze-out_depletion <relative depletion>``: between 0 and 1, depletion factor in the freeze-out region (default: 0)
 
-``-photo-dissociation``
+``-photo-dissociation``: photo-dissociate molecules at high-UV (see Pinte et al 2018)
 
-``-photo-desorption``
+``-photo-desorption``: photo-desorb molecules at high-UV (see Pinte et al 2018)
 
-``-prodimo``
+``-prodimo``: generates a a fits file forProDiMo.fits.gz with the required information to run a thermo-chemical model with ProDiMo
 
 ``-prodimo_fPAH``: force a fPAH value for ProDiMo
 
