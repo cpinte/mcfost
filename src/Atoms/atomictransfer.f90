@@ -493,19 +493,21 @@ MODULE AtomicTransfer
         subpixels = subpixels * 2
      else if (iter >= n_iter_max) then
         ! On arrete pour pas tourner dans le vide
-        ! write(*,*) "Warning : converging pb in ray-tracing"
-        ! write(*,*) " Pixel", ipix, jpix
+         !write(*,*) "Warning : converging pb in ray-tracing"
+         !write(*,*) " Pixel", ipix, jpix
+        if (diff > 1) write(*,*) 'pixel not converged:', iter, subpixels, diff
         exit infinie
      else
         ! On fait le test sur a difference
         diff = maxval( abs(I0 - Iold) / (I0 + 1e-300_dp) )
         ! There is no iteration for Q, U, V, assuming that if I is converged, then Q, U, V also.
         ! Can be added and then use diff as max(diff, diffQ, diffU, diffV)
-        if (diff > 1) write(*,*) 'iter pixels:', iter, subpixels, diff
+        !write(*,*) 'iter pixel:', ipix, jpix, i, j, iter, subpixels, diff
         if (diff > precision ) then
            ! On est pas converge
            subpixels = subpixels * 2
         else
+           !write(*,*) "Pixel converged", ipix, jpix, i, j, iter, diff
            exit infinie
         end if
      end if ! iter
@@ -679,12 +681,13 @@ MODULE AtomicTransfer
 
      ! loop on pixels
      id = 1 ! pour code sequentiel
-     n_iter_min = 3 !1
-     n_iter_max = 6 !1
+     n_iter_min = 1 !1 !3
+     n_iter_max = 6 !1 !6
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
+           if (n_iteR_min>1) write(*,*) "pixels iterated", i, j
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            CALL FLUX_PIXEL_LINE(id,ibin,iaz,n_iter_min,n_iter_max, &
