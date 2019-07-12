@@ -223,7 +223,7 @@ MODULE metal
      i = continuum%i
      j = continuum%j !+1 wrt C indexing
      Nblue = continuum%Nblue; Nred = continuum%Nred
-     !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid continua not defined on the grid
+     if (.not.continuum%lcontrib_to_opac) CYCLE !avoid continua not defined on the grid
 
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
@@ -348,7 +348,7 @@ MODULE metal
      line = atom%lines(kr)
      i = line%i; j = line%j
      Nred = line%Nred; Nblue = line%Nblue
-     !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid lines not defined on the grid
+     if (.not.line%lcontrib_to_opac) CYCLE !avoid lines not defined on the grid
      allocate(Vij(line%Nlambda))
 
 !     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"

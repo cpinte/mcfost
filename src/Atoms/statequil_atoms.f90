@@ -124,8 +124,9 @@ MODULE statequil_atoms
   integer :: nact, kr, i, j, Nblue, Nred, l
   !type (AtomType), pointer :: atom
   type (AtomicContinuum) :: cont
+  real(kind=dp) :: Jnu
   real(kind=dp), allocatable, dimension(:,:) :: Ieff
-  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk, Jnu
+  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk
 
   if (present(switch_to_lte)) then
    if (switch_to_lte) RETURN !Gamma initialized to Cul
@@ -141,13 +142,9 @@ MODULE statequil_atoms
     Nblue = cont%Nblue; Nred = cont%Nred
     
     allocate(Ieff(cont%Nlambda,n_rayons), twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
-    allocate(Jnu(cont%Nlambda))
     !Accelerated I
     Ieff(:,:) = NLTEspec%I(Nblue:Nred,:,id)*dexp(-NLTEspec%dtau(Nblue:Nred,:,id)) + \
              NLTEspec%Psi(Nblue:Nred,:,id) * atom%eta(Nblue:Nred,:,id)
-    Jnu(:) = sum(Ieff,dim=2) / n_rayons  !sum over rays
-!     write(*,*) maxval(Ieff(1,:)), minval(Ieff(1,:))
-!     write(*,*) Jnu(1)
 
              
     !nstar(i)/nstar(j)*exp(-hnu/kT)
@@ -156,17 +153,18 @@ MODULE statequil_atoms
     !2hnu3/c2 = 2hc/lambda3
     twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
     
-    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont) / n_rayons
-    ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
+    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+    ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
 
     !explicit do loop
     do l=1,cont%Nlambda
+     Jnu = sum(Ieff(l,:))/n_rayons
      !write(*,*) j, i, NLTEspec%lambda(Nblue+l-1), Jnu(l)
-     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu(l)*weight(l)
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu(l)+twohnu3_c2k(l))*gijk(l)*weight(l)
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2k(l))*gijk(l)*weight(l)
     enddo
     
-    deallocate(Ieff,twohnu3_c2k, weight, gijk, Jnu)
+    deallocate(Ieff,twohnu3_c2k, weight, gijk)!, Jnu)
    end do !over cont
    
    !atom => NULL()
@@ -189,7 +187,7 @@ MODULE statequil_atoms
    if (switch_to_lte) RETURN !Gamma initialized to Cul
   end if
   
-  factor = n_rayons / CLIGHT
+  !factor = n_rayons
   !do nact=1,atmos%NactiveAtoms !loop over each active atoms
   
    !atom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -205,10 +203,10 @@ MODULE statequil_atoms
 
     norm = 0d0
     do iray=1, n_rayons
-     norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))/n_rayons !angle and frequency integrated
+     norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))!/n_rayons !angle and frequency integrated
     enddo
-    
-    weight(:) =  line_wlam(line) / norm / factor
+    !the n_rayons simplify
+    weight(:) =  line_wlam(line) / norm! / factor
 !     write(*,*) id, j, i, maxval(weight), norm
     
     gij = line%Bji/line%Bij
@@ -262,7 +260,7 @@ MODULE statequil_atoms
     !2hnu3/c2 = 2hc/lambda3
     twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
     
-    weight(:) = fourPI * cont_wlam(cont) * bound_free_Xsection(cont)
+    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
     ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
 
     !explicit do loop

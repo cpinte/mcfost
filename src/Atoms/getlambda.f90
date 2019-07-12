@@ -11,7 +11,10 @@ MODULE getlambda
   
   IMPLICIT NONE
   
-!   double precision, dimension(:), allocatable :: Nred_array, Nblue_array, Nmid_array
+  !Number of points for each transition
+  integer, parameter :: Nlambda_cont = 30, &
+  						Nlambda_line_w = 7, Nlambda_line_c = 51
+  						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
   CONTAINS
   
@@ -73,7 +76,6 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    double precision, intent(in) :: lambdamin
    double precision :: resol
-   integer, parameter :: Nlambda = 51!101
    integer :: la
    double precision :: l0, l1
    
@@ -81,9 +83,9 @@ MODULE getlambda
 
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
    l0 = lambdamin
-   cont%Nlambda = Nlambda
+   cont%Nlambda = Nlambda_cont
    allocate(cont%lambda(cont%Nlambda))
-   resol = (l1 - l0) / real(Nlambda - 1, kind=dp)
+   resol = (l1 - l0) / real(cont%Nlambda - 1, kind=dp)
 !    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
 !               " Resolution (nm):", resol, " lambdamin =", lambdamin  
    
@@ -110,8 +112,9 @@ MODULE getlambda
    double precision :: adamp_char = 0d0
    double precision, parameter :: wing_to_core = 0.5, L = 5d0 !only if velocity field
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
-   integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
-   double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
+   !!integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
+   real(kind=dp), dimension(2*(Nlambda_line_c+Nlambda_line_w-1)-1) :: vel
+   !!double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
 
    adamp_char = 1d3 * L * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
@@ -131,8 +134,8 @@ MODULE getlambda
    vel = 0d0
 
    !from -v_char to 0
-   dvw = (v_char-vcore)/real(Nw-1,kind=dp) !(L * v_char-vcore)/real(Nw-1,kind=dp), old
-   dvc = vcore/real(Nc-1,kind=dp)
+   dvw = (v_char-vcore)/real(Nlambda_line_w-1,kind=dp) !(L * v_char-vcore)/real(Nw-1,kind=dp), old
+   dvc = vcore/real(Nlambda_line_c-1,kind=dp)
    
 !! Linear wing
    !vel(1:Nw) = -real(span(real(v1), real(vcore), Nw),kind=dp)
@@ -147,7 +150,7 @@ MODULE getlambda
    !should be log from vcore to v0 not the opposite
    !v0 is < 0 but spanl takes the abs
 !   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
-   vel(Nw:1:-1) = -real(spanl(real(vcore), real(v0), Nw),kind=dp)
+   vel(Nlambda_line_w:1:-1) = -real(spanl(real(vcore), real(v0), Nlambda_line_w),kind=dp)
 !    do la=1,Nw
 !     write(*,*) la, vel(la)/1000., vcore, -v_char, adamp_char*vD / 1000.
 !    end do
@@ -158,7 +161,7 @@ MODULE getlambda
    !la goes from 1 to Nw + Nc -1 total number of points.
    !if Nc=101 and Nw =11, 111 velocity points,because the point vel(11) of the wing grid
    !is shared with the point vel(1) of the core grid.
-   do la=Nw+1, Nc+Nw-1 !Half line core
+   do la=Nlambda_line_w+1, Nlambda_line_c+Nlambda_line_w-1 !Half line core
     vel(la) = vel(la-1) + dvc
     !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
@@ -166,14 +169,14 @@ MODULE getlambda
    !! Just a check here, maybe forcing the mid point to be zero is brutal
    !! but by construction it should be zero !
    !if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
-   if (dabs(vel(Nw+Nc-1)) /= 0d0) vel(Nw+Nc-1) = 0d0
-   if (vel(Nw+Nc-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
+   if (dabs(vel(Nlambda_line_w+Nlambda_line_c-1)) /= 0d0) vel(Nlambda_line_w+Nlambda_line_c-1) = 0d0
+   if (vel(Nlambda_line_w+Nlambda_line_c-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
 
   !number of points from -vchar to 0 is Nw+Nc-1, -1 because otherwise we count
   ! 2 times vcore which is shared by the wing (upper boundary) and core (lower boundary) grid.
   ! Total number of points is 2*(Nw+Nc-1) but here we count 2 times lambda0., therefore
   ! we remove 1 point.
-   Nlambda = 2 * (Nw + Nc - 1) - 1 
+   Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1 
    line%Nlambda = Nlambda
    Nmid = Nlambda/2 + 1 !As Nlambda is odd '1--2--3', Nmid = N/2 + 1 = 2, because 3/2 = 1
    						!because the division of too integers is the real part. 
@@ -221,6 +224,9 @@ MODULE getlambda
    integer :: Nred, Nblue, Nlambda_original!read from model
    double precision, allocatable, dimension(:) :: tempgrid, sorted_indexes
    double precision :: l0, l1 !ref wavelength of each transitions
+   
+   write(*,*) ' Defining the nLTE wavelength grid, using ', Nlambda_cont,' points for each continuum, and ', &
+    2*(Nlambda_line_w+Nlambda_line_c-1)-1, " points for each line."
 
    nn = 0
    allocate(alllines(MAX_TRANSITIONS), allcont(MAX_TRANSITIONS))!stored on heap
@@ -523,9 +529,10 @@ MODULE getlambda
 
       Atoms(n)%ptr_atom%continua(kc)%Nmid = -99
       
-      trans_contribute(kc) = .false.
+      Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac=.false.
+      trans_contribute(kc) = Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac!.false.
       write(*,*) " :: b-f transition", Atoms(n)%ptr_atom%continua(kc)%j,"->",Atoms(n)%ptr_atom%continua(kc)%i,&
-       " for atom ",Atoms(n)%ptr_atom%ID, l0,"-",l1, " removed."
+       " for atom ",Atoms(n)%ptr_atom%ID, l0,"-",l1," not counted." !, " removed."
      else
       Atoms(n)%ptr_atom%continua(kc)%Nlambda = Atoms(n)%ptr_atom%continua(kc)%Nred - &
                                  Atoms(n)%ptr_atom%continua(kc)%Nblue + 1
@@ -540,7 +547,7 @@ MODULE getlambda
      end if                          
     end do
     !If the transition is removed no need for testing Nred and Nlblue in the opacities
-    CALL realloc_continuum_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
+!CALL realloc_continuum_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
     !write(*,*) maxval(Atoms(n)%ptr_atom%continua(1)%alpha)
     deallocate(trans_contribute)
     !then bound-bound transitions
@@ -607,9 +614,10 @@ MODULE getlambda
 
       Atoms(n)%ptr_atom%lines(kr)%Nmid = -99
 
-      trans_contribute(kr) = .false.
+      Atoms(n)%ptr_atom%lines(kr)%lcontrib_to_opac=.false.
+      trans_contribute(kr) = Atoms(n)%ptr_atom%lines(kr)%lcontrib_to_opac!.false.
       write(*,*) " :: b-b transition", Atoms(n)%ptr_atom%lines(kr)%j,"->",Atoms(n)%ptr_atom%lines(kr)%i,&
-       " for atom " ,Atoms(n)%ptr_atom%ID, l0,"-",l1, " removed."
+       " for atom " ,Atoms(n)%ptr_atom%ID, l0,"-",l1," not counted."!, " removed."
      else
       Atoms(n)%ptr_atom%lines(kr)%Nlambda = Atoms(n)%ptr_atom%lines(kr)%Nred - &
                                  Atoms(n)%ptr_atom%lines(kr)%Nblue + 1
@@ -621,7 +629,7 @@ MODULE getlambda
     end do
 !      Atoms(n)%ptr_atom%lines = PACK(Atoms(n)%ptr_atom%lines, trans_contribute)
 !      Atoms(n)%ptr_atom%Nline = count(trans_contribute)
-     CALL realloc_line_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
+!CALL realloc_line_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
      deallocate(trans_contribute)
    end do !over atoms
    if (allocated(trans_contribute)) deallocate(trans_contribute) !in case

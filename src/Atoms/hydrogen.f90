@@ -144,6 +144,8 @@ MODULE hydrogen_opacities
   do kr=1,Hydrogen%Ncont
      cont = Hydrogen%continua(kr)
      Nred = cont%Nred; Nblue = cont%Nblue
+     if (.not.cont%lcontrib_to_opac) CYCLE
+
      allocate(gijk(cont%Nlambda), twohnu3_c2(cont%Nlambda))
    lambdaEdge = cont%lambda0 !ionisation frequency (min)
    i = cont%i

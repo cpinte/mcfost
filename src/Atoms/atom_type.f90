@@ -23,7 +23,7 @@ MODULE atom_type
   END TYPE ZeemanType
  
   TYPE AtomicLine
-   logical           :: symmetric, polarizable
+   logical           :: symmetric, polarizable, lcontrib_to_opac !default is yes, set at reading
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
@@ -52,7 +52,7 @@ MODULE atom_type
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
-   logical :: hydrogenic
+   logical :: hydrogenic, lcontrib_to_opac
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(8) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
    real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij

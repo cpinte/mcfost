@@ -19,10 +19,6 @@ MODULE Opacity
 
  IMPLICIT NONE
 
- !store the pure continuum NLTE opacities to be added to the total
- !continuum opacity after NLTEloop ends, if lstore_opac add them to Kc and jc
- !They are temporary stored in a large array (Nspace, Nlambda)
-
  CONTAINS
  
   SUBROUTINE add_to_psi_operator(id, icell, iray, ds)
@@ -50,7 +46,7 @@ MODULE Opacity
        CALL Error("Not implemented MALI") !should create an error before, in init_NLTE
        !!not allocated
        !!NLTEspec%dtau(:,iray,id) = 0d0 !not used in SEE
-       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !in meter
+       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !missing a exp(-tau) here ?
      CASE ("HOGEREIJDE")
        NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
        !NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
@@ -115,7 +111,6 @@ MODULE Opacity
   ! times c: dv.
   ! the integral of the radiative rates is
   ! integ (domega) * integ(dv/ch)
-  ! a 1/ch is missing. 
   !
   ! Vij = hnu/4pi * Bij * phi if integral is over dnu/hnu
   ! and Vij = hc/4pi * Bij * phi if integral is over (dv/hc).
@@ -133,7 +128,7 @@ MODULE Opacity
    !la=1 <=> la0=Nblue; la=Nlambda <=> la0 = Nred = Nblue - 1 + Nlambda
    !dlambda = (lambda(la0 + 1) - lambda(la0 - 1)) * 0.5 <=> mean value.
 
-  norm = 5d-1 / line%lambda0 !* CLIGHT, removed because we want dv/c not dv
+  norm = 5d-1 / line%lambda0 * CLIGHT !because we want dv
   Nblue = line%Nblue; Nred = line%Nred
   la_start = 1; la_end = line%Nlambda
 
@@ -186,10 +181,7 @@ MODULE Opacity
  RETURN
  END FUNCTION cont_wlam
 
- !add options to save %eta, %gij %Vij only during the NLTEloop. For the image we
- !do not need them as we do not update the pops
- !same condition as get_weights
- !Je n'ai besoin de gij, Vij qu'a l'indice de la cellule
+ !setting gij to 0 for tests
  SUBROUTINE NLTEOpacity(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
   !
   !
@@ -213,48 +205,52 @@ MODULE Opacity
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
-  real(kind=dp) :: gij, twohnu3_c2
+  real(kind=dp) :: gij, twohnu3_c2, stm
   double precision, dimension(:), allocatable :: Vij, gijk, twohnu3_c2k
   double precision, allocatable :: phi(:), phiZ(:,:), psiZ(:,:)
   character(len=20) :: VoigtMethod="HUMLICEK"
-
-
+  
   do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
    if (iterate) aatom%eta(:,iray,id) = 0d0 !init Eta only if iterate, for this cell and thread
 
    
    	do kc = 1, aatom%Ncont
+        stm = 1d0 !init for each transition
+        !Car tu ne peux pas mettre gij a 0 si tu veux neglier l'émission stimulée. Sinon, eta aussi
+        ! est nulle car prop to gij. Or, seulement le terme en nj*gij est nulle dans chi.
+  
     	cont = aatom%continua(kc)
     	Nred = cont%Nred; Nblue = cont%Nblue    	
     	i = cont%i; j=cont%j
+    	if (.not.cont%lcontrib_to_opac) CYCLE!(Nred==-99 .and. Nblue==-99) CYCLE
 
     	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
     	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
-     	 CALL Warning("too small cont populations") !or Error()
-     	 ! if (aatom%n(i, icell) <= tiny_dp) CYCLE !but do not skip if atom%j < tiny_dp
-!      	 aatom%n(j,icell) = 0d0 !here because it is < tiny_dp, otherwise it is n(i) and we skip
+    	 write(*,*) aatom%n(:,icell)
+     	 CALL ERROR("too small cont populations") !or Warning()
     	end if
       	allocate(gijk(cont%Nlambda))
         gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
 
-
       !Cannot be negative because we alread tested if < tiny_dp
-      if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
-        (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
-          write(*,*) id, icell, aatom%ID, &
-          	" ** Stimulated emission for continuum transition ",j,i," neglected"
-!          write(*,*) cont%i, cont%j, aatom%ID
-!          write(*,*) "at cell-1", atmos%nHtot(icell-1), atmos%nHtot(icell-1)*aatom%Abund, atmos%T(icell-1), atmos%ne(icell-1), atmos%nHmin(icell-1)
-!          write(*,*) "at cell", atmos%nHtot(icell), atmos%nHtot(icell)*aatom%Abund, atmos%T(icell), atmos%ne(icell), atmos%nHmin(icell)
-!          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
-!          write(*,*) minval(gijk)*aatom%n(j,icell), maxval(gijk)*aatom%n(j,icell)
-!          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
-!          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-!                   stop
-!         deallocate(gijk)
-!        CYCLE
-      end if
+!       if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
+!         (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
+! !           write(*,*) id, icell, aatom%ID, &
+! !           	" ** Stimulated emission for continuum transition ",j,i,&
+! !           								cont%lambda0, cont%lambdamin, " neglected"
+! ! 
+! !          write(*,*) cont%i, cont%j, aatom%ID
+! !          write(*,*) "at cell-1", atmos%nHtot(icell-1), atmos%nHtot(icell-1)*aatom%Abund, atmos%T(icell-1), atmos%ne(icell-1), atmos%nHmin(icell-1)
+! !          write(*,*) "at cell", atmos%nHtot(icell), atmos%nHtot(icell)*aatom%Abund, atmos%T(icell), atmos%ne(icell), atmos%nHmin(icell)
+! !          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
+! !          write(*,*) minval(gijk)*aatom%n(j,icell), maxval(gijk)*aatom%n(j,icell)
+! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
+! !                   stop
+!          stm = 0d0
+!       end if
+      !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
 	  allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
     	
       twohnu3_c2k(:) = twohc / NLTEspec%lambda(cont%Nblue:cont%Nred)**(3d0)
@@ -262,20 +258,17 @@ MODULE Opacity
 
     
     !store total emissivities and opacities
-        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
-       		Vij(:) * (aatom%n(i,icell)-gijk(:)*aatom%n(j,icell))
+        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+       		Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
        		
 		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
     	gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
     	
-    	!They are allocated if nlte so if we enter here
-!     	NLTEspec%AtomOpac%chic_nlte(icell, Nblue:Nred) = &
-!     	 NLTEspec%AtomOpac%chic_nlte(icell, Nblue:Nred) + &
-!     	 	Vij(Nblue:Nred) * (aatom%n(i,icell)-gij(Nblue:Nred)*aatom%n(j,icell))
-!     	NLTEspec%AtomOpac%etac_nlte(icell, Nblue:Nred) = &
-!     	 NLTEspec%AtomOpac%etac_nlte(icell, Nblue:Nred) + &
-!     	   gij(Nblue:Nred) * Vij(Nblue:Nred) * aatom%n(j,icell) * twohnu3_c2(Nblue:Nred)
+
+    	NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + &
+    	 	Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
+    	NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) + &
+    	   gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k(:)
 
     	
     	if (iterate) &
@@ -288,35 +281,40 @@ MODULE Opacity
    	end do
 
    do kr = 1, aatom%Nline
+   
+    stm = 1d0 !re init
+   
     line = aatom%lines(kr)
     Nred = line%Nred; Nblue = line%Nblue
-    !if (Nred == -99 .and. Nblue == -99) CYCLE
+    if (.not.line%lcontrib_to_opac) CYCLE
     i = line%i; j=line%j
     
     if ((aatom%n(j,icell) <= tiny_dp).or.(aatom%n(i,icell) <= tiny_dp)) then !no transition
     	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
         write(*,*) aatom%n(:,icell)
-     	CALL Warning("too small line populations") !or Error()
+     	CALL ERROR("too small line populations") !or Warning()
     end if 
 
     gij = line%Bji / line%Bij !array of constant Bji/Bij
+    
     !Cannot be negative because we alread tested if < tiny_dp
     if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
         (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
           write(*,*) id, icell, aatom%ID, &
-          	" ** Stimulated emission for line transition ",j,i," neglected"
-!          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
-!          write(*,*) gij
-!          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
-!          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-!         stop
-!	      CYCLE
+          	" ** Stimulated emission for line transition ",j,i,line%lambda0, " neglected"
+         write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
+         write(*,*) gij
+         write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+         write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
+        stm = 0d0 !not gij !! look at eta
     end if
     
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
     if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp
+    
     allocate(phi(line%Nlambda),Vij(line%Nlambda))
+    
     if (PRT_SOLUTION=="FULL_STOKES") allocate(phiZ(3,line%Nlambda), psiZ(3,line%Nlambda))
     !phiZ and psiZ are used only if Zeeman polarisation, which means we care only if
     !they are allocated in this case.
@@ -326,12 +324,10 @@ MODULE Opacity
      Vij(:) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
       
-     NLTEspec%AtomOpac%chi(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
-       		Vij(:) * (aatom%n(i,icell)-gij*aatom%n(j,icell))
+     NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+       		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
        		
-     NLTEspec%AtomOpac%eta(Nblue:Nred,id)= &
-     		NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
+     NLTEspec%AtomOpac%eta(Nblue:Nred,id)= NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
        		twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
       
     !line and cont are not pointers. Modification of line does not affect atom%lines(kr)
@@ -346,10 +342,10 @@ MODULE Opacity
        do nk = 1, 3
          !magneto-optical
          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (aatom%n(i,icell)-gij*aatom%n(j,icell)) * psiZ(nk,:)
+           hc_4PI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
          !dichroism
          NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (aatom%n(i,icell)-gij*aatom%n(j,icell)) * psiZ(nk,:)
+           hc_4PI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
          !emissivity
          NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
           twohnu3_c2 * gij * hc_4PI * line%Bij * aatom%n(j,icell) * phiZ(nk,:)

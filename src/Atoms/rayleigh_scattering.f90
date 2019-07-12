@@ -59,7 +59,7 @@ MODULE rayleigh_scattering
   if (.not.associated(Helium)) RETURN
   write(*,*) "Computing HE I rayleigh"
   
-  lambda_limit = 121.6d0
+  lambda_limit = 121.6d0 !which one for helium?
   scatt = 0d0
 
 
@@ -121,10 +121,15 @@ MODULE rayleigh_scattering
    RETURN
   end if
   
+  !!!!
+  !!!! There might be a bug here for image, because we do not do the sum over all transitions
+       ! since only contributing transitions are kept (Nred=Nblue=-99).  
+  !!!!
+  
  !   find lambda_red, the longest wavelength covered by the
  !   transition less than lambda for this atom.
    do kr=1,atom%Nline
-    !if (atom%lines(kr)%Nred==-99 .and. atom%lines(kr)%Nblue==-99) CYCLE
+    if (.not.atom%lines(kr)%lcontrib_to_opac) CYCLE
     ! BEWARE: a line expands from Nblue to Nred but the reddest wavelength
     ! is line%lambda(Nlambda) = NLTEspec%lambda(Nred) by construction.
     !In getlambda.f90, a new grid is constructed and lambda(Nlambda) might not
@@ -139,7 +144,7 @@ MODULE rayleigh_scattering
   lambda2 = 0d0
 
  do kr=1,atom%Nline
-  !if (atom%lines(kr)%Nred==-99 .and. atom%lines(kr)%Nblue==-99) CYCLE
+  if (.not.atom%lines(kr)%lcontrib_to_opac) CYCLE
   lambda_red =  NLTEspec%lambda(atom%lines(kr)%Nred)
    if (atom%lines(kr)%i == 1) then
     where((NLTEspec%lambda > lambda_limit).and.(NLTEspec%lambda > lambda_red))

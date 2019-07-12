@@ -21,11 +21,13 @@ MODULE spectrum_type
    ! I(x,y,0,lambda,imu), not used yet
    !character(len=*), parameter :: SPEC_FILE="spectrum.fits.gz"
    character(len=*), parameter :: OPAC_CONTRIB_FILE="opacities.fits.gz"
+   logical :: lcompute_continuum !if false, do not allocate cont only opacities (save memory)
+   								 !if lcontrib_function, set it to true, before computing contrib function
   
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
-!    double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
+   double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
    ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
@@ -60,7 +62,7 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
    !!double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
-   ! N_cells, Nvel, Ntrans, nincl, naz
+   ! N_cells, Nlambda ...
    double precision, allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
@@ -137,7 +139,7 @@ MODULE spectrum_type
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
    integer, dimension(:), allocatable :: Nlam_R
-   integer :: nat, kr, Ntrans_new
+   integer :: nat, kr, Ntrans_new, kp
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -157,20 +159,35 @@ MODULE spectrum_type
    deallocate(Nlam_R) !not used anymore  
    Ntrans_new = 0
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
+!I do not removed transitions for the moment
+!so I count only transitions falling in the new wavelength. Thi summation is implicit
+!if transitions are removed.
    do nat=1,NLTEspec%atmos%Natom
-    write(*,*) "   --> ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID, &
-     NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "(b-b)", &
-     NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
+     write(*,*) "  --> Atom ", NLTEspec%atmos%Atoms(nat)%ptr_atom%ID!, &
+!      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "b-b", &
+!      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
+     kp = 0
      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
-       write(*,*) "    b-b #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
+      if (NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nblue >= 1 .and. &
+      		NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nred <= NLTEspec%Nwaves) then
+       kp = kp + 1
+       write(*,*) "    b-b #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
         "nm"
-       Ntrans_new = Ntrans_new + 1     
+       Ntrans_new = Ntrans_new + 1    
+      endif 
      end do
+    write(*,*) "   --> ", kp, "b-b transitions"
+     kp = 0
      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
-       write(*,*) "    b-f #", kr, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
+      if (NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nblue >= 1 .and. &
+      		NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nred <= NLTEspec%Nwaves) then
+       kp = kp + 1
+       write(*,*) "    b-f #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
         "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"  
        Ntrans_new = Ntrans_new + 1  
+      endif
      end do
+    write(*,*) "   --> ", kp, "b-f transitions"
    end do
    write(*,*) "  ** Total number of transitions for image:", Ntrans_new
    NLTEspec%Ntrans = Ntrans_new
@@ -270,6 +287,9 @@ MODULE spectrum_type
    ! if pol allocate AtomOpac%rho
    NLTEspec%AtomOpac%chi = 0.
    NLTEspec%AtomOpac%eta = 0.
+   allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%Nwaves, NLTEspec%NPROC),&
+      NLTEspec%AtomOpac%etac_nlte(NLTEspec%Nwaves,NLTEspec%NPROC))
+   NLTEspec%AtomOpac%chic_nlte = 0d0; NLTEspec%AtomOpac%etac_nlte = 0d0
 
    allocate(NLTEspec%AtomOpac%eta_p(NLTEspec%Nwaves ,NLTEspec%NPROC))
    allocate(NLTEspec%AtomOpac%chi_p(NLTEspec%Nwaves ,NLTEspec%NPROC))
@@ -281,11 +301,6 @@ MODULE spectrum_type
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
    !in NLTEOpacity()
    if (alloc_atom_nlte) then !NLTE loop activated
-    
-    !!!!!!!!!!! POTENTIALLY ADD LARGE ARRAY HERE !!!!!!!!!!!!
-!     allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%atmos%Nspace, NLTEspec%Nwaves),&
-!      NLTEspec%AtomOpac%etac_nlte(NLTEspec%atmos%Nspace, NLTEspec%Nwaves))
-    !!!!!!!!!!! POTENTIALLY ADD LARGE ARRAY HERE !!!!!!!!!!!!
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") &
@@ -357,6 +372,7 @@ MODULE spectrum_type
    !active
    deallocate(NLTEspec%AtomOpac%chi)
    deallocate(NLTEspec%AtomOpac%eta)
+   deallocate(NLTEspec%AtomOpac%etac_nlte, NLTEspec%AtomOpac%chic_nlte)
    if (allocated(NLTEspec%Psi)) then
     deallocate(NLTEspec%Psi)
     if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
@@ -398,6 +414,8 @@ MODULE spectrum_type
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
+    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0
+    NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
     if (.not.lstore_opac) then
       NLTEspec%AtomOpac%chi_c(:,id) = 0d0
       NLTEspec%AtomOpac%eta_c(:,id) = 0d0
@@ -728,7 +746,7 @@ MODULE spectrum_type
   END FUNCTION air2vacuum
   
  !building 
- SUBROUTINE WRITE_CNTRB()
+ SUBROUTINE WRITE_CNTRB_FUNC_PIX()
  ! -------------------------------------------------- !
   ! Write contribution function to disk.
  ! --------------------------------------------------- !
@@ -738,6 +756,8 @@ MODULE spectrum_type
   logical :: simple, extend
   character(len=6) :: comment=""
   real :: pixel_scale_x, pixel_scale_y 
+  
+   write(*,*)" -> writing contribution function.."
   
    !  Get an unused Logical Unit Number to use to open the FITS file.
    status=0
@@ -800,45 +820,46 @@ MODULE spectrum_type
   endif
 
  RETURN
- END SUBROUTINE WRITE_CNTRB  
+ END SUBROUTINE WRITE_CNTRB_FUNC_PIX
+ 
   
-  !building 
-  SUBROUTINE writeContrib()
-  ! --------------------------------------------------------------- !
-   ! Write the different contributions to opacities to fits file
-  ! --------------------------------------------------------------- !
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(4) :: naxes
-  integer :: group,fpixel,nelements, i, xcenter
-  integer :: la, Nred, Nblue, kr, kc, m
-  logical :: simple, extend
-  character(len=6) :: comment=""
-  
-  write(*,*) "Writing opacities"
-  
-   !  Get an unused Logical Unit Number to use to open the FITS file.
-   status=0
-   CALL ftgiou (unit,status)
-
-   !  Create the new empty FITS file.
-   blocksize=1
-   CALL ftinit(unit,trim(OPAC_CONTRIB_FILE),blocksize,status)
-
-   simple=.true.
-   extend=.true.
-   group=1
-   fpixel=1
-
-   bitpix=-64
-   naxis=4
-   naxes(1)=NLTEspec%Nwaves
-   naxes(2)=NLTEspec%atmos%Nspace
-   naxes(3)=RT_n_incl
-   naxes(4)=RT_n_az
-   nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  
-  RETURN
-  END SUBROUTINE
+!   !!building 
+!   SUBROUTINE write_opacities()
+!   ! --------------------------------------------------------------- !
+!    Write the different contributions to opacities to fits file
+!   ! --------------------------------------------------------------- !
+!   integer :: status,unit,blocksize,bitpix,naxis
+!   integer, dimension(4) :: naxes
+!   integer :: group,fpixel,nelements, i, xcenter
+!   integer :: la, Nred, Nblue, kr, kc, m
+!   logical :: simple, extend
+!   character(len=6) :: comment=""
+!   
+!   write(*,*) "Writing opacities"
+!   
+!    !!!  Get an unused Logical Unit Number to use to open the FITS file.
+!    status=0
+!    CALL ftgiou (unit,status)
+! 
+!    !!  Create the new empty FITS file.
+!    blocksize=1
+!    CALL ftinit(unit,trim(OPAC_CONTRIB_FILE),blocksize,status)
+! 
+!    simple=.true.
+!    extend=.true.
+!    group=1
+!    fpixel=1
+! 
+!    bitpix=-64
+!    naxis=4
+!    naxes(1)=NLTEspec%Nwaves
+!    naxes(2)=NLTEspec%atmos%Nspace
+!    naxes(3)=RT_n_incl
+!    naxes(4)=RT_n_az
+!    nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+!   
+!   RETURN
+!   END SUBROUTINE write_opacities
 
 END MODULE spectrum_type
 

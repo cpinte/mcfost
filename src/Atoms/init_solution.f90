@@ -17,18 +17,20 @@ MODULE init_solution
  
  CONTAINS
  
- SUBROUTINE Init_NLTE(Ng_acceleration)
+ SUBROUTINE Init_NLTE(Ng_acceleration, sub_iterations_enabled)
  ! ---------------------------------------------------- !
   ! Initialize quantities for NLTE atomic line transfer
   ! set up pointers to the right FillGamma_bb and _bf.
  ! ---------------------------------------------------- !
   type (AtomType), pointer :: atom
-  logical, intent(in), optional :: Ng_acceleration
+  logical, intent(in), optional :: Ng_acceleration, sub_iterations_enabled
   integer :: nact, Nmaxlevel, icell
    
    !alloc space for line profiles for each line: line%phi(line%Nlambda, Nrays, Nproc)
    CALL alloc_phi_lambda()
-   
+   if (present(Ng_acceleration)) then
+    if (Ng_acceleration) CALL Warning("Acceleration enabled.")
+   endif
   ! if OLD_POPULATIONS, the init is done at the reading
   ! for now initialSol() is replaced by this if loop on active atoms
    NmaxLevel = 0
@@ -87,8 +89,13 @@ MODULE init_solution
      atom => NULL()
    enddo
    
-   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
-   allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
+   if (present(sub_iterations_enabled)) then
+    if (sub_iterations_enabled) then
+      Write(*,*) " Allocating space for sub-iterations populations"
+      allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
+      allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
+    endif
+   endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
   
   !at the end because if ZERO_RADIATION for instance the pointers is changed
@@ -111,16 +118,19 @@ MODULE init_solution
  RETURN
  END SUBROUTINE init_nlte
  
- SUBROUTINE free_nlte_sol(Ng_acceleration)
-  logical, intent(in) :: Ng_acceleration
+ SUBROUTINE free_nlte_sol(Ng_acceleration, sub_iterations_enabled)
+  logical, intent(in) :: Ng_acceleration, sub_iterations_enabled
   type (AtomType), pointer :: atom
   integer :: nact
   
   FillGamma_bb => NULL()
   FillGamma_bf => NULL() !not needed anymore at the end of the NLTE
  
-  deallocate(pop_old, gpop_old)
-  if (allocated(pop)) deallocate(pop)
+  deallocate(gpop_old)
+  if (sub_iterations_enabled) then
+   if (allocated(pop)) deallocate(pop)
+   if (allocated(pop_old)) deallocate(pop_old)
+  endif
   CALL dealloc_phi_lambda() !not used anymore, except if we kept them in Profile() ?
   
   do nact=1,atmos%Nactiveatoms

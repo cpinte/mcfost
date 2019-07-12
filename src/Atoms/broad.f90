@@ -35,6 +35,44 @@ MODULE broad
   !will be divided by 4PI later
  RETURN
  END SUBROUTINE Broad_Kurosawa
+ 
+ SUBROUTINE RadiativeDamping(icell, atom, kr, Grad)
+ ! -------------------------------------------------------------------------- !
+  ! Radiative damping of a line transition j->i,
+  ! assuming the radiation field is given by a Planck function, and psi=phi
+  !
+  ! Grad = Sum_l<m Aml + Bml * int2(psiml*I*dv) + Sum_n>m mn int2(phimn*Idv)
+ ! -------------------------------------------------------------------------- !
+  integer, intent(in) :: icell, kr
+  type (AtomType), intent(in) :: atom
+  real(kind=dp), intent(out) :: Grad
+  integer :: kp,l,n
+  real(kind=dp) :: hc_lakT, gamma_j, gamma_i
+  type (AtomicLine) :: other_line, line
+  !Remove radiation field to compare with RH
+  
+  hc_lakT = hc_k / atmos%T(icell) !nm factor
+  line = atom%lines(kr)
+  Grad = 0d0
+  gamma_j = 0d0; gamma_i = 0d0
+  
+  do kp=1,atom%Nline
+    other_line = atom%lines(kp)
+    l = other_line%i; n = other_line%j
+    if (n==line%j) then !our upper level is also the upper level of another transition
+     gamma_j = gamma_j + other_line%Aji/(1d0 - dexp(-hc_lakT/other_line%lambda0))
+    elseif (l==line%j) then !our upper level is a lower level of another transition
+     gamma_j = gamma_j + other_line%Bji/other_line%Bij * other_line%Aji / (dexp(hc_lakT/other_line%lambda0)-1d0)
+!     elseif (l==line%i) then !our lower level is zn upper level
+!      gamma_i = gamma_i + ohter
+    endif
+  
+  enddo
+  
+  Grad = gamma_j + gamma_i
+
+ RETURN
+ END SUBROUTINE RadiativeDamping
 
  SUBROUTINE VanderWaals(icell, atom, kr, GvdW)
  ! Compute van der Waals broadening in Lindholm theory with
@@ -86,10 +124,13 @@ MODULE broad
   j = line%j
   i = line%i
 
+  !could be nice to keep vrel35 for each atom ? as it depends only on the weight
   if (line%vdWaals.eq."UNSOLD" .or. line%vdWaals.eq."BARKLEM") then
    fourPIeps0 = 4.*PI*EPSILON_0
-   vrel35_He = dpow(8.*KBOLTZMANN/(PI*AMU*atom%weight) * &
-         (1.+atom%weight/Helium%weight),3d-1) !0.3
+   ! write(*,*) atom%weight/Helium%weight
+!    write(*,*) 8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight)
+   vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * &
+         (1.+atom%weight/Helium%weight))**0.3
 
    Z = atom%stage(j)+1 !remember, stage starts at 0 like in C
    !--> voir barklem.f90, Z is not an index but a physical value
@@ -274,6 +315,10 @@ MODULE broad
  END SUBROUTINE StarkLinear
 
  SUBROUTINE Damping(icell, atom, kr, adamp)
+ ! I need to change something here, only a line from Atom%lines is needed since,
+ !line%atom point to atom
+ ! Beware here, because if I remove some transitions for images, but I need to do the calculations of
+ !broadening by summing over transitions..
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
   type (AtomicLine) :: line
@@ -281,12 +326,19 @@ MODULE broad
   integer :: k
   double precision :: cDop
   double precision, intent(out) :: adamp
-  double precision :: Qelast
+  double precision :: Qelast, Gj
 
   Qelast = 0.0
 
   line=atom%lines(kr)
   !write(*,*) "Computing damping for line ",line%j,"-",line%i
+
+!   if (atom%g(line%j)==18.and.atom%g(line%i)==8) then
+!   CALL RadiativeDamping(icell, atom, kr, Gj)
+!   write(*,*) "Grad compare:", line%Grad, Gj
+!   
+!   stop
+!   endif
 
   cDop = (NM_TO_M*line%lambda0) / (4.*PI)
   ! van der Waals broadening

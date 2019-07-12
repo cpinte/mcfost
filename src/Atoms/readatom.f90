@@ -159,6 +159,7 @@ MODULE readatom
 
     do kr=1,atom%Nline
      atom%lines(kr)%atom => atom
+     atom%lines(kr)%lcontrib_to_opac=.true. !init
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
      atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
@@ -433,6 +434,7 @@ MODULE readatom
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      atom%continua(kr)%atom => atom
+     atom%continua(kr)%lcontrib_to_opac=.true.
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
