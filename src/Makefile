@@ -198,8 +198,8 @@ libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	ranlib libmcfost.a
 
 mcfost_env.o : .make_lastsystem mcfost_env.f90
-	rm -rf ../utils/Version ; grep required_utils_version mcfost_env.f90 | awk \
-		'{print $$6}' > ../utils/Version
+	mkdir -p ../utils ; rm -rf ../utils/Version ;
+	grep required_utils_version mcfost_env.f90 | awk '{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mcfost_env.f90 $(INCLUDE)
 
