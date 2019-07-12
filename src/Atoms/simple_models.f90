@@ -699,7 +699,7 @@ MODULE simple_models
 !        write(*,*) r, Rstar, rs, cm, atmos%nHtot(icell), atmos%T(icell), atmos%ne(icell)
 
        atmos%nHtot(icell) = 1d23 * (R0s/r)**2
-       atmos%T(icell) = etoile(1)%T * (R0s/r)**2
+       atmos%T(icell) = 3d3 !etoile(1)%T * (R0s/r)**2
        atmos%ne(icell) = atmos%nHtot(icell) * 1d-2
     
        !if (lmagnetoaccr) atmos%Vxyz(:,3) = Omega * (r*AU_to_m) * dsqrt(rcyl**2 / (rcyl**2+z**2))

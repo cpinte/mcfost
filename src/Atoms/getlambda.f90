@@ -117,13 +117,13 @@ MODULE getlambda
    !!double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
 
-   adamp_char = 1d3 * L * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
+   adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
    !write(*,*) adamp_char*vD/1000.
    vB = 0d0
    if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
    								 
-   v_char = (atmos%v_char*L + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
    vcore = (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) * wing_to_core
    !transition between wing and core in velocity
    !!vcore = L * v_char * wing_to_core ! == fraction of line extent

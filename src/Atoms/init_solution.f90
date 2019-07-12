@@ -39,8 +39,8 @@ MODULE init_solution
      allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
-     !Force it
-     !atom%initial_solution = "ZERO_RADIATION"
+     !!Force it
+     !!atom%initial_solution = "ZERO_RADIATION"
      atom%NLTEpops = .true.
      NmaxLevel = max(NmaxLevel, atom%Nlevel)
      write(*,*) "Setting initial solution ", atom%initial_solution," for active atom ", atom%ID, atom%active
@@ -60,8 +60,8 @@ MODULE init_solution
            !the next one is cell independent but we init Gamma at each cell
            CALL FillGamma_bb_zero_radiation(1, atom, 1) !no parallèle yet
            CALL SEE_atom(1, icell,atom)
-           !write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
-           !write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
+!            write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
+!            write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
          end if
         enddo
         FillGamma_bb => NULL(); FillGamma_bf => NULL() !because the final pointers should be the one of the methode

@@ -64,6 +64,7 @@ MODULE spectrum_type
    !Contribution function
    ! N_cells, Nlambda ...
    double precision, allocatable, dimension(:,:,:,:) :: Ksi 
+   real(kind=dp), allocatable, dimension(:,:,:) :: scale_ref
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
@@ -341,8 +342,12 @@ MODULE spectrum_type
    if (lcontrib_function .and. ltab_wavelength_image) then !the tab is here to prevent allocating a large array
 		!hence ksi should be computed for small waves intervals.
 	 !because otherwise, it is allocated with the alloc spectrum before initSpectrumImage()
-     if (alloc_image) allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace, NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ))    
-    NLTEspec%Ksi(:,:,:,:) = 0d0
+     if (alloc_image) then 
+      allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace, NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ))  
+      allocate(NLTEspec%scale_ref(NLTEspec%atmos%Nspace, RT_N_INCL, RT_N_AZ))
+      NLTEspec%Ksi(:,:,:,:) = 0d0
+      NLTEspec%scale_ref(:,:,:) = 0d0
+     end if
    else if (lcontrib_function .and. .not.ltab_wavelength_image) then
     CALL Warning(" Contribution function not taken into account. Use a wavelength table.")
     lcontrib_function = .false.
@@ -393,6 +398,7 @@ MODULE spectrum_type
 !    deallocate(Nblue_array, Nmid_array, Nred_array)
 
    if (allocated(NLTEspec%Ksi)) deallocate(NLTEspec%ksi)
+   if (NLTEspec%scale_ref) deallocate(NLTEspec%scale_ref)
 
   RETURN
   END SUBROUTINE freeSpectrum
@@ -809,6 +815,17 @@ MODULE spectrum_type
 
   !  Write the array to the FITS file.
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%ksi,status)
+  
+  !open new hdu for reference scale
+  CALL ftcrhd(unit, status)
+  
+  naxis = naxis - 1!remove the frequency dependence
+  nelements = nelements / NLTEspec%Nwaves
+  naxes = pack(naxes, naxes/=NLTEspec%Nwaves)
+  
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  CALL ftpkys(unit, "Optical depth", "", "", status)
+  CALL ftpprd(unit,group,fpixel,naxes,NLTEspec%scale_ref,status)
 
   !  Close the file and free the unit number.
   CALL ftclos(unit, status)

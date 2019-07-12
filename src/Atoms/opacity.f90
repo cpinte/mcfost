@@ -297,17 +297,17 @@ MODULE Opacity
 
     gij = line%Bji / line%Bij !array of constant Bji/Bij
     
-    !Cannot be negative because we alread tested if < tiny_dp
-    if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
-        (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
-          write(*,*) id, icell, aatom%ID, &
-          	" ** Stimulated emission for line transition ",j,i,line%lambda0, " neglected"
-         write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
-         write(*,*) gij
-         write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
-         write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-        stm = 0d0 !not gij !! look at eta
-    end if
+    !!Cannot be negative because we alread tested if < tiny_dp
+!     if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
+!         (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
+! !           write(*,*) id, icell, aatom%ID, &
+! !           	" ** Stimulated emission for line transition ",j,i,line%lambda0, " neglected"
+! !          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
+! !          write(*,*) gij
+! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
+! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
+!         stm = 0d0 !not gij !! look at eta
+!     end if
     
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)

@@ -50,7 +50,7 @@ MODULE AtomicTransfer
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
 
- real(kind=dp), allocatable :: S_contrib(:,:,:), tau_ref(:), chil(:), Sl(:)
+ real(kind=dp), allocatable :: S_contrib(:,:,:), chil(:), Sl(:), scale_ref(:)
 
  CONTAINS
  
@@ -452,6 +452,8 @@ MODULE AtomicTransfer
               !ne marche pas, car ici, icell est la cellule à la surface du modèle pour
               ! un pixel de la carte, vu qu'on se propage à l'envers.
              if (lcontrib_function) then
+              NLTEspec%scale_ref(:,ibin,iaz) = scale_ref(:)
+              scale_ref = 0d0
               NLTEspec%Ksi(:,:,ibin,iaz) = NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib(:,:,iray) / npix2
               !the other numerical factors are useless
              end if	
@@ -751,8 +753,8 @@ MODULE AtomicTransfer
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
    !CALL spherical_shells_model()
-   !CALL spherical_star()
-   CALL magneto_accretion_model()  
+   CALL spherical_star()
+   !CALL magneto_accretion_model()  
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -873,10 +875,10 @@ MODULE AtomicTransfer
   !Use converged NLTEOpac
   if (lcontrib_function) then 
    allocate(S_contrib(n_cells, NLTEspec%Nwaves, nb_proc))
-   allocate(chil(NLTEspec%Nwaves), Sl(NLTEspec%Nwaves), tau_ref(n_cells))
-   tau_ref = 0d0
+   allocate(chil(NLTEspec%Nwaves), Sl(NLTEspec%Nwaves, scale_ref(n_cells)))
    INTEG_RAY_LINE => NULL()
    INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB
+   scale_ref = 0d0
   end if
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
@@ -887,7 +889,7 @@ MODULE AtomicTransfer
   if (lcontrib_function) then 
    !!CALL compute_contribution_function()
    CALL WRITE_CNTRB_FUNC_pix()
-   deallocate(S_contrib, chil, Sl)
+   deallocate(S_contrib, chil, Sl, scale_ref)
   end if
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -1700,8 +1702,7 @@ MODULE AtomicTransfer
     !!if (lcontrib_function.and.(.not.labs)) then
      !for this direction and thread, at this cell
      !will be summed over all rays for this cell
-     ! rchi = chil + chilNlte
-     !    chil       =             chil + chic       +   chilnlte + chicnlte       - chic -chicnlte)
+     scale_ref(icell) = scale_ref(icell) + tau_c(idref)     
      Sl(:) = Snu(:) - Snu_c(:)
      S_contrib(icell,:,iray) = S_contrib(icell,:,iray) + chil(:) * &
      		(NLTEspec%Ic(:,iray,id) - Sl(:) * dexp(-tau))
@@ -1717,8 +1718,6 @@ MODULE AtomicTransfer
      !computed up to icell. For icell+1 we add tau of this icell.
      tau = tau + dtau
      tau_c = tau_c + dtau_c
-
-     tau_ref(icell) = tau_ref(icell) + tau_c(idref)
 
     end if  ! lcellule_non_vide
   end do infinie
