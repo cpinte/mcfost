@@ -250,6 +250,7 @@ release : clean main
 	git tag release
 	git push github
 	git push github --tags --force
+	mkdir -p $(MCFOST_INSTALL)/bin/
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/mac
