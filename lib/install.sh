@@ -57,6 +57,8 @@ fi
 #-- Clean previous files if any
 rm -rf lib include sprng2.0 cfitsio voro xgboost
 mkdir lib include
+mkdir include/$SYSTEM
+mkdir include/hdf5
 pushd .
 
 #-- Downloading libraries
@@ -131,9 +133,10 @@ echo "Done"
 echo "Compiling xgboost ..."
 cd xgboost
 git checkout v0.90
-if [ "$SYSTEM" = "ifort" ] ; then
+#-- we remove the test for the moment even if this works for gfortran
+#if [ "$SYSTEM" = "ifort" ] ; then
     \cp ../ifort/xgboost/base.h include/xgboost/base.h
-fi
+#fi
 make -j
 \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
 \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
@@ -154,10 +157,14 @@ if [ skip_hdf5 != "yes" ] ; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling hdf5 ..."
     tar xjvf hdf5-1.10.5.tar.bz2 ; mv hdf5-1.10.5 hdf5
+    mkdir -p $HOME/hdf5_install_tmp
     cd hdf5
-    ./configure --prefix=$MCFOST_INSTALL/hdf5/$SYSTEM --enable-fortran --disable-shared
+    ./configure --prefix=$HOME/hdf5_install_tmp --enable-fortran --disable-shared
     make -j -l6 install
     cd ~1
+    \cp $HOME/hdf5_install_tmp/lib/libhdf5.a $HOME/hdf5_install_tmp/lib/libhdf5_fortran.a lib/
+    \cp $HOME/hdf5_install_tmp/include/*.h include/hdf5/
+    \cp $HOME/hdf5_install_tmp/include/*.mod include/$SYSTEM
     echo "Done"
 fi
 

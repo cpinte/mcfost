@@ -129,35 +129,9 @@ ifeq ($(IPO), yes)
 endif
 
 #------------------------------------------------------------------------------#
-# HDF5 libraries
-# Will use the version compiled by install.sh by default but you can use
-# the system one if prefered
-#
-# In that case, it requires two directories:
-#   - include for Fortran .mod files
-#   - lib for the shared library .so files
-#
-# Often both directories are under one root,
-# e.g. HDF5ROOT= /usr/local/opt/hdf5
-# In this case just set HDF5ROOT for your machine.
-#
-# However, sometimes these directories are separate,
-# then you must set both HDF5INCLUDE and HDF5LIB.
-#
-ifeq (X$(HDF5ROOT), X)
-    HDF5ROOT=$(MCFOST_INSTALL)/hdf5/$(SYSTEM)
-endif
-ifeq (X$(HDF5INCLUDE), X)
-    HDF5INCLUDE= $(HDF5ROOT)/include
-endif
-ifeq (X$(HDF5LIB), X)
-    HDF5LIB= $(HDF5ROOT)/lib
-endif
-
-#------------------------------------------------------------------------------#
 # Library flags
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(HDF5INCLUDE)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/hdf5 -I$(MCFOST_INSTALL)/include/$(SYSTEM)
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -189,12 +163,8 @@ mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
 	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
-	rm -rf libtmp
-	mkdir -p libtmp
-	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/libdmlc.a $(LIBS)/librabit.a $(LIBS)/libxgboost.a $(HDF5LIB)/libhdf5.a $(HDF5LIB)/libhdf5_fortran.a libtmp
-	cd libtmp; ar x libcfitsio.a; ar x libsprng.a; ar x libvoro++.a; ar x libdmlc.a; ar x librabit.a; ar x libxgboost.a; ar x libhdf5.a; ar x libhdf5_fortran.a
-	rm -f mcfost.o libtmp/pmlcg.o libmcfost.a
-	ar vr libmcfost.a *.o libtmp/*.o
+	rm -f mcfost.o libmcfost.a
+	ar vr libmcfost.a *.o
 	ranlib libmcfost.a
 
 mcfost_env.o : .make_lastsystem mcfost_env.f90
