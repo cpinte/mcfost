@@ -191,8 +191,8 @@ mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
 	rm -rf libtmp
 	mkdir -p libtmp
-	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a libtmp
-	cd libtmp; ar x libcfitsio.a; ar x libsprng.a; ar x libvoro++.a
+	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a $(LIBS)/libdmlc.a $(LIBS)/librabit.a $(LIBS)/libxgboost.a $(HDF5LIB)/libhdf5.a $(HDF5LIB)/libhdf5_fortran.a libtmp
+	cd libtmp; ar x libcfitsio.a; ar x libsprng.a; ar x libvoro++.a; ar x libdmlc.a; ar x librabit.a; ar x libxgboost.a; ar x libhdf5.a; ar x libhdf5_fortran.a
 	rm -f mcfost.o libtmp/pmlcg.o libmcfost.a
 	ar vr libmcfost.a *.o libtmp/*.o
 	ranlib libmcfost.a
