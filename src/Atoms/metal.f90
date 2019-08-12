@@ -67,6 +67,7 @@ MODULE metal
     !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda(cont%Nblue:cont%Nred))
     CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
      	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred), alpha) !interpolation grid
+
    endif
  
  RETURN
@@ -86,7 +87,7 @@ MODULE metal
   type (AtomType)                                           :: metal
   type (AtomicContinuum)                                    :: continuum
   double precision                                          :: lambdaEdge
-  double precision, dimension(:), allocatable               :: twohnu3_c2, gijk
+  double precision, dimension(:), allocatable               :: twohnu3_c2, gijk, Vij
    !obtained_n = .false. !true if the routine to read principal quantum number is fine
    
    if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
@@ -101,7 +102,6 @@ MODULE metal
   ! wavelength min (frequency max). See Hydrogen b-f for more
   ! informations, and Hubeny & Mihalas chap. 7
 
-
   do m=1,atmos%Npassiveatoms
   ! run over all passive atoms
    metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
@@ -112,11 +112,14 @@ MODULE metal
      i = continuum%i
      j = continuum%j !+1 wrt C indexing
      Nblue = continuum%Nblue; Nred = continuum%Nred
+     if (.not.continuum%lcontrib_to_opac) CYCLE !avoid continua not defined on the grid
+
      !if (Nred == -99 .and. Nblue == -99) CYCLE !avoid continua not defined on the grid
      
-     allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda))
+     allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda), Vij(continuum%Nlambda))
      !hc_kla = hc_k/NLTEspec%lambda(Nblue:Nred) !factor 1/NM_TO_M in hc_k
      twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
+     Vij(:) = bound_free_Xsection(continuum)
 
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
@@ -148,26 +151,22 @@ MODULE metal
 !        				continuum%alpha(Nblue:Nred) * &
 !        				(1.-expla(Nblue:Nred))*metal%n(i,icell)
       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
-       				bound_free_Xsection(continuum) * &
-       				(metal%n(i,icell)-gijk(:)*metal%n(i,icell))
+       				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(i,icell))
        				
       NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
-       				twohnu3_c2(:) * gijk(:) * &
-         			bound_free_Xsection(continuum)*metal%n(j,icell)
+       				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
      else !proc id is important
 !       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
 !        				continuum%alpha(Nblue:Nred) * &
 !        				(1.-expla(Nblue:Nred))*metal%n(i,icell) !-->ETL only
       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-       				bound_free_Xsection(continuum) * &
-       				(metal%n(i,icell)-gijk(:)*metal%n(j,icell))
+       				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
 
       NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-      				twohnu3_c2(:) * gijk(:) * &
-         			bound_free_Xsection(continuum)*metal%n(j,icell)
+      				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
      end if
 
-     deallocate(gijk, twohnu3_c2)
+     deallocate(gijk, twohnu3_c2, Vij)
     end do ! loop over Ncont
   end do !loop over metals
 
